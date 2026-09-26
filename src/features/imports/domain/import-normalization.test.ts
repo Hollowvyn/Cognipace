@@ -255,12 +255,54 @@ describe('normalizeImportFile entries and duplicate folding', () => {
     ])
   })
 
-  it('does not coerce an invalid premium value', () => {
+  it('warns for malformed title without discarding valid sibling fields', () => {
     const result = expectValid(
-      envelope({ problems: [{ slug: 'two-sum', isPremium: 'false' }] }),
+      envelope({
+        problems: [
+          {
+            slug: 'two-sum',
+            title: 42,
+            difficulty: 'hard',
+            topics: ['Array'],
+          },
+        ],
+      }),
     )
     expect(result.document.problems).toMatchObject([
-      { slug: 'two-sum', isPremium: null },
+      {
+        slug: 'two-sum',
+        title: null,
+        difficulty: 'hard',
+        topics: [{ label: 'Array', path: 'problems[0].topics[0]' }],
+      },
+    ])
+    expectDiagnosticPaths(result, [
+      { code: 'invalid-field', path: 'problems[0].title' },
+    ])
+  })
+
+  it('does not coerce an invalid premium value', () => {
+    const result = expectValid(
+      envelope({
+        problems: [
+          {
+            slug: 'two-sum',
+            title: 'Two Sum',
+            difficulty: 'easy',
+            topics: ['Array'],
+            isPremium: 'false',
+          },
+        ],
+      }),
+    )
+    expect(result.document.problems).toMatchObject([
+      {
+        slug: 'two-sum',
+        title: 'Two Sum',
+        difficulty: 'easy',
+        topics: [{ label: 'Array', path: 'problems[0].topics[0]' }],
+        isPremium: null,
+      },
     ])
     expectDiagnosticPaths(result, [
       { code: 'invalid-field', path: 'problems[0].isPremium' },
@@ -339,6 +381,24 @@ describe('normalizeImportFile entries and duplicate folding', () => {
     expect(result.document.problems).toEqual([])
     expectDiagnosticPaths(result, [
       { code: 'invalid-identity', path: 'tracks[0].groups[0].slug' },
+    ])
+  })
+
+  it('drops an invalid track identity and its otherwise valid child references', () => {
+    const result = expectValid(
+      envelope({
+        tracks: [
+          {
+            slug: 'Invalid Track!',
+            groups: [{ slug: 'arrays', problems: ['two-sum'] }],
+          },
+        ],
+      }),
+    )
+    expect(result.document.tracks).toEqual([])
+    expect(result.document.problems).toEqual([])
+    expectDiagnosticPaths(result, [
+      { code: 'invalid-identity', path: 'tracks[0].slug' },
     ])
   })
 

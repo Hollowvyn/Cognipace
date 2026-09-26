@@ -14,6 +14,29 @@ import type {
   TrackDraft,
 } from './import-types'
 
+export type EntryNormalizer = {
+  problem(
+    value: unknown,
+    path: string,
+    diagnostics: ImportDiagnostic[],
+  ): ProblemDraft | null
+  track(
+    value: unknown,
+    path: string,
+    diagnostics: ImportDiagnostic[],
+  ): TrackDraft | null
+  group(
+    value: unknown,
+    path: string,
+    diagnostics: ImportDiagnostic[],
+  ): GroupDraft | null
+  labels(
+    value: unknown,
+    path: string,
+    diagnostics: ImportDiagnostic[],
+  ): LabelDraft[]
+}
+
 const problemFields = new Set([
   'slug',
   'url',
