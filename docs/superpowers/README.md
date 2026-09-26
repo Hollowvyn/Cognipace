@@ -13,6 +13,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 ## Specs
 
 - [`specs/2026-09-26-topics-foundation-library-filtering-design.md`](./specs/2026-09-26-topics-foundation-library-filtering-design.md): approved design for typed topic relationships, deterministic aliases, preserving upgrades, and Library filtering by descendants with Any/All matching.
+- [`specs/2026-09-26-non-destructive-content-import-design.md`](./specs/2026-09-26-non-destructive-content-import-design.md): design for a versioned JSON content format, additive problem/track/company/topic imports, read-only previews, partial validation, and atomic database application; written spec awaiting user review.
 - [`specs/2026-09-13-private-chrome-web-store-release-design.md`](./specs/2026-09-13-private-chrome-web-store-release-design.md): approved design for a private trusted-tester Chrome Web Store item, Recall Stack listing assets, accurate privacy and permission disclosures, Store build validation, manual first publication, and natural update proof.
 - [`specs/2026-09-13-editorconfig-baseline-design.md`](./specs/2026-09-13-editorconfig-baseline-design.md): approved design for adding an editor-neutral file-property baseline while keeping Prettier, ESLint, and TypeScript responsibilities separate.
 - [`specs/2026-09-13-ordered-track-next-design.md`](./specs/2026-09-13-ordered-track-next-design.md): approved design for keeping the active track's Next target in explicit group/problem order while leaving FSRS due-review urgency in the separate review loop.
