@@ -125,16 +125,11 @@ describe('content import service', () => {
         .set({ title: 'Changed after preview' })
         .where(eq(problems.slug, 'two-sum'))
 
-      const applied = await applyContentImport(
-        handle.db,
-        fileText,
-        preview.fingerprint!,
-        fixedNow,
-      )
+      await applyStaleWithoutWrites(handle.db, fileText, preview.fingerprint!)
 
-      expect(applied.status).toBe('stale')
-      expect(applied.preview.fingerprint).not.toBe(preview.fingerprint)
-      expect(await rowsForProblem(handle.db, 'new-problem')).toHaveLength(0)
+      expect(await rowsForProblem(handle.db, 'two-sum')).toMatchObject([
+        { title: 'Changed after preview' },
+      ])
     } finally {
       handle.rawDb.close()
     }
@@ -164,18 +159,12 @@ describe('content import service', () => {
         .set({ position: 7 })
         .where(eq(trackGroups.id, 'local-track:arrays'))
 
-      const applied = await applyContentImport(
-        handle.db,
-        fileText,
-        preview.fingerprint!,
-        fixedNow,
-      )
+      await applyStaleWithoutWrites(handle.db, fileText, preview.fingerprint!)
 
       expect(preview.status).toBe('ready')
-      expect(applied.status).toBe('stale')
-      expect(applied.preview.fingerprint).not.toBe(preview.fingerprint)
-      expect(await rowsForProblem(handle.db, 'two-sum')).toHaveLength(0)
-      expect(await handle.db.select().from(trackGroups)).toHaveLength(1)
+      expect(await handle.db.select().from(trackGroups)).toMatchObject([
+        { position: 7 },
+      ])
     } finally {
       handle.rawDb.close()
     }
@@ -199,16 +188,11 @@ describe('content import service', () => {
         .insert(problemTopics)
         .values({ problemSlug: 'two-sum', topicId: 'arrays' })
 
-      const applied = await applyContentImport(
-        handle.db,
-        fileText,
-        preview.fingerprint!,
-        fixedNow,
-      )
+      await applyStaleWithoutWrites(handle.db, fileText, preview.fingerprint!)
 
-      expect(applied.status).toBe('stale')
-      expect(applied.preview.fingerprint).not.toBe(preview.fingerprint)
-      expect(await rowsForProblem(handle.db, 'new-problem')).toHaveLength(0)
+      expect(await handle.db.select().from(problemTopics)).toEqual([
+        { problemSlug: 'two-sum', topicId: 'arrays' },
+      ])
     } finally {
       handle.rawDb.close()
     }
@@ -242,16 +226,11 @@ describe('content import service', () => {
         .set({ topicId: 'algorithms' })
         .where(eq(topicAliases.aliasKey, 'array'))
 
-      const applied = await applyContentImport(
-        handle.db,
-        fileText,
-        preview.fingerprint!,
-        fixedNow,
-      )
+      await applyStaleWithoutWrites(handle.db, fileText, preview.fingerprint!)
 
-      expect(applied.status).toBe('stale')
-      expect(applied.preview.fingerprint).not.toBe(preview.fingerprint)
-      expect(await rowsForProblem(handle.db, 'new-problem')).toHaveLength(0)
+      expect(await handle.db.select().from(topicAliases)).toMatchObject([
+        { aliasKey: 'array', topicId: 'algorithms' },
+      ])
     } finally {
       handle.rawDb.close()
     }
@@ -342,10 +321,24 @@ describe('content import service', () => {
         { slug: 'reviewed-problem', title: 'Imported replacement title' },
         { slug: 'new-problem', title: 'New Problem' },
       ],
+      tracks: [
+        {
+          slug: 'review-track',
+          title: 'Imported replacement track title',
+          groups: [
+            {
+              slug: 'completed',
+              title: 'Imported replacement group title',
+              problems: ['reviewed-problem'],
+            },
+          ],
+        },
+      ],
     })
     try {
       await seedReviewedState(handle.db)
       const before = await sensitiveState(handle.db)
+      const importRowsBefore = await importTables(handle.db)
       const preview = await previewContentImport(handle.db, fileText)
       const applied = await applyContentImport(
         handle.db,
@@ -354,11 +347,12 @@ describe('content import service', () => {
         fixedNow,
       )
       const after = await sensitiveState(handle.db)
+      const importRowsAfter = await importTables(handle.db)
 
       expect(applied.status).toBe('committed')
       expect(after).toEqual(before)
-      expect(await rowsForProblem(handle.db, 'reviewed-problem')).toMatchObject(
-        [{ title: 'Locally reviewed title' }],
+      expect(existingImportRows(importRowsBefore, importRowsAfter)).toEqual(
+        importRowsBefore,
       )
     } finally {
       handle.rawDb.close()
@@ -367,24 +361,35 @@ describe('content import service', () => {
 
   it('rolls back catalog and curriculum additions when a late membership insert fails', async () => {
     const handle = await createTestDb({ seed: false })
+    const fileText = JSON.stringify({
+      format: 'cognipace-content',
+      version: 1,
+      topics: ['Dynamic Programming'],
+      tracks: [
+        {
+          slug: 'imported-interview-track',
+          title: 'Imported Interview Track',
+          groups: [
+            {
+              slug: 'arrays',
+              title: 'Arrays',
+              problems: ['two-sum', 'valid-anagram'],
+            },
+          ],
+        },
+      ],
+    })
     try {
       handle.rawDb.exec(
         "CREATE TEMP TRIGGER fail_import_membership BEFORE INSERT ON track_group_problems BEGIN SELECT RAISE(ABORT, 'controlled import failure'); END;",
       )
-      const preview = await previewContentImport(
-        handle.db,
-        validTwoQuestionTrackFileText,
-      )
+      const preview = await previewContentImport(handle.db, fileText)
 
       await expect(
-        applyContentImport(
-          handle.db,
-          validTwoQuestionTrackFileText,
-          preview.fingerprint!,
-          fixedNow,
-        ),
+        applyContentImport(handle.db, fileText, preview.fingerprint!, fixedNow),
       ).rejects.toThrow()
 
+      expect(await handle.db.select().from(topics)).toEqual([])
       expect(await handle.db.select().from(problems)).toEqual([])
       expect(await handle.db.select().from(tracks)).toEqual([])
       expect(await handle.db.select().from(trackGroups)).toEqual([])
@@ -639,6 +644,73 @@ async function importTables(db: Db) {
     groups,
     memberships,
   }
+}
+
+async function applyStaleWithoutWrites(
+  db: Db,
+  fileText: string,
+  expectedFingerprint: string,
+) {
+  const before = await importTables(db)
+  const insertSpy = vi.spyOn(db, 'insert')
+  const updateSpy = vi.spyOn(db, 'update')
+  const deleteSpy = vi.spyOn(db, 'delete')
+
+  try {
+    const applied = await applyContentImport(
+      db,
+      fileText,
+      expectedFingerprint,
+      fixedNow,
+    )
+    const after = await importTables(db)
+
+    expect(applied.status).toBe('stale')
+    expect(applied.preview.fingerprint).not.toBe(expectedFingerprint)
+    expect(after).toEqual(before)
+    expect(insertSpy).not.toHaveBeenCalled()
+    expect(updateSpy).not.toHaveBeenCalled()
+    expect(deleteSpy).not.toHaveBeenCalled()
+    return applied
+  } finally {
+    vi.restoreAllMocks()
+  }
+}
+
+function existingImportRows(
+  before: Awaited<ReturnType<typeof importTables>>,
+  after: Awaited<ReturnType<typeof importTables>>,
+) {
+  return {
+    problems: existingRows(before.problems, after.problems, (row) => row.slug),
+    topics: existingRows(before.topics, after.topics, (row) => row.id),
+    companies: existingRows(before.companies, after.companies, (row) => row.id),
+    aliases: existingRows(before.aliases, after.aliases, (row) => row.aliasKey),
+    problemTopics: existingRows(
+      before.problemTopics,
+      after.problemTopics,
+      (row) => JSON.stringify([row.problemSlug, row.topicId]),
+    ),
+    problemCompanies: existingRows(
+      before.problemCompanies,
+      after.problemCompanies,
+      (row) => JSON.stringify([row.problemSlug, row.companyId]),
+    ),
+    tracks: existingRows(before.tracks, after.tracks, (row) => row.id),
+    groups: existingRows(before.groups, after.groups, (row) => row.id),
+    memberships: existingRows(before.memberships, after.memberships, (row) =>
+      JSON.stringify([row.trackId, row.trackGroupId, row.problemSlug]),
+    ),
+  }
+}
+
+function existingRows<Row>(
+  before: Row[],
+  after: Row[],
+  identity: (row: Row) => string,
+) {
+  const existingIdentities = new Set(before.map(identity))
+  return after.filter((row) => existingIdentities.has(identity(row)))
 }
 
 function emptyImportStateTables() {
