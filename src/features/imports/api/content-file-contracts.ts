@@ -14,7 +14,7 @@ export const importSlugSchema = z
 export const importUrlSchema = z
   .string()
   .regex(
-    /^https:\/\/(?:www\.)?leetcode\.com(?::443)?\/problems\/[a-z0-9]+(?:-[a-z0-9]+)*(?:[/?#].*)?$/,
+    /^https:\/\/(?:www\.)?leetcode\.com(?::443)?\/problems\/(?=[a-z0-9-]{1,200}(?:[/?#]|$))[a-z0-9]+(?:-[a-z0-9]+)*(?:[/?#].*)?$/,
   )
 
 export const problemReferenceSchema = z.union([

@@ -37,6 +37,28 @@ describe('content file authoring contract', () => {
     }
   })
 
+  it('limits URL problem slugs without limiting query strings', () => {
+    const prefix = 'a'.repeat(201)
+
+    expect(
+      contentFileSchema.safeParse({
+        format: 'cognipace-content',
+        version: 1,
+        problems: [`https://leetcode.com/problems/${prefix}/`],
+      }).success,
+    ).toBe(false)
+
+    expect(
+      contentFileSchema.safeParse({
+        format: 'cognipace-content',
+        version: 1,
+        problems: [
+          'https://leetcode.com/problems/two-sum/?' + 'a'.repeat(1000),
+        ],
+      }).success,
+    ).toBe(true)
+  })
+
   it('keeps the published schema and examples aligned with the contract', () => {
     const importDirectory = join(process.cwd(), 'public/import')
     const exampleDirectory = join(importDirectory, 'examples')
