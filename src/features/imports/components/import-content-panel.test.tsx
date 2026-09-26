@@ -475,6 +475,12 @@ describe('ImportContentPanel', () => {
     expect(
       screen.getByText(/preserving existing content and progress/i),
     ).toBeVisible()
+    expect(screen.getByText(/5 MiB of UTF-8 bytes/i)).toBeVisible()
+    expect(
+      screen.getByText(
+        /50,000 total entries across all arrays, including nested arrays/i,
+      ),
+    ).toBeVisible()
   })
 })
 

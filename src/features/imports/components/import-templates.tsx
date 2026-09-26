@@ -61,8 +61,10 @@ export function ImportTemplates() {
           </li>
           <li>
             Version 1 accepts the packaged JSON format and supported fields.
-            Invalid entries are reported and skipped when safe; fatal format
-            errors block the file.
+            Files may be up to 5 MiB of UTF-8 bytes and include up to 50,000
+            total entries across all arrays, including nested arrays. Invalid
+            entries are reported and skipped when safe; fatal format errors
+            block the file.
           </li>
           <li>Companies are labels linked to questions, not tracks.</li>
         </ul>
