@@ -60,6 +60,8 @@ it('plans a large curriculum in source order without practice operations', () =>
 
   expect(plan.changes.catalog.problems).toHaveLength(250)
   expect(plan.changes.curriculum.memberships).toHaveLength(250)
+  expect(plan.changes.curriculum.groups[0]?.position).toBe(1)
+  expect(plan.changes.curriculum.memberships[0]?.position).toBe(1)
   expect(
     plan.changes.curriculum.memberships.map(({ problemSlug }) => problemSlug),
   ).toEqual(problems)
@@ -230,7 +232,7 @@ it('appends new groups and memberships after local maximum positions', () => {
       trackId: 'custom-id',
       trackGroupId: 'custom-id:new',
       problemSlug: 'new-problem',
-      position: 0,
+      position: 1,
     },
     {
       trackId: 'custom-id',

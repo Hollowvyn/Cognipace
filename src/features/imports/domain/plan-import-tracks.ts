@@ -210,7 +210,7 @@ function planTrack(
   }[] = []
   const localGroups = localGroupsByTrack.get(trackId) ?? []
   const localGroupTitles = groupTitlesByTrack.get(trackId) ?? new Set<string>()
-  const initialMaxGroupPosition = maxGroupPositionByTrack.get(trackId) ?? -1
+  const initialMaxGroupPosition = maxGroupPositionByTrack.get(trackId) ?? 0
   let newGroupCount = 0
 
   for (const groupDraft of draft.groups) {
@@ -336,7 +336,7 @@ function planTrack(
         trackId,
         trackGroupId: group.id,
         problemSlug: reference.slug,
-        position: (maxMembershipPositionByGroup.get(group.id) ?? -1) + 1,
+        position: (maxMembershipPositionByGroup.get(group.id) ?? 0) + 1,
       }
       maxMembershipPositionByGroup.set(group.id, membership.position)
       changes.memberships.push(membership)
@@ -393,7 +393,7 @@ export function planImportTracks(
   const referenceSlugs = new Set<string>()
 
   for (const group of state.groups) groupById.set(group.id, group)
-  for (const membership of [...state.memberships].sort(compareMemberships)) {
+  for (const membership of state.memberships) {
     const key = membershipKey(membership.trackId, membership.problemSlug)
     if (!trackMemberships.has(key)) trackMemberships.set(key, membership)
     maxMembershipPositionByGroup.set(
