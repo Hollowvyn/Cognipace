@@ -1,4 +1,7 @@
-import type { ImportState } from '@/features/imports/domain/import-types'
+import type {
+  ImportPreview,
+  ImportState,
+} from '@/features/imports/domain/import-types'
 import type { TrackImportState } from '@/features/tracks/domain/track-import'
 
 export const validTwoQuestionTrackFileText = JSON.stringify({
@@ -18,6 +21,31 @@ export const validTwoQuestionTrackFileText = JSON.stringify({
     },
   ],
 })
+
+export const readyPreview: ImportPreview = {
+  status: 'ready',
+  fingerprint: 'a'.repeat(64),
+  additions: {
+    problems: 1,
+    topics: 0,
+    companies: 0,
+    problemTopics: 0,
+    problemCompanies: 0,
+    tracks: 0,
+    groups: 0,
+    memberships: 0,
+  },
+  items: [
+    {
+      kind: 'problems',
+      identity: 'two-sum',
+      label: 'Two Sum',
+      action: 'add',
+      path: '$.problems[0]',
+    },
+  ],
+  diagnostics: [],
+}
 
 export const existingLocalTrackFixture: TrackImportState = {
   tracks: [
