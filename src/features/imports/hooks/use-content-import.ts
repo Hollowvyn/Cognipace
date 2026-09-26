@@ -120,7 +120,7 @@ export function useContentImport() {
 
   const selectFile = useCallback(
     async (file: File | null) => {
-      if (writeLock.current) return
+      if (writeLock.current || state.step === 'persistence-error') return
 
       const generation = ++selectionGeneration.current
       if (file === null) {
@@ -169,18 +169,18 @@ export function useContentImport() {
 
       await previewText(file.name, fileText, generation)
     },
-    [isCurrent, previewText],
+    [isCurrent, previewText, state.step],
   )
 
   const clear = useCallback(() => {
-    if (writeLock.current) return
+    if (writeLock.current || state.step === 'persistence-error') return
 
     selectionGeneration.current += 1
     previewMutation.reset()
     applyMutation.reset()
     retryMutation.reset()
     setState(initialState)
-  }, [applyMutation, previewMutation, retryMutation])
+  }, [applyMutation, previewMutation, retryMutation, state.step])
 
   const apply = useCallback(async () => {
     if (writeLock.current) return

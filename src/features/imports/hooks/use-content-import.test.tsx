@@ -279,6 +279,29 @@ describe('useContentImport', () => {
     })
   })
 
+  it('keeps the persistence retry when clear or file selection is requested', async () => {
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(readyPreview)
+      .mockResolvedValueOnce({
+        status: 'persistence-error',
+        preview: readyPreview,
+      })
+    const { result } = setup()
+    await act(async () => result.current.selectFile(createFile().file))
+    await act(async () => result.current.apply())
+    expect(result.current.state.step).toBe('persistence-error')
+
+    act(() => result.current.clear())
+    expect(result.current.state.step).toBe('persistence-error')
+
+    const nextFile = createFile('another.json')
+    await act(async () => result.current.selectFile(nextFile.file))
+
+    expect(result.current.state.step).toBe('persistence-error')
+    expect(nextFile.readText).not.toHaveBeenCalled()
+    expect(sendMessage).toHaveBeenCalledTimes(2)
+  })
+
   it('repreviews after a worker restart and waits for another explicit apply', async () => {
     vi.mocked(sendMessage)
       .mockResolvedValueOnce(readyPreview)

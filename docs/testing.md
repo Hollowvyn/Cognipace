@@ -299,8 +299,9 @@ pending for this branch and must be completed before merge. The
    failure toggle to the shipped product or corrupt normal profile data.
 8. **Snapshot failure and retry:** in a test-only harness, fail snapshot flush
    after a successful database commit. Confirm the UI says content was added
-   but not saved, then retry saving. Verify the retry persists the committed
-   state without duplicating database entries.
+   but not saved, while file selection and dismissal stay disabled. Retry
+   saving and verify it persists the committed state without duplicating
+   database entries.
 9. **Backup regression:** export a full backup, select and validate it, then
    cancel restore and cancel clear-local-data. Confirm content import did not
    alter backup validation or silently restore/reset data. Perform an intentional

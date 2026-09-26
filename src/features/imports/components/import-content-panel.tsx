@@ -17,6 +17,7 @@ export function ImportContentPanel() {
   const isWriting = state.step === 'applying' || state.step === 'retrying'
   const isBusy =
     isWriting || state.step === 'reading' || state.step === 'previewing'
+  const isPersistencePending = state.step === 'persistence-error'
   const preview = state.preview
   const isReady =
     (state.step === 'preview' || state.step === 'applying') &&
@@ -66,7 +67,7 @@ export function ImportContentPanel() {
         <input
           accept=".json,application/json"
           className="min-w-0 rounded-[var(--cp-control-radius)] border border-border bg-background px-3 py-2 text-[length:var(--cp-copy-font-size)] file:mr-3 file:rounded-[var(--cp-control-radius)] file:border-0 file:bg-primary file:px-3 file:py-2 file:font-semibold file:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-          disabled={isWriting}
+          disabled={isWriting || isPersistencePending}
           id="content-import-file"
           onChange={handleFileChange}
           ref={inputRef}
@@ -119,7 +120,7 @@ export function ImportContentPanel() {
         ) : null}
         {state.step !== 'idle' ? (
           <Button
-            disabled={isWriting}
+            disabled={isWriting || isPersistencePending}
             onClick={() => {
               clear()
               if (inputRef.current) inputRef.current.value = ''

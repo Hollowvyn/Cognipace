@@ -319,6 +319,10 @@ describe('ImportContentPanel', () => {
     expect(persistenceStatus).toHaveAttribute('data-cp-tone', 'warning')
     expect(screen.getByRole('button', { name: 'Retry saving' })).toBeVisible()
     expect(
+      screen.getByRole('button', { name: 'Dismiss import' }),
+    ).toBeDisabled()
+    expect(fileInput()).toBeDisabled()
+    expect(
       screen.queryByRole('button', { name: /Import/ }),
     ).not.toBeInTheDocument()
 
