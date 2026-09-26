@@ -39,7 +39,7 @@ type ProblemLookups = {
   problemsBySlug: Map<string, ProblemImportState['problems']>
   topicsById: Map<string, ImportedLabel[]>
   topicsByKey: Map<string, ImportedLabel[]>
-  topicIds: Set<string>
+  topicLookupKeys: Set<string>
   aliasesByKey: Map<string, ProblemImportState['aliases']>
   companiesById: Map<string, ImportedLabel[]>
   companiesByKey: Map<string, ImportedLabel[]>
@@ -71,22 +71,36 @@ function appendLookup<T>(map: Map<string, T[]>, key: string, row: T) {
   map.set(key, values)
 }
 
-function createLookups(state: ProblemImportState): ProblemLookups {
+function createLookups(
+  document: NormalizedImport,
+  state: ProblemImportState,
+): ProblemLookups {
   const topicsById = new Map<string, ImportedLabel[]>()
   const topicsByKey = new Map<string, ImportedLabel[]>()
-  const topicIds = new Set<string>()
+  const topicLookupKeys = new Set<string>()
   const aliasesByKey = new Map<string, ProblemImportState['aliases']>()
   const companiesById = new Map<string, ImportedLabel[]>()
   const companiesByKey = new Map<string, ImportedLabel[]>()
   for (const topic of state.topics) {
     appendLookup(topicsById, topic.id, topic)
-    topicIds.add(topic.id)
-    appendLookup(topicsByKey, normalizeTopicLookupKey(topic.label), topic)
+    const idKey = normalizeTopicLookupKey(topic.id)
+    const labelKey = normalizeTopicLookupKey(topic.label)
+    topicLookupKeys.add(idKey)
+    topicLookupKeys.add(labelKey)
+    appendLookup(topicsByKey, labelKey, topic)
   }
   for (const alias of state.aliases) {
     const aliases = aliasesByKey.get(alias.aliasKey) ?? []
     aliases.push(alias)
     aliasesByKey.set(alias.aliasKey, aliases)
+    topicLookupKeys.add(normalizeTopicLookupKey(alias.aliasKey))
+    topicLookupKeys.add(normalizeTopicLookupKey(alias.label))
+  }
+  for (const { label } of [
+    ...document.topics,
+    ...document.problems.flatMap(({ topics }) => topics),
+  ]) {
+    topicLookupKeys.add(normalizeTopicLookupKey(label))
   }
   for (const company of state.companies) {
     appendLookup(companiesById, company.id, company)
@@ -102,7 +116,7 @@ function createLookups(state: ProblemImportState): ProblemLookups {
     ),
     topicsById,
     topicsByKey,
-    topicIds,
+    topicLookupKeys,
     aliasesByKey,
     companiesById,
     companiesByKey,
@@ -293,16 +307,13 @@ function resolveTopic(
     if (canonical) return { row: canonical, isNew: false }
   }
 
-  const occupiedTopicIds = new Set(lookups.topicIds)
-  for (const plannedTopic of changes.topics) {
-    occupiedTopicIds.add(plannedTopic.id)
-  }
   const row = {
-    id: createImportedTopicId(key, occupiedTopicIds),
+    id: createImportedTopicId(key, lookups.topicLookupKeys),
     label: draft.label,
   }
   changes.topics.push(row)
-  lookups.topicIds.add(row.id)
+  lookups.topicLookupKeys.add(normalizeTopicLookupKey(row.id))
+  lookups.topicLookupKeys.add(normalizeTopicLookupKey(row.label))
   plannedByKey.set(key, row)
   return { row, isNew: true }
 }
@@ -410,7 +421,7 @@ export function planImportProblems(
   state: ProblemImportState,
 ): PlannedProblems {
   const relevantState = relevantProblemState(document, references, state)
-  const lookups = createLookups(state)
+  const lookups = createLookups(document, state)
   const changes = emptyChanges()
   const items: ImportItem[] = []
   const diagnostics: ImportDiagnostic[] = []

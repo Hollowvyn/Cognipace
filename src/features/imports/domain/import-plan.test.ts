@@ -510,7 +510,11 @@ it('does not guess a group identity from a matching existing display title', () 
 it('links a topic alias to its canonical topic without creating another topic', () => {
   const state = emptyImportState()
   state.catalog.topics.push({ id: 'array', label: 'Arrays' })
-  state.catalog.aliases.push({ aliasKey: 'sequence', topicId: 'array' })
+  state.catalog.aliases.push({
+    aliasKey: 'sequence',
+    label: 'Sequence',
+    topicId: 'array',
+  })
   const plan = buildImportPlan(
     parse({
       ...envelope,
@@ -607,6 +611,75 @@ it('plans deterministic canonical topic IDs and avoids occupied topic IDs', () =
     new Set(collisionPlan.changes.catalog.topics.map(({ id }) => id)).size,
   ).toBe(3)
 })
+
+it.each(['topic label', 'alias key'] as const)(
+  'avoids generated IDs that collide with an existing %s',
+  (collisionKind) => {
+    const input = parse({ ...envelope, topics: ['Target Topic'] })
+    const generatedId = buildImportPlan(input, emptyImportState()).changes
+      .catalog.topics[0]?.id
+    if (!generatedId) throw new Error('Expected a planned topic ID')
+
+    const state = emptyImportState()
+    state.catalog.topics.push({ id: 'existing-topic', label: 'Existing Topic' })
+    if (collisionKind === 'topic label') {
+      state.catalog.topics.push({ id: 'different-topic', label: generatedId })
+    } else {
+      state.catalog.aliases.push({
+        aliasKey: generatedId,
+        label: ` ${generatedId.toUpperCase()} `,
+        topicId: 'existing-topic',
+      })
+    }
+
+    const plan = buildImportPlan(input, state)
+    const repeatedPlan = buildImportPlan(input, state)
+
+    expect(plan.changes.catalog.topics[0]?.id).not.toBe(generatedId)
+    expect(repeatedPlan.changes.catalog.topics).toEqual(
+      plan.changes.catalog.topics,
+    )
+    expect(repeatedPlan.preview.fingerprint).toBe(plan.preview.fingerprint)
+  },
+)
+
+it.each([
+  {
+    name: 'a later top-level topic label',
+    document: (generatedId: string) => ({
+      ...envelope,
+      topics: ['Target Topic', generatedId],
+    }),
+  },
+  {
+    name: 'a nested problem topic label',
+    document: (generatedId: string) => ({
+      ...envelope,
+      topics: ['Target Topic'],
+      problems: [{ slug: 'two-sum', topics: [generatedId] }],
+    }),
+  },
+])(
+  'avoids generated IDs that collide with $name and remains deterministic',
+  ({ document }) => {
+    const targetInput = parse({ ...envelope, topics: ['Target Topic'] })
+    const generatedId = buildImportPlan(targetInput, emptyImportState()).changes
+      .catalog.topics[0]?.id
+    if (!generatedId) throw new Error('Expected a planned topic ID')
+    const input = parse(document(generatedId))
+    const state = emptyImportState()
+    const plan = buildImportPlan(input, state)
+    const repeatedPlan = buildImportPlan(input, state)
+
+    expect(plan.changes.catalog.topics.map(({ id }) => id)).not.toContain(
+      generatedId,
+    )
+    expect(repeatedPlan.changes.catalog.topics).toEqual(
+      plan.changes.catalog.topics,
+    )
+    expect(repeatedPlan.preview.fingerprint).toBe(plan.preview.fingerprint)
+  },
+)
 
 it('skips ambiguous normalized company labels without losing other labels', () => {
   const state = emptyImportState()
@@ -707,7 +780,11 @@ it('changes its fingerprint input when relevant stored identities or ordering ch
     position: 0,
   })
   state.catalog.topics.push({ id: 'array', label: 'Array' })
-  state.catalog.aliases.push({ aliasKey: 'sequence', topicId: 'array' })
+  state.catalog.aliases.push({
+    aliasKey: 'sequence',
+    label: 'Sequence',
+    topicId: 'array',
+  })
   const input = parse({
     ...envelope,
     problems: [{ slug: 'two-sum', topics: ['Sequence'] }],

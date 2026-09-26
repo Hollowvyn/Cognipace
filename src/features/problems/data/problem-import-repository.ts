@@ -48,6 +48,7 @@ export async function readProblemImportState(
     db
       .select({
         aliasKey: topicAliases.aliasKey,
+        label: topicAliases.label,
         topicId: topicAliases.topicId,
       })
       .from(topicAliases)

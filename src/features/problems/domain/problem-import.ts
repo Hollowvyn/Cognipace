@@ -9,7 +9,7 @@ export interface ProblemImportState {
   problems: ImportedProblem[]
   topics: ImportedLabel[]
   companies: ImportedLabel[]
-  aliases: { aliasKey: string; topicId: string }[]
+  aliases: { aliasKey: string; label: string; topicId: string }[]
   problemTopics: ImportedTopicLink[]
   problemCompanies: ImportedCompanyLink[]
 }

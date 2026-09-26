@@ -72,7 +72,7 @@ describe('problem import repository', () => {
         ],
         topics: [{ id: 'arrays', label: 'Arrays' }],
         companies: [{ id: 'acme', label: 'Acme' }],
-        aliases: [{ aliasKey: 'array', topicId: 'arrays' }],
+        aliases: [{ aliasKey: 'array', label: 'Array', topicId: 'arrays' }],
         problemTopics: [{ problemSlug: 'two-sum', topicId: 'arrays' }],
         problemCompanies: [{ problemSlug: 'two-sum', companyId: 'acme' }],
       })
