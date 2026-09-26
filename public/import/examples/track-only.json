@@ -1,0 +1,22 @@
+{
+  "format": "cognipace-content",
+  "version": 1,
+  "tracks": [
+    {
+      "slug": "interview-essentials",
+      "title": "Interview Essentials",
+      "groups": [
+        {
+          "slug": "arrays",
+          "title": "Arrays",
+          "problems": ["two-sum", "contains-duplicate"]
+        },
+        {
+          "slug": "strings",
+          "title": "Strings",
+          "problems": ["valid-anagram"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "format": "cognipace-content",
+  "version": 1,
+  "problems": [
+    {
+      "slug": "two-sum",
+      "title": "Two Sum",
+      "difficulty": "easy",
+      "isPremium": null,
+      "topics": ["Array", "Hash Table"],
+      "companies": []
+    }
+  ]
+}
