@@ -1,7 +1,4 @@
-import {
-  createTopicId,
-  normalizeTopicLookupKey,
-} from '@/features/problems/domain/topic-taxonomy'
+import { normalizeTopicLookupKey } from '@/features/problems/domain/topic-taxonomy'
 import { titleFromSlug } from '@/features/problems/domain/problem'
 
 import { normalizeCompanyImportKey } from './import-identity'
@@ -243,11 +240,22 @@ function stableTopicIdSeed(key: string) {
   return `${(primary >>> 0).toString(16)}${(secondary >>> 0).toString(16)}`
 }
 
-function createImportedTopicId(key: string, occupied: ReadonlySet<string>) {
+export function allocateImportedTopicId(
+  key: string,
+  occupied: Set<string>,
+): string | null {
   const seed = stableTopicIdSeed(key)
-  let attempt = 0
 
-  return createTopicId(occupied, () => `import-${seed}-${attempt++}`)
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const id = `topic-import-${seed}-${attempt}`
+    const idKey = normalizeTopicLookupKey(id)
+
+    if (occupied.has(idKey)) continue
+    occupied.add(idKey)
+    return id
+  }
+
+  return null
 }
 
 function item(
@@ -307,12 +315,18 @@ function resolveTopic(
     if (canonical) return { row: canonical, isNew: false }
   }
 
-  const row = {
-    id: createImportedTopicId(key, lookups.topicLookupKeys),
-    label: draft.label,
+  const id = allocateImportedTopicId(key, lookups.topicLookupKeys)
+  if (id === null) {
+    addDiagnostic(
+      diagnostics,
+      'topic-id-allocation-failed',
+      draft.path,
+      'A unique topic ID could not be allocated after 8 attempts; this label is skipped.',
+    )
+    return null
   }
+  const row = { id, label: draft.label }
   changes.topics.push(row)
-  lookups.topicLookupKeys.add(normalizeTopicLookupKey(row.id))
   lookups.topicLookupKeys.add(normalizeTopicLookupKey(row.label))
   plannedByKey.set(key, row)
   return { row, isNew: true }

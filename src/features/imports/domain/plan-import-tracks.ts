@@ -1,4 +1,5 @@
 import { normalizeLeetCodeSlug } from '@/lib/leetcode'
+import { normalizeTopicSearchKey } from '@/features/problems/domain/topic-taxonomy'
 import { titleFromSlug } from '@/features/problems/domain/problem'
 
 import type {
@@ -187,6 +188,7 @@ function planTrack(
   existingTrackById: Map<string, ImportedTrack>,
   localGroupsByTrack: Map<string, ImportedGroup[]>,
   groupTitlesByTrack: Map<string, Set<string>>,
+  groupTitleSlugKeysByTrack: Map<string, Set<string>>,
   maxGroupPositionByTrack: Map<string, number>,
   maxMembershipPositionByGroup: Map<string, number>,
 ): void {
@@ -210,6 +212,8 @@ function planTrack(
   }[] = []
   const localGroups = localGroupsByTrack.get(trackId) ?? []
   const localGroupTitles = groupTitlesByTrack.get(trackId) ?? new Set<string>()
+  const localGroupTitleSlugKeys =
+    groupTitleSlugKeysByTrack.get(trackId) ?? new Set<string>()
   const initialMaxGroupPosition = maxGroupPositionByTrack.get(trackId) ?? 0
   let newGroupCount = 0
 
@@ -236,14 +240,17 @@ function planTrack(
       continue
     }
 
-    const incomingKeys = new Set(
-      [groupDraft.slug, groupDraft.title]
-        .filter((value): value is string => value !== null)
-        .map(normalizeLeetCodeSlug),
-    )
-    const hasFallbackMatch = [...incomingKeys].some((key) =>
-      localGroupTitles.has(key),
-    )
+    const incomingTitleKey =
+      groupDraft.title === null
+        ? null
+        : normalizeTopicSearchKey(groupDraft.title)
+    const incomingSlugKeys = [groupDraft.slug, groupDraft.title]
+      .filter((value): value is string => value !== null)
+      .map(normalizeLeetCodeSlug)
+      .filter(Boolean)
+    const hasFallbackMatch =
+      (incomingTitleKey !== null && localGroupTitles.has(incomingTitleKey)) ||
+      incomingSlugKeys.some((key) => localGroupTitleSlugKeys.has(key))
     if (hasFallbackMatch) {
       diagnostic(
         diagnostics,
@@ -373,14 +380,20 @@ export function planImportTracks(
   )
   const localGroupsByTrack = new Map<string, ImportedGroup[]>()
   const groupTitlesByTrack = new Map<string, Set<string>>()
+  const groupTitleSlugKeysByTrack = new Map<string, Set<string>>()
   const maxGroupPositionByTrack = new Map<string, number>()
   for (const group of state.groups) {
     const groups = localGroupsByTrack.get(group.trackId) ?? []
     groups.push(group)
     localGroupsByTrack.set(group.trackId, groups)
     const titles = groupTitlesByTrack.get(group.trackId) ?? new Set<string>()
-    titles.add(normalizeLeetCodeSlug(group.title))
+    titles.add(normalizeTopicSearchKey(group.title))
     groupTitlesByTrack.set(group.trackId, titles)
+    const slugKeys =
+      groupTitleSlugKeysByTrack.get(group.trackId) ?? new Set<string>()
+    const slugKey = normalizeLeetCodeSlug(group.title)
+    if (slugKey) slugKeys.add(slugKey)
+    groupTitleSlugKeysByTrack.set(group.trackId, slugKeys)
     maxGroupPositionByTrack.set(
       group.trackId,
       Math.max(
@@ -418,6 +431,7 @@ export function planImportTracks(
       existingTrackById,
       localGroupsByTrack,
       groupTitlesByTrack,
+      groupTitleSlugKeysByTrack,
       maxGroupPositionByTrack,
       maxMembershipPositionByGroup,
     )

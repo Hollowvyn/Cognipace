@@ -507,6 +507,93 @@ it('does not guess a group identity from a matching existing display title', () 
   )
 })
 
+it('allows distinct non-Latin group titles without an empty-key conflict', () => {
+  const state = emptyImportState()
+  state.curriculum.tracks.push({
+    id: 'custom-track',
+    slug: 'essentials',
+    title: 'Essentials',
+    description: null,
+    dueAt: null,
+  })
+  state.curriculum.groups.push({
+    id: 'custom-track:arrays',
+    trackId: 'custom-track',
+    title: '数组',
+    position: 0,
+  })
+  const plan = buildImportPlan(
+    parse({
+      ...envelope,
+      tracks: [
+        {
+          slug: 'essentials',
+          groups: [{ slug: 'graphs', title: '图论', problems: ['two-sum'] }],
+        },
+      ],
+    }),
+    state,
+  )
+
+  expect(plan.changes.curriculum.groups).toEqual([
+    {
+      id: 'custom-track:graphs',
+      trackId: 'custom-track',
+      title: '图论',
+      position: 1,
+    },
+  ])
+  expect(plan.changes.curriculum.memberships).toEqual([
+    {
+      trackId: 'custom-track',
+      trackGroupId: 'custom-track:graphs',
+      problemSlug: 'two-sum',
+      position: 1,
+    },
+  ])
+  expect(plan.preview.diagnostics).not.toContainEqual(
+    expect.objectContaining({ code: 'identity-conflict' }),
+  )
+})
+
+it('detects a repeated non-Latin group title across different slugs', () => {
+  const state = emptyImportState()
+  state.curriculum.tracks.push({
+    id: 'custom-track',
+    slug: 'essentials',
+    title: 'Essentials',
+    description: null,
+    dueAt: null,
+  })
+  state.curriculum.groups.push({
+    id: 'custom-track:graphs',
+    trackId: 'custom-track',
+    title: '图论',
+    position: 0,
+  })
+  const plan = buildImportPlan(
+    parse({
+      ...envelope,
+      tracks: [
+        {
+          slug: 'essentials',
+          groups: [
+            { slug: 'graph-algorithms', title: '图论', problems: ['two-sum'] },
+          ],
+        },
+      ],
+    }),
+    state,
+  )
+
+  expect(plan.changes.curriculum.groups).toEqual([])
+  expect(plan.changes.curriculum.memberships).toEqual([])
+  expect(plan.changes.catalog.problems).toEqual([])
+  expect(plan.preview.diagnostics).toContainEqual(
+    expect.objectContaining({ code: 'identity-conflict' }),
+  )
+})
+
 it('links a topic alias to its canonical topic without creating another topic', () => {
   const state = emptyImportState()
   state.catalog.topics.push({ id: 'array', label: 'Arrays' })
@@ -680,6 +767,41 @@ it.each([
     expect(repeatedPlan.preview.fingerprint).toBe(plan.preview.fingerprint)
   },
 )
+
+it('reports topic ID exhaustion for one label and plans valid siblings', () => {
+  const targetInput = parse({ ...envelope, topics: ['Target Topic'] })
+  const firstCandidate = buildImportPlan(targetInput, emptyImportState())
+    .changes.catalog.topics[0]?.id
+  if (!firstCandidate) throw new Error('Expected a planned topic ID')
+
+  const collidingLabels = Array.from({ length: 8 }, (_, attempt) =>
+    firstCandidate.replace(/-0$/, `-${attempt}`),
+  )
+  const input = parse({
+    ...envelope,
+    topics: ['Target Topic', ...collidingLabels, 'Other Valid Topic'],
+    problems: ['two-sum'],
+  })
+  const plan = buildImportPlan(input, emptyImportState())
+
+  expect(plan.preview.status).toBe('ready')
+  expect(plan.changes.catalog.problems.map(({ slug }) => slug)).toEqual([
+    'two-sum',
+  ])
+  expect(plan.changes.catalog.topics.map(({ label }) => label)).toContain(
+    'Other Valid Topic',
+  )
+  expect(plan.changes.catalog.topics.map(({ label }) => label)).not.toContain(
+    'Target Topic',
+  )
+  expect(plan.preview.diagnostics).toContainEqual(
+    expect.objectContaining({
+      severity: 'warning',
+      code: 'topic-id-allocation-failed',
+      path: 'topics[0]',
+    }),
+  )
+})
 
 it('skips ambiguous normalized company labels without losing other labels', () => {
   const state = emptyImportState()
