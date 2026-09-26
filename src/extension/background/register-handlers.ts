@@ -156,6 +156,7 @@ import {
   computeNotificationDryRun,
   createDevSmokeService,
 } from './dev-smoke-service'
+import { registerImportHandlers } from './import-handlers'
 import { assertCanSenderCallExtensionMethod } from './runtime-policy'
 import { getBackgroundDb as getAppDb } from './app-db'
 import { createAlarmScheduler } from './scheduler/alarm-scheduler'
@@ -231,6 +232,20 @@ export function registerBackgroundHandlers() {
 
   dueNotification.registerJobs()
   void dueNotification.handleStartup()
+
+  registerImportHandlers({
+    runInMutationQueue,
+    getDb: async () => (await getAppDb()).db,
+    flush: flushDbSnapshot,
+    markDirty: markSyncLocalDataChangedBestEffort,
+    invalidate: async () =>
+      broadcastCacheInvalidation({
+        reason: 'problem-catalog-updated',
+        source: 'dashboard',
+        tags: ['problems', 'tracks', 'analytics'],
+      }),
+    scheduleSync: scheduleAutoPushAfterMutationBestEffort,
+  })
 
   onMessage('runtime.ping', ({ data, sender }) => {
     const request = pingRequestSchema.parse(data)
