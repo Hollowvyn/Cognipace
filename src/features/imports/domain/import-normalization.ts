@@ -4,11 +4,22 @@ import {
   maxImportArrayEntries,
   maxImportBytes,
 } from '@/features/imports/api/content-file-contracts'
+import { normalizeTopicLookupKey } from '@/features/problems/domain/topic-taxonomy'
+
+import {
+  normalizeLabelEntries,
+  normalizeProblemEntry,
+  normalizeTrackEntry,
+} from './import-entry-normalization'
 
 import type {
+  GroupDraft,
   ImportDiagnostic,
+  LabelDraft,
   NormalizationResult,
   NormalizedImport,
+  ProblemDraft,
+  TrackDraft,
 } from './import-types'
 
 const recognizedSections = [
@@ -26,6 +37,14 @@ const knownFields = new Set<string>([
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function fieldPath(path: string, field: string): string {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(field)
+    ? path === '$'
+      ? `$.${field}`
+      : `${path}.${field}`
+    : `${path}[${JSON.stringify(field)}]`
 }
 
 function fatal(code: string, message: string): NormalizationResult {
@@ -51,6 +70,190 @@ export function exceedsArrayEntryLimit(root: unknown, limit: number): boolean {
   }
 
   return false
+}
+
+function takeFirst<T>(
+  current: T | null,
+  incoming: T | null,
+  path: string,
+  diagnostics: ImportDiagnostic[],
+): T | null {
+  if (current === null) return incoming
+  if (incoming !== null && incoming !== current) {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'conflicting-value',
+      path,
+      message: 'An earlier value for this identity is retained.',
+    })
+  }
+  return current
+}
+
+function unionLabels(
+  current: LabelDraft[],
+  incoming: LabelDraft[],
+): LabelDraft[] {
+  const labels = [...current]
+  const seen = new Set(
+    labels.map(({ label }) => normalizeTopicLookupKey(label)),
+  )
+
+  for (const label of incoming) {
+    const key = normalizeTopicLookupKey(label.label)
+    if (seen.has(key)) continue
+    seen.add(key)
+    labels.push(label)
+  }
+
+  return labels
+}
+
+function foldProblems(
+  values: unknown[],
+  diagnostics: ImportDiagnostic[],
+): ProblemDraft[] {
+  const folded: ProblemDraft[] = []
+  const indexes = new Map<string, number>()
+
+  values.forEach((value, index) => {
+    const incoming = normalizeProblemEntry(
+      value,
+      `problems[${index}]`,
+      diagnostics,
+    )
+    if (incoming === null) return
+
+    const existingIndex = indexes.get(incoming.slug)
+    if (existingIndex === undefined) {
+      indexes.set(incoming.slug, folded.length)
+      folded.push(incoming)
+      return
+    }
+
+    const current = folded[existingIndex]
+    if (!current) return
+    folded[existingIndex] = {
+      ...current,
+      title: takeFirst(
+        current.title,
+        incoming.title,
+        fieldPath(incoming.path, 'title'),
+        diagnostics,
+      ),
+      difficulty: takeFirst(
+        current.difficulty,
+        incoming.difficulty,
+        fieldPath(incoming.path, 'difficulty'),
+        diagnostics,
+      ),
+      isPremium: takeFirst(
+        current.isPremium,
+        incoming.isPremium,
+        fieldPath(incoming.path, 'isPremium'),
+        diagnostics,
+      ),
+      topics: unionLabels(current.topics, incoming.topics),
+      companies: unionLabels(current.companies, incoming.companies),
+    }
+  })
+
+  return folded
+}
+
+function placementDiagnostic(path: string, diagnostics: ImportDiagnostic[]) {
+  diagnostics.push({
+    severity: 'warning',
+    code: 'placement-preserved',
+    path,
+    message: 'The first group placement for this problem is retained.',
+  })
+}
+
+function appendTrackGroups(
+  current: TrackDraft,
+  incomingGroups: GroupDraft[],
+  diagnostics: ImportDiagnostic[],
+) {
+  const groupsBySlug = new Map(
+    current.groups.map((group) => [group.slug, group]),
+  )
+  const placements = new Map<string, string>()
+  for (const group of current.groups) {
+    for (const problem of group.problems) {
+      if (!placements.has(problem.slug))
+        placements.set(problem.slug, group.slug)
+    }
+  }
+
+  for (const incoming of incomingGroups) {
+    let group = groupsBySlug.get(incoming.slug)
+    if (!group) {
+      group = { ...incoming, problems: [] }
+      current.groups.push(group)
+      groupsBySlug.set(group.slug, group)
+    } else {
+      group.title = takeFirst(
+        group.title,
+        incoming.title,
+        fieldPath(incoming.path, 'title'),
+        diagnostics,
+      )
+    }
+
+    for (const problem of incoming.problems) {
+      const existingPlacement = placements.get(problem.slug)
+      if (existingPlacement !== undefined) {
+        if (existingPlacement !== group.slug) {
+          placementDiagnostic(problem.path, diagnostics)
+        }
+        continue
+      }
+
+      placements.set(problem.slug, group.slug)
+      group.problems.push(problem)
+    }
+  }
+}
+
+function foldTracks(
+  values: unknown[],
+  diagnostics: ImportDiagnostic[],
+): TrackDraft[] {
+  const folded: TrackDraft[] = []
+  const indexes = new Map<string, number>()
+
+  values.forEach((value, index) => {
+    const incoming = normalizeTrackEntry(value, `tracks[${index}]`, diagnostics)
+    if (incoming === null) return
+
+    const existingIndex = indexes.get(incoming.slug)
+    if (existingIndex === undefined) {
+      const current: TrackDraft = { ...incoming, groups: [] }
+      indexes.set(incoming.slug, folded.length)
+      appendTrackGroups(current, incoming.groups, diagnostics)
+      folded.push(current)
+      return
+    }
+
+    const current = folded[existingIndex]
+    if (!current) return
+    current.title = takeFirst(
+      current.title,
+      incoming.title,
+      fieldPath(incoming.path, 'title'),
+      diagnostics,
+    )
+    current.description = takeFirst(
+      current.description,
+      incoming.description,
+      fieldPath(incoming.path, 'description'),
+      diagnostics,
+    )
+    appendTrackGroups(current, incoming.groups, diagnostics)
+  })
+
+  return folded
 }
 
 export function normalizeImportFile(fileText: string): NormalizationResult {
@@ -93,7 +296,7 @@ export function normalizeImportFile(fileText: string): NormalizationResult {
       diagnostics.push({
         severity: 'warning',
         code: 'unknown-field',
-        path: `$.${key}`,
+        path: fieldPath('$', key),
         message: 'This field is not part of the cognipace-content format.',
       })
     }
@@ -111,14 +314,19 @@ export function normalizeImportFile(fileText: string): NormalizationResult {
     }
   }
 
-  // Entry parsing is intentionally composed here so each section can be
-  // normalized independently without turning one malformed section into a
-  // file-level failure.
   const document: NormalizedImport = {
-    problems: [],
-    tracks: [],
-    topics: [],
-    companies: [],
+    problems: Array.isArray(parsed.problems)
+      ? foldProblems(parsed.problems, diagnostics)
+      : [],
+    tracks: Array.isArray(parsed.tracks)
+      ? foldTracks(parsed.tracks, diagnostics)
+      : [],
+    topics: Array.isArray(parsed.topics)
+      ? normalizeLabelEntries(parsed.topics, 'topics', diagnostics)
+      : [],
+    companies: Array.isArray(parsed.companies)
+      ? normalizeLabelEntries(parsed.companies, 'companies', diagnostics)
+      : [],
   }
 
   return { status: 'valid', document, diagnostics }
