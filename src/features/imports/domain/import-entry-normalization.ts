@@ -422,7 +422,15 @@ export function normalizeTrackEntry(
     )
     return normalized === null ? [] : [normalized]
   })
-  if (groups.length === 0) return null
+  if (groups.length === 0) {
+    warn(
+      diagnostics,
+      'no-valid-groups',
+      groupsPath,
+      'A track requires at least one accepted group.',
+    )
+    return null
+  }
 
   return {
     slug,

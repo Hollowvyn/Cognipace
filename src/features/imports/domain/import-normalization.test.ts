@@ -381,6 +381,7 @@ describe('normalizeImportFile entries and duplicate folding', () => {
     expect(result.document.problems).toEqual([])
     expectDiagnosticPaths(result, [
       { code: 'invalid-identity', path: 'tracks[0].groups[0].slug' },
+      { code: 'no-valid-groups', path: 'tracks[0].groups' },
     ])
   })
 
@@ -437,6 +438,7 @@ describe('normalizeImportFile entries and duplicate folding', () => {
     expect(allInvalid.document.tracks).toEqual([])
     expectDiagnosticPaths(allInvalid, [
       { code: 'invalid-reference', path: 'tracks[0].groups[0].problems[0]' },
+      { code: 'no-valid-groups', path: 'tracks[0].groups' },
     ])
   })
 
@@ -459,6 +461,28 @@ describe('normalizeImportFile entries and duplicate folding', () => {
     ])
     expectDiagnosticPaths(result, [
       { code: 'invalid-field', path: 'tracks[0].groups[0].problems' },
+    ])
+  })
+
+  it('reports tracks with no accepted groups and keeps valid sibling problems', () => {
+    const result = expectValid(
+      envelope({
+        problems: ['two-sum'],
+        tracks: [
+          { slug: 'empty-track', groups: [] },
+          { slug: 'invalid-track', groups: [null] },
+        ],
+      }),
+    )
+
+    expect(result.document.problems.map(({ slug }) => slug)).toEqual([
+      'two-sum',
+    ])
+    expect(result.document.tracks).toEqual([])
+    expectDiagnosticPaths(result, [
+      { code: 'no-valid-groups', path: 'tracks[0].groups' },
+      { code: 'invalid-entry', path: 'tracks[1].groups[0]' },
+      { code: 'no-valid-groups', path: 'tracks[1].groups' },
     ])
   })
 
@@ -614,6 +638,27 @@ describe('normalizeImportFile entries and duplicate folding', () => {
       { code: 'conflicting-value', path: 'problems[2].isPremium' },
       { code: 'placement-preserved', path: 'tracks[0].groups[1].problems[0]' },
     ])
+  })
+
+  it('folds thousands of duplicate problem labels in first-appearance order', () => {
+    const labelCount = 5_000
+    const topics = Array.from(
+      { length: labelCount },
+      (_, index) => `Topic ${index}`,
+    )
+    const result = expectValid(
+      envelope({
+        problems: topics.map((topic) => ({
+          slug: 'shared-question',
+          topics: [topic],
+        })),
+      }),
+    )
+
+    expect(result.document.problems).toHaveLength(1)
+    expect(
+      result.document.problems[0]?.topics.map(({ label }) => label),
+    ).toEqual(topics)
   })
 
   it('treats unknown difficulty as an explicit value when folding duplicates', () => {

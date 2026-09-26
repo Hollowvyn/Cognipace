@@ -90,23 +90,35 @@ function takeFirst<T>(
   return current
 }
 
-function unionLabels(
+function appendLabels(
   current: LabelDraft[],
   incoming: LabelDraft[],
-): LabelDraft[] {
-  const labels = [...current]
-  const seen = new Set(
-    labels.map(({ label }) => normalizeTopicLookupKey(label)),
-  )
-
+  seen: Set<string>,
+): void {
   for (const label of incoming) {
     const key = normalizeTopicLookupKey(label.label)
     if (seen.has(key)) continue
     seen.add(key)
-    labels.push(label)
+    current.push(label)
   }
+}
 
-  return labels
+type ProblemAccumulator = {
+  draft: ProblemDraft
+  topicKeys: Set<string>
+  companyKeys: Set<string>
+}
+
+function createProblemAccumulator(draft: ProblemDraft): ProblemAccumulator {
+  return {
+    draft,
+    topicKeys: new Set(
+      draft.topics.map(({ label }) => normalizeTopicLookupKey(label)),
+    ),
+    companyKeys: new Set(
+      draft.companies.map(({ label }) => normalizeTopicLookupKey(label)),
+    ),
+  }
 }
 
 function foldProblems(
@@ -114,7 +126,7 @@ function foldProblems(
   diagnostics: ImportDiagnostic[],
 ): ProblemDraft[] {
   const folded: ProblemDraft[] = []
-  const indexes = new Map<string, number>()
+  const indexes = new Map<string, ProblemAccumulator>()
 
   values.forEach((value, index) => {
     const incoming = normalizeProblemEntry(
@@ -124,38 +136,34 @@ function foldProblems(
     )
     if (incoming === null) return
 
-    const existingIndex = indexes.get(incoming.slug)
-    if (existingIndex === undefined) {
-      indexes.set(incoming.slug, folded.length)
+    const accumulator = indexes.get(incoming.slug)
+    if (accumulator === undefined) {
+      indexes.set(incoming.slug, createProblemAccumulator(incoming))
       folded.push(incoming)
       return
     }
 
-    const current = folded[existingIndex]
-    if (!current) return
-    folded[existingIndex] = {
-      ...current,
-      title: takeFirst(
-        current.title,
-        incoming.title,
-        fieldPath(incoming.path, 'title'),
-        diagnostics,
-      ),
-      difficulty: takeFirst(
-        current.difficulty,
-        incoming.difficulty,
-        fieldPath(incoming.path, 'difficulty'),
-        diagnostics,
-      ),
-      isPremium: takeFirst(
-        current.isPremium,
-        incoming.isPremium,
-        fieldPath(incoming.path, 'isPremium'),
-        diagnostics,
-      ),
-      topics: unionLabels(current.topics, incoming.topics),
-      companies: unionLabels(current.companies, incoming.companies),
-    }
+    const current = accumulator.draft
+    current.title = takeFirst(
+      current.title,
+      incoming.title,
+      fieldPath(incoming.path, 'title'),
+      diagnostics,
+    )
+    current.difficulty = takeFirst(
+      current.difficulty,
+      incoming.difficulty,
+      fieldPath(incoming.path, 'difficulty'),
+      diagnostics,
+    )
+    current.isPremium = takeFirst(
+      current.isPremium,
+      incoming.isPremium,
+      fieldPath(incoming.path, 'isPremium'),
+      diagnostics,
+    )
+    appendLabels(current.topics, incoming.topics, accumulator.topicKeys)
+    appendLabels(current.companies, incoming.companies, accumulator.companyKeys)
   })
 
   return folded
@@ -170,27 +178,28 @@ function placementDiagnostic(path: string, diagnostics: ImportDiagnostic[]) {
   })
 }
 
+type TrackAccumulator = {
+  draft: TrackDraft
+  groupsBySlug: Map<string, GroupDraft>
+  placements: Map<string, string>
+}
+
+function createTrackAccumulator(draft: TrackDraft): TrackAccumulator {
+  return { draft, groupsBySlug: new Map(), placements: new Map() }
+}
+
 function appendTrackGroups(
-  current: TrackDraft,
+  accumulator: TrackAccumulator,
   incomingGroups: GroupDraft[],
   diagnostics: ImportDiagnostic[],
 ) {
-  const groupsBySlug = new Map(
-    current.groups.map((group) => [group.slug, group]),
-  )
-  const placements = new Map<string, string>()
-  for (const group of current.groups) {
-    for (const problem of group.problems) {
-      if (!placements.has(problem.slug))
-        placements.set(problem.slug, group.slug)
-    }
-  }
+  const { draft, groupsBySlug, placements } = accumulator
 
   for (const incoming of incomingGroups) {
     let group = groupsBySlug.get(incoming.slug)
     if (!group) {
       group = { ...incoming, problems: [] }
-      current.groups.push(group)
+      draft.groups.push(group)
       groupsBySlug.set(group.slug, group)
     } else {
       group.title = takeFirst(
@@ -221,23 +230,23 @@ function foldTracks(
   diagnostics: ImportDiagnostic[],
 ): TrackDraft[] {
   const folded: TrackDraft[] = []
-  const indexes = new Map<string, number>()
+  const indexes = new Map<string, TrackAccumulator>()
 
   values.forEach((value, index) => {
     const incoming = normalizeTrackEntry(value, `tracks[${index}]`, diagnostics)
     if (incoming === null) return
 
-    const existingIndex = indexes.get(incoming.slug)
-    if (existingIndex === undefined) {
+    const accumulator = indexes.get(incoming.slug)
+    if (accumulator === undefined) {
       const current: TrackDraft = { ...incoming, groups: [] }
-      indexes.set(incoming.slug, folded.length)
-      appendTrackGroups(current, incoming.groups, diagnostics)
+      const first = createTrackAccumulator(current)
+      indexes.set(incoming.slug, first)
+      appendTrackGroups(first, incoming.groups, diagnostics)
       folded.push(current)
       return
     }
 
-    const current = folded[existingIndex]
-    if (!current) return
+    const current = accumulator.draft
     current.title = takeFirst(
       current.title,
       incoming.title,
@@ -250,7 +259,7 @@ function foldTracks(
       fieldPath(incoming.path, 'description'),
       diagnostics,
     )
-    appendTrackGroups(current, incoming.groups, diagnostics)
+    appendTrackGroups(accumulator, incoming.groups, diagnostics)
   })
 
   return folded
