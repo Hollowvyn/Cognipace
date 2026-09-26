@@ -197,6 +197,47 @@ describe('ImportContentPanel', () => {
     expect(screen.getByText('Skipped the replacement entry.')).toBeVisible()
   })
 
+  it('jumps directly through a large diagnostic list and announces the result range', async () => {
+    const user = userEvent.setup()
+    const diagnostics = Array.from({ length: 50_000 }, (_, index) => ({
+      severity: 'warning' as const,
+      code: 'entry-skipped',
+      path: `$.problems[${index}]`,
+      message: `Skipped entry ${index + 1}.`,
+    }))
+    vi.mocked(sendMessage).mockResolvedValueOnce(
+      createPreview({
+        status: 'empty',
+        fingerprint: null,
+        diagnostics,
+      }),
+    )
+    renderPanel()
+
+    await user.upload(fileInput(), createFile())
+    await user.click(screen.getByText('Diagnostics (50000)'))
+
+    const pageInput = screen.getByRole('spinbutton', {
+      name: 'Diagnostic page number',
+    })
+    expect(pageInput).toHaveAttribute('max', '2000')
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
+
+    await user.clear(pageInput)
+    await user.type(pageInput, '2000')
+    await user.click(
+      screen.getByRole('button', { name: 'Go to diagnostic page' }),
+    )
+
+    const rangeAnnouncement = screen.getByRole('status', {
+      name: 'Diagnostic results',
+    })
+    expect(rangeAnnouncement).toHaveAttribute('aria-live', 'polite')
+    expect(rangeAnnouncement).toHaveTextContent('Showing 49976–50000 of 50000')
+    expect(screen.getByText('Skipped entry 50000.')).toBeVisible()
+  })
+
   it('paginates every planned item and renders HTML-looking values as text', async () => {
     const user = userEvent.setup()
     const items = Array.from({ length: 26 }, (_, index) => ({
@@ -223,6 +264,17 @@ describe('ImportContentPanel', () => {
     expect(screen.getByText('Showing 26–26 of 26')).toBeVisible()
     expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeVisible()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
+
+    const pageInput = screen.getByRole('spinbutton', {
+      name: 'Planned item page number',
+    })
+    await user.clear(pageInput)
+    await user.type(pageInput, '1{Enter}')
+    expect(screen.getByText('Showing 1–25 of 26')).toBeVisible()
+    expect(screen.getByText('Problem 1')).toBeVisible()
+    expect(
+      screen.queryByText('<img src=x onerror=alert(1)>'),
+    ).not.toBeInTheDocument()
   })
 
   it('shows the stale preview message before generic ready copy', async () => {

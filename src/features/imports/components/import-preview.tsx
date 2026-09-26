@@ -103,6 +103,9 @@ export function ImportPreviewView({ preview }: ImportPreviewViewProps) {
             <ImportPagination
               currentPage={itemPage}
               label="planned item"
+              onGoToPage={(page) =>
+                setItemPageState({ items: preview.items, page })
+              }
               onNext={() =>
                 setItemPageState({ items: preview.items, page: itemPage + 1 })
               }
