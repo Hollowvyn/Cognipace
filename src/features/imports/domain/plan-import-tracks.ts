@@ -186,7 +186,6 @@ function planTrack(
   groupById: Map<string, ImportedGroup>,
   existingTrackBySlug: Map<string, ImportedTrack>,
   existingTrackById: Map<string, ImportedTrack>,
-  localGroupsByTrack: Map<string, ImportedGroup[]>,
   groupTitlesByTrack: Map<string, Set<string>>,
   groupTitleSlugKeysByTrack: Map<string, Set<string>>,
   maxGroupPositionByTrack: Map<string, number>,
@@ -210,7 +209,6 @@ function planTrack(
     row: ImportedGroup
     isNew: boolean
   }[] = []
-  const localGroups = localGroupsByTrack.get(trackId) ?? []
   const localGroupTitles = groupTitlesByTrack.get(trackId) ?? new Set<string>()
   const localGroupTitleSlugKeys =
     groupTitleSlugKeysByTrack.get(trackId) ?? new Set<string>()
@@ -301,7 +299,6 @@ function planTrack(
     if (isNew) {
       changes.groups.push(group)
       groupById.set(group.id, group)
-      localGroups.push(group)
       items.push(groupItem(group, groupDraft.path, 'add'))
     } else {
       items.push(groupItem(group, groupDraft.path, 'retain'))
@@ -378,14 +375,10 @@ export function planImportTracks(
   const existingTrackById = new Map(
     state.tracks.map((track) => [track.id, track]),
   )
-  const localGroupsByTrack = new Map<string, ImportedGroup[]>()
   const groupTitlesByTrack = new Map<string, Set<string>>()
   const groupTitleSlugKeysByTrack = new Map<string, Set<string>>()
   const maxGroupPositionByTrack = new Map<string, number>()
   for (const group of state.groups) {
-    const groups = localGroupsByTrack.get(group.trackId) ?? []
-    groups.push(group)
-    localGroupsByTrack.set(group.trackId, groups)
     const titles = groupTitlesByTrack.get(group.trackId) ?? new Set<string>()
     titles.add(normalizeTopicSearchKey(group.title))
     groupTitlesByTrack.set(group.trackId, titles)
@@ -429,7 +422,6 @@ export function planImportTracks(
       groupById,
       existingTrackBySlug,
       existingTrackById,
-      localGroupsByTrack,
       groupTitlesByTrack,
       groupTitleSlugKeysByTrack,
       maxGroupPositionByTrack,

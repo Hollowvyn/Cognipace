@@ -25,7 +25,13 @@ export type ContentImportState = {
   fileName: string | null
   fileText: string | null
   preview: ImportPreviewResponse | null
-  message: string | null
+  issue:
+    | 'too-large'
+    | 'read-failed'
+    | 'preview-failed'
+    | 'apply-unconfirmed'
+    | 'stale'
+    | null
 }
 
 type PreviewFailureStep = 'error' | 'persistence-error'
@@ -35,19 +41,8 @@ const initialState: ContentImportState = {
   fileName: null,
   fileText: null,
   preview: null,
-  message: null,
+  issue: null,
 }
-
-const oversizedFileMessage =
-  'This file is larger than the 5 MiB limit. Choose a file that is 5 MiB or smaller.'
-const readFailureMessage =
-  'This file could not be read. Choose another file and try again.'
-const previewFailureMessage =
-  'This file could not be previewed. Check your connection and preview it again.'
-const applyFailureMessage =
-  'The import could not be confirmed. Preview the file again before trying another import.'
-const retryFailureMessage =
-  'The save could not be confirmed. You can retry saving this import.'
 
 export function useContentImport() {
   const previewMutation = usePreviewContentImport()
@@ -83,7 +78,7 @@ export function useContentImport() {
         fileName,
         fileText,
         preview: null,
-        message: null,
+        issue: null,
       })
 
       try {
@@ -95,7 +90,7 @@ export function useContentImport() {
           fileName,
           fileText,
           preview,
-          message: previewMessage(preview),
+          issue: null,
         })
         return preview
       } catch {
@@ -107,10 +102,7 @@ export function useContentImport() {
           fileName,
           fileText,
           preview: null,
-          message:
-            failureStep === 'persistence-error'
-              ? retryFailureMessage
-              : previewFailureMessage,
+          issue: failureStep === 'error' ? 'preview-failed' : null,
         }))
         return null
       }
@@ -119,26 +111,17 @@ export function useContentImport() {
   )
 
   const selectFile = useCallback(
-    async (file: File | null) => {
+    async (file: File) => {
       if (writeLock.current || state.step === 'persistence-error') return
 
       const generation = ++selectionGeneration.current
-      if (file === null) {
-        setState((current) =>
-          current.step === 'reading' || current.step === 'previewing'
-            ? initialState
-            : current,
-        )
-        return
-      }
-
       if (file.size > maxImportBytes) {
         setState({
           step: 'error',
           fileName: file.name,
           fileText: null,
           preview: null,
-          message: oversizedFileMessage,
+          issue: 'too-large',
         })
         return
       }
@@ -148,12 +131,12 @@ export function useContentImport() {
         fileName: file.name,
         fileText: null,
         preview: null,
-        message: null,
+        issue: null,
       })
 
       let fileText: string
       try {
-        fileText = await readFileText(file)
+        fileText = await file.text()
         if (!isCurrent(generation)) return
       } catch {
         if (!isCurrent(generation)) return
@@ -162,7 +145,7 @@ export function useContentImport() {
           fileName: file.name,
           fileText: null,
           preview: null,
-          message: readFailureMessage,
+          issue: 'read-failed',
         })
         return
       }
@@ -200,7 +183,7 @@ export function useContentImport() {
 
     writeLock.current = true
     const generation = selectionGeneration.current
-    setState({ ...currentState, step: 'applying', message: null })
+    setState({ ...currentState, step: 'applying', issue: null })
 
     try {
       const response = await applyMutation.mutateAsync({
@@ -216,7 +199,7 @@ export function useContentImport() {
             fileName,
             fileText: null,
             preview: response.preview,
-            message: 'Import saved.',
+            issue: null,
           })
           break
         case 'persistence-error':
@@ -225,8 +208,7 @@ export function useContentImport() {
             fileName,
             fileText,
             preview: response.preview,
-            message:
-              'The import was applied, but its local save needs to be retried.',
+            issue: null,
           })
           break
         case 'stale':
@@ -235,8 +217,7 @@ export function useContentImport() {
             fileName,
             fileText,
             preview: response.preview,
-            message:
-              'Local data changed after this preview. Review the updated preview before importing.',
+            issue: 'stale',
           })
           break
         case 'unchanged':
@@ -245,8 +226,7 @@ export function useContentImport() {
             fileName,
             fileText,
             preview: response.preview,
-            message:
-              'This content is already up to date. There is nothing to import.',
+            issue: null,
           })
           break
         case 'blocked':
@@ -255,7 +235,7 @@ export function useContentImport() {
             fileName,
             fileText,
             preview: response.preview,
-            message: 'Review the diagnostics. This import is blocked.',
+            issue: null,
           })
           break
       }
@@ -266,7 +246,7 @@ export function useContentImport() {
         fileName,
         fileText,
         preview,
-        message: applyFailureMessage,
+        issue: 'apply-unconfirmed',
       })
     } finally {
       writeLock.current = false
@@ -283,7 +263,7 @@ export function useContentImport() {
 
     writeLock.current = true
     const generation = selectionGeneration.current
-    setState({ ...state, step: 'retrying', message: null })
+    setState({ ...state, step: 'retrying', issue: null })
 
     try {
       const response = await retryMutation.mutateAsync()
@@ -295,7 +275,7 @@ export function useContentImport() {
           fileName,
           fileText: null,
           preview,
-          message: 'Import saved.',
+          issue: null,
         })
       } else if (response.status === 'persistence-error') {
         setState({
@@ -303,7 +283,7 @@ export function useContentImport() {
           fileName,
           fileText,
           preview,
-          message: retryFailureMessage,
+          issue: null,
         })
       } else {
         const nextGeneration = ++selectionGeneration.current
@@ -321,7 +301,7 @@ export function useContentImport() {
         fileName,
         fileText,
         preview,
-        message: retryFailureMessage,
+        issue: null,
       })
     } finally {
       writeLock.current = false
@@ -352,40 +332,5 @@ export function useContentImport() {
     apply,
     retryPersistence,
     previewAgain,
-  }
-}
-
-async function readFileText(file: File) {
-  if ('text' in file && typeof file.text === 'function') {
-    return file.text()
-  }
-
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result)
-        return
-      }
-
-      reject(new Error('Failed to read import file.'))
-    })
-    reader.addEventListener('error', () => {
-      reject(reader.error ?? new Error('Failed to read import file.'))
-    })
-    reader.readAsText(file)
-  })
-}
-
-function previewMessage(preview: ImportPreviewResponse) {
-  switch (preview.status) {
-    case 'ready':
-      return null
-    case 'unchanged':
-      return 'This content is already up to date. There is nothing to import.'
-    case 'empty':
-      return 'This file does not contain any importable content.'
-    case 'blocked':
-      return 'Review the diagnostics. This import is blocked.'
   }
 }

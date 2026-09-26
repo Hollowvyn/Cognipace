@@ -1,6 +1,3 @@
-import type { ProblemImportState } from '@/features/problems/domain/problem-import'
-import type { TrackImportState } from '@/features/tracks/domain/track-import'
-
 import { planImportProblems } from './plan-import-problems'
 import { planImportTracks } from './plan-import-tracks'
 
@@ -11,21 +8,6 @@ import type {
   ImportState,
   NormalizationResult,
 } from './import-types'
-
-function emptyProblemState(): ProblemImportState {
-  return {
-    problems: [],
-    topics: [],
-    companies: [],
-    aliases: [],
-    problemTopics: [],
-    problemCompanies: [],
-  }
-}
-
-function emptyTrackState(): TrackImportState {
-  return { tracks: [], groups: [], memberships: [] }
-}
 
 function emptyChanges(): ImportChanges {
   return {
@@ -67,10 +49,6 @@ function canonicalJson(value: unknown) {
   return JSON.stringify(canonicalize(value))
 }
 
-function emptyRelevantState() {
-  return { catalog: emptyProblemState(), curriculum: emptyTrackState() }
-}
-
 export function buildImportPlan(
   input: NormalizationResult,
   state: ImportState,
@@ -89,12 +67,7 @@ export function buildImportPlan(
         items: [],
         diagnostics,
       },
-      fingerprintInput: canonicalJson({
-        normalizedInput: input,
-        relevantState: emptyRelevantState(),
-        changes,
-        plannerDiagnostics: [],
-      }),
+      fingerprintInput: '',
     }
   }
 

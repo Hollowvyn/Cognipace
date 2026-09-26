@@ -6,13 +6,9 @@ import type {
   TrackImportChanges,
   TrackImportState,
 } from '@/features/tracks/domain/track-import'
+import type { ImportPreviewResponse } from '@/features/imports/api/import-runtime-contracts'
 
-export type ImportDiagnostic = {
-  severity: 'warning' | 'error'
-  code: string
-  path: string
-  message: string
-}
+export type ImportDiagnostic = ImportPreviewResponse['diagnostics'][number]
 
 export type LabelDraft = { label: string; path: string }
 
@@ -66,32 +62,9 @@ export type ImportChanges = {
   curriculum: TrackImportChanges
 }
 
-export type ImportCounts = {
-  problems: number
-  topics: number
-  companies: number
-  problemTopics: number
-  problemCompanies: number
-  tracks: number
-  groups: number
-  memberships: number
-}
-
-export type ImportItem = {
-  kind: keyof ImportCounts
-  identity: string
-  label: string
-  action: 'add' | 'retain'
-  path: string
-}
-
-export type ImportPreview = {
-  status: 'ready' | 'unchanged' | 'empty' | 'blocked'
-  fingerprint: string | null
-  additions: ImportCounts
-  items: ImportItem[]
-  diagnostics: ImportDiagnostic[]
-}
+export type ImportCounts = ImportPreviewResponse['additions']
+export type ImportItem = ImportPreviewResponse['items'][number]
+export type ImportPreview = ImportPreviewResponse
 
 export type ImportPlan = {
   changes: ImportChanges

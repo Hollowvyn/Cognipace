@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { sendMessage } from '@/extension/messaging'
 import { maxImportBytes } from '@/features/imports/api/content-file-contracts'
@@ -23,10 +23,6 @@ describe('useContentImport', () => {
     vi.resetAllMocks()
   })
 
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
   it('rejects files above 5 MiB before reading or calling the runtime', async () => {
     const file = createFile('large.json', fileText, maxImportBytes + 1)
     const { result } = setup()
@@ -36,7 +32,7 @@ describe('useContentImport', () => {
     expect(file.readText).not.toHaveBeenCalled()
     expect(sendMessage).not.toHaveBeenCalled()
     expect(result.current.state.step).toBe('error')
-    expect(result.current.state.message).toContain('5 MiB')
+    expect(result.current.state.issue).toBe('too-large')
   })
 
   it('does not preview or apply when reading the file fails', async () => {
@@ -70,34 +66,6 @@ describe('useContentImport', () => {
       preview: readyPreview,
     })
     expect(sendMessage).toHaveBeenCalledTimes(1)
-  })
-
-  it('uses FileReader when File.text is unavailable', async () => {
-    const listeners = new Map<string, EventListener>()
-    const reader = {
-      result: fileText,
-      error: null,
-      addEventListener: vi.fn((type: string, listener: EventListener) => {
-        listeners.set(type, listener)
-      }),
-      readAsText: vi.fn(() =>
-        listeners.get('load')?.(new ProgressEvent('load')),
-      ),
-    }
-    vi.stubGlobal('FileReader', function MockFileReader() {
-      return reader as unknown as FileReader
-    })
-    vi.mocked(sendMessage).mockResolvedValueOnce(readyPreview)
-    const file = { name: 'fallback.json', size: fileText.length } as File
-    const { result } = setup()
-
-    await act(async () => result.current.selectFile(file))
-
-    expect(reader.readAsText).toHaveBeenCalledExactlyOnceWith(file)
-    expect(sendMessage).toHaveBeenCalledExactlyOnceWith('imports.preview', {
-      surface: 'dashboard',
-      fileText,
-    })
   })
 
   it('ignores a file read that finishes after clear', async () => {
@@ -224,7 +192,7 @@ describe('useContentImport', () => {
       step: 'preview',
       preview: secondPreview,
     })
-    expect(result.current.state.message).toMatch(/changed/i)
+    expect(result.current.state.issue).toBe('stale')
     expect(sendMessage).toHaveBeenCalledTimes(2)
 
     await act(async () => result.current.apply())
@@ -347,7 +315,7 @@ describe('useContentImport', () => {
 
     expect(sendMessage).toHaveBeenCalledTimes(2)
     expect(result.current.state).toMatchObject({ step: 'error', fileText })
-    expect(result.current.state.message).toMatch(/preview the file again/i)
+    expect(result.current.state.issue).toBe('apply-unconfirmed')
 
     await act(async () => result.current.previewAgain())
     expect(sendMessage).toHaveBeenCalledTimes(3)
@@ -403,7 +371,6 @@ describe('useContentImport', () => {
       fileText,
       preview: readyPreview,
     })
-    expect(result.current.state.message).toMatch(/retry/i)
     expect(sendMessage).toHaveBeenCalledTimes(3)
   })
 
@@ -431,48 +398,6 @@ describe('useContentImport', () => {
       expect(sendMessage).toHaveBeenCalledTimes(2)
     },
   )
-
-  it('invalidates pending work when selection is canceled', async () => {
-    const read = deferred<string>()
-    const file = createFile('pending.json', fileText)
-    file.readText.mockReturnValue(read.promise)
-    const { result } = setup()
-
-    let selecting!: Promise<void>
-    act(() => {
-      selecting = result.current.selectFile(file.file)
-    })
-    await act(async () => result.current.selectFile(null))
-    await act(async () => {
-      read.resolve(fileText)
-      await selecting
-    })
-
-    expect(sendMessage).not.toHaveBeenCalled()
-    expect(result.current.state.step).toBe('idle')
-  })
-
-  it('settles to idle when selection is canceled in the same batch', async () => {
-    const read = deferred<string>()
-    const file = createFile('pending.json', fileText)
-    file.readText.mockReturnValue(read.promise)
-    const { result } = setup()
-
-    let selecting!: Promise<void>
-    let canceling!: Promise<void>
-    act(() => {
-      selecting = result.current.selectFile(file.file)
-      canceling = result.current.selectFile(null)
-    })
-    await act(async () => {
-      await canceling
-      read.resolve(fileText)
-      await selecting
-    })
-
-    expect(sendMessage).not.toHaveBeenCalled()
-    expect(result.current.state.step).toBe('idle')
-  })
 })
 
 function setup() {

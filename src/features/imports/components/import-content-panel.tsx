@@ -160,14 +160,39 @@ function getStatus(state: ReturnType<typeof useContentImport>['state']) {
         tone: 'warning' as const,
       }
     case 'error':
-      return {
-        message: state.message?.includes('confirmed')
-          ? 'The import result could not be confirmed. Preview the file again before retrying.'
-          : (state.message ?? 'The file could not be imported.'),
-        tone: 'danger' as const,
+      switch (state.issue) {
+        case 'too-large':
+          return {
+            message:
+              'This file is larger than the 5 MiB limit. Choose a file that is 5 MiB or smaller.',
+            tone: 'danger' as const,
+          }
+        case 'read-failed':
+          return {
+            message:
+              'This file could not be read. Choose another file and try again.',
+            tone: 'danger' as const,
+          }
+        case 'preview-failed':
+          return {
+            message:
+              'This file could not be previewed. Check your connection and preview it again.',
+            tone: 'danger' as const,
+          }
+        case 'apply-unconfirmed':
+          return {
+            message:
+              'The import result could not be confirmed. Preview the file again before retrying.',
+            tone: 'danger' as const,
+          }
+        default:
+          return {
+            message: 'The file could not be imported.',
+            tone: 'danger' as const,
+          }
       }
     case 'preview':
-      if (state.message?.match(/changed/i)) {
+      if (state.issue === 'stale') {
         return {
           message:
             'Local content changed. Review the updated preview before importing.',

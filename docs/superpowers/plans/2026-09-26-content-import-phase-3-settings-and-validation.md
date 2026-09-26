@@ -41,97 +41,19 @@ component library, or global state store is needed.
 
 - [ ] Add hook tests using `createQueryTestHarness`, `renderHook`, `act`, and mocked `sendMessage`. Verify the exact three message names/payloads, and assert that preview/stale/unchanged outcomes do not invalidate any queries.
 
-```ts
-it('previews a file without invalidating catalog queries', async () => {
-  const { wrapper, queryClient } = createQueryTestHarness()
-  const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
-  vi.mocked(sendMessage).mockResolvedValueOnce(readyPreview)
-  const { result } = renderHook(() => usePreviewContentImport(), { wrapper })
-  await act(async () => {
-    await result.current.mutateAsync('file contents')
-  })
-  expect(sendMessage).toHaveBeenCalledWith('imports.preview', {
-    surface: 'dashboard',
-    fileText: 'file contents',
-  })
-  expect(invalidate).not.toHaveBeenCalled()
-})
-```
+Source: [imports-api.ts](../../../src/features/imports/api/imports-api.ts) · coverage: [imports-api.test.tsx](../../../src/features/imports/api/imports-api.test.tsx).
 
 `readyPreview` is a concrete Phase 1 fixture: status `ready`, a 64-character
 hex fingerprint, one new question, one `add` item, all other counts zero, and
 no diagnostics. Define it in `imports/testing/import-fixtures.ts` and reuse it
 with typed overrides for `unchanged`, `stale`, and persistence tests.
 
-```ts
-export const readyPreview = {
-  status: 'ready',
-  fingerprint: 'a'.repeat(64),
-  additions: {
-    problems: 1,
-    topics: 0,
-    companies: 0,
-    problemTopics: 0,
-    problemCompanies: 0,
-    tracks: 0,
-    groups: 0,
-    memberships: 0,
-  },
-  items: [
-    {
-      kind: 'problems',
-      identity: 'two-sum',
-      label: 'Two Sum',
-      action: 'add',
-      path: 'problems[0]',
-    },
-  ],
-  diagnostics: [],
-} satisfies ImportPreview
-```
+Fixture: [import-fixtures.ts](../../../src/features/imports/testing/import-fixtures.ts).
 
 - [ ] Run `rtk proxy npx vitest run src/features/imports/api/imports-api.test.tsx`; expect missing hook failure.
 - [ ] Implement the hooks below. Both background broadcast and initiating-window invalidation follow existing app conventions:
 
-```ts
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { sendMessage } from '@/extension/messaging'
-import { invalidateTaggedQueries } from '@/platform/query/cache-invalidation'
-
-const importTags = ['problems', 'tracks', 'analytics'] as const
-
-export function usePreviewContentImport() {
-  return useMutation({
-    mutationFn: (fileText: string) =>
-      sendMessage('imports.preview', { surface: 'dashboard', fileText }),
-  })
-}
-
-export function useApplyContentImport() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (input: { fileText: string; fingerprint: string }) =>
-      sendMessage('imports.apply', { surface: 'dashboard', ...input }),
-    onSuccess: (result) => {
-      if (result.status === 'saved' || result.status === 'persistence-error') {
-        invalidateTaggedQueries(queryClient, importTags)
-      }
-    },
-  })
-}
-
-export function useRetryImportPersistence() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: () =>
-      sendMessage('imports.retryPersistence', { surface: 'dashboard' }),
-    onSuccess: (result) => {
-      if (result.status === 'saved')
-        invalidateTaggedQueries(queryClient, importTags)
-    },
-  })
-}
-```
+Source: [imports-api.ts](../../../src/features/imports/api/imports-api.ts) · coverage: [imports-api.test.tsx](../../../src/features/imports/api/imports-api.test.tsx).
 
 - [ ] Add cases for `saved` and `persistence-error` invalidating affected local views, retry success invalidation, and `repreview` causing no invalidation. Assert no `settings` mutation/tag.
 - [ ] Rerun the hook tests; expect PASS. Commit as `feat(imports): add content import runtime hooks`.
@@ -142,40 +64,7 @@ export function useRetryImportPersistence() {
 
 - [ ] Add hook tests before implementation. Use deferred promises to prove a response for file A cannot replace the preview for newly selected file B. Add cancellation during file reading and preview. Cancellation during apply/retry is disabled because writes may already be committed.
 
-```ts
-function deferred<T>() {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
-
-it('ignores an older preview after selecting another file', async () => {
-  const first = deferred<ImportPreview>()
-  vi.mocked(sendMessage)
-    .mockReturnValueOnce(first.promise)
-    .mockResolvedValueOnce(secondPreview)
-  const { wrapper } = createQueryTestHarness()
-  const { result } = renderHook(() => useContentImport(), { wrapper })
-  const a = new File(['a'], 'a.json', { type: 'application/json' })
-  const b = new File(['b'], 'b.json', { type: 'application/json' })
-  Object.defineProperty(a, 'text', { value: async () => 'a' })
-  Object.defineProperty(b, 'text', { value: async () => 'b' })
-  await act(async () => {
-    void result.current.selectFile(a)
-  })
-  await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1))
-  await act(async () => {
-    await result.current.selectFile(b)
-  })
-  await act(async () => {
-    first.resolve(readyPreview)
-  })
-  expect(result.current.state.fileName).toBe('b.json')
-  expect(result.current.state.preview).toEqual(secondPreview)
-})
-```
+Coverage: [use-content-import.test.tsx](../../../src/features/imports/hooks/use-content-import.test.tsx).
 
 Define `secondPreview` as the ready fixture with a different fingerprint and
 question identity. Import the actual Phase 1 type. Use mocks compatible with the
@@ -184,38 +73,7 @@ typed `sendMessage` signature, following existing API tests.
 - [ ] Run `rtk proxy npx vitest run src/features/imports/hooks/use-content-import.test.tsx`; expect missing controller failure.
 - [ ] Implement `useContentImport()` with the following state/API. Keep raw file text in component state, never query keys, logs, storage, or URLs:
 
-```ts
-type ImportStep =
-  | 'idle'
-  | 'reading'
-  | 'previewing'
-  | 'preview'
-  | 'applying'
-  | 'saved'
-  | 'persistence-error'
-  | 'retrying'
-  | 'error'
-export type ContentImportState = {
-  step: ImportStep
-  fileName: string | null
-  fileText: string | null
-  preview: ImportPreview | null
-  message: string | null
-}
-const initialState: ContentImportState = {
-  step: 'idle',
-  fileName: null,
-  fileText: null,
-  preview: null,
-  message: null,
-}
-// Public hook return: { state, selectFile, clear, apply, retryPersistence, previewAgain }
-// selectFile(file: File): Promise<void>
-// clear(): void
-// apply(): Promise<void>
-// retryPersistence(): Promise<void>
-// previewAgain(): Promise<void>
-```
+Source: [use-content-import.ts](../../../src/features/imports/hooks/use-content-import.ts) · coverage: [use-content-import.test.tsx](../../../src/features/imports/hooks/use-content-import.test.tsx).
 
 Use `useRef` for a monotonically increasing selection generation and a separate
 synchronous apply/retry lock. Increment the generation on file selection,
@@ -225,43 +83,7 @@ is insufficient. Reject select/clear while that lock is held.
 
 The concrete select-file flow is:
 
-```ts
-async function selectFile(file: File) {
-  if (writeInFlight.current) return
-  const generation = ++selectionGeneration.current
-  setState({ ...initialState, step: 'reading', fileName: file.name })
-  try {
-    if (file.size > maxImportBytes)
-      throw new Error('Choose a JSON file no larger than 5 MiB.')
-    const fileText = await readImportFileText(file)
-    if (generation !== selectionGeneration.current) return
-    setState({
-      ...initialState,
-      step: 'previewing',
-      fileName: file.name,
-      fileText,
-    })
-    const preview = await previewMutation.mutateAsync(fileText)
-    if (generation !== selectionGeneration.current) return
-    setState({
-      step: 'preview',
-      fileName: file.name,
-      fileText,
-      preview,
-      message: null,
-    })
-  } catch (error) {
-    if (generation !== selectionGeneration.current) return
-    setState({
-      ...initialState,
-      step: 'error',
-      fileName: file.name,
-      message:
-        error instanceof Error ? error.message : 'Could not preview this file.',
-    })
-  }
-}
-```
+Source: [use-content-import.ts](../../../src/features/imports/hooks/use-content-import.ts) · coverage: [use-content-import.test.tsx](../../../src/features/imports/hooks/use-content-import.test.tsx).
 
 `readImportFileText` is a local helper in the hook file: use `file.text()` when
 available and the existing backup screen's `FileReader` fallback otherwise.
@@ -318,85 +140,12 @@ Data Management and its test; delete the placeholder.
 
 - [ ] Write the user workflow test before UI code. Render `ImportContentPanel` with `createQueryTestHarness` and mocked runtime responses:
 
-```tsx
-it('requires a preview before importing and shows the saved result', async () => {
-  const user = userEvent.setup()
-  vi.mocked(sendMessage)
-    .mockResolvedValueOnce(readyPreview)
-    .mockResolvedValueOnce({ status: 'saved', preview: readyPreview })
-  const { wrapper } = createQueryTestHarness()
-  render(<ImportContentPanel />, { wrapper })
-  const file = new File(
-    ['{"format":"cognipace-content","version":1,"problems":["two-sum"]}'],
-    'questions.json',
-    { type: 'application/json' },
-  )
-  await user.upload(screen.getByLabelText('Choose content JSON file'), file)
-  expect(await screen.findByText('questions.json')).toBeVisible()
-  expect(sendMessage).toHaveBeenCalledTimes(1)
-  await user.click(
-    await screen.findByRole('button', { name: 'Import 1 addition' }),
-  )
-  expect(await screen.findByRole('status')).toHaveTextContent(
-    'Content imported and saved.',
-  )
-  expect(
-    screen.queryByRole('button', { name: 'Import 1 addition' }),
-  ).not.toBeInTheDocument()
-})
-```
+Coverage: [import-content-panel.test.tsx](../../../src/features/imports/components/import-content-panel.test.tsx).
 
 - [ ] Run `rtk proxy npx vitest run src/features/imports/components/import-content-panel.test.tsx`; expect missing component failure.
 - [ ] Build `ImportContentPanel` around the hook's API and this exact content order:
 
-```tsx
-<Surface aria-labelledby="import-content-title" className="grid gap-3">
-  <header className="grid gap-1">
-    <h2 id="import-content-title" className="font-bold">
-      Import content
-    </h2>
-    <p>
-      Add questions, tracks, companies, and topics while keeping your existing
-      data and progress.
-    </p>
-  </header>
-  <ImportTemplates />
-  <label className="grid gap-1">
-    <span>Choose content JSON file</span>
-    <input
-      type="file"
-      accept=".json,application/json"
-      disabled={isWriting}
-      onChange={(event) => {
-        const file = event.currentTarget.files?.[0]
-        event.currentTarget.value = ''
-        if (file) void workflow.selectFile(file)
-      }}
-    />
-  </label>
-  {state.fileName ? <p>{state.fileName}</p> : null}
-  {state.preview ? <ImportPreviewView preview={state.preview} /> : null}
-  <InlineStatus tone={statusTone}>{statusMessage}</InlineStatus>
-  {canApply ? (
-    <Button onClick={() => void workflow.apply()} disabled={isWriting}>
-      {importLabel}
-    </Button>
-  ) : null}
-  {state.step === 'persistence-error' ? (
-    <Button onClick={() => void workflow.retryPersistence()}>
-      Retry saving
-    </Button>
-  ) : null}
-  {canPreviewAgain ? (
-    <Button onClick={() => void workflow.previewAgain()}>Preview again</Button>
-  ) : null}
-  {state.step !== 'idle' ? (
-    <Button variant="ghost" disabled={isWriting} onClick={workflow.clear}>
-      Dismiss import
-    </Button>
-  ) : null}
-</Surface>
-```
+Source: [import-content-panel.tsx](../../../src/features/imports/components/import-content-panel.tsx) · coverage: [import-content-panel.test.tsx](../../../src/features/imports/components/import-content-panel.test.tsx).
 
 Derive `workflow = useContentImport()`, `state = workflow.state`,
 `isWriting = ['applying', 'retrying'].includes(state.step)`, and

@@ -1,6 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
-
-import type { ImportPreview } from '../domain/import-types'
+import { describe, expect, it } from 'vitest'
 import {
   importApplyRequestSchema,
   importApplyResponseSchema,
@@ -96,11 +94,7 @@ describe('import runtime contracts', () => {
     ).toBe(false)
   })
 
-  it('validates each preview discriminant and keeps the domain preview assignable', () => {
-    expectTypeOf<
-      ReturnType<typeof importPreviewResponseSchema.parse>
-    >().toMatchTypeOf<ImportPreview>()
-
+  it('validates each preview discriminant', () => {
     for (const status of ['ready', 'unchanged', 'empty', 'blocked'] as const) {
       expect(
         importPreviewResponseSchema.safeParse({ ...emptyPreview, status })

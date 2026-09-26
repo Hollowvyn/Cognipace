@@ -106,12 +106,6 @@ export function ImportPreviewView({ preview }: ImportPreviewViewProps) {
               onGoToPage={(page) =>
                 setItemPageState({ items: preview.items, page })
               }
-              onNext={() =>
-                setItemPageState({ items: preview.items, page: itemPage + 1 })
-              }
-              onPrevious={() =>
-                setItemPageState({ items: preview.items, page: itemPage - 1 })
-              }
               total={preview.items.length}
             />
           </>

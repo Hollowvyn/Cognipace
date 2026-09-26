@@ -46,106 +46,12 @@ the two owner-domain projection files listed above.
 
 - [ ] Add the following authoring test to `content-file-contracts.test.ts`.
 
-```ts
-import { describe, expect, it } from 'vitest'
-import { contentFileSchema } from './content-file-contracts'
-
-describe('content file authoring contract', () => {
-  it('allows sparse questions and optional null metadata', () => {
-    expect(
-      contentFileSchema.safeParse({
-        format: 'cognipace-content',
-        version: 1,
-        problems: [
-          'two-sum',
-          {
-            url: 'https://leetcode.com/problems/valid-anagram/',
-            difficulty: null,
-          },
-        ],
-        companies: null,
-      }).success,
-    ).toBe(true)
-  })
-
-  it('catches misspelled fields and objects without identity', () => {
-    for (const problem of [
-      { title: 'Two Sum' },
-      { slug: 'two-sum', difficulity: 'easy' },
-    ]) {
-      expect(
-        contentFileSchema.safeParse({
-          format: 'cognipace-content',
-          version: 1,
-          problems: [problem],
-        }).success,
-      ).toBe(false)
-    }
-  })
-})
-```
+Source: [content-file-contracts.test.ts](../../../src/features/imports/api/content-file-contracts.test.ts).
 
 - [ ] Run `rtk proxy npx vitest run src/features/imports/api/content-file-contracts.test.ts`; expect failure because the contract module is absent.
 - [ ] Define the authoring schemas without transforms or custom refinements, so JSON Schema conversion remains deterministic. Semantic identity agreement remains a parser responsibility.
 
-```ts
-import { z } from 'zod'
-
-export const contentFormat = 'cognipace-content' as const
-export const contentVersion = 1 as const
-export const maxImportBytes = 5 * 1024 * 1024
-export const maxImportArrayEntries = 50_000
-export const importSlugSchema = z
-  .string()
-  .min(1)
-  .max(200)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-export const importUrlSchema = z
-  .string()
-  .regex(
-    /^https:\/\/(?:www\.)?leetcode\.com(?::443)?\/problems\/[a-z0-9]+(?:-[a-z0-9]+)*(?:[/?#].*)?$/,
-  )
-export const problemReferenceSchema = z.union([
-  importSlugSchema,
-  importUrlSchema,
-])
-const labels = z.array(z.string().min(1).nullable()).nullish()
-const fields = {
-  slug: importSlugSchema.nullish(),
-  url: importUrlSchema.nullish(),
-  title: z.string().nullish(),
-  difficulty: z.enum(['easy', 'medium', 'hard', 'unknown']).nullish(),
-  isPremium: z.boolean().nullish(),
-  topics: labels,
-  companies: labels,
-}
-export const problemObjectSchema = z.union([
-  z.strictObject({ ...fields, slug: importSlugSchema }),
-  z.strictObject({ ...fields, url: importUrlSchema }),
-])
-export const groupObjectSchema = z.strictObject({
-  slug: importSlugSchema,
-  title: z.string().nullish(),
-  problems: z.array(problemReferenceSchema).nullish(),
-})
-export const trackObjectSchema = z.strictObject({
-  slug: importSlugSchema,
-  title: z.string().nullish(),
-  description: z.string().nullish(),
-  groups: z.array(groupObjectSchema).min(1),
-})
-export const contentFileSchema = z.strictObject({
-  $schema: z.string().optional(),
-  format: z.literal(contentFormat),
-  version: z.literal(contentVersion),
-  problems: z
-    .array(z.union([problemReferenceSchema, problemObjectSchema]))
-    .nullish(),
-  tracks: z.array(trackObjectSchema).nullish(),
-  companies: labels,
-  topics: labels,
-})
-```
+Source: [content-file-contracts.ts](../../../src/features/imports/api/content-file-contracts.ts) · coverage: [content-file-contracts.test.ts](../../../src/features/imports/api/content-file-contracts.test.ts).
 
 The published schema describes canonical spelling. Runtime additionally accepts
 trimmed/lowercased slugs and difficulty values, with identical meaning. Document
@@ -154,137 +60,13 @@ runtime URL parsing or identity agreement.
 
 - [ ] Define owner-domain types using existing schema row types. These are internal projections, not public file formats.
 
-```ts
-// src/features/problems/domain/problem-import.ts
-import type { ProblemRow } from '@/platform/db/schema/problems'
-export type ImportedProblem = Omit<ProblemRow, 'createdAt' | 'updatedAt'>
-export type ImportedLabel = { id: string; label: string }
-export type ImportedTopicLink = { problemSlug: string; topicId: string }
-export type ImportedCompanyLink = { problemSlug: string; companyId: string }
-export interface ProblemImportState {
-  problems: ImportedProblem[]
-  topics: ImportedLabel[]
-  companies: ImportedLabel[]
-  aliases: { aliasKey: string; topicId: string }[]
-  problemTopics: ImportedTopicLink[]
-  problemCompanies: ImportedCompanyLink[]
-}
-export type ProblemImportChanges = Omit<ProblemImportState, 'aliases'>
-```
+Source: [problem-import.ts](../../../src/features/problems/domain/problem-import.ts).
 
-```ts
-// src/features/tracks/domain/track-import.ts
-import type { TrackRow } from '@/platform/db/schema/tracks'
-import type { TrackGroupRow } from '@/platform/db/schema/track-groups'
-export type ImportedTrack = Omit<TrackRow, 'createdAt' | 'updatedAt'>
-export type ImportedGroup = Omit<TrackGroupRow, 'createdAt' | 'updatedAt'>
-export type ImportedMembership = {
-  trackId: string
-  trackGroupId: string
-  problemSlug: string
-  position: number
-}
-export interface TrackImportState {
-  tracks: ImportedTrack[]
-  groups: ImportedGroup[]
-  memberships: ImportedMembership[]
-}
-export type TrackImportChanges = TrackImportState
-```
+Source: [track-import.ts](../../../src/features/tracks/domain/track-import.ts).
 
 - [ ] Define the shared normalized/plan interfaces below. Use nullable fields rather than assigning `undefined` under `exactOptionalPropertyTypes`.
 
-```ts
-// src/features/imports/domain/import-types.ts
-import type {
-  ProblemImportChanges,
-  ProblemImportState,
-} from '@/features/problems/domain/problem-import'
-import type {
-  TrackImportChanges,
-  TrackImportState,
-} from '@/features/tracks/domain/track-import'
-
-export type ImportDiagnostic = {
-  severity: 'warning' | 'error'
-  code: string
-  path: string
-  message: string
-}
-export type LabelDraft = { label: string; path: string }
-export type ProblemDraft = {
-  slug: string
-  path: string
-  title: string | null
-  difficulty: 'easy' | 'medium' | 'hard' | 'unknown' | null
-  isPremium: boolean | null
-  topics: LabelDraft[]
-  companies: LabelDraft[]
-}
-export type GroupDraft = {
-  slug: string
-  path: string
-  title: string | null
-  problems: { slug: string; path: string }[]
-}
-export type TrackDraft = {
-  slug: string
-  path: string
-  title: string | null
-  description: string | null
-  groups: GroupDraft[]
-}
-export type NormalizedImport = {
-  problems: ProblemDraft[]
-  tracks: TrackDraft[]
-  topics: LabelDraft[]
-  companies: LabelDraft[]
-}
-export type NormalizationResult =
-  | { status: 'blocked'; diagnostics: ImportDiagnostic[] }
-  | {
-      status: 'valid'
-      document: NormalizedImport
-      diagnostics: ImportDiagnostic[]
-    }
-export type ImportState = {
-  catalog: ProblemImportState
-  curriculum: TrackImportState
-}
-export type ImportChanges = {
-  catalog: ProblemImportChanges
-  curriculum: TrackImportChanges
-}
-export type ImportCounts = {
-  problems: number
-  topics: number
-  companies: number
-  problemTopics: number
-  problemCompanies: number
-  tracks: number
-  groups: number
-  memberships: number
-}
-export type ImportItem = {
-  kind: keyof ImportCounts
-  identity: string
-  label: string
-  action: 'add' | 'retain'
-  path: string
-}
-export type ImportPreview = {
-  status: 'ready' | 'unchanged' | 'empty' | 'blocked'
-  fingerprint: string | null
-  additions: ImportCounts
-  items: ImportItem[]
-  diagnostics: ImportDiagnostic[]
-}
-export type ImportPlan = {
-  changes: ImportChanges
-  preview: ImportPreview
-  fingerprintInput: string
-}
-```
+Sources: [import-types.ts](../../../src/features/imports/domain/import-types.ts) and [import-runtime-contracts.ts](../../../src/features/imports/api/import-runtime-contracts.ts).
 
 - [ ] Rerun the focused contract test; expect PASS. Run `rtk proxy npm run typecheck` after WXT preparation succeeds.
 - [ ] Commit only these files as `feat(imports): define content format and import domain contracts`.
@@ -402,61 +184,12 @@ Schema conversion was checked against current [Zod documentation](https://github
 
 - [ ] Add table-driven identity tests before implementation:
 
-```ts
-import { describe, expect, it } from 'vitest'
-import { readProblemIdentity } from './import-identity'
-
-describe('import identities', () => {
-  it.each([
-    [' TWO-SUM ', 'two-sum'],
-    [
-      'https://leetcode.com/problems/two-sum/description/?x=1#answer',
-      'two-sum',
-    ],
-    ['https://example.com/problems/two-sum/', null],
-    ['https://leetcode.com.evil.test/problems/two-sum/', null],
-    ['https://user@leetcode.com/problems/two-sum/', null],
-    ['https://leetcode.com:8080/problems/two-sum/', null],
-    ['http://leetcode.com/problems/two-sum/', null],
-    ['Two Sum', null],
-    ['', null],
-  ])('normalizes %s to %s', (input, expected) => {
-    expect(readProblemIdentity(input)).toBe(expected)
-  })
-})
-```
+Coverage: [import-identity.test.ts](../../../src/features/imports/domain/import-identity.test.ts).
 
 - [ ] Run `rtk proxy npx vitest run src/features/imports/domain/import-identity.test.ts`; expect missing export failure.
 - [ ] Implement identity without falling back from rejected URLs to slugs:
 
-```ts
-export function readImportSlug(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const slug = value.trim().toLowerCase()
-  return slug.length <= 200 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
-    ? slug
-    : null
-}
-
-export function readProblemIdentity(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const input = value.trim()
-  const slug = readImportSlug(input)
-  if (slug) return slug
-  try {
-    const url = new URL(input)
-    if (url.protocol !== 'https:' || url.username || url.password || url.port)
-      return null
-    if (url.hostname !== 'leetcode.com' && url.hostname !== 'www.leetcode.com')
-      return null
-    const segments = url.pathname.split('/')
-    if (segments[1] !== 'problems') return null
-    return readImportSlug(segments[2])
-  } catch {
-    return null
-  }
-}
-```
+Source: [import-identity.ts](../../../src/features/imports/domain/import-identity.ts) · coverage: [import-identity.test.ts](../../../src/features/imports/domain/import-identity.test.ts).
 
 For object `url`, require an actual URL: a raw slug in that property must be
 rejected, even though a bare string reference may be a slug. For object `slug`,
@@ -467,23 +200,7 @@ otherwise repair a malformed address. Add this test with the implementation.
 - [ ] Add envelope/resource tests through `normalizeImportFile(fileText: string): NormalizationResult`: invalid JSON, array root, backup discriminator, version 2, wrong-type optional section, UTF-8 multibyte input exceeding 5 MiB, and 50,001 nested array entries. The fatal outcome must have no document and zero future changes.
 - [ ] Implement byte checking before `JSON.parse`; use an iterative stack to count array entries and traverse objects, stopping immediately over 50,000. This also avoids recursion overflow on adversarial nesting:
 
-```ts
-export function exceedsArrayEntryLimit(root: unknown, limit: number): boolean {
-  const pending: unknown[] = [root]
-  let count = 0
-  while (pending.length > 0) {
-    const value = pending.pop()
-    if (Array.isArray(value)) {
-      count += value.length
-      if (count > limit) return true
-      for (const child of value) pending.push(child)
-    } else if (value !== null && typeof value === 'object') {
-      for (const child of Object.values(value)) pending.push(child)
-    }
-  }
-  return false
-}
-```
+Source: [import-normalization.ts](../../../src/features/imports/domain/import-normalization.ts) · coverage: [import-normalization.test.ts](../../../src/features/imports/domain/import-normalization.test.ts).
 
 The normalizer checks plain JSON shape, header, then resources, then recognized
 sections. Unknown keys yield `unknown-field`; wrong-type optional sections yield
@@ -501,66 +218,12 @@ fixtures. All exports return the Task 1 types.
 
 - [ ] Add this normalization regression and assert exact diagnostic paths in separate parameterized cases:
 
-```ts
-import { expect, it } from 'vitest'
-import { normalizeImportFile } from './import-normalization'
-
-it('folds explicit metadata before assigning defaults', () => {
-  const result = normalizeImportFile(
-    JSON.stringify({
-      format: 'cognipace-content',
-      version: 1,
-      problems: [
-        'two-sum',
-        {
-          slug: 'two-sum',
-          title: 'Two Sum',
-          difficulty: ' EASY ',
-          topics: [null, ' Array '],
-        },
-      ],
-    }),
-  )
-  expect(result.status).toBe('valid')
-  if (result.status !== 'valid') throw new Error('Expected a valid document')
-  expect(result.document.problems).toHaveLength(1)
-  expect(result.document.problems[0]).toMatchObject({
-    slug: 'two-sum',
-    title: 'Two Sum',
-    difficulty: 'easy',
-    isPremium: null,
-    topics: [{ label: 'Array', path: 'problems[1].topics[1]' }],
-  })
-})
-```
+Coverage: [import-normalization.test.ts](../../../src/features/imports/domain/import-normalization.test.ts).
 
 - [ ] Run `rtk proxy npx vitest run src/features/imports/domain/import-normalization.test.ts`; verify this behavior fails before adding folding.
 - [ ] Add concrete parser functions with these contracts; each receives the diagnostics accumulator and records paths at the point the invalid value is discovered:
 
-```ts
-export type EntryNormalizer = {
-  problem(
-    value: unknown,
-    path: string,
-    diagnostics: ImportDiagnostic[],
-  ): ProblemDraft | null
-  track(
-    value: unknown,
-    path: string,
-    diagnostics: ImportDiagnostic[],
-  ): TrackDraft | null
-  group(
-    value: unknown,
-    path: string,
-    diagnostics: ImportDiagnostic[],
-  ): GroupDraft | null
-  labels(
-    value: unknown,
-    path: string,
-    diagnostics: ImportDiagnostic[],
-  ): LabelDraft[]
-}
-```
+Normalization is implemented in [import-entry-normalization.ts](../../../src/features/imports/domain/import-entry-normalization.ts); the unused dispatch interface was omitted.
 
 Implement these as named exports `normalizeProblemEntry`, `normalizeTrackEntry`,
 `normalizeGroupEntry`, and `normalizeLabelEntries`, importing the Task 1 types.
@@ -574,25 +237,7 @@ every reference is invalid. The latter skips the group.
 Duplicate scalar precedence uses the complete helper below after normalization;
 it never treats `false` or `unknown` as absent:
 
-```ts
-function takeFirst<T>(
-  current: T | null,
-  incoming: T | null,
-  path: string,
-  diagnostics: ImportDiagnostic[],
-): T | null {
-  if (current === null) return incoming
-  if (incoming !== null && incoming !== current) {
-    diagnostics.push({
-      severity: 'warning',
-      code: 'conflicting-value',
-      path,
-      message: 'An earlier value for this identity is retained.',
-    })
-  }
-  return current
-}
-```
+Source: [import-normalization.ts](../../../src/features/imports/domain/import-normalization.ts) · coverage: [import-normalization.test.ts](../../../src/features/imports/domain/import-normalization.test.ts).
 
 Fold problems in insertion-ordered maps keyed by slug. Union labels by the
 existing `normalizeTopicLookupKey` convention, retaining the first label/path.
@@ -629,71 +274,12 @@ fixtures with `emptyImportState()` returning all Task 1 arrays empty.
 
 - [ ] Write tests for the concrete pure interface:
 
-```ts
-import { expect, it } from 'vitest'
-import { normalizeImportFile } from './import-normalization'
-import { buildImportPlan } from './import-plan'
-import { emptyImportState } from '../testing/import-fixtures'
-
-it('retains stored metadata and plans only missing label joins', () => {
-  const state = emptyImportState()
-  state.catalog.problems.push({
-    slug: 'two-sum',
-    title: 'My title',
-    difficulty: 'hard',
-    isPremium: true,
-  })
-  const input = normalizeImportFile(
-    JSON.stringify({
-      format: 'cognipace-content',
-      version: 1,
-      problems: [
-        {
-          slug: 'two-sum',
-          title: 'Incoming title',
-          difficulty: 'easy',
-          topics: ['Array'],
-        },
-      ],
-    }),
-  )
-  const plan = buildImportPlan(input, state)
-  expect(plan.changes.catalog.problems).toEqual([])
-  expect(plan.changes.catalog.topics).toEqual([{ id: 'array', label: 'Array' }])
-  expect(plan.changes.catalog.problemTopics).toEqual([
-    { problemSlug: 'two-sum', topicId: 'array' },
-  ])
-  expect(state.catalog.problems[0]?.title).toBe('My title')
-  expect(plan.preview.additions.problems).toBe(0)
-})
-```
+Coverage: [import-plan.test.ts](../../../src/features/imports/domain/import-plan.test.ts).
 
 - [ ] Run `rtk proxy npx vitest run src/features/imports/domain/import-plan.test.ts`; expect missing planner failure.
 - [ ] Implement explicit planner functions with the following inputs/outputs, using owner-domain row shapes from Task 1:
 
-```ts
-// plan-import-tracks.ts
-export type PlannedTracks = {
-  changes: TrackImportChanges
-  references: { slug: string; path: string }[]
-  items: ImportItem[]
-  diagnostics: ImportDiagnostic[]
-  relevantState: TrackImportState
-}
-// planImportTracks(tracks: TrackDraft[], state: TrackImportState): PlannedTracks
-
-// plan-import-problems.ts
-export type PlannedProblems = {
-  changes: ProblemImportChanges
-  items: ImportItem[]
-  diagnostics: ImportDiagnostic[]
-  relevantState: ProblemImportState
-}
-// planImportProblems(document: NormalizedImport, references: PlannedTracks['references'], state: ProblemImportState): PlannedProblems
-
-// import-plan.ts
-// buildImportPlan(input: NormalizationResult, state: ImportState): ImportPlan
-```
+Source: [plan-import-tracks.ts](../../../src/features/imports/domain/plan-import-tracks.ts) · coverage: [import-plan.test.ts](../../../src/features/imports/domain/import-plan.test.ts).
 
 Implement curriculum planning first: look up a track by slug; check new-track ID
 collisions; check expected group ID/owner and fallback-title ambiguity; plan new

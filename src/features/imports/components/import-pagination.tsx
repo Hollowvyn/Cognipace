@@ -6,8 +6,6 @@ interface ImportPaginationProps {
   currentPage: number
   label: string
   onGoToPage: (pageIndex: number) => void
-  onNext: () => void
-  onPrevious: () => void
   total: number
 }
 
@@ -17,8 +15,6 @@ export function ImportPagination({
   currentPage,
   label,
   onGoToPage,
-  onNext,
-  onPrevious,
   total,
 }: ImportPaginationProps) {
   const pageInputId = useId()
@@ -55,7 +51,7 @@ export function ImportPagination({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           disabled={currentPage === 0}
-          onClick={onPrevious}
+          onClick={() => onGoToPage(currentPage - 1)}
           size="sm"
           variant="outline"
         >
@@ -63,7 +59,7 @@ export function ImportPagination({
         </Button>
         <Button
           disabled={currentPage + 1 >= pageCount}
-          onClick={onNext}
+          onClick={() => onGoToPage(currentPage + 1)}
           size="sm"
           variant="outline"
         >

@@ -48,8 +48,6 @@ export function ImportDiagnostics({ diagnostics }: ImportDiagnosticsProps) {
             onGoToPage={(nextPage) =>
               setPageState({ diagnostics, page: nextPage })
             }
-            onNext={() => setPageState({ diagnostics, page: page + 1 })}
-            onPrevious={() => setPageState({ diagnostics, page: page - 1 })}
             total={diagnostics.length}
           />
         </>
