@@ -1,9 +1,10 @@
 # CogniPace Content Format, Version 1
 
 This document defines the versioned JSON format for reusable questions
-(`problems` in the file), tracks, companies, and topic labels. These rules are
-the public v1 contract; the Settings import workflow is forthcoming and is not
-shipped yet. This file format is separate from CogniPace's full-backup format.
+(`problems` in the file), tracks, companies, and topic labels. These four
+sections form the public v1 content-import contract and can be used
+independently or together in Settings > Data Management. Content import is
+separate from CogniPace's full-backup format.
 
 The checked-in [JSON Schema](../public/import/cognipace-content-v1.schema.json)
 is intended for editors and authoring tools. Ready-to-copy files are in
@@ -121,9 +122,9 @@ substitute for runtime validation.
 
 Missing and `null` optional sections mean no supplied data. A `null` metadata
 field means “leave this value alone,” never “clear it.” Null label elements are
-ignored. Empty arrays add nothing and clear nothing. An empty file has no
-content to commit; a file whose valid content is already present has no changes
-to apply.
+ignored. A `null` content entry is invalid and is skipped with a diagnostic.
+Empty arrays add nothing and clear nothing. An empty file has no content to
+commit; a file whose valid content is already present has no changes to apply.
 
 Imports are additive and non-destructive:
 
@@ -149,7 +150,16 @@ does not create a track or associate it with questions unless the question
 object supplies that company. Top-level `companies` and `topics` can register
 labels without assigning them to a question; labels named in a problem object
 can be created as needed, so repeating them at the top level is optional.
-Topic hierarchy and alias authoring are outside v1.
+
+Topic labels use exact normalized lookup against stored topic IDs, canonical
+labels, and aliases already registered in CogniPace. Normalization applies
+Unicode NFC, trims and collapses whitespace, normalizes common dash characters,
+and ignores case; lookup is not fuzzy. A known alias resolves to its canonical
+topic. An unknown label becomes its own canonical topic, so an unregistered
+alternate spelling can create a separate topic instead of merging with a
+similar label. Ambiguous matches are skipped with a diagnostic rather than
+guessed. Content files cannot create aliases or topic relations. Topic
+hierarchy and alias authoring remain outside v1.
 
 ## Duplicate precedence
 
@@ -173,14 +183,14 @@ Repeated content is folded before comparing it with local data:
 
 ## Partial imports and failures
 
-The planned importer reports stable diagnostic codes, input paths, and
+The importer preview reports stable diagnostic codes, input paths, and
 plain-language messages. A file-level error prevents previewing any content:
 unreadable or invalid JSON, a non-object root, an incorrect `format`, an
 unsupported version, or a resource limit exceeded. Identity failures skip the
 affected problem/track/group entry. Invalid optional metadata is omitted with a
 warning while an otherwise valid problem can still be accepted. Invalid label
 elements and invalid individual group references are skipped; independent
-valid sections and entries remain eligible.
+valid sections and entries remain eligible for the same preview and apply.
 
 A wrong-type optional top-level section is skipped with an error while other
 valid sections remain eligible. Unknown fields at recognized object levels
@@ -220,6 +230,7 @@ workflow and format: a backup is not accepted as a content file, and content
 import does not restore or replace a user's library, curriculum edits, or
 practice data.
 
-The Settings > Data Management preview/apply workflow and template picker are
-not shipped yet. They are planned to use this contract and show additions and
-diagnostics before any writes.
+Settings > Data Management provides packaged templates and this JSON Schema,
+then shows a read-only preview of additions and diagnostics before applying
+valid content. See the [manual content-import smoke flow](testing.md#settings-content-import)
+for real-extension verification steps.

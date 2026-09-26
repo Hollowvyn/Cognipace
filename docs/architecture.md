@@ -103,6 +103,9 @@ Not every feature needs every folder. Add only the folder needed for the change.
 - `problems`: problem identity, catalog rows, Library behavior, edit data,
   companies, standardized topics, topic alias resolution, topic parent rollups,
   difficulty, premium status, and page upserts.
+- `imports`: content-file contracts, normalization and planning, preview/apply
+  workflow, and import diagnostics. It delegates catalog writes to Problems and
+  curriculum writes to Tracks.
 - `queue`: review recommendation composition for today.
 - `tracks`: curriculum tracks, groups, ordered memberships, active track and
   group state, progress, and dashboard track management.
@@ -196,6 +199,41 @@ UI hook or surface action
 - After database writes, flush the database snapshot before broadcasting cache
   invalidation.
 - Broadcast invalidation tags for every query family affected by a write.
+
+### Content Import
+
+The `imports` feature owns the v1 content format and Settings workflow; the
+complete public contract is in [docs/import-format.md](import-format.md). It
+uses the existing database schema and owner repositories: Problems persists
+questions, companies, topics, and their direct question associations; Tracks
+persists tracks, groups, and ordered question memberships. Content import adds
+to those existing records and does not change the full-backup format or require
+a schema migration.
+
+The dashboard-only runtime methods are `imports.preview`, `imports.apply`, and
+`imports.retryPersistence`. Their request and response payloads use Zod
+contracts, and sender authorization checks the actual dashboard sender. All
+three methods run through the shared background mutation queue. Apply rebuilds
+the plan against current local state in that queue and compares its fingerprint
+with the preview. If relevant content changed, it returns a fresh stale preview
+without writing; the user must review and explicitly apply that preview.
+
+An accepted apply inserts the catalog and curriculum changes in one database
+transaction. After commit, the background marks local sync data dirty and flushes
+the database snapshot. A successful flush is followed by `problems`, `tracks`,
+and `analytics` invalidation broadcasts and automatic-push scheduling when Gist
+sync is configured. A snapshot failure does not undo the already committed
+transaction: the UI reports that content was added but could not be saved to
+browser storage, and the handler retains a pending-persistence state. Retrying
+flushes that committed state without applying the database changes again. Once
+the retry succeeds, the handler clears the pending state, broadcasts
+invalidations, and schedules sync. If no pending snapshot exists, retry asks the
+UI to preview again.
+
+Topic labels are resolved by exact normalized lookup against stored canonical
+labels, IDs, and aliases. Unknown labels become standalone canonical topics;
+content import does not create topic aliases or hierarchy relations. Stored
+aliases are consulted during lookup; topic relation rows remain untouched.
 
 ## State And Data Flow
 
