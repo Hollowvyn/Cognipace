@@ -47,6 +47,24 @@ export const readyPreview: ImportPreview = {
   diagnostics: [],
 }
 
+export const secondPreview: ImportPreview = {
+  ...readyPreview,
+  fingerprint: 'b'.repeat(64),
+  additions: {
+    ...readyPreview.additions,
+    problems: 2,
+  },
+  items: [
+    {
+      kind: 'problems',
+      identity: 'valid-anagram',
+      label: 'Valid Anagram',
+      action: 'add',
+      path: '$.problems[1]',
+    },
+  ],
+}
+
 export const existingLocalTrackFixture: TrackImportState = {
   tracks: [
     {
