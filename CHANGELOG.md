@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/Hollowvyn/Cognipace/compare/v1.3.2...v1.4.0) (2026-09-26)
+
+
+### Features
+
+* **release:** prepare private Chrome Web Store publication ([#165](https://github.com/Hollowvyn/Cognipace/issues/165)) ([472a053](https://github.com/Hollowvyn/Cognipace/commit/472a053d60966798f4727b1540c9adc7eb89e7ab))
+* **topics:** add canonical taxonomy and Library filtering ([#171](https://github.com/Hollowvyn/Cognipace/issues/171)) ([1f61c89](https://github.com/Hollowvyn/Cognipace/commit/1f61c89b3f2440351c55e21dea42d926b1c968ef))
+
 ## [1.3.2](https://github.com/Hollowvyn/cognipace-v2/compare/v1.3.1...v1.3.2) (2026-09-14)
 
 
