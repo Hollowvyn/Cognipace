@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { expect, it } from 'vitest'
 
 import { emptyImportState } from '../testing/import-fixtures'
@@ -10,6 +12,104 @@ function parse(document: unknown): NormalizationResult {
 }
 
 const envelope = { format: 'cognipace-content', version: 1 }
+
+it('builds ready plans with the expected additions for every packaged example', () => {
+  const examples = [
+    {
+      file: 'minimal-problems.json',
+      additions: {
+        problems: 2,
+        topics: 0,
+        companies: 0,
+        problemTopics: 0,
+        problemCompanies: 0,
+        tracks: 0,
+        groups: 0,
+        memberships: 0,
+      },
+    },
+    {
+      file: 'detailed-problems.json',
+      additions: {
+        problems: 1,
+        topics: 2,
+        companies: 0,
+        problemTopics: 2,
+        problemCompanies: 0,
+        tracks: 0,
+        groups: 0,
+        memberships: 0,
+      },
+    },
+    {
+      file: 'companies.json',
+      additions: {
+        problems: 0,
+        topics: 0,
+        companies: 1,
+        problemTopics: 0,
+        problemCompanies: 0,
+        tracks: 0,
+        groups: 0,
+        memberships: 0,
+      },
+    },
+    {
+      file: 'topics.json',
+      additions: {
+        problems: 0,
+        topics: 3,
+        companies: 0,
+        problemTopics: 0,
+        problemCompanies: 0,
+        tracks: 0,
+        groups: 0,
+        memberships: 0,
+      },
+    },
+    {
+      file: 'track-only.json',
+      additions: {
+        problems: 3,
+        topics: 0,
+        companies: 0,
+        problemTopics: 0,
+        problemCompanies: 0,
+        tracks: 1,
+        groups: 2,
+        memberships: 3,
+      },
+    },
+    {
+      file: 'combined.json',
+      additions: {
+        problems: 2,
+        topics: 1,
+        companies: 1,
+        problemTopics: 1,
+        problemCompanies: 1,
+        tracks: 1,
+        groups: 1,
+        memberships: 2,
+      },
+    },
+  ]
+  const examplesDirectory = join(process.cwd(), 'public/import/examples')
+
+  for (const { file, additions } of examples) {
+    const input = normalizeImportFile(
+      readFileSync(join(examplesDirectory, file), 'utf8'),
+    )
+    const plan = buildImportPlan(input, emptyImportState())
+
+    expect(plan.preview.status, file).toBe('ready')
+    expect(plan.preview.additions, file).toEqual(additions)
+    expect(
+      plan.preview.diagnostics.filter(({ severity }) => severity === 'error'),
+      file,
+    ).toEqual([])
+  }
+})
 
 it('retains stored metadata and plans only missing label joins', () => {
   const state = emptyImportState()
