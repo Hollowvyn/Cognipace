@@ -1,3 +1,5 @@
+import { normalizeLeetCodeSlug } from '@/lib/leetcode'
+
 export function readImportSlug(value: unknown): string | null {
   if (typeof value !== 'string') return null
 
@@ -5,6 +7,11 @@ export function readImportSlug(value: unknown): string | null {
   return slug.length <= 200 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
     ? slug
     : null
+}
+
+/** Preserves the existing taxonomy ID convention used for company labels. */
+export function normalizeCompanyImportKey(value: string) {
+  return normalizeLeetCodeSlug(value)
 }
 
 function readLeetCodeUrlIdentity(value: string): string | null {

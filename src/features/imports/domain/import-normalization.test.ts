@@ -366,6 +366,41 @@ describe('normalizeImportFile entries and duplicate folding', () => {
     ])
   })
 
+  it('skips labels rejected by topic identity rules without aborting the file', () => {
+    const result = expectValid(
+      envelope({
+        topics: ['!!!', 'Dynamic Programming'],
+        companies: ['💡', 'Example Company'],
+        problems: [
+          {
+            slug: 'two-sum',
+            topics: ['---', 'Array'],
+            companies: ['✨', 'Example Company'],
+          },
+        ],
+      }),
+    )
+
+    expect(result.document.topics).toEqual([
+      { label: 'Dynamic Programming', path: 'topics[1]' },
+    ])
+    expect(result.document.companies).toEqual([
+      { label: 'Example Company', path: 'companies[1]' },
+    ])
+    expect(result.document.problems[0]?.topics).toEqual([
+      { label: 'Array', path: 'problems[0].topics[1]' },
+    ])
+    expect(result.document.problems[0]?.companies).toEqual([
+      { label: 'Example Company', path: 'problems[0].companies[1]' },
+    ])
+    expectDiagnosticPaths(result, [
+      { code: 'invalid-label', path: 'problems[0].topics[0]' },
+      { code: 'invalid-label', path: 'problems[0].companies[0]' },
+      { code: 'invalid-label', path: 'topics[0]' },
+      { code: 'invalid-label', path: 'companies[0]' },
+    ])
+  })
+
   it('does not parse references from a group with an invalid identity', () => {
     const result = expectValid(
       envelope({

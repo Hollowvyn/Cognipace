@@ -76,9 +76,9 @@ describe('imports API hooks', () => {
         fileText,
         fingerprint,
       })
-      expect(invalidatedKeys(invalidateQueries.mock.calls)).toEqual(
-        affectedQueryKeys,
-      )
+      expect(
+        canonicalQueryKeys(invalidatedKeys(invalidateQueries.mock.calls)),
+      ).toEqual(canonicalQueryKeys(affectedQueryKeys))
       expect(invalidatedKeys(invalidateQueries.mock.calls)).not.toContainEqual(
         queryKeys.settings.all,
       )
@@ -117,9 +117,9 @@ describe('imports API hooks', () => {
       'imports.retryPersistence',
       { surface: 'dashboard' },
     )
-    expect(invalidatedKeys(invalidateQueries.mock.calls)).toEqual(
-      affectedQueryKeys,
-    )
+    expect(
+      canonicalQueryKeys(invalidatedKeys(invalidateQueries.mock.calls)),
+    ).toEqual(canonicalQueryKeys(affectedQueryKeys))
     expect(invalidatedKeys(invalidateQueries.mock.calls)).not.toContainEqual(
       queryKeys.settings.all,
     )
@@ -163,4 +163,8 @@ function invalidatedKeys(
   calls: Parameters<QueryClient['invalidateQueries']>[],
 ) {
   return calls.map(([filters]) => filters?.queryKey)
+}
+
+function canonicalQueryKeys(keys: readonly unknown[]) {
+  return keys.map((key) => JSON.stringify(key) ?? 'undefined').sort()
 }

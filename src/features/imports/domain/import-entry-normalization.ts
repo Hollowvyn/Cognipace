@@ -1,6 +1,7 @@
 import { normalizeTopicLookupKey } from '@/features/problems/domain/topic-taxonomy'
 
 import {
+  normalizeCompanyImportKey,
   readImportSlug,
   readProblemIdentity,
   readProblemUrlIdentity,
@@ -158,6 +159,7 @@ export function normalizeLabelEntries(
   value: unknown,
   path: string,
   diagnostics: ImportDiagnostic[],
+  normalizeKey: (label: string) => string = normalizeTopicLookupKey,
 ): LabelDraft[] {
   if (value === undefined || value === null) return []
   if (!Array.isArray(value)) {
@@ -177,13 +179,34 @@ export function normalizeLabelEntries(
     }
 
     const label = item.trim().replace(/\s+/g, ' ')
-    const lookupKey = normalizeTopicLookupKey(label)
-    if (!label || !lookupKey) {
+    if (!label) {
       warn(
         diagnostics,
         'invalid-label',
         itemPath,
         'Expected a non-empty label.',
+      )
+      return
+    }
+
+    let lookupKey: string
+    try {
+      lookupKey = normalizeKey(label)
+    } catch {
+      warn(
+        diagnostics,
+        'invalid-label',
+        itemPath,
+        'A label must contain a Unicode letter or number.',
+      )
+      return
+    }
+    if (!lookupKey) {
+      warn(
+        diagnostics,
+        'invalid-label',
+        itemPath,
+        'Expected a non-empty normalized label identity.',
       )
       return
     }
@@ -305,6 +328,7 @@ export function normalizeProblemEntry(
       value.companies,
       fieldPath(path, 'companies'),
       diagnostics,
+      normalizeCompanyImportKey,
     ),
   }
 }

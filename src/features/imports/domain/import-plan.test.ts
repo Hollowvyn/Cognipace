@@ -135,9 +135,11 @@ it('retains stored metadata and plans only missing label joins', () => {
   )
   const plan = buildImportPlan(input, state)
   expect(plan.changes.catalog.problems).toEqual([])
-  expect(plan.changes.catalog.topics).toEqual([{ id: 'array', label: 'Array' }])
+  expect(plan.changes.catalog.topics).toHaveLength(1)
+  expect(plan.changes.catalog.topics[0]?.id).toMatch(/^topic-/)
+  expect(plan.changes.catalog.topics[0]?.label).toBe('Array')
   expect(plan.changes.catalog.problemTopics).toEqual([
-    { problemSlug: 'two-sum', topicId: 'array' },
+    { problemSlug: 'two-sum', topicId: plan.changes.catalog.topics[0]?.id },
   ])
   expect(state.catalog.problems[0]?.title).toBe('My title')
   expect(plan.preview.additions.problems).toBe(0)
@@ -521,13 +523,20 @@ it('links a topic alias to its canonical topic without creating another topic', 
   expect(plan.changes.catalog.problemTopics).toEqual([
     { problemSlug: 'two-sum', topicId: 'array' },
   ])
+  expect(plan.preview.items).toContainEqual(
+    expect.objectContaining({
+      kind: 'problemTopics',
+      label: 'two-sum · Arrays',
+      action: 'add',
+    }),
+  )
 })
 
 it('skips an ambiguous normalized topic match instead of selecting a row by return order', () => {
   const state = emptyImportState()
   state.catalog.topics.push(
     { id: 'topic-one', label: 'Special Topic' },
-    { id: 'topic-two', label: 'special-topic' },
+    { id: 'topic-two', label: 'special   topic' },
   )
   const plan = buildImportPlan(
     parse({
@@ -557,19 +566,53 @@ it('imports top-level taxonomy labels without requiring problem records', () => 
     emptyImportState(),
   )
 
-  expect(plan.changes.catalog.topics).toEqual([
-    { id: 'dynamic-programming', label: 'Dynamic Programming' },
-  ])
+  expect(plan.changes.catalog.topics).toHaveLength(1)
+  expect(plan.changes.catalog.topics[0]?.id).toMatch(/^topic-/)
+  expect(plan.changes.catalog.topics[0]?.label).toBe('Dynamic Programming')
   expect(plan.changes.catalog.companies).toEqual([
     { id: 'example-co', label: 'Example Co' },
   ])
+})
+
+it('plans deterministic canonical topic IDs and avoids occupied topic IDs', () => {
+  const input = parse({
+    ...envelope,
+    topics: ['Dynamic Programming', 'Sliding Window'],
+    problems: [{ slug: 'two-sum', topics: ['Array'] }],
+  })
+  const initialState = emptyImportState()
+  const firstPlan = buildImportPlan(input, initialState)
+  const repeatedPlan = buildImportPlan(input, initialState)
+  const firstTopicId = firstPlan.changes.catalog.topics[0]?.id
+
+  expect(firstTopicId).toMatch(/^topic-/)
+  expect(firstPlan.changes.catalog.topics.map(({ id }) => id)).toHaveLength(3)
+  expect(
+    new Set(firstPlan.changes.catalog.topics.map(({ id }) => id)).size,
+  ).toBe(3)
+  expect(repeatedPlan.changes.catalog.topics).toEqual(
+    firstPlan.changes.catalog.topics,
+  )
+  expect(repeatedPlan.preview.fingerprint).toBe(firstPlan.preview.fingerprint)
+
+  const stateWithOccupiedId = emptyImportState()
+  stateWithOccupiedId.catalog.topics.push({
+    id: firstTopicId!,
+    label: 'Unrelated',
+  })
+  const collisionPlan = buildImportPlan(input, stateWithOccupiedId)
+
+  expect(collisionPlan.changes.catalog.topics[0]?.id).not.toBe(firstTopicId)
+  expect(
+    new Set(collisionPlan.changes.catalog.topics.map(({ id }) => id)).size,
+  ).toBe(3)
 })
 
 it('skips ambiguous normalized company labels without losing other labels', () => {
   const state = emptyImportState()
   state.catalog.companies.push(
     { id: 'company-one', label: 'Example Corp' },
-    { id: 'company-two', label: 'example-corp' },
+    { id: 'company-two', label: 'example corp' },
   )
   const plan = buildImportPlan(
     parse({

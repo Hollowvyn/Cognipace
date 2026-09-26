@@ -4,6 +4,8 @@ import {
 } from '@/features/problems/domain/topic-taxonomy'
 import { titleFromSlug } from '@/features/problems/domain/problem'
 
+import { normalizeCompanyImportKey } from './import-identity'
+
 import type {
   ImportDiagnostic,
   ImportItem,
@@ -37,6 +39,7 @@ type ProblemLookups = {
   problemsBySlug: Map<string, ProblemImportState['problems']>
   topicsById: Map<string, ImportedLabel[]>
   topicsByKey: Map<string, ImportedLabel[]>
+  topicIds: Set<string>
   aliasesByKey: Map<string, ProblemImportState['aliases']>
   companiesById: Map<string, ImportedLabel[]>
   companiesByKey: Map<string, ImportedLabel[]>
@@ -71,11 +74,13 @@ function appendLookup<T>(map: Map<string, T[]>, key: string, row: T) {
 function createLookups(state: ProblemImportState): ProblemLookups {
   const topicsById = new Map<string, ImportedLabel[]>()
   const topicsByKey = new Map<string, ImportedLabel[]>()
+  const topicIds = new Set<string>()
   const aliasesByKey = new Map<string, ProblemImportState['aliases']>()
   const companiesById = new Map<string, ImportedLabel[]>()
   const companiesByKey = new Map<string, ImportedLabel[]>()
   for (const topic of state.topics) {
     appendLookup(topicsById, topic.id, topic)
+    topicIds.add(topic.id)
     appendLookup(topicsByKey, normalizeTopicLookupKey(topic.label), topic)
   }
   for (const alias of state.aliases) {
@@ -87,7 +92,7 @@ function createLookups(state: ProblemImportState): ProblemLookups {
     appendLookup(companiesById, company.id, company)
     appendLookup(
       companiesByKey,
-      normalizeTopicLookupKey(company.label),
+      normalizeCompanyImportKey(company.label),
       company,
     )
   }
@@ -97,6 +102,7 @@ function createLookups(state: ProblemImportState): ProblemLookups {
     ),
     topicsById,
     topicsByKey,
+    topicIds,
     aliasesByKey,
     companiesById,
     companiesByKey,
@@ -122,7 +128,7 @@ function relevantProblemState(
     [
       ...document.companies,
       ...document.problems.flatMap(({ companies }) => companies),
-    ].map(({ label }) => normalizeTopicLookupKey(label)),
+    ].map(({ label }) => normalizeCompanyImportKey(label)),
   )
   const topicCandidateIds = new Set<string>()
   for (const topic of state.topics) {
@@ -140,7 +146,7 @@ function relevantProblemState(
   for (const company of state.companies) {
     if (
       companyKeys.has(company.id) ||
-      companyKeys.has(normalizeTopicLookupKey(company.label))
+      companyKeys.has(normalizeCompanyImportKey(company.label))
     ) {
       companyCandidateIds.add(company.id)
     }
@@ -210,6 +216,26 @@ function addDiagnostic(
   diagnostics.push({ severity: 'warning', code, path, message })
 }
 
+function stableTopicIdSeed(key: string) {
+  let primary = 0x811c9dc5
+  let secondary = 0x9e3779b9
+
+  for (let index = 0; index < key.length; index += 1) {
+    const code = key.charCodeAt(index)
+    primary = Math.imul(primary ^ code, 16777619)
+    secondary = Math.imul(secondary ^ code, 1597334677)
+  }
+
+  return `${(primary >>> 0).toString(16)}${(secondary >>> 0).toString(16)}`
+}
+
+function createImportedTopicId(key: string, occupied: ReadonlySet<string>) {
+  const seed = stableTopicIdSeed(key)
+  let attempt = 0
+
+  return createTopicId(occupied, () => `import-${seed}-${attempt++}`)
+}
+
 function item(
   kind: ImportItem['kind'],
   identity: string,
@@ -267,8 +293,16 @@ function resolveTopic(
     if (canonical) return { row: canonical, isNew: false }
   }
 
-  const row = { id: createTopicId(draft.label), label: draft.label }
+  const occupiedTopicIds = new Set(lookups.topicIds)
+  for (const plannedTopic of changes.topics) {
+    occupiedTopicIds.add(plannedTopic.id)
+  }
+  const row = {
+    id: createImportedTopicId(key, occupiedTopicIds),
+    label: draft.label,
+  }
   changes.topics.push(row)
+  lookups.topicIds.add(row.id)
   plannedByKey.set(key, row)
   return { row, isNew: true }
 }
@@ -280,7 +314,16 @@ function resolveCompany(
   changes: ProblemImportChanges,
   diagnostics: ImportDiagnostic[],
 ): ResolvedLabel | null {
-  const key = normalizeTopicLookupKey(draft.label)
+  const key = normalizeCompanyImportKey(draft.label)
+  if (!key) {
+    addDiagnostic(
+      diagnostics,
+      'invalid-company-identity',
+      draft.path,
+      'This company label cannot produce an ID using the existing company naming rules.',
+    )
+    return null
+  }
   const matches = [
     ...(lookups.companiesById.get(key) ?? []),
     ...(lookups.companiesByKey.get(key) ?? []),

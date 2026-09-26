@@ -6,6 +6,7 @@ import {
 } from '@/features/imports/api/content-file-contracts'
 import { normalizeTopicLookupKey } from '@/features/problems/domain/topic-taxonomy'
 
+import { normalizeCompanyImportKey } from './import-identity'
 import {
   normalizeLabelEntries,
   normalizeProblemEntry,
@@ -94,9 +95,10 @@ function appendLabels(
   current: LabelDraft[],
   incoming: LabelDraft[],
   seen: Set<string>,
+  normalizeKey: (label: string) => string,
 ): void {
   for (const label of incoming) {
-    const key = normalizeTopicLookupKey(label.label)
+    const key = normalizeKey(label.label)
     if (seen.has(key)) continue
     seen.add(key)
     current.push(label)
@@ -116,7 +118,7 @@ function createProblemAccumulator(draft: ProblemDraft): ProblemAccumulator {
       draft.topics.map(({ label }) => normalizeTopicLookupKey(label)),
     ),
     companyKeys: new Set(
-      draft.companies.map(({ label }) => normalizeTopicLookupKey(label)),
+      draft.companies.map(({ label }) => normalizeCompanyImportKey(label)),
     ),
   }
 }
@@ -162,8 +164,18 @@ function foldProblems(
       fieldPath(incoming.path, 'isPremium'),
       diagnostics,
     )
-    appendLabels(current.topics, incoming.topics, accumulator.topicKeys)
-    appendLabels(current.companies, incoming.companies, accumulator.companyKeys)
+    appendLabels(
+      current.topics,
+      incoming.topics,
+      accumulator.topicKeys,
+      normalizeTopicLookupKey,
+    )
+    appendLabels(
+      current.companies,
+      incoming.companies,
+      accumulator.companyKeys,
+      normalizeCompanyImportKey,
+    )
   })
 
   return folded
@@ -334,7 +346,12 @@ export function normalizeImportFile(fileText: string): NormalizationResult {
       ? normalizeLabelEntries(parsed.topics, 'topics', diagnostics)
       : [],
     companies: Array.isArray(parsed.companies)
-      ? normalizeLabelEntries(parsed.companies, 'companies', diagnostics)
+      ? normalizeLabelEntries(
+          parsed.companies,
+          'companies',
+          diagnostics,
+          normalizeCompanyImportKey,
+        )
       : [],
   }
 

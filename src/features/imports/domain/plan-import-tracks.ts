@@ -1,4 +1,4 @@
-import { normalizeTopicLookupKey } from '@/features/problems/domain/topic-taxonomy'
+import { normalizeLeetCodeSlug } from '@/lib/leetcode'
 import { titleFromSlug } from '@/features/problems/domain/problem'
 
 import type {
@@ -239,7 +239,7 @@ function planTrack(
     const incomingKeys = new Set(
       [groupDraft.slug, groupDraft.title]
         .filter((value): value is string => value !== null)
-        .map(normalizeTopicLookupKey),
+        .map(normalizeLeetCodeSlug),
     )
     const hasFallbackMatch = [...incomingKeys].some((key) =>
       localGroupTitles.has(key),
@@ -379,7 +379,7 @@ export function planImportTracks(
     groups.push(group)
     localGroupsByTrack.set(group.trackId, groups)
     const titles = groupTitlesByTrack.get(group.trackId) ?? new Set<string>()
-    titles.add(normalizeTopicLookupKey(group.title))
+    titles.add(normalizeLeetCodeSlug(group.title))
     groupTitlesByTrack.set(group.trackId, titles)
     maxGroupPositionByTrack.set(
       group.trackId,
