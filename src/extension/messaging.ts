@@ -30,6 +30,22 @@ import type {
   GetAiProviderSecretPresenceRequest,
   SetAiProviderSecretRequest,
 } from '@/features/genai/api'
+import type {
+  ImportApplyRequest,
+  ImportApplyResponse,
+  ImportPreviewRequest,
+  ImportPreviewResponse,
+  ImportRetryPersistenceRequest,
+  ImportRetryPersistenceResponse,
+} from '@/features/imports/api/import-runtime-contracts'
+export type {
+  ImportApplyRequest,
+  ImportApplyResponse,
+  ImportPreviewRequest,
+  ImportPreviewResponse,
+  ImportRetryPersistenceRequest,
+  ImportRetryPersistenceResponse,
+} from '@/features/imports/api/import-runtime-contracts'
 export {
   clearAiProviderSecretRequestSchema,
   getAiProviderSecretPresenceRequestSchema,
@@ -318,6 +334,11 @@ export interface ProtocolMap {
   'genai.recommendLeetCodeAssessment'(
     request: RecommendLeetCodeAssessmentRequest,
   ): RecommendLeetCodeAssessmentResponse
+  'imports.preview'(request: ImportPreviewRequest): ImportPreviewResponse
+  'imports.apply'(request: ImportApplyRequest): ImportApplyResponse
+  'imports.retryPersistence'(
+    request: ImportRetryPersistenceRequest,
+  ): ImportRetryPersistenceResponse
   'devSmoke.run'(request: DevSmokeRequest): DevSmokeReport
   'sync.getStatus'(request: SyncRequest): SerializedSyncStatus
   'sync.validateGithubToken'(request: SyncGithubTokenRequest): SyncActionResult
@@ -419,6 +440,9 @@ export const protocolMethodNames = [
   'genai.setAiProviderSecret',
   'genai.clearAiProviderSecret',
   'genai.recommendLeetCodeAssessment',
+  'imports.preview',
+  'imports.apply',
+  'imports.retryPersistence',
   'devSmoke.run',
   'sync.getStatus',
   'sync.validateGithubToken',

@@ -51,24 +51,32 @@ describe('DataManagementScreen', () => {
     expect(within(backupPanel).queryByText('Backup exported.')).toBeNull()
   })
 
-  it('renders GitHub sync settings between full backup and selective import', () => {
+  it('renders GitHub sync settings before import content and reset', () => {
     const { wrapper } = createQueryTestHarness()
 
     render(<DataManagementScreen />, { wrapper })
 
     const backup = screen.getByRole('region', { name: 'Export backup' })
     const sync = screen.getByRole('region', { name: 'GitHub sync settings' })
-    const selectiveImport = screen.getByRole('region', {
-      name: 'Selective import',
+    const importContent = screen.getByRole('region', {
+      name: 'Import content',
     })
+    const reset = screen.getByRole('region', { name: 'Clear local data' })
 
     expect(
       backup.compareDocumentPosition(sync) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
     expect(
-      sync.compareDocumentPosition(selectiveImport) &
+      sync.compareDocumentPosition(importContent) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
+    expect(
+      importContent.compareDocumentPosition(reset) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      screen.getByText('Back up, restore, import, or clear local study data.'),
+    ).toBeVisible()
   })
 
   it('validates an imported backup, shows the selected file, and keeps restore calm', async () => {

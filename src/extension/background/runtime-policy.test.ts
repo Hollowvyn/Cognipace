@@ -182,6 +182,30 @@ describe('runtime-policy', () => {
     }
   })
 
+  it('keeps content import methods dashboard-only and rejects forged senders', () => {
+    for (const method of [
+      'imports.preview',
+      'imports.apply',
+      'imports.retryPersistence',
+    ]) {
+      expect(canCallExtensionMethod(method, 'dashboard')).toBe(true)
+      expect(canCallExtensionMethod(method, 'popup')).toBe(false)
+      expect(canCallExtensionMethod(method, 'content-script')).toBe(false)
+
+      expect(() =>
+        assertCanSenderCallExtensionMethod(method, 'dashboard', {
+          url: 'chrome-extension://extension-id/popup.html',
+        }),
+      ).toThrow(/cannot claim/)
+      expect(() =>
+        assertCanSenderCallExtensionMethod(method, 'dashboard', {
+          tab: { id: 7 },
+          url: 'https://leetcode.com/problems/two-sum/',
+        }),
+      ).toThrow(/cannot claim/)
+    }
+  })
+
   it('keeps backup and local reset methods dashboard-only', () => {
     for (const method of [
       'backup.exportFullBackup',

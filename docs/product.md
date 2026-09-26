@@ -106,8 +106,15 @@ Current behavior:
   create/edit, activation, deletion, and reset progress.
 - Settings manages persisted user preferences through a dirty-state form workflow.
 - Data Management in Settings exports full local backups, validates and restores
-  full backups, configures optional GitHub Gist pseudo-sync, shows planned
-  selective import sections, and performs explicit full local clear/reset.
+  full backups, imports versioned content files, configures optional GitHub Gist
+  pseudo-sync, and performs explicit full local clear/reset. Content imports
+  accept questions (`problems`), tracks, companies, and topics independently
+  or together. Preview shows planned additions and row-level diagnostics; valid
+  entries can be applied when unrelated rows are invalid. Imports add missing
+  values and associations while preserving stored scalar values, track/group
+  order and placements, and practice progress. Missing, null, and empty
+  optional data does not clear local content. See the
+  [content format reference](import-format.md) for the v1 contract.
 - The dashboard header shows compact pull and push shortcuts after GitHub Gist
   sync is configured.
 - Analytics shows local review-day totals, all-time review counts, current
@@ -188,7 +195,9 @@ Library filters, and an empty topic selection places no topic constraint.
 The product does not include a topic graph management UI. Graph-derived
 membership is a Problems read-model capability used by Library filtering; it
 does not change direct problem assignments or imply that Analytics uses topic
-ancestors.
+ancestors. Content import resolves exact normalized labels and existing stored
+aliases; an unknown label becomes its own canonical topic. Import files cannot
+author topic aliases or hierarchy relations, which remain deferred.
 
 ### Tracks
 
@@ -344,7 +353,6 @@ These are possible future directions, not approved work by default:
 
 - overview home polish
 - richer analytics
-- selective import conflict policies for topics, companies, tracks, and problems
 - improved notification strategy beyond the current local due-review reminder
 - passphrase lock for local BYOK secrets
 - enterprise KMS-backed secret wrapping

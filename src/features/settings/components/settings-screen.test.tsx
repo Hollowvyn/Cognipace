@@ -108,7 +108,7 @@ describe('SettingsScreen', () => {
     ).toBeVisible()
     expect(screen.getByRole('button', { name: 'Export backup' })).toBeVisible()
     expect(
-      screen.getByRole('heading', { name: 'Selective import' }),
+      screen.getByRole('heading', { name: 'Import content' }),
     ).toBeVisible()
     expect(
       screen.getByRole('heading', { name: 'Clear local data' }),

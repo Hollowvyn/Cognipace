@@ -99,6 +99,8 @@ const backgroundMocks = vi.hoisted(() => {
     backupValidateFullBackup: vi.fn(),
     broadcastCacheInvalidation: vi.fn(),
     getAnalyticsSummary: vi.fn(),
+    previewContentImport: vi.fn(),
+    applyContentImport: vi.fn(),
     getTodayQueue: vi.fn(),
     flushDbSnapshot: vi.fn(),
     getActiveTrack: vi.fn(),
@@ -205,6 +207,11 @@ vi.mock('@/features/app-shell/server/app-shell-service', () => ({
 
 vi.mock('@/features/analytics/server/analytics-service', () => ({
   getAnalyticsSummary: backgroundMocks.getAnalyticsSummary,
+}))
+
+vi.mock('@/features/imports/server/import-service', () => ({
+  applyContentImport: backgroundMocks.applyContentImport,
+  previewContentImport: backgroundMocks.previewContentImport,
 }))
 
 vi.mock('@/features/queue/server/queue-service', () => ({
@@ -346,6 +353,41 @@ describe('background handler registration', () => {
     backgroundMocks.handlers.clear()
     vi.clearAllMocks()
     backgroundMocks.broadcastCacheInvalidation.mockResolvedValue(null)
+    backgroundMocks.previewContentImport.mockResolvedValue({
+      status: 'ready',
+      fingerprint: 'a'.repeat(64),
+      additions: {
+        problems: 1,
+        topics: 0,
+        companies: 0,
+        problemTopics: 0,
+        problemCompanies: 0,
+        tracks: 0,
+        groups: 0,
+        memberships: 0,
+      },
+      items: [],
+      diagnostics: [],
+    })
+    backgroundMocks.applyContentImport.mockResolvedValue({
+      status: 'committed',
+      preview: {
+        status: 'ready',
+        fingerprint: 'a'.repeat(64),
+        additions: {
+          problems: 1,
+          topics: 0,
+          companies: 0,
+          problemTopics: 0,
+          problemCompanies: 0,
+          tracks: 0,
+          groups: 0,
+          memberships: 0,
+        },
+        items: [],
+        diagnostics: [],
+      },
+    })
     backgroundMocks.getAnalyticsSummary.mockResolvedValue({
       ...createSerializedAnalyticsSummary(),
       range: 30,
@@ -1219,6 +1261,96 @@ describe('background handler registration', () => {
     expect(remoteWorkRan).toBe(false)
     expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
     expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('registers all import methods and serializes previews with edits and sync restores', async () => {
+    registerBackgroundHandlers()
+    expect(backgroundMocks.handlers.has('imports.preview')).toBe(true)
+    expect(backgroundMocks.handlers.has('imports.apply')).toBe(true)
+    expect(backgroundMocks.handlers.has('imports.retryPersistence')).toBe(true)
+
+    const editGate = createDeferred<typeof trackForEditResponse>()
+    backgroundMocks.updateTrack.mockReturnValueOnce(editGate.promise)
+    const editPromise = sendRuntimeMessage('tracks.updateTrack', {
+      ...createTrackRequest(),
+      trackId: 'leetcode-75',
+    })
+    await waitUntil(() =>
+      expect(backgroundMocks.updateTrack).toHaveBeenCalled(),
+    )
+
+    const importRequest = {
+      surface: 'dashboard',
+      fileText: '{"format":"cognipace-content","version":1}',
+    }
+    const previewAfterEdit = sendRuntimeMessage(
+      'imports.preview',
+      importRequest,
+    )
+    await Promise.resolve()
+    expect(backgroundMocks.previewContentImport).not.toHaveBeenCalled()
+
+    editGate.resolve(trackForEditResponse)
+    await Promise.all([editPromise, previewAfterEdit])
+    expect(backgroundMocks.previewContentImport).toHaveBeenCalledTimes(1)
+
+    let restoreStarted = false
+    const restoreGate = createDeferred<void>()
+    backgroundMocks.syncService.pullLatest.mockImplementationOnce(async () => {
+      await readLatestSyncFactoryOptions().runRemoteRestore(async () => {
+        restoreStarted = true
+        await restoreGate.promise
+        return null
+      })
+      return syncActionResult
+    })
+
+    const syncPromise = sendRuntimeMessage('sync.pullLatest', {
+      surface: 'dashboard',
+    })
+    await waitUntil(() => expect(restoreStarted).toBe(true))
+    const previewCallsBeforeRestoreRelease =
+      backgroundMocks.previewContentImport.mock.calls.length
+    const previewAfterRestore = sendRuntimeMessage(
+      'imports.preview',
+      importRequest,
+    )
+    await Promise.resolve()
+    expect(backgroundMocks.previewContentImport).toHaveBeenCalledTimes(
+      previewCallsBeforeRestoreRelease,
+    )
+
+    restoreGate.resolve()
+    await Promise.all([syncPromise, previewAfterRestore])
+    expect(backgroundMocks.previewContentImport).toHaveBeenCalledTimes(
+      previewCallsBeforeRestoreRelease + 1,
+    )
+  })
+
+  it('wires committed imports to snapshot, dirty-mark, invalidation, and sync scheduling', async () => {
+    const response = await sendRuntimeMessage('imports.apply', {
+      surface: 'dashboard',
+      fileText: '{"format":"cognipace-content","version":1}',
+      fingerprint: 'a'.repeat(64),
+    })
+
+    expectRuntimePolicy('imports.apply', 'dashboard')
+    expect(backgroundMocks.applyContentImport).toHaveBeenCalledWith(
+      backgroundMocks.db,
+      '{"format":"cognipace-content","version":1}',
+      'a'.repeat(64),
+    )
+    expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      reason: 'problem-catalog-updated',
+      source: 'dashboard',
+      tags: ['problems', 'tracks', 'analytics'],
+    })
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).toHaveBeenCalledTimes(1)
+    expect(response).toMatchObject({ status: 'saved' })
   })
 
   it('registers active-track handling with runtime serialization', async () => {

@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "format": { "type": "string", "const": "cognipace-content" },
+    "version": { "type": "number", "const": 1 },
+    "problems": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^https:\\/\\/(?:www\\.)?leetcode\\.com(?::443)?\\/problems\\/(?=[a-z0-9-]{1,200}(?:[/?#]|$))[a-z0-9]+(?:-[a-z0-9]+)*(?:[/?#].*)?$"
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                      },
+                      "url": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^https:\\/\\/(?:www\\.)?leetcode\\.com(?::443)?\\/problems\\/(?=[a-z0-9-]{1,200}(?:[/?#]|$))[a-z0-9]+(?:-[a-z0-9]+)*(?:[/?#].*)?$"
+                          },
+                          { "type": "null" }
+                        ]
+                      },
+                      "title": {
+                        "anyOf": [{ "type": "string" }, { "type": "null" }]
+                      },
+                      "difficulty": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": ["easy", "medium", "hard", "unknown"]
+                          },
+                          { "type": "null" }
+                        ]
+                      },
+                      "isPremium": {
+                        "anyOf": [{ "type": "boolean" }, { "type": "null" }]
+                      },
+                      "topics": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                { "type": "string", "minLength": 1 },
+                                { "type": "null" }
+                              ]
+                            }
+                          },
+                          { "type": "null" }
+                        ]
+                      },
+                      "companies": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                { "type": "string", "minLength": 1 },
+                                { "type": "null" }
+                              ]
+                            }
+                          },
+                          { "type": "null" }
+                        ]
+                      }
+                    },
+                    "required": ["slug"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                          },
+                          { "type": "null" }
+                        ]
+                      },
+                      "url": {
+                        "type": "string",
+                        "pattern": "^https:\\/\\/(?:www\\.)?leetcode\\.com(?::443)?\\/problems\\/(?=[a-z0-9-]{1,200}(?:[/?#]|$))[a-z0-9]+(?:-[a-z0-9]+)*(?:[/?#].*)?$"
+                      },
+                      "title": {
+                        "anyOf": [{ "type": "string" }, { "type": "null" }]
+                      },
+                      "difficulty": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": ["easy", "medium", "hard", "unknown"]
+                          },
+                          { "type": "null" }
+                        ]
+                      },
+                      "isPremium": {
+                        "anyOf": [{ "type": "boolean" }, { "type": "null" }]
+                      },
+                      "topics": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                { "type": "string", "minLength": 1 },
+                                { "type": "null" }
+                              ]
+                            }
+                          },
+                          { "type": "null" }
+                        ]
+                      },
+                      "companies": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                { "type": "string", "minLength": 1 },
+                                { "type": "null" }
+                              ]
+                            }
+                          },
+                          { "type": "null" }
+                        ]
+                      }
+                    },
+                    "required": ["url"],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "tracks": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+              },
+              "title": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+              "description": {
+                "anyOf": [{ "type": "string" }, { "type": "null" }]
+              },
+              "groups": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slug": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                    },
+                    "title": {
+                      "anyOf": [{ "type": "string" }, { "type": "null" }]
+                    },
+                    "problems": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200,
+                                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^https:\\/\\/(?:www\\.)?leetcode\\.com(?::443)?\\/problems\\/(?=[a-z0-9-]{1,200}(?:[/?#]|$))[a-z0-9]+(?:-[a-z0-9]+)*(?:[/?#].*)?$"
+                              }
+                            ]
+                          }
+                        },
+                        { "type": "null" }
+                      ]
+                    }
+                  },
+                  "required": ["slug"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["slug", "groups"],
+            "additionalProperties": false
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "companies": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "topics": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+          }
+        },
+        { "type": "null" }
+      ]
+    }
+  },
+  "required": ["format", "version"],
+  "additionalProperties": false
+}

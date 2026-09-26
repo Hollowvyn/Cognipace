@@ -4,6 +4,7 @@ import {
   FeedbackToast,
   type FeedbackToastStatus,
 } from '@/components/ui/feedback-toast'
+import { ImportContentPanel } from '@/features/imports'
 import { GitHubSyncSettingsSection } from '@/features/sync'
 
 import {
@@ -20,7 +21,6 @@ import {
   BackupRestorePanel,
 } from './backup-restore-panel'
 import { ResetLocalDataPanel } from './reset-local-data-panel'
-import { SelectiveImportPanel } from './selective-import-panel'
 
 export function DataManagementScreen() {
   const exportBackup = useExportFullBackup()
@@ -151,7 +151,7 @@ export function DataManagementScreen() {
           Data Management
         </h1>
         <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
-          Backup, restore, or clear local study data.
+          Back up, restore, import, or clear local study data.
         </p>
       </header>
 
@@ -179,7 +179,7 @@ export function DataManagementScreen() {
         status={backupToast}
       />
       <GitHubSyncSettingsSection />
-      <SelectiveImportPanel />
+      <ImportContentPanel />
       <ResetLocalDataPanel
         error={resetError}
         isResetting={resetLocalData.isPending}

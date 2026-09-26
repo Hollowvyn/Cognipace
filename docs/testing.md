@@ -259,6 +259,58 @@ confirmation, restore success resets the import card, and clear offers backup
 first inside the confirmation dialog. After that backup export succeeds, the
 dialog button changes to a success state labeled Backup exported.
 
+### Settings Content Import
+
+Use an isolated Chrome profile with disposable data. These real-extension
+happy-path and edge-case flows, plus screenshot or screen-recording proof, are
+pending for this branch and must be completed before merge. The
+[content format reference](import-format.md) defines the file contract.
+
+1. **250-question curriculum and ordering:** prepare a valid content file with
+   250 ordered question references across ordered tracks and groups. Preview
+   the counts, page through planned items to inspect the beginning, middle, end,
+   and group boundaries, then import. Open Tracks, verify group and question
+   order against the file, reload, and confirm the curriculum remains saved.
+2. **Identical reimport:** preview and apply that same file again. Confirm the
+   preview reports that everything is already present and offers no import
+   action. Verify review history and track progress remain unchanged.
+3. **Expanded file after local edits:** import a smaller file, then edit a
+   stored question title, reorder a group or question, and record review and
+   track progress. Expand the file with new groups/references and conflicting
+   values for existing content. Confirm the preview reports preserved values;
+   after import, local titles, order, placements, reviews, and progress remain,
+   while new groups and references append. Reload and confirm the result.
+4. **Independent sections:** import a companies-only file, a topics-only file,
+   and a track-only file. Confirm company/topic labels are registered without
+   question associations unless the file supplies them, stored topic aliases
+   resolve to their canonical topic, track references are added in file order,
+   and the active track is unchanged.
+5. **Invalid rows and nulls:** preview a mixed file with valid entries, invalid
+   identities or references, invalid optional fields, null entries, null label
+   elements, and null optional sections/metadata. Confirm diagnostics show the
+   input path and reason, valid independent rows remain eligible, and null or
+   empty data leaves stored values and associations unchanged.
+6. **Stale preview:** preview a file, then change matching local content before
+   applying it. Confirm apply returns an updated preview and performs no writes
+   from the stale plan. Review the new preview and click Import again to apply.
+7. **Transaction failure:** in a test-only failure-injection harness, fail the
+   database transaction after writes have begun. Confirm the transaction rolls
+   back and no partial catalog or curriculum additions appear. Do not add a
+   failure toggle to the shipped product or corrupt normal profile data.
+8. **Snapshot failure and retry:** in a test-only harness, fail snapshot flush
+   after a successful database commit. Confirm the UI says content was added
+   but not saved, while file selection and dismissal stay disabled. Retry
+   saving and verify it persists the committed state without duplicating
+   database entries.
+9. **Backup regression:** export a full backup, select and validate it, then
+   cancel restore and cancel clear-local-data. Confirm content import did not
+   alter backup validation or silently restore/reset data. Perform an intentional
+   restore only in a disposable profile.
+
+Record these human flows and attach redacted screenshots or a recording to the
+implementation PR before merge. Automated validation and this checklist do not
+count as completed browser proof.
+
 ### AI Assessment Settings
 
 1. Open the dashboard.
