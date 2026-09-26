@@ -551,7 +551,11 @@ function fileInput() {
 
 function createFile(contents = fileText, name = 'content.json') {
   const file = new File([contents], name, { type: 'application/json' })
-  Object.defineProperty(file, 'text', { value: async () => contents })
+  Object.defineProperty(file, 'text', {
+    configurable: true,
+    value: () => Promise.resolve(contents),
+    writable: true,
+  })
   return file
 }
 
