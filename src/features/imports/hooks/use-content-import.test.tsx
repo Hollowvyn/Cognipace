@@ -428,6 +428,28 @@ describe('useContentImport', () => {
     expect(sendMessage).not.toHaveBeenCalled()
     expect(result.current.state.step).toBe('idle')
   })
+
+  it('settles to idle when selection is canceled in the same batch', async () => {
+    const read = deferred<string>()
+    const file = createFile('pending.json', fileText)
+    file.readText.mockReturnValue(read.promise)
+    const { result } = setup()
+
+    let selecting!: Promise<void>
+    let canceling!: Promise<void>
+    act(() => {
+      selecting = result.current.selectFile(file.file)
+      canceling = result.current.selectFile(null)
+    })
+    await act(async () => {
+      await canceling
+      read.resolve(fileText)
+      await selecting
+    })
+
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(result.current.state.step).toBe('idle')
+  })
 })
 
 function setup() {

@@ -124,9 +124,11 @@ export function useContentImport() {
 
       const generation = ++selectionGeneration.current
       if (file === null) {
-        if (state.step === 'reading' || state.step === 'previewing') {
-          setState(initialState)
-        }
+        setState((current) =>
+          current.step === 'reading' || current.step === 'previewing'
+            ? initialState
+            : current,
+        )
         return
       }
 
@@ -167,7 +169,7 @@ export function useContentImport() {
 
       await previewText(file.name, fileText, generation)
     },
-    [isCurrent, previewText, state.step],
+    [isCurrent, previewText],
   )
 
   const clear = useCallback(() => {
