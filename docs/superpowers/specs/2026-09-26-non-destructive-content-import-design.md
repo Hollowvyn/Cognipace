@@ -3,8 +3,8 @@
 ## Status and Intent
 
 Product format, merge policy, preview flow, architecture, and validation scope
-were approved in the design conversation on 2026-09-26. This written specification
-is awaiting the user's review before implementation planning.
+were approved in the design conversation on 2026-09-26. The user approved moving
+from the written specification to implementation planning on 2026-09-26.
 
 Enable repeated imports of coding-study content without replacing the user's
 Library, curriculum edits, practice history, or track progress. A curriculum such
