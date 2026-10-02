@@ -588,11 +588,16 @@ Human installed-extension happy-path and edge-case smoke with screenshot or
 recording proof is required before PR review or merge:
 
 1. Click a track card's title, description, progress, and spare summary space.
-   Confirm its inline preview toggles; Enter and Space on the Preview control
+   Confirm its inline preview toggles; Enter and Space on the focused card
    do the same and keep focus. Opening an inactive track must not activate it,
    change the active group, or change progress. Collapse/reopen All tracks with
-   and without an active track; the count and create/import actions remain.
-2. Inspect a populated preview. Confirm ordered group headers and question
+   and without an active track; the count and create/import actions remain,
+   and the preview stays closed when the collection reopens. Open another
+   track and confirm the previous track closes, with focus on the new toggle.
+2. Inspect a populated preview. Confirm the card summary and expanded groups
+   share one clear rounded outline and background, with groups constrained
+   inside their owning track. The summary has only a chevron, with no visible
+   Preview label or extra owning-track caption. Confirm ordered group headers and question
    order match Edit Track, the first group starts open, each group can collapse,
    and complete titles, difficulty, and topic labels wrap at narrow widths.
    A long curriculum scrolls inside the compact preview. Inspect empty groups
@@ -602,7 +607,7 @@ recording proof is required before PR review or merge:
    reset/delete and verify the preview and focus remain usable. Edit and save a
    group's questions, then reopen the preview and verify fresh content.
 4. With controlled slow or failed preview reads, close while loading, check
-   the error and Retry preview, then retry. Focus returns to the Preview control
+   the error and Retry preview, then retry. Focus returns to the card toggle
    before the temporary retry button disappears. Opening a preview performs
    only the existing read and never a track mutation.
 

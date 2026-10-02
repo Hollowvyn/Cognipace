@@ -777,6 +777,8 @@ describe('TracksScreen', () => {
     const toggle = await screen.findByRole('button', {
       name: 'Preview Grind 75',
     })
+    const card = screen.getByRole('article', { name: 'Grind 75' })
+    expect(within(card).queryByText('Preview')).not.toBeInTheDocument()
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(sendMessage).not.toHaveBeenCalledWith(
       'tracks.getTrackForEdit',
@@ -786,6 +788,9 @@ describe('TracksScreen', () => {
     expect(toggle).toHaveFocus()
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     const preview = screen.getByRole('region', { name: 'Grind 75 preview' })
+    expect(within(card).getByRole('region', { name: 'Grind 75 preview' })).toBe(
+      preview,
+    )
     expect(
       document.getElementById(toggle.getAttribute('aria-controls') ?? ''),
     ).toBe(preview)
@@ -824,6 +829,78 @@ describe('TracksScreen', () => {
       screen.queryByRole('region', { name: 'Grind 75 preview' }),
     ).not.toBeInTheDocument()
     expect(toggle).toHaveFocus()
+  })
+
+  it('opens only one track preview at a time without activating it', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'tracks.getWorkspace')
+        return Promise.resolve(twoGroupWorkspace)
+      if (method === 'tracks.getTrackForEdit')
+        return Promise.resolve(trackPreview)
+      return Promise.resolve(null)
+    })
+    renderTracksScreen()
+    const grindToggle = await screen.findByRole('button', {
+      name: 'Preview Grind 75',
+    })
+    const leetcodeToggle = screen.getByRole('button', {
+      name: 'Preview LeetCode 75',
+    })
+
+    await user.click(grindToggle)
+    expect(
+      screen.getByRole('region', { name: 'Grind 75 preview' }),
+    ).toBeVisible()
+    await user.click(leetcodeToggle)
+    expect(
+      screen.queryByRole('region', { name: 'Grind 75 preview' }),
+    ).not.toBeInTheDocument()
+    expect(grindToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(leetcodeToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(leetcodeToggle).toHaveFocus()
+    expect(
+      screen.getByRole('region', { name: 'LeetCode 75 preview' }),
+    ).toBeVisible()
+
+    await user.keyboard(' ')
+    expect(leetcodeToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(
+      screen.queryByRole('region', { name: 'LeetCode 75 preview' }),
+    ).not.toBeInTheDocument()
+    expect(leetcodeToggle).toHaveFocus()
+    for (const method of ['tracks.setActiveTrack', 'tracks.setActiveGroup']) {
+      expect(sendMessage).not.toHaveBeenCalledWith(method, expect.anything())
+    }
+  })
+
+  it('closes a track preview when the collection collapses', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'tracks.getWorkspace')
+        return Promise.resolve(twoGroupWorkspace)
+      if (method === 'tracks.getTrackForEdit')
+        return Promise.resolve(trackPreview)
+      return Promise.resolve(null)
+    })
+    renderTracksScreen()
+    await user.click(
+      await screen.findByRole('button', { name: 'Preview Grind 75' }),
+    )
+    expect(
+      screen.getByRole('region', { name: 'Grind 75 preview' }),
+    ).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Hide all tracks' }))
+    expect(
+      screen.queryByRole('region', { name: 'Grind 75 preview' }),
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show all tracks' }))
+    expect(
+      screen.getByRole('button', { name: 'Preview Grind 75' }),
+    ).toHaveAttribute('aria-expanded', 'false')
+    expect(
+      screen.queryByRole('region', { name: 'Grind 75 preview' }),
+    ).not.toBeInTheDocument()
   })
 
   it('keeps every catalog action usable without toggling an open preview', async () => {

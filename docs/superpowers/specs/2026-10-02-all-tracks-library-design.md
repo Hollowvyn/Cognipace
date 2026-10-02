@@ -29,6 +29,15 @@ button covers the summary, supports Enter/Space, exposes expansion state, and
 shows a chevron. Existing Set active, Clear Active, Edit, Reset Progress, and
 Delete controls remain independently usable and do not toggle the preview.
 
+After inspecting the installed extension, the user requested stronger ownership
+of the expanded content and removal of the visible Preview label. An expanded
+card encloses both its summary and groups in one clear continuous rounded
+outline and tonal background, without an extra caption. Only one track preview
+can be open: opening another track closes the previous one. Collapsing All
+tracks also closes its preview. Keep only the chevron on the clickable summary;
+the native card toggle and its accessible name remain for keyboard/screen-reader
+access.
+
 Load the existing Tracks read query only when a preview opens. Display ordered
 groups as full-width shaded collapsible headers, with the first group open.
 Inside, show ordered full question titles, difficulty, and direct topic labels

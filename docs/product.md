@@ -112,7 +112,9 @@ Current behavior:
   track. It shows every available track, emphasizes the active track, and
   offers explicit activation, New Track, and a compact Import tracks action.
   Clicking a track card's summary opens a compact read-only preview of its
-  ordered groups, questions, and topics. Groups can be collapsed individually;
+  ordered groups, questions, and topics inside the same outlined card. Only one
+  track preview can be open at a time; collapsing All tracks closes it.
+  Groups can be collapsed individually;
   the card's management actions stay available. Previewing does not activate
   the track or change the active group.
   Import tracks opens a template-first dialog with a downloadable track JSON

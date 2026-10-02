@@ -120,3 +120,73 @@ the user's requested hands-on testing. See docs/testing.md > Track Card Preview.
 Release impact remains an additive feat(tracks) UI change. Roll back by
 reverting the collection/import and preview feature commits while retaining
 main's existing migration and editor changes.
+
+## Installed-Extension Visual Follow-Up
+
+The user's supplied screenshot shows an open NeetCode 150 card. They requested
+that the expanded groups visibly belong to that track and that the redundant
+Preview label disappear. Their latest refinement asks for a clear enclosing
+outline without an extra caption, and only one open track at a time. This is a
+scoped adjustment to the approved card-click interaction.
+
+- [x] Extend preview interaction coverage for no visible Preview text, content
+      contained in its owning article, exclusive track expansion, and closing
+      the preview when All tracks collapses. Confirm the exclusive-expansion
+      test fails before implementation. Preserve keyboard and action coverage.
+- [x] In other-tracks-accordion.tsx, enclose the open summary and content within
+      a clear continuous rounded outline/background, give the open summary a
+      tonal fill, and remove the visible Preview text and extra owning-track
+      caption. Lift the open track ID into the collection so opening another
+      track closes the current one. Retain the native toggle and chevron.
+- [x] Update docs/product.md and the smoke guidance in docs/testing.md. Run focused tests, npm run lint,
+      npm run check, npm run build, touched-file Prettier, and git diff --check.
+- [x] Publish the scoped change to existing draft PR #183. Add the supplied
+      screenshot as human installed-extension evidence of the earlier preview
+      state; final framing proof remains pending another human screenshot.
+      Continue the dev build into the user's installed WebstormProjects folder.
+
+### Follow-Up Verification Record
+
+The exclusive-expansion test failed before implementation because both track
+previews remained in the document. The earlier no-visible-Preview regression
+also failed before the label was removed. The final focused run passed 103
+tests across two files; `npm run check` passed 1,960 tests across 187 files,
+database consistency, typecheck, and lint. Production build passed with the
+existing non-blocking chunk-size warning. Independent static review found no
+actionable issue; the reviewer's duplicate test attempt was blocked by sandbox
+EPERM on `.vite-temp`, so execution evidence comes from the successful main
+agent runs.
+
+Commands executed from the feature worktree through `rtk proxy`, using the
+project's Node v24.20.0 PATH:
+
+```sh
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx -t 'lazily previews'
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx -t 'opens only one track preview'
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
+npm run lint
+npm run check
+npm run build
+npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --write --ignore-path /dev/null docs/product.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/product.md docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+rtk git diff --check
+npm run dev -- --config /private/tmp/cognipace-tracks-installed-dev.config.ts --port 3000
+```
+
+The temporary dev configuration keeps feature source in the managed worktree
+and writes development output into
+`/Users/tobiolutimehin/WebstormProjects/cognipace-v2/dist/chrome-mv3-dev`, the
+folder Chrome loads. Localhost source verification confirmed the single-track
+state, enclosing outline, and absent extra caption. The original checkout's
+source remains clean.
+
+Skipped `npm run zip` because release packaging is unchanged. Skipped
+`npm run db:generate` because no schema changed; `npm run check` includes the
+database consistency check. Human installed-extension happy-path and edge-case
+smoke remains pending for this latest refinement. Browser automation cannot
+claim extension URLs under its URL policy; source and automated tests are not
+live visual proof. The supplied human screenshot is preserved byte-for-byte at
+`docs/superpowers/evidence/2026-10-02-all-tracks/installed-preview-before-framing.png`
+and is labeled as the installed preview before this framing/accordion change.
+Keep the PR draft until final human smoke and updated visual proof are attached.
