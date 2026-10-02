@@ -1,19 +1,21 @@
 # Ponytail implementation ledger
 
-Design approved by the human engineer on 2026-10-02; execution continues in
-`codex/ponytail-codebase-audit`. Baseline and original findings are in the
+Design approved by the human engineer on 2026-10-02. All five phases are
+implemented and independently reviewed in `codex/ponytail-codebase-audit`.
+Final automated validation passed; human realtime proof remains pending before
+PR review or merge. Baseline and original findings are in the
 [audit](2026-10-02-ponytail-codebase-audit.md). The
 [approved design](../specs/2026-10-02-ponytail-cleanup-design.md) defines scope.
 
 ## Progress
 
-| Phase                        | Status                                              | Review/validation                               |
-| ---------------------------- | --------------------------------------------------- | ----------------------------------------------- |
-| 1: backup and sync recovery  | Implemented and independently reviewed              | 181 focused tests; full check 1926 tests passed |
-| 2: identity/calendar/capture | Implemented and independently reviewed              | Full check 1984 tests passed                    |
-| 3: AI ownership/deadline     | Implemented and independently reviewed              | Full check 1984 tests passed                    |
-| 4: proven deletions          | Implemented and independently reviewed              | Full check 1982 tests passed                    |
-| 5: modal/dependency repair   | Modal repair implemented; dependency fixes selected | 126 UI tests passed; independent review pending |
+| Phase                        | Status                                 | Review/validation                                |
+| ---------------------------- | -------------------------------------- | ------------------------------------------------ |
+| 1: backup and sync recovery  | Implemented and independently reviewed | 181 focused tests; full check 1926 tests passed  |
+| 2: identity/calendar/capture | Implemented and independently reviewed | Full check 1984 tests passed                     |
+| 3: AI ownership/deadline     | Implemented and independently reviewed | Full check 1984 tests passed                     |
+| 4: proven deletions          | Implemented and independently reviewed | Full check 1982 tests passed                     |
+| 5: modal/dependency repair   | Implemented and independently reviewed | 131 UI tests; final full check 1985 tests passed |
 
 ## Baseline
 
@@ -94,6 +96,81 @@ Root Phase 4 checkpoint passed: `rtk proxy npm run db:check > /private/tmp/cogni
 
 ## Phase 5 implementation evidence
 
-Modal regression command: `rtk proxy npm test -- src/features/problems/components src/features/tracks/components --run` first failed 11 new cases while 60 existing tests passed. After repair, 8 files / 126 tests pass with 12 new cases covering initial focus, Tab/Shift+Tab wrapping, opener restoration, Escape/pending locks, visible errors, metadata draft/retry/cancel and selection changes. The three affected confirmations share existing local focus behavior through one small hook. Owned-file Prettier/ESLint pass. Independent review is checking dynamic control removal before the root checkpoint.
+Modal regression command: `rtk proxy npm test -- src/features/problems/components src/features/tracks/components --run` first failed 11 new cases while 60 existing tests passed. After repair, 8 files / 126 tests passed with 12 new cases covering initial focus, Tab/Shift+Tab wrapping, opener restoration, Escape/pending locks, visible errors, metadata draft/retry/cancel and selection changes. The three affected confirmations share existing local focus behavior through one small hook. Owned-file Prettier/ESLint passed. Independent review then checked dynamic control removal before the root checkpoint.
 
 Independent modal review reproduced two focused-pill removal cases where focus fell to body and Tab escaped. The existing label input now restores focus after removal (one production line); the two maintained cases passed after failing before repair. Three more regressions reproduced metadata/delete/reset dialogs reopening after zero-to-one selection changes. A nine-line conditional state reset dismisses emptied-selection dialogs and clears their error, without changing captured pending mutation slugs or nonzero draft preservation. Final `rtk npm test -- src/features/problems/components src/features/tracks/components --run` passed 8 files / 131 tests. Owned-file Prettier/ESLint and scoped diff checks pass. Root independently reviewed the two small follow-up repairs; no further actionable modal findings. Human keyboard/retry/chip/empty-selection proof remains pending.
+
+### Dependency remediation
+
+Fresh pre-update command `rtk proxy npm audit --json --cache /private/tmp/cognipace-ponytail-npm-cache > /private/tmp/cognipace-ponytail-phase5-before-audit.json 2> /private/tmp/cognipace-ponytail-phase5-before-audit.stderr` returned exit 1 with the same 9 affected entries (2 high, 6 moderate, 1 low). Primary advisories and npm documentation were reviewed before selecting compatible versions.
+
+| Package                 | Before | After  | Evidence                                                                                                            |
+| ----------------------- | ------ | ------ | ------------------------------------------------------------------------------------------------------------------- |
+| DOMPurify               | 3.4.13 | 3.4.16 | [DOMPurify advisory](https://github.com/cure53/DOMPurify/security/advisories/GHSA-p98j-92pf-mc4p)                   |
+| Vitest / @vitest family | 4.1.6  | 4.1.11 | [Vitest advisory](https://github.com/vitest-dev/vitest/security/advisories/GHSA-82fw-gwwq-j7x9)                     |
+| brace-expansion         | 5.0.9  | 5.0.12 | [brace-expansion advisory](https://github.com/juliangruber/brace-expansion/security/advisories/GHSA-q2hr-2g5m-vwhr) |
+| undici                  | 7.29.0 | 7.30.0 | [undici advisory](https://github.com/nodejs/undici/security/advisories/GHSA-rfgv-xxqx-mfg5)                         |
+
+Manifest floors now require the fixed DOMPurify/Vitest versions. `rtk proxy npm update dompurify vitest brace-expansion undici --cache /private/tmp/cognipace-ponytail-npm-cache > /private/tmp/cognipace-ponytail-phase5-update.log 2>&1` succeeded, changing only 13 nodes in those graphs (including Chai 6.3.0 and tinyrainbow 3.2.0). No new direct dependencies, overrides, unrelated top-level updates or forced downgrades. `rtk proxy npm ci --cache /private/tmp/cognipace-ponytail-npm-cache > /private/tmp/cognipace-ponytail-final-ci.log 2>&1` passed, confirming reproducible installation. `rtk proxy npm ls dompurify vitest @vitest/mocker brace-expansion undici drizzle-kit esbuild` confirms the installed versions and unchanged Drizzle chain.
+
+Final `rtk proxy npm audit --json --cache /private/tmp/cognipace-ponytail-npm-cache > /private/tmp/cognipace-ponytail-final-audit.json 2> /private/tmp/cognipace-ponytail-final-audit.stderr` returns exit 1: 4 moderate affected entries, 0 high/critical/low. `rtk proxy npm audit --omit=dev --json --cache /private/tmp/cognipace-ponytail-npm-cache > /private/tmp/cognipace-ponytail-final-production-audit.json 2> /private/tmp/cognipace-ponytail-final-production-audit.stderr` returns exit 0 with 0 production advisories.
+
+The remaining four scanner entries propagate one [esbuild serve advisory](https://github.com/evanw/esbuild/security/advisories/GHSA-67mh-4wv8-2f99) through development-only `drizzle-kit@0.31.10 -> @esbuild-kit/esm-loader@2.6.5 -> @esbuild-kit/core-utils@3.3.2 -> esbuild@0.18.20`. Current stable Drizzle Kit still carries the loader; no compatible patched loader was found. The scanner suggests a major downgrade to Drizzle Kit 0.18.1, which is not applied. The installed loader calls transform/transformSync, and this repository's generate/check paths do not start esbuild's server. This is an exposure assessment, not a claim that the dependency is patched. Revisit when Drizzle provides a compatible updated dependency chain.
+
+## Final review and measured scope
+
+Independent source/regression-evidence review passed C1-C9 and the restart risk without edits or redundant broad test runs. Separate independent reviews passed C10-C11 and deletion/caller/test migration. The root reviewed the two additional dialog lifecycle repairs. No actionable finding remains from the approved audit scope.
+
+| Finding      | Final owner and regression evidence                                                                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1           | Backup component selection generation; late reads/validation/errors in its maintained component suite.                                                               |
+| C2           | Parsed dashboard manual pull passes action-scoped overwrite to queued restore; automatic/default dirty restores remain blocked in handler/service/runtime tests.     |
+| C3           | Recommendation hook shares watcher promise with display/save; composed tests cover user choices, locks, latest results, navigation and restart.                      |
+| C4           | Shared provider helper bounds body reads and cleans timers/listeners; all three adapters cover stalled success/error and caller cancellation.                        |
+| C5           | Useful remote cache gates and metadata title/difficulty guard; reader/service/watcher tests cover incomplete, offline/reconnected and stale paths.                   |
+| C6           | Normalized import lookup/fingerprint keys preserve exact persisted IDs; planner/service regressions cover aliases, companies and stale previews.                     |
+| C7           | Shared URL parser rejects failed URL-shaped input; parser, Library form and Tracks repository suites exercise all callers.                                           |
+| C8           | Selected-timezone calendar comparison retained through deletion; real FSRS same-day/previous-day tests match workload forecasts.                                     |
+| C9           | Exact-first company reuse, collision-safe allocation and ambiguous rollback; maintained repository regressions prove identities and transactions.                    |
+| C10/C11      | Shared existing confirmation focus behavior and in-dialog errors; 131 UI tests include chip removal and zero-to-one selection follow-ups.                            |
+| Restart risk | Atomic snapshot/dirty marker, validated metadata reads and explicit clean acknowledgement; real runtime/SQLite restart suite covers failed and pending dirty writes. |
+
+`rtk proxy git diff 709957e --numstat -- src` measures 675 production additions / 3103 deletions across 53 files: **2428 net production lines removed** for the entire implementation, including correctness and accessibility repairs. Test/fixture changes are counted separately (3525 additions / 1419 deletions); line savings do not represent reduced supported behavior. Phase 4 alone removed 2627 net production lines. Three direct dependencies were removed, none added.
+
+Final caller search finds no removed API references. `rtk proxy git diff 709957e --name-only -- src/platform/db/migrations src/platform/db/schema src/features/backup/api/backup-contracts.ts src/extension/background/runtime-policy.ts wxt.config.ts .github/workflows scripts` returns no changes: migration SQL, backup wire format, sender policy, extension config, CI and release scripts remain unchanged. Post-flush feature invalidation, Zod parsing and secret redaction were independently reviewed.
+
+Final debt scan `rtk proxy rg -n --hidden '(#|//|/\*)[[:space:]]*ponytail:' . --glob '!node_modules/**' --glob '!.git/**' --glob '!dist/**' --glob '!.wxt/**' --glob '!.agents/**' --glob '!.codex/**' --glob '!docs/superpowers/**'` returns exit 1 with no matches. Exclusions are dependency/generated/Git/skill and historical audit-example directories. No ponytail: debt. Clean ledger. 0 markers, 0 with no trigger.
+
+## Final validation checkpoint
+
+All commands below ran after the final modal repairs, compatible dependency
+updates and clean installation:
+
+| Exact command                                                                          | Result                                                                                                                      |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `rtk proxy npm run db:check > /private/tmp/cognipace-ponytail-final-db.log 2>&1`       | Passed; unchanged migration history.                                                                                        |
+| `rtk proxy npm run lint > /private/tmp/cognipace-ponytail-final-lint.log 2>&1`         | Passed.                                                                                                                     |
+| `rtk proxy npm run check > /private/tmp/cognipace-ponytail-final-check.log 2>&1`       | Passed DB check, WXT/typecheck, ESLint and 185 files / 1985 tests under Vitest 4.1.11. Baseline was 185 files / 1884 tests. |
+| `rtk proxy npm run build > /private/tmp/cognipace-ponytail-final-build.log 2>&1`       | Passed; production extension 3.87 MB.                                                                                       |
+| `rtk proxy npm run store:check > /private/tmp/cognipace-ponytail-final-store.log 2>&1` | Passed; version 1.4.0, four required icons.                                                                                 |
+| `rtk proxy npm run zip > /private/tmp/cognipace-ponytail-final-zip.log 2>&1`           | Passed; `dist/cognipace-1.4.0-chrome.zip`, 1.25 MB.                                                                         |
+| `rtk proxy npm run format > /private/tmp/cognipace-ponytail-final-format.log 2>&1`     | Passed.                                                                                                                     |
+| `rtk proxy git diff --check` and staged diff checks                                    | Passed.                                                                                                                     |
+
+Explicit planning-artifact formatting command (normally ignored by the full
+format script):
+
+```sh
+rtk proxy npx prettier --check --ignore-path /dev/null docs/architecture.md docs/testing.md docs/superpowers/specs/2026-10-02-ponytail-cleanup-design.md docs/superpowers/plans/2026-10-02-ponytail-phase-1-data-safety.md docs/superpowers/plans/2026-10-02-ponytail-phase-2-correctness.md docs/superpowers/plans/2026-10-02-ponytail-phase-3-ai.md docs/superpowers/plans/2026-10-02-ponytail-phase-4-deletion.md docs/superpowers/plans/2026-10-02-ponytail-phase-5-ui-dependencies.md docs/superpowers/audits/2026-10-02-ponytail-codebase-audit.md docs/superpowers/audits/2026-10-02-ponytail-implementation-ledger.md docs/superpowers/audits/2026-10-02-ponytail-pr-handoff.md
+```
+
+Passed, with a final rerun after handoff edits. Independent dependency review
+confirms the 13 changed nodes are compatible with pinned Node 24.20.0, Vitest
+versions align, and the remaining esbuild exposure assessment matches current
+calls. No source edits were made after final code validation.
+
+Implementation commits: `1a557ea` (data safety), `dd05169` (catalog/capture),
+`ed85b29` (AI/deadline), `41c14ab` (deletions), `c189c08` (dialogs), `83c7f06`
+(dependencies). Approval/design was recorded in `9803e57`. Final handoff is in
+[PR-ready context](2026-10-02-ponytail-pr-handoff.md); human proof and exact
+skipped commands/reasons remain listed above. No PR/push/merge/publication.

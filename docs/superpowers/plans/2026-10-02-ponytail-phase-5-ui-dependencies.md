@@ -22,16 +22,16 @@ Approved design: [cleanup](../specs/2026-10-02-ponytail-cleanup-design.md).
 
 **Files:** `package.json`, `package-lock.json`; no source/tooling migration unless specifically justified by current advisory.
 
-- [ ] Fetch a fresh `rtk proxy npm audit --json --cache /private/tmp/cognipace-ponytail-npm-cache`; inspect exact advisory ranges/URLs and dependency chains with `npm explain`. Read primary advisory/package documentation (Context7 where applicable). Record runtime versus dev-only exposure and exact fixed versions.
-- [ ] Select narrow compatible patches for DOMPurify, Vitest/@vitest/mocker, brace-expansion and undici. Avoid `npm audit fix --force`, major downgrades or unrelated dependency updates.
-- [ ] Investigate the Drizzle Kit legacy esbuild-loader chain separately. Preserve Drizzle/database compatibility; document any advisory whose compatible fix is unavailable instead of forcing a downgrade.
-- [ ] Root applies only reviewed package/lockfile changes. Run `rtk npm run db:check`, `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run store:check`, `rtk npm run zip`, `rtk npm run format` and fresh audit after updates. Record exact final counts, package versions and remaining advisories if any.
+- [x] Fetch a fresh `rtk proxy npm audit --json --cache /private/tmp/cognipace-ponytail-npm-cache`; inspect exact advisory ranges/URLs and dependency chains with `npm explain`. Read primary advisory/package documentation (Context7 where applicable). Record runtime versus dev-only exposure and exact fixed versions.
+- [x] Select narrow compatible patches for DOMPurify, Vitest/@vitest/mocker, brace-expansion and undici. Avoid `npm audit fix --force`, major downgrades or unrelated dependency updates.
+- [x] Investigate the Drizzle Kit legacy esbuild-loader chain separately. Preserve Drizzle/database compatibility; document any advisory whose compatible fix is unavailable instead of forcing a downgrade.
+- [x] Root applies only reviewed package/lockfile changes. Run `rtk npm run db:check`, `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run store:check`, `rtk npm run zip`, `rtk npm run format` and fresh audit after updates. Record exact final counts, package versions and remaining advisories if any.
 
 ## Task 3: Final independent audit and handoff
 
-- [ ] Recheck every original C1-C11 finding and restart risk against final code and regression evidence. Inspect diff for new root-cause defects, scope creep, stale docs or unnecessary layers.
-- [ ] Re-run Ponytail caller/debt scan excluding generated/dependency/skill-example directories; count actual production cuts and removed direct deps.
-- [ ] Update phase checkboxes, audit status, implementation ledger, current architecture/testing docs and PR-ready handoff with exact validation commands and skipped commands/reasons.
-- [ ] Commit reviewed phase/final documentation using Conventional Commit titles. Leave changes reviewable on the task branch. Do not push, publish, merge or create user-owned chats without authorization.
+- [x] Recheck every original C1-C11 finding and restart risk against final code and regression evidence. Inspect diff for new root-cause defects, scope creep, stale docs or unnecessary layers.
+- [x] Re-run Ponytail caller/debt scan excluding generated/dependency/skill-example directories; count actual production cuts and removed direct deps.
+- [x] Update phase checkboxes, audit status, implementation ledger, current architecture/testing docs and PR-ready handoff with exact validation commands and skipped commands/reasons.
+- [x] Commit reviewed phase/final documentation using Conventional Commit titles. Leave changes reviewable on the task branch. Do not push, publish, merge or create user-owned chats without authorization.
 
 Human proof remains pending for keyboard dialog flows, failed mutation retry/cancel, Tracks reset and all changed behavior listed in prior phases. The human engineer must complete happy-path/edge-case realtime smoke with redacted screenshots/recording before PR review or merge. Skip `rtk npm run db:generate`: no schema changes. No live Gist/provider calls are claimed.
