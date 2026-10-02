@@ -680,6 +680,24 @@ happy path, slug-fallback edge path, and structured-log removal/preservation
 flows above and attach screenshot or screen-recording proof before PR review or
 merge. Automated checks do not replace that proof.
 
+#### LeetCode Submission Capture
+
+1. With code focused in the LeetCode editor, submit an accepted solution using
+   Command+Enter on macOS or Ctrl+Enter on Windows/Linux. Confirm the overlay
+   captures the attempt and updates when judging finishes, just as it does
+   when clicking LeetCode's Submit button.
+2. Submit a wrong-answer or runtime-error solution with the same shortcut.
+   Confirm the overlay receives the failed result and its matching code.
+3. Type ordinary Enter and use LeetCode's Run shortcut. Confirm neither starts
+   a submission capture. Hold the submit shortcut and confirm key repeats do
+   not restart capture or polling.
+4. Navigate to another problem during judging. Confirm the previous result
+   does not replace the new problem's context, and the shortcut works there.
+
+Human-run happy-path and edge-case smoke with screenshot or screen-recording
+proof is required before PR review or merge. This shortcut fix has automated
+watcher coverage; real-browser proof remains pending.
+
 ### Cross-Surface Refresh
 
 1. Save a review from the overlay.
