@@ -307,5 +307,12 @@ Task-local screenshots:
 - [New Track narrow](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-implemented-create.png)
 
 These agent screenshots do not satisfy the human installed-extension smoke
-requirement. The branch stays local for that smoke; no PR, merge, publication,
-or store action was requested.
+requirement. On 2026-10-02 the user requested a pull request. It is prepared as a
+draft with the smoke checklist pending before review or merge. No merge,
+release publication, or store action was requested.
+
+Repository-hosted screenshots for the PR:
+
+- [Desktop hierarchy](../evidence/2026-10-02-track-editor/desktop.png)
+- [Narrow hierarchy](../evidence/2026-10-02-track-editor/mobile.png)
+- [Change menu](../evidence/2026-10-02-track-editor/change-menu.png)
