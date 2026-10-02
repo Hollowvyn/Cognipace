@@ -209,9 +209,12 @@ Tracks owns curriculum progression. Track completion is independent of global
 practice history by default, and active track/session state is local database
 state. Tracks can contain groups and ordered problem memberships.
 
-The create/edit modal uses full-width ordered group sections. Select a group to
-expand its Library problem picker and question list; Rename reveals its title
-field. Click an expanded header again to collapse it; all groups may be closed.
+The create/edit modal uses full-width ordered group sections with shaded headers
+and larger group titles. Questions form a continuous ordered list with thin
+dividers and quieter titles, making the group/question hierarchy clear. Select
+a group to expand its Library problem picker and question list; Rename reveals
+its title field. Click an expanded header again to collapse it; all groups may
+be closed.
 Opening another group closes the previous one. Rename, New Group, and an invalid
 group title on Save open the relevant section. Question titles and difficulty
 remain visible, and the Change button opens a menu for moving a question to

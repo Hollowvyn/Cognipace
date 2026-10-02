@@ -557,6 +557,10 @@ restore, and correction cases.
    Enter, or Space reopens it. Confirm header focus remains after collapse and
    opening another group closes the previous one. Rename and New Group open
    their title field, and saving with all groups closed retains every question.
+   Check light/dark appearance and 200% text scaling: shaded headers and larger
+   topic titles should stay distinct from the flat, divided question rows. Full
+   titles, metadata, and every action must fit without clipping; Library results
+   and Change menus must remain visible above surrounding content.
    Rename, add/reorder groups and questions, remove an empty group, and confirm
    non-empty and final groups cannot be removed. Save an invalid empty group
    title, collapse all groups, then Save and confirm that group expands with its

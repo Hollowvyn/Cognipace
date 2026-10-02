@@ -234,7 +234,7 @@ function TrackFormFields({
   return (
     <form
       autoComplete="off"
-      className="grid gap-5"
+      className="grid min-w-0 grid-cols-1 gap-5"
       noValidate
       onKeyDown={handleFormKeyDown}
       onSubmit={(event) => {
@@ -556,7 +556,7 @@ function TrackGroupList({
     <section className="grid min-w-0 content-start gap-3" aria-label="Groups">
       <div
         aria-label="Track groups header"
-        className={cn(editorPaneHeaderClassName, 'justify-between')}
+        className={cn(editorPaneHeaderClassName, 'flex-wrap justify-between')}
       >
         <h3 className="m-0 text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
           Groups
@@ -583,38 +583,44 @@ function TrackGroupList({
             <div
               aria-label={`${displayTitle}, ${formatProblemCount(group.problemSlugs.length)}`}
               className={cn(
-                'grid min-w-0 gap-3 rounded-[var(--cp-control-radius)] border border-border bg-background/30 p-3',
-                isSelected && 'border-primary bg-muted/20',
+                'grid min-w-0 rounded-[var(--cp-control-radius)] border border-border bg-background/30',
+                isSelected && 'border-primary',
               )}
               key={group.key}
               role="listitem"
             >
-              <div className="grid min-w-0 grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div
+                className={cn(
+                  'grid min-w-0 grid-cols-1 items-start gap-2 rounded-[var(--cp-control-radius)] bg-muted/45 p-3 sm:grid-cols-[minmax(0,1fr)_auto]',
+                  isSelected &&
+                    'rounded-b-none border-b border-border bg-muted/80',
+                )}
+              >
                 <button
                   aria-label={`Select ${displayTitle}`}
                   aria-controls={`track-group-panel-${group.key}`}
                   aria-expanded={isSelected}
-                  className="grid min-w-0 justify-items-start gap-1 rounded-[var(--cp-control-radius)] px-1 py-1 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-w-0 items-start gap-2 rounded-[var(--cp-control-radius)] px-1 py-1 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => {
                     dispatch({ groupKey: group.key, type: 'toggle-group' })
                     setRenamingGroupKey(null)
                   }}
                   type="button"
                 >
-                  <span className="flex min-w-0 items-start gap-2">
-                    <ChevronDown
-                      aria-hidden="true"
-                      className={cn(
-                        'mt-0.5 size-4 shrink-0 transition-transform',
-                        !isSelected && '-rotate-90',
-                      )}
-                    />
-                    <span className="min-w-0 break-words text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={cn(
+                      'mt-0.5 size-4 shrink-0 transition-transform',
+                      !isSelected && '-rotate-90',
+                    )}
+                  />
+                  <span className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3">
+                    <span className="min-w-0 max-w-full break-words text-base font-bold text-foreground">
                       {displayTitle}
                     </span>
-                  </span>
-                  <span className="pl-6 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
-                    {formatProblemCount(group.problemSlugs.length)}
+                    <span className="whitespace-nowrap text-[length:var(--cp-badge-font-size)] text-muted-foreground">
+                      {formatProblemCount(group.problemSlugs.length)}
+                    </span>
                   </span>
                 </button>
                 <div className="flex flex-wrap justify-end gap-1">
@@ -691,7 +697,7 @@ function TrackGroupList({
               {isSelected ? (
                 <div
                   id={`track-group-panel-${group.key}`}
-                  className="grid min-w-0 gap-4"
+                  className="grid min-w-0 gap-4 p-3"
                 >
                   {renamingGroupKey === group.key ? (
                     <TrackTextField
@@ -829,7 +835,7 @@ function OrderedProblemList({
       ) : (
         <ol
           aria-label="Selected problems"
-          className="m-0 grid list-none gap-2 p-0"
+          className="m-0 grid list-none divide-y divide-border p-0"
         >
           {selectedGroup.problemSlugs.map((problemSlug, index) => {
             const row = problemRowsBySlug.get(problemSlug)
@@ -837,15 +843,20 @@ function OrderedProblemList({
             return (
               <li
                 aria-label={`${index + 1}. ${title}`}
-                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-[var(--cp-control-radius)] border border-border bg-background/30 px-3 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
                 data-problem-slug={problemSlug}
                 key={problemSlug}
               >
-                <span className="pt-1 text-[length:var(--cp-badge-font-size)] font-bold text-muted-foreground tabular-nums">
+                <span className="pt-1 text-[length:var(--cp-badge-font-size)] text-muted-foreground tabular-nums">
                   {index + 1}
                 </span>
                 <div className="min-w-0">
-                  <ProblemSummary compact title={title} slug={problemSlug} />
+                  <ProblemSummary
+                    compact
+                    title={title}
+                    slug={problemSlug}
+                    titleClassName="font-semibold"
+                  />
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
                     {row && row.problem.difficulty !== 'unknown' ? (
                       <span>
@@ -971,15 +982,22 @@ function ProblemSummary({
   compact = false,
   slug,
   title,
+  titleClassName = 'font-bold',
 }: {
   compact?: boolean | undefined
   slug: string
   title: string
+  titleClassName?: string | undefined
 }) {
   return (
     <div className="min-w-0">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="min-w-0 max-w-full break-words text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
+        <span
+          className={cn(
+            'min-w-0 max-w-full break-words text-[length:var(--cp-copy-font-size)] text-foreground',
+            titleClassName,
+          )}
+        >
           {title}
         </span>
       </div>

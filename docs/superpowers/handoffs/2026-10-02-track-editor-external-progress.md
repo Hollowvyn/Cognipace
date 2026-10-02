@@ -65,8 +65,10 @@ rtk npm run test -- src/features/backup/api/backup-contracts.test.ts src/feature
 rtk npm run test -- src/platform/db/instance.test.ts src/platform/db/snapshot-state.test.ts src/platform/db/snapshot-upgrade.test.ts src/platform/db/open-snapshot.test.ts
 ```
 
-The first combined check passed 187 test files and 1,927 tests. The final combined check passed 187 files and 1,928 tests after the browser
-regressions were repaired.
+The initial feature's first combined check passed 187 test files and 1,927 tests.
+Its final combined check passed 187 files and 1,928 tests after the browser
+regressions were repaired. The final collapse and hierarchy follow-up checks
+passed 187 files and 1,932 tests, as recorded below.
 Independent spec and code-quality reviews found no actionable source findings.
 
 Initial TDD runs intentionally failed for missing setting/eligibility,
@@ -101,6 +103,9 @@ Use the **Vertical Track Editor And External Progress** flow in
 - [ ] Create/edit at desktop and 320px; complete group/question titles, rename,
       Library add, order, group removal, and invalid title reveal. Collapse every
       group, reopen by click/Enter/Space, and save without losing questions.
+- [ ] Shaded topic headers and flat divided question rows remain distinct in
+      light/dark appearance and at 200% text scaling. Full titles and actions fit;
+      Library suggestions and Change menus remain visible.
 - [ ] Change menu mouse/keyboard, full destination titles, Escape/Tab/outside,
       source focus, footer flip/scroll, and moving the final source question.
 - [ ] Historical solve counts only when enabled; save/reopen and toggle off/on;
@@ -199,6 +204,66 @@ review or merge. `rtk npm run zip` remains skipped because packaging behavior
 is unchanged; `rtk npm run db:generate` was not repeated for the collapse fix
 because it does not touch schema or persistence. Combined check includes
 `rtk npm run db:check`.
+
+## Follow-up: Distinguish Group Headers From Questions
+
+The user approved the **Section headers** refinement after seeing both proposed
+styles. Group headers use a shaded band, larger bold title, and quieter count;
+questions use flat divided rows, semibold titles, and quieter order numbers.
+This changes Tracks form styling only. Existing controls, collapse, ordering,
+request payloads, and progress behavior remain covered by their regressions.
+
+Spec compliance and source-quality reviews found no actionable issues. The
+focused form/hook/routes command passed 90 tests, and full check passed
+**187 files / 1,932 tests**. Standalone lint, production build, and repository
+formatting also passed. Exact commands:
+
+```sh
+rtk npm run test -- src/features/tracks/components/track-form.test.tsx src/features/tracks/hooks/use-track-form.test.tsx src/app/dashboard/routes.test.tsx
+rtk npm run lint
+rtk npm run check
+rtk npm run build
+rtk npm run format
+rtk git diff --check
+```
+
+The combined check, standalone lint, formatting, and production build were
+repeated after the final responsive corrections. Browser text scaling first
+exposed the form's intrinsic auto column widening native fields, a squeezed New
+Group label, and long group titles extending beyond their button. Browser-only
+experiments isolated the minimal fixes: one constrained form column, header
+wrapping, and title max-width. No extra field/footer/action-row overrides were
+needed. All final checks passed after applying those constraints.
+
+Actual-component browser proof passed 12 clean-source cases: create/edit in
+light/dark at 736px/320px modal widths, plus edit in both themes and widths at
+200% root text scaling. It checked computed typography and row/header treatment,
+complete titles, modal and question-row control bounds, internal button overflow,
+Change positioning/focus, visible Library suggestions, collapse/Enter/Space,
+Rename/New Group, and all-closed Save payloads. No browser errors were recorded.
+The final run injected no corrective CSS. Extension messaging and persistence
+were mocked; the harness used actual TrackForm, RouteModal, and app styles.
+
+```sh
+rtk proxy node /private/tmp/track-editor-implemented-harness/serve.mjs
+rtk proxy node /private/tmp/diagnose-track-editor-hierarchy-scaling.cjs
+rtk proxy node /private/tmp/check-track-editor-hierarchy.cjs
+rtk proxy npx prettier --check src/features/tracks/components/track-form.tsx docs/product.md docs/testing.md docs/superpowers/specs/2026-10-02-track-editor-external-progress-design.md docs/superpowers/plans/2026-10-02-track-editor-phase-1.md docs/superpowers/handoffs/2026-10-02-track-editor-external-progress.md
+```
+
+The server is stopped. At 200% text scaling, viewport widths 800px/384px kept
+the modal at 736px/320px after outer rem padding doubled. Browser zoom was not
+tested; the large-text proof explicitly covers root font scaling.
+
+- [Desktop hierarchy](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-desktop.png)
+- [Narrow hierarchy](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-mobile.png)
+- [Light desktop](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-desktop-light.png)
+- [Light narrow](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-mobile-light.png)
+- [Change menu](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-menu.png)
+
+Human installed-extension smoke and visual proof remain pending before PR review
+or merge. `rtk npm run zip` is skipped because packaging is unchanged, and
+`rtk npm run db:generate` is not repeated because schema/persistence is unchanged.
 
 ## Initial Feature Completion Evidence
 

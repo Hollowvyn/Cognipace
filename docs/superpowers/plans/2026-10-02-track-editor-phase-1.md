@@ -162,7 +162,7 @@ Owner: focused form implementer; root owns documentation and full validation.
 - Validate: `src/app/dashboard/routes.test.tsx`
 - Update: `docs/product.md`, `docs/testing.md`, and this feature's handoff.
 
-- [ ] Keep the outer group outline and remove its shared card padding/fill
+- [x] Keep the outer group outline and remove its shared card padding/fill
       treatment from the header/body layout. Put padding on the shaded header
       and expanded body separately. Keep overflow visible so suggestions fit.
       The header uses semantic `bg-muted` tones, with stronger expanded state:
@@ -174,10 +174,10 @@ className={cn(
 )}
 ```
 
-- [ ] Use a 16px bold wrapping group title and an adjacent quieter count at
+- [x] Use a 16px bold wrapping group title and an adjacent quieter count at
       desktop; count and controls wrap at narrow widths. Preserve native header
       button, disclosure state, focus rings, labels, and action handlers.
-- [ ] Replace repeated question-card chrome with one divided list:
+- [x] Replace repeated question-card chrome with one divided list:
 
 ```tsx
 <ol className="m-0 grid list-none divide-y divide-border p-0">
@@ -190,7 +190,15 @@ className={cn(
       Use semibold selected-question titles through a scoped ProblemSummary
       title class; keep Library suggestion emphasis. Remove bold order-number
       weight. Do not alter reducers, request payloads, or menu implementation.
-- [ ] Run existing focused tests before required full checks; no new tests that
+- [x] Apply the browser-confirmed form width constraint for large text: use
+      `className="grid min-w-0 grid-cols-1 gap-5"` on TrackFormFields' form.
+      At 200% root text scaling, its implicit auto grid column otherwise expands
+      native fields beyond a narrow modal. Keep field/metadata behavior intact.
+- [x] Keep Groups/New Group usable with large text by adding `flex-wrap` to
+      Track groups header and `max-w-full` to the bold group-title span. Browser
+      experiments confirmed these minimal additions prevent internal label
+      overflow; count, metadata, footer, and action-row overrides are unnecessary.
+- [x] Run existing focused tests before required full checks; no new tests that
       merely assert class strings for this reversible styling change:
 
 ```sh
@@ -201,7 +209,7 @@ rtk npm run build
 rtk npm run format
 ```
 
-- [ ] Review spec compliance, then source quality. Browser-inspect actual
+- [x] Review spec compliance, then source quality. Browser-inspect actual
       components at 736px and 320px in both themes, including full title wrapping,
       all controls, collapse/reopen, Change/menu focus, and unclipped Library
       suggestions. Inspect 200% text scaling, record screenshots and exact
