@@ -21,10 +21,7 @@ vi.mock('recharts', async (importOriginal) => {
 import { ChartContainer, ChartTooltip, type ChartConfig } from './chart'
 
 const chartConfig = {
-  reviews: {
-    label: 'Reviews',
-    color: 'var(--chart-1)',
-  },
+  reviews: 'var(--chart-1)',
 } satisfies ChartConfig
 
 describe('Chart primitive', () => {
@@ -55,18 +52,18 @@ describe('Chart primitive', () => {
 
     const { rerender } = render(chart)
 
-    const chartContainer = document.querySelector(
-      '[data-chart="chart-analytics-review-quality"]',
-    )
+    const chartContainer = document.querySelector('#analytics-review-quality')
 
     expect(chartContainer).toBeInTheDocument()
     expect(chartContainer).toHaveAttribute(
       'aria-describedby',
       'review-chart-description',
     )
-    expect(chartContainer?.querySelector('style')).toHaveTextContent(
-      '--color-reviews: var(--chart-1)',
-    )
+    expect(
+      (chartContainer as HTMLDivElement).style.getPropertyValue(
+        '--color-reviews',
+      ),
+    ).toBe('var(--chart-1)')
     const chartSurface = screen.getByRole('application')
     expect(chartSurface).toHaveAttribute('tabindex', '0')
     expect(chartSurface.querySelector('title')).toHaveTextContent(
@@ -78,9 +75,9 @@ describe('Chart primitive', () => {
 
     rerender(chart)
 
-    expect(
-      document.querySelector('[data-chart="chart-analytics-review-quality"]'),
-    ).toBe(chartContainer)
+    expect(document.querySelector('#analytics-review-quality')).toBe(
+      chartContainer,
+    )
   })
 
   it('marks the generic chart surface as non-animated when reduced motion is preferred', () => {
@@ -99,9 +96,10 @@ describe('Chart primitive', () => {
       </ChartContainer>,
     )
 
-    expect(
-      document.querySelector('[data-chart="chart-reduced-motion-chart"]'),
-    ).toHaveAttribute('data-chart-animation', 'disabled')
+    expect(document.querySelector('#reduced-motion-chart')).toHaveAttribute(
+      'data-chart-animation',
+      'disabled',
+    )
     expect(matchMedia).toHaveBeenCalledWith('(prefers-reduced-motion: reduce)')
   })
 
@@ -139,14 +137,10 @@ describe('Chart primitive', () => {
     )
 
     expect(
-      document.querySelector(
-        '[data-chart="chart-default-dimensions-chart"] svg',
-      ),
+      document.querySelector('#default-dimensions-chart svg'),
     ).toHaveAttribute('width', '320')
     expect(
-      document.querySelector(
-        '[data-chart="chart-default-dimensions-chart"] svg',
-      ),
+      document.querySelector('#default-dimensions-chart svg'),
     ).toHaveAttribute('height', '192')
   })
 })

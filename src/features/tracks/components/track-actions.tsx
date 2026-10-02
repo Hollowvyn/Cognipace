@@ -1,6 +1,7 @@
 import { CircleOff, RefreshCw, Trash2, type LucideIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { IconButton } from '@/components/ui/icon-button'
 import { InlineStatus } from '@/components/ui/inline-status'
 import { cn } from '@/utils/cn'
@@ -11,7 +12,6 @@ import {
   useResetTrackProgress,
 } from '../api/tracks-api'
 import type { SerializedTrack } from '../api/tracks-contracts'
-import { TrackConfirmationDialog } from './track-confirmation-dialog'
 
 export type RenderTrackEditAction = (track: SerializedTrack) => ReactNode
 
@@ -108,7 +108,7 @@ export function TrackActions({
         />
       </div>
       {confirmation === 'reset-progress' ? (
-        <TrackConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Reset Progress"
           description="This clears completed progress for this track."
           error={error}
@@ -126,7 +126,7 @@ export function TrackActions({
         />
       ) : null}
       {confirmation === 'delete' ? (
-        <TrackConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Delete Track"
           description="This permanently deletes this track and its groups."
           error={error}

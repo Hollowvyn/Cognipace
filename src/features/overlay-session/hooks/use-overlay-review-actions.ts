@@ -43,9 +43,16 @@ type AcceptedAssessmentDecision = Extract<
 type SaveAssessmentInput = {
   decision: AcceptedAssessmentDecision
   session: ReturnType<typeof deriveOverlayAssessmentSessionContext>
-  submission: RecommendLeetCodeAssessmentRequest['submission']
-  submissionResult?: LeetCodeSubmissionResult
-}
+} & (
+  | {
+      submission: RecommendLeetCodeAssessmentRequest['submission']
+      submissionResult?: never
+    }
+  | {
+      submission?: never
+      submissionResult: LeetCodeSubmissionResult
+    }
+)
 
 type UseOverlayReviewActionsOptions = {
   contextRef: LatestRef<LeetCodeOverlayContext | null>
@@ -292,7 +299,6 @@ export function useOverlayReviewActions({
     return saveAcceptedReview({
       decision,
       session,
-      submission: toAssessmentSubmission(result),
       submissionResult: result,
     })
   }
@@ -472,12 +478,10 @@ export function useOverlayReviewActions({
     })
   }
 
-  async function maybeApplyAiRecommendation({
-    decision,
-    session,
-    submission,
-    submissionResult,
-  }: SaveAssessmentInput): Promise<AcceptedAssessmentDecision | null> {
+  async function maybeApplyAiRecommendation(
+    input: SaveAssessmentInput,
+  ): Promise<AcceptedAssessmentDecision | null> {
+    const { decision, session, submissionResult } = input
     const currentContext = contextRef.current
     const problem = currentContext?.problem
 
@@ -503,7 +507,7 @@ export function useOverlayReviewActions({
               problemSlug: problem.problemSlug,
               decision,
               session,
-              submission,
+              submission: input.submission,
             }),
             problem: {
               slug: problem.problemSlug,
@@ -511,7 +515,7 @@ export function useOverlayReviewActions({
               difficulty: problem.difficulty,
               topics: [],
             },
-            submission,
+            submission: input.submission,
             timing: {
               elapsedSeconds: decision.elapsedSeconds,
               targetSeconds: decision.targetSeconds,
@@ -564,39 +568,6 @@ export function useOverlayReviewActions({
     startTimer: timer.start,
     submitReview,
     updateReview,
-  }
-}
-
-function toAssessmentSubmission(
-  result: LeetCodeSubmissionResult,
-): RecommendLeetCodeAssessmentRequest['submission'] {
-  const common = {
-    code: result.resultCodeSnapshot?.code ?? undefined,
-    language: result.resultCodeSnapshot?.language ?? undefined,
-    passedTestCount: result.passedTestCount ?? undefined,
-    totalTestCount: result.totalTestCount ?? undefined,
-  }
-
-  if (result.status === 'accepted') {
-    return {
-      status: 'accepted',
-      ...common,
-      runtime: result.runtime ?? undefined,
-      memory: result.memory ?? undefined,
-    }
-  }
-
-  return {
-    status: 'failed',
-    ...common,
-    failingTestcase: result.failingTestcase ?? result.lastTestcase ?? undefined,
-    expectedOutput: result.expectedOutput ?? undefined,
-    actualOutput: result.codeOutput ?? undefined,
-    errorMessage:
-      result.errorMessage ??
-      result.compileError ??
-      result.runtimeError ??
-      undefined,
   }
 }
 

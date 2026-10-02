@@ -25,7 +25,6 @@ import {
   toAssessmentPracticeContext,
   type OverlaySessionAction,
   type OverlaySessionState,
-  type OverlaySubmittedSession,
 } from '../domain'
 import type { LeetCodeOverlayContext } from './use-leetcode-page-sync'
 import { createSubmissionResultKey } from './submission-result-key'
@@ -51,7 +50,6 @@ export type UseLeetCodeAssessmentRecommendationOptions = {
   activeProblemSlug: string | null
   metadata: LeetCodeProblemMetadata | null
   submissionResult: LeetCodeSubmissionResult | null
-  submittedSession: OverlaySubmittedSession | null
   overlayState: OverlaySessionState
   context: LeetCodeOverlayContext | null
   timing: {

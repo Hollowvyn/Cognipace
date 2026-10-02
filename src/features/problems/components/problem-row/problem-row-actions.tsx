@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { InlineStatus } from '@/components/ui/inline-status'
 import { useDeleteProblem } from '@/features/problems/api/problems-api'
 import type {
@@ -11,8 +12,6 @@ import {
   useResetPracticeSchedule,
   useSetPracticeSuspended,
 } from '@/features/practice'
-
-import { ProblemConfirmationDialog } from '../library/problem-confirmation-dialog'
 
 export type RenderProblemEditAction = (problem: SerializedProblem) => ReactNode
 
@@ -107,7 +106,7 @@ export function ProblemRowPracticeActions({
       </Button>
 
       {isResetConfirmationOpen ? (
-        <ProblemConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Reset Schedule"
           description="This clears the FSRS schedule and review history for this problem."
           error={error}
@@ -191,7 +190,7 @@ export function ProblemRowDeleteAction({
       </Button>
 
       {isDeleteConfirmationOpen ? (
-        <ProblemConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Delete Problem"
           description="This permanently deletes this problem and its practice data."
           error={error}

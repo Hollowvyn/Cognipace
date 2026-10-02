@@ -136,7 +136,7 @@ Independent source/regression-evidence review passed C1-C9 and the restart risk 
 | C10/C11      | Shared existing confirmation focus behavior and in-dialog errors; 131 UI tests include chip removal and zero-to-one selection follow-ups.                            |
 | Restart risk | Atomic snapshot/dirty marker, validated metadata reads and explicit clean acknowledgement; real runtime/SQLite restart suite covers failed and pending dirty writes. |
 
-`rtk proxy git diff 709957e --numstat -- src` measures 675 production additions / 3103 deletions across 53 files: **2428 net production lines removed** for the entire implementation, including correctness and accessibility repairs. Test/fixture changes are counted separately (3525 additions / 1419 deletions); line savings do not represent reduced supported behavior. Phase 4 alone removed 2627 net production lines. Three direct dependencies were removed, none added.
+At the pre-PR-review checkpoint, `rtk proxy git diff 709957e --numstat -- src` measured 675 production additions / 3103 deletions across 53 files: **2428 net production lines removed**, including correctness and accessibility repairs. Test/fixture changes were counted separately (3525 additions / 1419 deletions); line savings do not represent reduced supported behavior. Phase 4 alone removed 2627 net production lines. Three direct dependencies were removed, none added.
 
 Final caller search finds no removed API references. `rtk proxy git diff 709957e --name-only -- src/platform/db/migrations src/platform/db/schema src/features/backup/api/backup-contracts.ts src/extension/background/runtime-policy.ts wxt.config.ts .github/workflows scripts` returns no changes: migration SQL, backup wire format, sender policy, extension config, CI and release scripts remain unchanged. Post-flush feature invalidation, Zod parsing and secret redaction were independently reviewed.
 
@@ -202,9 +202,29 @@ Fresh integration validation:
 - `rtk proxy npm run format > /private/tmp/cognipace-ponytail-pr-format.log 2>&1`: passed.
 - `rtk proxy npx prettier --check --ignore-path /dev/null docs/architecture.md docs/testing.md docs/superpowers/audits/2026-10-02-ponytail-implementation-ledger.md docs/superpowers/audits/2026-10-02-ponytail-pr-handoff.md`: passed after the final handoff edits.
 
-Scope measurement against
-the refreshed PR base remains 2428 net production lines removed (674 additions /
-3102 deletions in 53 files). Audit findings, dependency exposure assessment,
-schema/permission safety and human-proof requirements remain unchanged. PR is
-created as a draft while human happy-path/edge-case smoke and screenshots are
-pending; no ready-for-review request or remote merge is performed.
+Before the final PR review, the refreshed-base measurement was 2428 net
+production lines removed (674 additions / 3102 deletions in 53 files). Audit
+findings, dependency exposure assessment, schema/permission safety and
+human-proof requirements remain unchanged. PR is a draft while human
+happy-path/edge-case smoke and screenshots are pending; no ready-for-review
+request or remote merge is performed.
+
+## Final Ponytail PR review
+
+The `ponytail-review` pass cut unused chart theme/style/label plumbing, merged
+two identical confirmation dialogs into one six-caller component, removed unused
+watcher submission mapping and a recommendation option, simplified a redundant
+URL guard, and put duplicated provider body-timeout/cancel tests into one
+table-driven suite. All twelve provider/status/behavior cases remain covered.
+The final diff against `origin/main` measures **2652 net production lines removed**
+(706 additions / 3358 deletions, with Git detecting the shared dialog rename). The
+review itself removed 224 further net production lines.
+
+After this review, `rtk proxy npm run lint`, `rtk proxy npm run format`,
+`rtk proxy npm run check` (DB check, typecheck, lint, 187 files / 1985 tests),
+`rtk proxy npm run build` (3.86 MB), `rtk proxy npm run store:check` (version 2.0.0,
+four icons), `rtk proxy npm run zip` (1.25 MB), and `rtk proxy git diff --check`
+passed. Focused chart, overlay, Problems/Tracks, provider and URL tests also
+passed before the full check. `rtk proxy npm run db:generate` remains skipped
+because schema did not change; realtime human Chrome/Gist/provider smoke and
+redacted visual proof remain pending before PR review or merge.

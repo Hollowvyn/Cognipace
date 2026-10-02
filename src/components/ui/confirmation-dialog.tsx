@@ -1,11 +1,11 @@
 import { Loader2 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { InlineStatus } from '@/components/ui/inline-status'
 import { useModalFocus } from '@/components/ui/use-modal-focus'
 
-export function TrackConfirmationDialog({
+export function ConfirmationDialog({
   confirmLabel,
   description,
   error,
@@ -26,9 +26,10 @@ export function TrackConfirmationDialog({
     onCancel,
     pending,
   })
-  const titleId = `track-confirmation-${title.toLowerCase().replace(/\W+/g, '-')}`
-  const descriptionId = `${titleId}-description`
-  const errorId = `${titleId}-error`
+  const id = useId()
+  const titleId = `${id}-title`
+  const descriptionId = `${id}-description`
+  const errorId = `${id}-error`
 
   return (
     <div

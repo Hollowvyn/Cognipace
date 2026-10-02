@@ -315,10 +315,7 @@ function RetentionMapChart({
         aria-roledescription="interactive scatter plot"
         className="aspect-auto h-80 min-h-[20rem]"
         config={{
-          retrievability: {
-            label: 'Current recall',
-            color: 'var(--cp-analytics-observed)',
-          },
+          retrievability: 'var(--cp-analytics-observed)',
         }}
         initialDimension={chartDimension}
         role="region"

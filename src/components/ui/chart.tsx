@@ -3,11 +3,6 @@ import * as RechartsPrimitive from 'recharts'
 
 import { cn } from '@/utils/cn'
 
-const CHART_THEMES = {
-  light: ":root, [data-cp-theme='light'], [data-cp-theme='system']",
-  dark: "[data-cp-theme='dark']",
-} as const
-
 const DEFAULT_CHART_INITIAL_DIMENSION = { height: 192, width: 320 } as const
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 const ANIMATED_CHART_COMPONENTS = new Set<unknown>([
@@ -22,16 +17,7 @@ const ANIMATED_CHART_COMPONENTS = new Set<unknown>([
   RechartsPrimitive.Tooltip,
 ])
 
-export type ChartConfig = Record<
-  string,
-  {
-    label?: React.ReactNode
-    icon?: React.ComponentType
-  } & (
-    | { color?: string; theme?: never }
-    | { color?: never; theme: Record<keyof typeof CHART_THEMES, string> }
-  )
->
+export type ChartConfig = Record<string, string>
 
 export interface ChartContainerProps extends React.ComponentProps<'div'> {
   config: ChartConfig
@@ -52,20 +38,21 @@ export const ChartContainer = React.forwardRef<
 >(
   (
     {
-      id,
       className,
       children,
       config,
       initialDimension,
       accessibleName,
       accessibleDescription,
+      style,
       ...props
     },
     ref,
   ) => {
-    const uniqueId = React.useId()
-    const chartId = `chart-${id ?? uniqueId.replace(/:/g, '')}`
     const prefersReducedMotion = usePrefersReducedMotion()
+    const chartColors = Object.fromEntries(
+      Object.entries(config).map(([key, color]) => [`--color-${key}`, color]),
+    )
     const accessibleChartChildren =
       React.isValidElement(children) &&
       (accessibleName !== undefined || accessibleDescription !== undefined)
@@ -90,7 +77,7 @@ export const ChartContainer = React.forwardRef<
         {...props}
         ref={ref}
         data-chart-animation={prefersReducedMotion ? 'disabled' : 'enabled'}
-        data-chart={chartId}
+        style={{ ...chartColors, ...style }}
         className={cn(
           'relative flex aspect-video min-h-48 w-full min-w-0 justify-center text-xs',
           '[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground',
@@ -107,7 +94,6 @@ export const ChartContainer = React.forwardRef<
           className,
         )}
       >
-        <ChartStyle config={config} id={chartId} />
         <RechartsPrimitive.ResponsiveContainer
           height="100%"
           minHeight="12rem"
@@ -180,40 +166,4 @@ function disableChartAnimations(children: React.ReactNode): React.ReactNode {
   })
 }
 
-function ChartStyle({ config, id }: { config: ChartConfig; id: string }) {
-  const colorConfig = Object.entries(config).filter(
-    ([, itemConfig]) => itemConfig.theme || itemConfig.color,
-  )
-
-  if (!colorConfig.length) {
-    return null
-  }
-
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(CHART_THEMES)
-          .map(
-            ([theme, selector]) => `
-${selector} [data-chart="${id}"] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof CHART_THEMES] ?? itemConfig.color
-
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .filter(Boolean)
-  .join('\n')}
-}
-`,
-          )
-          .join('\n'),
-      }}
-    />
-  )
-}
-
 export const ChartTooltip = RechartsPrimitive.Tooltip
-
-export { ChartStyle }

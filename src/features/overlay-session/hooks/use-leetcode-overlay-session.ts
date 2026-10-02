@@ -126,7 +126,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     activeProblemSlug: overlay.activeProblemSlug,
     metadata: pageSync.metadata,
     submissionResult: pageSync.submission.result,
-    submittedSession: overlay.submittedSession,
     overlayState: overlay,
     context: pageSync.context,
     timing: {

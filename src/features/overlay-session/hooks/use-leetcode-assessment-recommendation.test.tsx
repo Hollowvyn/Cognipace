@@ -174,7 +174,6 @@ function makeOptions(
     activeProblemSlug: 'two-sum',
     metadata: baseMetadata,
     submissionResult: null,
-    submittedSession: null,
     overlayState: initialOverlaySessionState,
     context: baseContext,
     timing: { elapsedSeconds: 600, targetSeconds: 2100, timerUsed: true },

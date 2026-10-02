@@ -20,8 +20,11 @@ deadlines cover response bodies. Library/Tracks confirmations contain keyboard
 focus and show retryable errors within the dialog.
 
 Proven unused Analytics calculations/charts, superseded Tracks/FSRS APIs,
-placeholder files and three direct dependencies are removed. The entire change
-removes 2428 net production lines; meaningful tests now exercise the live paths.
+placeholder files and three direct dependencies are removed. A final
+`ponytail-review` also replaced unused chart stylesheet/theme plumbing with CSS
+custom properties, combined duplicate confirmation dialogs, removed unused
+overlay input, and consolidated provider body-deadline tests. The entire change
+removes 2652 net production lines; meaningful tests still exercise the live paths.
 Compatible dependency fixes remove the high and production advisory entries.
 Four moderate scanner entries remain in one development-only Drizzle/esbuild
 chain without a compatible patched loader; versions and exposure assessment are
@@ -51,9 +54,8 @@ The approved design and original audit document the scope and findings.
 
 ## Testing
 
-- [x] `rtk proxy npm run check` passed after integrating current main: DB check,
-      typecheck, lint and 186 files /
-      1985 tests under patched Vitest 4.1.11.
+- [x] `rtk proxy npm run check` passed after the final Ponytail review: DB
+      check, typecheck, lint and 187 files / 1985 tests under Vitest 4.1.11.
 - [x] `rtk proxy npm run lint` passed.
 - [x] `rtk proxy npm run db:check` passed.
 - [x] `rtk proxy npm run build` passed: 3.86 MB production extension.

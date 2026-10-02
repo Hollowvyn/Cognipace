@@ -8,6 +8,7 @@ import {
   X,
 } from 'lucide-react'
 
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { IconButton } from '@/components/ui/icon-button'
 import { InlineStatus } from '@/components/ui/inline-status'
 import {
@@ -24,7 +25,6 @@ import type {
   ProblemLibraryRow,
   ProblemsBulkUpdateProblemsRequest,
 } from '../../api/problems-contracts'
-import { ProblemConfirmationDialog } from './problem-confirmation-dialog'
 import { ProblemBulkMetadataDialog } from './problem-bulk-metadata-dialog'
 
 type BulkConfirmation = 'delete' | 'reset'
@@ -243,7 +243,7 @@ export function ProblemBulkActionBar({
       ) : null}
 
       {confirmation === 'reset' ? (
-        <ProblemConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Reset Schedule"
           description={`This clears schedules and review history for ${selectedRows.length} selected ${pluralize('problem', selectedRows.length)}.`}
           error={error}
@@ -276,7 +276,7 @@ export function ProblemBulkActionBar({
       ) : null}
 
       {confirmation === 'delete' ? (
-        <ProblemConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Delete Problems"
           description="This permanently deletes the selected problems and their practice data."
           error={error}
