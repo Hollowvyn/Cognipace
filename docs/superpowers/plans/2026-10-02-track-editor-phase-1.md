@@ -148,3 +148,62 @@ the relevant group. Collapse changes only local form presentation.
 - [x] Run focused form/hook/routes tests, required check/build/format, and an
       implemented-component browser check. Update current docs and handoff;
       human extension smoke and visual proof remain pending before review/merge.
+
+## Follow-up: Distinguish Group Headers From Question Rows
+
+Approved by the user on 2026-10-02 through the **Section headers** preview.
+Owner: focused form implementer; root owns documentation and full validation.
+
+**Files:**
+
+- Modify: `src/features/tracks/components/track-form.tsx`
+- Validate: `src/features/tracks/components/track-form.test.tsx`
+- Validate: `src/features/tracks/hooks/use-track-form.test.tsx`
+- Validate: `src/app/dashboard/routes.test.tsx`
+- Update: `docs/product.md`, `docs/testing.md`, and this feature's handoff.
+
+- [ ] Keep the outer group outline and remove its shared card padding/fill
+      treatment from the header/body layout. Put padding on the shaded header
+      and expanded body separately. Keep overflow visible so suggestions fit.
+      The header uses semantic `bg-muted` tones, with stronger expanded state:
+
+```tsx
+className={cn(
+  'grid min-w-0 grid-cols-1 items-start gap-2 rounded-[var(--cp-control-radius)] bg-muted/45 p-3 sm:grid-cols-[minmax(0,1fr)_auto]',
+  isSelected && 'rounded-b-none border-b border-border bg-muted/80',
+)}
+```
+
+- [ ] Use a 16px bold wrapping group title and an adjacent quieter count at
+      desktop; count and controls wrap at narrow widths. Preserve native header
+      button, disclosure state, focus rings, labels, and action handlers.
+- [ ] Replace repeated question-card chrome with one divided list:
+
+```tsx
+<ol className="m-0 grid list-none divide-y divide-border p-0">
+  <li className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+    {/* Existing order, full title, metadata, and controls. */}
+  </li>
+</ol>
+```
+
+      Use semibold selected-question titles through a scoped ProblemSummary
+      title class; keep Library suggestion emphasis. Remove bold order-number
+      weight. Do not alter reducers, request payloads, or menu implementation.
+- [ ] Run existing focused tests before required full checks; no new tests that
+      merely assert class strings for this reversible styling change:
+
+```sh
+rtk npm run test -- src/features/tracks/components/track-form.test.tsx src/features/tracks/hooks/use-track-form.test.tsx src/app/dashboard/routes.test.tsx
+rtk npm run lint
+rtk npm run check
+rtk npm run build
+rtk npm run format
+```
+
+- [ ] Review spec compliance, then source quality. Browser-inspect actual
+      components at 736px and 320px in both themes, including full title wrapping,
+      all controls, collapse/reopen, Change/menu focus, and unclipped Library
+      suggestions. Inspect 200% text scaling, record screenshots and exact
+      commands in the handoff, then commit with a Conventional Commit title.
+      Human installed-extension smoke remains pending before PR review/merge.

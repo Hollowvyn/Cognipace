@@ -99,6 +99,30 @@ global review history.
 - Apply the same editor to normal create, edit, and create-from-Library-selection.
   Preserve the latter's initial selection and grouping controls.
 
+## Approved Visual Hierarchy Follow-up
+
+On 2026-10-02, the user approved the **Section headers** refinement after
+comparing it with an indented-list alternative. Group sections and question rows
+had shared the same rounded outline, fill, padding, and bold body-size title.
+
+- Keep one outer group outline and give its header a full-width shaded band.
+  Use a 16px bold wrapping group title, disclosure chevron, and quieter count.
+  The expanded band is slightly stronger and separates from its content below.
+- Render questions as a continuous ordered list with thin horizontal dividers;
+  remove individual question-card fills, outlines, corner radii, and gaps. Use
+  14px semibold wrapping question titles and quieter tabular order numbers.
+- Retain the Library picker immediately above Questions, the selected count,
+  complete titles, difficulty, Previously solved label, and all existing actions.
+  Narrow layouts keep controls on the second line. Use current semantic theme
+  tokens for both light and dark appearance.
+- Preserve collapse, Rename, New Group, validation, menu/focus behavior, ordering,
+  and saved data. The styling remains in the Tracks form. Do not clip the outer
+  group; Library suggestions and Change menus must remain visible.
+
+This is a styling refinement of the approved editor, with no runtime, reducer,
+database, or external-progress changes. Existing interaction tests and actual
+component browser proof validate it; no CSS snapshot tests are needed.
+
 ## External Progress Behavior
 
 Checkbox helper: “Count successful solves from anywhere in CogniPace, including
