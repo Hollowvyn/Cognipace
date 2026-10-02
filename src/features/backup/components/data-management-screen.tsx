@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import {
   FeedbackToast,
@@ -40,6 +40,7 @@ export function DataManagementScreen() {
   const [resetError, setResetError] = useState<string | null>(null)
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const backupSelectionGeneration = useRef(0)
 
   async function handleExport(scope: 'backup' | 'reset') {
     clearStatus(scope)
@@ -59,6 +60,9 @@ export function DataManagementScreen() {
   }
 
   async function handleFileSelect(file: File) {
+    const generation = ++backupSelectionGeneration.current
+    const isCurrentSelection = () =>
+      generation === backupSelectionGeneration.current
     setSelectedBackup(null)
     setSelectedBackupFileName(file.name)
     setBackupSummary(null)
@@ -70,12 +74,17 @@ export function DataManagementScreen() {
     try {
       parsedBackup = JSON.parse(await readFileText(file))
     } catch {
-      setBackupError('Invalid JSON backup file.')
+      if (isCurrentSelection()) {
+        setBackupError('Invalid JSON backup file.')
+      }
       return
     }
 
+    if (!isCurrentSelection()) return
+
     try {
       const summary = await validateBackup.mutateAsync(parsedBackup)
+      if (!isCurrentSelection()) return
       setSelectedBackup(parsedBackup)
       setBackupSummary(summary)
       setBackupToast({
@@ -83,7 +92,9 @@ export function DataManagementScreen() {
         tone: 'success',
       })
     } catch (error) {
-      setBackupError(readErrorMessage(error, 'Backup validation failed.'))
+      if (isCurrentSelection()) {
+        setBackupError(readErrorMessage(error, 'Backup validation failed.'))
+      }
     }
   }
 

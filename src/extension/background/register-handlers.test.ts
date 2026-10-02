@@ -1242,28 +1242,170 @@ describe('background handler registration', () => {
     expect(backgroundMocks.syncService.pushLocal).not.toHaveBeenCalled()
   })
 
-  it('aborts queued sync remote restores when local data becomes dirty first', async () => {
-    let remoteWorkRan = false
+  it('allows an authorized confirmed manual pull to restore dirty local data', async () => {
+    const { assertCanSenderCallExtensionMethod } =
+      await vi.importActual<typeof import('./runtime-policy')>(
+        './runtime-policy',
+      )
+    backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementationOnce(
+      assertCanSenderCallExtensionMethod,
+    )
+    const sender = {
+      url: 'chrome-extension://extension-id/dashboard.html',
+    }
+    const restore = vi.fn(async () => {
+      await backgroundMocks.flushDbSnapshot()
+    })
     backgroundMocks.readSyncMetadata.mockResolvedValueOnce(dirtySyncMetadata)
-    backgroundMocks.syncService.pullLatest.mockImplementation(async () => {
-      await readLatestSyncFactoryOptions().runRemoteRestore(() => {
-        remoteWorkRan = true
-
-        return Promise.resolve(null)
-      })
+    backgroundMocks.syncService.pullLatest.mockImplementationOnce(async () => {
+      await readLatestSyncFactoryOptions().runRemoteRestore(restore)
 
       return syncActionResult
     })
 
-    await expect(
-      sendRuntimeMessage('sync.pullLatest', {
-        surface: 'dashboard',
-      }),
-    ).rejects.toThrow(/Local data changed/)
+    const response = await sendRuntimeMessage(
+      'sync.pullLatest',
+      { surface: 'dashboard', confirmLocalOverwrite: true },
+      sender,
+    )
 
-    expect(remoteWorkRan).toBe(false)
+    expectRuntimePolicy('sync.pullLatest', 'dashboard', sender)
+    expect(backgroundMocks.syncService.pullLatest).toHaveBeenCalledWith({
+      confirmLocalOverwrite: true,
+    })
+    expect(response).toEqual(syncActionResult)
+    expect(restore).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.readSyncMetadata).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
     expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
-    expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+    expect(
+      backgroundMocks.syncAutoSync.clearPendingAutomaticSync,
+    ).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([undefined, false])(
+    'aborts dirty manual sync restores with confirmation %s',
+    async (confirmLocalOverwrite) => {
+      let remoteWorkRan = false
+      backgroundMocks.readSyncMetadata.mockResolvedValueOnce(dirtySyncMetadata)
+      backgroundMocks.syncService.pullLatest.mockImplementationOnce(
+        async () => {
+          await readLatestSyncFactoryOptions().runRemoteRestore(() => {
+            remoteWorkRan = true
+
+            return Promise.resolve(null)
+          })
+
+          return syncActionResult
+        },
+      )
+
+      await expect(
+        sendRuntimeMessage('sync.pullLatest', {
+          surface: 'dashboard',
+          ...(confirmLocalOverwrite === undefined
+            ? {}
+            : { confirmLocalOverwrite }),
+        }),
+      ).rejects.toThrow(/Local data changed/)
+
+      expect(remoteWorkRan).toBe(false)
+      expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+      expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.syncAutoSync.clearPendingAutomaticSync,
+      ).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['runtime', 'background'])(
+    'blocks dirty automatic restores from %s open checks',
+    async (source) => {
+      const restore = vi.fn(() => Promise.resolve(null))
+      backgroundMocks.readSyncMetadata.mockResolvedValueOnce(dirtySyncMetadata)
+      backgroundMocks.syncService.checkRemoteOnOpen.mockImplementationOnce(
+        async () => {
+          await readLatestSyncFactoryOptions().runRemoteRestore(restore)
+
+          return syncOpenCheckResult
+        },
+      )
+
+      await expect(
+        source === 'runtime'
+          ? sendRuntimeMessage('sync.checkRemoteOnOpen', {
+              surface: 'dashboard',
+            })
+          : readLatestSyncAutoSyncDeps().runCleanPullCheck(),
+      ).rejects.toThrow(/Local data changed/)
+
+      expect(restore).not.toHaveBeenCalled()
+      expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+      expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+    },
+  )
+
+  it('rejects confirmed manual pulls from senders claiming dashboard access before DB access', async () => {
+    const { assertCanSenderCallExtensionMethod } =
+      await vi.importActual<typeof import('./runtime-policy')>(
+        './runtime-policy',
+      )
+    backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementationOnce(
+      assertCanSenderCallExtensionMethod,
+    )
+
+    expect(() =>
+      sendRuntimeMessage(
+        'sync.pullLatest',
+        { surface: 'dashboard', confirmLocalOverwrite: true },
+        {
+          tab: { id: 7 },
+          url: 'https://leetcode.com/problems/two-sum/',
+        },
+      ),
+    ).toThrow(/cannot claim/)
+
+    expect(backgroundMocks.getAppDb).not.toHaveBeenCalled()
+    expect(backgroundMocks.createBackgroundSyncService).not.toHaveBeenCalled()
+    expect(backgroundMocks.syncService.pullLatest).not.toHaveBeenCalled()
+  })
+
+  it('keeps confirmed restores blocked until a pending dirty mark is saved', async () => {
+    backgroundMocks.markSyncLocalDataChanged
+      .mockRejectedValueOnce(new Error('storage unavailable'))
+      .mockRejectedValueOnce(new Error('storage still unavailable'))
+    await sendRuntimeMessage(
+      'problems.createProblem',
+      binarySearchCreateRequest(),
+    )
+    const restore = vi.fn(() => Promise.resolve(null))
+    backgroundMocks.readSyncMetadata.mockResolvedValueOnce(dirtySyncMetadata)
+    backgroundMocks.syncService.pullLatest.mockImplementationOnce(async () => {
+      await readLatestSyncFactoryOptions().runRemoteRestore(restore)
+
+      return syncActionResult
+    })
+    const request = { surface: 'dashboard', confirmLocalOverwrite: true }
+
+    await expect(
+      sendRuntimeMessage('sync.pullLatest', request),
+    ).rejects.toThrow(
+      'Local data changed but sync metadata could not be saved.',
+    )
+
+    expect(restore).not.toHaveBeenCalled()
+    expect(backgroundMocks.syncService.pullLatest).not.toHaveBeenCalled()
+    expect(backgroundMocks.createBackgroundSyncService).not.toHaveBeenCalled()
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
+
+    backgroundMocks.markSyncLocalDataChanged.mockResolvedValueOnce(
+      dirtySyncMetadata,
+    )
+    await expect(
+      sendRuntimeMessage('sync.pullLatest', request),
+    ).resolves.toEqual(syncActionResult)
+    expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(3)
+    expect(restore).toHaveBeenCalledTimes(1)
   })
 
   it('registers all import methods and serializes previews with edits and sync restores', async () => {
@@ -1958,33 +2100,58 @@ describe('background handler registration', () => {
     ).not.toHaveBeenCalled()
   })
 
-  it('queues manual pull so later local mutations wait behind the sync work', async () => {
-    const pullLatest = createDeferred<typeof syncActionResult>()
-    backgroundMocks.syncService.pullLatest.mockReturnValueOnce(
-      pullLatest.promise,
-    )
+  it.each([undefined, true])(
+    'queues manual restore with confirmation %s ahead of later local mutations',
+    async (confirmLocalOverwrite) => {
+      const restoreGate = createDeferred<void>()
+      const workOrder: string[] = []
+      let restoreStarted = false
+      backgroundMocks.readSyncMetadata.mockResolvedValueOnce(
+        confirmLocalOverwrite ? dirtySyncMetadata : cleanSyncMetadata,
+      )
+      backgroundMocks.syncService.pullLatest.mockImplementationOnce(
+        async () => {
+          await readLatestSyncFactoryOptions().runRemoteRestore(async () => {
+            restoreStarted = true
+            await restoreGate.promise
+            workOrder.push('restore-complete')
+          })
 
-    const syncPromise = sendRuntimeMessage('sync.pullLatest', {
-      surface: 'dashboard',
-    })
-    await waitUntil(() => {
-      expect(backgroundMocks.syncService.pullLatest).toHaveBeenCalled()
-    })
+          return syncActionResult
+        },
+      )
 
-    const mutationPromise = sendRuntimeMessage(
-      'problems.createProblem',
-      binarySearchCreateRequest(),
-    )
+      const syncPromise = sendRuntimeMessage('sync.pullLatest', {
+        surface: 'dashboard',
+        ...(confirmLocalOverwrite === undefined
+          ? {}
+          : { confirmLocalOverwrite }),
+      })
+      await waitUntil(() => {
+        expect(restoreStarted).toBe(true)
+      })
 
-    await Promise.resolve()
-    expect(backgroundMocks.createProblem).not.toHaveBeenCalled()
+      backgroundMocks.createProblem.mockImplementationOnce(() => {
+        workOrder.push('local-write')
 
-    pullLatest.resolve(syncActionResult)
-    await syncPromise
-    await mutationPromise
+        return Promise.resolve(problemForEditResponse)
+      })
+      const mutationPromise = sendRuntimeMessage(
+        'problems.createProblem',
+        binarySearchCreateRequest(),
+      )
 
-    expect(backgroundMocks.createProblem).toHaveBeenCalledTimes(1)
-  })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(backgroundMocks.createProblem).not.toHaveBeenCalled()
+
+      restoreGate.resolve()
+      await syncPromise
+      await mutationPromise
+
+      expect(workOrder).toEqual(['restore-complete', 'local-write'])
+      expect(backgroundMocks.createProblem).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it('rejects invalid problem writes before mutation side effects', () => {
     expect(() =>

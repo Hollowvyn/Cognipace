@@ -2,6 +2,7 @@ import type { DbHandle } from './client'
 
 export const SNAPSHOT_KEY = 'cognipace_db_snapshot_v1'
 export const FINGERPRINT_KEY = 'cognipace_db_snapshot_fingerprint_v1'
+export const SNAPSHOT_DIRTY_KEY = 'cognipace_db_snapshot_dirty_v1'
 
 export function computeFingerprint(text: string) {
   let hash = 5381
@@ -61,12 +62,14 @@ export function deserializeDb(handle: DbHandle, bytes: Uint8Array) {
 export interface StoredSnapshot {
   fingerprint: string
   bytes: Uint8Array
+  hasMutations?: boolean
 }
 
 export async function writeSnapshotToStorage(snapshot: StoredSnapshot) {
   await chrome.storage.local.set({
     [SNAPSHOT_KEY]: bytesToBase64(snapshot.bytes),
     [FINGERPRINT_KEY]: snapshot.fingerprint,
+    ...(snapshot.hasMutations ? { [SNAPSHOT_DIRTY_KEY]: true } : {}),
   })
 }
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,6 +10,7 @@ import {
   type BackupFile,
   type BackupSummary,
 } from '../api/backup-contracts'
+import { BackupRestorePanel } from './backup-restore-panel'
 import { DataManagementScreen } from './data-management-screen'
 
 vi.mock('@/extension/messaging', () => ({
@@ -21,6 +22,15 @@ vi.mock('@/features/sync', () => ({
     <section aria-label="GitHub sync settings">GitHub Sync</section>
   ),
 }))
+
+vi.mock('./backup-restore-panel', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./backup-restore-panel')>()
+
+  return {
+    ...actual,
+    BackupRestorePanel: vi.fn(actual.BackupRestorePanel),
+  }
+})
 
 describe('DataManagementScreen', () => {
   beforeEach(() => {
@@ -137,6 +147,157 @@ describe('DataManagementScreen', () => {
     )
     expect(sendMessage).not.toHaveBeenCalled()
   })
+
+  it('restores the latest selected backup when an earlier file read finishes late', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockResolvedValue(validSummary)
+    const { wrapper } = createQueryTestHarness()
+    const backupA = { ...validBackup, exportedAt: '2026-05-01T12:00:00.000Z' }
+    const backupB = { ...validBackup, exportedAt: '2026-05-02T12:00:00.000Z' }
+    const firstRead = createDeferred<string>()
+    const fileA = createBackupFile(backupA, 'A.json')
+    Object.defineProperty(fileA, 'text', { value: () => firstRead.promise })
+
+    render(<DataManagementScreen />, { wrapper })
+
+    await user.upload(screen.getByLabelText('Backup file'), fileA)
+    expect(screen.getByLabelText('Backup file')).toBeEnabled()
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      createBackupFile(backupB, 'B.json'),
+    )
+    expect(
+      await screen.findByRole('status', { name: 'Data management feedback' }),
+    ).toHaveTextContent('Backup ready to restore.')
+
+    await act(() => {
+      firstRead.resolve(JSON.stringify(backupA))
+      return firstRead.promise
+    })
+
+    expect(screen.getByText('B.json')).toBeVisible()
+    await user.click(
+      screen.getByRole('button', { name: 'Restore full backup' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Confirm restore' }))
+
+    expect(sendMessage).toHaveBeenCalledWith('backup.restoreFullBackup', {
+      surface: 'dashboard',
+      backup: backupB,
+    })
+  })
+
+  it('keeps a newer backup ready when an earlier file read rejects', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockResolvedValue(validSummary)
+    const { wrapper } = createQueryTestHarness()
+    const firstRead = createDeferred<string>()
+    const fileA = createBackupFile(validBackup, 'A.json')
+    Object.defineProperty(fileA, 'text', { value: () => firstRead.promise })
+
+    render(<DataManagementScreen />, { wrapper })
+
+    await user.upload(screen.getByLabelText('Backup file'), fileA)
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      createBackupFile(validBackup, 'B.json'),
+    )
+    expect(
+      await screen.findByRole('status', { name: 'Data management feedback' }),
+    ).toHaveTextContent('Backup ready to restore.')
+
+    await act(() => {
+      firstRead.reject(new Error('Failed to read A.json.'))
+      return firstRead.promise.catch(() => undefined)
+    })
+
+    expect(screen.getByText('B.json')).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('status', { name: 'Data management feedback' }),
+    ).toHaveTextContent('Backup ready to restore.')
+    expect(
+      screen.getByRole('button', { name: 'Restore full backup' }),
+    ).toBeEnabled()
+  })
+
+  it.each(['succeeds', 'rejects'] as const)(
+    'keeps the latest backup when an earlier validation %s late',
+    async (outcome) => {
+      const user = userEvent.setup()
+      const firstValidation = createDeferred<BackupSummary>()
+      const backupA = {
+        ...validBackup,
+        exportedAt: '2026-05-01T12:00:00.000Z',
+      }
+      const backupB = {
+        ...validBackup,
+        exportedAt: '2026-05-02T12:00:00.000Z',
+      }
+      const summaryB = { ...validSummary, exportedAt: backupB.exportedAt }
+      vi.mocked(sendMessage).mockImplementation((method, payload) => {
+        if (method === 'backup.validateFullBackup') {
+          const { backup } = payload as { backup: BackupFile }
+          return backup.exportedAt === backupA.exportedAt
+            ? firstValidation.promise
+            : Promise.resolve(summaryB)
+        }
+        if (method === 'backup.restoreFullBackup') {
+          return Promise.resolve(summaryB)
+        }
+        return Promise.reject(new Error(`Unexpected method ${method}`))
+      })
+      const { wrapper } = createQueryTestHarness()
+
+      render(<DataManagementScreen />, { wrapper })
+
+      await user.upload(
+        screen.getByLabelText('Backup file'),
+        createBackupFile(backupA, 'A.json'),
+      )
+      await waitFor(() => {
+        expect(screen.getByLabelText('Backup file')).toBeDisabled()
+      })
+
+      // Exercise the selection callback while the real input is disabled.
+      act(() => {
+        const props = vi.mocked(BackupRestorePanel).mock.calls.at(-1)?.[0]
+        props?.onFileSelect(createBackupFile(backupB, 'B.json'))
+      })
+      expect(
+        await screen.findByRole('status', { name: 'Data management feedback' }),
+      ).toHaveTextContent('Backup ready to restore.')
+
+      await act(() => {
+        if (outcome === 'succeeds') {
+          firstValidation.resolve({
+            ...validSummary,
+            exportedAt: backupA.exportedAt,
+          })
+        } else {
+          firstValidation.reject(new Error('A.json validation failed.'))
+        }
+        return firstValidation.promise.catch(() => undefined)
+      })
+
+      expect(screen.getByText('B.json')).toBeVisible()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(
+        screen.getByText(
+          `Exported: ${formatExpectedDateTime(summaryB.exportedAt)}`,
+        ),
+      ).toBeVisible()
+      await user.click(
+        screen.getByRole('button', { name: 'Restore full backup' }),
+      )
+      await user.click(screen.getByRole('button', { name: 'Confirm restore' }))
+
+      expect(sendMessage).toHaveBeenCalledWith('backup.restoreFullBackup', {
+        surface: 'dashboard',
+        backup: backupB,
+      })
+    },
+  )
 
   it('requires confirmation before restoring a full backup', async () => {
     const user = userEvent.setup()
@@ -282,10 +443,21 @@ describe('DataManagementScreen', () => {
   })
 })
 
-function createBackupFile(backup: BackupFile) {
-  return new File([JSON.stringify(backup)], 'backup.json', {
+function createBackupFile(backup: BackupFile, fileName = 'backup.json') {
+  return new File([JSON.stringify(backup)], fileName, {
     type: 'application/json',
   })
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: Error) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+
+  return { promise, resolve, reject }
 }
 
 // ⚡ Bolt: Cache DateTimeFormat at module level to prevent excessive

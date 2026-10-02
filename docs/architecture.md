@@ -327,6 +327,12 @@ mutation commits, sync metadata is marked dirty, the database snapshot is
 flushed, normal invalidation is broadcast, and an alarm-backed auto-push is
 scheduled when Gist sync is configured. Alarm jobs run through the same mutation
 queue as manual sync work, so remote restores and local writes stay serialized.
+Snapshots containing DB mutations atomically persist a local dirty marker with
+the snapshot and fingerprint. Sync reads combine this marker with validated
+metadata, preserving dirty state across worker restart even when the best-effort
+metadata write fails. Initial publication and no-op flushes retain the marker;
+a successful push or pull explicitly acknowledges clean data and clears it in
+the same storage write as that acknowledgement. Disconnect retains it.
 
 Opening popup, dashboard, or overlay surfaces calls the safe
 `sync.checkRemoteOnOpen` runtime path. That path clean-pulls changed remote Gist

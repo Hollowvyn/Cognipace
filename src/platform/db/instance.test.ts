@@ -33,6 +33,7 @@ import {
   deserializeDb,
   FINGERPRINT_KEY,
   SNAPSHOT_KEY,
+  SNAPSHOT_DIRTY_KEY,
   computeFingerprint,
   serializeDb,
 } from './snapshot'
@@ -44,6 +45,7 @@ const openedHandles: Awaited<ReturnType<typeof getAppDb>>[] = []
 class FakeStorage {
   readonly values: Record<string, unknown> = {}
   rejectActiveSnapshotWrite = false
+  beforeSet?: (values: Record<string, unknown>) => Promise<void>
 
   get = vi.fn((keys: string[]) =>
     Promise.resolve(
@@ -55,16 +57,16 @@ class FakeStorage {
     ),
   )
 
-  set = vi.fn((values: Record<string, unknown>) => {
+  set = vi.fn(async (values: Record<string, unknown>) => {
     if (
       this.rejectActiveSnapshotWrite &&
       SNAPSHOT_KEY in values &&
       FINGERPRINT_KEY in values
     ) {
-      return Promise.reject(new Error('storage unavailable'))
+      throw new Error('storage unavailable')
     }
+    await this.beforeSet?.(values)
     Object.assign(this.values, values)
-    return Promise.resolve()
   })
 
   remove = vi.fn((keys: string[]) => {
@@ -80,6 +82,7 @@ beforeEach(() => {
 afterEach(() => {
   resetAppDbForTesting()
   while (openedHandles.length > 0) openedHandles.pop()?.rawDb.close()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -128,6 +131,94 @@ function readOwnedRows(db: Awaited<ReturnType<typeof getAppDb>>) {
 }
 
 describe('app database startup', () => {
+  it('keeps initial publication and no-op flushes clean without clearing stored dirtiness', async () => {
+    const storage = installStorage()
+    await openTestDb()
+    expect(storage.values[SNAPSHOT_DIRTY_KEY]).toBeUndefined()
+    await flushDbSnapshot()
+    expect(storage.values[SNAPSHOT_DIRTY_KEY]).toBeUndefined()
+    storage.values[SNAPSHOT_DIRTY_KEY] = true
+    await flushDbSnapshot()
+    expect(storage.values[SNAPSHOT_DIRTY_KEY]).toBe(true)
+  })
+
+  it('publishes mutation dirtiness atomically and leaves a clean acknowledgement intact on no-op flush', async () => {
+    const storage = installStorage()
+    const handle = await openTestDb()
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await flushDbSnapshot()
+    const publication = storage.set.mock.calls.at(-1)?.[0]
+    expect(Object.keys(publication ?? {}).sort()).toEqual(
+      [SNAPSHOT_KEY, FINGERPRINT_KEY, SNAPSHOT_DIRTY_KEY].sort(),
+    )
+    expect(publication?.[SNAPSHOT_DIRTY_KEY]).toBe(true)
+    storage.values[SNAPSHOT_DIRTY_KEY] = false
+    await flushDbSnapshot()
+    expect(storage.values[SNAPSHOT_DIRTY_KEY]).toBe(false)
+    expect(storage.set.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      SNAPSHOT_DIRTY_KEY,
+    )
+    resetAppDbForTesting()
+    await openTestDb()
+    await flushDbSnapshot()
+    expect(storage.values[SNAPSHOT_DIRTY_KEY]).toBe(false)
+  })
+
+  it('marks debounced mutation snapshots dirty without waiting for a metadata write', async () => {
+    const storage = installStorage()
+    const handle = await openTestDb()
+    vi.useFakeTimers()
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await vi.advanceTimersByTimeAsync(250)
+    expect(storage.values[SNAPSHOT_DIRTY_KEY]).toBe(true)
+    resetAppDbForTesting()
+    const reopened = await openTestDb()
+    await expect(
+      createSettingsRepository(reopened.db).getSettings(),
+    ).resolves.toMatchObject({ appearance: { themeMode: 'dark' } })
+  })
+
+  it('retains mutations that arrive while an earlier snapshot write awaits storage', async () => {
+    const storage = installStorage()
+    const handle = await openTestDb()
+    vi.useFakeTimers()
+    const settings = createSettingsRepository(handle.db)
+    await settings.updateSettings({ appearance: { themeMode: 'dark' } }, now)
+    let release!: () => void
+    let started!: () => void
+    const start = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    storage.beforeSet = () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+        started()
+      })
+    const firstFlush = flushDbSnapshot()
+    await start
+    await settings.updateSettings(
+      { appearance: { themeMode: 'light' } },
+      new Date(now.getTime() + 1_000),
+    )
+    release()
+    await firstFlush
+    delete storage.beforeSet
+    storage.values[SNAPSHOT_DIRTY_KEY] = false
+    await flushDbSnapshot()
+    expect(storage.values[SNAPSHOT_DIRTY_KEY]).toBe(true)
+    resetAppDbForTesting()
+    const reopened = await openTestDb()
+    await expect(
+      createSettingsRepository(reopened.db).getSettings(),
+    ).resolves.toMatchObject({ appearance: { themeMode: 'light' } })
+  })
+
   it('round-trips seeded problem, review, FSRS, track, and settings data', async () => {
     installStorage()
     const handle = await openTestDb()
@@ -703,6 +794,7 @@ describe('app database startup', () => {
     await flushDbSnapshot()
     const originalSnapshot = fakeStorage.values[SNAPSHOT_KEY]
     const originalFingerprint = fakeStorage.values[FINGERPRINT_KEY]
+    fakeStorage.values[SNAPSHOT_DIRTY_KEY] = false
 
     fakeStorage.rejectActiveSnapshotWrite = true
     await settings.updateSettings(
@@ -712,10 +804,12 @@ describe('app database startup', () => {
     await expect(flushDbSnapshot()).rejects.toThrow('storage unavailable')
     expect(fakeStorage.values[SNAPSHOT_KEY]).toBe(originalSnapshot)
     expect(fakeStorage.values[FINGERPRINT_KEY]).toBe(originalFingerprint)
+    expect(fakeStorage.values[SNAPSHOT_DIRTY_KEY]).toBe(false)
 
     fakeStorage.rejectActiveSnapshotWrite = false
     await flushDbSnapshot()
     const retriedSnapshot = fakeStorage.values[SNAPSHOT_KEY]
+    expect(fakeStorage.values[SNAPSHOT_DIRTY_KEY]).toBe(true)
     expect(retriedSnapshot).not.toBe(originalSnapshot)
     expect(fakeStorage.values[FINGERPRINT_KEY]).toBe(originalFingerprint)
 

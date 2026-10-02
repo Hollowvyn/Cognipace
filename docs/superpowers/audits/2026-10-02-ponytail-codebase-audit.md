@@ -3,9 +3,11 @@
 Date: 2026-10-02. Baseline: `709957e`, current `origin/main` after fetch.
 Branch: `codex/ponytail-codebase-audit`.
 
-Status: audit complete; application changes have not started. The proposed
-design is [here](../specs/2026-10-02-ponytail-cleanup-design.md). Approval is
-pending under the repository's design-before-implementation gate.
+Status: historical baseline audit complete. The human approved the
+[design](../specs/2026-10-02-ponytail-cleanup-design.md) on 2026-10-02;
+implementation and current evidence are tracked in the
+[ledger](2026-10-02-ponytail-implementation-ledger.md). Findings below record the
+pre-fix state.
 
 Four agents reviewed separate areas: core feature/domain/data code; UI,
 dashboard, popup and overlay flows; runtime, persistence and integrations;

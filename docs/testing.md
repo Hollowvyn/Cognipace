@@ -394,6 +394,15 @@ stored BYOK secret presence and must not expose secret values.
     cancel once before intentionally confirming.
 25. Confirm force push replaces the Gist with local data only after
     confirmation.
+26. In a disposable-profile test harness, fail the sync metadata dirty write
+    while permitting the snapshot write. Save a visible local setting, restart
+    the worker, and confirm the setting survives and automatic open-check skips
+    pulling over it. Repeat with the debounce snapshot firing while the metadata
+    write is pending. Do not edit or expose real snapshot bytes or token values.
+27. Restore normal storage, push the local change, restart again, and confirm
+    clean open-check can pull a later remote change. Repeat failed acknowledgement
+    and verify dirty protection remains; cancel and confirm manual force pull as
+    the explicit recovery path.
 
 Expected: sync is pseudo-real-time, with automatic safe push and clean open-check
 pulls plus manual directional pull and push actions for explicit recovery. Local
