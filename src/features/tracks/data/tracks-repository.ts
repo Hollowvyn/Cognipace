@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 
 import { normalizeProblemDifficulty, type Problem } from '@/features/problems'
 import {
@@ -8,6 +8,7 @@ import {
 import type { Db } from '@/platform/db'
 import {
   problems,
+  problemPractice,
   trackGroupProblems,
   trackGroups,
   trackProblemProgress,
@@ -33,6 +34,10 @@ import type {
   TrackSessionState,
   UpdateTrackInput,
 } from '../domain/track'
+import {
+  readSuccessfulReviews,
+  resolveTrackCompletion,
+} from './track-progress-read-model'
 
 export function createTracksRepository(db: Db) {
   return new TracksRepository(db)
@@ -101,7 +106,13 @@ export class TracksRepository {
   }
 
   async getMemberships(trackId: string): Promise<TrackProblemMembership[]> {
-    return readMemberships(this.db, trackId)
+    return readMemberships(this.db, [trackId.trim()])
+  }
+
+  async getExternalProgressProblemSlugs(
+    problemSlugs: readonly string[],
+  ): Promise<string[]> {
+    return [...(await readSuccessfulReviews(this.db, problemSlugs)).keys()]
   }
 
   async getProgressByTrack(
@@ -121,20 +132,7 @@ export class TracksRepository {
       return new Map()
     }
 
-    const rows = await this.db
-      .select({
-        trackId: trackGroupProblems.trackId,
-        completedAt: trackProblemProgress.completedAt,
-      })
-      .from(trackGroupProblems)
-      .leftJoin(
-        trackProblemProgress,
-        and(
-          eq(trackProblemProgress.trackId, trackGroupProblems.trackId),
-          eq(trackProblemProgress.problemSlug, trackGroupProblems.problemSlug),
-        ),
-      )
-      .where(inArray(trackGroupProblems.trackId, requestedTrackIds))
+    const rows = await readMemberships(this.db, requestedTrackIds)
 
     for (const row of rows) {
       const progress = progressByTrack.get(row.trackId)
@@ -145,7 +143,7 @@ export class TracksRepository {
 
       progress.totalCount += 1
 
-      if (row.completedAt !== null) {
+      if (row.completion.status === 'completed') {
         progress.completedCount += 1
       }
     }
@@ -294,6 +292,7 @@ export class TracksRepository {
         title: normalizedTrack.title,
         description: normalizedTrack.description,
         dueAt: normalizedTrack.dueAt,
+        allowExternalProgress: normalizedTrack.allowExternalProgress,
         createdAt: timestamp,
         updatedAt: timestamp,
       })
@@ -357,6 +356,7 @@ export class TracksRepository {
           title: normalizedTrack.title,
           description: normalizedTrack.description,
           dueAt: normalizedTrack.dueAt,
+          allowExternalProgress: normalizedTrack.allowExternalProgress,
           updatedAt: timestamp,
         })
         .where(eq(tracks.id, existingTrack.id))
@@ -422,9 +422,9 @@ export class TracksRepository {
       if (!track) {
         throw new Error(`Cannot update missing track "${trackId}".`)
       }
-      const membership = (await readMemberships(transactionDb, track.id)).find(
-        (row) => row.problemSlug === problemSlug,
-      )
+      const membership = (
+        await readMemberships(transactionDb, [track.id])
+      ).find((row) => row.problemSlug === problemSlug)
       if (!membership) return
 
       await transactionDb
@@ -482,11 +482,15 @@ export class TracksRepository {
     })
   }
 
-  async resetTrackProgress(trackId: string): Promise<void> {
+  async resetTrackProgress(trackId: string, now = new Date()): Promise<void> {
     await this.db.transaction(async (transactionDb) => {
       await transactionDb
         .delete(trackProblemProgress)
         .where(eq(trackProblemProgress.trackId, trackId))
+      await transactionDb
+        .update(tracks)
+        .set({ allowExternalProgress: false, updatedAt: now.getTime() })
+        .where(eq(tracks.id, trackId))
     })
   }
 
@@ -665,17 +669,34 @@ export class TracksRepository {
       return { group: null, problem: null }
     }
 
-    const preferredIndex = preferredGroup
-      ? groups.findIndex((group) => group.id === preferredGroup.id)
-      : -1
-    const startIndex = preferredIndex >= 0 ? preferredIndex : 0
-    const candidateGroups = groups.slice(startIndex)
-
-    for (const group of candidateGroups) {
-      const problem = await this.getNextProblem(group.id)
-
-      if (problem) {
-        return { group, problem }
+    const memberships = await this.getMemberships(trackId)
+    const incomplete = memberships.filter(
+      (membership) => membership.completion.status === 'incomplete',
+    )
+    if (incomplete.length > 0) {
+      const candidates = await this.db
+        .select({ problem: problems, isSuspended: problemPractice.isSuspended })
+        .from(problems)
+        .leftJoin(
+          problemPractice,
+          eq(problemPractice.problemSlug, problems.slug),
+        )
+        .where(
+          inArray(
+            problems.slug,
+            incomplete.map((membership) => membership.problemSlug),
+          ),
+        )
+      const bySlug = new Map(candidates.map((row) => [row.problem.slug, row]))
+      for (const membership of incomplete) {
+        const candidate = bySlug.get(membership.problemSlug)
+        if (candidate && !candidate.isSuspended) {
+          return {
+            group:
+              groups.find((group) => group.id === membership.groupId) ?? null,
+            problem: mapProblem(candidate.problem),
+          }
+        }
       }
     }
 
@@ -683,36 +704,6 @@ export class TracksRepository {
       group: preferredGroup ?? groups[0] ?? null,
       problem: null,
     }
-  }
-
-  private async getNextProblem(groupId: string) {
-    const rows = await this.db
-      .select({
-        problem: problems,
-      })
-      .from(trackGroupProblems)
-      .innerJoin(problems, eq(problems.slug, trackGroupProblems.problemSlug))
-      .leftJoin(
-        trackProblemProgress,
-        and(
-          eq(trackProblemProgress.trackId, trackGroupProblems.trackId),
-          eq(trackProblemProgress.problemSlug, trackGroupProblems.problemSlug),
-        ),
-      )
-      .where(
-        and(
-          eq(trackGroupProblems.trackGroupId, groupId),
-          isNull(trackProblemProgress.completedAt),
-        ),
-      )
-      .orderBy(asc(trackGroupProblems.position))
-      .limit(1)
-
-    if (rows[0]) {
-      return mapProblem(rows[0].problem)
-    }
-
-    return null
   }
 }
 
@@ -807,8 +798,9 @@ async function readGroups(
 
 async function readMemberships(
   db: TracksReadDb,
-  trackId: string,
+  trackIds: readonly string[],
 ): Promise<TrackProblemMembership[]> {
+  if (trackIds.length === 0) return []
   const rows = await db
     .select({
       group: trackGroups,
@@ -817,9 +809,11 @@ async function readMemberships(
       reviewAttemptId: trackProblemProgress.reviewAttemptId,
       completedAt: trackProblemProgress.completedAt,
       completedRating: trackProblemProgress.completedRating,
+      allowExternalProgress: tracks.allowExternalProgress,
     })
     .from(trackGroupProblems)
     .innerJoin(trackGroups, eq(trackGroups.id, trackGroupProblems.trackGroupId))
+    .innerJoin(tracks, eq(tracks.id, trackGroups.trackId))
     .leftJoin(
       trackProblemProgress,
       and(
@@ -827,8 +821,19 @@ async function readMemberships(
         eq(trackProblemProgress.problemSlug, trackGroupProblems.problemSlug),
       ),
     )
-    .where(eq(trackGroups.trackId, trackId.trim()))
-    .orderBy(asc(trackGroups.position), asc(trackGroupProblems.position))
+    .where(inArray(trackGroups.trackId, [...trackIds]))
+    .orderBy(
+      asc(trackGroups.trackId),
+      asc(trackGroups.position),
+      asc(trackGroupProblems.position),
+    )
+
+  const externalReviews = await readSuccessfulReviews(
+    db,
+    rows
+      .filter((row) => row.allowExternalProgress)
+      .map((row) => row.problemSlug),
+  )
 
   return rows.map((row) => {
     const completedRating = parseTrackCompletedRating(row.completedRating)
@@ -842,11 +847,15 @@ async function readMemberships(
       groupPosition: row.group.position,
       problemSlug: row.problemSlug,
       problemPosition: row.problemPosition,
-      completion: mapTrackProblemCompletion({
-        completedAt,
-        completedRating,
-        reviewAttemptId: row.reviewAttemptId,
-      }),
+      completion: resolveTrackCompletion(
+        mapTrackProblemCompletion({
+          completedAt,
+          completedRating,
+          reviewAttemptId: row.reviewAttemptId,
+        }),
+        row.allowExternalProgress,
+        externalReviews.get(row.problemSlug),
+      ),
     }
   })
 }
@@ -1045,6 +1054,7 @@ function normalizeTrackMutationInput(
     title: normalizeRequiredLabel(input.title, 'track title'),
     description: normalizeDescription(input.description),
     dueAt: normalizeDueAt(input.dueAt),
+    allowExternalProgress: input.allowExternalProgress ?? false,
     groups: input.groups,
   }
 }
@@ -1284,6 +1294,7 @@ function mapTrack(row: TrackRow): Track {
     title: row.title,
     description: row.description,
     dueAt: row.dueAt === null ? null : new Date(row.dueAt),
+    allowExternalProgress: row.allowExternalProgress,
   }
 }
 
@@ -1313,6 +1324,7 @@ type TracksReadDb = Pick<Db, 'select'>
 type TracksWriteDb = Pick<Db, 'delete' | 'insert' | 'select' | 'update'>
 
 interface NormalizedTrackMutationInput {
+  allowExternalProgress: boolean
   title: string
   description: string | null
   dueAt: number | null

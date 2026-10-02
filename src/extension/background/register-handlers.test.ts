@@ -2148,7 +2148,6 @@ describe('background handler registration', () => {
         problemSlug: 'two-sum',
         rating: 'hard',
       }),
-      defaultUserSettings,
     )
     expect(backgroundMocks.overrideLastReviewResult).not.toHaveBeenCalled()
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
@@ -2638,6 +2637,7 @@ function createActiveTrack(dueAt: Date | null): ActiveTrack {
       title: 'LeetCode 75',
       description: 'Focused starter track.',
       dueAt,
+      allowExternalProgress: false,
     },
     activeGroup: {
       id: 'leetcode-75:arrays-hashing',
@@ -2839,6 +2839,7 @@ const validBackup = backupFileSchema.parse({
           title: 'Custom Track',
           description: 'A local track',
           dueAt: null,
+          allowExternalProgress: false,
           createdAt: backupTimestamp,
           updatedAt: backupTimestamp,
         },

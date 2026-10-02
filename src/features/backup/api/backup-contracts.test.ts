@@ -137,6 +137,7 @@ function createValidBackupFixture() {
             title: 'Custom Track',
             description: 'A local track',
             dueAt: null,
+            allowExternalProgress: true,
             createdAt: timestamp,
             updatedAt: timestamp,
           },
@@ -191,7 +192,7 @@ function createValidBackupFixture() {
 }
 
 describe('backup contracts', () => {
-  it('parses a valid v4 CogniPace backup and creates summary counts', () => {
+  it('parses a valid v5 CogniPace backup and creates summary counts', () => {
     const backup = parseBackupFileForCurrentApp(createValidBackupFixture())
 
     expect(backup).toEqual(createValidBackupFixture())
@@ -220,6 +221,75 @@ describe('backup contracts', () => {
     })
   })
 
+  it('requires an explicit boolean external-progress policy in v5', () => {
+    const fixture = createValidBackupFixture()
+    const track = fixture.data.tracks.tracks[0]!
+    const legacyTrack = Object.fromEntries(
+      Object.entries(track).filter(([key]) => key !== 'allowExternalProgress'),
+    )
+    const withTrack = (value: unknown) => ({
+      ...fixture,
+      schemaVersion: 5,
+      data: {
+        ...fixture.data,
+        tracks: { ...fixture.data.tracks, tracks: [value] },
+      },
+    })
+
+    expect(
+      parseBackupFileForCurrentApp(withTrack(track)).data.tracks.tracks[0],
+    ).toMatchObject({ allowExternalProgress: true })
+    expect(() => parseBackupFileForCurrentApp(withTrack(legacyTrack))).toThrow()
+    expect(() =>
+      parseBackupFileForCurrentApp(
+        withTrack({ ...track, allowExternalProgress: 1 }),
+      ),
+    ).toThrow()
+  })
+
+  it.each([1, 2, 3, 4] as const)(
+    'defaults v%s external progress to false and retains stored progress',
+    (schemaVersion) => {
+      const legacy = createLegacyBackupFixture(schemaVersion)
+      const parsed = parseBackupFileForCurrentApp(legacy)
+
+      expect(parsed.schemaVersion).toBe(5)
+      expect(parsed.data.tracks.tracks[0]).toMatchObject({
+        id: 'custom-track',
+        allowExternalProgress: false,
+      })
+      expect(parsed.data.tracks.progress[0]).toMatchObject({
+        trackId: 'custom-track',
+        completedRating: 'good',
+        completedAt: timestamp,
+      })
+      expect(parsed.data.practice.reviewAttempts).toEqual(
+        legacy.data.practice.reviewAttempts,
+      )
+    },
+  )
+
+  it.each([1, 2, 3, 4] as const)(
+    'keeps the v%s track format strict when a v5 field is supplied',
+    (schemaVersion) => {
+      const legacy = createLegacyBackupFixture(schemaVersion)
+      const track = legacy.data.tracks.tracks[0]!
+
+      expect(() =>
+        parseBackupFileForCurrentApp({
+          ...legacy,
+          data: {
+            ...legacy.data,
+            tracks: {
+              ...legacy.data.tracks,
+              tracks: [{ ...track, allowExternalProgress: true }],
+            },
+          },
+        }),
+      ).toThrow()
+    },
+  )
+
   it('migrates a v3 alias key and legacy false containment into v4 typed relations', () => {
     const fixture = createValidBackupFixture()
     const v3Backup = {
@@ -227,6 +297,7 @@ describe('backup contracts', () => {
       schemaVersion: 3,
       data: {
         ...fixture.data,
+        tracks: createLegacyTrackData(fixture),
         topics: [
           ...fixture.data.topics,
           {
@@ -270,7 +341,7 @@ describe('backup contracts', () => {
 
     const parsed = parseBackupFileForCurrentApp(v3Backup)
 
-    expect(parsed.schemaVersion).toBe(4)
+    expect(parsed.schemaVersion).toBe(backupSchemaVersion)
     expect(parsed.data.topicAliases).toContainEqual(
       expect.objectContaining({
         aliasKey: 'priority queue',
@@ -295,21 +366,29 @@ describe('backup contracts', () => {
     )
   })
 
-  it('rejects malformed v4 alias keys instead of repairing them', () => {
-    const fixture = createValidBackupFixture()
-    const malformed = {
-      ...fixture,
-      data: {
-        ...fixture.data,
-        topicAliases: fixture.data.topicAliases.map((alias) => ({
-          ...alias,
-          aliasKey: 'hash-map',
-        })),
-      },
-    }
+  it.each([4, 5] as const)(
+    'rejects malformed v%s alias keys instead of repairing them',
+    (version) => {
+      const fixture =
+        version === 4
+          ? createLegacyBackupFixture(4)
+          : createValidBackupFixture()
+      const malformed = {
+        ...fixture,
+        data: {
+          ...fixture.data,
+          topicAliases: (fixture.data.topicAliases ?? []).map((alias) => ({
+            ...alias,
+            aliasKey: 'hash-map',
+          })),
+        },
+      }
 
-    expect(() => parseBackupFileForCurrentApp(malformed)).toThrow(/alias key/i)
-  })
+      expect(() => parseBackupFileForCurrentApp(malformed)).toThrow(
+        /alias key/i,
+      )
+    },
+  )
 
   it('preserves hard as a recalled track completion rating', () => {
     const backup = createValidBackupFixture()
@@ -334,6 +413,7 @@ describe('backup contracts', () => {
       schemaVersion: 2,
       data: {
         ...fixture.data,
+        tracks: createLegacyTrackData(fixture),
         topics: [{ id: 'array', label: 'Array' }],
         topicAliases: undefined,
         topicRelations: undefined,
@@ -342,7 +422,7 @@ describe('backup contracts', () => {
 
     const parsed = parseBackupFileForCurrentApp(v2Backup)
 
-    expect(parsed.schemaVersion).toBe(4)
+    expect(parsed.schemaVersion).toBe(backupSchemaVersion)
     expect(parsed.data.topics.find(({ id }) => id === 'array')).toMatchObject({
       id: 'array',
       label: 'Array',
@@ -370,7 +450,7 @@ describe('backup contracts', () => {
         ...createLegacyBackupData(fixture),
         topics: [{ id: 'array', label: 'Array' }],
         tracks: {
-          ...fixture.data.tracks,
+          ...createLegacyTrackData(fixture),
           progress: [
             {
               trackGroupId: 'custom-track:arrays',
@@ -387,7 +467,7 @@ describe('backup contracts', () => {
 
     const parsed = parseBackupFileForCurrentApp(v1Backup)
 
-    expect(parsed.schemaVersion).toBe(4)
+    expect(parsed.schemaVersion).toBe(backupSchemaVersion)
     expect(parsed.data.tracks.progress[0]).toMatchObject({
       trackId: 'custom-track',
       problemSlug: 'two-sum',
@@ -410,7 +490,7 @@ describe('backup contracts', () => {
         ...createLegacyBackupData(fixture),
         topics: [{ id: 'array', label: 'Array' }],
         tracks: {
-          ...fixture.data.tracks,
+          ...createLegacyTrackData(fixture),
           progress: [
             {
               trackGroupId: 'missing-group',
@@ -625,7 +705,68 @@ function createLegacyBackupData(
     problemTopics: backup.data.problemTopics,
     problemCompanies: backup.data.problemCompanies,
     practice: backup.data.practice,
-    tracks: backup.data.tracks,
+    tracks: createLegacyTrackData(backup),
     settings: backup.data.settings,
+  }
+}
+
+function createLegacyTrackData(
+  backup: ReturnType<typeof createValidBackupFixture>,
+) {
+  return {
+    ...backup.data.tracks,
+    tracks: backup.data.tracks.tracks.map((track) =>
+      Object.fromEntries(
+        Object.entries(track).filter(
+          ([key]) => key !== 'allowExternalProgress',
+        ),
+      ),
+    ),
+  }
+}
+
+function createLegacyBackupFixture(schemaVersion: 1 | 2 | 3 | 4) {
+  const fixture = createValidBackupFixture()
+  const data = {
+    ...fixture.data,
+    tracks: createLegacyTrackData(fixture),
+    ...(schemaVersion <= 2
+      ? {
+          topics: fixture.data.topics.map(({ id, label }) => ({ id, label })),
+          topicAliases: undefined,
+          topicRelations: undefined,
+        }
+      : schemaVersion === 3
+        ? {
+            topicRelations: fixture.data.topicRelations.map((edge) => ({
+              parentTopicId: edge.targetTopicId,
+              childTopicId: edge.sourceTopicId,
+              createdAt: edge.createdAt,
+              updatedAt: edge.updatedAt,
+            })),
+          }
+        : {}),
+  }
+
+  return {
+    ...fixture,
+    schemaVersion,
+    data: {
+      ...data,
+      tracks: {
+        ...data.tracks,
+        progress:
+          schemaVersion === 1
+            ? fixture.data.tracks.progress.map((row) => ({
+                trackGroupId: 'custom-track:arrays',
+                problemSlug: row.problemSlug,
+                completedAt: row.completedAt,
+                completedRating: row.completedRating,
+                createdAt: row.createdAt,
+                updatedAt: row.updatedAt,
+              }))
+            : data.tracks.progress,
+      },
+    },
   }
 }

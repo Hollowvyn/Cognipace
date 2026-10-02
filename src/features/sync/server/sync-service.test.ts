@@ -441,6 +441,9 @@ describe('sync service', () => {
     const restoredBackup = harness.restoreBackup.mock.calls[0]![0]
 
     expect(restoredBackup.schemaVersion).toBe(backupSchemaVersion)
+    expect(restoredBackup.data.tracks.tracks[0]).toMatchObject({
+      allowExternalProgress: false,
+    })
     expect(restoredBackup.data.tracks.progress).toEqual([
       expect.objectContaining({
         trackId: 'leetcode-75',
@@ -509,7 +512,7 @@ describe('sync service', () => {
     })
     expect(harness.restoreBackup).toHaveBeenCalledTimes(1)
     const restoredBackup = harness.restoreBackup.mock.calls[0]![0]
-    expect(restoredBackup.schemaVersion).toBe(4)
+    expect(restoredBackup.schemaVersion).toBe(backupSchemaVersion)
     expect(restoredBackup.data.topicRelations).toContainEqual(
       expect.objectContaining({
         sourceTopicId: 'hash-table',
@@ -519,7 +522,123 @@ describe('sync service', () => {
     )
   })
 
-  it('pullLatest rejects a v5 remote backup before restore', async () => {
+  it('pullLatest preserves a v5 external-progress policy in envelope v1', async () => {
+    const harness = createHarness()
+    harness.setMetadata({
+      enabled: true,
+      gistId: 'gist_1',
+      dirtySinceLastSync: false,
+      lastRemoteVersion: 'remote_1',
+    })
+    const withExternalProgress = createExternalProgressBackup()
+    const envelope = buildSyncEnvelope({
+      backup: withExternalProgress,
+      dataUpdatedAt: '2026-05-26T12:10:00.000Z',
+    })
+    expect(envelope.syncEnvelopeVersion).toBe(1)
+    harness.githubClient.getGist.mockResolvedValue(
+      createGistSummary({
+        id: 'gist_1',
+        remoteVersion: 'remote_2',
+        content: JSON.stringify(envelope),
+      }),
+    )
+
+    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+      outcome: 'success',
+      direction: 'pull',
+    })
+    expect(harness.restoreBackup).toHaveBeenCalledWith(withExternalProgress)
+  })
+
+  it('pullLatest normalizes a v4 external-progress policy to false', async () => {
+    const harness = createHarness()
+    harness.setMetadata({
+      enabled: true,
+      gistId: 'gist_1',
+      dirtySinceLastSync: false,
+      lastRemoteVersion: 'remote_1',
+    })
+    const current = createExternalProgressBackup()
+    const legacy = {
+      ...current,
+      schemaVersion: 4,
+      data: {
+        ...current.data,
+        tracks: {
+          ...current.data.tracks,
+          tracks: current.data.tracks.tracks.map((track) =>
+            Object.fromEntries(
+              Object.entries(track).filter(
+                ([key]) => key !== 'allowExternalProgress',
+              ),
+            ),
+          ),
+        },
+      },
+    }
+    harness.githubClient.getGist.mockResolvedValue(
+      createGistSummary({
+        id: 'gist_1',
+        remoteVersion: 'remote_2',
+        content: JSON.stringify({
+          syncEnvelopeVersion: 1,
+          app: 'cognipace',
+          exportedAt: backup.exportedAt,
+          dataUpdatedAt: backup.exportedAt,
+          backup: legacy,
+        }),
+      }),
+    )
+
+    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+      outcome: 'success',
+      direction: 'pull',
+    })
+    expect(harness.restoreBackup).toHaveBeenCalledWith({
+      ...current,
+      data: {
+        ...current.data,
+        tracks: {
+          ...current.data.tracks,
+          tracks: current.data.tracks.tracks.map((track) => ({
+            ...track,
+            allowExternalProgress: false,
+          })),
+        },
+      },
+    })
+  })
+
+  it('pushLocal carries v5 external progress without changing the sync envelope', async () => {
+    const harness = createHarness()
+    const withExternalProgress = createExternalProgressBackup()
+    harness.exportFullBackup.mockResolvedValue(withExternalProgress)
+    harness.setMetadata({
+      enabled: true,
+      gistId: 'gist_1',
+      dirtySinceLastSync: true,
+      lastRemoteVersion: 'remote_1',
+    })
+    harness.githubClient.getGist.mockResolvedValue(
+      createGistSummary({ id: 'gist_1', remoteVersion: 'remote_1' }),
+    )
+    harness.githubClient.updateSyncGist.mockResolvedValue(
+      createGistSummary({ id: 'gist_1', remoteVersion: 'remote_2' }),
+    )
+
+    await expect(harness.service.pushLocal()).resolves.toMatchObject({
+      outcome: 'success',
+      direction: 'push',
+    })
+    const content = harness.githubClient.updateSyncGist.mock.calls[0]![1]
+    expect(JSON.parse(content)).toMatchObject({
+      syncEnvelopeVersion: 1,
+      backup: withExternalProgress,
+    })
+  })
+
+  it('pullLatest rejects a future remote backup before restore', async () => {
     const harness = createHarness()
     harness.setMetadata({
       enabled: true,
@@ -537,7 +656,7 @@ describe('sync service', () => {
           app: 'cognipace',
           exportedAt: backup.exportedAt,
           dataUpdatedAt: backup.exportedAt,
-          backup: { ...backup, schemaVersion: 5 },
+          backup: { ...backup, schemaVersion: backupSchemaVersion + 1 },
         }),
       }),
     )
@@ -1445,6 +1564,30 @@ function createHarness(
     saveToken,
     writeMetadata,
     createGitHubClient,
+  }
+}
+
+function createExternalProgressBackup(): BackupFile {
+  return {
+    ...backup,
+    data: {
+      ...backup.data,
+      tracks: {
+        ...backup.data.tracks,
+        tracks: [
+          {
+            id: 'custom-track',
+            slug: 'custom-track',
+            title: 'Custom Track',
+            description: null,
+            dueAt: null,
+            allowExternalProgress: true,
+            createdAt: backup.exportedAt,
+            updatedAt: backup.exportedAt,
+          },
+        ],
+      },
+    },
   }
 }
 

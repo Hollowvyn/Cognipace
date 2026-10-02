@@ -1,4 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -30,6 +36,78 @@ describe('TrackForm', () => {
     vi.useRealTimers()
   })
 
+  it('defaults external progress off and previews eligible selected questions when enabled', async () => {
+    const user = userEvent.setup()
+    mockTrackFormRuntime(
+      createTrackForEditResponse({
+        ...createTrackDefaults(),
+        externalProgressProblemSlugs: ['two-sum'],
+      }),
+    )
+    renderTrackForm(
+      <TrackForm mode="create" onCancel={vi.fn()} onSaved={vi.fn()} />,
+    )
+    const option = await screen.findByRole('checkbox', {
+      name: 'Allow external progress',
+    })
+    expect(option).not.toBeChecked()
+    await user.type(screen.getByLabelText('Title'), 'External track')
+    await user.type(screen.getByLabelText('Search Library problems'), 'two')
+    await user.click(screen.getByRole('button', { name: 'Add Two Sum' }))
+    expect(screen.queryByText('Previously solved')).toBeNull()
+    await user.click(option)
+    expect(
+      screen.getByText('1 selected question can count earlier progress.'),
+    ).toBeVisible()
+    expect(
+      within(screen.getByRole('listitem', { name: '1. Two Sum' })).getByText(
+        'Previously solved',
+      ),
+    ).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'SAVE' }))
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        'tracks.createTrack',
+        expect.objectContaining({ allowExternalProgress: true }),
+      ),
+    )
+  })
+
+  it('restores external progress in edit mode and saves opt-out', async () => {
+    const user = userEvent.setup()
+    const response = createEditResponse()
+    response.track!.allowExternalProgress = true
+    response.externalProgressProblemSlugs = ['two-sum', 'maximum-subarray']
+    mockTrackFormRuntime(response)
+    renderTrackForm(
+      <TrackForm
+        mode="edit"
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+        trackId="leetcode-75"
+      />,
+    )
+    const option = await screen.findByRole('checkbox', {
+      name: 'Allow external progress',
+    })
+    expect(option).toBeChecked()
+    expect(
+      screen.getByText('2 selected questions can count earlier progress.'),
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('checkbox', { name: 'Set as active track' }),
+    ).toBeNull()
+    await user.click(option)
+    expect(screen.queryByText('Previously solved')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'SAVE' }))
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        'tracks.updateTrack',
+        expect.objectContaining({ allowExternalProgress: false }),
+      ),
+    )
+  })
+
   it('requires a title and starts create mode with a Main group', async () => {
     const user = userEvent.setup()
     mockTrackFormRuntime(createTrackDefaults())
@@ -39,7 +117,11 @@ describe('TrackForm', () => {
     )
 
     expect(await screen.findByLabelText('Title')).toHaveValue('')
-    expect(screen.getByLabelText('Group title')).toHaveValue('Main')
+    expect(screen.queryByLabelText('Group title')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Select Main' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
 
     await user.click(screen.getByRole('button', { name: 'SAVE' }))
 
@@ -100,6 +182,7 @@ describe('TrackForm', () => {
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith('tracks.createTrack', {
         surface: 'dashboard',
+        allowExternalProgress: false,
         title: 'Interview Track',
         description: 'Focused prep',
         dueAt: '2026-06-15T00:00:00.000Z',
@@ -157,7 +240,11 @@ describe('TrackForm', () => {
     expect(await screen.findByText('3 selected Library problems')).toBeVisible()
     expect(screen.getByLabelText('Group by')).toHaveValue('none')
     expect(screen.getByLabelText('Target date')).toBeVisible()
-    expect(screen.getByLabelText('Group title')).toHaveValue('Main')
+    expect(screen.queryByLabelText('Group title')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Select Main' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
     expect(screen.getByRole('listitem', { name: '1. Two Sum' })).toBeVisible()
     expect(
       screen.getByRole('listitem', { name: '2. Group Anagrams' }),
@@ -170,6 +257,7 @@ describe('TrackForm', () => {
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith('tracks.createTrack', {
         surface: 'dashboard',
+        allowExternalProgress: false,
         title: 'Netflix Prep',
         description: null,
         dueAt: null,
@@ -341,7 +429,7 @@ describe('TrackForm', () => {
     })
   })
 
-  it('regroups and moves draft problems with compact group selectors', async () => {
+  it('regroups and moves draft problems with a Change button menu', async () => {
     const user = userEvent.setup()
     mockTrackFormRuntime(createTrackDefaultsWithSelectionRows())
 
@@ -370,10 +458,10 @@ describe('TrackForm', () => {
     ).toBeVisible()
     expect(screen.getByRole('listitem', { name: '1. Two Sum' })).toBeVisible()
 
-    await user.selectOptions(
-      screen.getByLabelText('Group for Two Sum'),
-      'draft-group-2',
+    await user.click(
+      screen.getByRole('button', { name: 'Change group for Two Sum' }),
     )
+    await user.click(screen.getByRole('menuitem', { name: 'Hash Maps' }))
     await user.click(screen.getByRole('button', { name: 'Select Hash Maps' }))
 
     expect(screen.getByRole('listitem', { name: '2. Two Sum' })).toBeVisible()
@@ -472,65 +560,294 @@ describe('TrackForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Create failed')
   })
 
-  it('renders compact group rows and expands only the selected group title input', async () => {
+  it.each(['create', 'edit'] as const)(
+    'allows every group to collapse and reopen by click or keyboard in %s mode',
+    async (mode) => {
+      const user = userEvent.setup()
+      mockTrackFormRuntime(
+        mode === 'create' ? createTrackDefaults() : createEditResponse(),
+      )
+      renderTrackForm(
+        <TrackForm
+          {...(mode === 'edit'
+            ? { mode: 'edit', trackId: 'leetcode-75' }
+            : { mode: 'create' })}
+          onCancel={vi.fn()}
+          onSaved={vi.fn()}
+        />,
+      )
+      const header = await screen.findByRole('button', {
+        name: mode === 'create' ? 'Select Main' : 'Select Arrays and Hashing',
+      })
+      expect(header).toHaveAttribute('aria-expanded', 'true')
+      await user.click(header)
+      expect(header).toHaveAttribute('aria-expanded', 'false')
+      expect(header).toHaveFocus()
+      expect(
+        screen.queryByLabelText('Search Library problems'),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('region', { name: 'Selected problem rows' }),
+      ).not.toBeInTheDocument()
+      await user.keyboard('{Enter}')
+      expect(header).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByLabelText('Search Library problems')).toBeVisible()
+      await user.keyboard(' ')
+      expect(header).toHaveAttribute('aria-expanded', 'false')
+      await user.click(header)
+      expect(header).toHaveAttribute('aria-expanded', 'true')
+    },
+  )
+
+  it('opens a collapsed group for Rename and exits rename when its header collapses it', async () => {
     const user = userEvent.setup()
     mockTrackFormRuntime(createEditResponse())
-
     renderTrackForm(
       <TrackForm
         mode="edit"
         onCancel={vi.fn()}
-        onLoaded={vi.fn()}
         onSaved={vi.fn()}
         trackId="leetcode-75"
       />,
     )
-
-    expect(await screen.findByLabelText('Title')).toHaveValue('LeetCode 75')
-
-    const groups = screen.getByLabelText('Groups')
-    const arraysRow = within(groups).getByRole('listitem', {
-      name: /Arrays and Hashing/i,
+    const header = await screen.findByRole('button', {
+      name: 'Select Arrays and Hashing',
     })
-    const dynamicRow = within(groups).getByRole('listitem', {
-      name: /Dynamic Programming/i,
-    })
-
-    expect(within(arraysRow).getByText('2 problems')).toBeVisible()
-    expect(within(dynamicRow).getByText('1 problem')).toBeVisible()
-    expect(within(arraysRow).getByLabelText('Group title')).toHaveValue(
-      'Arrays and Hashing',
-    )
-    expect(within(dynamicRow).queryByLabelText('Group title')).toBeNull()
-
+    await user.click(header)
     await user.click(
-      within(dynamicRow).getByRole('button', {
-        name: 'Move Dynamic Programming up',
+      screen.getByRole('button', { name: 'Rename Arrays and Hashing' }),
+    )
+    expect(header).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText('Group title')).toHaveFocus()
+    await user.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText('Group title')).not.toBeInTheDocument()
+    await user.click(header)
+    expect(screen.queryByLabelText('Group title')).not.toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', { name: 'Rename Arrays and Hashing' }),
+    )
+    expect(screen.getByLabelText('Group title')).toBeVisible()
+  })
+
+  it('expands one full-width group section and requires an explicit rename action', async () => {
+    const user = userEvent.setup()
+    mockTrackFormRuntime(createEditResponse())
+    renderTrackForm(
+      <TrackForm
+        mode="edit"
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+        trackId="leetcode-75"
+      />,
+    )
+    const arraysButton = await screen.findByRole('button', {
+      name: 'Select Arrays and Hashing',
+    })
+    const dynamicButton = screen.getByRole('button', {
+      name: 'Select Dynamic Programming',
+    })
+    expect(arraysButton).toHaveAttribute('aria-expanded', 'true')
+    expect(dynamicButton).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText('Group title')).toBeNull()
+    const arraysSection = arraysButton.closest('[role="listitem"]')!
+    expect(
+      within(arraysSection as HTMLElement).getByLabelText(
+        'Search Library problems',
+      ),
+    ).toBeVisible()
+    expect(
+      within(arraysSection as HTMLElement).getByRole('listitem', {
+        name: '1. Two Sum',
       }),
+    ).toBeVisible()
+    await user.click(
+      screen.getByRole('button', { name: 'Rename Dynamic Programming' }),
     )
-
-    expect(within(arraysRow).getByLabelText('Group title')).toHaveValue(
-      'Arrays and Hashing',
-    )
-    expect(within(dynamicRow).queryByLabelText('Group title')).toBeNull()
-
-    await user.click(dynamicRow)
-
-    expect(within(arraysRow).queryByLabelText('Group title')).toBeNull()
-    expect(within(dynamicRow).getByLabelText('Group title')).toHaveValue(
+    expect(dynamicButton).toHaveAttribute('aria-expanded', 'true')
+    expect(arraysButton).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByLabelText('Group title')).toHaveValue(
       'Dynamic Programming',
     )
+    await user.click(arraysButton)
+    expect(screen.queryByLabelText('Group title')).toBeNull()
+  })
 
+  it('opens Change with the keyboard, navigates destinations, and dismisses before the modal receives Escape', async () => {
+    const user = userEvent.setup()
+    const onEscape = vi.fn()
+    const response = createEditResponse()
+    response.groups.push({
+      id: 'third',
+      trackId: 'leetcode-75',
+      title: 'A long destination group title',
+      position: 3,
+      problemSlugs: [],
+    })
+    mockTrackFormRuntime(response)
+    renderTrackForm(
+      <div
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') onEscape()
+        }}
+      >
+        <TrackForm
+          mode="edit"
+          onCancel={vi.fn()}
+          onSaved={vi.fn()}
+          trackId="leetcode-75"
+        />
+      </div>,
+    )
+    const change = await screen.findByRole('button', {
+      name: 'Change group for Two Sum',
+    })
+    change.focus()
+    await user.keyboard('{Enter}')
+    expect(change).toHaveAttribute('aria-expanded', 'true')
+    const first = screen.getByRole('menuitem', { name: 'Dynamic Programming' })
+    const last = screen.getByRole('menuitem', {
+      name: 'A long destination group title',
+    })
+    expect(first).toHaveFocus()
+    expect(
+      screen.queryByRole('menuitem', { name: 'Arrays and Hashing' }),
+    ).toBeNull()
+    await user.keyboard('{End}')
+    expect(last).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(first).toHaveFocus()
+    await user.keyboard('{Home}{Escape}')
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(change).toHaveFocus()
+    expect(onEscape).not.toHaveBeenCalled()
+    await user.keyboard(' ')
+    expect(
+      screen.getByRole('menuitem', { name: 'Dynamic Programming' }),
+    ).toHaveFocus()
+    await user.click(screen.getByLabelText('Title'))
+    expect(screen.queryByRole('menu')).toBeNull()
+    change.focus()
+    await user.keyboard('{Enter}{Tab}')
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('keeps an open Change menu within the modal after the viewport shrinks', async () => {
+    const user = userEvent.setup()
+    let modalHeight = 480
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute('role') === 'dialog')
+          return new DOMRect(0, 0, 400, modalHeight)
+        if (this.getAttribute('aria-label') === 'Change group for Two Sum')
+          return new DOMRect(300, 350, 80, 32)
+        return new DOMRect()
+      })
+    const heights = vi
+      .spyOn(Element.prototype, 'scrollHeight', 'get')
+      .mockReturnValue(300)
+    try {
+      mockTrackFormRuntime(createEditResponse())
+      renderTrackForm(
+        <div role="dialog">
+          <TrackForm
+            mode="edit"
+            onCancel={vi.fn()}
+            onSaved={vi.fn()}
+            trackId="leetcode-75"
+          />
+        </div>,
+      )
+      await user.click(
+        await screen.findByRole('button', { name: 'Change group for Two Sum' }),
+      )
+      modalHeight = 240
+      fireEvent(window, new Event('resize'))
+      const menu = screen.getByRole('menu')
+      const top = Number.parseFloat(menu.style.top)
+      const height = Number.parseFloat(menu.style.maxHeight)
+      expect(top).toBeGreaterThanOrEqual(8)
+      expect(top + height).toBeLessThanOrEqual(modalHeight - 8)
+    } finally {
+      bounds.mockRestore()
+      heights.mockRestore()
+    }
+  })
+
+  it('moves a question to the destination and focuses a surviving source question', async () => {
+    const user = userEvent.setup()
+    mockTrackFormRuntime(createEditResponse())
+    renderTrackForm(
+      <TrackForm
+        mode="edit"
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+        trackId="leetcode-75"
+      />,
+    )
     await user.click(
-      within(groups).getByRole('button', {
-        name: 'Select Arrays and Hashing',
-      }),
+      await screen.findByRole('button', { name: 'Change group for Two Sum' }),
     )
+    await user.keyboard('{Enter}')
+    expect(screen.queryByRole('listitem', { name: '1. Two Sum' })).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Select Arrays and Hashing' }),
+    ).toHaveAttribute('aria-expanded', 'true')
+    expect(
+      screen.getByRole('button', { name: 'Change group for Binary Search' }),
+    ).toHaveFocus()
+    await user.click(
+      screen.getByRole('button', { name: 'Select Dynamic Programming' }),
+    )
+    expect(screen.getByRole('listitem', { name: '2. Two Sum' })).toBeVisible()
+  })
 
-    expect(within(dynamicRow).queryByLabelText('Group title')).toBeNull()
-    expect(within(arraysRow).getByLabelText('Group title')).toHaveValue(
-      'Arrays and Hashing',
+  it('focuses Library search without covering the next group after moving the final question', async () => {
+    const user = userEvent.setup()
+    const response = createEditResponse()
+    response.groups[0]!.problemSlugs = ['two-sum']
+    mockTrackFormRuntime(response)
+    renderTrackForm(
+      <TrackForm
+        mode="edit"
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+        trackId="leetcode-75"
+      />,
     )
+    await user.click(
+      await screen.findByRole('button', { name: 'Change group for Two Sum' }),
+    )
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Dynamic Programming' }),
+    )
+    expect(screen.getByLabelText('Search Library problems')).toHaveFocus()
+    expect(
+      screen.queryByRole('region', { name: 'Library problem suggestions' }),
+    ).toBeNull()
+    await user.click(screen.getByLabelText('Search Library problems'))
+    expect(
+      screen.getByRole('region', { name: 'Library problem suggestions' }),
+    ).toBeVisible()
+  })
+
+  it('omits Change for a single group and returns focus to Library search after adding', async () => {
+    const user = userEvent.setup()
+    mockTrackFormRuntime(createTrackDefaults())
+    renderTrackForm(
+      <TrackForm mode="create" onCancel={vi.fn()} onSaved={vi.fn()} />,
+    )
+    const search = await screen.findByLabelText('Search Library problems')
+    await user.type(search, 'two')
+    await user.click(screen.getByRole('button', { name: 'Add Two Sum' }))
+    expect(search).toHaveFocus()
+    expect(
+      screen.queryByRole('button', { name: 'Change group for Two Sum' }),
+    ).toBeNull()
+    expect(
+      screen.getByRole('listitem', { name: '1. Two Sum' }),
+    ).toHaveTextContent('Easy')
   })
 
   it('keeps group removal disabled for non-empty groups and the final group', async () => {
@@ -705,12 +1022,21 @@ describe('TrackForm', () => {
         name: 'Select Dynamic Programming',
       }),
     )
+    await user.click(
+      screen.getByRole('button', { name: 'Rename Dynamic Programming' }),
+    )
     await user.clear(screen.getByLabelText('Group title'))
     await user.click(
       within(groups).getByRole('button', {
         name: 'Select Arrays and Hashing',
       }),
     )
+    await user.click(
+      within(groups).getByRole('button', { name: 'Select Arrays and Hashing' }),
+    )
+    expect(
+      screen.queryByLabelText('Search Library problems'),
+    ).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'SAVE' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -744,9 +1070,7 @@ describe('TrackForm', () => {
       'Core interview practice.',
     )
     expect(screen.getByLabelText('Target date')).toHaveValue('2026-06-15')
-    expect(screen.getByLabelText('Group title')).toHaveValue(
-      'Arrays and Hashing',
-    )
+    expect(screen.queryByLabelText('Group title')).toBeNull()
     expect(
       screen.getByRole('button', { name: 'Select Dynamic Programming' }),
     ).toBeVisible()
@@ -767,6 +1091,7 @@ describe('TrackForm', () => {
       expect(sendMessage).toHaveBeenCalledWith('tracks.updateTrack', {
         surface: 'dashboard',
         trackId: 'leetcode-75',
+        allowExternalProgress: false,
         title: 'LeetCode 75 Updated',
         description: 'Core interview practice.',
         dueAt: '2026-06-15T00:00:00.000Z',

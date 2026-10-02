@@ -170,6 +170,28 @@ function TrackProblemTableRow({
             className="px-6 py-5 md:px-8"
             colSpan={row.getVisibleCells().length}
           >
+            {row.original.membership.completion.status === 'completed' ? (
+              <p className="mb-4 flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">
+                  {row.original.membership.completion.source === 'external'
+                    ? 'External progress'
+                    : 'Completed in this track'}
+                </span>
+                <span>
+                  {formatDateCell(
+                    row.original.membership.completion.completedAt,
+                  )}
+                </span>
+                <span>
+                  {row.original.membership.completion.completedRating === 'hard'
+                    ? 'Hard'
+                    : row.original.membership.completion.completedRating ===
+                        'good'
+                      ? 'Good'
+                      : 'Easy'}
+                </span>
+              </p>
+            ) : null}
             <ProblemRowDetails
               actions={
                 <ProblemRowActionsBar>

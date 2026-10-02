@@ -543,7 +543,10 @@ describe('dashboard routes', () => {
     const dialog = screen.getByRole('dialog', { name: 'New Track' })
     expect(dialog).toBeVisible()
     expect(await within(dialog).findByLabelText('Title')).toBeVisible()
-    expect(within(dialog).getByLabelText('Group title')).toHaveValue('Main')
+    expect(
+      within(dialog).getByRole('button', { name: 'Select Main' }),
+    ).toHaveAttribute('aria-expanded', 'true')
+    expect(within(dialog).queryByLabelText('Group title')).toBeNull()
     const searchInput = within(dialog).getByLabelText('Search Library problems')
 
     expect(searchInput).toBeVisible()
@@ -679,9 +682,12 @@ describe('dashboard routes', () => {
     const arraysRow = within(groups).getByRole('listitem', {
       name: /Arrays and Hashing, 1 problem/i,
     })
-    expect(within(arraysRow).getByLabelText('Group title')).toHaveValue(
-      'Arrays and Hashing',
-    )
+    expect(
+      within(arraysRow).getByRole('button', {
+        name: 'Select Arrays and Hashing',
+      }),
+    ).toHaveAttribute('aria-expanded', 'true')
+    expect(within(arraysRow).queryByLabelText('Group title')).toBeNull()
     expect(within(dialog).getByText('Two Sum')).toBeVisible()
   })
 

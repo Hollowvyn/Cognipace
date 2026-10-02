@@ -29,6 +29,7 @@ const trackProblemCompletionSchema = z.discriminatedUnion('status', [
     completedAt: z.iso.datetime(),
     completedRating: trackCompletedRatingSchema,
     reviewAttemptId: z.string().nullable(),
+    source: z.enum(['track', 'external']).optional(),
   }),
 ])
 
@@ -71,6 +72,7 @@ export const serializedTrackSchema = z.object({
   title: z.string(),
   description: z.string().nullable(),
   dueAt: z.iso.datetime().nullable(),
+  allowExternalProgress: z.boolean().default(false),
 })
 
 export type SerializedTrack = z.infer<typeof serializedTrackSchema>
@@ -148,6 +150,7 @@ export const trackForEditResponseSchema = z.object({
   track: serializedTrackSchema.nullable(),
   groups: z.array(serializedTrackGroupForEditSchema),
   problemRows: z.array(problemLibraryRowSchema),
+  externalProgressProblemSlugs: z.array(problemSlugSchema).default(() => []),
 })
 
 export type TrackForEditResponse = z.infer<typeof trackForEditResponseSchema>
@@ -187,6 +190,7 @@ const trackGroupInputSchema = z.object({
 export type TrackGroupInput = z.infer<typeof trackGroupInputSchema>
 
 const trackMutationInputBaseSchema = z.object({
+  allowExternalProgress: z.boolean().default(false),
   title: z.string().trim().min(1),
   description: z.string().trim().nullable().default(null),
   dueAt: z.iso.datetime().nullable().default(null),
