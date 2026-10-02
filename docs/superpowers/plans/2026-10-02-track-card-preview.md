@@ -239,7 +239,11 @@ adjustment. Existing behavior coverage and the human visual smoke checklist
 remain the relevant checks. The already running dev server serves the updated
 heading; browser automation remains unable to claim extension URLs.
 
-## Collection Collapse Button Removal
+## Collection Collapse Button Removal (Superseded)
+
+This phase implemented an incorrect interpretation of the user's screenshot.
+The user intended removal of the track-row chevrons, while the collection
+chevron remains required. The correction below supersedes this phase.
 
 The user requested removal of the standalone All tracks chevron icon button.
 Keep the heading as the accessible click/Enter/Space expansion control. Track
@@ -340,3 +344,53 @@ visual proof remains pending for inactive expansion, active expansion, and
 keyboard focus in light/dark themes and narrow layouts. The dev server serves
 the update on port 3000 to the user's loaded folder; extension URL automation
 remains unavailable under the browser policy.
+
+## Chevron Scope Correction
+
+The user clarified that the All tracks chevron is important and must remain.
+Restore that icon button beside the collection actions, sharing the heading's
+expansion state and reset behavior. Remove only the individual track row
+chevrons; rows remain clickable and keyboard-accessible. Preserve the neutral
+preview outlines, active green markers, and single-open track behavior.
+
+- [x] Adjust existing collection tests to exercise both heading and chevron,
+      including synchronized expansion states and keyboard reopening without
+      an active track. Confirm the regression fails before restoring the icon.
+- [x] Restore the collection IconButton/ChevronUp import and rendering in
+      other-tracks-accordion.tsx; remove the row's decorative ChevronDown.
+      Correct the current design spec and human smoke guidance.
+- [x] Run focused Tracks/route tests, lint/check/build, touched-file Prettier,
+      and diff check. Update draft PR #183 around the correct final behavior
+      and verify the running dev source. Human visual proof remains pending.
+
+### Chevron Correction Verification
+
+The existing heading regression first failed because the All tracks chevron's
+accessible Hide all tracks button was absent. After correction, focused
+coverage passed 103 tests across two files. `npm run lint` passed;
+`npm run check` passed database consistency, typecheck, lint, and 1,960 tests
+across 187 files. `npm run build` passed with the existing non-blocking chunk-size
+warning. Prettier and diff checks passed. Source verification on localhost
+confirmed the collection toggle is restored, row chevrons are absent, and row
+click handling remains, served to the user's installed dev folder on port 3000.
+
+Exact commands executed through `rtk proxy` with Node v24.20.0:
+
+```sh
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx -t 'toggles all tracks when the collection heading is clicked'
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
+npm run lint
+npm run check
+npm run build
+npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+rtk git diff --check
+```
+
+Skipped `npm run zip` because packaging is unchanged. Skipped
+`npm run db:generate` because no schema changed; database consistency passed
+inside `npm run check`. Human installed-extension visual/smoke proof remains
+pending for the restored collection chevron and row chevron removal. The
+earlier supplied screenshots precede this correction. Browser automation still
+cannot claim extension URLs under its policy; source verification and tests
+are not a substitute for that proof. Keep the PR draft.

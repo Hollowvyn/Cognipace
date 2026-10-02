@@ -11,10 +11,10 @@ header, New Track, and a small accessible Import tracks icon. The collection
 starts expanded and can be collapsed whether or not an active track exists.
 Adding a track reopens the collection.
 
-The All tracks heading is the collection's sole expansion control. The user
-requested removal of the redundant standalone chevron icon button beside the
-create/import actions. Keep the heading's native button, expansion state, and
-keyboard support.
+The All tracks heading and its separate chevron icon button both control the
+collection's expansion. Keep the visible collection chevron beside the
+create/import actions, its expansion state, and keyboard support. The user's
+chevron-removal request applies to the individual track rows.
 
 After comparing the installed heading with dashboard typography, the user
 approved using the existing system sans-serif family and bold weight. Retain
@@ -35,8 +35,8 @@ the group presentation in merged PR #180. Their existing instruction to
 implement trusted routine design choices applies to this scoped extension.
 
 Clicking a track card's summary toggles a compact inline preview. A semantic
-button covers the summary, supports Enter/Space, exposes expansion state, and
-shows a chevron. Existing Set active, Clear Active, Edit, Reset Progress, and
+button covers the summary, supports Enter/Space, and exposes expansion state.
+The row has no expansion chevron or visible Preview label. Existing Set active, Clear Active, Edit, Reset Progress, and
 Delete controls remain independently usable and do not toggle the preview.
 
 After inspecting the installed extension, the user requested stronger ownership
@@ -44,8 +44,7 @@ of the expanded content and removal of the visible Preview label. An expanded
 card encloses both its summary and groups in one clear continuous rounded
 outline and tonal background, without an extra caption. Only one track preview
 can be open: opening another track closes the previous one. Collapsing All
-tracks also closes its preview. Keep only the chevron on the clickable summary;
-the native card toggle and its accessible name remain for keyboard/screen-reader
+tracks also closes its preview. The native card toggle and its accessible name remain for keyboard/screen-reader
 access.
 
 An expanded inactive track uses a neutral outline of uniform thickness around

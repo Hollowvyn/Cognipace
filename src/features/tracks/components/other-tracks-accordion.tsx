@@ -1,8 +1,9 @@
-import { Check, ChevronDown, LibraryBig } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, LibraryBig } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { InlineStatus } from '@/components/ui/inline-status'
 import { cn } from '@/utils/cn'
 
@@ -113,6 +114,22 @@ export function OtherTracksAccordion({
         >
           {newTrackAction}
           {importTrackAction}
+          {tracks.length > 0 ? (
+            <IconButton
+              aria-controls={collectionId}
+              aria-expanded={isOpen}
+              label={isOpen ? 'Hide all tracks' : 'Show all tracks'}
+              onClick={toggleCollection}
+              tooltip={isOpen ? 'Hide all tracks' : 'Show all tracks'}
+              variant="ghost"
+            >
+              {isOpen ? (
+                <ChevronUp aria-hidden="true" />
+              ) : (
+                <ChevronDown aria-hidden="true" />
+              )}
+            </IconButton>
+          ) : null}
         </div>
       </header>
       {isOpen ? (
@@ -221,13 +238,6 @@ function OtherTrackRow({
                 Active
               </Badge>
             ) : null}
-            <ChevronDown
-              aria-hidden="true"
-              className={cn(
-                'ml-auto size-4 shrink-0 text-muted-foreground transition-transform',
-                isPreviewOpen && 'rotate-180',
-              )}
-            />
           </div>
           {row.track.description ? (
             <p className="m-0 mt-1 line-clamp-2 text-[length:var(--cp-badge-font-size)] leading-snug text-muted-foreground">

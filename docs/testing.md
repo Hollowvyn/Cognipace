@@ -557,12 +557,13 @@ is required before review or merge:
    Check each row's title,
    description, completed/total count, and progress bar. Select an inactive
    track with Set active and confirm both the collection and workspace update.
-2. Collapse and reopen the collection with its heading; confirm there is no
-   separate collapse icon button beside New Track and Import tracks. Then use
+2. Collapse and reopen the collection with its heading and the separate
+   chevron button beside New Track and Import tracks. Confirm both controls'
+   expansion states stay in sync. Then use
    New Track and Import tracks. Confirm the actions do not collapse the
    collection. Check the narrow layout, long titles, zero progress, and a
    completed track. With no active track, confirm the collection starts expanded
-   and can still collapse/reopen using the heading, Enter, and Space;
+   and can still collapse/reopen using the heading, chevron, Enter, and Space;
    with no tracks, confirm both create and import are available.
 3. Open Import tracks, download the template, author a disposable track, and
    choose that file. Inspect its groups and additions in the preview before
@@ -603,8 +604,9 @@ recording proof is required before PR review or merge:
    of uniform thickness; the active track keeps its green outline, thicker
    leading accent, tinted background, and Active badge whether open or closed.
    Tab between card toggles and confirm the neutral focus ring is visible at
-   desktop and narrow widths in light and dark themes. The summary has only a chevron, with no visible
-   Preview label or extra owning-track caption. Confirm ordered group headers and question
+   desktop and narrow widths in light and dark themes. Each track summary has
+   no expansion chevron, visible Preview label, or extra owning-track caption;
+   clicking the summary still toggles its preview. Confirm ordered group headers and question
    order match Edit Track, the first group starts open, each group can collapse,
    and complete titles, difficulty, and topic labels wrap at narrow widths.
    A long curriculum scrolls inside the compact preview. Inspect empty groups

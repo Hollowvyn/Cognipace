@@ -697,10 +697,13 @@ describe('TracksScreen', () => {
 
     expect(await screen.findByText('All tracks')).toBeVisible()
     expect(
-      screen.queryByRole('button', { name: /^(Hide|Show) all tracks$/ }),
-    ).not.toBeInTheDocument()
+      screen.getByRole('button', { name: 'Hide all tracks' }),
+    ).toHaveAttribute('aria-expanded', 'true')
     await user.click(screen.getByRole('button', { name: 'All tracks' }))
     expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Show all tracks' }),
+    ).toHaveAttribute('aria-expanded', 'false')
 
     await user.click(screen.getByText('All tracks'))
 
@@ -728,7 +731,7 @@ describe('TracksScreen', () => {
     expect(screen.getByRole('button', { name: 'All tracks' })).toBeVisible()
   })
 
-  it('allows heading collapse without an active track and keyboard reopening', async () => {
+  it('allows heading and chevron collapse without an active track and keyboard reopening', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce({
       ...twoGroupWorkspace,
@@ -747,7 +750,7 @@ describe('TracksScreen', () => {
     expect(screen.getByRole('button', { name: 'All tracks' })).toHaveFocus()
     await user.keyboard('{Enter}')
     expect(screen.getByText('Grind 75')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'All tracks' }))
+    await user.click(screen.getByRole('button', { name: 'Hide all tracks' }))
     expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
     await user.keyboard(' ')
     expect(screen.getByText('Grind 75')).toBeVisible()
