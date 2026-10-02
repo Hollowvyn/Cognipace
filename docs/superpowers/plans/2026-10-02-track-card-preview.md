@@ -288,3 +288,55 @@ dev folder on port 3000. Final human installed-extension visual and smoke proof
 remains pending; extension URL automation is still unavailable under the
 browser policy. Existing tests cover the remaining heading's click/Enter/Space
 behavior, automatic reopen after adding a track, and preview reset on collapse.
+
+## Active And Expanded Track Styling
+
+The user's latest installed-extension screenshot shows that inactive expanded
+and active tracks both use green outlines and thicker leading accents. Reserve
+those active markers for the active track. Give an expanded inactive track a
+clear neutral outline of uniform thickness around its summary and groups,
+with a subtle surface tint. Use a neutral card-toggle focus ring to distinguish
+keyboard focus from activation. Preserve the single-open preview interaction.
+
+- [x] Simplify the article's state classes in other-tracks-accordion.tsx so
+      active styling takes priority whether open or closed, while inactive
+      expansion uses neutral styling. Change the card-toggle focus ring to
+      neutral. Update the design spec and manual visual smoke guidance.
+- [x] Run existing focused Tracks/route coverage, lint/check/build, touched-file
+      Prettier, and diff check. Avoid new tests that mirror CSS classes for this
+      presentation adjustment.
+- [x] Publish to draft PR #183 and verify the running dev source. Preserve the
+      supplied screenshot as evidence before the state-style distinction.
+      Final human installed-extension visual confirmation remains pending.
+
+### Active/Expanded Styling Verification
+
+Existing focused coverage passed 103 tests across two files. `npm run lint`
+passed; `npm run check` passed database consistency, typecheck, lint, and 1,960
+tests across 187 files. `npm run build` passed with the existing non-blocking
+chunk-size warning. Prettier and diff checks passed. Localhost source
+verification confirmed the neutral inactive preview outline, active green
+leading accent/tint, and neutral focus ring. No new CSS-class tests were added.
+
+Exact commands executed through `rtk proxy` with Node v24.20.0:
+
+```sh
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
+npm run lint
+npm run check
+npm run build
+npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+rtk git diff --check
+```
+
+Skipped `npm run zip` because packaging is unchanged. Skipped
+`npm run db:generate` because no schema changed; database consistency passed
+inside `npm run check`. The supplied installed-extension screenshot is
+preserved byte-for-byte at
+`docs/superpowers/evidence/2026-10-02-all-tracks/installed-preview-before-state-distinction.png`.
+It shows the contained preview before this state-style change. Final human
+visual proof remains pending for inactive expansion, active expansion, and
+keyboard focus in light/dark themes and narrow layouts. The dev server serves
+the update on port 3000 to the user's loaded folder; extension URL automation
+remains unavailable under the browser policy.

@@ -48,6 +48,12 @@ tracks also closes its preview. Keep only the chevron on the clickable summary;
 the native card toggle and its accessible name remain for keyboard/screen-reader
 access.
 
+An expanded inactive track uses a neutral outline of uniform thickness around
+the summary and groups, plus a subtle surface tint. Reserve the green outline,
+thicker leading accent, primary tint, and Active badge for the active track,
+whether its preview is open or closed. The card toggle's keyboard focus ring is
+neutral, so focus does not resemble activation.
+
 Load the existing Tracks read query only when a preview opens. Display ordered
 groups as full-width shaded collapsible headers, with the first group open.
 Inside, show ordered full question titles, difficulty, and direct topic labels

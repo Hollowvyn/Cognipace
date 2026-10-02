@@ -599,7 +599,11 @@ recording proof is required before PR review or merge:
    track and confirm the previous track closes, with focus on the new toggle.
 2. Inspect a populated preview. Confirm the card summary and expanded groups
    share one clear rounded outline and background, with groups constrained
-   inside their owning track. The summary has only a chevron, with no visible
+   inside their owning track. An expanded inactive track has a neutral outline
+   of uniform thickness; the active track keeps its green outline, thicker
+   leading accent, tinted background, and Active badge whether open or closed.
+   Tab between card toggles and confirm the neutral focus ring is visible at
+   desktop and narrow widths in light and dark themes. The summary has only a chevron, with no visible
    Preview label or extra owning-track caption. Confirm ordered group headers and question
    order match Edit Track, the first group starts open, each group can collapse,
    and complete titles, difficulty, and topic labels wrap at narrow widths.

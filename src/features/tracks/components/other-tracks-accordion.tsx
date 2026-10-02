@@ -181,15 +181,12 @@ function OtherTrackRow({
     <article
       aria-labelledby={titleId}
       className={cn(
-        'min-w-0 overflow-hidden rounded-[var(--cp-control-radius)] border-2 border-transparent border-l-4',
+        'min-w-0 overflow-hidden rounded-[var(--cp-control-radius)] border-2 border-transparent',
         isActive
-          ? 'bg-primary/10'
+          ? 'border-l-4 border-primary/50 border-l-primary bg-primary/10'
           : isPreviewOpen
-            ? 'bg-muted/20'
+            ? 'border-muted-foreground/70 bg-muted/20'
             : 'border-t-border',
-        isPreviewOpen
-          ? 'border-primary/70 border-l-primary'
-          : isActive && 'border-primary/50 border-l-primary',
       )}
     >
       <div
@@ -202,7 +199,7 @@ function OtherTrackRow({
           aria-controls={previewId}
           aria-expanded={isPreviewOpen}
           aria-label={`Preview ${row.track.title}`}
-          className="absolute inset-0 cursor-pointer rounded-[var(--cp-control-radius)] transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          className="absolute inset-0 cursor-pointer rounded-[var(--cp-control-radius)] transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground/70"
           onClick={onTogglePreview}
           ref={previewToggleRef}
           type="button"
