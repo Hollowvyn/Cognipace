@@ -557,11 +557,12 @@ is required before review or merge:
    Check each row's title,
    description, completed/total count, and progress bar. Select an inactive
    track with Set active and confirm both the collection and workspace update.
-2. Collapse and reopen the collection with the heading and chevron, then use
+2. Collapse and reopen the collection with its heading; confirm there is no
+   separate collapse icon button beside New Track and Import tracks. Then use
    New Track and Import tracks. Confirm the actions do not collapse the
    collection. Check the narrow layout, long titles, zero progress, and a
    completed track. With no active track, confirm the collection starts expanded
-   and can still collapse/reopen using the heading, chevron, Enter, and Space;
+   and can still collapse/reopen using the heading, Enter, and Space;
    with no tracks, confirm both create and import are available.
 3. Open Import tracks, download the template, author a disposable track, and
    choose that file. Inspect its groups and additions in the preview before

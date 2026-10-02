@@ -11,6 +11,11 @@ header, New Track, and a small accessible Import tracks icon. The collection
 starts expanded and can be collapsed whether or not an active track exists.
 Adding a track reopens the collection.
 
+The All tracks heading is the collection's sole expansion control. The user
+requested removal of the redundant standalone chevron icon button beside the
+create/import actions. Keep the heading's native button, expansion state, and
+keyboard support.
+
 After comparing the installed heading with dashboard typography, the user
 approved using the existing system sans-serif family and bold weight. Retain
 the larger collection title and existing header hierarchy; do not introduce a

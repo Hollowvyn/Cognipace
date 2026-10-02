@@ -112,11 +112,7 @@ describe('TracksScreen', () => {
     expect(
       within(allTracksActions).getByRole('link', { name: 'New Track' }),
     ).toHaveAttribute('href', '#/tracks/new')
-    expect(
-      within(allTracksActions).getByRole('button', {
-        name: 'Hide all tracks',
-      }),
-    ).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toBeEnabled()
   })
 
   it('renders the active workspace title, summaries, metrics, groups, and active rows', async () => {
@@ -227,11 +223,7 @@ describe('TracksScreen', () => {
     expect(
       within(allTracksActions).getByRole('link', { name: 'New Track' }),
     ).toHaveAttribute('href', '#/tracks/new')
-    expect(
-      within(allTracksActions).getByRole('button', {
-        name: 'Hide all tracks',
-      }),
-    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toBeVisible()
   })
 
   it('formats target summary and catalog metadata without local timezone drift', async () => {
@@ -645,7 +637,7 @@ describe('TracksScreen', () => {
       }),
     ).toHaveAttribute('aria-valuenow', '13')
     const toggle = within(collection).getByRole('button', {
-      name: 'Hide all tracks',
+      name: 'All tracks',
     })
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(
@@ -653,7 +645,7 @@ describe('TracksScreen', () => {
     ).toContainElement(otherRow)
     await user.click(toggle)
     expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show all tracks' }))
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
     expect(screen.getByText('Grind 75')).toBeVisible()
   })
 
@@ -681,21 +673,21 @@ describe('TracksScreen', () => {
     }
 
     const { rerender } = renderOtherTracksAccordion(initialTracks)
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Hide all tracks' }),
-    )
+    await userEvent.click(screen.getByRole('button', { name: 'All tracks' }))
 
     expect(screen.queryByText('Fresh Track')).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Show all tracks' }),
-    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
 
     rerender(createOtherTracksAccordionElement([...initialTracks, addedTrack]))
 
     expect(screen.getByText('Fresh Track')).toBeVisible()
-    expect(
-      screen.getByRole('button', { name: 'Hide all tracks' }),
-    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
   })
 
   it('toggles all tracks when the collection heading is clicked', async () => {
@@ -704,22 +696,21 @@ describe('TracksScreen', () => {
     renderTracksScreen()
 
     expect(await screen.findByText('All tracks')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Hide all tracks' }))
+    expect(
+      screen.queryByRole('button', { name: /^(Hide|Show) all tracks$/ }),
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
     expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
 
     await user.click(screen.getByText('All tracks'))
 
     expect(screen.getByText('Grind 75')).toBeVisible()
-    expect(
-      screen.getByRole('button', { name: 'Hide all tracks' }),
-    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toBeVisible()
 
     await user.click(screen.getByText('All tracks'))
 
     expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Show all tracks' }),
-    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toBeVisible()
   })
 
   it('does not toggle all tracks when New Track is clicked', async () => {
@@ -734,12 +725,10 @@ describe('TracksScreen', () => {
     )
 
     expect(screen.getByText('Grind 75')).toBeVisible()
-    expect(
-      screen.getByRole('button', { name: 'Hide all tracks' }),
-    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toBeVisible()
   })
 
-  it('allows heading and chevron collapse without an active track and keyboard reopening', async () => {
+  it('allows heading collapse without an active track and keyboard reopening', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce({
       ...twoGroupWorkspace,
@@ -758,7 +747,7 @@ describe('TracksScreen', () => {
     expect(screen.getByRole('button', { name: 'All tracks' })).toHaveFocus()
     await user.keyboard('{Enter}')
     expect(screen.getByText('Grind 75')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Hide all tracks' }))
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
     expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
     await user.keyboard(' ')
     expect(screen.getByText('Grind 75')).toBeVisible()
@@ -890,11 +879,11 @@ describe('TracksScreen', () => {
     expect(
       screen.getByRole('region', { name: 'Grind 75 preview' }),
     ).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Hide all tracks' }))
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
     expect(
       screen.queryByRole('region', { name: 'Grind 75 preview' }),
     ).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show all tracks' }))
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
     expect(
       screen.getByRole('button', { name: 'Preview Grind 75' }),
     ).toHaveAttribute('aria-expanded', 'false')
@@ -987,7 +976,7 @@ describe('TracksScreen', () => {
     expect(screen.getByText('Loading track preview…')).toBeVisible()
     await user.click(toggle)
     expect(screen.queryByText('Loading track preview…')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Hide all tracks' }))
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
     expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
   })
 
@@ -1065,7 +1054,7 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('button', { name: 'Hide all tracks' })
+    await screen.findByRole('button', { name: 'All tracks' })
     await user.click(
       screen.getByRole('button', { name: 'Set Grind 75 active' }),
     )
@@ -1130,7 +1119,7 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('button', { name: 'Hide all tracks' })
+    await screen.findByRole('button', { name: 'All tracks' })
 
     const actions = screen.getByLabelText('Grind 75 catalog actions')
 

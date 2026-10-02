@@ -558,7 +558,7 @@ describe('dashboard routes', () => {
       within(dialog).getByLabelText('Choose track JSON file'),
     ).toBeVisible()
     expect(
-      within(collection).getByRole('button', { name: 'Hide all tracks' }),
+      within(collection).getByRole('button', { name: 'All tracks' }),
     ).toHaveAttribute('aria-expanded', 'true')
     await user.keyboard('{Escape}')
     await waitFor(() => expect(router.state.location.pathname).toBe('/tracks'))

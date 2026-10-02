@@ -238,3 +238,53 @@ inside `npm run check`. No new tests were added for this reversible font-class
 adjustment. Existing behavior coverage and the human visual smoke checklist
 remain the relevant checks. The already running dev server serves the updated
 heading; browser automation remains unable to claim extension URLs.
+
+## Collection Collapse Button Removal
+
+The user requested removal of the standalone All tracks chevron icon button.
+Keep the heading as the accessible click/Enter/Space expansion control. Track
+card chevrons and create/import actions retain their existing behavior.
+
+- [x] Update existing collection tests to use the heading and verify the
+      redundant control is absent. Run the focused heading regression before
+      removing the button, then preserve existing collection/preview coverage.
+      Update the import route's existing expansion assertion in
+      src/app/dashboard/routes.test.tsx to reference the remaining heading.
+- [x] Remove the collection IconButton and unused imports in
+      other-tracks-accordion.tsx. Update the design spec and smoke guidance.
+- [x] Run focused Tracks/route tests, lint/check/build, touched-file Prettier,
+      and diff check. Publish to draft PR #183 and confirm the running dev
+      extension serves the update. Human visual proof remains pending.
+
+### Collapse Button Removal Verification
+
+The existing heading test first failed because the redundant collapse button
+was still present. After removal, the first focused two-file run passed 102
+tests and failed one import-route assertion that still referenced the removed
+button. Updating that assertion to use the heading produced 103 passing tests.
+`npm run lint` passed; `npm run check` passed database consistency, typecheck,
+lint, and 1,960 tests across 187 files. `npm run build` passed with the existing
+non-blocking chunk-size warning. Prettier and diff checks passed.
+
+Exact commands executed through `rtk proxy` with Node v24.20.0:
+
+```sh
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx -t 'toggles all tracks when the collection heading is clicked'
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
+npm run lint
+npm run check
+npm run build
+npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+rtk git diff --check
+```
+
+Skipped `npm run zip` because packaging is unchanged. Skipped
+`npm run db:generate` because no schema changed; database consistency passed
+inside `npm run check`. Localhost source verification confirmed the redundant
+control is gone and the heading toggle remains, served to the user's installed
+dev folder on port 3000. Final human installed-extension visual and smoke proof
+remains pending; extension URL automation is still unavailable under the
+browser policy. Existing tests cover the remaining heading's click/Enter/Space
+behavior, automatic reopen after adding a track, and preview reset on collapse.

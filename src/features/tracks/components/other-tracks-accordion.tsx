@@ -1,9 +1,8 @@
-import { Check, ChevronDown, ChevronUp, LibraryBig } from 'lucide-react'
+import { Check, ChevronDown, LibraryBig } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { IconButton } from '@/components/ui/icon-button'
 import { InlineStatus } from '@/components/ui/inline-status'
 import { cn } from '@/utils/cn'
 
@@ -114,22 +113,6 @@ export function OtherTracksAccordion({
         >
           {newTrackAction}
           {importTrackAction}
-          {tracks.length > 0 ? (
-            <IconButton
-              aria-controls={collectionId}
-              aria-expanded={isOpen}
-              label={isOpen ? 'Hide all tracks' : 'Show all tracks'}
-              onClick={toggleCollection}
-              tooltip={isOpen ? 'Hide all tracks' : 'Show all tracks'}
-              variant="ghost"
-            >
-              {isOpen ? (
-                <ChevronUp aria-hidden="true" />
-              ) : (
-                <ChevronDown aria-hidden="true" />
-              )}
-            </IconButton>
-          ) : null}
         </div>
       </header>
       {isOpen ? (
