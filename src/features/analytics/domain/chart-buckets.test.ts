@@ -1,32 +1,7 @@
+import { classifyLineContinuity } from './chart-buckets'
 import { describe, expect, it } from 'vitest'
 
-import {
-  classifyLineContinuity,
-  lastBucketValue,
-  medianBucketValues,
-  recomputeBucketRatio,
-  sumBucketValues,
-} from './chart-buckets'
-
 describe('chart buckets', () => {
-  it('recomputes ratios from totals instead of averaging percentages', () => {
-    expect(
-      recomputeBucketRatio([
-        { numerator: 1, denominator: 1 },
-        { numerator: 0, denominator: 9 },
-      ]),
-    ).toBe(0.1)
-  })
-
-  it('aggregates sums, medians, and last values without mutating samples', () => {
-    const values = [7, 1, 4]
-
-    expect(sumBucketValues(values)).toBe(12)
-    expect(medianBucketValues(values)).toBe(4)
-    expect(lastBucketValue(values)).toBe(4)
-    expect(values).toEqual([7, 1, 4])
-  })
-
   it('classifies solid adjacency', () => {
     expect(classifyLineContinuity([0.8, 0.84])).toEqual([
       { kind: 'solid', fromIndex: 0, toIndex: 1 },

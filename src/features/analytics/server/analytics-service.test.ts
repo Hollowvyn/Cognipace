@@ -38,13 +38,12 @@ describe('getAnalyticsSummary dashboard views', () => {
       expect(summary.historicalReadiness.requested.requestedDays).toBe(range)
       expect(summary.observedRatingQuality).toBeNull()
       expect(summary.historicalReadiness.requested.ready).toBe(false)
-      expect(summary.predictedRecall).toEqual({
-        value: null,
-        sampleSize: 0,
-        lowSample: true,
-      })
-      expect(summary.recallQuality).toEqual([])
-      expect(summary.ratingsMix).toEqual([])
+      expect(
+        summary.views.observedRecallVsFsrs.rows.every(
+          (row) => row.observedRecall === null && row.fsrsEstimate === null,
+        ),
+      ).toBe(true)
+      expect(summary.views.ratingsMix.selectedValidRatings).toBe(0)
       expect(summary.views.upcomingReviewLoad.rows).toHaveLength(14)
     },
   )
@@ -56,16 +55,18 @@ describe('getAnalyticsSummary dashboard views', () => {
     const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
 
     expect(summary.historicalReadiness.requested.ready).toBe(false)
-    expect(summary.predictedRecall).toEqual({
-      value: null,
-      sampleSize: 0,
-      lowSample: true,
-    })
     expect(
-      summary.recallQuality.every((point) => point.observedRecall === null),
+      summary.views.observedRecallVsFsrs.rows.every(
+        (row) => row.observedRecall === null && row.fsrsEstimate === null,
+      ),
     ).toBe(true)
-    expect(summary.topics).toEqual([])
-    expect(summary.stability).toEqual([])
+    expect(summary.views.topicPerformance.rows).toEqual([])
+    expect(summary.views.topicPerformance.lowEvidenceTopics).toEqual([])
+    expect(
+      summary.views.memoryStrength.rows.every(
+        (row) => row.medianStrengthDays === null,
+      ),
+    ).toBe(true)
     expect(summary.views.overdueBacklog.knownDays).toBe(0)
     expect(summary.views.upcomingReviewLoad.rows).toHaveLength(14)
     expect(
@@ -93,13 +94,17 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
 
     const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
-    const day = summary.recallQuality.find(
+    const day = summary.views.observedRecallVsFsrs.rows.find(
       (point) => point.bucketStart === '2026-08-02',
     )
 
-    expect(summary.predictedRecall.sampleSize).toBe(2)
-    expect(summary.predictedRecall.lowSample).toBe(true)
-    expect(day).toMatchObject({ reviewCount: 2 })
+    expect(day).toMatchObject({ pairedReviews: 2 })
+    expect(day?.fsrsEstimate).not.toBeNull()
+    expect(
+      summary.views.practiceRhythm.rows.find(
+        (row) => row.bucketStart === '2026-08-02',
+      ),
+    ).toMatchObject({ completedReviews: 2 })
   })
 
   it('excludes future-dated reviews from observed rating quality', async () => {
@@ -290,36 +295,42 @@ describe('getAnalyticsSummary dashboard views', () => {
     await updateSettings(handle.db, { review: { targetRetention: 0.85 } })
 
     const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
-    const graphsPoint = summary.topics.find((topic) => topic.topic === 'Graphs')
-    const recallPoint = summary.recallQuality.find(
+    const recallPoint = summary.views.observedRecallVsFsrs.rows.find(
       (point) => point.bucketStart === '2026-01-20',
     )
 
     expect(summary.targetRetention).toBe(0.85)
-    expect(summary.predictedRecall.sampleSize).toBe(11)
-    expect(summary.predictedRecall.lowSample).toBe(false)
-    expect(summary.predictedRecall.value).not.toBeNull()
-    expect(summary.hardAgain).toMatchObject({
-      selectedShare: 1 / 11,
-      sampleSize: 11,
-      previousShare: null,
-      previousSampleSize: 1,
-      previousLowSample: true,
-      direction: null,
-    })
-    expect(recallPoint?.predictedRecall).not.toBeNull()
-    expect(graphsPoint).toMatchObject({
-      topic: 'Graphs',
-      recallQuality: 1,
-      sampleSize: 10,
-      lowSample: false,
-    })
-    expect(summary.stability.length).toBeGreaterThan(0)
     expect(
-      summary.stability.some((point) => point.medianStabilityDays !== null),
+      summary.views.observedRecallVsFsrs.rows.reduce(
+        (total, row) => total + row.pairedReviews,
+        0,
+      ),
+    ).toBe(11)
+    expect(summary.views.ratingsMix).toMatchObject({
+      selectedHardAgain: 1,
+      selectedValidRatings: 11,
+      comparison: {
+        previousHardAgainShare: null,
+        previousValidRatings: 1,
+        direction: null,
+      },
+    })
+    expect(recallPoint?.fsrsEstimate).not.toBeNull()
+    expect(summary.views.topicPerformance.lowEvidenceTopics).toEqual(
+      expect.arrayContaining([
+        { topic: 'Graphs', validRatings: 10, distinctProblems: 1 },
+      ]),
+    )
+    expect(
+      summary.views.memoryStrength.rows.some(
+        (point) => point.medianStrengthDays !== null,
+      ),
     ).toBe(true)
     expect(
-      summary.ratingsMix.reduce((sum, point) => sum + point.again, 0),
+      summary.views.ratingsMix.rows.reduce(
+        (sum, point) => sum + point.again,
+        0,
+      ),
     ).toBe(1)
     expect(summary.views.upcomingReviewLoad.rows[0]?.overdueCount).toBe(0)
     expect(summary.views.upcomingReviewLoad.rows[1]?.dueCount).toBe(1)
@@ -447,12 +458,15 @@ describe('getAnalyticsSummary dashboard views', () => {
     expect(summary.historicalReadiness.recallQuality.failingReasons).toContain(
       'no-evidence',
     )
-    expect(summary.recallQuality.length).toBeGreaterThan(0)
     expect(
-      summary.recallQuality.every(
-        (point) =>
-          point.observedRecall === null && point.predictedRecall !== null,
+      summary.views.observedRecallVsFsrs.rows.some(
+        (row) => row.pairedReviews > 0,
       ),
+    ).toBe(true)
+    expect(
+      summary.views.observedRecallVsFsrs.rows
+        .filter((row) => row.pairedReviews > 0)
+        .every((row) => row.observedRecall === 1 && row.fsrsEstimate !== null),
     ).toBe(true)
   })
 
@@ -489,14 +503,16 @@ describe('getAnalyticsSummary dashboard views', () => {
       assessments: 0,
       activeBuckets: 0,
     })
-    expect(summary.practiceRhythm.length).toBeGreaterThan(0)
-    expect(summary.practiceRhythm.some((point) => point.reviewCount > 0)).toBe(
-      true,
-    )
     expect(
-      summary.practiceRhythm.every(
-        (point) => point.observedCorrectness === null,
+      summary.views.practiceRhythm.rows.reduce(
+        (total, row) => total + row.completedReviews,
+        0,
       ),
+    ).toBe(24)
+    expect(
+      summary.views.practiceRhythm.rows
+        .filter((row) => row.completedReviews > 0)
+        .every((row) => row.reviewSuccess === 1),
     ).toBe(true)
   })
 
@@ -545,11 +561,24 @@ describe('getAnalyticsSummary dashboard views', () => {
         effectiveStart: null,
       })
     }
-    expect(summary.recallQuality).toEqual([])
-    expect(summary.practiceRhythm).toEqual([])
-    expect(summary.ratingsMix).toEqual([])
-    expect(summary.topics).toEqual([])
-    expect(summary.stability).toEqual([])
+    expect(
+      summary.views.observedRecallVsFsrs.rows.every(
+        (row) => row.pairedReviews === 0 && row.observedRecall === null,
+      ),
+    ).toBe(true)
+    expect(
+      summary.views.practiceRhythm.rows.every(
+        (row) => row.completedReviews === 0 && row.reviewSuccess === null,
+      ),
+    ).toBe(true)
+    expect(summary.views.ratingsMix.selectedValidRatings).toBe(0)
+    expect(summary.views.topicPerformance.rows).toEqual([])
+    expect(summary.views.topicPerformance.lowEvidenceTopics).toEqual([])
+    expect(
+      summary.views.memoryStrength.rows.every(
+        (row) => row.eligibleReviews === 0,
+      ),
+    ).toBe(true)
   })
 
   it('uses only valid persisted ratings for mixed historical readiness evidence', async () => {
@@ -595,27 +624,25 @@ describe('getAnalyticsSummary dashboard views', () => {
       expect(readiness).toMatchObject({ assessments: 7, activeBuckets: 7 })
     }
     expect(
-      summary.recallQuality.reduce(
-        (count, point) => count + point.eligibleSampleSize,
+      summary.views.observedRecallVsFsrs.rows.reduce(
+        (count, row) => count + row.pairedReviews,
         0,
       ),
     ).toBe(7)
     expect(
-      summary.practiceRhythm.reduce(
-        (count, point) => count + point.reviewCount,
+      summary.views.practiceRhythm.rows.reduce(
+        (count, row) => count + row.completedReviews,
         0,
       ),
     ).toBe(7)
-    expect(summary.topics).toEqual([
-      {
-        topic: 'Graphs',
-        recallQuality: 1,
-        sampleSize: 7,
-        lowSample: true,
-      },
+    expect(summary.views.topicPerformance.lowEvidenceTopics).toEqual([
+      { topic: 'Graphs', validRatings: 7, distinctProblems: 1 },
     ])
     expect(
-      summary.stability.reduce((count, point) => count + point.sampleSize, 0),
+      summary.views.memoryStrength.rows.reduce(
+        (count, row) => count + row.eligibleReviews,
+        0,
+      ),
     ).toBe(7)
   })
 
@@ -721,16 +748,21 @@ describe('getAnalyticsSummary dashboard views', () => {
       },
     })
 
-    expect(parsed.practiceRhythm).toHaveLength(12)
+    expect(parsed.views.practiceRhythm.rows).toHaveLength(14)
     expect(
-      parsed.practiceRhythm.find((point) => point.reviewCount > 0),
+      parsed.views.practiceRhythm.rows.find(
+        (point) => point.completedReviews > 0,
+      ),
     ).toEqual({
+      id: '2026-01-20',
       bucketStart: '2026-01-20',
       bucketEnd: '2026-01-20',
-      reviewCount: 1,
-      observedCorrectness: 1,
-      sampleSize: 1,
-      associationOnly: true,
+      isPartial: false,
+      completedReviews: 1,
+      goodEasy: 1,
+      validRatings: 1,
+      reviewSuccess: 1,
+      evidence: 'measured',
     })
   })
 
@@ -777,9 +809,11 @@ describe('getAnalyticsSummary dashboard views', () => {
       effectiveStart: '2026-07-20',
     })
     expect(readiness.historicalReadiness.recommendedRange).toBe(30)
-    expect(readiness.recallQuality).toHaveLength(
-      readiness.historicalReadiness.recallQuality.effectiveBuckets,
-    )
+    expect(
+      readiness.views.observedRecallVsFsrs.rows.find(
+        (row) => row.pairedReviews > 0,
+      )?.bucketStart,
+    ).toBe(readiness.historicalReadiness.recallQuality.effectiveStart)
     expect(readiness.views.upcomingReviewLoad.rows).toHaveLength(14)
     expect(readiness.views.retentionMap.rows.length).toBeGreaterThan(0)
   })
@@ -977,10 +1011,12 @@ describe('getAnalyticsSummary dashboard views', () => {
       timeZone: 'America/New_York',
     })
 
-    expect(summary.recallQuality[0]).toMatchObject({
+    expect(
+      summary.views.practiceRhythm.rows.find((row) => row.completedReviews > 0),
+    ).toMatchObject({
       bucketStart: '2026-03-07',
       bucketEnd: '2026-03-07',
-      reviewCount: 1,
+      completedReviews: 1,
     })
     expect(summary.views.upcomingReviewLoad.rows[0]).toMatchObject({
       date: '2026-03-08',
@@ -1030,12 +1066,10 @@ describe('getAnalyticsSummary dashboard views', () => {
 
     expect(summary.observedRatingSampleSize).toBe(10)
     expect(summary.observedRatingQuality).toBe(1)
-    expect(summary.hardAgain).toMatchObject({
-      selectedShare: 0,
-      sampleSize: 10,
-      previousShare: 0,
-      previousSampleSize: 10,
-      previousLowSample: false,
+    expect(summary.views.ratingsMix).toMatchObject({
+      selectedHardAgain: 0,
+      selectedValidRatings: 10,
+      comparison: { previousValidRatings: 10 },
     })
   })
 })

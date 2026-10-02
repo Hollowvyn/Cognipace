@@ -236,6 +236,46 @@ describe('content import service', () => {
     }
   })
 
+  it.each(['topic', 'company'] as const)(
+    'returns stale when a normalized-ID-matched %s changes after preview',
+    async (kind) => {
+      const handle = await createTestDb({ seed: false })
+      const fileText = JSON.stringify({
+        format: 'cognipace-content',
+        version: 1,
+        problems: [
+          {
+            slug: 'two-sum',
+            [kind === 'topic' ? 'topics' : 'companies']: ['custom-id'],
+          },
+        ],
+      })
+      try {
+        const table = kind === 'topic' ? topics : companies
+        await handle.db
+          .insert(table)
+          .values({ id: 'Custom-ID', label: 'Different Label' })
+        const preview = await previewContentImport(handle.db, fileText)
+        await handle.db
+          .update(table)
+          .set({ label: 'Changed after preview' })
+          .where(eq(table.id, 'Custom-ID'))
+
+        await applyStaleWithoutWrites(handle.db, fileText, preview.fingerprint!)
+
+        expect(await handle.db.select().from(table)).toEqual([
+          expect.objectContaining({
+            id: 'Custom-ID',
+            label: 'Changed after preview',
+          }),
+        ])
+      } finally {
+        vi.restoreAllMocks()
+        handle.rawDb.close()
+      }
+    },
+  )
+
   it('keeps the fingerprint stable when unrelated practice state changes', async () => {
     const handle = await createTestDb({ seed: false })
     const fileText = JSON.stringify({

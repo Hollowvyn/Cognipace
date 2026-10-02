@@ -1,11 +1,14 @@
 import { Loader2 } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useId, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { InlineStatus } from '@/components/ui/inline-status'
+import { useModalFocus } from '@/components/ui/use-modal-focus'
 
-export function ProblemConfirmationDialog({
+export function ConfirmationDialog({
   confirmLabel,
   description,
+  error,
   onCancel,
   onConfirm,
   pending,
@@ -13,27 +16,25 @@ export function ProblemConfirmationDialog({
 }: {
   confirmLabel: string
   description: string
+  error?: ReactNode | undefined
   onCancel: () => void
   onConfirm: () => void
   pending: boolean
   title: string
 }) {
-  const cancelButtonRef = useRef<HTMLButtonElement>(null)
-  const titleId = `problem-confirmation-${title.toLowerCase().replace(/\W+/g, '-')}`
-  const descriptionId = `${titleId}-description`
-
-  useEffect(() => {
-    cancelButtonRef.current?.focus()
-  }, [])
+  const { cancelButtonRef, dialogRef, handleKeyDown } = useModalFocus({
+    onCancel,
+    pending,
+  })
+  const id = useId()
+  const titleId = `${id}-title`
+  const descriptionId = `${id}-description`
+  const errorId = `${id}-error`
 
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-background/75 p-4"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && !pending) {
-          onCancel()
-        }
-      }}
+      onKeyDown={handleKeyDown}
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) {
           event.preventDefault()
@@ -45,11 +46,13 @@ export function ProblemConfirmationDialog({
     >
       <section
         aria-busy={pending || undefined}
-        aria-describedby={descriptionId}
+        aria-describedby={error ? `${descriptionId} ${errorId}` : descriptionId}
         aria-labelledby={titleId}
         aria-modal="true"
-        className="grid w-full max-w-md gap-4 rounded-[var(--cp-panel-radius)] border border-border bg-card p-[var(--cp-panel-padding)] text-card-foreground shadow-surface"
+        className="grid w-full max-w-md gap-4 rounded-[var(--cp-panel-radius)] border border-border bg-card p-[var(--cp-panel-padding)] text-card-foreground shadow-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
       >
         <div className="grid gap-2">
           <h2
@@ -65,6 +68,11 @@ export function ProblemConfirmationDialog({
             {description}
           </p>
         </div>
+        {error ? (
+          <InlineStatus id={errorId} role="alert" tone="danger">
+            {error}
+          </InlineStatus>
+        ) : null}
         <div className="flex flex-wrap justify-end gap-2">
           <Button
             disabled={pending}

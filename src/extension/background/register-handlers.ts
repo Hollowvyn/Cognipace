@@ -495,10 +495,13 @@ export function registerBackgroundHandlers() {
     )
     return getAppDb().then(async ({ db }) => {
       const result = parseSyncActionResult(
-        await runQueuedSyncAction(db, (service) =>
-          service.pullLatest({
-            confirmLocalOverwrite: request.confirmLocalOverwrite,
-          }),
+        await runQueuedSyncAction(
+          db,
+          (service) =>
+            service.pullLatest({
+              confirmLocalOverwrite: request.confirmLocalOverwrite,
+            }),
+          { confirmLocalOverwrite: request.confirmLocalOverwrite },
         ),
       )
 
@@ -1395,7 +1398,13 @@ function createSyncServiceForDb(db: Db) {
   return createSyncServiceForDbInQueue(db, false)
 }
 
-function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
+type SyncRestoreOptions = { confirmLocalOverwrite?: boolean }
+
+function createSyncServiceForDbInQueue(
+  db: Db,
+  isInsideMutationQueue: boolean,
+  options: SyncRestoreOptions = {},
+) {
   return createBackgroundSyncService(
     db,
     async () => {
@@ -1403,7 +1412,11 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
     },
     {
       runRemoteRestore: (work) =>
-        runRemoteRestoreInMutationQueue(work, isInsideMutationQueue),
+        runRemoteRestoreInMutationQueue(
+          work,
+          isInsideMutationQueue,
+          options.confirmLocalOverwrite === true,
+        ),
     },
   )
 }
@@ -1413,6 +1426,7 @@ type BackgroundSyncService = ReturnType<typeof createBackgroundSyncService>
 function runQueuedSyncAction<T>(
   db: Db,
   action: (service: BackgroundSyncService) => Promise<T>,
+  options: SyncRestoreOptions = {},
 ) {
   return runInMutationQueue(async () => {
     const dirtyMarkReady = await retryPendingDirtyMark()
@@ -1423,7 +1437,7 @@ function runQueuedSyncAction<T>(
       )
     }
 
-    return action(createSyncServiceForDbInQueue(db, true))
+    return action(createSyncServiceForDbInQueue(db, true, options))
   })
 }
 
@@ -1523,11 +1537,12 @@ async function retryPendingDirtyMark() {
 function runRemoteRestoreInMutationQueue<T>(
   work: () => Promise<T>,
   isInsideMutationQueue: boolean,
+  confirmLocalOverwrite = false,
 ) {
   const guardedWork = async () => {
     const metadata = await readSyncMetadata()
 
-    if (metadata.dirtySinceLastSync) {
+    if (metadata.dirtySinceLastSync && !confirmLocalOverwrite) {
       throw new Error(
         'Sync conflict detected. Local data changed before remote data could be applied.',
       )

@@ -53,12 +53,26 @@ describe('normalizeLeetCodeSlug', () => {
 })
 
 describe('parseLeetCodeProblemInput', () => {
-  it('accepts either a URL or bare slug', () => {
-    expect(parseLeetCodeProblemInput('valid-parentheses')).toEqual({
-      slug: 'valid-parentheses',
-      url: 'https://leetcode.com/problems/valid-parentheses/',
+  it.each([
+    'two-sum',
+    'Problems/two-sum/',
+    'https://leetcode.com/problems/two-sum/',
+  ])('accepts canonical URLs and normalized slug input %s', (input) => {
+    expect(parseLeetCodeProblemInput(input)).toEqual({
+      slug: 'two-sum',
+      url: 'https://leetcode.com/problems/two-sum/',
       host: 'leetcode.com',
     })
+  })
+
+  it.each([
+    'https://example.com/problems/two-sum/',
+    'https://leetcode.com/explore/',
+    'https://',
+    '//example.com/problems/two-sum/',
+    'mailto:two-sum@example.com',
+  ])('rejects invalid URL input %s', (input) => {
+    expect(parseLeetCodeProblemInput(input)).toBeNull()
   })
 })
 

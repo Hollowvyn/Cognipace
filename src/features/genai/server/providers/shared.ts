@@ -17,54 +17,38 @@ export type FetchWithTimeoutOptions = {
   externalSignal?: AbortSignal
 }
 
-export async function fetchWithTimeout(
+export async function fetchWithTimeout<T>(
   url: string,
   init: RequestInit,
   options: FetchWithTimeoutOptions,
-): Promise<Response> {
-  const timeoutController = new AbortController()
+  consumeResponse: (response: Response) => Promise<T>,
+): Promise<T> {
+  if (options.externalSignal?.aborted) throw options.externalSignal.reason
+  const controller = new AbortController()
+  const onExternalAbort = () => controller.abort(options.externalSignal?.reason)
+  let rejectAbort!: (reason: unknown) => void
+  const aborted = new Promise<never>((_resolve, reject) => {
+    rejectAbort = reject
+  })
+  const onAbort = () => rejectAbort(controller.signal.reason)
+  controller.signal.addEventListener('abort', onAbort, { once: true })
+  options.externalSignal?.addEventListener('abort', onExternalAbort, {
+    once: true,
+  })
   const timeoutId = setTimeout(() => {
-    timeoutController.abort(new GenAiTimeoutError())
+    controller.abort(new GenAiTimeoutError())
   }, options.timeoutMs)
 
-  const composedSignal = composeSignals(
-    timeoutController.signal,
-    options.externalSignal,
-  )
-
   try {
-    return await fetch(url, { ...init, signal: composedSignal })
-  } catch (error) {
-    if (timeoutController.signal.aborted) {
-      const reason: unknown = timeoutController.signal.reason
-      throw reason instanceof GenAiTimeoutError
-        ? reason
-        : new GenAiTimeoutError()
-    }
-    throw error
+    return await Promise.race([
+      aborted,
+      fetch(url, { ...init, signal: controller.signal }).then(consumeResponse),
+    ])
   } finally {
     clearTimeout(timeoutId)
+    controller.signal.removeEventListener('abort', onAbort)
+    options.externalSignal?.removeEventListener('abort', onExternalAbort)
   }
-}
-
-function composeSignals(
-  primary: AbortSignal,
-  secondary: AbortSignal | undefined,
-): AbortSignal {
-  if (!secondary) {
-    return primary
-  }
-  if (secondary.aborted) {
-    return secondary
-  }
-  const merged = new AbortController()
-  primary.addEventListener('abort', () => merged.abort(primary.reason), {
-    once: true,
-  })
-  secondary.addEventListener('abort', () => merged.abort(secondary.reason), {
-    once: true,
-  })
-  return merged.signal
 }
 
 export function mapHttpStatusToGenAiError(status: number): GenAiError | null {

@@ -84,6 +84,32 @@ describe('ProblemForm', () => {
     })
   })
 
+  it('rejects a foreign problem URL without submitting a fabricated slug', async () => {
+    const user = userEvent.setup()
+    renderProblemForm(
+      <ProblemForm mode="create" onCancel={vi.fn()} onSaved={vi.fn()} />,
+    )
+
+    await user.type(
+      screen.getByLabelText('LeetCode URL or slug'),
+      'https://example.com/problems/two-sum/',
+    )
+    await user.type(screen.getByLabelText('Title'), 'Two Sum')
+    await user.click(screen.getByRole('button', { name: 'SAVE' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Enter a LeetCode URL or slug.',
+    )
+    expect(screen.getByLabelText('LeetCode URL or slug')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'problems.createProblem',
+      expect.anything(),
+    )
+  })
+
   it('loads an edit problem and saves base metadata', async () => {
     const user = userEvent.setup()
     const onSaved = vi.fn()

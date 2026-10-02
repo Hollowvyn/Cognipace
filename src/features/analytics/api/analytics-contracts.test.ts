@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { analyticsChartPointFixtures } from '@/testing/analytics-fixtures'
-
 import {
   analyticsReadinessSchema,
   analyticsRangeSchema,
   analyticsSummaryRequestSchema,
   analyticsSummarySchema,
-  hardAgainSummarySchema,
-  practiceRhythmPointSchema,
-  ratingsMixPointSchema,
+  ratingsMixComparisonSchema,
+  practiceRhythmRowSchema,
+  ratingsMixRowSchema,
   type AnalyticsReadiness,
   type SerializedAnalyticsSummary,
 } from './analytics-contracts'
@@ -83,11 +81,6 @@ const validSummary: SerializedAnalyticsSummary = {
     sampleSize: 20,
     lowSample: false,
   },
-  predictedRecall: {
-    value: null,
-    sampleSize: 0,
-    lowSample: true,
-  },
   observedRatingSampleSize: 20,
   lowSample: false,
   targetRetention: 0.9,
@@ -153,21 +146,38 @@ const validSummary: SerializedAnalyticsSummary = {
     },
   },
   historicalReadiness: withRequestedReadiness(readiness, null),
-  recallQuality: [],
-  practiceRhythm: [],
-  ratingsMix: [],
-  hardAgain: {
-    selectedShare: null,
-    previousShare: null,
-    delta: null,
-    direction: null,
-    sampleSize: 0,
-    previousSampleSize: 0,
-    lowSample: true,
-    previousLowSample: true,
-  },
-  topics: [],
-  stability: [],
+}
+
+const observedRow = {
+  id: '2026-01-15',
+  bucketStart: '2026-01-15',
+  bucketEnd: '2026-01-15',
+  isPartial: true,
+  recalledCount: 3,
+  pairedReviews: 4,
+  observedRecall: 0.75,
+  fsrsEstimate: 0.8,
+  difference: -0.05,
+  provenance: 'reconstructed' as const,
+  evidence: 'measured' as const,
+}
+
+const ratingsRow = {
+  id: '2026-01-15',
+  bucketStart: '2026-01-15',
+  bucketEnd: '2026-01-15',
+  isPartial: true,
+  again: 1,
+  hard: 1,
+  good: 2,
+  easy: 0,
+  againShare: 0.25,
+  hardShare: 0.25,
+  goodShare: 0.5,
+  easyShare: 0,
+  validRatings: 4,
+  challengingReviews: 2,
+  evidence: 'measured' as const,
 }
 
 function withoutSummaryField(field: keyof SerializedAnalyticsSummary) {
@@ -257,6 +267,26 @@ describe('analyticsSummaryRequestSchema', () => {
 })
 
 describe('analyticsSummarySchema', () => {
+  it('accepts the live summary without obsolete top-level chart payloads', () => {
+    const summary = { ...validSummary }
+    const obsoleteFields = [
+      'predictedRecall',
+      'recallQuality',
+      'practiceRhythm',
+      'ratingsMix',
+      'hardAgain',
+      'topics',
+      'stability',
+    ]
+    for (const field of obsoleteFields) Reflect.deleteProperty(summary, field)
+
+    const parsed = analyticsSummarySchema.parse(summary)
+
+    expect(parsed.views).toEqual(validSummary.views)
+    expect(parsed.historicalReadiness).toEqual(validSummary.historicalReadiness)
+    for (const field of obsoleteFields) expect(parsed).not.toHaveProperty(field)
+  })
+
   it('requires the Phase 2 historical view presentation models', () => {
     expect(analyticsSummarySchema.safeParse(validSummary).success).toBe(true)
     expect(
@@ -423,64 +453,93 @@ describe('analyticsSummarySchema', () => {
     ).toBe(false)
   })
 
-  it('accepts chart payloads without duplicate period metadata', () => {
-    const chartReadySummary = {
+  it('accepts live measured payloads without duplicate period metadata', () => {
+    const summary = {
       ...validSummary,
       historicalReadiness: withRequestedReadiness(readyReadiness, null),
-      recallQuality: [
-        {
-          bucketStart: '2026-01-15',
-          bucketEnd: '2026-01-15',
-          observedRecall: 0.75,
-          predictedRecall: null,
-          targetRetention: 0.9,
-          reviewCount: 2,
-          eligibleSampleSize: 2,
+      views: {
+        ...validSummary.views,
+        observedRecallVsFsrs: {
+          ...validSummary.views.observedRecallVsFsrs,
+          rows: [observedRow],
         },
-      ],
-      ...analyticsChartPointFixtures,
+        ratingsMix: { ...validSummary.views.ratingsMix, rows: [ratingsRow] },
+      },
     }
 
-    expect(analyticsSummarySchema.parse(chartReadySummary)).toMatchObject({
+    expect(analyticsSummarySchema.parse(summary)).toMatchObject({
       range: 30,
-      recallQuality: chartReadySummary.recallQuality,
-      practiceRhythm: chartReadySummary.practiceRhythm,
-      ratingsMix: chartReadySummary.ratingsMix,
+      views: summary.views,
     })
   })
 
-  it('permits sparse summaries without hiding measured chart values', () => {
+  it('permits sparse summaries without hiding measured live values', () => {
+    const parsed = analyticsSummarySchema.parse({
+      ...validSummary,
+      views: {
+        ...validSummary.views,
+        observedRecallVsFsrs: {
+          ...validSummary.views.observedRecallVsFsrs,
+          rows: [
+            {
+              ...observedRow,
+              pairedReviews: 1,
+              recalledCount: 1,
+              observedRecall: 1,
+            },
+          ],
+        },
+      },
+    })
+
+    expect(parsed.historicalReadiness.requested.ready).toBe(false)
+    expect(parsed.views.observedRecallVsFsrs.rows[0]?.observedRecall).toBe(1)
+  })
+
+  it('keeps unknown live values null instead of coercing them to zero', () => {
+    const unknown = {
+      ...observedRow,
+      recalledCount: 0,
+      pairedReviews: 0,
+      observedRecall: null,
+      fsrsEstimate: null,
+      difference: null,
+      evidence: 'not-measured' as const,
+    }
+    const parsed = analyticsSummarySchema.parse({
+      ...validSummary,
+      views: {
+        ...validSummary.views,
+        observedRecallVsFsrs: {
+          ...validSummary.views.observedRecallVsFsrs,
+          rows: [unknown],
+        },
+      },
+    })
+
+    expect(parsed.views.observedRecallVsFsrs.rows[0]).toEqual(unknown)
+  })
+
+  it.each([
+    { observedRecall: 1.01 },
+    { pairedReviews: -1 },
+    { pairedReviews: 0.5 },
+    { provenance: 'invented' },
+    { evidence: 'unknown' },
+    { isPartial: undefined },
+  ])('rejects malformed live recall rows: %j', (invalidFields) => {
     expect(
       analyticsSummarySchema.safeParse({
         ...validSummary,
-        predictedRecall: { value: null, sampleSize: 1, lowSample: true },
-      }).success,
-    ).toBe(true)
-    expect(
-      analyticsSummarySchema.safeParse({
-        ...validSummary,
-        recallQuality: [
-          {
-            bucketStart: '2026-01-15',
-            bucketEnd: '2026-01-15',
-            observedRecall: 0.75,
-            predictedRecall: null,
-            targetRetention: 0.9,
-            reviewCount: 2,
-            eligibleSampleSize: 2,
+        views: {
+          ...validSummary.views,
+          observedRecallVsFsrs: {
+            ...validSummary.views.observedRecallVsFsrs,
+            rows: [{ ...observedRow, ...invalidFields }],
           },
-        ],
+        },
       }).success,
-    ).toBe(true)
-  })
-
-  it('keeps low-sample metric values null instead of coercing them to zero', () => {
-    expect(validSummary.predictedRecall.value).toBeNull()
-    expect(analyticsSummarySchema.parse(validSummary).predictedRecall).toEqual({
-      value: null,
-      sampleSize: 0,
-      lowSample: true,
-    })
+    ).toBe(false)
   })
 
   it.each([
@@ -519,26 +578,28 @@ describe('analyticsSummarySchema', () => {
     expect(
       analyticsSummarySchema.safeParse({
         ...validSummary,
-        ratingsMix: [{ ...validSummary.ratingsMix[0], again: -1 }],
+        views: {
+          ...validSummary.views,
+          ratingsMix: {
+            ...validSummary.views.ratingsMix,
+            rows: [{ ...ratingsRow, again: -1 }],
+          },
+        },
       }).success,
     ).toBe(false)
   })
 })
 
-describe('hardAgainSummarySchema', () => {
+describe('ratingsMixComparisonSchema', () => {
   it('preserves valid period comparison semantics', () => {
     expect(
-      hardAgainSummarySchema.parse({
-        selectedShare: 0.18,
-        previousShare: 0.27,
-        delta: -0.09,
+      ratingsMixComparisonSchema.parse({
+        previousHardAgainShare: 0.27,
+        difference: -0.09,
         direction: 'down',
-        sampleSize: 50,
-        previousSampleSize: 48,
-        lowSample: false,
-        previousLowSample: false,
+        previousValidRatings: 48,
       }),
-    ).toMatchObject({ direction: 'down', sampleSize: 50 })
+    ).toMatchObject({ direction: 'down', previousValidRatings: 48 })
   })
 })
 
@@ -568,29 +629,24 @@ describe('analyticsSummarySchema', () => {
   })
 })
 
-describe('chart point contracts', () => {
-  it('preserves association semantics and Hard + Again share during serialization', () => {
+describe('live chart row contracts', () => {
+  it('preserves Review Success and Hard + Again evidence during serialization', () => {
     expect(
-      practiceRhythmPointSchema.parse({
-        bucketStart: '2026-01-12',
-        bucketEnd: '2026-01-18',
-        reviewCount: 3,
-        observedCorrectness: 0.75,
-        sampleSize: 4,
-        associationOnly: true,
-      }),
-    ).toMatchObject({ associationOnly: true })
-    expect(
-      ratingsMixPointSchema.parse({
+      practiceRhythmRowSchema.parse({
+        id: '2026-01-15',
         bucketStart: '2026-01-15',
         bucketEnd: '2026-01-15',
-        again: 1,
-        hard: 1,
-        good: 2,
-        easy: 0,
-        total: 4,
-        hardAgainShare: 0.5,
+        isPartial: true,
+        completedReviews: 4,
+        goodEasy: 3,
+        reviewSuccess: 0.75,
+        validRatings: 4,
+        evidence: 'measured',
       }),
-    ).toMatchObject({ hardAgainShare: 0.5 })
+    ).toMatchObject({ reviewSuccess: 0.75, completedReviews: 4 })
+    expect(ratingsMixRowSchema.parse(ratingsRow)).toMatchObject({
+      validRatings: 4,
+      challengingReviews: 2,
+    })
   })
 })

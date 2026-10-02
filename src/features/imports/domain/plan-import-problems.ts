@@ -79,8 +79,8 @@ function createLookups(
   const companiesById = new Map<string, ImportedLabel[]>()
   const companiesByKey = new Map<string, ImportedLabel[]>()
   for (const topic of state.topics) {
-    appendLookup(topicsById, topic.id, topic)
     const idKey = normalizeTopicLookupKey(topic.id)
+    appendLookup(topicsById, idKey, topic)
     const labelKey = normalizeTopicLookupKey(topic.label)
     topicLookupKeys.add(idKey)
     topicLookupKeys.add(labelKey)
@@ -100,7 +100,7 @@ function createLookups(
     topicLookupKeys.add(normalizeTopicLookupKey(label))
   }
   for (const company of state.companies) {
-    appendLookup(companiesById, company.id, company)
+    appendLookup(companiesById, normalizeCompanyImportKey(company.id), company)
     appendLookup(
       companiesByKey,
       normalizeCompanyImportKey(company.label),
@@ -144,7 +144,7 @@ function relevantProblemState(
   const topicCandidateIds = new Set<string>()
   for (const topic of state.topics) {
     if (
-      topicKeys.has(topic.id) ||
+      topicKeys.has(normalizeTopicLookupKey(topic.id)) ||
       topicKeys.has(normalizeTopicLookupKey(topic.label))
     ) {
       topicCandidateIds.add(topic.id)
@@ -156,7 +156,7 @@ function relevantProblemState(
   const companyCandidateIds = new Set<string>()
   for (const company of state.companies) {
     if (
-      companyKeys.has(company.id) ||
+      companyKeys.has(normalizeCompanyImportKey(company.id)) ||
       companyKeys.has(normalizeCompanyImportKey(company.label))
     ) {
       companyCandidateIds.add(company.id)
@@ -311,7 +311,9 @@ function resolveTopic(
     return null
   }
   if (aliasTopicIds.length === 1) {
-    const canonical = (lookups.topicsById.get(aliasTopicIds[0]!) ?? [])[0]
+    const canonical = (lookups.topicsById.get(
+      normalizeTopicLookupKey(aliasTopicIds[0]!),
+    ) ?? [])[0]
     if (canonical) return { row: canonical, isNew: false }
   }
 

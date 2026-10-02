@@ -25,7 +25,6 @@ import {
   toAssessmentPracticeContext,
   type OverlaySessionAction,
   type OverlaySessionState,
-  type OverlaySubmittedSession,
 } from '../domain'
 import type { LeetCodeOverlayContext } from './use-leetcode-page-sync'
 import { createSubmissionResultKey } from './submission-result-key'
@@ -51,7 +50,6 @@ export type UseLeetCodeAssessmentRecommendationOptions = {
   activeProblemSlug: string | null
   metadata: LeetCodeProblemMetadata | null
   submissionResult: LeetCodeSubmissionResult | null
-  submittedSession: OverlaySubmittedSession | null
   overlayState: OverlaySessionState
   context: LeetCodeOverlayContext | null
   timing: {
@@ -66,6 +64,9 @@ export type UseLeetCodeAssessmentRecommendationOptions = {
 export type UseLeetCodeAssessmentRecommendationResult = {
   state: AssessmentRecommendationState
   reset: () => void
+  requestRecommendation: (
+    result: LeetCodeSubmissionResult,
+  ) => Promise<RecommendLeetCodeAssessmentResponse | null>
 }
 
 const IDLE_STATE: AssessmentRecommendationState = { status: 'idle' }
@@ -77,7 +78,6 @@ export function useLeetCodeAssessmentRecommendation(
     activeProblemSlug,
     metadata,
     submissionResult,
-    submittedSession,
     overlayState,
     context,
     timing,
@@ -91,12 +91,13 @@ export function useLeetCodeAssessmentRecommendation(
   const overlayStateRef = useRef(overlayState)
   const contextRef = useRef(context)
   const metadataRef = useRef(metadata)
-  const submittedSessionRef = useRef(submittedSession)
   const timingRef = useRef(timing)
   const aiEnabledRef = useRef(aiEnabled)
   const activeProblemSlugRef = useRef(activeProblemSlug)
 
-  const handledFingerprintsRef = useRef<Set<string>>(new Set())
+  const requestsRef = useRef(
+    new Map<string, Promise<RecommendLeetCodeAssessmentResponse | null>>(),
+  )
   const pendingFingerprintRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -113,9 +114,6 @@ export function useLeetCodeAssessmentRecommendation(
     metadataRef.current = metadata
   }, [metadata])
   useEffect(() => {
-    submittedSessionRef.current = submittedSession
-  }, [submittedSession])
-  useEffect(() => {
     timingRef.current = timing
   }, [timing])
   useEffect(() => {
@@ -129,7 +127,7 @@ export function useLeetCodeAssessmentRecommendation(
     abortControllerRef.current?.abort()
     abortControllerRef.current = null
     pendingFingerprintRef.current = null
-    handledFingerprintsRef.current.clear()
+    requestsRef.current.clear()
     setState(IDLE_STATE)
   }, [])
 
@@ -140,152 +138,158 @@ export function useLeetCodeAssessmentRecommendation(
   }
 
   useEffect(() => {
-    const handledFingerprints = handledFingerprintsRef.current
+    const requests = requestsRef.current
     return () => {
       abortControllerRef.current?.abort()
       abortControllerRef.current = null
       pendingFingerprintRef.current = null
-      handledFingerprints.clear()
+      requests.clear()
     }
   }, [activeProblemSlug])
 
-  useEffect(() => {
-    if (!aiEnabled || !activeProblemSlug || !submissionResult) {
-      return
-    }
-
-    if (submissionResult.location.slug !== activeProblemSlug) {
-      return
-    }
-
-    const currentContext = contextRef.current
-    const currentMetadata = metadataRef.current
-    const problemSummary = currentContext?.problem ?? null
-
-    if (!currentContext || !currentMetadata || !problemSummary) {
-      return
-    }
-
-    const fingerprint = createSubmissionResultKey(submissionResult)
-
-    if (
-      handledFingerprintsRef.current.has(fingerprint) ||
-      pendingFingerprintRef.current === fingerprint
-    ) {
-      return
-    }
-
-    abortControllerRef.current?.abort()
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-    pendingFingerprintRef.current = fingerprint
-    handledFingerprintsRef.current.add(fingerprint)
-    setState({ status: 'pending', fingerprint })
-
-    const submission = buildSubmissionPayload(submissionResult)
-    const sessionContext = deriveOverlayAssessmentSessionContext({
-      context: currentContext,
-      submissionSource: 'leetcode-watcher',
-      timerUsed: timingRef.current.timerUsed,
-    })
-    const decision = buildDeterministicDecision({
-      submissionResult,
-      problemDifficulty: problemSummary.difficulty,
-      timingSettings: currentContext.timing,
-      elapsedSeconds: timingRef.current.elapsedSeconds,
-      sessionContext,
-    })
-
-    const request: RecommendLeetCodeAssessmentRequest = {
-      surface: 'content-script',
-      problemSlug: activeProblemSlug,
-      submissionFingerprint: fingerprint,
-      problem: buildProblemPayload(problemSummary, currentMetadata),
-      submission,
-      timing: buildTimingPayload(timingRef.current, submissionResult),
-      deterministicDecision: decision,
-      sessionContext,
-    }
-
-    void sendMessage('genai.recommendLeetCodeAssessment', request).then(
-      (response: RecommendLeetCodeAssessmentResponse) => {
-        if (controller.signal.aborted) {
-          return
-        }
-        if (pendingFingerprintRef.current !== fingerprint) {
-          return
-        }
-        if (activeProblemSlugRef.current !== activeProblemSlug) {
-          return
-        }
-        pendingFingerprintRef.current = null
-        applyResponse(response, fingerprint)
-      },
-      (error: unknown) => {
-        if (controller.signal.aborted) {
-          return
-        }
-        if (pendingFingerprintRef.current !== fingerprint) {
-          return
-        }
-        if (activeProblemSlugRef.current !== activeProblemSlug) {
-          return
-        }
-        pendingFingerprintRef.current = null
-        setState({
-          status: 'error',
-          fingerprint,
-          code: 'unknown',
-          message: error instanceof Error ? error.message : String(error),
-        })
-      },
-    )
-
-    function applyResponse(
-      response: RecommendLeetCodeAssessmentResponse,
-      currentFingerprint: string,
-    ): void {
-      if (response.status === 'ready') {
-        setState({
-          status: 'ready',
-          fingerprint: currentFingerprint,
-          recommendation: response.recommendation,
-          providerMetadata: response.providerMetadata,
-        })
-        maybePreselectRating(response.recommendation.recommendedRating)
-        return
+  const requestRecommendation = useCallback(
+    (submissionResult: LeetCodeSubmissionResult) => {
+      const activeProblemSlug = activeProblemSlugRef.current
+      if (
+        !aiEnabledRef.current ||
+        !activeProblemSlug ||
+        submissionResult.location.slug !== activeProblemSlug
+      ) {
+        return Promise.resolve(null)
       }
 
-      if (response.status === 'unavailable') {
-        setState({
-          status: 'unavailable',
-          fingerprint: currentFingerprint,
-          message: response.message,
+      const currentContext = contextRef.current
+      const currentMetadata = metadataRef.current
+      const problemSummary = currentContext?.problem ?? null
+      const fingerprint = createSubmissionResultKey(submissionResult)
+      if (!currentContext || !currentMetadata || !problemSummary) {
+        return Promise.resolve({
+          status: 'unavailable' as const,
+          submissionFingerprint: fingerprint,
+          message: 'AI assessment context is not ready.',
         })
-        return
       }
 
-      setState({
-        status: 'error',
-        fingerprint: currentFingerprint,
-        code: response.code,
-        message: response.message,
+      const existingRequest = requestsRef.current.get(fingerprint)
+      if (existingRequest) return existingRequest
+
+      abortControllerRef.current?.abort()
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+      pendingFingerprintRef.current = fingerprint
+      setState({ status: 'pending', fingerprint })
+
+      const sessionContext = deriveOverlayAssessmentSessionContext({
+        context: currentContext,
+        submissionSource: 'leetcode-watcher',
+        timerUsed: timingRef.current.timerUsed,
       })
+      const decision = buildDeterministicDecision({
+        submissionResult,
+        problemDifficulty: problemSummary.difficulty,
+        timingSettings: currentContext.timing,
+        elapsedSeconds: timingRef.current.elapsedSeconds,
+        sessionContext,
+      })
+      const request: RecommendLeetCodeAssessmentRequest = {
+        surface: 'content-script',
+        problemSlug: activeProblemSlug,
+        submissionFingerprint: fingerprint,
+        problem: buildProblemPayload(problemSummary, currentMetadata),
+        submission: buildSubmissionPayload(submissionResult),
+        timing: buildTimingPayload(timingRef.current, submissionResult),
+        deterministicDecision: decision,
+        sessionContext,
+      }
+      const responsePromise = sendMessage(
+        'genai.recommendLeetCodeAssessment',
+        request,
+      ).then(
+        (response: RecommendLeetCodeAssessmentResponse) => {
+          if (!isCurrent()) return null
+          pendingFingerprintRef.current = null
+
+          if (response.status === 'ready') {
+            setState({
+              status: 'ready',
+              fingerprint,
+              recommendation: response.recommendation,
+              providerMetadata: response.providerMetadata,
+            })
+            const overlay = overlayStateRef.current
+            const rating = response.recommendation.recommendedRating
+            if (
+              response.recommendation.shouldUpdateRating &&
+              decision.status === 'accepted' &&
+              !decision.lockReason &&
+              !overlay.ratingLockReason &&
+              !overlay.userTouchedRating &&
+              overlay.selectedRating !== rating
+            ) {
+              dispatchRef.current({ type: 'ai-preselect-rating', rating })
+            }
+          } else if (response.status === 'unavailable') {
+            setState({
+              status: 'unavailable',
+              fingerprint,
+              message: response.message,
+            })
+          } else {
+            setState({
+              status: 'error',
+              fingerprint,
+              code: response.code,
+              message: response.message,
+            })
+          }
+          return response
+        },
+        (error: unknown) => {
+          if (!isCurrent()) return null
+          pendingFingerprintRef.current = null
+          setState({
+            status: 'error',
+            fingerprint,
+            code: 'unknown',
+            message: error instanceof Error ? error.message : String(error),
+          })
+          return {
+            status: 'error' as const,
+            code: 'unknown' as const,
+            message: error instanceof Error ? error.message : String(error),
+            submissionFingerprint: fingerprint,
+          }
+        },
+      )
+      const promise = Promise.race([
+        responsePromise,
+        new Promise<null>((resolve) => {
+          controller.signal.addEventListener('abort', () => resolve(null), {
+            once: true,
+          })
+        }),
+      ])
+      requestsRef.current.set(fingerprint, promise)
+      return promise
+
+      function isCurrent() {
+        return (
+          !controller.signal.aborted &&
+          pendingFingerprintRef.current === fingerprint &&
+          activeProblemSlugRef.current === activeProblemSlug
+        )
+      }
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (submissionResult) {
+      void requestRecommendation(submissionResult)
     }
+  }, [activeProblemSlug, aiEnabled, submissionResult, requestRecommendation])
 
-    function maybePreselectRating(
-      rating: AssessmentRecommendation['recommendedRating'],
-    ): void {
-      const overlay = overlayStateRef.current
-      if (overlay.ratingLockReason) return
-      if (overlay.userTouchedRating) return
-      if (overlay.selectedRating === rating) return
-
-      dispatchRef.current({ type: 'ai-preselect-rating', rating })
-    }
-  }, [activeProblemSlug, aiEnabled, submissionResult])
-
-  return { state, reset: teardown }
+  return { state, reset: teardown, requestRecommendation }
 }
 
 function buildProblemPayload(

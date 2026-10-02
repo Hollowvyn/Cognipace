@@ -42,14 +42,8 @@ export function ObservedRecallVsFsrsView({
               aria-label="Observed Recall vs FSRS Estimate chart"
               className="aspect-auto h-80 min-h-[20rem]"
               config={{
-                observedRecall: {
-                  label: 'Observed recall',
-                  color: 'var(--cp-analytics-observed)',
-                },
-                fsrsEstimate: {
-                  label: 'FSRS estimate',
-                  color: 'var(--cp-analytics-predicted)',
-                },
+                observedRecall: 'var(--cp-analytics-observed)',
+                fsrsEstimate: 'var(--cp-analytics-predicted)',
               }}
               initialDimension={chartDimension}
               role="img"
@@ -145,10 +139,7 @@ export function MemoryStrengthView({
             aria-label="Memory Strength chart"
             className="aspect-auto h-72 min-h-[18rem]"
             config={{
-              medianStrengthDays: {
-                label: 'Median strength',
-                color: 'var(--cp-analytics-healthy)',
-              },
+              medianStrengthDays: 'var(--cp-analytics-healthy)',
             }}
             initialDimension={chartDimension}
             role="img"
@@ -239,14 +230,8 @@ export function PracticeRhythmView({
               aria-label="Practice Rhythm chart"
               className="aspect-auto h-72 min-h-[18rem]"
               config={{
-                completedReviews: {
-                  label: 'Completed reviews',
-                  color: 'var(--cp-analytics-practice-volume)',
-                },
-                reviewSuccess: {
-                  label: 'Review Success',
-                  color: 'var(--cp-analytics-observed)',
-                },
+                completedReviews: 'var(--cp-analytics-practice-volume)',
+                reviewSuccess: 'var(--cp-analytics-observed)',
               }}
               initialDimension={chartDimension}
               role="img"
@@ -346,22 +331,10 @@ export function RatingsMixView({
                 aria-roledescription="100% stacked column chart"
                 className="aspect-auto h-72 min-h-[18rem]"
                 config={{
-                  againShare: {
-                    label: 'Again',
-                    color: 'var(--cp-analytics-again)',
-                  },
-                  hardShare: {
-                    label: 'Hard',
-                    color: 'var(--cp-analytics-hard)',
-                  },
-                  goodShare: {
-                    label: 'Good',
-                    color: 'var(--cp-analytics-good)',
-                  },
-                  easyShare: {
-                    label: 'Easy',
-                    color: 'var(--cp-analytics-easy)',
-                  },
+                  againShare: 'var(--cp-analytics-again)',
+                  hardShare: 'var(--cp-analytics-hard)',
+                  goodShare: 'var(--cp-analytics-good)',
+                  easyShare: 'var(--cp-analytics-easy)',
                 }}
                 initialDimension={chartDimension}
                 role="img"
@@ -482,10 +455,7 @@ export function TopicPerformanceView({
               aria-roledescription="ranked horizontal bar chart"
               className="aspect-auto h-72 min-h-[18rem]"
               config={{
-                reviewSuccess: {
-                  label: 'Review Success',
-                  color: 'var(--cp-analytics-attention)',
-                },
+                reviewSuccess: 'var(--cp-analytics-attention)',
               }}
               initialDimension={chartDimension}
               role="img"

@@ -172,6 +172,182 @@ describe('ProblemsRepository library data', () => {
     })
   })
 
+  it('preserves distinct company labels when their ID slugs collide', async () => {
+    const handle = await createTestDb()
+    await handle.db.insert(companies).values({ id: 'meta', label: 'Meta' })
+
+    const created = await createProblem(
+      handle.db,
+      newProblemInput({ companyLabels: ['Meta!'] }),
+    )
+
+    expect(created.companies).toHaveLength(1)
+    expect(created.companies[0]?.label).toBe('Meta!')
+    expect(created.companies[0]?.id).toEqual(expect.any(String))
+    expect(created.companies[0]?.id).not.toBe('meta')
+    expect(await handle.db.select().from(companies)).toEqual(
+      expect.arrayContaining([
+        { id: 'meta', label: 'Meta' },
+        { id: created.companies[0]?.id, label: 'Meta!' },
+      ]),
+    )
+  })
+
+  it('reuses normalized existing company labels across create, edit and bulk writes', async () => {
+    const handle = await createTestDb()
+    await handle.db
+      .insert(companies)
+      .values({ id: 'Legacy-Company-ID', label: 'Acme   Corp' })
+
+    await createProblem(
+      handle.db,
+      newProblemInput({ companyLabels: [' acme corp '] }),
+    )
+    const edited = await updateProblem(
+      handle.db,
+      updateProblemInput({ companyLabels: ['ACME CORP'] }),
+    )
+    await bulkUpdateProblems(handle.db, {
+      surface: 'dashboard',
+      problemSlugs: ['binary-search', 'two-sum'],
+      set: { companyLabels: [' Acme  Corp '] },
+    })
+
+    expect(edited?.companies).toEqual([
+      { id: 'Legacy-Company-ID', label: 'Acme   Corp' },
+    ])
+    expect(await handle.db.select().from(companies)).toEqual([
+      { id: 'Legacy-Company-ID', label: 'Acme   Corp' },
+    ])
+    const rows = await createProblemsRepository(handle.db).getLibraryRowsBySlug(
+      ['binary-search', 'two-sum'],
+    )
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(row.companies).toEqual([
+        { id: 'Legacy-Company-ID', label: 'Acme   Corp' },
+      ])
+    }
+  })
+
+  it.each(['Acme Corp', 'Acme   Corp'])(
+    'preserves the exact restored company association for %s',
+    async (label) => {
+      const handle = await createTestDb()
+      await createProblem(handle.db, newProblemInput())
+      await handle.db.insert(companies).values([
+        { id: 'original-acme', label },
+        { id: 'legacy-acme', label: 'ACME CORP' },
+      ])
+      await handle.db.insert(problemCompanies).values({
+        problemSlug: 'binary-search',
+        companyId: 'original-acme',
+      })
+
+      const saved = await updateProblem(
+        handle.db,
+        updateProblemInput({ companyLabels: [label] }),
+      )
+
+      expect(saved?.companies).toEqual([{ id: 'original-acme', label }])
+      expect(await handle.db.select().from(companies)).toEqual([
+        { id: 'original-acme', label },
+        { id: 'legacy-acme', label: 'ACME CORP' },
+      ])
+    },
+  )
+
+  it('rejects ambiguous normalized company labels and rolls back metadata changes', async () => {
+    const handle = await createTestDb()
+    await createProblem(handle.db, newProblemInput())
+    await handle.db.insert(companies).values([
+      { id: 'original-acme', label: 'Acme Corp' },
+      { id: 'legacy-acme', label: 'ACME CORP' },
+    ])
+    await handle.db.insert(problemCompanies).values({
+      problemSlug: 'binary-search',
+      companyId: 'original-acme',
+    })
+
+    await expect(
+      updateProblem(
+        handle.db,
+        updateProblemInput({
+          title: 'Should Not Be Saved',
+          topicLabels: ['New Rollback Topic'],
+          companyLabels: ['New Company', 'aCmE CoRp'],
+        }),
+      ),
+    ).rejects.toThrow(/ambiguous company label/i)
+
+    const saved = await createProblemsRepository(handle.db).getForEdit(
+      'binary-search',
+    )
+    expect(saved?.problem.title).toBe('Binary Search')
+    expect(saved?.companies).toEqual([
+      { id: 'original-acme', label: 'Acme Corp' },
+    ])
+    expect(await handle.db.select().from(companies)).toHaveLength(2)
+    expect(
+      await handle.db
+        .select()
+        .from(schema.topics)
+        .where(eq(schema.topics.label, 'New Rollback Topic')),
+    ).toEqual([])
+  })
+
+  it('allocates distinct company IDs within one batch, including empty slugs', async () => {
+    const handle = await createTestDb()
+    const labels = ['New Co', 'New-Co', '!!!', '???']
+
+    const saved = await createProblem(
+      handle.db,
+      newProblemInput({ companyLabels: labels }),
+    )
+
+    expect(saved.companies.map(({ label }) => label).sort()).toEqual(
+      [...labels].sort(),
+    )
+    expect(new Set(saved.companies.map(({ id }) => id)).size).toBe(4)
+    expect(saved.companies.every(({ id }) => id.length > 0)).toBe(true)
+    expect(saved.companies.find(({ label }) => label === 'New Co')?.id).toBe(
+      'new-co',
+    )
+  })
+
+  it('rolls back a company write and problem changes when association persistence fails', async () => {
+    const handle = await createTestDb()
+    const delegate = createProxyCallback(handle.rawDb)
+    const db: Db = drizzle(
+      (sql, params, method) => {
+        if (sql.startsWith('insert into "problem_companies"')) {
+          throw new Error('Company association write failed')
+        }
+        return delegate(sql, params, method)
+      },
+      { schema },
+    )
+
+    await expect(
+      createProblemsRepository(db).createProblem(
+        newProblemInput({
+          slugOrUrl: 'company-rollback-drill',
+          companyLabels: ['New Co', 'New-Co'],
+        }),
+      ),
+    ).rejects.toHaveProperty(
+      'cause.message',
+      'Company association write failed',
+    )
+    expect(await handle.db.select().from(companies)).toEqual([])
+    expect(
+      await handle.db
+        .select()
+        .from(schema.problems)
+        .where(eq(schema.problems.slug, 'company-rollback-drill')),
+    ).toEqual([])
+  })
+
   it('resolves topic aliases and auto-creates unknown topics on manual writes', async () => {
     const handle = await createTestDb({
       now: new Date('2026-05-29T12:00:00.000Z'),

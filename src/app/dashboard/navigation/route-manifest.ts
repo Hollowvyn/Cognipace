@@ -5,7 +5,7 @@ export type DashboardSection =
   | 'analytics'
   | 'settings'
 
-export type DashboardRoutePresentation = 'page' | 'modal' | 'modal-placeholder'
+export type DashboardRoutePresentation = 'page' | 'modal'
 
 export interface DashboardRouteStaticData {
   navLabel?: string
@@ -63,7 +63,7 @@ interface DashboardModalRoute {
   description: string
   relativePath: string
   staticData: DashboardRouteStaticData & {
-    presentation: 'modal' | 'modal-placeholder'
+    presentation: 'modal'
   }
 }
 

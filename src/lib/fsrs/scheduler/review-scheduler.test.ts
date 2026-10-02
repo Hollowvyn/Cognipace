@@ -4,7 +4,6 @@ import {
   createInitialFsrsCard,
   getTargetRetentionDuration,
   getRetrievability,
-  projectReviewSchedule,
   replayReviewHistory,
   replayReviewHistorySequence,
   scheduleReview,
@@ -180,55 +179,6 @@ describe('fsrs scheduler wrapper', () => {
       replayedReviews.at(-1)?.card,
     )
   })
-
-  it('projects future reviews from the stored due date', () => {
-    const card = createReviewedCard()
-    const projections = projectReviewSchedule(card, {
-      startAt: new Date('2026-01-02T10:00:00.000Z'),
-      horizonDays: 90,
-      maxReviews: 5,
-    })
-
-    expect(projections.length).toBeGreaterThan(0)
-    expect(projections.length).toBeLessThanOrEqual(5)
-    expect(projections[0]?.reviewedAt).toEqual(card.dueAt)
-    expect(projections[0]?.log).toMatchObject({
-      rating: 'good',
-      reviewedAt: card.dueAt.toISOString(),
-    })
-    expect(
-      projections.every((projection, index) => {
-        const previous = projections[index - 1]
-        return (
-          !previous ||
-          projection.reviewedAt.getTime() > previous.reviewedAt.getTime()
-        )
-      }),
-    ).toBe(true)
-  })
-
-  it('projects from start date when the card is already due', () => {
-    const card = createReviewedCard()
-    const startAt = new Date('2026-03-01T10:00:00.000Z')
-    const [projection] = projectReviewSchedule(card, {
-      startAt,
-      maxReviews: 1,
-    })
-
-    expect(projection?.reviewedAt).toEqual(startAt)
-  })
-
-  it.each([
-    [{ horizonDays: -1 }, 'Invalid FSRS projection horizon "-1".'],
-    [{ maxReviews: 1.5 }, 'Invalid FSRS projection max reviews "1.5".'],
-  ] as const)(
-    'rejects invalid review projection limit $error',
-    (options, error) => {
-      expect(() =>
-        projectReviewSchedule(createReviewedCard(), options),
-      ).toThrow(error)
-    },
-  )
 })
 
 function createReviewedCard(rating: ReviewRating = 'easy') {

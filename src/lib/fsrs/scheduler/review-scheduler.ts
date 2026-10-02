@@ -23,17 +23,6 @@ export interface FsrsReviewHistoryEntry {
   rating: ReviewRating
 }
 
-/** Options for simulating future review dates from an existing card. */
-export interface FsrsReviewScheduleProjectionOptions extends FsrsSchedulingOptions {
-  startAt?: Date | undefined
-  horizonDays?: number | undefined
-  maxReviews?: number | undefined
-  assumedRating?: ReviewRating | undefined
-}
-
-/** One simulated future review and the resulting card/log state. */
-export type FsrsProjectedReview = FsrsScheduledReview
-
 /** Creates a new dependency-free FSRS card snapshot. */
 export function createInitialFsrsCard(now = new Date()): FsrsCardSnapshot {
   return createEmptyCardSnapshot(now)
@@ -117,82 +106,3 @@ export function replayReviewHistorySequence(
 
   return sequence
 }
-
-/** Projects future reviews by assuming each simulated review gets one rating. */
-export function projectReviewSchedule(
-  card: FsrsCardSnapshot,
-  options: FsrsReviewScheduleProjectionOptions = {},
-): FsrsProjectedReview[] {
-  const {
-    assumedRating = 'good',
-    horizonDays: rawHorizonDays = defaultProjectionHorizonDays,
-    maxReviews: rawMaxReviews = defaultProjectionMaxReviews,
-    startAt = new Date(),
-  } = options
-  const horizonDays = normalizeProjectionHorizonDays(rawHorizonDays)
-  const maxReviews = normalizeProjectionMaxReviews(rawMaxReviews)
-  const schedulingOptions = readSchedulingOptions(options)
-  const horizonAt = new Date(startAt.getTime() + horizonDays * dayMs)
-  const projections: FsrsProjectedReview[] = []
-  let currentCard = card
-  let reviewAt = card.dueAt.getTime() > startAt.getTime() ? card.dueAt : startAt
-
-  for (
-    let reviewCount = 0;
-    reviewCount < maxReviews && reviewAt.getTime() <= horizonAt.getTime();
-    reviewCount += 1
-  ) {
-    const projected = scheduleReview(
-      currentCard,
-      assumedRating,
-      reviewAt,
-      schedulingOptions,
-    )
-    projections.push(projected)
-
-    if (projected.card.dueAt.getTime() <= reviewAt.getTime()) {
-      break
-    }
-
-    currentCard = projected.card
-    reviewAt = projected.card.dueAt
-  }
-
-  return projections
-}
-
-function readSchedulingOptions(
-  options: FsrsReviewScheduleProjectionOptions,
-): FsrsSchedulingOptions {
-  return {
-    targetRetention: options.targetRetention,
-    enableFuzz: options.enableFuzz,
-    enableShortTerm: options.enableShortTerm,
-    learningSteps: options.learningSteps,
-    relearningSteps: options.relearningSteps,
-  }
-}
-
-function normalizeProjectionHorizonDays(value: number): number {
-  if (!Number.isFinite(value) || value < 0) {
-    throw new Error(
-      `Invalid FSRS projection horizon "${value}". Use a finite number greater than or equal to 0.`,
-    )
-  }
-
-  return value
-}
-
-function normalizeProjectionMaxReviews(value: number): number {
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error(
-      `Invalid FSRS projection max reviews "${value}". Use a whole number greater than or equal to 0.`,
-    )
-  }
-
-  return value
-}
-
-const dayMs = 24 * 60 * 60 * 1000
-const defaultProjectionHorizonDays = 90
-const defaultProjectionMaxReviews = 50

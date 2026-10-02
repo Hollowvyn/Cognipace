@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { LeetCodePageEvent } from '../domain/types'
+import type {
+  LeetCodePageEvent,
+  LeetCodeProblemContentResult,
+} from '../domain/types'
+import { createLeetCodeFetchRemoteClient } from '../remote/leetcode-fetch-remote-client'
 import {
   createLeetCodeSubmissionApiFixtureFetcher,
   leetcodeAcceptedSubmissionApiFixture,
@@ -95,6 +99,197 @@ describe('createLeetCodePageWatcher', () => {
     expect(filterEvents(events, 'metadata-updated')).toHaveLength(1)
     expect(filterEvents(events, 'problem-content-updated')).toHaveLength(1)
   })
+
+  it.each(['http-error', 'empty-question', 'partial-question'])(
+    'retries %s metadata even when remote content is already useful',
+    async (failure) => {
+      vi.useFakeTimers()
+      renderProblemHeader()
+      const successfulFetch = createQuestionContentFetcher()
+      let metadataReads = 0
+      const fetcher = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const body = typeof init?.body === 'string' ? init.body : ''
+        if (!body.includes('questionContent') && metadataReads++ === 0) {
+          return Promise.resolve(
+            failure === 'http-error'
+              ? new Response('', { status: 503 })
+              : Response.json({
+                  data: {
+                    question:
+                      failure === 'empty-question'
+                        ? {}
+                        : { title: 'Partial Metadata' },
+                  },
+                }),
+          )
+        }
+        return successfulFetch(input, init)
+      })
+      const { events, watcher } = createWatcherTestHarness({
+        hydrationDelays: [0, 500, 1500],
+        fetch: fetcher,
+      })
+
+      watcher.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(findEvent(events, 'page-ready')).toMatchObject({
+        metadata: { source: 'fallback' },
+      })
+      await vi.runAllTimersAsync()
+      watcher.stop()
+
+      expect(
+        filterEvents(events, 'metadata-updated').map(
+          (event) => event.metadata.source,
+        ),
+      ).toEqual(['fallback', 'graphql'])
+      expect(filterEvents(events, 'page-ready')).toHaveLength(1)
+      expect(filterEvents(events, 'problem-content-updated')).toHaveLength(1)
+      expect(fetcher).toHaveBeenCalledTimes(4)
+    },
+  )
+
+  it.each(['failed', 'empty'])(
+    'retries %s content on the next hydration refresh',
+    async (failure) => {
+      vi.useFakeTimers()
+      renderProblemHeader()
+      const successfulFetch = createQuestionContentFetcher()
+      let contentReads = 0
+      const fetcher = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const body = typeof init?.body === 'string' ? init.body : ''
+        if (body.includes('questionContent') && contentReads++ === 0) {
+          return Promise.resolve(
+            failure === 'failed'
+              ? new Response('', { status: 503 })
+              : Response.json({
+                  data: { question: { content: '<p></p>', hints: [] } },
+                }),
+          )
+        }
+        return successfulFetch(input, init)
+      })
+      const { events, watcher } = createWatcherTestHarness({
+        hydrationDelays: [0, 500, 1500],
+        fetch: fetcher,
+      })
+
+      watcher.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(filterEvents(events, 'page-ready')).toHaveLength(1)
+      expect(filterEvents(events, 'problem-content-updated')).toHaveLength(0)
+      await vi.runAllTimersAsync()
+      watcher.stop()
+
+      expect(findEvent(events, 'problem-content-updated')).toMatchObject({
+        content: { source: 'graphql', statement: 'Return indices.' },
+      })
+      expect(filterEvents(events, 'page-ready')).toHaveLength(1)
+      expect(filterEvents(events, 'metadata-updated')).toHaveLength(1)
+      expect(fetcher).toHaveBeenCalledTimes(4)
+    },
+  )
+
+  it('shares an in-flight content read and emits page-ready before it resolves', async () => {
+    vi.useFakeTimers()
+    renderProblemHeader()
+    const successfulFetch = createQuestionContentFetcher()
+    let resolveContent!: (response: Response) => void
+    const pendingContent = new Promise<Response>((resolve) => {
+      resolveContent = resolve
+    })
+    const fetcher = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const body = typeof init?.body === 'string' ? init.body : ''
+      return body.includes('questionContent')
+        ? pendingContent
+        : successfulFetch(input, init)
+    })
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [0, 500, 1500, 3000],
+      fetch: fetcher,
+    })
+
+    watcher.start()
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(filterEvents(events, 'page-ready')).toHaveLength(1)
+    expect(filterEvents(events, 'problem-content-updated')).toHaveLength(0)
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    resolveContent(await successfulFetch('', { body: 'questionContent' }))
+    await vi.runAllTimersAsync()
+    watcher.stop()
+
+    expect(filterEvents(events, 'problem-content-updated')).toHaveLength(1)
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
+  it('limits incomplete detail retries to the existing hydration schedule', async () => {
+    vi.useFakeTimers()
+    renderProblemHeader()
+    const fetcher = createQuestionMetadataFetcher()
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [0, 500, 1500],
+      fetch: fetcher,
+    })
+
+    watcher.start()
+    await vi.runAllTimersAsync()
+    watcher.stop()
+
+    expect(fetcher).toHaveBeenCalledTimes(6)
+    expect(filterEvents(events, 'page-ready')).toHaveLength(1)
+    expect(filterEvents(events, 'problem-content-updated')).toHaveLength(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it.each(['resolve', 'reject'])(
+    'ignores a stale content %s after navigating to a different problem',
+    async (outcome) => {
+      vi.useFakeTimers()
+      renderProblemHeader()
+      let currentUrl = problemUrl
+      let resolveContent!: (result: LeetCodeProblemContentResult) => void
+      let rejectContent!: (error: Error) => void
+      const pendingContent = new Promise<LeetCodeProblemContentResult>(
+        (resolve, reject) => {
+          resolveContent = resolve
+          rejectContent = reject
+        },
+      )
+      const remoteClient = createLeetCodeFetchRemoteClient({
+        document,
+        fetch: createQuestionContentFetcher(),
+      })
+      const readContent = vi
+        .fn(remoteClient.readProblemContent)
+        .mockReturnValueOnce(pendingContent)
+      const { events, watcher } = createWatcherTestHarness({
+        getCurrentUrl: () => currentUrl,
+        remoteClient: { ...remoteClient, readProblemContent: readContent },
+      })
+
+      watcher.start()
+      await vi.advanceTimersByTimeAsync(0)
+      currentUrl = 'https://leetcode.com/problems/valid-parentheses/'
+      watcher.refresh()
+      await vi.advanceTimersByTimeAsync(0)
+      if (outcome === 'reject') {
+        rejectContent(new Error('Stale content request failed'))
+      } else {
+        resolveContent(
+          await remoteClient.readProblemContent({ location: problemLocation }),
+        )
+      }
+      await vi.runAllTimersAsync()
+      watcher.stop()
+
+      expect(
+        filterEvents(events, 'problem-content-updated').map(
+          (event) => event.location.slug,
+        ),
+      ).toEqual(['valid-parentheses'])
+      expect(filterEvents(events, 'watcher-error')).toHaveLength(0)
+    },
+  )
 
   it('emits page changes when the active slug changes', async () => {
     vi.useFakeTimers()

@@ -111,7 +111,6 @@ function baseAnalyticsSummary(): SerializedAnalyticsSummary {
     totalReviews: 381,
     currentStreak: 7,
     observedRatingQuality: { value: 0.72, sampleSize: 58, lowSample: false },
-    predictedRecall: { value: null, sampleSize: 0, lowSample: true },
     observedRatingSampleSize: 58,
     lowSample: false,
     targetRetention: 0.9,
@@ -177,21 +176,6 @@ function baseAnalyticsSummary(): SerializedAnalyticsSummary {
       },
     },
     historicalReadiness: createUnreadyHistoricalReadiness(),
-    recallQuality: [],
-    practiceRhythm: [],
-    ratingsMix: [],
-    hardAgain: {
-      selectedShare: null,
-      previousShare: null,
-      delta: null,
-      direction: null,
-      sampleSize: 0,
-      previousSampleSize: 0,
-      lowSample: true,
-      previousLowSample: true,
-    },
-    topics: [],
-    stability: [],
   }
 }
 
@@ -206,55 +190,6 @@ function readyAnalyticsSummary(
 ): SerializedAnalyticsSummary {
   return createAnalyticsSummary({
     historicalReadiness: createReadyHistoricalReadiness(),
-    recallQuality: [
-      {
-        bucketStart: '2026-01-14',
-        bucketEnd: '2026-01-14',
-        observedRecall: 0.78,
-        predictedRecall: 0.84,
-        targetRetention: 0.9,
-        reviewCount: 12,
-        eligibleSampleSize: 12,
-      },
-    ],
-    practiceRhythm: [
-      {
-        bucketStart: '2026-01-12',
-        bucketEnd: '2026-01-14',
-        reviewCount: 4,
-        observedCorrectness: 0.78,
-        sampleSize: 12,
-        associationOnly: true,
-      },
-    ],
-    ratingsMix: [
-      {
-        bucketStart: '2026-01-14',
-        bucketEnd: '2026-01-14',
-        again: 1,
-        hard: 2,
-        good: 6,
-        easy: 3,
-        total: 12,
-        hardAgainShare: 0.25,
-      },
-    ],
-    topics: [
-      {
-        topic: 'Graphs',
-        recallQuality: 0.61,
-        sampleSize: 12,
-        lowSample: false,
-      },
-    ],
-    stability: [
-      {
-        bucketStart: '2026-01-12',
-        bucketEnd: '2026-01-14',
-        medianStabilityDays: 8.2,
-        sampleSize: 12,
-      },
-    ],
     ...overrides,
   })
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SNAPSHOT_DIRTY_KEY } from '@/platform/db/snapshot'
 
 import {
   syncActionReasonSchema,
@@ -47,10 +48,18 @@ export const defaultSyncMetadata: SyncMetadata = {
 }
 
 export async function readSyncMetadata(): Promise<SyncMetadata> {
-  const result = await readChromeLocalStorage().get(syncMetadataKey)
+  const result = await readChromeLocalStorage().get([
+    syncMetadataKey,
+    SNAPSHOT_DIRTY_KEY,
+  ])
   const parsed = syncMetadataSchema.safeParse(result[syncMetadataKey])
+  const metadata = parsed.success ? parsed.data : { ...defaultSyncMetadata }
 
-  return parsed.success ? parsed.data : { ...defaultSyncMetadata }
+  return {
+    ...metadata,
+    dirtySinceLastSync:
+      metadata.dirtySinceLastSync || result[SNAPSHOT_DIRTY_KEY] === true,
+  }
 }
 
 export async function writeSyncMetadata(
@@ -59,7 +68,12 @@ export async function writeSyncMetadata(
   const current = await readSyncMetadata()
   const next = syncMetadataSchema.parse({ ...current, ...patch })
 
-  await readChromeLocalStorage().set({ [syncMetadataKey]: next })
+  await readChromeLocalStorage().set({
+    [syncMetadataKey]: next,
+    ...(patch.dirtySinceLastSync === false
+      ? { [SNAPSHOT_DIRTY_KEY]: false }
+      : {}),
+  })
 
   return next
 }

@@ -284,18 +284,20 @@ The owners in that flow are:
 - `src/features/analytics/domain/analytics-readiness.ts` derives the effective
   window and readiness gates. `S`, `A`, `G`, `K`, and `E` mean eligible
   assessments, active buckets, longest gap, gap runs, and effective buckets.
-- `src/features/analytics/domain/chart-buckets.ts` and
-  `src/features/analytics/domain/chart-data.ts` aggregate each metric only from
-  eligible evidence, preserve unknown buckets as `null`, and classify solid or
-  dashed next-valid-point line continuity. Practice Rhythm retains zero-volume
-  buckets after its first supported bucket.
+- `src/features/analytics/domain/historical-presentation.ts` builds the live
+  historical views from eligible evidence; `current-state-presentation.ts` and
+  `workload-presentation.ts` own current-card and workload views. Unknown
+  values remain unknown, and Practice Rhythm retains zero-volume buckets after
+  its first supported bucket. `chart-data.ts` retains shared evidence and
+  replay helpers; `chart-buckets.ts` classifies measured/dashed line continuity.
 - `src/features/analytics/api/analytics-contracts.ts` validates the serialized
   read model with Zod before it crosses the extension runtime boundary.
-- `src/features/analytics/components/charts/chart-definitions.ts` is the typed
-  chart catalogue: title, question, data meaning, eligibility, aggregation,
-  semantic series, and sparse-state copy. `LineSegments` in
+- `src/features/analytics/components/historical-views.tsx`,
+  `current-state-views.tsx` and `workload-views.tsx` render live read models from
+  `summary.views`. Each view owns its question, interpretation and sparse-state copy. `LineSegments` in
   `src/features/analytics/components/charts/line-segments.tsx` renders measured
-  runs and dashed next-valid-point bridges without interpolating data.
+  runs and dashed next-valid-point bridges without interpolating data. Removed
+  legacy charts and top-level response fields have no parallel calculation.
 - `src/lib/leetcode/domain/problem-url.ts` owns canonical problem URLs; the
   retention details and fragile-knowledge rows use `createLeetCodeProblemUrl`
   rather than constructing links in chart components.
@@ -327,6 +329,12 @@ mutation commits, sync metadata is marked dirty, the database snapshot is
 flushed, normal invalidation is broadcast, and an alarm-backed auto-push is
 scheduled when Gist sync is configured. Alarm jobs run through the same mutation
 queue as manual sync work, so remote restores and local writes stay serialized.
+Snapshots containing DB mutations atomically persist a local dirty marker with
+the snapshot and fingerprint. Sync reads combine this marker with validated
+metadata, preserving dirty state across worker restart even when the best-effort
+metadata write fails. Initial publication and no-op flushes retain the marker;
+a successful push or pull explicitly acknowledges clean data and clears it in
+the same storage write as that acknowledgement. Disconnect retains it.
 
 Opening popup, dashboard, or overlay surfaces calls the safe
 `sync.checkRemoteOnOpen` runtime path. That path clean-pulls changed remote Gist
@@ -338,6 +346,14 @@ enforces both defaults so force pull and force push only happen after a UI
 confirmation dialog. The `enabled` flag controls automatic sync only; manual
 directional actions remain available whenever token and Gist configuration are
 present.
+
+The overlay recommendation hook owns one watcher assessment promise per
+submission. Automatic review saving consumes the same captured request/result
+that supplies the displayed recommendation; manual actions retain their own
+assessment flow. Rating locks, user choices and navigation/restart guards remain
+in the overlay owner. The shared provider deadline covers headers and response
+body consumption, including error bodies; external cancellation and timeout
+remain distinct from invalid output.
 
 ## External APIs And Secrets
 

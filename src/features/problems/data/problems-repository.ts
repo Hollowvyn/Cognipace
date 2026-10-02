@@ -696,13 +696,12 @@ async function readLabelOptions(db: ProblemReadDb, kind: TaxonomyKind) {
     .orderBy(asc(source.label))
 }
 
-async function setProblemLabels(
+async function setProblemCompanyLabels(
   db: ProblemWriteDb,
-  kind: TaxonomyKind,
   problemSlug: string,
   labels: readonly string[],
 ) {
-  const storedLabels = await ensureLabels(db, kind, normalizeLabelList(labels))
+  const storedLabels = await ensureCompanyLabels(db, normalizeLabelList(labels))
 
   await db
     .delete(problemCompanies)
@@ -735,36 +734,64 @@ async function setProblemTaxonomyLabels(
   }
 
   if (labels.companyLabels !== undefined) {
-    await setProblemLabels(db, 'company', problemSlug, labels.companyLabels)
+    await setProblemCompanyLabels(db, problemSlug, labels.companyLabels)
   }
 }
 
-async function ensureLabels(
+async function ensureCompanyLabels(
   db: ProblemWriteDb,
-  kind: TaxonomyKind,
   labels: readonly string[],
 ) {
   if (labels.length === 0) {
     return []
   }
 
-  const source = taxonomySource(kind)
-
-  await db
-    .insert(source.labelTable)
-    .values(labels.map((label) => ({ id: createTaxonomyId(label), label })))
-    .onConflictDoNothing()
-
-  return sortLabelsByInput(
-    labels,
-    await db
-      .select({
-        id: source.id,
-        label: source.label,
-      })
-      .from(source.labelTable)
-      .where(inArray(source.label, [...labels])),
+  const existing = await db.select().from(companies)
+  const labelsByLabel = new Map(
+    existing.map((company) => [company.label, company]),
   )
+  const labelsByKey = new Map<string, (typeof existing)[number] | null>()
+  for (const company of existing) {
+    const key = normalizeLabel(company.label).toLowerCase()
+    labelsByKey.set(key, labelsByKey.has(key) ? null : company)
+  }
+  const occupiedIds = new Set(existing.map((company) => company.id))
+  const newCompanies: typeof existing = []
+  const storedLabels = labels.map((inputLabel) => {
+    const exactLabel = labelsByLabel.get(inputLabel)
+
+    if (exactLabel) return exactLabel
+
+    const label = normalizeLabel(inputLabel)
+    const key = label.toLowerCase()
+    const storedLabel = labelsByKey.get(key)
+
+    if (storedLabel === null) {
+      throw new Error(
+        `Ambiguous company label "${label}". Use an exact stored label.`,
+      )
+    }
+    if (storedLabel) return storedLabel
+
+    const baseId = normalizeLeetCodeSlug(label) || 'company'
+    let id = baseId
+    for (let suffix = 2; occupiedIds.has(id); suffix += 1) {
+      id = `${baseId}-${suffix}`
+    }
+
+    const company = { id, label }
+    occupiedIds.add(id)
+    labelsByLabel.set(label, company)
+    labelsByKey.set(key, company)
+    newCompanies.push(company)
+    return company
+  })
+
+  if (newCompanies.length > 0) {
+    await db.insert(companies).values(newCompanies)
+  }
+
+  return storedLabels
 }
 
 function taxonomySource(kind: TaxonomyKind) {
@@ -794,9 +821,13 @@ function normalizeProblemSlugList(problemSlugs: readonly string[]) {
 function normalizeLabelList(labels: readonly string[]) {
   return uniqueNormalizedStrings(
     labels,
-    (label) => label.trim().replace(/\s+/g, ' '),
-    (label) => label.toLowerCase(),
+    (label) => label.trim(),
+    (label) => normalizeLabel(label).toLowerCase(),
   )
+}
+
+function normalizeLabel(label: string) {
+  return label.trim().replace(/\s+/g, ' ')
 }
 
 function uniqueNormalizedStrings(
@@ -820,27 +851,6 @@ function uniqueNormalizedStrings(
   }
 
   return normalizedValues
-}
-
-function createTaxonomyId(label: string) {
-  return normalizeLeetCodeSlug(label)
-}
-
-function sortLabelsByInput(
-  inputLabels: readonly string[],
-  labels: readonly ProblemTaxonomyLabel[],
-) {
-  const labelsByLabel = new Map(labels.map((label) => [label.label, label]))
-
-  return inputLabels.map((label) => {
-    const storedLabel = labelsByLabel.get(label)
-
-    if (!storedLabel) {
-      throw new Error(`Failed to read saved label "${label}".`)
-    }
-
-    return storedLabel
-  })
 }
 
 type ProblemReadDb = Pick<Db, 'select'>

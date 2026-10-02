@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { InlineStatus } from '@/components/ui/inline-status'
 import { useDeleteProblem } from '@/features/problems/api/problems-api'
 import type {
@@ -11,8 +12,6 @@ import {
   useResetPracticeSchedule,
   useSetPracticeSuspended,
 } from '@/features/practice'
-
-import { ProblemConfirmationDialog } from '../library/problem-confirmation-dialog'
 
 export type RenderProblemEditAction = (problem: SerializedProblem) => ReactNode
 
@@ -71,7 +70,7 @@ export function ProblemRowPracticeActions({
 
   return (
     <>
-      {error ? (
+      {error && !isResetConfirmationOpen ? (
         <InlineStatus className="basis-full" role="alert" tone="danger">
           {error}
         </InlineStatus>
@@ -96,7 +95,10 @@ export function ProblemRowPracticeActions({
       </Button>
       <Button
         disabled={isDisabled}
-        onClick={() => setIsResetConfirmationOpen(true)}
+        onClick={() => {
+          setError(null)
+          setIsResetConfirmationOpen(true)
+        }}
         size="sm"
         variant="ghost"
       >
@@ -104,10 +106,14 @@ export function ProblemRowPracticeActions({
       </Button>
 
       {isResetConfirmationOpen ? (
-        <ProblemConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Reset Schedule"
           description="This clears the FSRS schedule and review history for this problem."
-          onCancel={() => setIsResetConfirmationOpen(false)}
+          error={error}
+          onCancel={() => {
+            setError(null)
+            setIsResetConfirmationOpen(false)
+          }}
           onConfirm={() => {
             void confirmReset()
           }}
@@ -165,7 +171,7 @@ export function ProblemRowDeleteAction({
 
   return (
     <>
-      {error ? (
+      {error && !isDeleteConfirmationOpen ? (
         <InlineStatus className="basis-full" role="alert" tone="danger">
           {error}
         </InlineStatus>
@@ -173,7 +179,10 @@ export function ProblemRowDeleteAction({
       <Button
         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
         disabled={isDisabled}
-        onClick={() => setIsDeleteConfirmationOpen(true)}
+        onClick={() => {
+          setError(null)
+          setIsDeleteConfirmationOpen(true)
+        }}
         size="sm"
         variant="ghost"
       >
@@ -181,10 +190,14 @@ export function ProblemRowDeleteAction({
       </Button>
 
       {isDeleteConfirmationOpen ? (
-        <ProblemConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Delete Problem"
           description="This permanently deletes this problem and its practice data."
-          onCancel={() => setIsDeleteConfirmationOpen(false)}
+          error={error}
+          onCancel={() => {
+            setError(null)
+            setIsDeleteConfirmationOpen(false)
+          }}
           onConfirm={() => {
             void confirmDelete()
           }}

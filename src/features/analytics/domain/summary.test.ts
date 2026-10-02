@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
+
 import type {
   ObservedRatingQualityResult,
   HistoricalReadiness,
@@ -188,6 +190,7 @@ describe('buildAnalyticsSummary', () => {
       lowSample: false,
     }
     const result = buildAnalyticsSummary({
+      views: createSerializedAnalyticsSummary().views,
       generatedAt,
       timeFrame: buildAnalyticsTimeFrame({
         asOf: generatedAt,
@@ -216,6 +219,7 @@ describe('buildAnalyticsSummary', () => {
 
   it('keeps selected-range evidence and metric readiness explicit in the summary', () => {
     const result = buildAnalyticsSummary({
+      views: createSerializedAnalyticsSummary().views,
       generatedAt: now,
       timeFrame: buildAnalyticsTimeFrame({
         asOf: now,

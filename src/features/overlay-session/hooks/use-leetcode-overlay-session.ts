@@ -119,10 +119,23 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     onProblemLoaded: handleProblemLoaded,
   })
 
-  const recommendationResetRef = useRef<() => void>(() => undefined)
-  const handleRestart = useCallback(() => {
-    recommendationResetRef.current()
-  }, [])
+  const targetSeconds = getTargetSeconds(pageSync.context)
+  const elapsedSeconds = timer.elapsedSeconds
+
+  const recommendation = useLeetCodeAssessmentRecommendation({
+    activeProblemSlug: overlay.activeProblemSlug,
+    metadata: pageSync.metadata,
+    submissionResult: pageSync.submission.result,
+    overlayState: overlay,
+    context: pageSync.context,
+    timing: {
+      elapsedSeconds,
+      targetSeconds,
+      timerUsed: timer.status !== 'idle',
+    },
+    aiEnabled: pageSync.context?.aiAssessmentAvailable ?? false,
+    dispatch,
+  })
 
   const actions = useOverlayReviewActions({
     contextRef: pageSync.latestContextRef,
@@ -131,7 +144,8 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     refreshContext: pageSync.refreshContext,
     syncTokenRef: pageSync.syncTokenRef,
     timer,
-    onRestart: handleRestart,
+    onRestart: recommendation.reset,
+    requestSubmissionRecommendation: recommendation.requestRecommendation,
   })
 
   useLeetCodeSubmissionAutomation({
@@ -144,29 +158,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     submittedSession: overlay.submittedSession,
     submissionResult: pageSync.submission.result,
   })
-
-  const targetSeconds = getTargetSeconds(pageSync.context)
-  const elapsedSeconds = timer.elapsedSeconds
-
-  const recommendation = useLeetCodeAssessmentRecommendation({
-    activeProblemSlug: overlay.activeProblemSlug,
-    metadata: pageSync.metadata,
-    submissionResult: pageSync.submission.result,
-    submittedSession: overlay.submittedSession,
-    overlayState: overlay,
-    context: pageSync.context,
-    timing: {
-      elapsedSeconds,
-      targetSeconds,
-      timerUsed: timer.status !== 'idle',
-    },
-    aiEnabled: pageSync.context?.aiAssessmentAvailable ?? false,
-    dispatch,
-  })
-
-  useEffect(() => {
-    recommendationResetRef.current = recommendation.reset
-  }, [recommendation.reset])
 
   return {
     location: pageSync.location,

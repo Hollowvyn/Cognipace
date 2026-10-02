@@ -76,6 +76,7 @@ export type OverlaySessionAction =
       nextStep: OverlayNextStep | null
       feedback: OverlayFeedback | null
     }
+  | { type: 'save-cancelled' }
   | { type: 'mutation-failed'; message: string }
   | { type: 'next-step-loading' }
   | { type: 'next-step-loaded'; nextStep: OverlayNextStep | null }
@@ -196,6 +197,8 @@ export function overlaySessionReducer(
         nextStep: nextStepStateFromValue(action.nextStep),
         feedback: action.feedback,
       }
+    case 'save-cancelled':
+      return { ...state, reviewStatus: 'draft', feedback: null }
     case 'mutation-failed':
       return {
         ...state,

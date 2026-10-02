@@ -36,12 +36,9 @@ export {
   createInitialFsrsCard,
   getRetrievability,
   getTargetRetentionDuration,
-  projectReviewSchedule,
   replayReviewHistory,
   replayReviewHistorySequence,
   scheduleReview,
-  type FsrsProjectedReview,
   type FsrsReviewHistoryEntry,
-  type FsrsReviewScheduleProjectionOptions,
   type FsrsScheduledReview,
 } from './scheduler/review-scheduler'

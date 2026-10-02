@@ -394,6 +394,15 @@ stored BYOK secret presence and must not expose secret values.
     cancel once before intentionally confirming.
 25. Confirm force push replaces the Gist with local data only after
     confirmation.
+26. In a disposable-profile test harness, fail the sync metadata dirty write
+    while permitting the snapshot write. Save a visible local setting, restart
+    the worker, and confirm the setting survives and automatic open-check skips
+    pulling over it. Repeat with the debounce snapshot firing while the metadata
+    write is pending. Do not edit or expose real snapshot bytes or token values.
+27. Restore normal storage, push the local change, restart again, and confirm
+    clean open-check can pull a later remote change. Repeat failed acknowledgement
+    and verify dirty protection remains; cancel and confirm manual force pull as
+    the explicit recovery path.
 
 Expected: sync is pseudo-real-time, with automatic safe push and clean open-check
 pulls plus manual directional pull and push actions for explicit recovery. Local
@@ -413,6 +422,17 @@ UI text.
    review shows `Due today`, a future review shows `Scheduled`, and an
    unstarted problem shows `New`.
 7. Confirm the combined overdue-plus-due-today count is labeled `Reviews Due`.
+8. Create a problem with a bare slug and a canonical LeetCode problem URL.
+   Reject a foreign-host problem URL, LeetCode Explore URL and malformed URL;
+   repeat in Track input and confirm no `https` problem is inserted.
+9. Create/edit/bulk-set `Meta` and `Meta!` company labels, then a case/whitespace
+   variation. Reload and verify distinct labels retain distinct associations,
+   while an unambiguous normalized variation reuses the existing company ID.
+   Restore two case-distinct legacy labels and verify editing an exact label
+   preserves its association; an ambiguous variation must show an error.
+10. With a restored mixed-case custom topic ID, import its lowercase ID and
+    verify reuse rather than duplication. Change its label between preview and
+    apply, and confirm stale preview returns without writes.
 
 Expected: Library reflects persisted problem metadata and remains usable after
 reloading the extension. Track problem rows use the same review-status labels.
@@ -614,7 +634,10 @@ and required before review or merge:
 9. Confirm Recent Overdue Backlog has a watch zone at five problems: values at
    or below five render in the healthy green treatment, values above five use
    the attention yellow treatment, and its tooltip reports the bucket's
-   threshold status. Unknown/reconstructable history must not be made up.
+   threshold status. Unknown/reconstructable history must not be made up. A card due earlier today
+   must count as due today in Upcoming Load and zero in today's overdue backlog;
+   a prior selected-timezone calendar date must count as overdue. Repeat at a
+   timezone boundary.
 10. Confirm Upcoming Review Load always shows its fixed next 14 calendar days,
     including when the selected historical range is unready.
 11. In Retention Health, hover and keyboard-focus a point to inspect the
@@ -844,3 +867,35 @@ Full verification:
 npm run check
 npm run format
 ```
+
+### Ponytail Regression Smoke
+
+Use disposable data and existing opt-in provider/sync flows. The human engineer
+must attach redacted happy-path and edge-case screenshots/recording before PR
+review or merge for the cleanup branch.
+
+- Data Management: replace a slow-reading/validating backup with another file;
+  confirm filename, summary and restored payload all belong to the latest file.
+  Repeat with a late rejection and confirm the current valid file stays ready.
+- LeetCode capture: start offline, verify the overlay becomes ready from available
+  page data, reconnect and refresh/hydrate. Confirm remote metadata/content
+  replaces fallback and successful reads remain deduplicated. Navigate while
+  reading and verify no stale content or error enters the new problem.
+- AI: enable configured assessment and auto-detection, submit Accepted, and verify
+  one watcher recommendation request and agreement between displayed/saved
+  rating. Select a rating while the provider is pending, navigate or restart,
+  and verify the choice remains or stale save is cancelled. Repeat manual quick
+  submit, failed/strict timing locks, unavailable provider and stalled response
+  body; timeout must remain visible and secrets redacted.
+- Library dialogs: open row and bulk confirmations and bulk metadata editing.
+  Verify initial Cancel focus, Tab/Shift+Tab containment, Escape cancellation and
+  focus returning to the opener. Delay saving and confirm fields and dismissal
+  stay locked. Reject saving, confirm the error is visible inside the dialog,
+  and retry with the metadata draft intact. Cancel and reopen; the old error must
+  be cleared. Change the selection and verify the new action has no stale error.
+  Remove a focused topic/company pill and confirm focus returns to its input.
+  Empty the selection through a refresh, then select another row; an old dialog
+  must stay closed until explicitly reopened.
+- Tracks reset: verify the shared confirmation retains keyboard containment,
+  pending dismissal locks and opener focus restoration, then confirm the reset
+  changes only the disposable track's progress.

@@ -29,6 +29,8 @@ let activeHandle: DbHandle | null = null
 let openGeneration = 0
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null
 let snapshotWriteChain: Promise<void> = Promise.resolve()
+let mutationVersion = 0
+let persistedMutationVersion = 0
 
 export interface AppDbOptions {
   beforePublish?: (handle: DbHandle, context: PublishContext) => Promise<void>
@@ -62,6 +64,8 @@ export function resetAppDbForTesting() {
   setOnMutationHook(null)
   handlePromise = null
   activeHandle = null
+  mutationVersion = 0
+  persistedMutationVersion = 0
 
   if (snapshotTimer) {
     clearTimeout(snapshotTimer)
@@ -143,6 +147,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
 }
 
 function scheduleSnapshot() {
+  mutationVersion += 1
   if (!canUseChromeStorage()) {
     return
   }
@@ -172,10 +177,14 @@ async function persistSnapshot() {
     return
   }
 
+  const generation = openGeneration
+  const version = mutationVersion
   await writeSnapshotToStorage({
     fingerprint: computeFingerprint(migrationSql),
     bytes: serializeDb(activeHandle),
+    hasMutations: version !== persistedMutationVersion,
   })
+  if (generation === openGeneration) persistedMutationVersion = version
 }
 
 function createSnapshotStorage(): SnapshotStorage {

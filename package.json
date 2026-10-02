@@ -46,8 +46,7 @@
     "@webext-core/messaging": "^2.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.2.1",
-    "dompurify": "^3.4.8",
+    "dompurify": "^3.4.16",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.16.0",
     "react": "^19.2.6",
@@ -70,9 +69,7 @@
     "@wxt-dev/module-react": "^1.2.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.3.0",
-    "eslint-plugin-import-x": "^4.16.2",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "jsdom": "^29.1.1",
     "prettier": "^3.8.3",
@@ -80,7 +77,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
-    "vitest": "^4.1.6",
+    "vitest": "^4.1.11",
     "wxt": "^0.21.3"
   }
 }

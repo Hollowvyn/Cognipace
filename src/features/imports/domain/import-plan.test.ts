@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 
 import { emptyImportState } from '../testing/import-fixtures'
+import { buildTopicLookup } from '@/features/problems/domain/topic-taxonomy'
 import type { NormalizationResult } from './import-types'
 import { normalizeImportFile } from './import-normalization'
 import { buildImportPlan } from './import-plan'
@@ -619,6 +620,73 @@ it('links a topic alias to its canonical topic without creating another topic', 
       kind: 'problemTopics',
       label: 'two-sum · Arrays',
       action: 'add',
+    }),
+  )
+})
+
+it.each(['custom-id', 'Restored Alias'])(
+  'reuses a mixed-case restored topic ID for %s without creating a conflicting lookup',
+  (label) => {
+    const state = emptyImportState()
+    state.catalog.topics.push({ id: 'Custom-ID', label: 'Different Label' })
+    state.catalog.aliases.push({
+      aliasKey: 'restored alias',
+      label: 'Restored Alias',
+      topicId: 'Custom-ID',
+    })
+    const plan = buildImportPlan(
+      parse({
+        ...envelope,
+        topics: [label],
+        problems: [{ slug: 'two-sum', topics: [label] }],
+      }),
+      state,
+    )
+
+    expect(plan.changes.catalog.topics).toEqual([])
+    expect(plan.changes.catalog.problemTopics).toEqual([
+      { problemSlug: 'two-sum', topicId: 'Custom-ID' },
+    ])
+    expect(plan.preview.items).toContainEqual(
+      expect.objectContaining({
+        kind: 'topics',
+        identity: 'Custom-ID',
+        action: 'retain',
+      }),
+    )
+    expect(
+      buildTopicLookup(
+        [...state.catalog.topics, ...plan.changes.catalog.topics],
+        state.catalog.aliases,
+      ).get(label.toLowerCase()),
+    ).toEqual({ id: 'Custom-ID', label: 'Different Label' })
+  },
+)
+
+it('reuses a normalized restored company ID while preserving its exact identity', () => {
+  const state = emptyImportState()
+  state.catalog.companies.push({
+    id: 'Custom-Company',
+    label: 'Different Company',
+  })
+  const plan = buildImportPlan(
+    parse({
+      ...envelope,
+      companies: ['custom-company'],
+      problems: [{ slug: 'two-sum', companies: ['custom-company'] }],
+    }),
+    state,
+  )
+
+  expect(plan.changes.catalog.companies).toEqual([])
+  expect(plan.changes.catalog.problemCompanies).toEqual([
+    { problemSlug: 'two-sum', companyId: 'Custom-Company' },
+  ])
+  expect(plan.preview.items).toContainEqual(
+    expect.objectContaining({
+      kind: 'companies',
+      identity: 'Custom-Company',
+      action: 'retain',
     }),
   )
 })

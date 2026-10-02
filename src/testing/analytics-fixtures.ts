@@ -1,30 +1,5 @@
 import type { SerializedAnalyticsSummary } from '@/features/analytics/api/analytics-contracts'
 
-export const analyticsChartPointFixtures = {
-  practiceRhythm: [
-    {
-      bucketStart: '2026-05-25',
-      bucketEnd: '2026-05-27',
-      reviewCount: 4,
-      observedCorrectness: 0.75,
-      sampleSize: 8,
-      associationOnly: true,
-    },
-  ],
-  ratingsMix: [
-    {
-      bucketStart: '2026-05-28',
-      bucketEnd: '2026-05-30',
-      again: 1,
-      hard: 2,
-      good: 4,
-      easy: 1,
-      total: 8,
-      hardAgainShare: 0.375,
-    },
-  ],
-} satisfies Pick<SerializedAnalyticsSummary, 'practiceRhythm' | 'ratingsMix'>
-
 function createUnreadyReadiness(): SerializedAnalyticsSummary['historicalReadiness']['requested'] {
   return {
     ready: false,
@@ -93,7 +68,6 @@ export function createSerializedAnalyticsSummary(
     totalReviews: 150,
     currentStreak: 7,
     observedRatingQuality: { value: 0.85, sampleSize: 50, lowSample: false },
-    predictedRecall: { value: null, sampleSize: 0, lowSample: true },
     observedRatingSampleSize: 50,
     lowSample: false,
     targetRetention: 0.9,
@@ -159,21 +133,6 @@ export function createSerializedAnalyticsSummary(
       },
     },
     historicalReadiness: createHistoricalReadiness(),
-    recallQuality: [],
-    practiceRhythm: [],
-    ratingsMix: [],
-    hardAgain: {
-      selectedShare: null,
-      previousShare: null,
-      delta: null,
-      direction: null,
-      sampleSize: 0,
-      previousSampleSize: 0,
-      lowSample: true,
-      previousLowSample: true,
-    },
-    topics: [],
-    stability: [],
     ...overrides,
   }
 }

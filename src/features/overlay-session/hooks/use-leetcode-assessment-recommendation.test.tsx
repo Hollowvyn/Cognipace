@@ -174,7 +174,6 @@ function makeOptions(
     activeProblemSlug: 'two-sum',
     metadata: baseMetadata,
     submissionResult: null,
-    submittedSession: null,
     overlayState: initialOverlaySessionState,
     context: baseContext,
     timing: { elapsedSeconds: 600, targetSeconds: 2100, timerUsed: true },
@@ -430,6 +429,23 @@ describe('useLeetCodeAssessmentRecommendation', () => {
     await waitFor(() => {
       expect(result.current.state.status).toBe('ready')
     })
+
+    expect(actions).toEqual([])
+  })
+
+  it('keeps the deterministic rating when the recommendation says not to update', async () => {
+    sendMessageMock.mockResolvedValueOnce(
+      makeReadyResponse(makeRecommendation({ shouldUpdateRating: false })),
+    )
+    const { options, actions } = makeOptions({
+      submissionResult: makeSubmissionResult(),
+    })
+    const { result } = renderHook(
+      (props) => useLeetCodeAssessmentRecommendation(props),
+      { initialProps: options },
+    )
+
+    await waitFor(() => expect(result.current.state.status).toBe('ready'))
 
     expect(actions).toEqual([])
   })

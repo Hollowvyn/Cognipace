@@ -8,6 +8,7 @@ import {
   X,
 } from 'lucide-react'
 
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { IconButton } from '@/components/ui/icon-button'
 import { InlineStatus } from '@/components/ui/inline-status'
 import {
@@ -24,7 +25,6 @@ import type {
   ProblemLibraryRow,
   ProblemsBulkUpdateProblemsRequest,
 } from '../../api/problems-contracts'
-import { ProblemConfirmationDialog } from './problem-confirmation-dialog'
 import { ProblemBulkMetadataDialog } from './problem-bulk-metadata-dialog'
 
 type BulkConfirmation = 'delete' | 'reset'
@@ -68,6 +68,15 @@ export function ProblemBulkActionBar({
     bulkUpdate.isPending ||
     resetSchedule.isPending ||
     setSuspended.isPending
+
+  if (
+    selectedRows.length === 0 &&
+    (confirmation !== null || isMetadataDialogOpen)
+  ) {
+    setConfirmation(null)
+    setIsMetadataDialogOpen(false)
+    setError(null)
+  }
 
   if (selectedRows.length === 0 && !message && !error) {
     return null
@@ -149,7 +158,7 @@ export function ProblemBulkActionBar({
       aria-label="Bulk actions"
       className="flex min-w-0 flex-wrap items-center gap-2"
     >
-      {error ? (
+      {error && !confirmation && !isMetadataDialogOpen ? (
         <InlineStatus role="alert" tone="danger">
           {error}
         </InlineStatus>
@@ -185,7 +194,10 @@ export function ProblemBulkActionBar({
             <IconButton
               disabled={isPending}
               label="Reset Schedule"
-              onClick={() => setConfirmation('reset')}
+              onClick={() => {
+                setError(null)
+                setConfirmation('reset')
+              }}
               tooltip="Reset selected schedules"
               variant="ghost"
             >
@@ -194,7 +206,10 @@ export function ProblemBulkActionBar({
             <IconButton
               disabled={isPending}
               label="Edit Metadata"
-              onClick={() => setIsMetadataDialogOpen(true)}
+              onClick={() => {
+                setError(null)
+                setIsMetadataDialogOpen(true)
+              }}
               tooltip="Edit selected metadata"
               variant="ghost"
             >
@@ -204,7 +219,10 @@ export function ProblemBulkActionBar({
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               disabled={isPending}
               label="Delete Problems"
-              onClick={() => setConfirmation('delete')}
+              onClick={() => {
+                setError(null)
+                setConfirmation('delete')
+              }}
               tooltip="Delete selected problems"
               variant="ghost"
             >
@@ -225,10 +243,14 @@ export function ProblemBulkActionBar({
       ) : null}
 
       {confirmation === 'reset' ? (
-        <ProblemConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Reset Schedule"
           description={`This clears schedules and review history for ${selectedRows.length} selected ${pluralize('problem', selectedRows.length)}.`}
-          onCancel={() => setConfirmation(null)}
+          error={error}
+          onCancel={() => {
+            setError(null)
+            setConfirmation(null)
+          }}
           onConfirm={() => {
             void confirmReset()
           }}
@@ -239,7 +261,11 @@ export function ProblemBulkActionBar({
 
       {isMetadataDialogOpen ? (
         <ProblemBulkMetadataDialog
-          onCancel={() => setIsMetadataDialogOpen(false)}
+          error={error}
+          onCancel={() => {
+            setError(null)
+            setIsMetadataDialogOpen(false)
+          }}
           onSubmit={(set) => {
             void updateMetadata(set)
           }}
@@ -250,10 +276,14 @@ export function ProblemBulkActionBar({
       ) : null}
 
       {confirmation === 'delete' ? (
-        <ProblemConfirmationDialog
+        <ConfirmationDialog
           confirmLabel="Delete Problems"
           description="This permanently deletes the selected problems and their practice data."
-          onCancel={() => setConfirmation(null)}
+          error={error}
+          onCancel={() => {
+            setError(null)
+            setConfirmation(null)
+          }}
           onConfirm={() => {
             void confirmDelete()
           }}

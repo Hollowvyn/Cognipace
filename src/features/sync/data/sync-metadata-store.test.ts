@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { SNAPSHOT_DIRTY_KEY } from '@/platform/db/snapshot'
 
 import {
   clearSyncMetadata,
@@ -43,6 +44,76 @@ afterEach(() => {
 })
 
 describe('sync metadata store', () => {
+  it('treats the durable snapshot marker as dirty even with clean or invalid metadata', async () => {
+    await writeSyncMetadata({
+      enabled: true,
+      gistId: 'gist_1',
+      dirtySinceLastSync: false,
+    })
+    storage.set(SNAPSHOT_DIRTY_KEY, true)
+    await expect(readSyncMetadata()).resolves.toMatchObject({
+      enabled: true,
+      dirtySinceLastSync: true,
+    })
+    storage.set('cognipace_sync_metadata_v1', { enabled: true })
+    await expect(readSyncMetadata()).resolves.toMatchObject({
+      enabled: false,
+      dirtySinceLastSync: true,
+    })
+  })
+
+  it.each([false, 'true', 1, null])(
+    'ignores a non-true snapshot dirty marker %j',
+    async (marker) => {
+      storage.set(SNAPSHOT_DIRTY_KEY, marker)
+      await expect(readSyncMetadata()).resolves.toMatchObject({
+        dirtySinceLastSync: false,
+      })
+    },
+  )
+
+  it('clears the marker atomically with an explicit clean acknowledgement', async () => {
+    await markLocalDataChanged()
+    storage.set(SNAPSHOT_DIRTY_KEY, true)
+    const set = vi.spyOn(chrome.storage.local, 'set')
+    const next = await writeSyncMetadata({ dirtySinceLastSync: false })
+    expect(set).toHaveBeenLastCalledWith({
+      cognipace_sync_metadata_v1: next,
+      [SNAPSHOT_DIRTY_KEY]: false,
+    })
+    await expect(readSyncMetadata()).resolves.toMatchObject({
+      dirtySinceLastSync: false,
+    })
+  })
+
+  it('retains dirtiness when a clean acknowledgement cannot be saved', async () => {
+    await markLocalDataChanged()
+    storage.set(SNAPSHOT_DIRTY_KEY, true)
+    vi.spyOn(chrome.storage.local, 'set').mockRejectedValueOnce(
+      new Error('storage unavailable'),
+    )
+    await expect(
+      writeSyncMetadata({ dirtySinceLastSync: false }),
+    ).rejects.toThrow('storage unavailable')
+    expect(storage.get(SNAPSHOT_DIRTY_KEY)).toBe(true)
+    await expect(readSyncMetadata()).resolves.toMatchObject({
+      dirtySinceLastSync: true,
+    })
+  })
+
+  it('preserves the snapshot marker through unrelated updates and disconnect', async () => {
+    storage.set(SNAPSHOT_DIRTY_KEY, true)
+    await writeSyncMetadata({ enabled: false, gistId: null })
+    expect(storage.get(SNAPSHOT_DIRTY_KEY)).toBe(true)
+    await clearSyncMetadata()
+    expect(storage.get(SNAPSHOT_DIRTY_KEY)).toBe(true)
+    await expect(readSyncMetadata()).resolves.toMatchObject({
+      enabled: false,
+      gistId: null,
+      dirtySinceLastSync: true,
+    })
+  })
+
   it('defaults to disabled clean metadata', async () => {
     await expect(readSyncMetadata()).resolves.toMatchObject({
       enabled: false,

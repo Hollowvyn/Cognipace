@@ -1,13 +1,11 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 
-import { normalizeProblemDifficulty, type Problem } from '@/features/problems'
 import {
   normalizeLeetCodeSlug,
   parseLeetCodeProblemInput,
 } from '@/lib/leetcode'
 import type { Db } from '@/platform/db'
 import {
-  problems,
   trackGroupProblems,
   trackGroups,
   trackProblemProgress,
@@ -18,7 +16,6 @@ import {
 } from '@/platform/db/schema'
 
 import type {
-  ActiveTrack,
   CreateTrackInput,
   Track,
   TrackCatalogItem,
@@ -40,32 +37,6 @@ export function createTracksRepository(db: Db) {
 
 export class TracksRepository {
   constructor(private readonly db: Db) {}
-
-  async getActiveTrack(): Promise<ActiveTrack | null> {
-    const session = await this.getSession()
-
-    if (!session.activeTrack) {
-      return null
-    }
-
-    const preferredGroup =
-      session.activeGroup ??
-      (await readFirstGroup(this.db, session.activeTrack.id))
-    const next = await this.getNextProblemInTrack(
-      session.activeTrack.id,
-      preferredGroup,
-    )
-    const progressByTrack = await this.getProgressByTrack([
-      session.activeTrack.id,
-    ])
-
-    return {
-      track: session.activeTrack,
-      activeGroup: next.group,
-      progress: progressByTrack.get(session.activeTrack.id) ?? emptyProgress(),
-      nextProblem: next.problem,
-    }
-  }
 
   async getTrackCatalog(): Promise<TrackCatalogItem[]> {
     const trackRows = await this.db
@@ -651,69 +622,6 @@ export class TracksRepository {
       return true
     })
   }
-
-  private async getNextProblemInTrack(
-    trackId: string,
-    preferredGroup: TrackGroup | null,
-  ): Promise<{
-    group: TrackGroup | null
-    problem: Problem | null
-  }> {
-    const groups = await readGroups(this.db, trackId)
-
-    if (groups.length === 0) {
-      return { group: null, problem: null }
-    }
-
-    const preferredIndex = preferredGroup
-      ? groups.findIndex((group) => group.id === preferredGroup.id)
-      : -1
-    const startIndex = preferredIndex >= 0 ? preferredIndex : 0
-    const candidateGroups = groups.slice(startIndex)
-
-    for (const group of candidateGroups) {
-      const problem = await this.getNextProblem(group.id)
-
-      if (problem) {
-        return { group, problem }
-      }
-    }
-
-    return {
-      group: preferredGroup ?? groups[0] ?? null,
-      problem: null,
-    }
-  }
-
-  private async getNextProblem(groupId: string) {
-    const rows = await this.db
-      .select({
-        problem: problems,
-      })
-      .from(trackGroupProblems)
-      .innerJoin(problems, eq(problems.slug, trackGroupProblems.problemSlug))
-      .leftJoin(
-        trackProblemProgress,
-        and(
-          eq(trackProblemProgress.trackId, trackGroupProblems.trackId),
-          eq(trackProblemProgress.problemSlug, trackGroupProblems.problemSlug),
-        ),
-      )
-      .where(
-        and(
-          eq(trackGroupProblems.trackGroupId, groupId),
-          isNull(trackProblemProgress.completedAt),
-        ),
-      )
-      .orderBy(asc(trackGroupProblems.position))
-      .limit(1)
-
-    if (rows[0]) {
-      return mapProblem(rows[0].problem)
-    }
-
-    return null
-  }
 }
 
 async function readTrackById(
@@ -1293,17 +1201,6 @@ function mapTrackGroup(row: TrackGroupRow): TrackGroup {
     trackId: row.trackId,
     title: row.title,
     position: row.position,
-  }
-}
-
-function mapProblem(row: typeof problems.$inferSelect): Problem {
-  return {
-    slug: row.slug,
-    title: row.title,
-    difficulty: normalizeProblemDifficulty(row.difficulty),
-    isPremium: row.isPremium,
-    createdAt: new Date(row.createdAt),
-    updatedAt: new Date(row.updatedAt),
   }
 }
 

@@ -2,8 +2,6 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { LineChart, Tooltip, XAxis, YAxis } from 'recharts'
 import { describe, expect, it } from 'vitest'
 
-import { analyticsChartDefinitions } from './chart-definitions'
-import { AnalyticsChartLegendItem } from './chart-shared'
 import { LineSegments } from './line-segments'
 
 function TooltipProbe({
@@ -53,9 +51,7 @@ function AnalyticsLineChart({ defaultIndex }: { defaultIndex: number }) {
         />
       </LineChart>
       <div aria-label="Chart legend" role="list">
-        <AnalyticsChartLegendItem
-          item={analyticsChartDefinitions.practiceRhythm.series[1]}
-        />
+        <span role="listitem">Observed correctness</span>
       </div>
     </div>
   )

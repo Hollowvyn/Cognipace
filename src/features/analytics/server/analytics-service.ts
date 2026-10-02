@@ -21,13 +21,6 @@ import {
 } from '../data/analytics-repository'
 
 import {
-  buildHardAgainSummary,
-  buildPredictedRecallSamples,
-  buildPracticeRhythmPoints,
-  buildRatingsMixPoints,
-  buildRecallQualityPoints,
-  buildStabilityPoints,
-  buildTopicPoints,
   buildUpcomingLoadPoints,
   getValidStabilitySample,
   hasObservedCorrectnessReview,
@@ -41,7 +34,6 @@ import {
 import {
   calculateAnalyticsReadiness,
   findRichestReadyRange,
-  type AnalyticsReadiness,
 } from '../domain/analytics-readiness'
 import {
   buildAnalyticsBucketsFromTimeFrame,
@@ -199,25 +191,6 @@ export async function getAnalyticsSummary(
   })
   const ratingsMixReadiness = requestedReadiness
 
-  const recallQuality = buildRecallQualityPoints(
-    analyticsReviewHistory,
-    chartOptions,
-  )
-  const predictedRecall = buildMetricSummary(
-    buildPredictedRecallSamples(analyticsReviewHistory, chartOptions).map(
-      (sample) => sample.value,
-    ),
-  )
-  const practiceRhythm = buildPracticeRhythmPoints(
-    analyticsReviewHistory,
-    chartOptions,
-  )
-  const ratingsMix = trimHistoricalPoints(
-    buildRatingsMixPoints(analyticsReviewHistory, chartOptions),
-    ratingsMixReadiness,
-  )
-  const hardAgain = buildHardAgainSummary(analyticsReviewHistory, chartOptions)
-  const topics = buildTopicPoints(analyticsReviewHistory, chartOptions)
   const topicReadiness = calculateAnalyticsReadiness({
     requestedDays: range,
     evidenceCounts: buildBucketEvidenceCounts(
@@ -228,7 +201,6 @@ export async function getAnalyticsSummary(
     ),
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
-  const stability = buildStabilityPoints(analyticsReviewHistory, chartOptions)
   const stabilityReadiness = calculateAnalyticsReadiness({
     requestedDays: range,
     evidenceCounts: buildBucketEvidenceCounts(
@@ -292,13 +264,6 @@ export async function getAnalyticsSummary(
     targetRetention: fsrsOptions.targetRetention,
     views,
     historicalReadiness,
-    predictedRecall,
-    recallQuality,
-    practiceRhythm,
-    ratingsMix,
-    hardAgain,
-    topics,
-    stability,
   })
 }
 
@@ -343,22 +308,6 @@ function buildCurrentCard(card: CurrentFsrsCard): FsrsCardSnapshot {
   }
 }
 
-function buildMetricSummary(
-  values: readonly number[],
-  lowSampleThreshold = 10,
-): { value: number | null; sampleSize: number; lowSample: boolean } {
-  const sampleSize = values.length
-  if (sampleSize < lowSampleThreshold) {
-    return { value: null, sampleSize, lowSample: true }
-  }
-
-  return {
-    value: values.reduce((sum, value) => sum + value, 0) / sampleSize,
-    sampleSize,
-    lowSample: false,
-  }
-}
-
 function buildBucketEvidenceCounts(
   events: readonly AnalyticsReviewEvent[],
   buckets: readonly AnalyticsBucket[],
@@ -388,19 +337,6 @@ function bucketCountsFromDatedObservations<T extends { date: Date }>(
           observation.date >= bucket.start && observation.date <= bucket.end,
       ).length,
   )
-}
-
-function trimHistoricalPoints<T extends { bucketStart: string }>(
-  points: readonly T[],
-  readiness: AnalyticsReadiness,
-): T[] {
-  if (readiness.effectiveStart === null) return []
-
-  const effectiveStartIndex = points.findIndex(
-    (point) => point.bucketStart === readiness.effectiveStart,
-  )
-
-  return effectiveStartIndex === -1 ? [] : points.slice(effectiveStartIndex)
 }
 
 function findRecommendedRange(

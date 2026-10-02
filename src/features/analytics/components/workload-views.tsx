@@ -122,10 +122,7 @@ function OverdueBacklogChart({
         aria-roledescription="interactive daily step line"
         className="aspect-auto h-72 min-h-[18rem]"
         config={{
-          overdue: {
-            label: 'Overdue problems',
-            color: 'var(--cp-analytics-attention)',
-          },
+          overdue: 'var(--cp-analytics-attention)',
         }}
         initialDimension={chartDimension}
         onKeyDown={(event) => {
@@ -371,8 +368,8 @@ function UpcomingLoadChart({
         aria-roledescription="interactive stacked daily columns"
         className="aspect-auto h-72 min-h-[18rem]"
         config={{
-          due: { label: 'Due', color: 'var(--cp-analytics-healthy)' },
-          overdue: { label: 'Overdue', color: 'var(--cp-analytics-risk)' },
+          due: 'var(--cp-analytics-healthy)',
+          overdue: 'var(--cp-analytics-risk)',
         }}
         initialDimension={chartDimension}
         onKeyDown={(event) => {

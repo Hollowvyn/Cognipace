@@ -47,7 +47,9 @@ export async function readLeetCodeProblemMetadataInBackground(
   const result = serializeLeetCodeMetadataResult(
     await leetCodeRemoteClient.readProblemMetadata(request),
   )
-  metadataCache.set(request.location.slug, result)
+  if (result.ok && result.metadata.source === 'graphql') {
+    metadataCache.set(request.location.slug, result)
+  }
 
   return result
 }
@@ -64,7 +66,16 @@ export async function readLeetCodeProblemContentInBackground(
   const result = serializeLeetCodeProblemContentResult(
     await leetCodeRemoteClient.readProblemContent(request),
   )
-  contentCache.set(request.location.slug, result)
+  if (
+    result.ok &&
+    result.content.source === 'graphql' &&
+    (result.content.statement.length > 0 ||
+      result.content.examples.length > 0 ||
+      result.content.constraints.length > 0 ||
+      result.content.hints.length > 0)
+  ) {
+    contentCache.set(request.location.slug, result)
+  }
 
   return result
 }
