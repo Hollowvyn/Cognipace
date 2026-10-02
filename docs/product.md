@@ -205,6 +205,11 @@ Tracks owns curriculum progression. Track completion is separate from global
 practice history, and active track/session state is local database state. Tracks
 can contain groups and ordered problem memberships.
 
+Every track group's problem table uses Library-style pagination with a fixed
+15 problems per page. The footer shows the visible range and Previous/Next
+controls. Switching track or group starts at the first page; paging preserves
+the group's explicit problem order and does not change track progression.
+
 Expanded track problem rows offer **Remove from track** beside Edit. Removal
 only affects that track membership and its track completion; the Library
 problem, global practice/review data, and other track memberships remain.

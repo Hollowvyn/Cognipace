@@ -4,14 +4,17 @@ import {
   flexRender,
   getCoreRowModel,
   getExpandedRowModel,
+  getPaginationRowModel,
   useReactTable,
   type ColumnDef,
   type ExpandedState,
+  type PaginationState,
   type Row,
   type Updater,
 } from '@tanstack/react-table'
 
 import { Badge } from '@/components/ui/badge'
+import { TablePagination } from '@/components/ui/table-pagination'
 import {
   ProblemDifficultyBadge,
   ProblemRowActionsBar,
@@ -34,6 +37,18 @@ export function TrackProblemTable({
   rows: readonly TrackProblemRow[]
 }) {
   const [expanded, setExpanded] = useState<ExpandedState>({})
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 15,
+  })
+  const lastPageIndex = Math.max(
+    0,
+    Math.ceil(rows.length / pagination.pageSize) - 1,
+  )
+
+  if (pagination.pageIndex > lastPageIndex) {
+    setPagination({ ...pagination, pageIndex: lastPageIndex })
+  }
   const columns = useMemo(() => createTrackProblemColumns(), [])
   const data = useMemo(
     () =>
@@ -46,18 +61,22 @@ export function TrackProblemTable({
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table owns table state and exposes non-memoizable handlers by design.
   const table = useReactTable({
+    autoResetPageIndex: false,
     columns,
     data,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     getRowCanExpand: () => true,
     getRowId: (row) =>
       `${row.membership.groupId}:${row.membership.problemPosition}:${row.problem.slug}`,
     onExpandedChange: (updater) => {
       setExpanded((current) => getSingleExpandedRow(updater, current))
     },
+    onPaginationChange: setPagination,
     state: {
       expanded,
+      pagination,
     },
   })
 
@@ -70,42 +89,45 @@ export function TrackProblemTable({
   }
 
   return (
-    <div className="overflow-x-auto border-t border-border bg-card">
-      <table className="w-full min-w-[54rem] border-collapse text-left text-[length:var(--cp-copy-font-size)]">
-        <thead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr
-              className="border-b border-border bg-muted/50 text-[length:var(--cp-badge-font-size)] uppercase tracking-normal text-muted-foreground"
-              key={headerGroup.id}
-            >
-              {headerGroup.headers.map((header) => (
-                <th
-                  className={getHeaderClassName(header.column.id)}
-                  key={header.id}
-                  scope="col"
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <TrackProblemTableRow
-              key={row.id}
-              renderEditProblemAction={renderEditProblemAction}
-              row={row}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="overflow-x-auto border-t border-border bg-card">
+        <table className="w-full min-w-[54rem] border-collapse text-left text-[length:var(--cp-copy-font-size)]">
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr
+                className="border-b border-border bg-muted/50 text-[length:var(--cp-badge-font-size)] uppercase tracking-normal text-muted-foreground"
+                key={headerGroup.id}
+              >
+                {headerGroup.headers.map((header) => (
+                  <th
+                    className={getHeaderClassName(header.column.id)}
+                    key={header.id}
+                    scope="col"
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <TrackProblemTableRow
+                key={row.id}
+                renderEditProblemAction={renderEditProblemAction}
+                row={row}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <TablePagination table={table} />
+    </>
   )
 }
 

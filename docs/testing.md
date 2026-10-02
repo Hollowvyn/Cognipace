@@ -544,6 +544,27 @@ group and problem order without being reordered by due state. In Study Plan mode
 incomplete problem nor clears an earlier completion. Free Practice does not write
 active-track progress.
 
+#### Track Table Pagination
+
+Human realtime happy-path and edge-case smoke with screenshots or a recording
+is required before review or merge:
+
+1. Select a group with more than 15 problems. Confirm exactly 15 problems on the
+   first page, “Rows per page: 15”, a correct range count, and disabled Previous.
+   Page forward and back; confirm the last partial page, disabled Next, and
+   original membership order numbers. Expand a problem on each page and check
+   its details, edit/practice actions, and LeetCode link.
+2. From a later page, switch groups and tracks. Confirm each starts on page one
+   with collapsed details. Verify an empty group and groups with 1 or exactly
+   15 problems retain correct counts and disabled navigation.
+3. In a disposable 16-problem group, remove the only problem on page two.
+   Confirm the table returns to the valid first page with 15 problems and
+   “1-15 of 15”. Refresh practice state within a larger group and confirm the
+   current page remains selected. Track progress and Next still reflect the
+   full track rather than just the visible page.
+4. In Library, verify its 20/30/50 page-size choices, Previous/Next controls,
+   and selected-row bulk actions still work with the shared footer.
+
 #### Remove From Track
 
 Human happy-path and edge-case smoke with screenshots or a recording is pending

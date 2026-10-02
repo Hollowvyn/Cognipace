@@ -76,6 +76,7 @@ export function ActiveTrackWorkspace({
         </div>
       ) : (
         <TrackProblemTable
+          key={`${activeTrack.track.id}:${activeGroupId}`}
           renderEditProblemAction={renderEditProblemAction}
           rows={activeRows}
         />
