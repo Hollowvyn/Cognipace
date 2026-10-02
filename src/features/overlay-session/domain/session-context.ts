@@ -24,7 +24,6 @@ export type OverlayAssessmentSessionContext = {
   previousRating: ReviewRating | null
   bestElapsedSeconds: number | null
   latestAttempt: OverlayAssessmentLatestAttempt | null
-  currentDraftHasChanges: boolean
 }
 
 export type DeriveOverlayAssessmentSessionContextInput = {
@@ -55,8 +54,6 @@ export function deriveOverlayAssessmentSessionContext(
           occurredAt: Date.parse(latestAttempt.reviewedAt),
         }
       : null,
-    // Retained for compatibility with the assessment runtime contract.
-    currentDraftHasChanges: false,
   }
 }
 

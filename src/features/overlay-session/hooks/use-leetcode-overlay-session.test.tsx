@@ -15,7 +15,6 @@ import { makeValidRecommendation } from '@/features/leetcode-review-assistant/te
 import {
   overrideLastReviewResultViaRuntime,
   saveReviewResultViaRuntime,
-  updateCurrentPracticeLogViaRuntime,
 } from '@/features/practice'
 import type { SerializedPracticeDetails } from '@/features/practice/api/practice-contracts'
 import { upsertProblemFromPageViaRuntime } from '@/features/problems'
@@ -102,7 +101,6 @@ vi.mock('@/features/leetcode-review-assistant', async (importOriginal) => {
 vi.mock('@/features/practice', () => ({
   overrideLastReviewResultViaRuntime: vi.fn(),
   saveReviewResultViaRuntime: vi.fn(),
-  updateCurrentPracticeLogViaRuntime: vi.fn(),
 }))
 
 vi.mock('@/features/app-shell', async () => {
@@ -197,9 +195,6 @@ describe('useLeetCodeOverlaySession', () => {
     )
     vi.mocked(overrideLastReviewResultViaRuntime).mockResolvedValue(
       createSavedPracticeDetails(),
-    )
-    vi.mocked(updateCurrentPracticeLogViaRuntime).mockResolvedValue(
-      createPracticeDetails(),
     )
     vi.mocked(getOverlayAppShellDataViaRuntime).mockResolvedValue(
       createOverlayData(),
@@ -566,7 +561,7 @@ describe('useLeetCodeOverlaySession', () => {
         result.current.actions[action]()
       })
       await flushEffects()
-      expect(updateCurrentPracticeLogViaRuntime).not.toHaveBeenCalled()
+      expect(sendMessage).not.toHaveBeenCalled()
       expect(saveReviewResultViaRuntime).not.toHaveBeenCalled()
       expect(result.current.context?.practice?.currentLog.notes).toBe(
         'Keep this saved note.',

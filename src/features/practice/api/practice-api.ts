@@ -9,7 +9,6 @@ import type {
   PracticeResetScheduleRequest,
   PracticeSaveReviewResultRequest,
   PracticeSetSuspendedRequest,
-  PracticeUpdateCurrentLogRequest,
 } from './practice-contracts'
 
 export const practiceQueryKeys = queryKeys.practice
@@ -40,12 +39,6 @@ export function resetPracticeScheduleViaRuntime(
   request: PracticeResetScheduleRequest,
 ) {
   return sendMessage('practice.resetSchedule', request)
-}
-
-export function updateCurrentPracticeLogViaRuntime(
-  request: PracticeUpdateCurrentLogRequest,
-) {
-  return sendMessage('practice.updateCurrentLog', request)
 }
 
 export type RuntimePracticeDetails = Awaited<
@@ -80,11 +73,5 @@ export function useSetPracticeSuspended() {
 export function useResetPracticeSchedule() {
   return useMutation({
     mutationFn: resetPracticeScheduleViaRuntime,
-  })
-}
-
-export function useUpdateCurrentPracticeLog() {
-  return useMutation({
-    mutationFn: updateCurrentPracticeLogViaRuntime,
   })
 }

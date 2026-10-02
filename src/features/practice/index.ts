@@ -4,13 +4,11 @@ export {
   resetPracticeScheduleViaRuntime,
   saveReviewResultViaRuntime,
   setPracticeSuspendedViaRuntime,
-  updateCurrentPracticeLogViaRuntime,
   usePracticeDetails,
   useOverrideLastReviewResult,
   useResetPracticeSchedule,
   useSaveReviewResult,
   useSetPracticeSuspended,
-  useUpdateCurrentPracticeLog,
   type RuntimePracticeDetails,
 } from './api/practice-api'
 export {
@@ -28,13 +26,11 @@ export {
   practiceSetSuspendedRequestSchema,
   normalizedPracticeStateSchema,
   practiceStateSnapshotSchema,
-  practiceUpdateCurrentLogRequestSchema,
   type PracticeDetailsRequest,
   type PracticeOverrideLastReviewResultRequest,
   type PracticeResetScheduleRequest,
   type PracticeSaveReviewResultRequest,
   type PracticeSetSuspendedRequest,
-  type PracticeUpdateCurrentLogRequest,
   type SerializedNormalizedPracticeState,
   type SerializedPracticeDetails,
   type SerializedReviewResult,
@@ -68,5 +64,4 @@ export {
   type ResetPracticeScheduleInput,
   type SaveReviewResultInput,
   type SetPracticeSuspendedInput,
-  type UpdatePracticeLogInput,
 } from './domain'

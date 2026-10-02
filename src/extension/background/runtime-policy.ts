@@ -43,7 +43,6 @@ const methodSurfaceAccess = {
   'practice.overrideLastReviewResult': ['popup', 'dashboard', 'content-script'],
   'practice.setSuspended': ['popup', 'dashboard', 'content-script'],
   'practice.resetSchedule': ['popup', 'dashboard', 'content-script'],
-  'practice.updateCurrentLog': ['popup', 'dashboard', 'content-script'],
   'queue.getTodayQueue': ['popup', 'dashboard'],
   'tracks.getActiveTrack': ['popup', 'dashboard'],
   'tracks.getWorkspace': ['dashboard'],

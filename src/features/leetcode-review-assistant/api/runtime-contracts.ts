@@ -132,7 +132,6 @@ const overlayAssessmentSessionContextSchema = z
     previousRating: reviewRatingSchema.nullable(),
     bestElapsedSeconds: z.number().nullable(),
     latestAttempt: overlayAssessmentLatestAttemptSchema.nullable(),
-    currentDraftHasChanges: z.boolean(),
   })
   .strict()
 

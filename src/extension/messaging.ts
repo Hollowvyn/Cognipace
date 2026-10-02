@@ -80,7 +80,6 @@ import {
   type PracticeResetScheduleRequest,
   type PracticeSaveReviewResultRequest,
   type PracticeSetSuspendedRequest,
-  type PracticeUpdateCurrentLogRequest,
   type SerializedPracticeDetails,
 } from '@/features/practice/api/practice-contracts'
 import {
@@ -391,9 +390,6 @@ export interface ProtocolMap {
   'practice.resetSchedule'(
     request: PracticeResetScheduleRequest,
   ): SerializedPracticeDetails
-  'practice.updateCurrentLog'(
-    request: PracticeUpdateCurrentLogRequest,
-  ): SerializedPracticeDetails
   'queue.getTodayQueue'(request: QueueRequest): SerializedTodayQueue
   'tracks.getActiveTrack'(
     request: TracksGetActiveTrackRequest,
@@ -469,7 +465,6 @@ export const protocolMethodNames = [
   'practice.overrideLastReviewResult',
   'practice.setSuspended',
   'practice.resetSchedule',
-  'practice.updateCurrentLog',
   'queue.getTodayQueue',
   'tracks.getActiveTrack',
   'tracks.getWorkspace',

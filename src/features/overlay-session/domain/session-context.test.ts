@@ -93,22 +93,6 @@ function makeContext(
 }
 
 describe('deriveOverlayAssessmentSessionContext', () => {
-  it('reports no editable log draft even when historical notes exist', () => {
-    const result = deriveOverlayAssessmentSessionContext({
-      context: makeContext(
-        makePractice({
-          currentLog: {
-            ...makePractice().currentLog,
-            notes: 'Historical note.',
-          },
-        }),
-      ),
-      submissionSource: 'manual-overlay',
-      timerUsed: false,
-    })
-    expect(result.currentDraftHasChanges).toBe(false)
-  })
-
   it('marks first-solve when latestAttempt is null', () => {
     const result = deriveOverlayAssessmentSessionContext({
       context: makeContext(makePractice()),
@@ -275,7 +259,6 @@ describe('toAssessmentPracticeContext', () => {
         elapsedSeconds: 600,
         occurredAt: Date.parse('2026-05-30T10:00:00.000Z'),
       },
-      currentDraftHasChanges: false,
       ...overrides,
     }
   }

@@ -99,7 +99,7 @@ Not every feature needs every folder. Add only the folder needed for the change.
 - `overlay-session`: LeetCode overlay UI state, timer, page sync,
   submission automation, and review action orchestration.
 - `practice`: FSRS-backed practice state, review logs, scheduling details,
-  suspension, resets, and current log updates.
+  suspension, resets, and historical log preservation.
 - `problems`: problem identity, catalog rows, Library behavior, edit data,
   companies, standardized topics, topic alias resolution, topic parent rollups,
   difficulty, premium status, and page upserts.
@@ -613,8 +613,8 @@ When adding or changing data dependencies:
    `runtime-policy.ts`.
    The overlay does not own editable practice logs. Its review save and override
    requests omit log patches, preserving historical fields through Practice.
-   The assessment request retains `currentDraftHasChanges: false` for contract
-   compatibility.
+   The standalone log-editing endpoint and unused assessment draft flag are
+   removed; historical log fields remain in persisted data and read contracts.
 7. Test collapsed, expanded, docked, timer, rating update, save, and page-sync behavior
    when the change touches those flows.
 
