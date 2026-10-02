@@ -65,9 +65,9 @@ notification-specific count.
 
 When both snapshot keys are absent, startup creates and seeds a fresh database.
 A partial pair, malformed value, or unknown or unsupported fingerprint fails
-startup and retains the original available values for recovery. The only
-legacy fingerprint accepted for an automatic upgrade is the exact migration
-prefix in [`snapshot-upgrade.ts`](../src/platform/db/snapshot-upgrade.ts),
+startup and retains the original available values for recovery. Automatic
+upgrades accept only the exact v7/v8 migration prefixes allowlisted in
+[`snapshot-upgrade.ts`](../src/platform/db/snapshot-upgrade.ts),
 documented in [Database And Persistence](architecture.md#database-and-persistence).
 Automatic downgrade is unsupported. The Library may still offer Retry for
 transient startup failures, but retrying does not repair corrupt or unsupported
@@ -77,7 +77,7 @@ To make a local recovery copy:
 
 1. Open `chrome://extensions`, find CogniPace, and select its service worker
    console from the Inspect views.
-2. In that console, run the following expression. It reads only the three
+2. In that console, run the following expression. It reads only the four
    database recovery keys and copies their JSON values to the clipboard:
 
    ```js
@@ -87,6 +87,7 @@ To make a local recovery copy:
          'cognipace_db_snapshot_v1',
          'cognipace_db_snapshot_fingerprint_v1',
          'cognipace_db_recovery_topics_v1',
+         'cognipace_db_recovery_tracks_v1',
        ]),
      ),
    )
@@ -135,17 +136,17 @@ shows only the relevant UI state and safe error text.
      hash = ((hash << 5) + hash) ^ sql.charCodeAt(index)
    }
    const current = (hash >>> 0).toString(16).padStart(8, "0")
-   const fixture = fs.readFileSync(
-     "src/testing/fixtures/topics-legacy-migrations.ts",
+   const upgrade = fs.readFileSync(
+     "src/platform/db/snapshot-upgrade.ts",
      "utf8",
    )
-   const legacy = fixture.match(
-     /expectedLegacyMigrationFingerprint = .([a-f0-9]{8})./,
-   )?.[1]
-   if (!legacy) throw new Error("Could not read the allowlisted fingerprint")
+   const legacy = Array.from(upgrade.matchAll(
+     /legacy(?:Topic|Track)MigrationFingerprint = '([a-f0-9]{8})'/g,
+   ), (match) => match[1])
+   if (legacy.length !== 2) throw new Error("Could not read both allowlisted fingerprints")
    let candidate = 0
    const sentinel = () => candidate.toString(16).padStart(8, "0")
-   while ([current, legacy].includes(sentinel())) candidate += 1
+   while ([current, ...legacy].includes(sentinel())) candidate += 1
    console.log(sentinel())
    NODE
    ```
@@ -498,7 +499,7 @@ existing Library, capture, and backup flows:
    as `Tree / Graph` in a disposable problem. Save, reload, and edit again;
    confirm Unicode and slash text survive lookup and persistence.
 4. Export a backup and inspect only the disposable fixture's taxonomy rows.
-   Confirm it declares schema version 4 and typed relations have source,
+   Confirm it declares schema version 5 and typed relations have source,
    target, and kind fields. Import that file into another disposable profile
    and verify assignments, aliases, and both relation kinds round-trip.
 
@@ -508,7 +509,7 @@ redact topic values, settings, fingerprints, and all snapshot or recovery bytes
 from shared proof. Such screenshots do not prove the v7 migration or collision
 recovery behavior; the Vitest command above covers those internal paths. Record
 the populated-database upgrade and recovery evidence from Phase 1 separately,
-and the backup v4 export/import evidence from Phase 2 separately. Do not treat
+and the current backup export/import evidence separately. Do not treat
 the Library filtering recording as proof of either migration or backup
 compatibility.
 
@@ -579,6 +580,71 @@ is required before review or merge:
    > Check Tab and Escape during pending apply/retry and after each result; the
    > status keeps focus during writes, a save failure focuses Retry saving, and a
    > saved import focuses the result without exposing background navigation.
+
+#### Vertical Track Editor And External Progress
+
+Human realtime happy-path and edge-case smoke with screenshots or a recording
+is required before PR review or merge. Use a disposable profile for reset,
+restore, and correction cases.
+
+1. Open New Track and edit a populated track at desktop and narrow widths.
+   Confirm every group and question title wraps, the selected group's Library
+   picker is immediately above its questions, and the footer stays reachable.
+   Click the open group header to collapse it, leaving all groups closed; click,
+   Enter, or Space reopens it. Confirm header focus remains after collapse and
+   opening another group closes the previous one. Rename and New Group open
+   their title field, and saving with all groups closed retains every question.
+   Check light/dark appearance and 200% text scaling: shaded headers and larger
+   topic titles should stay distinct from the flat, divided question rows. Full
+   titles, metadata, and every action must fit without clipping; Library results
+   and Change menus must remain visible above surrounding content.
+   Rename, add/reorder groups and questions, remove an empty group, and confirm
+   non-empty and final groups cannot be removed. Save an invalid empty group
+   title, collapse all groups, then Save and confirm that group expands with its
+   title field visible.
+2. Open Change by mouse and keyboard. Check full destination titles, Arrow keys,
+   Home/End, Enter/Space selection, Escape without closing the modal, outside
+   click and Tab dismissal. Move a question and confirm it appends to the
+   destination, disappears from the source, and focus remains useful. Check a
+   menu near the modal footer with enough groups to scroll, including at 320px.
+3. Successfully solve a question before creating a track. Create two tracks
+   sharing it, enabling Allow external progress in only one. Confirm the editor
+   preview, completion count, expanded External progress rating/date, Next, and
+   popup guidance agree; the default-off track remains incomplete. Save/reopen
+   both settings and test turning the option off and back on.
+4. In Free Practice, save a future `hard`, `good`, or `easy` for another member of
+   an inactive opted-in track. Confirm credit without changing the default-off
+   track. Save a later separate `again` and confirm earlier success still counts.
+   In a separate correction case, update the latest successful review to `again`,
+   then back to a successful rating; check removal/restoration, including fallback
+   to another historical success.
+5. Complete a question in Study Plan mode, switch mode or active track, and
+   correct the linked review. Confirm the original owned completion updates and
+   expanded details say Completed in this track. Reset the original track, then
+   correct its old review and confirm deleted owned progress is not resurrected.
+6. Suspend an incomplete question and confirm Next skips it while total count
+   remains. Move/reorder/remove memberships and confirm totals and Next still
+   use explicit whole-track order. Due review scheduling must remain unchanged.
+7. Reset an opted-in track. Confirm the dialog explains that external progress
+   turns off, the count becomes zero, and practice history remains. Re-enable to
+   restore historical credit. Reset global practice for a question and confirm
+   its evidence disappears from every opted-in track.
+8. Export a v5 backup with an enabled track; restore into a disposable profile
+   and confirm the flag and raw history survive. Restore v1-v4 fixtures and
+   confirm flags default false. Re-import content v1 and confirm an existing
+   enabled flag stays enabled while new imported tracks default off. Run the
+   existing authorized sync smoke with v5 data if testing configured sync.
+
+Bounded database upgrade proof is automated using frozen populated v7 and v8
+fixtures. Run `npm run test -- src/platform/db/instance.test.ts
+src/platform/db/snapshot-upgrade.test.ts src/testing/db-foundation.test.ts`.
+For actual extension upgrade smoke, prepare those disposable historical profiles
+and capture their data before/after loading the new build. Check recovery retry,
+unsupported fingerprints, and retained originals on failed upgrades. Confirm the
+v8 Track upgrade preserves its original in the Track recovery slot alongside an
+existing v7 Topics recovery copy. A different original already in the same slot
+blocks overwrite; never discard it to bypass this condition. Agent component
+screenshots do not replace human extension/runtime or upgrade proof.
 
 #### Track Table Pagination
 
@@ -715,6 +781,24 @@ For this behavior-changing overlay update, a human engineer must run the title
 happy path, slug-fallback edge path, and structured-log removal/preservation
 flows above and attach screenshot or screen-recording proof before PR review or
 merge. Automated checks do not replace that proof.
+
+#### LeetCode Submission Capture
+
+1. With code focused in the LeetCode editor, submit an accepted solution using
+   Command+Enter on macOS or Ctrl+Enter on Windows/Linux. Confirm the overlay
+   captures the attempt and updates when judging finishes, just as it does
+   when clicking LeetCode's Submit button.
+2. Submit a wrong-answer or runtime-error solution with the same shortcut.
+   Confirm the overlay receives the failed result and its matching code.
+3. Type ordinary Enter and use LeetCode's Run shortcut. Confirm neither starts
+   a submission capture. Hold the submit shortcut and confirm key repeats do
+   not restart capture or polling.
+4. Navigate to another problem during judging. Confirm the previous result
+   does not replace the new problem's context, and the shortcut works there.
+
+Human-run happy-path and edge-case smoke with screenshot or screen-recording
+proof is required before PR review or merge. This shortcut fix has automated
+watcher coverage; real-browser proof remains pending.
 
 ### Cross-Surface Refresh
 

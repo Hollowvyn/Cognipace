@@ -2,6 +2,7 @@ import { asc, eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
 import { createSettingsRepository } from '@/features/settings/data/settings-repository'
+import { createPracticeRepository } from '@/features/practice/data/practice-repository'
 import {
   fsrsCards,
   problemPractice,
@@ -25,6 +26,61 @@ import {
 } from './tracks-service'
 
 describe('tracks service', () => {
+  it('persists external progress and supplies eligibility plus consistent workspace and popup guidance', async () => {
+    const { db } = await createTestDb()
+    const practice = createPracticeRepository(db)
+    await practice.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'hard',
+      reviewedAt: new Date('2026-01-01T00:00:00Z'),
+      reviewAttemptId: 'eligible-history',
+    })
+    const defaults = await getTrackForEdit(db, { surface: 'dashboard' })
+    expect(defaults.externalProgressProblemSlugs).toEqual(['two-sum'])
+    const edit = await createTrack(db, {
+      surface: 'dashboard',
+      title: 'External service',
+      description: null,
+      dueAt: null,
+      allowExternalProgress: true,
+      setActive: true,
+      groups: [
+        { title: 'Main', problemSlugs: ['two-sum', 'valid-parentheses'] },
+      ],
+    })
+    expect(edit.track?.allowExternalProgress).toBe(true)
+    const workspace = await getWorkspace(db, { surface: 'dashboard' })
+    expect(workspace.activeTrack?.progress).toEqual({
+      completedCount: 1,
+      totalCount: 2,
+      percent: 50,
+    })
+    expect(workspace.activeTrackRows[0]?.membership.completion).toMatchObject({
+      status: 'completed',
+      source: 'external',
+      reviewAttemptId: 'eligible-history',
+    })
+    expect(workspace.activeTrack?.nextProblem?.slug).toBe('valid-parentheses')
+    expect((await getActiveTrack(db))?.nextProblem?.slug).toBe(
+      'valid-parentheses',
+    )
+    await updateTrack(db, {
+      surface: 'dashboard',
+      trackId: edit.track!.id,
+      title: 'External service',
+      description: null,
+      dueAt: null,
+      allowExternalProgress: false,
+      groups: [
+        { title: 'Main', problemSlugs: ['two-sum', 'valid-parentheses'] },
+      ],
+    })
+    expect(
+      (await getWorkspace(db, { surface: 'dashboard' })).activeTrack?.progress
+        .completedCount,
+    ).toBe(0)
+  })
+
   it('returns the active track in study-plan mode', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
@@ -434,6 +490,7 @@ describe('tracks service', () => {
     const edit = await createTrack(handle.db, {
       surface: 'dashboard',
       title: 'Dynamic Plan',
+      allowExternalProgress: false,
       description: null,
       dueAt: null,
       groups: [
@@ -469,6 +526,7 @@ describe('tracks service', () => {
         trackId: 'leetcode-75',
         title: 'LeetCode 75',
         description: null,
+        allowExternalProgress: false,
         dueAt: null,
         groups: [],
       }),

@@ -19,6 +19,7 @@ export function createSerializedTrack(
     title: 'LeetCode 75',
     description: 'Core interview practice.',
     dueAt: null,
+    allowExternalProgress: false,
     ...overrides,
   }
 }
@@ -104,6 +105,7 @@ export function createTrackForEditResponse(
   overrides: Partial<TrackForEditResponse> = {},
 ): TrackForEditResponse {
   return {
+    externalProgressProblemSlugs: [],
     track: createSerializedTrack(),
     groups: [
       {

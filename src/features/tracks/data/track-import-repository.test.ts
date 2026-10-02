@@ -37,6 +37,7 @@ describe('track import repository', () => {
         title: 'Interview 75',
         description: 'A curriculum',
         dueAt: 100,
+        allowExternalProgress: true,
         createdAt: 12,
         updatedAt: 13,
       })
@@ -75,6 +76,7 @@ describe('track import repository', () => {
             title: 'Interview 75',
             description: 'A curriculum',
             dueAt: 100,
+            allowExternalProgress: true,
           },
         ],
         groups: [
@@ -109,6 +111,7 @@ describe('track import repository', () => {
         title: 'Existing Track',
         description: null,
         dueAt: null,
+        allowExternalProgress: false,
         createdAt: 100,
         updatedAt: 200,
       })
@@ -148,6 +151,7 @@ describe('track import repository', () => {
               title: 'Interview 75',
               description: 'A curriculum',
               dueAt: null,
+              allowExternalProgress: false,
             },
           ],
           groups: [
@@ -182,6 +186,7 @@ describe('track import repository', () => {
           title: 'Interview 75',
           description: 'A curriculum',
           dueAt: null,
+          allowExternalProgress: false,
           createdAt: now.getTime(),
           updatedAt: now.getTime(),
         },
@@ -224,6 +229,7 @@ describe('track import repository', () => {
               title: 'Track 1',
               description: null,
               dueAt: null,
+              allowExternalProgress: false,
             },
           ],
           groups: [],
@@ -244,6 +250,7 @@ describe('track import repository', () => {
                 title: 'Duplicate',
                 description: null,
                 dueAt: null,
+                allowExternalProgress: false,
               },
               {
                 id: 'duplicate',
@@ -251,6 +258,7 @@ describe('track import repository', () => {
                 title: 'Duplicate Again',
                 description: null,
                 dueAt: null,
+                allowExternalProgress: false,
               },
             ],
             groups: [],
@@ -294,6 +302,7 @@ describe('track import repository', () => {
         title: `Track ${index}`,
         description: null,
         dueAt: null,
+        allowExternalProgress: false,
       }))
 
       await insertTrackImportChanges(

@@ -1,0 +1,1 @@
+ALTER TABLE `tracks` ADD `allow_external_progress` integer DEFAULT false NOT NULL;

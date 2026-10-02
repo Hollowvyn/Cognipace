@@ -210,9 +210,21 @@ author topic aliases or hierarchy relations, which remain deferred.
 
 ### Tracks
 
-Tracks owns curriculum progression. Track completion is separate from global
-practice history, and active track/session state is local database state. Tracks
-can contain groups and ordered problem memberships.
+Tracks owns curriculum progression. Track completion is independent of global
+practice history by default, and active track/session state is local database
+state. Tracks can contain groups and ordered problem memberships.
+
+The create/edit modal uses full-width ordered group sections with shaded headers
+and larger group titles. Questions form a continuous ordered list with thin
+dividers and quieter titles, making the group/question hierarchy clear. Select
+a group to expand its Library problem picker and question list; Rename reveals
+its title field. Click an expanded header again to collapse it; all groups may
+be closed.
+Opening another group closes the previous one. Rename, New Group, and an invalid
+group title on Save open the relevant section. Question titles and difficulty
+remain visible, and the Change button opens a menu for moving a question to
+another group. Moving appends it to the destination without changing the source
+selection. Empty groups may be removed when another group remains.
 
 Every track group's problem table uses Library-style pagination with a fixed
 15 problems per page. The footer shows the page size and visible range;
@@ -236,6 +248,23 @@ complete a currently incomplete track problem. Free Practice does not write
 active-track progress, and a later `again` review does not clear an existing
 completion. FSRS scheduling and global practice history remain separate from
 track completion.
+
+Each track offers **Allow external progress**, off by default. When enabled,
+any saved `hard`, `good`, or `easy` review for a member question counts, including
+reviews before track creation and future reviews in Free Practice or another
+track. A later separate `again` does not erase that evidence. Updating a review
+can add or remove its credit; an older remaining successful review still counts.
+The editor previews eligible selected questions, and expanded question details
+identify External progress or Completed in this track with the rating and date.
+Owned track completion takes precedence over external evidence.
+
+External credit is derived from review history and does not create track-ledger
+entries or change FSRS. Corrections update existing linked ledger entries even
+after switching practice mode or active track. Turning the option off removes
+only external credit. Reset Progress clears the track's owned ledger and turns
+external progress off while keeping practice history; re-enabling the option
+restores historical credit. Resetting a question's global practice history
+removes its review evidence and owned completion across tracks.
 
 ### Settings
 

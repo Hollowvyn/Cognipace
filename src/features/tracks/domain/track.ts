@@ -6,6 +6,7 @@ export interface Track {
   title: string
   description: string | null
   dueAt: Date | null
+  allowExternalProgress: boolean
 }
 
 export interface TrackGroup {
@@ -44,6 +45,7 @@ export type TrackProblemCompletion =
       completedAt: Date
       completedRating: TrackCompletedRating
       reviewAttemptId: string | null
+      source?: 'track' | 'external'
     }
 
 export interface TrackReviewProgressInput {
@@ -80,6 +82,7 @@ export interface TrackGroupInput {
 }
 
 export interface TrackMutationInput {
+  allowExternalProgress?: boolean
   title: string
   description: string | null
   dueAt: Date | string | null

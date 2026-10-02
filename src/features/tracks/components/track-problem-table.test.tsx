@@ -15,6 +15,38 @@ import { ActiveTrackWorkspace } from './active-track-workspace'
 import { TrackProblemTable } from './track-problem-table'
 
 describe('TrackProblemTable pagination', () => {
+  it.each(['external', 'track'] as const)(
+    'shows %s completion provenance in expanded question details',
+    async (source) => {
+      const user = userEvent.setup()
+      const row = createRows(1)[0]!
+      renderTable([
+        {
+          ...row,
+          membership: {
+            ...row.membership,
+            completion: {
+              status: 'completed',
+              source,
+              completedAt: '2026-01-01T10:00:00.000Z',
+              completedRating: 'hard',
+              reviewAttemptId: 'provenance-review',
+            },
+          },
+        },
+      ])
+      await user.click(screen.getByRole('button', { name: 'Expand Problem 1' }))
+      expect(
+        screen.getByText(
+          source === 'external'
+            ? 'External progress'
+            : 'Completed in this track',
+        ),
+      ).toBeVisible()
+      expect(screen.getByText(/Hard/)).toBeVisible()
+    },
+  )
+
   it('pages ordered problems in fixed batches of 15 with correct navigation boundaries', async () => {
     const user = userEvent.setup()
     renderTable(createRows(31).reverse())

@@ -73,6 +73,7 @@ export const existingLocalTrackFixture: TrackImportState = {
       title: 'My Local Track',
       description: 'Locally created and owned',
       dueAt: null,
+      allowExternalProgress: false,
     },
   ],
   groups: [

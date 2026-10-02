@@ -425,6 +425,7 @@ const validBackup = {
           title: 'Custom Track',
           description: 'A local track',
           dueAt: null,
+          allowExternalProgress: false,
           createdAt: '2026-05-25T12:00:00.000Z',
           updatedAt: '2026-05-25T12:00:00.000Z',
         },

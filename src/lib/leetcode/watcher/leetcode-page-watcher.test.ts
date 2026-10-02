@@ -220,6 +220,141 @@ describe('createLeetCodePageWatcher', () => {
     })
   })
 
+  it.each([
+    { shortcut: 'Command+Enter', metaKey: true },
+    { shortcut: 'Ctrl+Enter', ctrlKey: true },
+  ])('polls for the API result after $shortcut', async (shortcut) => {
+    vi.useFakeTimers()
+    renderProblemEditorPage()
+    const fetcher = createLeetCodeSubmissionApiFixtureFetcher(
+      leetcodeAcceptedSubmissionApiFixture,
+    )
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [0, 1000],
+      fetch: fetcher,
+      now: () => 5000,
+    })
+    const editor = document.querySelector('.view-lines')
+    expect(editor).not.toBeNull()
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+      ...shortcut,
+    })
+    // Monaco can stop bubbling; the page watcher must observe capture events.
+    const stopBubbling = (event: Event) => event.stopPropagation()
+    editor?.addEventListener('keydown', stopBubbling)
+
+    watcher.start()
+    editor?.dispatchEvent(event)
+    await vi.runAllTimersAsync()
+    watcher.stop()
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(filterEvents(events, 'submission-started')).toHaveLength(1)
+    expect(findEvent(events, 'submission-started')).toMatchObject({
+      attempt: {
+        location: problemLocation,
+        clickedAt: 5000,
+        submittedCodeSnapshot: {
+          code: 'class Solution:\n    pass',
+          language: 'Python3',
+          source: 'monaco',
+          capturedAt: 5000,
+        },
+      },
+    })
+    expect(readSubmissionPollingPhases(events)).toContain('api-result-found')
+    expect(filterEvents(events, 'submission-result-updated')).toHaveLength(1)
+    expect(findEvent(events, 'submission-result-updated')).toMatchObject({
+      result: { source: 'api', status: 'accepted' },
+    })
+    expect(fetcher).toHaveBeenCalledTimes(3)
+  })
+
+  it.each([
+    { key: 'Enter' },
+    { key: "'", metaKey: true },
+    { key: 'Enter', metaKey: true, shiftKey: true },
+    { key: 'Enter', ctrlKey: true, altKey: true },
+    { key: 'Enter', metaKey: true, repeat: true },
+    { key: 'Enter', ctrlKey: true, isComposing: true },
+  ])('ignores non-submit or repeated keyboard input: %j', async (input) => {
+    vi.useFakeTimers()
+    renderProblemEditorPage()
+    const fetcher = createLeetCodeSubmissionApiFixtureFetcher(
+      leetcodeAcceptedSubmissionApiFixture,
+    )
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [0],
+      fetch: fetcher,
+    })
+
+    watcher.start()
+    document.dispatchEvent(new KeyboardEvent('keydown', input))
+    await vi.runAllTimersAsync()
+    watcher.stop()
+
+    expect(filterEvents(events, 'submission-started')).toHaveLength(0)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('removes the shortcut listener and clears its polling on stop', async () => {
+    vi.useFakeTimers()
+    renderProblemEditorPage()
+    const fetcher = createLeetCodeSubmissionApiFixtureFetcher(
+      leetcodeAcceptedSubmissionApiFixture,
+    )
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [1000],
+      fetch: fetcher,
+    })
+
+    watcher.start()
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', metaKey: true }),
+    )
+    watcher.stop()
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', metaKey: true }),
+    )
+    await vi.runAllTimersAsync()
+
+    expect(filterEvents(events, 'submission-started')).toHaveLength(1)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('ignores the shortcut after navigating away from problem pages', async () => {
+    vi.useFakeTimers()
+    renderProblemEditorPage()
+    let currentUrl = problemUrl
+    const fetcher = createLeetCodeSubmissionApiFixtureFetcher(
+      leetcodeAcceptedSubmissionApiFixture,
+    )
+    const { events, watcher } = createWatcherTestHarness({
+      getCurrentUrl: () => currentUrl,
+      hydrationDelays: [],
+      submissionResultReadDelays: [0],
+      fetch: fetcher,
+    })
+
+    watcher.start()
+    currentUrl = 'https://leetcode.com/problemset/'
+    watcher.refresh()
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', metaKey: true }),
+    )
+    await vi.runAllTimersAsync()
+    watcher.stop()
+
+    expect(filterEvents(events, 'submission-started')).toHaveLength(0)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
   it('emits API submission details after LeetCode finishes judging', async () => {
     vi.useFakeTimers()
     renderProblemEditorPage()

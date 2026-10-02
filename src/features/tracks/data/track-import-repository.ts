@@ -19,6 +19,7 @@ export async function readTrackImportState(db: Db): Promise<TrackImportState> {
         title: tracks.title,
         description: tracks.description,
         dueAt: tracks.dueAt,
+        allowExternalProgress: tracks.allowExternalProgress,
       })
       .from(tracks)
       .orderBy(asc(tracks.id)),

@@ -4,6 +4,7 @@ import type {
   LeetCodeProblemContent,
   LeetCodeProblemLocation,
   LeetCodeProblemMetadata,
+  LeetCodeSubmissionClick,
 } from '../domain/types'
 import { createLeetCodeProblemMetadataFingerprint } from '../metadata/metadata-fingerprint'
 import { readLeetCodePageSnapshot } from '../page/page-snapshot-reader'
@@ -131,6 +132,7 @@ export function createLeetCodePageWatcher(
   function start() {
     navigationObserver.start()
     documentRef.addEventListener('click', handleClick, true)
+    documentRef.addEventListener('keydown', handleKeyDown, true)
     observeMutations()
     activateFromCurrentUrl()
   }
@@ -141,6 +143,7 @@ export function createLeetCodePageWatcher(
     mutationObserver?.disconnect()
     mutationObserver = null
     documentRef.removeEventListener('click', handleClick, true)
+    documentRef.removeEventListener('keydown', handleKeyDown, true)
     navigationObserver.stop()
 
     if (mutationRefreshTimer !== null) {
@@ -327,6 +330,32 @@ export function createLeetCodePageWatcher(
       return
     }
 
+    handleSubmission(click)
+  }
+
+  function handleKeyDown(event: KeyboardEvent) {
+    if (
+      !activeLocation ||
+      event.key !== 'Enter' ||
+      (!event.metaKey && !event.ctrlKey) ||
+      event.altKey ||
+      event.shiftKey ||
+      event.repeat ||
+      event.isComposing ||
+      parseLeetCodeProblemLocation(getCurrentUrl())?.slug !==
+        activeLocation.slug
+    ) {
+      return
+    }
+
+    handleSubmission({
+      location: activeLocation,
+      clickedAt: now(),
+      buttonText: 'Submit',
+    })
+  }
+
+  function handleSubmission(click: LeetCodeSubmissionClick) {
     options.onEvent({ type: 'submit-clicked', click })
     const attempt = readLeetCodeSubmissionAttempt({
       click,

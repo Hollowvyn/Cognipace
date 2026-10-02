@@ -289,6 +289,7 @@ function planTrack(
       title: draft.title ?? titleFromSlug(draft.slug),
       description: draft.description,
       dueAt: null,
+      allowExternalProgress: false,
     }
     changes.tracks.push(newTrack)
     items.push(trackItem(newTrack, draft.path, 'add'))
