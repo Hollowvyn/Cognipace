@@ -498,13 +498,11 @@ function normalizeBackupV3ToCurrent(backup: BackupFileV3): BackupFile {
     },
     { legacy: true, now: backup.exportedAt, catalogue },
   )
-  return normalizeBackupV4ToV5(
-    backupFileV4Schema.parse({
-      ...backup,
-      schemaVersion: 4,
-      data: { ...backup.data, ...taxonomy },
-    }),
-  )
+  return normalizeBackupV4ToV5({
+    ...backup,
+    schemaVersion: 4,
+    data: { ...backup.data, ...taxonomy },
+  })
 }
 
 function normalizeBackupV4ToV5(backup: BackupFileV4): BackupFile {

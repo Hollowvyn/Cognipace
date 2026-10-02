@@ -1,61 +1,65 @@
 # Track Editor And External Progress Handoff
 
-Suggested PR title: `feat(tracks): improve editor and allow external progress`
+PR: https://github.com/Hollowvyn/Cognipace/pull/180 (draft)
 
 Branch: `codex/track-editor-external-progress`, based on `origin/main` at
-`f3e6d73`. It began at `94e88d3` and was rebased onto the metadata-only 2.0.0
-release commit after main advanced during implementation. Design approved by the
-user after the Change button/menu revision.
+`f3e6d73`. The user approved the Change button/menu design and Section headers
+refinement, then requested independent group collapse and this simplification.
 
 ## Details
 
-The create/edit Track modal now uses full-width group sections with complete
-wrapping question titles, explicit rename, and a Library picker directly above
-the selected group's questions. Change opens an anchored destination menu with
-keyboard navigation and useful focus after moving a question. The existing
-modal shell, order, uniqueness, activation, and Library draft flows remain.
+Create/edit uses full-width group sections, complete wrapping question titles,
+explicit rename, and a Library picker above each expanded group's questions.
+Shaded bold group headers distinguish topics from flat divided question rows.
+Every group can collapse; Rename, New Group, and invalid-title Save explicitly
+open the relevant group. Collapse never changes saved groups or questions.
+Change opens an anchored destination menu with keyboard navigation, viewport
+bounds, dismissal, and useful focus after moving a question.
 
 Allow external progress defaults off and continuously counts saved successful
-reviews from anywhere in CogniPace, including earlier history. Owned completion
-takes precedence; external credit is derived without ledger writes. Rows,
-totals, and Next share effective completion. Expanded details expose provenance.
-Corrections update only existing attempt-linked ledger entries across mode or
-active-track switches. Reset clears owned progress and disables the option while
-keeping practice history.
+reviews from anywhere in CogniPace, including past and future history. Owned
+completion takes precedence; external credit is derived without ledger writes.
+Rows, totals, and Next share effective completion; details show provenance.
+Corrections update existing attempt-linked ledger entries across mode and
+active-track changes. Reset clears owned progress and disables the option while
+retaining practice history.
 
-Migration 0009 adds the boolean without modifying shipped SQL. Exact populated
-v7/v8 baselines upgrade while retaining originals. The v8 Track migration has a
-separate recovery slot so an earlier v7 Topics recovery copy survives the normal
-upgrade chain. Backup v5 requires the setting, v1-v4 normalize it to false, and
-content import v1 preserves existing settings while new tracks default off.
+Migration 0009 appends the boolean without modifying shipped SQL. Exact v7/v8
+baselines upgrade while retaining their originals in separate recovery slots.
+Backup v5 requires the setting, v1-v4 normalize it to false, and content import
+v1 preserves existing settings while new tracks default off.
+
+The simplification removes the question-list forwarding wrapper, unused field
+props and summary variants, and an intermediate backup parse. Strict legacy
+input parsing and final v5 validation remain. The three repository screenshots
+were removed at the user's request. The PR description remains unchanged; its
+image links reference the earlier commit.
 
 ## Issue
 
 No issue: direct user-requested work with an approved design and phase plans.
 
-## Testing
+## Validation
 
-Required combined validation is recorded below. Human realtime smoke is still
-pending before PR review or merge; this is implementation evidence, not a
-claim that a human exercised the installed extension.
+Final simplification validation passed **187 files / 1,932 tests**, including
+migration checks, WXT type generation, TypeScript, and ESLint. Production build,
+formatting, 90 editor tests, 117 backup/sync tests, and 12 browser cases passed.
 
-Passed commands:
+Commands run across the feature and follow-ups:
 
 ```sh
 rtk npm ci
 rtk npm run db:generate
 rtk npm run db:check
 rtk proxy npx tsc --noEmit
+rtk npm run typecheck
 rtk npm run lint
 rtk npm run check
 rtk npm run build
 rtk npm run format
 rtk git diff --check
-```
-
-Focused final checks:
-
-```sh
+rtk proxy npx prettier --write src/features/tracks/components/track-form.tsx
+rtk proxy npx prettier --write src/features/backup/api/backup-contracts.ts docs/superpowers/handoffs/2026-10-02-track-editor-external-progress.md
 rtk npm run test -- src/features/tracks/components/track-form.test.tsx src/features/tracks/hooks/use-track-form.test.tsx src/app/dashboard/routes.test.tsx
 rtk npm run test -- src/features/tracks/api/tracks-contracts.test.ts src/features/tracks/data/tracks-repository.test.ts src/features/tracks/server/tracks-service.test.ts src/features/practice/practice-core.integration.test.ts src/features/queue/queue-track-independence.integration.test.ts src/extension/background/register-handlers.test.ts
 rtk npm run test -- src/features/tracks/components/track-problem-table.test.tsx src/features/tracks/components/track-actions.test.tsx src/features/tracks/data/tracks-repository.test.ts src/extension/background/register-handlers.test.ts
@@ -63,256 +67,94 @@ rtk npm run test -- src/features/practice/practice-core.integration.test.ts src/
 rtk npm run test -- src/platform/db/snapshot-upgrade.test.ts src/platform/db/instance.test.ts src/platform/db/open-snapshot.test.ts src/testing/db-foundation.test.ts src/features/tracks/data/track-import-repository.test.ts src/features/imports/domain/import-plan.test.ts src/features/imports/server/import-service.test.ts
 rtk npm run test -- src/features/backup/api/backup-contracts.test.ts src/features/backup/data/backup-repository.test.ts src/features/backup/server/backup-service.test.ts src/features/backup/components/data-management-screen.test.tsx src/features/sync/server/sync-service.test.ts src/features/sync/domain/sync-envelope.test.ts
 rtk npm run test -- src/platform/db/instance.test.ts src/platform/db/snapshot-state.test.ts src/platform/db/snapshot-upgrade.test.ts src/platform/db/open-snapshot.test.ts
-```
-
-The initial feature's first combined check passed 187 test files and 1,927 tests.
-Its final combined check passed 187 files and 1,928 tests after the browser
-regressions were repaired. The final collapse and hierarchy follow-up checks
-passed 187 files and 1,932 tests, as recorded below.
-Independent spec and code-quality reviews found no actionable source findings.
-
-Initial TDD runs intentionally failed for missing setting/eligibility,
-historical completion, reset policy, correction after mode switch, menu and
-rename behavior, backup v5, and supported v8 migration. These were followed by
-passing focused runs. Transitional failures during concurrent edits included a
-current backup fixture missing its required flag, unused correction settings,
-and unformatted touched tests; each was repaired. Test output includes existing
-jsdom `Window.scrollTo` notices; the build includes its existing large-chunk
-warning. Both commands complete successfully.
-
-`rtk npm run typecheck`, `rtk npm run lint`, and `rtk npm run format` each had
-an initial failing run during those transitional edits. Final combined check
-covers typecheck/lint, and the final formatting run passed.
-
-Skipped commands and flows:
-
-- `rtk npm run zip`: artifact packaging behavior was not changed; production
-  build is covered. No release or store upload was requested.
-- Human realtime installed-extension smoke, popup/LeetCode review/correction,
-  actual historical-profile upgrade, backup restore, and configured Gist sync:
-  pending human execution and screenshots/recording, as required by
-  `docs/agent-governance.md`. Automated runtime/database tests cover these paths;
-  the isolated component harness does not execute extension transport or storage.
-
-### Human Smoke Checklist
-
-Use the **Vertical Track Editor And External Progress** flow in
-[`docs/testing.md`](../../testing.md). Reload the unpacked production build at
-`dist/chrome-mv3` in a disposable profile for reset/restore cases.
-
-- [ ] Create/edit at desktop and 320px; complete group/question titles, rename,
-      Library add, order, group removal, and invalid title reveal. Collapse every
-      group, reopen by click/Enter/Space, and save without losing questions.
-- [ ] Shaded topic headers and flat divided question rows remain distinct in
-      light/dark appearance and at 200% text scaling. Full titles and actions fit;
-      Library suggestions and Change menus remain visible.
-- [ ] Change menu mouse/keyboard, full destination titles, Escape/Tab/outside,
-      source focus, footer flip/scroll, and moving the final source question.
-- [ ] Historical solve counts only when enabled; save/reopen and toggle off/on;
-      expanded provenance, totals, Next, and popup agree.
-- [ ] Future Free Practice and inactive-track solves, later separate Again,
-      latest-review corrections, and fallback to earlier successes.
-- [ ] Owned correction after changing mode/active track; no resurrection after
-      reset; suspension and whole-track ordering.
-- [ ] Track reset disables external progress while retaining history;
-      re-enable restores it; global reset removes question evidence.
-- [ ] v5 backup export/restore and v1-v4 default-off restoration; additive import
-      preserves existing true and creates false; configured authorized sync v5.
-- [ ] Historical v7/v8 profile upgrade retains data and both recovery copies;
-      same-original retry and conflicting-original recovery retention.
-- [ ] Attach screenshots or a recording for happy-path and edge-case proof
-      before PR review or merge.
-
-## Screenshots
-
-Agent browser evidence uses the implemented TrackForm, RouteModal, and app
-styles with runtime data mocked. It is separate from the required human proof.
-Local screenshots and exact harness commands are recorded at completion below.
-
-## Risk, Release, And Recovery
-
-This is a feature release change to visible UI, local persisted shape, and
-derived Track progress. No permissions, runtime methods, auth, secret handling,
-sync envelope, network behavior, or sync orchestration were expanded. Existing
-Zod request parsing, sender authorization, practice/track invalidation, and
-app-shell refresh paths remain. Sync carries the current backup payload; clients
-that only understand v4 reject v5 rather than silently dropping the setting.
-
-Unknown database fingerprints and conflicting originals in the same recovery
-slot fail closed. Existing data does not reset automatically. Preserve both
-recovery storage keys and export a v5 backup before rollback. An older build
-cannot read the new snapshot fingerprint or v5 backup; use a compatible
-pre-upgrade original/export with that build, or retain the new build to export
-data. Never rewrite shipped SQL or discard recovery copies to force a downgrade.
-
-## Follow-up: Allow All Groups To Collapse
-
-The user requested that clicking the expanded group header collapse it without
-requiring another group to open. This refines the original design. Form selection
-now permits null, and header toggling is separate from explicit opening for
-Rename, New Group, and invalid-title Save. Local collapse does not modify the
-payload, question order, membership, or persisted progress.
-
-Five regression expectations failed before the fix. The updated focused command
-passes 90 tests across form, hook, and routes:
-
-```sh
-rtk npm run test -- src/features/tracks/components/track-form.test.tsx src/features/tracks/hooks/use-track-form.test.tsx src/app/dashboard/routes.test.tsx
-```
-
-Read-only review found no issues. The initial follow-up combined check caught a
-TypeScript error in the parameterized create/edit test's props; the fixture now
-uses the discriminated mode/trackId pair. Production build, standalone lint,
-and formatting passed. No database or runtime-contract changes were needed.
-
-Final follow-up `rtk npm run check` passed **187 files / 1,932 tests**, including
-database checks, WXT type generation, TypeScript, ESLint, and the full suite.
-The production build contains the collapse fix in `dist/chrome-mv3`.
-
-Passed follow-up commands:
-
-```sh
-rtk npm run lint
-rtk npm run check
-rtk npm run build
-rtk npm run format
 rtk proxy npx prettier --check src/features/tracks/components/track-form.tsx src/features/tracks/components/track-form.test.tsx src/features/tracks/hooks/use-track-form.ts src/features/tracks/hooks/use-track-form.test.tsx docs/product.md docs/testing.md docs/superpowers/specs/2026-10-02-track-editor-external-progress-design.md docs/superpowers/plans/2026-10-02-track-editor-phase-1.md docs/superpowers/handoffs/2026-10-02-track-editor-external-progress.md
-rtk git diff --check
-```
-
-Implemented-component browser verification passed using:
-
-```sh
-rtk proxy node /private/tmp/track-editor-implemented-harness/serve.mjs
-rtk proxy node /private/tmp/check-track-editor-collapse.cjs
-```
-
-The harness uses actual TrackForm, RouteModal, and app styles with extension
-messaging and persistence mocked. Create/edit modes at 736px and 320px passed
-click/Enter/Space collapse and reopen, header focus retention, all-closed Save
-without changing groups/order, Rename reopening, and New Group opening with
-title focus. No browser errors or horizontal overflow were recorded. Sandbox
-restrictions initially blocked the local server and Chrome; the same commands
-succeeded with approved escalation. An ambiguous temporary test locator was
-corrected before the passing browser run. The server is stopped.
-
-- [Collapsed desktop groups](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-collapse-desktop.png)
-- [Collapsed narrow groups](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-collapse-mobile.png)
-
-Human installed-extension smoke with visual proof remains pending before PR
-review or merge. `rtk npm run zip` remains skipped because packaging behavior
-is unchanged; `rtk npm run db:generate` was not repeated for the collapse fix
-because it does not touch schema or persistence. Combined check includes
-`rtk npm run db:check`.
-
-## Follow-up: Distinguish Group Headers From Questions
-
-The user approved the **Section headers** refinement after seeing both proposed
-styles. Group headers use a shaded band, larger bold title, and quieter count;
-questions use flat divided rows, semibold titles, and quieter order numbers.
-This changes Tracks form styling only. Existing controls, collapse, ordering,
-request payloads, and progress behavior remain covered by their regressions.
-
-Spec compliance and source-quality reviews found no actionable issues. The
-focused form/hook/routes command passed 90 tests, and full check passed
-**187 files / 1,932 tests**. Standalone lint, production build, and repository
-formatting also passed. Exact commands:
-
-```sh
-rtk npm run test -- src/features/tracks/components/track-form.test.tsx src/features/tracks/hooks/use-track-form.test.tsx src/app/dashboard/routes.test.tsx
-rtk npm run lint
-rtk npm run check
-rtk npm run build
-rtk npm run format
-rtk git diff --check
-```
-
-The combined check, standalone lint, formatting, and production build were
-repeated after the final responsive corrections. Browser text scaling first
-exposed the form's intrinsic auto column widening native fields, a squeezed New
-Group label, and long group titles extending beyond their button. Browser-only
-experiments isolated the minimal fixes: one constrained form column, header
-wrapping, and title max-width. No extra field/footer/action-row overrides were
-needed. All final checks passed after applying those constraints.
-
-Actual-component browser proof passed 12 clean-source cases: create/edit in
-light/dark at 736px/320px modal widths, plus edit in both themes and widths at
-200% root text scaling. It checked computed typography and row/header treatment,
-complete titles, modal and question-row control bounds, internal button overflow,
-Change positioning/focus, visible Library suggestions, collapse/Enter/Space,
-Rename/New Group, and all-closed Save payloads. No browser errors were recorded.
-The final run injected no corrective CSS. Extension messaging and persistence
-were mocked; the harness used actual TrackForm, RouteModal, and app styles.
-
-```sh
-rtk proxy node /private/tmp/track-editor-implemented-harness/serve.mjs
-rtk proxy node /private/tmp/diagnose-track-editor-hierarchy-scaling.cjs
-rtk proxy node /private/tmp/check-track-editor-hierarchy.cjs
 rtk proxy npx prettier --check src/features/tracks/components/track-form.tsx docs/product.md docs/testing.md docs/superpowers/specs/2026-10-02-track-editor-external-progress-design.md docs/superpowers/plans/2026-10-02-track-editor-phase-1.md docs/superpowers/handoffs/2026-10-02-track-editor-external-progress.md
 ```
 
-The server is stopped. At 200% text scaling, viewport widths 800px/384px kept
-the modal at 736px/320px after outer rem padding doubled. Browser zoom was not
-tested; the large-text proof explicitly covers root font scaling.
+Initial TDD runs failed for the new setting, history, correction/reset policy,
+menu/rename, backup, migration, and collapse cases before implementation. During
+concurrent edits, typecheck, lint, format, and backup fixtures had transitional
+failures; all were repaired before the final passing commands. Existing jsdom
+`Window.scrollTo` notices and the build's large-chunk warning remain nonfatal.
+Independent spec, source-quality, and simplification reviews found no issues.
 
-- [Desktop hierarchy](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-desktop.png)
-- [Narrow hierarchy](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-mobile.png)
-- [Light desktop](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-desktop-light.png)
-- [Light narrow](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-mobile-light.png)
-- [Change menu](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-hierarchy-implemented-menu.png)
+### Browser Proof
 
-Human installed-extension smoke and visual proof remain pending before PR review
-or merge. `rtk npm run zip` is skipped because packaging is unchanged, and
-`rtk npm run db:generate` is not repeated because schema/persistence is unchanged.
+The actual TrackForm, RouteModal, and app styles were exercised with extension
+messaging and persistence mocked. Final hierarchy proof covered 12 cases:
+create/edit in light/dark at 736px/320px modal widths, plus edit in both themes
+and widths at 200% root text scaling. It checked complete titles, typography,
+header/row distinction, control bounds, Change positioning/focus, Library
+suggestions, collapse by click/Enter/Space, Rename/New Group, and closed Save
+payloads. No browser errors or corrective CSS were present.
 
-## Initial Feature Completion Evidence
-
-Final `rtk npm run check` passed **187 files / 1,928 tests**. It includes database
-migration checks, WXT type generation, TypeScript, ESLint, and the full suite.
-Final `rtk npm run build` and `rtk npm run format` passed. Production output is in
-`dist/chrome-mv3`. The final editor/hook/route check passed 86 tests.
-
-The combined check and production build were repeated after the release-metadata
-rebase so the final artifact carries version 2.0.0.
-
-Browser verification passed using:
+Earlier menu proof also covered destination omission, Arrow/Home/End selection,
+Escape/outside/Tab dismissal, source focus, above/below positioning, 30 scrolling
+destinations, viewport shrink with an offscreen anchor, external-progress
+preview/payload, and Library add/final-row fallback focus. Browser regressions
+for obscuring suggestions and escaped menu bounds are retained in component
+tests. Large-text fixes constrain the form column, wrap the group header, and
+bound title width. At 200% text scaling, 800px/384px viewports preserve
+736px/320px modals after outer rem padding doubles; browser zoom was not tested.
 
 ```sh
 rtk proxy node /private/tmp/track-editor-implemented-harness/serve.mjs
 rtk proxy node /private/tmp/check-track-editor-implemented.cjs
+rtk proxy node /private/tmp/check-track-editor-collapse.cjs
+rtk proxy node /private/tmp/diagnose-track-editor-hierarchy-scaling.cjs
+rtk proxy node /private/tmp/check-track-editor-hierarchy.cjs
 ```
 
-The harness renders actual components and app styles, with runtime data mocked.
-It covers create/edit at 736px and 320px, complete title wrapping, click/Enter/
-Space menus, destination omission, Arrow/Home/End navigation, selection and
-source focus, Escape/outside/Tab dismissal, above/below positioning, 30 scrolling
-destinations, viewport shrinking with an offscreen anchor, external checkbox
-preview/saved payload, and Library add/final-row fallback focus. No page errors
-were recorded. The validation server is stopped.
+Sandbox restrictions initially blocked the local server and Chrome; the same
+commands succeeded with approved escalation. A temporary ambiguous locator was
+corrected before passing. The server is stopped. Agent component proof does not
+replace human installed-extension smoke.
 
-Browser checks first exposed automatic suggestions obscuring the next group and
-menu bounds escaping after viewport shrink. Retained component regressions now
-cover both fixes, including intentional click to reopen an already focused
-search. Independent quality review of these final changes found no actionable
-bugs.
+### Skipped Validation And Human Smoke
 
-Task-local screenshots:
+- `rtk npm run zip`: packaging is unchanged; production build is covered. No
+  release or store upload was requested.
+- `rtk npm run db:generate` was not repeated for collapse, styling, or
+  simplification: no schema changes. `rtk npm run check` includes `db:check`.
+- Human realtime installed-extension happy-path and edge-case smoke with
+  screenshots/recording remains pending before PR review or merge, as required
+  by `docs/agent-governance.md`.
 
-- [Desktop editor](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-implemented-desktop.png)
-- [Desktop Change menu](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-implemented-desktop-menu.png)
-- [Narrow editor](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-implemented-mobile.png)
-- [Narrow Change menu](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-implemented-mobile-menu.png)
-- [Many destinations](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-implemented-mobile-many-groups.png)
-- [New Track desktop](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-implemented-create-desktop.png)
-- [New Track narrow](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-implemented-create.png)
+Use the **Vertical Track Editor And External Progress** flow in
+[`docs/testing.md`](../../testing.md). Reload `dist/chrome-mv3` in a disposable
+profile for reset/restore cases.
 
-These agent screenshots do not satisfy the human installed-extension smoke
-requirement. On 2026-10-02 the user requested a pull request. It is prepared as a
-draft with the smoke checklist pending before review or merge. No merge,
-release publication, or store action was requested.
+- [ ] Create/edit at desktop and 320px; full titles, rename, Library add, order,
+      group removal, invalid title reveal, independent collapse by click/Enter/
+      Space, and closed Save without losing questions.
+- [ ] Distinct headers/questions in light/dark at 200% text scaling; controls,
+      Library suggestions, and Change menus fit.
+- [ ] Change by mouse/keyboard; full destinations, Escape/Tab/outside dismissal,
+      source focus, footer flip/scroll, and final-source-question focus.
+- [ ] Past and future solves count when enabled; save/reopen, toggle off/on,
+      provenance, totals, Next, and popup agree. Check inactive tracks, Free
+      Practice, later separate Again, and corrections falling back to history.
+- [ ] Owned correction after mode/active-track changes, no resurrection after
+      reset, suspension, and whole-track ordering.
+- [ ] Track reset retains history and disables external credit; re-enable
+      restores credit. Global reset removes question evidence.
+- [ ] v5 export/restore, v1-v4 default-off restore, additive import preserving
+      existing true/new false, and configured authorized Gist sync v5.
+- [ ] Historical v7/v8 upgrade retains data and both recovery copies;
+      same-original retry and conflicting-original retention.
+- [ ] Attach human happy-path and edge-case proof before PR review or merge.
 
-Repository-hosted screenshots for the PR:
+## Risk, Release, And Recovery
 
-- [Desktop hierarchy](../evidence/2026-10-02-track-editor/desktop.png)
-- [Narrow hierarchy](../evidence/2026-10-02-track-editor/mobile.png)
-- [Change menu](../evidence/2026-10-02-track-editor/change-menu.png)
+Feature release impact: visible UI, local persisted shape, and derived Track
+progress. No permissions, runtime methods, auth, secret handling, sync envelope,
+network behavior, or sync orchestration were expanded. Zod parsing, sender
+checks, practice/track invalidation, and app-shell refresh remain. Sync carries
+v5 backups; clients that only understand v4 reject v5.
+
+Unknown fingerprints and conflicting originals fail closed. Existing data does
+not reset automatically. Preserve both recovery keys and export v5 before
+rollback. Older builds cannot read the new fingerprint or v5 backup; use a
+compatible pre-upgrade original/export or retain the new build to export data.
+Never rewrite shipped SQL or discard recovery copies to force a downgrade.
+No merge, release publication, or store action was requested.

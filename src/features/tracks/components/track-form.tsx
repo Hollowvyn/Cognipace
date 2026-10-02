@@ -747,49 +747,6 @@ function SelectedGroupProblems({
   onFocusSearch: () => void
   selectedGroup: TrackFormGroupState
 }) {
-  return (
-    <section
-      aria-label="Selected group problems"
-      className="grid min-w-0 gap-3"
-    >
-      <div
-        aria-label="Selected group problems header"
-        className={cn(editorPaneHeaderClassName, 'flex-wrap gap-y-1')}
-      >
-        <h3 className="m-0 break-words text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
-          Questions
-        </h3>
-        <p className="m-0 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
-          {selectedGroup.problemSlugs.length} selected
-        </p>
-      </div>
-      <OrderedProblemList
-        dispatch={dispatch}
-        eligibleProblemSlugs={eligibleProblemSlugs}
-        groups={groups}
-        problemRowsBySlug={problemRowsBySlug}
-        onFocusSearch={onFocusSearch}
-        selectedGroup={selectedGroup}
-      />
-    </section>
-  )
-}
-
-function OrderedProblemList({
-  dispatch,
-  eligibleProblemSlugs,
-  groups,
-  problemRowsBySlug,
-  onFocusSearch,
-  selectedGroup,
-}: {
-  dispatch: ReturnType<typeof useTrackForm>['dispatch']
-  eligibleProblemSlugs: ReadonlySet<string>
-  groups: readonly TrackFormGroupState[]
-  problemRowsBySlug: ReadonlyMap<string, ProblemLibraryRow>
-  onFocusSearch: () => void
-  selectedGroup: TrackFormGroupState
-}) {
   const [openMenuSlug, setOpenMenuSlug] = useState<string | null>(null)
   const rowsRef = useRef<HTMLDivElement>(null)
   const pendingFocusSlugRef = useRef<string | null | undefined>(undefined)
@@ -824,131 +781,145 @@ function OrderedProblemList({
   }
 
   return (
-    <div
-      aria-label="Selected problem rows"
-      className="min-w-0"
-      ref={rowsRef}
-      role="region"
+    <section
+      aria-label="Selected group problems"
+      className="grid min-w-0 gap-3"
     >
-      {selectedGroup.problemSlugs.length === 0 ? (
-        <InlineStatus>No problems in this group.</InlineStatus>
-      ) : (
-        <ol
-          aria-label="Selected problems"
-          className="m-0 grid list-none divide-y divide-border p-0"
-        >
-          {selectedGroup.problemSlugs.map((problemSlug, index) => {
-            const row = problemRowsBySlug.get(problemSlug)
-            const title = row?.problem.title ?? problemSlug
-            return (
-              <li
-                aria-label={`${index + 1}. ${title}`}
-                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
-                data-problem-slug={problemSlug}
-                key={problemSlug}
-              >
-                <span className="pt-1 text-[length:var(--cp-badge-font-size)] text-muted-foreground tabular-nums">
-                  {index + 1}
-                </span>
-                <div className="min-w-0">
-                  <ProblemSummary
-                    compact
-                    title={title}
-                    slug={problemSlug}
-                    titleClassName="font-semibold"
-                  />
-                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
-                    {row && row.problem.difficulty !== 'unknown' ? (
-                      <span>
-                        {row.problem.difficulty.charAt(0).toUpperCase() +
-                          row.problem.difficulty.slice(1)}
-                      </span>
-                    ) : null}
-                    {eligibleProblemSlugs.has(problemSlug) ? (
-                      <span className="font-semibold text-primary">
-                        Previously solved
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="col-start-2 flex flex-wrap justify-end gap-1 sm:col-start-auto">
-                  {groups.length > 1 ? (
-                    <TrackQuestionGroupMenu
-                      destinations={groups.filter(
-                        (group) => group.key !== selectedGroup.key,
-                      )}
-                      isOpen={openMenuSlug === problemSlug}
-                      onMove={(toGroupKey) =>
-                        moveProblem(problemSlug, toGroupKey)
-                      }
-                      onOpenChange={(open) =>
-                        setOpenMenuSlug(open ? problemSlug : null)
-                      }
+      <div
+        aria-label="Selected group problems header"
+        className={cn(editorPaneHeaderClassName, 'flex-wrap gap-y-1')}
+      >
+        <h3 className="m-0 break-words text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
+          Questions
+        </h3>
+        <p className="m-0 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
+          {selectedGroup.problemSlugs.length} selected
+        </p>
+      </div>
+      <div
+        aria-label="Selected problem rows"
+        className="min-w-0"
+        ref={rowsRef}
+        role="region"
+      >
+        {selectedGroup.problemSlugs.length === 0 ? (
+          <InlineStatus>No problems in this group.</InlineStatus>
+        ) : (
+          <ol
+            aria-label="Selected problems"
+            className="m-0 grid list-none divide-y divide-border p-0"
+          >
+            {selectedGroup.problemSlugs.map((problemSlug, index) => {
+              const row = problemRowsBySlug.get(problemSlug)
+              const title = row?.problem.title ?? problemSlug
+              return (
+                <li
+                  aria-label={`${index + 1}. ${title}`}
+                  className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+                  data-problem-slug={problemSlug}
+                  key={problemSlug}
+                >
+                  <span className="pt-1 text-[length:var(--cp-badge-font-size)] text-muted-foreground tabular-nums">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <ProblemSummary
                       title={title}
+                      titleClassName="font-semibold"
                     />
-                  ) : null}
-                  <IconButton
-                    className="w-8 px-0"
-                    disabled={index === 0}
-                    label={`Move ${title} up`}
-                    onClick={() =>
-                      dispatch({
-                        direction: 'up',
-                        groupKey: selectedGroup.key,
-                        problemSlug,
-                        type: 'move-problem',
-                      })
-                    }
-                    size="sm"
-                    tooltip="Move up"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <ArrowUp aria-hidden="true" />
-                  </IconButton>
-                  <IconButton
-                    className="w-8 px-0"
-                    disabled={index === selectedGroup.problemSlugs.length - 1}
-                    label={`Move ${title} down`}
-                    onClick={() =>
-                      dispatch({
-                        direction: 'down',
-                        groupKey: selectedGroup.key,
-                        problemSlug,
-                        type: 'move-problem',
-                      })
-                    }
-                    size="sm"
-                    tooltip="Move down"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <ArrowDown aria-hidden="true" />
-                  </IconButton>
-                  <IconButton
-                    className="w-8 px-0"
-                    label={`Remove ${title}`}
-                    onClick={() =>
-                      dispatch({
-                        groupKey: selectedGroup.key,
-                        problemSlug,
-                        type: 'remove-problem',
-                      })
-                    }
-                    size="sm"
-                    tooltip="Remove"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <X aria-hidden="true" />
-                  </IconButton>
-                </div>
-              </li>
-            )
-          })}
-        </ol>
-      )}
-    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
+                      {row && row.problem.difficulty !== 'unknown' ? (
+                        <span>
+                          {row.problem.difficulty.charAt(0).toUpperCase() +
+                            row.problem.difficulty.slice(1)}
+                        </span>
+                      ) : null}
+                      {eligibleProblemSlugs.has(problemSlug) ? (
+                        <span className="font-semibold text-primary">
+                          Previously solved
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="col-start-2 flex flex-wrap justify-end gap-1 sm:col-start-auto">
+                    {groups.length > 1 ? (
+                      <TrackQuestionGroupMenu
+                        destinations={groups.filter(
+                          (group) => group.key !== selectedGroup.key,
+                        )}
+                        isOpen={openMenuSlug === problemSlug}
+                        onMove={(toGroupKey) =>
+                          moveProblem(problemSlug, toGroupKey)
+                        }
+                        onOpenChange={(open) =>
+                          setOpenMenuSlug(open ? problemSlug : null)
+                        }
+                        title={title}
+                      />
+                    ) : null}
+                    <IconButton
+                      className="w-8 px-0"
+                      disabled={index === 0}
+                      label={`Move ${title} up`}
+                      onClick={() =>
+                        dispatch({
+                          direction: 'up',
+                          groupKey: selectedGroup.key,
+                          problemSlug,
+                          type: 'move-problem',
+                        })
+                      }
+                      size="sm"
+                      tooltip="Move up"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <ArrowUp aria-hidden="true" />
+                    </IconButton>
+                    <IconButton
+                      className="w-8 px-0"
+                      disabled={index === selectedGroup.problemSlugs.length - 1}
+                      label={`Move ${title} down`}
+                      onClick={() =>
+                        dispatch({
+                          direction: 'down',
+                          groupKey: selectedGroup.key,
+                          problemSlug,
+                          type: 'move-problem',
+                        })
+                      }
+                      size="sm"
+                      tooltip="Move down"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <ArrowDown aria-hidden="true" />
+                    </IconButton>
+                    <IconButton
+                      className="w-8 px-0"
+                      label={`Remove ${title}`}
+                      onClick={() =>
+                        dispatch({
+                          groupKey: selectedGroup.key,
+                          problemSlug,
+                          type: 'remove-problem',
+                        })
+                      }
+                      size="sm"
+                      tooltip="Remove"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <X aria-hidden="true" />
+                    </IconButton>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -967,11 +938,7 @@ function ProblemSearchResult({
         onClick={onAdd}
         type="button"
       >
-        <ProblemSummary
-          compact
-          slug={row.problem.slug}
-          title={row.problem.title}
-        />
+        <ProblemSummary title={row.problem.title} />
         <Plus aria-hidden="true" />
       </button>
     </div>
@@ -979,13 +946,9 @@ function ProblemSearchResult({
 }
 
 function ProblemSummary({
-  compact = false,
-  slug,
   title,
   titleClassName = 'font-bold',
 }: {
-  compact?: boolean | undefined
-  slug: string
   title: string
   titleClassName?: string | undefined
 }) {
@@ -1001,11 +964,6 @@ function ProblemSummary({
           {title}
         </span>
       </div>
-      {compact ? null : (
-        <p className="m-0 mt-1 truncate text-[length:var(--cp-badge-font-size)] text-muted-foreground">
-          {slug}
-        </p>
-      )}
     </div>
   )
 }
@@ -1018,11 +976,9 @@ function TrackTextField({
   inputRef,
   label,
   name,
-  onBlur,
   onChange,
   onClick,
   onFocus,
-  onKeyDown,
   required = false,
   type = 'text',
   value,
@@ -1034,13 +990,11 @@ function TrackTextField({
   invalid?: boolean
   label: string
   name: string
-  onBlur?: ((event: FocusEvent<HTMLInputElement>) => void) | undefined
   onChange: (value: string) => void
   onClick?: (() => void) | undefined
   onFocus?: ((event: FocusEvent<HTMLInputElement>) => void) | undefined
-  onKeyDown?: ((event: KeyboardEvent<HTMLInputElement>) => void) | undefined
   required?: boolean
-  type?: 'date' | 'search' | 'text'
+  type?: 'search' | 'text'
   value: string
 }) {
   return (
@@ -1059,11 +1013,9 @@ function TrackTextField({
         autoComplete="off"
         className={cn(fieldClassName, icon && 'pl-9')}
         name={name}
-        onBlur={onBlur}
         onChange={(event) => onChange(event.target.value)}
         onClick={onClick}
         onFocus={onFocus}
-        onKeyDown={onKeyDown}
         required={required}
         type={type}
         value={value}
