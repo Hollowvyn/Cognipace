@@ -1,4 +1,4 @@
-import { Bar, BarChart, type TooltipPayloadEntry } from 'recharts'
+import { Bar, BarChart } from 'recharts'
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -18,14 +18,7 @@ vi.mock('recharts', async (importOriginal) => {
   }
 })
 
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from './chart'
+import { ChartContainer, ChartTooltip, type ChartConfig } from './chart'
 
 const chartConfig = {
   reviews: {
@@ -35,7 +28,7 @@ const chartConfig = {
 } satisfies ChartConfig
 
 describe('Chart primitive', () => {
-  it('provides stable identity, configured labels, and an accessible description', () => {
+  it('provides stable identity, configured colors, and an accessible description', () => {
     const chart = (
       <>
         <p id="review-chart-description">
@@ -55,20 +48,6 @@ describe('Chart primitive', () => {
             responsive
           >
             <Bar dataKey="reviews" fill="var(--color-reviews)" />
-            <ChartLegend
-              content={
-                <ChartLegendContent
-                  payload={[
-                    {
-                      color: 'var(--chart-1)',
-                      dataKey: 'reviews',
-                      type: 'square',
-                      value: 'reviews',
-                    },
-                  ]}
-                />
-              }
-            />
           </BarChart>
         </ChartContainer>
       </>
@@ -85,7 +64,9 @@ describe('Chart primitive', () => {
       'aria-describedby',
       'review-chart-description',
     )
-    expect(screen.getByText('Reviews')).toBeInTheDocument()
+    expect(chartContainer?.querySelector('style')).toHaveTextContent(
+      '--color-reviews: var(--chart-1)',
+    )
     const chartSurface = screen.getByRole('application')
     expect(chartSurface).toHaveAttribute('tabindex', '0')
     expect(chartSurface.querySelector('title')).toHaveTextContent(
@@ -100,44 +81,6 @@ describe('Chart primitive', () => {
     expect(
       document.querySelector('[data-chart="chart-analytics-review-quality"]'),
     ).toBe(chartContainer)
-  })
-
-  it('normalizes formatter tuples and omits rows when formatting returns null', () => {
-    const payload: ReadonlyArray<TooltipPayloadEntry> = [
-      {
-        dataKey: 'reviews',
-        graphicalItemId: 'reviews',
-        name: 'reviews',
-        value: 3,
-      },
-      {
-        dataKey: 'skipped',
-        graphicalItemId: 'skipped',
-        name: 'skipped',
-        value: 1,
-      },
-    ]
-
-    render(
-      <ChartContainer
-        config={chartConfig}
-        initialDimension={{ height: 180, width: 320 }}
-      >
-        <ChartTooltipContent
-          active
-          formatter={(value, name) =>
-            name === 'reviews'
-              ? [`${String(value)} formatted`, 'Formatted reviews']
-              : null
-          }
-          payload={payload}
-        />
-      </ChartContainer>,
-    )
-
-    expect(screen.getByText('Formatted reviews')).toBeInTheDocument()
-    expect(screen.getByText('3 formatted')).toBeInTheDocument()
-    expect(screen.queryByText('skipped')).not.toBeInTheDocument()
   })
 
   it('marks the generic chart surface as non-animated when reduced motion is preferred', () => {

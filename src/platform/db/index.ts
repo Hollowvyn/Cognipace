@@ -5,7 +5,6 @@ export { seedInitialCatalog } from './seed'
 export {
   base64ToBytes,
   bytesToBase64,
-  clearSnapshot,
   computeFingerprint,
   deserializeDb,
   serializeDb,

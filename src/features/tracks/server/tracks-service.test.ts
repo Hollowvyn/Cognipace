@@ -25,6 +25,127 @@ import {
 } from './tracks-service'
 
 describe('tracks service', () => {
+  it('returns null when the active session has no active track', async () => {
+    const handle = await createTestDb({
+      now: new Date('2026-01-01T00:00:00.000Z'),
+    })
+
+    await handle.db
+      .update(trackSession)
+      .set({
+        activeTrackId: null,
+        activeGroupId: null,
+      })
+      .where(eq(trackSession.id, 'active'))
+
+    const activeTrack = await getActiveTrack(handle.db)
+
+    expect(activeTrack).toBeNull()
+  })
+
+  it('keeps ordered next guidance and track progress independent of global mastery', async () => {
+    const handle = await createTestDb({
+      now: new Date('2026-01-01T00:00:00.000Z'),
+    })
+    const timestamp = new Date('2026-01-01T08:00:00.000Z').getTime()
+
+    await makeLeetCodeActive(handle.db)
+    await handle.db.insert(trackGroups).values({
+      id: 'leetcode-75:stack',
+      trackId: 'leetcode-75',
+      title: 'Stack',
+      position: 2,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    await handle.db.insert(trackGroupProblems).values({
+      trackGroupId: 'leetcode-75:stack',
+      trackId: 'leetcode-75',
+      problemSlug: 'valid-parentheses',
+      position: 1,
+    })
+    await handle.db.insert(problemPractice).values({
+      problemSlug: 'two-sum',
+      status: 'mastered',
+      firstSeenAt: timestamp,
+      lastSeenAt: timestamp,
+      lastReviewedAt: timestamp,
+      lastRating: 'easy',
+      solvedCount: 1,
+      attemptCount: 1,
+      isSuspended: false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+
+    const activeTrack = await getActiveTrack(handle.db)
+
+    expect(activeTrack?.progress).toEqual({
+      completedCount: 0,
+      totalCount: 2,
+      percent: 0,
+    })
+    expect(activeTrack?.activeGroup).toMatchObject({
+      id: 'leetcode-75:arrays-hashing',
+      title: 'Arrays and Hashing',
+    })
+    expect(activeTrack?.nextProblem).toMatchObject({
+      slug: 'two-sum',
+    })
+  })
+
+  it('counts completed track progress from the track ledger only', async () => {
+    const handle = await createTestDb({
+      now: new Date('2026-01-01T00:00:00.000Z'),
+    })
+    const timestamp = new Date('2026-01-01T08:00:00.000Z').getTime()
+
+    await makeLeetCodeActive(handle.db)
+    await handle.db.insert(trackGroups).values({
+      id: 'leetcode-75:stack',
+      trackId: 'leetcode-75',
+      title: 'Stack',
+      position: 2,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    await handle.db.insert(trackGroupProblems).values({
+      trackGroupId: 'leetcode-75:stack',
+      trackId: 'leetcode-75',
+      problemSlug: 'valid-parentheses',
+      position: 1,
+    })
+    await handle.db.insert(problemPractice).values({
+      problemSlug: 'valid-parentheses',
+      status: 'mastered',
+      firstSeenAt: timestamp,
+      lastSeenAt: timestamp,
+      lastReviewedAt: timestamp,
+      lastRating: 'easy',
+      solvedCount: 1,
+      attemptCount: 1,
+      isSuspended: false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    await handle.db.insert(trackProblemProgress).values({
+      trackId: 'leetcode-75',
+      problemSlug: 'two-sum',
+      completedAt: timestamp,
+      completedRating: 'good',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+
+    const activeTrack = await getActiveTrack(handle.db)
+
+    expect(activeTrack?.progress).toEqual({
+      completedCount: 1,
+      totalCount: 2,
+      percent: 50,
+    })
+  })
+
   it('returns the active track in study-plan mode', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
@@ -35,7 +156,11 @@ describe('tracks service', () => {
     expect(activeTrack).toMatchObject({
       track: {
         id: 'bytebytego-coding-patterns-101',
+        title: 'ByteByteGo Coding Patterns 101',
+        dueAt: null,
       },
+      activeGroup: { title: 'Two Pointers' },
+      progress: { completedCount: 0, totalCount: 101, percent: 0 },
       nextProblem: {
         slug: 'two-sum-ii-input-array-is-sorted',
       },
@@ -322,6 +447,17 @@ describe('tracks service', () => {
         nextProblem: null,
       },
     })
+
+    await completeHandle.db
+      .delete(trackGroupProblems)
+      .where(eq(trackGroupProblems.trackId, 'leetcode-75'))
+
+    await expect(getActiveTrack(completeHandle.db)).resolves.toMatchObject({
+      track: { id: 'leetcode-75' },
+      activeGroup: { id: 'leetcode-75:arrays-hashing' },
+      nextProblem: null,
+      progress: { completedCount: 0, totalCount: 0, percent: 0 },
+    })
   })
 
   it('uses the ordered workspace next-problem algorithm for direct active-track reads', async () => {
@@ -340,12 +476,18 @@ describe('tracks service', () => {
       now: new Date('2026-01-10T12:00:00.000Z'),
     })
 
+    await handle.db
+      .update(trackSession)
+      .set({ activeGroupId: 'leetcode-75:stack' })
+      .where(eq(trackSession.id, 'active'))
+
     const activeTrack = await getActiveTrack(
       handle.db,
       new Date('2026-01-10T12:00:00.000Z'),
     )
 
     expect(activeTrack?.nextProblem?.slug).toBe('two-sum')
+    expect(activeTrack?.activeGroup?.id).toBe('leetcode-75:stack')
   })
 
   it('returns create defaults and searchable Library problem rows for a new track', async () => {

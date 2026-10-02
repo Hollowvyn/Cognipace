@@ -91,61 +91,6 @@ export type AnalyticsSummaryRequest = z.infer<
   typeof analyticsSummaryRequestSchema
 >
 
-export const recallQualityPointSchema = z.object({
-  bucketStart: z.string(),
-  bucketEnd: z.string(),
-  observedRecall: nullablePercentageSchema,
-  predictedRecall: nullablePercentageSchema,
-  targetRetention: percentageSchema,
-  reviewCount: countSchema,
-  eligibleSampleSize: countSchema,
-})
-
-export const practiceRhythmPointSchema = z.object({
-  bucketStart: z.string(),
-  bucketEnd: z.string(),
-  reviewCount: countSchema,
-  observedCorrectness: nullablePercentageSchema,
-  sampleSize: countSchema,
-  associationOnly: z.literal(true),
-})
-
-export const ratingsMixPointSchema = z.object({
-  bucketStart: z.string(),
-  bucketEnd: z.string(),
-  again: countSchema,
-  hard: countSchema,
-  good: countSchema,
-  easy: countSchema,
-  total: countSchema,
-  hardAgainShare: nullablePercentageSchema,
-})
-
-export const hardAgainSummarySchema = z.object({
-  selectedShare: nullablePercentageSchema,
-  previousShare: nullablePercentageSchema,
-  delta: z.number().min(-1).max(1).nullable(),
-  direction: z.enum(['up', 'down', 'flat']).nullable(),
-  sampleSize: countSchema,
-  previousSampleSize: countSchema,
-  lowSample: z.boolean(),
-  previousLowSample: z.boolean(),
-})
-
-export const topicPointSchema = z.object({
-  topic: z.string(),
-  recallQuality: nullablePercentageSchema,
-  sampleSize: countSchema,
-  lowSample: z.boolean(),
-})
-
-export const stabilityPointSchema = z.object({
-  bucketStart: z.string(),
-  bucketEnd: z.string(),
-  medianStabilityDays: z.number().nonnegative().nullable(),
-  sampleSize: countSchema,
-})
-
 const analyticsScaleSchema = z.object({
   domain: z.tuple([z.number(), z.number()]),
   ticks: z.array(z.number()).min(2),
@@ -373,18 +318,11 @@ export const analyticsSummarySchema = z
     totalReviews: countSchema,
     currentStreak: countSchema,
     observedRatingQuality: analyticsMetricSummarySchema,
-    predictedRecall: analyticsMetricSummarySchema,
     observedRatingSampleSize: countSchema,
     lowSample: z.boolean(),
     targetRetention: percentageSchema,
     views: analyticsViewsSchema,
     historicalReadiness: historicalReadinessSchema,
-    recallQuality: z.array(recallQualityPointSchema),
-    practiceRhythm: z.array(practiceRhythmPointSchema),
-    ratingsMix: z.array(ratingsMixPointSchema),
-    hardAgain: hardAgainSummarySchema,
-    topics: z.array(topicPointSchema),
-    stability: z.array(stabilityPointSchema),
   })
   .superRefine((summary, context) => {
     if (summary.range !== summary.timeFrame.requestedDays) {

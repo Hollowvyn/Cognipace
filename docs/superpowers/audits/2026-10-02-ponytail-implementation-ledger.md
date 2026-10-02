@@ -7,13 +7,13 @@ Design approved by the human engineer on 2026-10-02; execution continues in
 
 ## Progress
 
-| Phase                        | Status                                          | Review/validation                               |
-| ---------------------------- | ----------------------------------------------- | ----------------------------------------------- |
-| 1: backup and sync recovery  | Implemented and independently reviewed          | 181 focused tests; full check 1926 tests passed |
-| 2: identity/calendar/capture | Implemented and independently reviewed          | Pending                                         |
-| 3: AI ownership/deadline     | Implemented and independently reviewed          | Pending                                         |
-| 4: proven deletions          | Plan written; caller recheck complete           | Pending                                         |
-| 5: modal/dependency repair   | Plan written; dependency investigation complete | Pending                                         |
+| Phase                        | Status                                              | Review/validation                               |
+| ---------------------------- | --------------------------------------------------- | ----------------------------------------------- |
+| 1: backup and sync recovery  | Implemented and independently reviewed              | 181 focused tests; full check 1926 tests passed |
+| 2: identity/calendar/capture | Implemented and independently reviewed              | Full check 1984 tests passed                    |
+| 3: AI ownership/deadline     | Implemented and independently reviewed              | Full check 1984 tests passed                    |
+| 4: proven deletions          | Implemented and independently reviewed              | Full check 1982 tests passed                    |
+| 5: modal/dependency repair   | Modal repair implemented; dependency fixes selected | 126 UI tests passed; independent review pending |
 
 ## Baseline
 
@@ -75,3 +75,23 @@ Current Fetch/AbortSignal semantics verified through Context7 `/mdn/content`: [A
 Phase 2/3 stable checkpoint: `rtk proxy npm run db:check > /private/tmp/cognipace-ponytail-phase23-db.log 2>&1`; `rtk proxy npm run lint > /private/tmp/cognipace-ponytail-phase23-lint.log 2>&1`; `rtk proxy npm run check > /private/tmp/cognipace-ponytail-phase23-check.log 2>&1` (186 files / 1984 tests); `rtk proxy npm run build > /private/tmp/cognipace-ponytail-phase23-build.log 2>&1` (3.88 MB) all passed. The final empty/partial GraphQL guard passed re-review. Human proof remains pending; automatic checkboxes do not claim Chrome smoke.
 
 Final Phase 3 independent review found no actionable issue. Independent command `rtk npm test -- src/features/overlay-session/hooks src/features/overlay-session/domain/overlay-session-state.test.ts src/features/leetcode-capture/server/leetcode-capture-service.test.ts src/lib/leetcode/metadata/metadata-reader.test.ts src/lib/leetcode/watcher/leetcode-page-watcher.test.ts --run` passed 8 files / 121 tests, including the final metadata boundary and silent cancellation. Provider review separately passed. Phase 2 is committed as `dd05169`; Phase 3 is validated by the same stable full checkpoint above.
+
+## Phase 4 implementation evidence
+
+Caller recheck confirmed all audited dead paths, with live Analytics evidence/readiness, calendar backlog, current views and line-segments retained. The Analytics deletion owner established a current baseline: `rtk proxy npm test -- src/features/analytics src/components/ui/chart.test.tsx src/app/dashboard/routes.test.tsx src/features/dev-smoke src/extension/background/dev-smoke-service.test.ts --run` passed 28 files / 312 tests.
+
+Root deleted four uncalled placeholder/ping files and `clearSnapshot`/export after `rtk proxy rg -n 'DashboardPlaceholderPage|PlaceholderPanel|ModalPlaceholders|useExtensionPing|clearSnapshot|dashboard-placeholder-page|placeholder-panel|modal-placeholders|use-extension-ping' src` found only declarations and internal dead references. Live runtime ping and route metadata remain. Actual root production cut: 117 lines.
+
+`rtk proxy npm uninstall date-fns eslint-plugin-import-x eslint-plugin-react-refresh --ignore-scripts --no-audit --cache /private/tmp/cognipace-ponytail-npm-cache` removed the 3 unused direct dependencies and 11 installed packages. `rtk proxy npm ls date-fns eslint-plugin-import-x eslint-plugin-react-refresh` reports an empty tree (exit 1 is npm's absent-package result). No package upgrades in this deletion task; scoped advisory updates follow its checkpoint.
+
+Analytics final focused command: `rtk proxy npm test -- src/features/analytics src/components/ui/chart.test.tsx src/app/dashboard/routes.test.tsx src/features/dev-smoke src/extension/background/dev-smoke-service.test.ts src/extension/background/register-handlers.test.ts --run` passed 28 files / 370 tests. The compact live-contract test failed before deletion as expected. Meaningful assertions moved to live views/contracts: pre-range replay, multiple cards/configured FSRS, invalid/future exclusion, raw-count adaptive aggregation, exact boundaries, evidence gaps, malformed rows, and null unknown values. The committed calendar implementation and remaining backlog regressions were byte-compared and retained. `rtk proxy npm run typecheck`, owned-file ESLint/Prettier and diff checks pass after migrating an obsolete runtime assertion and its two fixtures. Actual production reduction: 32 additions / 2346 deletions, net 2314 lines.
+
+Tracks/FSRS command: `rtk npm test -- src/features/tracks src/lib/fsrs src/platform/db src/testing/db-foundation.test.ts src/testing/architecture-boundaries.test.ts --run` passed 23 files / 270 tests. Guidance, ledger and foundation assertions now exercise the live service; tests preserve suspended skipping, selected-group independence, empty guidance and nullable dates. Actual production reduction: 1 addition / 197 deletions, net 196 lines. Owned-file Prettier/ESLint and scoped diff checks pass after removing one stale test import. Independent caller/test review passes for these deletions and root placeholder/dependency cuts; no schema/migration change.
+
+Independent Analytics review passes: all removed consumers belong to the obsolete graph, live runtime validators/refinements and evidence/readiness remain, and migrated tests cover the actual rating-derived live semantics. Phase 4 net production reduction is 2627 lines plus 3 direct dependencies. This excludes tests, package/lockfile changes and parallel modal repair.
+
+Root Phase 4 checkpoint passed: `rtk proxy npm run db:check > /private/tmp/cognipace-ponytail-phase4-db.log 2>&1`; `rtk proxy npm run lint > /private/tmp/cognipace-ponytail-phase4-lint.log 2>&1`; `rtk proxy npm run check > /private/tmp/cognipace-ponytail-phase4-check.log 2>&1` (185 files / 1982 tests); `rtk proxy npm run build > /private/tmp/cognipace-ponytail-phase4-build.log 2>&1` (3.86 MB); `rtk proxy npm run format > /private/tmp/cognipace-ponytail-phase4-format.log 2>&1`; `rtk proxy npm run zip > /private/tmp/cognipace-ponytail-phase4-zip.log 2>&1` (1.25 MB archive). The check includes the first modal implementation and chip focus repair, but precedes the final empty-selection lifecycle regression; final dependency validation will include that repair too. jsdom's existing `scrollTo` notices do not fail tests.
+
+## Phase 5 implementation evidence
+
+Modal regression command: `rtk proxy npm test -- src/features/problems/components src/features/tracks/components --run` first failed 11 new cases while 60 existing tests passed. After repair, 8 files / 126 tests pass with 12 new cases covering initial focus, Tab/Shift+Tab wrapping, opener restoration, Escape/pending locks, visible errors, metadata draft/retry/cancel and selection changes. The three affected confirmations share existing local focus behavior through one small hook. Owned-file Prettier/ESLint pass. Independent review is checking dynamic control removal before the root checkpoint.

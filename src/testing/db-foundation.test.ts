@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { saveReviewResult } from '@/features/practice/server/practice-service'
 import { createProblemsRepository } from '@/features/problems/data/problems-repository'
 import { getTodayQueue } from '@/features/queue/server/queue-service'
-import { createTracksRepository } from '@/features/tracks/data/tracks-repository'
+import { getActiveTrack } from '@/features/tracks/server/tracks-service'
 import migration0000 from '@/platform/db/migrations/0000_initial.sql?raw'
 import migration0001 from '@/platform/db/migrations/0001_lively_namor.sql?raw'
 import migration0002 from '@/platform/db/migrations/0002_add_track_due_at.sql?raw'
@@ -32,7 +32,7 @@ describe('db foundation', () => {
     })
 
     const rows = await handle.db.select().from(problems)
-    const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
+    const activeTrack = await getActiveTrack(handle.db)
 
     expect(rows).toHaveLength(seededProblemCount)
     expect(rows.map((row) => row.slug)).toEqual(
@@ -722,7 +722,7 @@ describe('db foundation', () => {
       updatedAt: timestamp,
     })
 
-    const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
+    const activeTrack = await getActiveTrack(handle.db)
 
     expect(activeTrack?.nextProblem).toMatchObject({
       slug: byteByteGoFirstProblemSlug,

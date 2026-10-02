@@ -13,7 +13,6 @@ import {
 
 import {
   getReviewDayStats,
-  getRecentRatings,
   getCurrentFsrsCards,
   getUpcomingCards,
   getReviewEvents,
@@ -149,11 +148,14 @@ describe('getReviewDayStats', () => {
 
 // ---------------------------------------------------------------------------
 
-describe('getRecentRatings', () => {
+describe('review event ratings', () => {
   it('returns empty when no attempts exist', async () => {
     const { db } = await createTestDb()
     const since = new Date('2026-01-01T00:00:00.000Z')
-    const result = await getRecentRatings(db, since)
+    const result = await getReviewEvents(db, {
+      since,
+      until: new Date('2026-02-01T00:00:00.000Z'),
+    })
     expect(result).toEqual([])
   })
 
@@ -169,7 +171,10 @@ describe('getRecentRatings', () => {
     await insertAttempt(db, 'a2', 'two-sum', cardId, 'good', exactly)
     await insertAttempt(db, 'a3', 'two-sum', cardId, 'easy', after)
 
-    const result = await getRecentRatings(db, since)
+    const result = await getReviewEvents(db, {
+      since,
+      until: new Date('2026-02-01T00:00:00.000Z'),
+    })
     expect(result).toHaveLength(2)
     expect(result.map((r) => r.rating)).toEqual(
       expect.arrayContaining(['good', 'easy']),
@@ -184,7 +189,10 @@ describe('getRecentRatings', () => {
     const cardId = await insertCard(db, 'two-sum')
     await insertAttempt(db, 'a1', 'two-sum', cardId, 'again', reviewedAt)
 
-    const [item] = await getRecentRatings(db, since)
+    const [item] = await getReviewEvents(db, {
+      since,
+      until: new Date('2026-02-01T00:00:00.000Z'),
+    })
     expect(item?.rating).toBe('again')
     expect(item?.reviewedAt.getTime()).toBe(reviewedAt.getTime())
   })
@@ -200,7 +208,7 @@ describe('getRecentRatings', () => {
     await insertAttempt(db, 'inside', 'two-sum', cardId, 'good', inside)
     await insertAttempt(db, 'future', 'two-sum', cardId, 'again', future)
 
-    const result = await getRecentRatings(db, since, until)
+    const result = await getReviewEvents(db, { since, until })
 
     expect(result.map((rating) => rating.rating)).toEqual(['good'])
   })

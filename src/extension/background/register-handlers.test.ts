@@ -408,23 +408,7 @@ describe('background handler registration', () => {
       observedRatingSampleSize: 12,
       lowSample: false,
       targetRetention: 0.9,
-      predictedRecall: { value: 0.86, sampleSize: 12, lowSample: false },
       historicalReadiness: createReadyHistoricalReadiness(),
-      recallQuality: [],
-      practiceRhythm: [],
-      ratingsMix: [],
-      hardAgain: {
-        selectedShare: null,
-        previousShare: null,
-        delta: null,
-        direction: null,
-        sampleSize: 0,
-        previousSampleSize: 0,
-        lowSample: true,
-        previousLowSample: true,
-      },
-      topics: [],
-      stability: [],
     })
     backgroundMocks.backupExportFullBackup.mockResolvedValue(validBackup)
     backgroundMocks.backupResetLocalData.mockResolvedValue(null)
@@ -641,11 +625,9 @@ describe('background handler registration', () => {
     })
     const parsedResponse = analyticsSummarySchema.parse(response)
     expect(parsedResponse.historicalReadiness.requested.ready).toBe(true)
-    expect(parsedResponse.predictedRecall).toEqual({
-      value: 0.86,
-      sampleSize: 12,
-      lowSample: false,
-    })
+    expect(parsedResponse.views.observedRecallVsFsrs.rows).toEqual([])
+    expect(parsedResponse.views.upcomingReviewLoad.rows).toHaveLength(14)
+    expect(parsedResponse).not.toHaveProperty('predictedRecall')
   })
 
   it('passes range without an undefined now option when at is absent', async () => {
@@ -734,22 +716,6 @@ describe('background handler registration', () => {
       lowSample: true,
       targetRetention: 0.9,
       historicalReadiness: createReadyHistoricalReadiness(),
-      predictedRecall: { value: null, sampleSize: 0, lowSample: true },
-      recallQuality: [],
-      practiceRhythm: [],
-      ratingsMix: [],
-      hardAgain: {
-        selectedShare: null,
-        previousShare: null,
-        delta: null,
-        direction: null,
-        sampleSize: 0,
-        previousSampleSize: 0,
-        lowSample: true,
-        previousLowSample: true,
-      },
-      topics: [],
-      stability: [],
     })
 
     const response = analyticsSummarySchema.parse(

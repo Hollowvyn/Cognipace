@@ -284,18 +284,20 @@ The owners in that flow are:
 - `src/features/analytics/domain/analytics-readiness.ts` derives the effective
   window and readiness gates. `S`, `A`, `G`, `K`, and `E` mean eligible
   assessments, active buckets, longest gap, gap runs, and effective buckets.
-- `src/features/analytics/domain/chart-buckets.ts` and
-  `src/features/analytics/domain/chart-data.ts` aggregate each metric only from
-  eligible evidence, preserve unknown buckets as `null`, and classify solid or
-  dashed next-valid-point line continuity. Practice Rhythm retains zero-volume
-  buckets after its first supported bucket.
+- `src/features/analytics/domain/historical-presentation.ts` builds the live
+  historical views from eligible evidence; `current-state-presentation.ts` and
+  `workload-presentation.ts` own current-card and workload views. Unknown
+  values remain unknown, and Practice Rhythm retains zero-volume buckets after
+  its first supported bucket. `chart-data.ts` retains shared evidence and
+  replay helpers; `chart-buckets.ts` classifies measured/dashed line continuity.
 - `src/features/analytics/api/analytics-contracts.ts` validates the serialized
   read model with Zod before it crosses the extension runtime boundary.
-- `src/features/analytics/components/charts/chart-definitions.ts` is the typed
-  chart catalogue: title, question, data meaning, eligibility, aggregation,
-  semantic series, and sparse-state copy. `LineSegments` in
+- `src/features/analytics/components/historical-views.tsx`,
+  `current-state-views.tsx` and `workload-views.tsx` render live read models from
+  `summary.views`. Each view owns its question, interpretation and sparse-state copy. `LineSegments` in
   `src/features/analytics/components/charts/line-segments.tsx` renders measured
-  runs and dashed next-valid-point bridges without interpolating data.
+  runs and dashed next-valid-point bridges without interpolating data. Removed
+  legacy charts and top-level response fields have no parallel calculation.
 - `src/lib/leetcode/domain/problem-url.ts` owns canonical problem URLs; the
   retention details and fragile-knowledge rows use `createLeetCodeProblemUrl`
   rather than constructing links in chart components.

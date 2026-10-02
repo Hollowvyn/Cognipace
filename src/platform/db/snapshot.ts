@@ -72,7 +72,3 @@ export async function writeSnapshotToStorage(snapshot: StoredSnapshot) {
     ...(snapshot.hasMutations ? { [SNAPSHOT_DIRTY_KEY]: true } : {}),
   })
 }
-
-export async function clearSnapshot() {
-  await chrome.storage.local.remove([SNAPSHOT_KEY, FINGERPRINT_KEY])
-}

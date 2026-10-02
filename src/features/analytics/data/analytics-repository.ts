@@ -18,11 +18,6 @@ export interface ReviewDayStats {
   reviewDays: number
 }
 
-export interface RecentRating {
-  rating: string
-  reviewedAt: Date
-}
-
 export interface ReviewEvent {
   id: string
   problemSlug: string
@@ -77,33 +72,6 @@ export async function getReviewDayStats(db: Db): Promise<ReviewDayStats> {
     totalReviews: totals?.totalReviews ?? 0,
     reviewDays: totals?.reviewDays ?? 0,
   }
-}
-
-export async function getRecentRatings(
-  db: Db,
-  since: Date,
-  until?: Date,
-): Promise<RecentRating[]> {
-  const rows = await db
-    .select({
-      rating: reviewAttempts.rating,
-      reviewedAt: reviewAttempts.reviewedAt,
-    })
-    .from(reviewAttempts)
-    .where(
-      until
-        ? and(
-            gte(reviewAttempts.reviewedAt, since.getTime()),
-            lte(reviewAttempts.reviewedAt, until.getTime()),
-          )
-        : gte(reviewAttempts.reviewedAt, since.getTime()),
-    )
-    .orderBy(asc(reviewAttempts.reviewedAt), asc(reviewAttempts.id))
-
-  return rows.map((row) => ({
-    rating: row.rating,
-    reviewedAt: new Date(row.reviewedAt),
-  }))
 }
 
 export async function getReviewHistory(db: Db): Promise<ReviewEvent[]> {
