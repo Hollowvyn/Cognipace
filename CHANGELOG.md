@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/Hollowvyn/Cognipace/compare/v2.0.0...v2.0.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* **leetcode:** poll results after keyboard submissions ([#179](https://github.com/Hollowvyn/Cognipace/issues/179)) ([2158ada](https://github.com/Hollowvyn/Cognipace/commit/2158adaa7f10975f2fbae90dcf1d9af4e3a162d0))
+
 ## [2.0.0](https://github.com/Hollowvyn/Cognipace/compare/v1.4.0...v2.0.0) (2026-10-02)
 
 
