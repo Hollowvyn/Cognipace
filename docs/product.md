@@ -206,8 +206,9 @@ practice history, and active track/session state is local database state. Tracks
 can contain groups and ordered problem memberships.
 
 Every track group's problem table uses Library-style pagination with a fixed
-15 problems per page. The footer shows the visible range and Previous/Next
-controls. Switching track or group starts at the first page; paging preserves
+15 problems per page. The footer shows the page size and visible range;
+Previous/Next controls appear only when there is more than one page in Tracks
+and Library. Switching track or group starts at the first page; paging preserves
 the group's explicit problem order and does not change track progression.
 
 Expanded track problem rows offer **Remove from track** beside Edit. Removal

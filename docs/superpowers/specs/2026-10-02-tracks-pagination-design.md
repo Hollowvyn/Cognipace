@@ -6,7 +6,9 @@ with a fixed limit of 15 problems per page, based on the latest main.
 Extract Library's existing footer into a generic `TablePagination` component
 under `src/components/ui`. Library retains its page-size selector and bulk
 actions. Tracks uses the same range and Previous/Next controls with a fixed
-“Rows per page: 15” label.
+“Rows per page: 15” label. In both tables, Previous/Next controls appear only
+when there is more than one page; single-page results retain the page size and
+range.
 
 Tracks owns its pagination state. Paginate after ordering memberships, keep
 expanded details attached to their problem, and retain membership order numbers

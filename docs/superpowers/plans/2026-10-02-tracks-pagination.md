@@ -78,3 +78,49 @@ sync, persistence, and track progression are unaffected. No issue was created
 because this is a directly requested, bounded UI change. Suggested PR title:
 `fix(tracks): paginate problem tables at 15 rows`. Release impact: user-visible
 fix; rollback by reverting the pagination changes, with no data migration.
+
+## Follow-up: Single-page Controls
+
+User-approved adjustment: retain page size and row range but show the shared
+Previous/Next controls only when the table has more than one page.
+
+- [x] Update existing Tracks boundary tests for hidden controls on 1, 8, and 15
+      problems, plus controls disappearing after removal leaves one page.
+- [x] Add Library coverage for controls hiding/reappearing as page size changes.
+- [x] Confirm focused tests fail, then conditionally render controls using
+      `table.getPageCount() > 1` in `TablePagination`.
+- [x] Update product/design/smoke docs; rerun focused tests, lint, full check,
+      build, formatting, and diff checks. Commit and push the update to PR #176.
+
+Human browser smoke with screenshots/recording remains pending before review or
+merge; include single-page Tracks and Library page-size transitions in that proof.
+
+### Follow-up Validation
+
+The shared footer now renders its chevrons only for `table.getPageCount() > 1`.
+Tracks keeps “Rows per page: 15” and the visible range on a single page; Library
+keeps its selector and range. Existing multiple-page navigation remains intact.
+
+Commands run:
+
+```sh
+rtk proxy env DEBUG_PRINT_LIMIT=1000 npm run test -- src/features/tracks/components/track-problem-table.test.tsx src/features/problems/components/library/problem-library-screen.test.tsx
+rtk proxy npm run test -- src/features/tracks/components/track-problem-table.test.tsx src/features/tracks/components/tracks-screen.test.tsx src/features/problems/components/library/problem-library-screen.test.tsx
+rtk proxy npm run lint
+rtk proxy npm run check
+rtk proxy npm run build
+rtk proxy npx prettier --check --ignore-path /dev/null src/components/ui/table-pagination.tsx src/features/problems/components/library/problem-library-table.tsx src/features/tracks/components/track-problem-table.tsx src/features/tracks/components/track-problem-table.test.tsx src/features/tracks/components/active-track-workspace.tsx docs/product.md docs/testing.md docs/superpowers/specs/2026-10-02-tracks-pagination-design.md docs/superpowers/plans/2026-10-02-tracks-pagination.md src/features/problems/components/library/problem-library-screen.test.tsx
+rtk git diff --check
+```
+
+Five assertions failed as expected before the conditional was implemented,
+because single-page chevrons were still present. After implementation, 70 focused
+Tracks/Library tests passed; the full check passed 186 files and 1,894 tests.
+Lint, type checking, database checks, build, formatting, and diff checks passed.
+An independent read-only review found no concrete issues. Full tests emitted
+JSDOM scrollTo notices and the build emitted a chunk-size warning.
+
+Skipped: `npm run zip` because artifact packaging is unchanged. Human realtime
+smoke and screenshot/recording proof remain pending before review or merge,
+including single-page Tracks counts and Library page-size transitions. The PR
+remains a draft until that proof is attached.

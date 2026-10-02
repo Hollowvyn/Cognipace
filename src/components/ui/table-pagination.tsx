@@ -50,26 +50,28 @@ export function TablePagination<TData>({
         <span className="min-w-28 text-right tabular-nums">
           {firstRow}-{lastRow} of {filteredCount}
         </span>
-        <div className="inline-flex items-center gap-1">
-          <Button
-            aria-label="Previous page"
-            disabled={!table.getCanPreviousPage()}
-            onClick={() => table.previousPage()}
-            size="icon"
-            variant="ghost"
-          >
-            <ChevronLeft aria-hidden="true" />
-          </Button>
-          <Button
-            aria-label="Next page"
-            disabled={!table.getCanNextPage()}
-            onClick={() => table.nextPage()}
-            size="icon"
-            variant="ghost"
-          >
-            <ChevronRight aria-hidden="true" />
-          </Button>
-        </div>
+        {table.getPageCount() > 1 ? (
+          <div className="inline-flex items-center gap-1">
+            <Button
+              aria-label="Previous page"
+              disabled={!table.getCanPreviousPage()}
+              onClick={() => table.previousPage()}
+              size="icon"
+              variant="ghost"
+            >
+              <ChevronLeft aria-hidden="true" />
+            </Button>
+            <Button
+              aria-label="Next page"
+              disabled={!table.getCanNextPage()}
+              onClick={() => table.nextPage()}
+              size="icon"
+              variant="ghost"
+            >
+              <ChevronRight aria-hidden="true" />
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   )

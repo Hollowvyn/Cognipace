@@ -555,15 +555,17 @@ is required before review or merge:
    original membership order numbers. Expand a problem on each page and check
    its details, edit/practice actions, and LeetCode link.
 2. From a later page, switch groups and tracks. Confirm each starts on page one
-   with collapsed details. Verify an empty group and groups with 1 or exactly
-   15 problems retain correct counts and disabled navigation.
+   with collapsed details. Verify groups with 1, 8, or exactly 15 problems show
+   the page size and correct range with no Previous/Next controls. Empty groups
+   retain their empty state without pagination.
 3. In a disposable 16-problem group, remove the only problem on page two.
    Confirm the table returns to the valid first page with 15 problems and
-   “1-15 of 15”. Refresh practice state within a larger group and confirm the
-   current page remains selected. Track progress and Next still reflect the
-   full track rather than just the visible page.
-4. In Library, verify its 20/30/50 page-size choices, Previous/Next controls,
-   and selected-row bulk actions still work with the shared footer.
+   “1-15 of 15” with no Previous/Next controls. Refresh practice state within a
+   larger group and confirm the current page remains selected. Track progress
+   and Next still reflect the full track rather than just the visible page.
+4. In Library, verify its 20/30/50 page-size choices and selected-row bulk actions
+   still work with the shared footer. Previous/Next controls appear only for
+   multiple pages; single-page results retain the page-size selector and range.
 
 #### Remove From Track
 

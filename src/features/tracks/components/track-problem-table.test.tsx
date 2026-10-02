@@ -43,13 +43,21 @@ describe('TrackProblemTable pagination', () => {
     expect(screen.getByText('16-30 of 31')).toBeVisible()
   })
 
-  it.each([1, 15])('disables both controls for a %i-problem group', (count) => {
-    renderTable(createRows(count))
-    expect(problemLinks()).toHaveLength(count)
-    expect(screen.getByText(`1-${count} of ${count}`)).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled()
-  })
+  it.each([1, 8, 15])(
+    'keeps the count and hides both controls for a %i-problem group',
+    (count) => {
+      renderTable(createRows(count))
+      expect(problemLinks()).toHaveLength(count)
+      expect(screen.getByText(`1-${count} of ${count}`)).toBeVisible()
+      expect(screen.getByText('Rows per page: 15')).toBeVisible()
+      expect(
+        screen.queryByRole('button', { name: 'Previous page' }),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Next page' }),
+      ).not.toBeInTheDocument()
+    },
+  )
 
   it('keeps the empty-group state without pagination', () => {
     renderTable([])
@@ -96,6 +104,15 @@ describe('TrackProblemTable pagination', () => {
 
     view.rerender(tableElement(createRows(31)))
     expect(screen.getByText('16-30 of 31')).toBeVisible()
+
+    view.rerender(tableElement(createRows(15)))
+    expect(screen.getByText('1-15 of 15')).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Previous page' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Next page' }),
+    ).not.toBeInTheDocument()
 
     view.rerender(tableElement([]))
     expect(screen.getByText('No problems in this group.')).toBeVisible()
