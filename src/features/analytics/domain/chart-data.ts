@@ -485,6 +485,7 @@ export function reconstructOverdueBacklogSnapshots(
   }))
 
   return dailyObservationDates(options).flatMap((observationAt) => {
+    const observationKey = toAnalyticsDateKey(observationAt, options.timeZone)
     let overdueCount = 0
 
     for (const { card, intervals } of intervalsByCard) {
@@ -495,7 +496,11 @@ export function reconstructOverdueBacklogSnapshots(
           observationAt < candidate.endExclusive,
       )
       if (!interval) return []
-      if (interval.dueAt < observationAt) overdueCount += 1
+      if (
+        toAnalyticsDateKey(interval.dueAt, options.timeZone) < observationKey
+      ) {
+        overdueCount += 1
+      }
     }
 
     return [{ date: observationAt, overdueCount }]

@@ -93,6 +93,45 @@ describe('fetchLeetCodeProblemMetadata', () => {
       },
     })
   })
+
+  it.each([
+    {},
+    { title: 'Two Sum' },
+    { title: '   ', difficulty: 'Easy' },
+    { title: 'Two Sum', difficulty: 'Unknown' },
+  ])('rejects incomplete remote question metadata %j', async (question) => {
+    const fetcher = vi.fn(() =>
+      Promise.resolve(Response.json({ data: { question } })),
+    )
+
+    await expect(
+      fetchLeetCodeProblemMetadata(location, { fetch: fetcher }),
+    ).resolves.toMatchObject({ ok: false })
+  })
+
+  it('accepts core metadata without optional remote fields', async () => {
+    const fetcher = vi.fn(() =>
+      Promise.resolve(
+        Response.json({
+          data: { question: { title: 'Two Sum', difficulty: 'Easy' } },
+        }),
+      ),
+    )
+
+    await expect(
+      fetchLeetCodeProblemMetadata(location, { fetch: fetcher }),
+    ).resolves.toMatchObject({
+      ok: true,
+      metadata: {
+        title: 'Two Sum',
+        difficulty: 'Easy',
+        frontendId: null,
+        isPremium: null,
+        topics: [],
+        source: 'graphql',
+      },
+    })
+  })
 })
 
 describe('readLeetCodeProblemMetadata', () => {
@@ -123,6 +162,29 @@ describe('readLeetCodeProblemMetadata', () => {
         source: 'dom',
         capturedAt: 400,
       },
+    })
+  })
+
+  it('preserves DOM fallback for incomplete remote metadata', async () => {
+    document.body.innerHTML =
+      '<main><h1>1. Two Sum</h1><span>Medium</span></main>'
+    const fetcher = vi.fn(() =>
+      Promise.resolve(
+        Response.json({
+          data: { question: { title: 'Partial remote title' } },
+        }),
+      ),
+    )
+
+    await expect(
+      readLeetCodeProblemMetadata(location, {
+        root: document,
+        document,
+        fetch: fetcher,
+      }),
+    ).resolves.toMatchObject({
+      ok: true,
+      metadata: { title: 'Two Sum', difficulty: 'Medium', source: 'dom' },
     })
   })
 })

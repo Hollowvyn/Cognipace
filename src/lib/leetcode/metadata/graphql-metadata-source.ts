@@ -46,11 +46,14 @@ export async function fetchLeetCodeProblemMetadata(
   const parsedQuestionMetadata = readLeetCodeQuestionFromGraphQlPayload(
     graphQlResult.payload,
   )
+  const difficulty = parseLeetCodeDifficulty(parsedQuestionMetadata?.difficulty)
 
-  if (!parsedQuestionMetadata) {
+  if (!parsedQuestionMetadata?.title || difficulty === 'Unknown') {
     return {
       ok: false,
-      error: new Error('LeetCode GraphQL response did not include question.'),
+      error: new Error(
+        'LeetCode GraphQL response did not include complete question metadata.',
+      ),
     }
   }
 
@@ -58,9 +61,9 @@ export async function fetchLeetCodeProblemMetadata(
     ok: true,
     metadata: {
       location: createCanonicalLocation(location, parsedQuestionMetadata),
-      title: parsedQuestionMetadata.title || location.slug,
+      title: parsedQuestionMetadata.title,
       frontendId: parsedQuestionMetadata.questionFrontendId,
-      difficulty: parseLeetCodeDifficulty(parsedQuestionMetadata.difficulty),
+      difficulty,
       isPremium: parsedQuestionMetadata.isPaidOnly,
       topics: parsedQuestionMetadata.topicTags,
       source: 'graphql',

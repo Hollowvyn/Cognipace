@@ -39,6 +39,13 @@ export function parseLeetCodeProblemInput(problemInput: string) {
     return parsedLocation
   }
 
+  if (
+    readAbsoluteUrl(problemInput) ||
+    /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(problemInput.trim())
+  ) {
+    return null
+  }
+
   const normalizedSlug = normalizeLeetCodeSlug(problemInput)
 
   if (!normalizedSlug) {

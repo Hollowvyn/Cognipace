@@ -706,6 +706,26 @@ describe('TracksRepository', () => {
     ])
   })
 
+  it('rejects foreign problem URLs when saving a track', async () => {
+    const handle = await createTestDb()
+    const repository = createTracksRepository(handle.db)
+
+    await expect(
+      repository.createTrack({
+        title: 'Invalid URL Plan',
+        description: null,
+        dueAt: null,
+        groups: [
+          {
+            title: 'Arrays',
+            problemSlugs: ['https://example.com/problems/two-sum/'],
+          },
+        ],
+      }),
+    ).rejects.toThrow(/problem slug/)
+    expect(await repository.getTrackById('invalid-url-plan')).toBeNull()
+  })
+
   it('rejects duplicate problem slugs across groups when saving a track', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),

@@ -7,13 +7,13 @@ Design approved by the human engineer on 2026-10-02; execution continues in
 
 ## Progress
 
-| Phase                        | Status                                            | Review/validation                               |
-| ---------------------------- | ------------------------------------------------- | ----------------------------------------------- |
-| 1: backup and sync recovery  | Implemented and independently reviewed            | 181 focused tests; full check 1926 tests passed |
-| 2: identity/calendar/capture | URL/company implementation active; calendar fixed | Pending                                         |
-| 3: AI ownership/deadline     | Plan written                                      | Pending                                         |
-| 4: proven deletions          | Plan written; caller recheck complete             | Pending                                         |
-| 5: modal/dependency repair   | Plan written; dependency investigation complete   | Pending                                         |
+| Phase                        | Status                                             | Review/validation                               |
+| ---------------------------- | -------------------------------------------------- | ----------------------------------------------- |
+| 1: backup and sync recovery  | Implemented and independently reviewed             | 181 focused tests; full check 1926 tests passed |
+| 2: identity/calendar/capture | Implemented and independently reviewed             | Pending                                         |
+| 3: AI ownership/deadline     | Implemented; independent review/checkpoint running | Pending                                         |
+| 4: proven deletions          | Plan written; caller recheck complete              | Pending                                         |
+| 5: modal/dependency repair   | Plan written; dependency investigation complete    | Pending                                         |
 
 ## Baseline
 
@@ -57,3 +57,19 @@ Independent Phase2 owners start after Phase1 backup/manual-pull focused review, 
 Phase 1 stable checkpoint passed: `rtk proxy npm run lint > /private/tmp/cognipace-ponytail-phase1-lint.log 2>&1`; `rtk proxy npm run check > /private/tmp/cognipace-ponytail-phase1-check.log 2>&1` (186 files / 1926 tests; DB check, typecheck, ESLint included); `rtk proxy npm run build > /private/tmp/cognipace-ponytail-phase1-build.log 2>&1` (3.88 MB). The checkpoint also contains the independent URL/company/calendar fixes already at green. An earlier full check failed an exactOptionalPropertyTypes test assignment; corrected by deleting the optional test hook rather than assigning undefined. The final lint/check reruns pass. Independent spec/caller/safety review passes for backup, authorized pull, durable marker and calendar.
 
 Identity red/green: `rtk npm test -- src/lib/leetcode/domain/problem-url.test.ts src/features/problems/components/form/problem-form.test.tsx src/features/tracks/data/tracks-repository.test.ts --run` failed 6 new cases; `rtk npm test -- src/features/problems/data/problems-repository.test.ts --run` failed 4 new cases. Final `rtk npm test -- src/lib/leetcode/domain/problem-url.test.ts src/features/problems/components/form/problem-form.test.tsx src/features/problems/data/problems-repository.test.ts src/features/tracks/data/tracks-repository.test.ts --run` passed all 81 tests. Per-file ESLint and Prettier pass. Actual company changes simplify the dead generic writer branch and preserve transaction rollback.
+
+Imports red/green: `rtk npm test -- src/features/imports/domain src/features/imports/server/import-service.test.ts --run` failed 4 added cases before the normalized-key fix; passed 5 files / 104 tests afterward. Exact stored topic/company IDs and alias references remain unchanged, and changed normalized-ID matches invalidate preview without writes.
+
+Capture red/green: `rtk npm test -- src/features/leetcode-capture/server/leetcode-capture-service.test.ts src/lib/leetcode/watcher/leetcode-page-watcher.test.ts --run` initially failed 10 new cases, then passed 29 after useful-success caching, bounded hydration retry and stale-rejection protection. Independent review found source-only success still accepted an empty GraphQL object; the reader now requires actual title and known difficulty, retaining nullable/empty optional fields. Follow-up empty/partial reader/cache/watcher coverage failed 9 before repair and passed 43 afterward. No new scheduler or cache layer.
+
+Company independent review found arbitrary last-wins selection of valid legacy case-distinct labels. Exact-label-first and ambiguity rejection repair: `rtk npm test -- src/features/problems/data/problems-repository.test.ts --run` failed 2 new cases before repair and passed 26 afterward. Regression proves exact ID preservation and transactional rollback on ambiguity. Re-review passes.
+
+## Phase 3 implementation evidence
+
+Overlay composed regression first failed duplicate request, pending user rating and stale navigation/restart persistence (4 cases); display `shouldUpdateRating:false` regression failed separately. One existing recommendation hook now shares captured watcher request/promise/result with saving and display. Latest distinct result cancellation was also reproduced red and repaired using the existing automation owner. `rtk npm test -- src/features/overlay-session/hooks --run` passes 64 tests. Root replaced temporary failure-tone supersession with a narrow silent `save-cancelled` reducer action; `rtk npm test -- src/features/overlay-session/hooks src/features/overlay-session/domain/overlay-session-state.test.ts --run` passes 5 files / 78 tests.
+
+Provider red: `rtk npm test -- src/features/genai/server/providers --run` failed all 6 added stalled HTTP 200/429 body cases before repair. Green after caller-reason preservation and test type narrowing: 4 files / 74 tests passed, covering timeout, caller cancellation, already-aborted signal, cleanup and redaction. `rtk proxy npx eslint src/features/genai/server/providers` passed. `rtk proxy npm run typecheck > /private/tmp/cognipace-ponytail-phase3-typecheck.log 2>&1` passed after correcting 3 new test-only result narrowing errors. An intermediate provider run exposed cross-realm cancellation classification; matching the actual external signal reason preserves cancellation without trusting DOMException identity. Independent provider review passes.
+
+Current Fetch/AbortSignal semantics verified through Context7 `/mdn/content`: [AbortSignal documentation](https://github.com/mdn/content/blob/main/files/en-us/web/api/abortsignal/index.md). The deadline stays active through response consumption; timers and named listeners are removed in finally. No browser API/permission expansion or live provider requests.
+
+Phase 2/3 stable checkpoint: `rtk proxy npm run db:check > /private/tmp/cognipace-ponytail-phase23-db.log 2>&1`; `rtk proxy npm run lint > /private/tmp/cognipace-ponytail-phase23-lint.log 2>&1`; `rtk proxy npm run check > /private/tmp/cognipace-ponytail-phase23-check.log 2>&1` (186 files / 1984 tests); `rtk proxy npm run build > /private/tmp/cognipace-ponytail-phase23-build.log 2>&1` (3.88 MB) all passed. The final empty/partial GraphQL guard passed re-review. Human proof remains pending; automatic checkboxes do not claim Chrome smoke.

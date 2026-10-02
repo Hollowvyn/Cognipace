@@ -757,6 +757,72 @@ describe('analytics chart-data builders', () => {
     ])
   })
 
+  it.each([
+    { hoursAfterDue: 1, timeZone: 'UTC', expected: 0 },
+    { hoursAfterDue: 25, timeZone: 'UTC', expected: 1 },
+    { hoursAfterDue: 11, timeZone: 'America/New_York', expected: 0 },
+    { hoursAfterDue: 11, timeZone: 'UTC', expected: 1 },
+  ])(
+    'matches upcoming calendar backlog $hoursAfterDue hours after due in $timeZone',
+    ({ hoursAfterDue, timeZone, expected }) => {
+      const createdAt = new Date('2026-08-01T13:00:00.000Z')
+      const reviewedAt = new Date('2026-08-02T13:00:00.000Z')
+      const fsrsOptions = normalizeFsrsSchedulingOptions({
+        enableShortTerm: false,
+        learningSteps: ['1d'],
+        relearningSteps: ['1d'],
+      })
+      const scheduled = scheduleReview(
+        createInitialFsrsCard(createdAt),
+        'good',
+        reviewedAt,
+        fsrsOptions,
+      )
+      const now = new Date(
+        scheduled.card.dueAt.getTime() + hoursAfterDue * 60 * 60 * 1000,
+      )
+      const card: AnalyticsCurrentCard = {
+        cardId: 'card-1',
+        slug: 'two-sum',
+        title: 'Two Sum',
+        topics: ['Array'],
+        retrievability: 0.8,
+        targetRetention: 0.9,
+        stabilityDays: scheduled.card.stability,
+        difficulty: scheduled.card.difficulty,
+        lapseCount: scheduled.card.lapses,
+        dueAt: scheduled.card.dueAt,
+        createdAt,
+        lastReviewAt: reviewedAt,
+      }
+      const snapshots = reconstructOverdueBacklogSnapshots(
+        [
+          event({
+            reviewedAt,
+            fsrsReviewLog: serializeFsrsReviewLogSnapshot(scheduled.log),
+          }),
+        ],
+        [card],
+        {
+          ...options,
+          start: createdAt,
+          end: now,
+          timeZone,
+          fsrsOptions,
+          timeFrame: buildAnalyticsTimeFrame({
+            asOf: now,
+            requestedDays: 14,
+            timeZone,
+          }),
+        },
+      )
+      expect(snapshots.at(-1)?.overdueCount).toBe(expected)
+      expect(
+        buildUpcomingLoadPoints([card.dueAt], now, timeZone)[0]?.overdueCount,
+      ).toBe(expected)
+    },
+  )
+
   it('reconstructs only daily overdue counts proven by FSRS due dates', () => {
     const reviewAt = new Date('2026-08-03T12:00:00.000Z')
     const card: AnalyticsCurrentCard = {
@@ -797,7 +863,7 @@ describe('analytics chart-data builders', () => {
         snapshot.overdueCount,
       ]),
     ).toEqual([
-      ['2026-08-01', 1],
+      ['2026-08-01', 0],
       ['2026-08-02', 1],
       ['2026-08-03', 0],
     ])
@@ -850,7 +916,7 @@ describe('analytics chart-data builders', () => {
     )
 
     expect(snapshots.map((snapshot) => snapshot.overdueCount)).toEqual([
-      1, 1, 0,
+      0, 1, 0,
     ])
   })
 
@@ -923,7 +989,7 @@ describe('analytics chart-data builders', () => {
     expect(secondReview.log.dueAt).toBe(firstReviewedAt.toISOString())
     expect(countsByDate.get('2026-08-02')).toBe(0)
     expect(countsByDate.get('2026-08-04')).toBe(0)
-    expect(countsByDate.get(toAnalyticsDateKey(firstReview.card.dueAt))).toBe(1)
+    expect(countsByDate.get(toAnalyticsDateKey(firstReview.card.dueAt))).toBe(0)
   })
 
   it('leaves the backlog unknown after an invalid review log', () => {

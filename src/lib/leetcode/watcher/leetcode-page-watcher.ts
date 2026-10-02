@@ -250,7 +250,6 @@ export function createLeetCodePageWatcher(
       }
 
       const problemMetadata = metadataReadResult.metadata
-      completedProblemDetailsReadSlug = location.slug
 
       if (readySlug !== location.slug) {
         readySlug = location.slug
@@ -276,10 +275,21 @@ export function createLeetCodePageWatcher(
 
       if (contentReadResult.ok) {
         emitProblemContentIfUseful(location, contentReadResult.content)
+        if (
+          problemMetadata.source === 'graphql' &&
+          contentReadResult.content.source === 'graphql' &&
+          isUsefulProblemContent(contentReadResult.content)
+        ) {
+          completedProblemDetailsReadSlug = location.slug
+        }
       } else {
         emitWatcherError(location, contentReadResult.error)
       }
     } catch (error) {
+      if (isStaleSnapshotRefresh(token, location)) {
+        return
+      }
+
       emitWatcherError(
         location,
         error instanceof Error ? error : new Error(String(error)),
