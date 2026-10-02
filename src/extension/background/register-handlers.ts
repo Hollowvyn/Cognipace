@@ -49,6 +49,7 @@ import {
   tracksGetTrackForEditRequestSchema,
   tracksGetWorkspaceRequestSchema,
   tracksNullResponseSchema,
+  tracksRemoveProblemRequestSchema,
   tracksResetTrackProgressRequestSchema,
   tracksRequestSchema,
   tracksSetActiveGroupRequestSchema,
@@ -142,6 +143,7 @@ import {
   getActiveTrack,
   getTrackForEdit,
   getWorkspace,
+  removeTrackProblem,
   resetTrackProgress,
   setActiveGroup,
   setActiveTrack,
@@ -1117,6 +1119,26 @@ export function registerBackgroundHandlers() {
     return runDbMutation(
       async (db) =>
         trackForEditResponseSchema.parse(await updateTrack(db, request)),
+      () =>
+        broadcastTracksInvalidation({
+          source: request.surface,
+          tags: ['tracks', 'problems'],
+        }),
+    )
+  })
+
+  onMessage('tracks.removeProblem', ({ data, sender }) => {
+    const request = tracksRemoveProblemRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'tracks.removeProblem',
+      request.surface,
+      sender,
+    )
+    return runDbMutation(
+      async (db) => {
+        await removeTrackProblem(db, request)
+        return tracksNullResponseSchema.parse(null)
+      },
       () =>
         broadcastTracksInvalidation({
           source: request.surface,

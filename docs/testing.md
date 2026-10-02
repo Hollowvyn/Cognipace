@@ -544,6 +544,23 @@ group and problem order without being reordered by due state. In Study Plan mode
 incomplete problem nor clears an earlier completion. Free Practice does not write
 active-track progress.
 
+#### Remove From Track
+
+Human happy-path and edge-case smoke with screenshots or a recording is pending
+and required before review or merge:
+
+1. Expand a middle problem in the active track. Verify **Remove from track** sits
+   beside Edit, click it, and check that the row disappears and order, progress,
+   and Next refresh. Reload to confirm persistence.
+2. Check Library and another track containing that problem: the problem and its
+   global practice/review history remain, and the other membership is unchanged.
+3. Remove a completed problem and then the last problem in a disposable group.
+   Confirm progress updates and the group remains with “No problems in this
+   group.” Re-add through Edit Track and check that it is incomplete while its
+   global practice history remains.
+4. In a test harness, delay or reject saving. Verify removal and practice buttons
+   disable while pending, errors display inline, and retry is available.
+
 ### Dashboard Analytics
 
 1. Open the dashboard.

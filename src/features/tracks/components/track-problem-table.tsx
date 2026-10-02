@@ -24,6 +24,7 @@ import { createLeetCodeProblemUrl } from '@/lib/leetcode'
 import { cn } from '@/utils/cn'
 
 import type { TrackProblemRow } from '../api/tracks-contracts'
+import { TrackProblemRemoveAction } from './track-problem-remove-action'
 
 export function TrackProblemTable({
   renderEditProblemAction,
@@ -115,6 +116,8 @@ function TrackProblemTableRow({
   renderEditProblemAction: RenderProblemEditAction
   row: Row<TrackProblemRow>
 }) {
+  const [isRemoving, setIsRemoving] = useState(false)
+  const [isPracticePending, setIsPracticePending] = useState(false)
   return (
     <>
       <tr
@@ -149,6 +152,15 @@ function TrackProblemTableRow({
               actions={
                 <ProblemRowActionsBar>
                   <ProblemRowPracticeActions
+                    afterEditAction={
+                      <TrackProblemRemoveAction
+                        disabled={isPracticePending || isRemoving}
+                        onPendingChange={setIsRemoving}
+                        row={row.original}
+                      />
+                    }
+                    disabled={isRemoving}
+                    onPendingChange={setIsPracticePending}
                     renderEditProblemAction={renderEditProblemAction}
                     row={row.original}
                   />

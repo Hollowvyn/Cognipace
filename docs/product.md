@@ -205,6 +205,11 @@ Tracks owns curriculum progression. Track completion is separate from global
 practice history, and active track/session state is local database state. Tracks
 can contain groups and ordered problem memberships.
 
+Expanded track problem rows offer **Remove from track** beside Edit. Removal
+only affects that track membership and its track completion; the Library
+problem, global practice/review data, and other track memberships remain.
+Remaining problems keep their relative order, and empty groups remain editable.
+
 The active track's `Next` target is the first incomplete, non-suspended
 membership in explicit group and problem order. FSRS due state does not reorder
 track progression; due reviews remain a separate review target. Selecting an

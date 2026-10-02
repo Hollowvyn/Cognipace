@@ -1096,6 +1096,75 @@ describe('TracksScreen', () => {
     ).toBeDisabled()
   })
 
+  it('removes a problem from its current track and refreshes the workspace', async () => {
+    const user = userEvent.setup()
+    let removed = false
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'tracks.getWorkspace') {
+        return Promise.resolve(
+          removed
+            ? {
+                ...twoGroupWorkspace,
+                activeTrackRows: twoGroupWorkspace.activeTrackRows.filter(
+                  (row) => row.problem.slug !== 'two-sum',
+                ),
+              }
+            : twoGroupWorkspace,
+        )
+      }
+      if (method === 'tracks.removeProblem') removed = true
+      return Promise.resolve(null)
+    })
+    renderTracksScreen()
+    await user.click(
+      await screen.findByRole('button', { name: 'Expand Two Sum' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Remove from track' }))
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Collapse Two Sum' }),
+      ).toBeNull(),
+    )
+    expect(sendMessage).toHaveBeenCalledWith('tracks.removeProblem', {
+      surface: 'dashboard',
+      trackId: 'leetcode-75',
+      problemSlug: 'two-sum',
+    })
+  })
+
+  it('disables removal while pending and lets the user retry a failed removal', async () => {
+    const user = userEvent.setup()
+    let rejectRemoval: (error: Error) => void = () => undefined
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'tracks.getWorkspace')
+        return Promise.resolve(twoGroupWorkspace)
+      if (method === 'tracks.removeProblem')
+        return new Promise((_, reject) => {
+          rejectRemoval = reject
+        })
+      return Promise.resolve(null)
+    })
+    renderTracksScreen()
+    await user.click(
+      await screen.findByRole('button', { name: 'Expand Two Sum' }),
+    )
+    const remove = screen.getByRole('button', { name: 'Remove from track' })
+    await user.click(remove)
+    expect(remove).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Suspend' })).toBeDisabled()
+    rejectRemoval(new Error('Could not save track.'))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not save track.',
+    )
+    expect(remove).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'Collapse Two Sum' }),
+    ).toBeVisible()
+    await user.click(remove)
+    expect(remove).toBeDisabled()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('expands problem rows with reusable practice actions and no global Delete', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockImplementation((method) => {

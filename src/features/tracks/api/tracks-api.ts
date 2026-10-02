@@ -11,6 +11,7 @@ import type {
   TracksGetActiveTrackRequest,
   TracksGetTrackForEditRequest,
   TracksGetWorkspaceRequest,
+  TracksRemoveProblemRequest,
   TracksResetTrackProgressRequest,
   TracksSetActiveGroupRequest,
   TracksSetActiveTrackRequest,
@@ -55,6 +56,12 @@ export function createTrackViaRuntime(request: TracksCreateTrackRequest) {
 
 export function updateTrackViaRuntime(request: TracksUpdateTrackRequest) {
   return sendMessage('tracks.updateTrack', request)
+}
+
+export function removeTrackProblemViaRuntime(
+  request: TracksRemoveProblemRequest,
+) {
+  return sendMessage('tracks.removeProblem', request)
 }
 
 export function deleteTrackViaRuntime(request: TracksDeleteTrackRequest) {
@@ -106,6 +113,10 @@ export function useCreateTrack() {
 
 export function useUpdateTrack() {
   return useTrackMutation(updateTrackViaRuntime, ['tracks', 'problems'])
+}
+
+export function useRemoveTrackProblem() {
+  return useTrackMutation(removeTrackProblemViaRuntime, ['tracks', 'problems'])
 }
 
 export function useDeleteTrack() {

@@ -174,6 +174,7 @@ describe('runtime-policy', () => {
       'tracks.createTrack',
       'tracks.updateTrack',
       'tracks.deleteTrack',
+      'tracks.removeProblem',
       'tracks.resetTrackProgress',
     ]) {
       expect(canCallExtensionMethod(method, 'dashboard')).toBe(true)

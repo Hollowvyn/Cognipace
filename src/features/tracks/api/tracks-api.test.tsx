@@ -15,6 +15,7 @@ import {
   useClearActiveTrack,
   useCreateTrack,
   useDeleteTrack,
+  useRemoveTrackProblem,
   useResetTrackProgress,
   useSetActiveGroup,
   useSetActiveTrack,
@@ -25,6 +26,7 @@ import {
 import type {
   TracksCreateTrackRequest,
   TracksDeleteTrackRequest,
+  TracksRemoveProblemRequest,
   TracksResetTrackProgressRequest,
   TracksSetActiveGroupRequest,
   TracksSetActiveTrackRequest,
@@ -193,6 +195,17 @@ describe('tracks API hooks', () => {
       } satisfies TracksDeleteTrackRequest,
       response: null,
       useHook: useDeleteTrack,
+      invalidatedQueryKeys,
+    })
+    await expectTrackMutation({
+      method: 'tracks.removeProblem',
+      request: {
+        surface: 'dashboard',
+        trackId: 'leetcode-75',
+        problemSlug: 'two-sum',
+      } satisfies TracksRemoveProblemRequest,
+      response: null,
+      useHook: useRemoveTrackProblem,
       invalidatedQueryKeys,
     })
     await expectTrackMutation({
