@@ -399,9 +399,9 @@ Schema change rules:
 - Keep database writes behind the owning feature repository or service.
 
 Snapshot compatibility is deliberately bounded. The app opens a snapshot when
-its fingerprint matches the current migration SQL. The only older fingerprint
-eligible for automatic upgrade is the exact migration sequence listed in
-`src/platform/db/snapshot-upgrade.ts`; the app validates that schema and runs
+its fingerprint matches the current migration SQL. Only the exact v7/v8
+migration sequences allowlisted in `src/platform/db/snapshot-upgrade.ts` are
+eligible for automatic upgrade; the app validates the matching schema and runs
 only the migrations after that supported prefix. When both snapshot keys are
 absent, the app treats the profile as a fresh install and creates and seeds a
 new database. A partial pair, malformed value, or unknown or unsupported
@@ -410,9 +410,11 @@ original available snapshot values remain available for recovery; the app does
 not clear them and silently seed a fresh database.
 
 Before a supported upgrade replaces the active snapshot, the app retains the
-original snapshot and fingerprint in `cognipace_db_recovery_topics_v1`. An
-existing recovery record is kept until it is exported and must not be overwritten
-by another upgrade. These recovery values are private local data. Never log or
+original snapshot and fingerprint in the baseline's recovery slot:
+`cognipace_db_recovery_topics_v1` for v7 or
+`cognipace_db_recovery_tracks_v1` for v8. Both copies survive sequential upgrades.
+An existing recovery record must not be overwritten by a different original.
+These recovery values are private local data. Never log or
 share their contents in an issue; use the scoped local export procedure in
 `docs/testing.md` if recovery is needed. Startup diagnostics must describe the
 failure without printing snapshot bytes, topic values, tokens, or settings.

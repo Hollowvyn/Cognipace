@@ -158,3 +158,27 @@ rollback. Older builds cannot read the new fingerprint or v5 backup; use a
 compatible pre-upgrade original/export or retain the new build to export data.
 Never rewrite shipped SQL or discard recovery copies to force a downgrade.
 No merge, release publication, or store action was requested.
+
+## V5 Migration Audit
+
+Backup export/restore and sync already operate on v5; strict legacy reads migrate
+v1-v4 input before persistence. The audit found no missing production migration.
+The recovery guide now exports both recovery slots and accounts for both supported
+SQLite baselines. [Issue #182](https://github.com/Hollowvyn/Cognipace/issues/182)
+tracks cleanup and eventual v5-only input after a supported conversion bridge.
+
+Passed: 145 tests across seven migration/backup/sync files, the documented
+fingerprint-sentinel script, Markdown formatting, and `rtk git diff --check`:
+
+```sh
+rtk npm run test -- src/features/backup/api/backup-contracts.test.ts src/features/backup/server/backup-service.test.ts src/features/sync/domain/sync-envelope.test.ts src/features/sync/server/sync-service.test.ts src/platform/db/snapshot-upgrade.test.ts src/platform/db/instance.test.ts src/platform/db/open-snapshot.test.ts
+rtk proxy node /private/tmp/cognipace-recovery-sentinel-check.cjs
+rtk proxy npx prettier --check docs/testing.md docs/architecture.md docs/superpowers/handoffs/2026-10-02-track-editor-external-progress.md
+```
+
+`rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run format`,
+`rtk npm run db:check`, and `rtk npm run db:generate` were not repeated for these
+docs-only corrections; source and schema are unchanged from the passing full
+validation. `rtk npm run zip` and human smoke remain skipped as recorded above.
+For user testing, `rtk proxy npm run dev` is running interactively on port 3001;
+the separate worktree's server on port 3000 was left running.

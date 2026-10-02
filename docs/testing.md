@@ -65,9 +65,9 @@ notification-specific count.
 
 When both snapshot keys are absent, startup creates and seeds a fresh database.
 A partial pair, malformed value, or unknown or unsupported fingerprint fails
-startup and retains the original available values for recovery. The only
-legacy fingerprint accepted for an automatic upgrade is the exact migration
-prefix in [`snapshot-upgrade.ts`](../src/platform/db/snapshot-upgrade.ts),
+startup and retains the original available values for recovery. Automatic
+upgrades accept only the exact v7/v8 migration prefixes allowlisted in
+[`snapshot-upgrade.ts`](../src/platform/db/snapshot-upgrade.ts),
 documented in [Database And Persistence](architecture.md#database-and-persistence).
 Automatic downgrade is unsupported. The Library may still offer Retry for
 transient startup failures, but retrying does not repair corrupt or unsupported
@@ -77,7 +77,7 @@ To make a local recovery copy:
 
 1. Open `chrome://extensions`, find CogniPace, and select its service worker
    console from the Inspect views.
-2. In that console, run the following expression. It reads only the three
+2. In that console, run the following expression. It reads only the four
    database recovery keys and copies their JSON values to the clipboard:
 
    ```js
@@ -87,6 +87,7 @@ To make a local recovery copy:
          'cognipace_db_snapshot_v1',
          'cognipace_db_snapshot_fingerprint_v1',
          'cognipace_db_recovery_topics_v1',
+         'cognipace_db_recovery_tracks_v1',
        ]),
      ),
    )
@@ -135,17 +136,17 @@ shows only the relevant UI state and safe error text.
      hash = ((hash << 5) + hash) ^ sql.charCodeAt(index)
    }
    const current = (hash >>> 0).toString(16).padStart(8, "0")
-   const fixture = fs.readFileSync(
-     "src/testing/fixtures/topics-legacy-migrations.ts",
+   const upgrade = fs.readFileSync(
+     "src/platform/db/snapshot-upgrade.ts",
      "utf8",
    )
-   const legacy = fixture.match(
-     /expectedLegacyMigrationFingerprint = .([a-f0-9]{8})./,
-   )?.[1]
-   if (!legacy) throw new Error("Could not read the allowlisted fingerprint")
+   const legacy = Array.from(upgrade.matchAll(
+     /legacy(?:Topic|Track)MigrationFingerprint = '([a-f0-9]{8})'/g,
+   ), (match) => match[1])
+   if (legacy.length !== 2) throw new Error("Could not read both allowlisted fingerprints")
    let candidate = 0
    const sentinel = () => candidate.toString(16).padStart(8, "0")
-   while ([current, legacy].includes(sentinel())) candidate += 1
+   while ([current, ...legacy].includes(sentinel())) candidate += 1
    console.log(sentinel())
    NODE
    ```
