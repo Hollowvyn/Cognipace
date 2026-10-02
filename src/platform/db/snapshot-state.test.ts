@@ -3,6 +3,7 @@ import {
   preserveRecovery,
   readSnapshotState,
   RECOVERY_KEY,
+  TRACK_RECOVERY_KEY,
 } from './snapshot-state'
 import { FINGERPRINT_KEY, SNAPSHOT_KEY } from './snapshot'
 
@@ -93,6 +94,44 @@ describe('preserveRecovery', () => {
     [FINGERPRINT_KEY]: 'damaged',
   }
   const now = new Date('2026-09-26T12:00:00.000Z')
+
+  it('stores a track-upgrade original separately from the earlier topic recovery', async () => {
+    const earlier = {
+      version: 1,
+      raw: { [SNAPSHOT_KEY]: 'earlier v7 original' },
+      savedAt: now.toISOString(),
+    }
+    const storage = {
+      get: vi.fn().mockResolvedValue({ [RECOVERY_KEY]: earlier }),
+      set: vi.fn().mockResolvedValue(undefined),
+    }
+    await preserveRecovery(storage, raw, now, TRACK_RECOVERY_KEY)
+    expect(storage.get).toHaveBeenCalledWith([TRACK_RECOVERY_KEY])
+    expect(storage.set).toHaveBeenCalledWith({
+      [TRACK_RECOVERY_KEY]: { version: 1, raw, savedAt: now.toISOString() },
+    })
+  })
+
+  it('retains the same track original on retry and rejects a different track original', async () => {
+    const first = { version: 1, raw, savedAt: '2026-09-25T12:00:00.000Z' }
+    const storage = {
+      get: vi.fn().mockResolvedValue({ [TRACK_RECOVERY_KEY]: first }),
+      set: vi.fn(),
+    }
+    await preserveRecovery(storage, raw, now, TRACK_RECOVERY_KEY)
+    expect(storage.set).not.toHaveBeenCalled()
+    await expect(
+      preserveRecovery(
+        storage,
+        { [SNAPSHOT_KEY]: 'different v8 original' },
+        now,
+        TRACK_RECOVERY_KEY,
+      ),
+    ).rejects.toThrow(
+      'An earlier database recovery record must be exported before another upgrade.',
+    )
+    expect(storage.set).not.toHaveBeenCalled()
+  })
 
   it('writes the raw snapshot and timestamp before upgrade', async () => {
     const storage = {

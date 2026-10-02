@@ -14,18 +14,46 @@ export const legacyTopicMigrationPaths = [
   './migrations/0007_track_simple_recall.sql',
 ] as const
 
-const legacyEntries = legacyTopicMigrationPaths.map((path) => {
-  const entry = migrationEntries.find((candidate) => candidate.path === path)
-  if (!entry) throw new Error(`Missing supported legacy migration: ${path}`)
-  return entry
-})
+export const legacyTrackMigrationPaths = [
+  ...legacyTopicMigrationPaths,
+  './migrations/0008_topics_typed_relations.sql',
+] as const
 
-export const legacyTopicMigrationSql = legacyEntries
-  .map((entry) => entry.sql)
-  .join('\n')
-export const legacyTopicMigrationFingerprint = computeFingerprint(
-  legacyTopicMigrationSql,
+function readBaselineSql(paths: readonly string[]) {
+  return paths
+    .map((path) => {
+      const entry = migrationEntries.find(
+        (candidate) => candidate.path === path,
+      )
+      if (!entry) throw new Error(`Missing supported legacy migration: ${path}`)
+      return entry.sql
+    })
+    .join('\n')
+}
+
+export const legacyTopicMigrationSql = readBaselineSql(
+  legacyTopicMigrationPaths,
 )
+export const legacyTrackMigrationSql = readBaselineSql(
+  legacyTrackMigrationPaths,
+)
+
+// Shipped SQL fingerprints are fixed compatibility boundaries.
+export const legacyTopicMigrationFingerprint = 'b1c2b4d7'
+export const legacyTrackMigrationFingerprint = 'a35941fc'
+
+const supportedBaselines = [
+  {
+    fingerprint: legacyTopicMigrationFingerprint,
+    paths: legacyTopicMigrationPaths,
+    sql: legacyTopicMigrationSql,
+  },
+  {
+    fingerprint: legacyTrackMigrationFingerprint,
+    paths: legacyTrackMigrationPaths,
+    sql: legacyTrackMigrationSql,
+  },
+] as const
 
 const schemaQuery = `SELECT type, name, tbl_name, sql FROM sqlite_schema
   WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name`
@@ -34,26 +62,39 @@ export function selectUpgradeSql(
   fromFingerprint: string,
   entries: readonly { path: string; sql: string }[] = migrationEntries,
 ): string {
-  if (fromFingerprint !== computeFingerprint(legacyTopicMigrationSql)) {
+  const baseline = getSupportedBaseline(fromFingerprint, entries)
+  return entries
+    .slice(baseline.paths.length)
+    .map((entry) => entry.sql)
+    .join('\n')
+}
+
+export function selectSnapshotBaselineSql(fromFingerprint: string): string {
+  return getSupportedBaseline(fromFingerprint, migrationEntries).sql
+}
+
+function getSupportedBaseline(
+  fromFingerprint: string,
+  entries: readonly { path: string; sql: string }[],
+) {
+  const baseline = supportedBaselines.find(
+    (candidate) => candidate.fingerprint === fromFingerprint,
+  )
+  if (!baseline) {
     throw new Error(
       'This database version requires recovery; its original data was retained.',
     )
   }
-  const prefix = entries.slice(0, legacyTopicMigrationPaths.length)
+  const prefix = entries.slice(0, baseline.paths.length)
   if (
-    prefix.length !== legacyTopicMigrationPaths.length ||
-    prefix.some(
-      (entry, index) => entry.path !== legacyTopicMigrationPaths[index],
-    ) ||
+    prefix.length !== baseline.paths.length ||
+    prefix.some((entry, index) => entry.path !== baseline.paths[index]) ||
     computeFingerprint(prefix.map((entry) => entry.sql).join('\n')) !==
-      computeFingerprint(legacyTopicMigrationSql)
+      baseline.fingerprint
   ) {
     throw new Error('The supported migration prefix has changed.')
   }
-  return entries
-    .slice(prefix.length)
-    .map((entry) => entry.sql)
-    .join('\n')
+  return baseline
 }
 
 export async function validateSnapshotSchema(

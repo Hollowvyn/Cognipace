@@ -158,6 +158,7 @@ describe('tracks API hooks', () => {
       request: {
         surface: 'dashboard',
         title: 'Interview Track',
+        allowExternalProgress: false,
         description: null,
         dueAt: null,
         groups: [{ title: 'Arrays', problemSlugs: ['two-sum'] }],
@@ -173,6 +174,7 @@ describe('tracks API hooks', () => {
         surface: 'dashboard',
         trackId: 'leetcode-75',
         title: 'Interview Track',
+        allowExternalProgress: false,
         description: null,
         dueAt: null,
         groups: [

@@ -783,18 +783,14 @@ export function registerBackgroundHandlers() {
     return runDbMutation(
       async (db) => {
         const settings = await getSettings(db)
-        await overrideLastReviewResultWithTrackProgress(
-          db,
-          {
-            problemSlug: request.problemSlug,
-            rating: request.rating,
-            elapsedSeconds: request.elapsedSeconds,
-            isCorrect: request.isCorrect,
-            log: readReviewLogRequest(request),
-            targetRetention: settings.review.targetRetention,
-          },
-          settings,
-        )
+        await overrideLastReviewResultWithTrackProgress(db, {
+          problemSlug: request.problemSlug,
+          rating: request.rating,
+          elapsedSeconds: request.elapsedSeconds,
+          isCorrect: request.isCorrect,
+          log: readReviewLogRequest(request),
+          targetRetention: settings.review.targetRetention,
+        })
         const details = await getPracticeDetails(db, request.problemSlug)
 
         return serializePracticeDetails(details)

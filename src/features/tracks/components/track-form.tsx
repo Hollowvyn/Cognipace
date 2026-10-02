@@ -1,13 +1,24 @@
-import { Loader2, Plus, Search, X, ArrowDown, ArrowUp } from 'lucide-react'
+import {
+  Loader2,
+  Plus,
+  Search,
+  X,
+  ArrowDown,
+  ArrowUp,
+  Pencil,
+  ChevronDown,
+} from 'lucide-react'
 import {
   useEffect,
   useMemo,
+  useLayoutEffect,
   useRef,
   useState,
   type FocusEvent,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -28,6 +39,7 @@ import type {
   TracksUpdateTrackRequest,
 } from '../api/tracks-contracts'
 import { getDateInputMin } from '../domain'
+import { TrackQuestionGroupMenu } from './track-question-group-menu'
 import {
   trackFormGroupByOptions,
   type TrackFormInitialDraft,
@@ -135,6 +147,9 @@ function TrackFormFields({
   const { canSubmit, dispatch, fieldErrors, payload, selectedGroup, state } =
     useTrackForm(source, initialDraft ? { initialDraft } : {})
   const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchFocused, setSearchFocused] = useState(false)
+  const [renamingGroupKey, setRenamingGroupKey] = useState<string | null>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const shouldShowGroupBy = mode === 'create' && Boolean(initialDraft)
@@ -148,6 +163,17 @@ function TrackFormFields({
   const availableProblemRows = useMemo(
     () => mergeProblemRows(source.problemRows, initialDraft?.problemRows ?? []),
     [initialDraft?.problemRows, source.problemRows],
+  )
+  const eligibleProblemSlugs = useMemo(
+    () => new Set(source.externalProgressProblemSlugs),
+    [source.externalProgressProblemSlugs],
+  )
+  const eligibleSelectedCount = state.groups.reduce(
+    (count, group) =>
+      count +
+      group.problemSlugs.filter((slug) => eligibleProblemSlugs.has(slug))
+        .length,
+    0,
   )
   const problemRowsBySlug = useMemo(
     () =>
@@ -167,6 +193,7 @@ function TrackFormFields({
 
       if (firstInvalidGroupKey) {
         dispatch({ groupKey: firstInvalidGroupKey, type: 'select-group' })
+        setRenamingGroupKey(firstInvalidGroupKey)
       }
 
       return
@@ -294,35 +321,83 @@ function TrackFormFields({
             <span>Set as active track</span>
           </label>
         ) : null}
+        <div className="grid gap-1">
+          <label className="inline-flex min-h-[var(--cp-control-height)] w-fit items-center gap-2 text-[length:var(--cp-control-font-size)] font-semibold text-foreground">
+            <input
+              checked={state.allowExternalProgress}
+              className="size-4 rounded border-border accent-primary"
+              name="track-allow-external-progress"
+              aria-describedby="track-external-progress-help"
+              onChange={(event) =>
+                dispatch({
+                  type: 'set-allow-external-progress',
+                  checked: event.target.checked,
+                })
+              }
+              type="checkbox"
+            />
+            <span>Allow external progress</span>
+          </label>
+          <p
+            id="track-external-progress-help"
+            className="m-0 text-[length:var(--cp-badge-font-size)] text-muted-foreground"
+          >
+            Count successful solves from anywhere in CogniPace, including
+            earlier solves.
+          </p>
+          {state.allowExternalProgress ? (
+            <p
+              aria-live="polite"
+              className="m-0 text-[length:var(--cp-badge-font-size)] font-semibold text-primary"
+            >
+              {eligibleSelectedCount} selected{' '}
+              {eligibleSelectedCount === 1 ? 'question' : 'questions'} can count
+              earlier progress.
+            </p>
+          ) : null}
+        </div>
       </section>
-
-      <TrackProblemSearch
-        dispatch={dispatch}
-        groups={state.groups}
-        problemRows={availableProblemRows}
-        searchQuery={searchQuery}
-        selectedGroup={selectedGroup}
-        setSearchQuery={setSearchQuery}
-      />
 
       <div
         aria-label="Track composition editor"
-        className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+        className="grid min-w-0 gap-3"
         role="group"
       >
         <TrackGroupList
           dispatch={dispatch}
           fieldErrors={fieldErrors}
           groups={state.groups}
+          nextGroupNumber={state.nextGroupNumber}
+          renamingGroupKey={renamingGroupKey}
           selectedGroupKey={selectedGroup.key}
+          setRenamingGroupKey={setRenamingGroupKey}
           showErrors={submitAttempted}
-        />
-        <SelectedGroupProblems
-          dispatch={dispatch}
-          groups={state.groups}
-          problemRowsBySlug={problemRowsBySlug}
-          selectedGroup={selectedGroup}
-        />
+        >
+          <TrackProblemSearch
+            dispatch={dispatch}
+            groups={state.groups}
+            inputRef={searchInputRef}
+            isSearchFocused={isSearchFocused}
+            setSearchFocused={setSearchFocused}
+            problemRows={availableProblemRows}
+            searchQuery={searchQuery}
+            selectedGroup={selectedGroup}
+            setSearchQuery={setSearchQuery}
+          />
+          <SelectedGroupProblems
+            dispatch={dispatch}
+            eligibleProblemSlugs={
+              state.allowExternalProgress ? eligibleProblemSlugs : new Set()
+            }
+            groups={state.groups}
+            problemRowsBySlug={problemRowsBySlug}
+            onFocusSearch={() => {
+              searchInputRef.current?.focus()
+              setSearchFocused(false)
+            }}
+            selectedGroup={selectedGroup}
+          />
+        </TrackGroupList>
       </div>
 
       <div
@@ -347,6 +422,9 @@ function TrackFormFields({
 function TrackProblemSearch({
   dispatch,
   groups,
+  inputRef,
+  isSearchFocused,
+  setSearchFocused,
   problemRows,
   searchQuery,
   selectedGroup,
@@ -354,6 +432,9 @@ function TrackProblemSearch({
 }: {
   dispatch: ReturnType<typeof useTrackForm>['dispatch']
   groups: readonly TrackFormGroupState[]
+  inputRef: RefObject<HTMLInputElement | null>
+  isSearchFocused: boolean
+  setSearchFocused: (focused: boolean) => void
   problemRows: readonly ProblemLibraryRow[]
   searchQuery: string
   selectedGroup: TrackFormGroupState
@@ -361,7 +442,6 @@ function TrackProblemSearch({
 }) {
   const normalizedSearchQuery = searchQuery.trim()
   const hasSearchQuery = normalizedSearchQuery.length > 0
-  const [isSearchFocused, setSearchFocused] = useState(false)
   const selectedProblemSlugSet = new Set(
     groups.flatMap((group) => group.problemSlugs),
   )
@@ -399,10 +479,12 @@ function TrackProblemSearch({
       onBlur={handleBlur}
     >
       <TrackTextField
+        inputRef={inputRef}
         icon={<Search aria-hidden="true" />}
         label="Search Library problems"
         name="track-problem-search"
         onChange={setSearchQuery}
+        onClick={() => setSearchFocused(true)}
         onFocus={() => setSearchFocused(true)}
         type="search"
         value={searchQuery}
@@ -429,6 +511,7 @@ function TrackProblemSearch({
                       type: 'add-problem',
                     })
                     setSearchQuery('')
+                    inputRef.current?.focus()
                     setSearchFocused(false)
                   }}
                   row={row}
@@ -445,16 +528,24 @@ function TrackProblemSearch({
 }
 
 function TrackGroupList({
+  children,
   dispatch,
   fieldErrors,
   groups,
+  nextGroupNumber,
+  renamingGroupKey,
   selectedGroupKey,
+  setRenamingGroupKey,
   showErrors,
 }: {
+  children: ReactNode
   dispatch: ReturnType<typeof useTrackForm>['dispatch']
   fieldErrors: TrackFormFieldErrors
   groups: readonly TrackFormGroupState[]
+  nextGroupNumber: number
+  renamingGroupKey: string | null
   selectedGroupKey: string
+  setRenamingGroupKey: (groupKey: string | null) => void
   showErrors: boolean
 }) {
   return (
@@ -467,7 +558,10 @@ function TrackGroupList({
           Groups
         </h3>
         <Button
-          onClick={() => dispatch({ type: 'add-group' })}
+          onClick={() => {
+            dispatch({ type: 'add-group' })
+            setRenamingGroupKey(`new-group-${nextGroupNumber}`)
+          }}
           size="sm"
           type="button"
           variant="outline"
@@ -476,54 +570,68 @@ function TrackGroupList({
           New Group
         </Button>
       </div>
-      <div
-        aria-label="Track groups"
-        className="grid h-80 content-start gap-2 overflow-y-auto rounded-[var(--cp-control-radius)] border-2 border-border bg-card/50 p-3"
-        role="list"
-      >
+      <div aria-label="Track groups" className="grid min-w-0 gap-3" role="list">
         {groups.map((group, index) => {
           const displayTitle = getGroupDisplayTitle(group, index)
           const isSelected = group.key === selectedGroupKey
           const groupTitleError = fieldErrors.groupTitles[group.key]
-
           return (
             <div
-              aria-label={`${displayTitle}, ${formatProblemCount(
-                group.problemSlugs.length,
-              )}`}
+              aria-label={`${displayTitle}, ${formatProblemCount(group.problemSlugs.length)}`}
               className={cn(
-                'grid min-w-0 cursor-pointer gap-2 rounded-[var(--cp-control-radius)] border border-border bg-background/30 px-3 py-2 transition-colors hover:bg-muted/45',
-                isSelected && 'border-primary bg-muted/45',
+                'grid min-w-0 gap-3 rounded-[var(--cp-control-radius)] border border-border bg-background/30 p-3',
+                isSelected && 'border-primary bg-muted/20',
               )}
               key={group.key}
-              onClick={(event) => {
-                if (isFormCardControl(event.target)) {
-                  return
-                }
-
-                dispatch({ groupKey: group.key, type: 'select-group' })
-              }}
               role="listitem"
             >
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+              <div className="grid min-w-0 grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                 <button
                   aria-label={`Select ${displayTitle}`}
-                  aria-pressed={isSelected}
-                  className="grid min-w-0 justify-items-start gap-0.5 rounded-[var(--cp-control-radius)] px-2 py-1 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  onClick={() =>
+                  aria-controls={`track-group-panel-${group.key}`}
+                  aria-expanded={isSelected}
+                  className="grid min-w-0 justify-items-start gap-1 rounded-[var(--cp-control-radius)] px-1 py-1 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => {
                     dispatch({ groupKey: group.key, type: 'select-group' })
-                  }
+                    if (!isSelected) setRenamingGroupKey(null)
+                  }}
                   type="button"
                 >
-                  <span className="min-w-0 max-w-full truncate text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
-                    {displayTitle}
+                  <span className="flex min-w-0 items-start gap-2">
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={cn(
+                        'mt-0.5 size-4 shrink-0 transition-transform',
+                        !isSelected && '-rotate-90',
+                      )}
+                    />
+                    <span className="min-w-0 break-words text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
+                      {displayTitle}
+                    </span>
                   </span>
-                  <span className="text-[length:var(--cp-badge-font-size)] text-muted-foreground">
+                  <span className="pl-6 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
                     {formatProblemCount(group.problemSlugs.length)}
                   </span>
                 </button>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex flex-wrap justify-end gap-1">
                   <IconButton
+                    className="w-8 px-0"
+                    label={`Rename ${displayTitle}`}
+                    onClick={() => {
+                      dispatch({ groupKey: group.key, type: 'select-group' })
+                      setRenamingGroupKey(
+                        renamingGroupKey === group.key ? null : group.key,
+                      )
+                    }}
+                    size="sm"
+                    tooltip="Rename group"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Pencil aria-hidden="true" />
+                  </IconButton>
+                  <IconButton
+                    className="w-8 px-0"
                     disabled={index === 0}
                     label={`Move ${displayTitle} up`}
                     onClick={() =>
@@ -541,6 +649,7 @@ function TrackGroupList({
                     <ArrowUp aria-hidden="true" />
                   </IconButton>
                   <IconButton
+                    className="w-8 px-0"
                     disabled={index === groups.length - 1}
                     label={`Move ${displayTitle} down`}
                     onClick={() =>
@@ -558,6 +667,7 @@ function TrackGroupList({
                     <ArrowDown aria-hidden="true" />
                   </IconButton>
                   <IconButton
+                    className="w-8 px-0"
                     disabled={
                       groups.length <= 1 || group.problemSlugs.length > 0
                     }
@@ -575,25 +685,34 @@ function TrackGroupList({
                 </div>
               </div>
               {isSelected ? (
-                <TrackTextField
-                  describedBy={
-                    showErrors && groupTitleError
-                      ? 'track-form-error'
-                      : undefined
-                  }
-                  invalid={showErrors && Boolean(groupTitleError)}
-                  label="Group title"
-                  name={`track-group-${index + 1}-title`}
-                  onChange={(title) =>
-                    dispatch({
-                      groupKey: group.key,
-                      title,
-                      type: 'rename-group',
-                    })
-                  }
-                  required
-                  value={group.title}
-                />
+                <div
+                  id={`track-group-panel-${group.key}`}
+                  className="grid min-w-0 gap-4"
+                >
+                  {renamingGroupKey === group.key ? (
+                    <TrackTextField
+                      autoFocus
+                      describedBy={
+                        showErrors && groupTitleError
+                          ? 'track-form-error'
+                          : undefined
+                      }
+                      invalid={showErrors && Boolean(groupTitleError)}
+                      label="Group title"
+                      name={`track-group-${index + 1}-title`}
+                      onChange={(title) =>
+                        dispatch({
+                          groupKey: group.key,
+                          title,
+                          type: 'rename-group',
+                        })
+                      }
+                      required
+                      value={group.title}
+                    />
+                  ) : null}
+                  {children}
+                </div>
               ) : null}
             </div>
           )
@@ -605,36 +724,41 @@ function TrackGroupList({
 
 function SelectedGroupProblems({
   dispatch,
+  eligibleProblemSlugs,
   groups,
   problemRowsBySlug,
+  onFocusSearch,
   selectedGroup,
 }: {
   dispatch: ReturnType<typeof useTrackForm>['dispatch']
+  eligibleProblemSlugs: ReadonlySet<string>
   groups: readonly TrackFormGroupState[]
   problemRowsBySlug: ReadonlyMap<string, ProblemLibraryRow>
+  onFocusSearch: () => void
   selectedGroup: TrackFormGroupState
 }) {
   return (
     <section
       aria-label="Selected group problems"
-      className="grid min-w-0 content-start gap-3"
+      className="grid min-w-0 gap-3"
     >
       <div
         aria-label="Selected group problems header"
         className={cn(editorPaneHeaderClassName, 'flex-wrap gap-y-1')}
       >
-        <h3 className="m-0 truncate text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
-          {selectedGroup.title.trim() || 'Selected group'} problems
+        <h3 className="m-0 break-words text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
+          Questions
         </h3>
-        <p className="m-0 text-[length:var(--cp-badge-font-size)] leading-none text-muted-foreground">
+        <p className="m-0 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
           {selectedGroup.problemSlugs.length} selected
         </p>
       </div>
-
       <OrderedProblemList
         dispatch={dispatch}
+        eligibleProblemSlugs={eligibleProblemSlugs}
         groups={groups}
         problemRowsBySlug={problemRowsBySlug}
+        onFocusSearch={onFocusSearch}
         selectedGroup={selectedGroup}
       />
     </section>
@@ -643,19 +767,57 @@ function SelectedGroupProblems({
 
 function OrderedProblemList({
   dispatch,
+  eligibleProblemSlugs,
   groups,
   problemRowsBySlug,
+  onFocusSearch,
   selectedGroup,
 }: {
   dispatch: ReturnType<typeof useTrackForm>['dispatch']
+  eligibleProblemSlugs: ReadonlySet<string>
   groups: readonly TrackFormGroupState[]
   problemRowsBySlug: ReadonlyMap<string, ProblemLibraryRow>
+  onFocusSearch: () => void
   selectedGroup: TrackFormGroupState
 }) {
+  const [openMenuSlug, setOpenMenuSlug] = useState<string | null>(null)
+  const rowsRef = useRef<HTMLDivElement>(null)
+  const pendingFocusSlugRef = useRef<string | null | undefined>(undefined)
+  useLayoutEffect(() => {
+    if (pendingFocusSlugRef.current === undefined) return
+    const targetSlug = pendingFocusSlugRef.current
+    const row = Array.from(
+      rowsRef.current?.querySelectorAll<HTMLElement>('[data-problem-slug]') ??
+        [],
+    ).find((element) => element.dataset.problemSlug === targetSlug)
+    const control = row?.querySelector<HTMLButtonElement>(
+      'button:not([disabled])',
+    )
+    if (control) control.focus()
+    else onFocusSearch()
+    pendingFocusSlugRef.current = undefined
+  }, [onFocusSearch, selectedGroup.problemSlugs])
+
+  function moveProblem(problemSlug: string, toGroupKey: string) {
+    const index = selectedGroup.problemSlugs.indexOf(problemSlug)
+    pendingFocusSlugRef.current =
+      selectedGroup.problemSlugs[index + 1] ??
+      selectedGroup.problemSlugs[index - 1] ??
+      null
+    setOpenMenuSlug(null)
+    dispatch({
+      fromGroupKey: selectedGroup.key,
+      problemSlug,
+      toGroupKey,
+      type: 'move-problem-to-group',
+    })
+  }
+
   return (
     <div
       aria-label="Selected problem rows"
-      className="h-80 overflow-y-auto rounded-[var(--cp-control-radius)] border-2 border-border bg-card/50 p-3"
+      className="min-w-0"
+      ref={rowsRef}
       role="region"
     >
       {selectedGroup.problemSlugs.length === 0 ? (
@@ -668,38 +830,50 @@ function OrderedProblemList({
           {selectedGroup.problemSlugs.map((problemSlug, index) => {
             const row = problemRowsBySlug.get(problemSlug)
             const title = row?.problem.title ?? problemSlug
-
             return (
               <li
                 aria-label={`${index + 1}. ${title}`}
-                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-[var(--cp-control-radius)] border border-border bg-background/30 px-3 py-2"
+                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-[var(--cp-control-radius)] border border-border bg-background/30 px-3 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+                data-problem-slug={problemSlug}
                 key={problemSlug}
               >
-                <span className="text-[length:var(--cp-badge-font-size)] font-bold text-muted-foreground tabular-nums">
+                <span className="pt-1 text-[length:var(--cp-badge-font-size)] font-bold text-muted-foreground tabular-nums">
                   {index + 1}
                 </span>
-                <ProblemSummary compact title={title} slug={problemSlug} />
-                <div className="flex shrink-0 justify-end gap-1">
-                  <select
-                    aria-label={`Group for ${title}`}
-                    className="h-8 max-w-36 rounded-[var(--cp-control-radius)] border border-border bg-background px-2 text-[length:var(--cp-badge-font-size)] text-foreground"
-                    onChange={(event) =>
-                      dispatch({
-                        fromGroupKey: selectedGroup.key,
-                        problemSlug,
-                        toGroupKey: event.target.value,
-                        type: 'move-problem-to-group',
-                      })
-                    }
-                    value={selectedGroup.key}
-                  >
-                    {groups.map((group) => (
-                      <option key={group.key} value={group.key}>
-                        {group.title.trim() || 'Untitled group'}
-                      </option>
-                    ))}
-                  </select>
+                <div className="min-w-0">
+                  <ProblemSummary compact title={title} slug={problemSlug} />
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
+                    {row && row.problem.difficulty !== 'unknown' ? (
+                      <span>
+                        {row.problem.difficulty.charAt(0).toUpperCase() +
+                          row.problem.difficulty.slice(1)}
+                      </span>
+                    ) : null}
+                    {eligibleProblemSlugs.has(problemSlug) ? (
+                      <span className="font-semibold text-primary">
+                        Previously solved
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="col-start-2 flex flex-wrap justify-end gap-1 sm:col-start-auto">
+                  {groups.length > 1 ? (
+                    <TrackQuestionGroupMenu
+                      destinations={groups.filter(
+                        (group) => group.key !== selectedGroup.key,
+                      )}
+                      isOpen={openMenuSlug === problemSlug}
+                      onMove={(toGroupKey) =>
+                        moveProblem(problemSlug, toGroupKey)
+                      }
+                      onOpenChange={(open) =>
+                        setOpenMenuSlug(open ? problemSlug : null)
+                      }
+                      title={title}
+                    />
+                  ) : null}
                   <IconButton
+                    className="w-8 px-0"
                     disabled={index === 0}
                     label={`Move ${title} up`}
                     onClick={() =>
@@ -718,6 +892,7 @@ function OrderedProblemList({
                     <ArrowUp aria-hidden="true" />
                   </IconButton>
                   <IconButton
+                    className="w-8 px-0"
                     disabled={index === selectedGroup.problemSlugs.length - 1}
                     label={`Move ${title} down`}
                     onClick={() =>
@@ -736,6 +911,7 @@ function OrderedProblemList({
                     <ArrowDown aria-hidden="true" />
                   </IconButton>
                   <IconButton
+                    className="w-8 px-0"
                     label={`Remove ${title}`}
                     onClick={() =>
                       dispatch({
@@ -799,7 +975,7 @@ function ProblemSummary({
   return (
     <div className="min-w-0">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="min-w-0 max-w-full truncate text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
+        <span className="min-w-0 max-w-full break-words text-[length:var(--cp-copy-font-size)] font-bold text-foreground">
           {title}
         </span>
       </div>
@@ -813,26 +989,32 @@ function ProblemSummary({
 }
 
 function TrackTextField({
+  autoFocus = false,
   describedBy,
   icon,
   invalid = false,
+  inputRef,
   label,
   name,
   onBlur,
   onChange,
+  onClick,
   onFocus,
   onKeyDown,
   required = false,
   type = 'text',
   value,
 }: {
+  autoFocus?: boolean
   describedBy?: string | undefined
+  inputRef?: RefObject<HTMLInputElement | null>
   icon?: ReactNode | undefined
   invalid?: boolean
   label: string
   name: string
   onBlur?: ((event: FocusEvent<HTMLInputElement>) => void) | undefined
   onChange: (value: string) => void
+  onClick?: (() => void) | undefined
   onFocus?: ((event: FocusEvent<HTMLInputElement>) => void) | undefined
   onKeyDown?: ((event: KeyboardEvent<HTMLInputElement>) => void) | undefined
   required?: boolean
@@ -848,6 +1030,8 @@ function TrackTextField({
         </span>
       ) : null}
       <input
+        autoFocus={autoFocus}
+        ref={inputRef}
         aria-describedby={describedBy}
         aria-invalid={invalid || undefined}
         autoComplete="off"
@@ -855,6 +1039,7 @@ function TrackTextField({
         name={name}
         onBlur={onBlur}
         onChange={(event) => onChange(event.target.value)}
+        onClick={onClick}
         onFocus={onFocus}
         onKeyDown={onKeyDown}
         required={required}
@@ -1021,13 +1206,6 @@ function getGroupDisplayTitle(group: TrackFormGroupState, index: number) {
 
 function formatProblemCount(count: number) {
   return `${count} ${count === 1 ? 'problem' : 'problems'}`
-}
-
-function isFormCardControl(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    Boolean(target.closest('button, input, textarea, select, label'))
-  )
 }
 
 function matchesProblemSearch(row: ProblemLibraryRow, searchQuery: string) {

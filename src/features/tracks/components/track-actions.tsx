@@ -110,7 +110,11 @@ export function TrackActions({
       {confirmation === 'reset-progress' ? (
         <TrackConfirmationDialog
           confirmLabel="Reset Progress"
-          description="This clears completed progress for this track."
+          description={
+            track.allowExternalProgress
+              ? 'This clears completed progress for this track and turns off external progress. Your practice history is kept.'
+              : 'This clears completed progress for this track.'
+          }
           error={error}
           onCancel={closeConfirmation}
           onConfirm={() => {

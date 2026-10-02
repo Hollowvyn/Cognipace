@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createSerializedProblem } from '@/testing/problem-fixtures'
 import {
+  createSerializedTrack,
   createSerializedTrackGroup,
   createTrackForEditResponse,
   createTrackProblemRow,
@@ -259,5 +260,39 @@ describe('useTrackForm problem movement', () => {
     })
 
     expect(result.current.state).toBe(groupedState)
+  })
+})
+
+describe('useTrackForm external progress', () => {
+  it('starts new tracks off and includes the selected setting in the payload', () => {
+    const { result } = renderHook(() =>
+      useTrackForm(createTrackForEditResponse({ track: null })),
+    )
+    expect(result.current.state.allowExternalProgress).toBe(false)
+    act(() => {
+      result.current.dispatch({ type: 'set-title', title: 'New track' })
+      result.current.dispatch({
+        type: 'set-allow-external-progress',
+        checked: true,
+      })
+    })
+    expect(result.current.payload?.allowExternalProgress).toBe(true)
+  })
+
+  it('restores the saved setting and supports turning it off without changing membership', () => {
+    const source = createTrackForEditResponse({
+      track: createSerializedTrack({ allowExternalProgress: true }),
+    })
+    const { result } = renderHook(() => useTrackForm(source))
+    expect(result.current.state.allowExternalProgress).toBe(true)
+    const groups = result.current.state.groups
+    act(() =>
+      result.current.dispatch({
+        type: 'set-allow-external-progress',
+        checked: false,
+      }),
+    )
+    expect(result.current.payload?.allowExternalProgress).toBe(false)
+    expect(result.current.state.groups).toBe(groups)
   })
 })

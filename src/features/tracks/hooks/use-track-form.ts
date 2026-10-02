@@ -19,6 +19,7 @@ export type TrackFormAction =
   | { type: 'set-description'; description: string }
   | { type: 'set-due-at'; dueAt: string }
   | { type: 'set-active-after-create'; checked: boolean }
+  | { type: 'set-allow-external-progress'; checked: boolean }
   | {
       type: 'set-group-by'
       groupBy: TrackFormGroupBy
@@ -52,6 +53,7 @@ export interface TrackFormGroupState {
 }
 
 export interface TrackFormState {
+  allowExternalProgress: boolean
   description: string
   dueAt: string
   groupBy: TrackFormGroupBy
@@ -116,6 +118,8 @@ function trackFormReducer(
       return { ...state, description: action.description }
     case 'set-due-at':
       return { ...state, dueAt: action.dueAt }
+    case 'set-allow-external-progress':
+      return { ...state, allowExternalProgress: action.checked }
     case 'set-active-after-create':
       return { ...state, setActiveAfterCreate: action.checked }
     case 'set-group-by': {
@@ -305,6 +309,7 @@ function createInitialTrackFormState({
   const initialDueAt = toDateInputValue(source.track?.dueAt ?? null)
 
   return {
+    allowExternalProgress: source.track?.allowExternalProgress ?? false,
     description: source.track?.description ?? '',
     dueAt: initialDueAt,
     groupBy: 'none',
@@ -397,6 +402,7 @@ function isFieldErrorFree(fieldErrors: TrackFormFieldErrors) {
 
 function createTrackMutationPayload(state: TrackFormState): TrackMutationInput {
   return {
+    allowExternalProgress: state.allowExternalProgress,
     description: toNullableTrimmedValue(state.description),
     dueAt: state.dueAt ? `${state.dueAt}T00:00:00.000Z` : null,
     groups: state.groups.map(createGroupInput),

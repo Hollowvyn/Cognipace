@@ -42,6 +42,12 @@ describe('db foundation', () => {
       ]),
     )
     expect(activeTrack?.track.title).toBe(byteByteGoTrackTitle)
+    expect(
+      readSqliteRows(
+        handle.rawDb,
+        'SELECT DISTINCT allow_external_progress FROM tracks',
+      ),
+    ).toEqual([[0]])
     expect(activeTrack?.nextProblem?.slug).toBe(byteByteGoFirstProblemSlug)
   })
 

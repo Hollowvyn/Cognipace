@@ -19,16 +19,19 @@ versions normalize to false. Preserve sync orchestration and content-import v1.
 - Generate: `src/platform/db/migrations/0009_*.sql` and migration metadata
 - Modify: `src/platform/db/snapshot-upgrade.ts`
 - Modify: `src/platform/db/instance.ts`
+- Modify: `src/platform/db/snapshot-state.ts`
+- Test: `src/platform/db/snapshot-state.test.ts`
+- Create: `src/testing/fixtures/tracks-external-progress-legacy-migrations.ts`
 - Test: `src/platform/db/snapshot-upgrade.test.ts`
 - Test: `src/platform/db/instance.test.ts`
 - Test: `src/testing/db-foundation.test.ts`
 
-- [ ] Freeze the currently shipped 0000–0008 SQL prefix before generation and add
+- [x] Freeze the currently shipped 0000–0008 SQL prefix before generation and add
       failing upgrade/default tests. Populate reviews, track progress, settings,
       and membership order to detect data loss.
-- [ ] Run focused upgrade tests and verify the v8 upgrade is rejected before the
+- [x] Run focused upgrade tests and verify the v8 upgrade is rejected before the
       change.
-- [ ] Add the flag and generate an appended migration using the repository's
+- [x] Add the flag and generate an appended migration using the repository's
       canonical workflow. Expected generated SQL:
 
 ```sql
@@ -41,13 +44,16 @@ allowExternalProgress: integer('allow_external_progress', { mode: 'boolean' })
   .default(false),
 ```
 
-- [ ] Run `rtk npm run db:generate`. Review only the appended SQL/metadata; do not
+- [x] Run `rtk npm run db:generate`. Review only the appended SQL/metadata; do not
       alter shipped migration SQL. Ensure runtime migration bundling includes it.
-- [ ] Recognize exact supported v7 and v8 fingerprints; validate the full
+- [x] Recognize exact supported v7 and v8 fingerprints; validate the full
       pre-upgrade schema for each baseline, apply only its missing suffix, run
       preparation/integrity checks, and publish the staged snapshot last.
-      Preserve existing recovery records and rejection behavior.
-- [ ] Run `rtk npm run db:check` and upgrade/foundation tests. Confirm current
+      Preserve existing recovery records and rejection behavior. Use a separate
+      Track recovery slot for exact v8 originals so a retained v7 Topics recovery
+      does not block the normal v7 → v8 → v9 chain; protect each slot from
+      conflicting originals and support same-original retry.
+- [x] Run `rtk npm run db:check` and upgrade/foundation tests. Confirm current
       populated data stays intact and new/existing flags default false.
 
 ## Task 2: Full Backup Version 5
@@ -61,9 +67,9 @@ allowExternalProgress: integer('allow_external_progress', { mode: 'boolean' })
 - Test: `src/features/backup/server/backup-service.test.ts`
 - Test: `src/features/sync/server/sync-service.test.ts`
 
-- [ ] Add failing v5 round-trip tests with an enabled track and v1–v4
+- [x] Add failing v5 round-trip tests with an enabled track and v1–v4
       normalization tests without the new field.
-- [ ] Freeze old strict track-row schemas for legacy versions and require the
+- [x] Freeze old strict track-row schemas for legacy versions and require the
       boolean in v5. Do not accept arbitrary future versions.
 
 ```ts
@@ -72,10 +78,10 @@ const backupTrackRowSchema = legacyBackupTrackRowSchema.extend({
 })
 ```
 
-- [ ] Normalize each legacy track to `{ ...track, allowExternalProgress: false }`.
+- [x] Normalize each legacy track to `{ ...track, allowExternalProgress: false }`.
       Keep review evidence/track ledger/session validation unchanged. Export and
       restore the flag alongside the stored track row.
-- [ ] Run backup and sync service tests. Keep the sync envelope version and all
+- [x] Run backup and sync service tests. Keep the sync envelope version and all
       dirty-local/overwrite checks unchanged; older clients reject backup v5.
 
 ## Task 3: Content Import Preservation
@@ -88,12 +94,12 @@ const backupTrackRowSchema = legacyBackupTrackRowSchema.extend({
 - Test: `src/features/tracks/data/track-import-repository.test.ts`
 - Test: matching existing import planner/service tests
 
-- [ ] Add failing tests that new imported tracks default false and re-importing
+- [x] Add failing tests that new imported tracks default false and re-importing
       an existing enabled track preserves its value.
-- [ ] Include the flag in stored-track reads and initialize new planned tracks
+- [x] Include the flag in stored-track reads and initialize new planned tracks
       with false. Preserve scalar values for existing tracks. Do not expand the
       public content import format or let import files toggle this setting.
-- [ ] Run focused import tests and format changed maintained files.
+- [x] Run focused import tests and format changed maintained files.
 
 ## Done When
 

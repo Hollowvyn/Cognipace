@@ -10,6 +10,9 @@ export const tracks = sqliteTable('tracks', {
   title: text('title').notNull(),
   description: text('description'),
   dueAt: integer('due_at'),
+  allowExternalProgress: integer('allow_external_progress', { mode: 'boolean' })
+    .notNull()
+    .default(false),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })

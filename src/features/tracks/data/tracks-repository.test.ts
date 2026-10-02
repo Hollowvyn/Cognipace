@@ -18,6 +18,244 @@ import type { Db } from '@/platform/db'
 import { createTracksRepository } from './tracks-repository'
 
 describe('TracksRepository', () => {
+  it('derives opted-in completion from historical reviews without writing the track ledger', async () => {
+    const { db } = await createTestDb()
+    const repository = createTracksRepository(db)
+    await insertReviewAttempt(db, {
+      id: 'historical',
+      problemSlug: 'two-sum',
+      rating: 'hard',
+      reviewedAt: new Date(1000),
+    })
+    await insertReviewAttempt(db, {
+      id: 'later-again',
+      problemSlug: 'two-sum',
+      rating: 'again',
+      reviewedAt: new Date(2000),
+    })
+    const input = {
+      description: null,
+      dueAt: null,
+      groups: [
+        { title: 'Main', problemSlugs: ['two-sum', 'valid-parentheses'] },
+      ],
+    }
+    const external = await repository.createTrack({
+      ...input,
+      title: 'External history',
+      allowExternalProgress: true,
+    })
+    const independent = await repository.createTrack({
+      ...input,
+      title: 'Independent history',
+    })
+    expect(external.allowExternalProgress).toBe(true)
+    expect(independent.allowExternalProgress).toBe(false)
+    expect(
+      (await repository.getMemberships(external.id))[0]?.completion,
+    ).toEqual({
+      status: 'completed',
+      source: 'external',
+      completedAt: new Date(1000),
+      completedRating: 'hard',
+      reviewAttemptId: 'historical',
+    })
+    const progress = await repository.getProgressByTrack([
+      external.id,
+      independent.id,
+    ])
+    expect(progress.get(external.id)).toEqual({
+      completedCount: 1,
+      totalCount: 2,
+      percent: 50,
+    })
+    expect(progress.get(independent.id)?.completedCount).toBe(0)
+    expect(await db.select().from(trackProblemProgress)).toEqual([])
+    await repository.setActiveTrack(external.id)
+    expect((await repository.getActiveTrack())?.nextProblem?.slug).toBe(
+      'valid-parentheses',
+    )
+  })
+
+  it('uses the latest remaining success with deterministic provenance and prefers owned completion', async () => {
+    const { db } = await createTestDb()
+    const repository = createTracksRepository(db)
+    const track = await repository.createTrack({
+      title: 'Review corrections',
+      description: null,
+      dueAt: null,
+      allowExternalProgress: true,
+      groups: [{ title: 'Main', problemSlugs: ['two-sum'] }],
+    })
+    for (const [id, time] of [
+      ['old-success', 1000],
+      ['same-a', 2000],
+      ['same-z', 2000],
+    ] as const) {
+      await insertReviewAttempt(db, {
+        id,
+        reviewedAt: new Date(time),
+        problemSlug: 'two-sum',
+        rating: 'good',
+      })
+    }
+    expect(
+      (await repository.getMemberships(track.id))[0]?.completion
+        .reviewAttemptId,
+    ).toBe('same-z')
+    await db
+      .update(reviewAttempts)
+      .set({ rating: 'again' })
+      .where(eq(reviewAttempts.id, 'same-z'))
+    expect(
+      (await repository.getMemberships(track.id))[0]?.completion
+        .reviewAttemptId,
+    ).toBe('same-a')
+    await repository.setActiveTrack(track.id)
+    await repository.recordActiveTrackProblemReview({
+      problemSlug: 'two-sum',
+      rating: 'hard',
+      reviewedAt: new Date(3000),
+      reviewAttemptId: 'same-a',
+    })
+    expect((await repository.getMemberships(track.id))[0]?.completion).toEqual({
+      status: 'completed',
+      completedAt: new Date(3000),
+      completedRating: 'hard',
+      reviewAttemptId: 'same-a',
+    })
+    await repository.reconcileActiveTrackProblemReviewOverride({
+      problemSlug: 'two-sum',
+      rating: 'again',
+      reviewedAt: new Date(3000),
+      reviewAttemptId: 'same-a',
+    })
+    await db
+      .update(reviewAttempts)
+      .set({ rating: 'again' })
+      .where(eq(reviewAttempts.id, 'same-a'))
+    expect(
+      (await repository.getMemberships(track.id))[0]?.completion,
+    ).toMatchObject({ source: 'external', reviewAttemptId: 'old-success' })
+    await db
+      .update(reviewAttempts)
+      .set({ rating: 'again' })
+      .where(eq(reviewAttempts.id, 'old-success'))
+    expect(
+      (await repository.getMemberships(track.id))[0]?.completion.status,
+    ).toBe('incomplete')
+    await db
+      .update(reviewAttempts)
+      .set({ rating: 'easy' })
+      .where(eq(reviewAttempts.id, 'same-z'))
+    expect(
+      (await repository.getMemberships(track.id))[0]?.completion,
+    ).toMatchObject({
+      source: 'external',
+      completedRating: 'easy',
+      reviewAttemptId: 'same-z',
+    })
+  })
+
+  it('reset disables external credit atomically while retaining review history and can be re-enabled', async () => {
+    const { db } = await createTestDb()
+    const repository = createTracksRepository(db)
+    const track = await repository.createTrack({
+      title: 'External reset',
+      description: null,
+      dueAt: null,
+      allowExternalProgress: true,
+      groups: [{ title: 'Main', problemSlugs: ['two-sum'] }],
+    })
+    await insertReviewAttempt(db, {
+      id: 'reset-history',
+      problemSlug: 'two-sum',
+      rating: 'easy',
+      reviewedAt: new Date(1000),
+    })
+    await repository.setActiveTrack(track.id)
+    await repository.recordActiveTrackProblemReview({
+      problemSlug: 'two-sum',
+      rating: 'easy',
+      reviewedAt: new Date(1000),
+      reviewAttemptId: 'reset-history',
+    })
+    await repository.resetTrackProgress(track.id)
+    expect(
+      (await repository.getTrackById(track.id))?.allowExternalProgress,
+    ).toBe(false)
+    expect(
+      (await repository.getProgressByTrack([track.id])).get(track.id)
+        ?.completedCount,
+    ).toBe(0)
+    expect(await db.select().from(trackProblemProgress)).toEqual([])
+    expect(await db.select().from(reviewAttempts)).toHaveLength(1)
+    const groups = await repository.getGroups(track.id)
+    await repository.updateTrack({
+      ...track,
+      trackId: track.id,
+      allowExternalProgress: true,
+      groups: groups.map((group) => ({ ...group, problemSlugs: ['two-sum'] })),
+    })
+    expect(
+      (await repository.getMemberships(track.id))[0]?.completion,
+    ).toMatchObject({ source: 'external' })
+    await repository.updateTrack({
+      ...track,
+      trackId: track.id,
+      allowExternalProgress: false,
+      groups: groups.map((group) => ({ ...group, problemSlugs: ['two-sum'] })),
+    })
+    expect(
+      (await repository.getMemberships(track.id))[0]?.completion.status,
+    ).toBe('incomplete')
+  })
+
+  it('keeps Next in whole-track order and skips suspended questions without erasing completion', async () => {
+    const { db } = await createTestDb()
+    const repository = createTracksRepository(db)
+    const track = await repository.createTrack({
+      title: 'Ordered external',
+      description: null,
+      dueAt: null,
+      allowExternalProgress: true,
+      groups: [
+        { title: 'First', problemSlugs: ['two-sum', 'valid-parentheses'] },
+        { title: 'Last', problemSlugs: ['two-sum-ii-input-array-is-sorted'] },
+      ],
+    })
+    await db.insert(problemPractice).values({
+      problemSlug: 'two-sum',
+      status: 'mastered',
+      firstSeenAt: 0,
+      solvedCount: 9,
+      attemptCount: 9,
+      lastRating: 'easy',
+      isSuspended: true,
+      createdAt: 0,
+      updatedAt: 0,
+    })
+    await repository.setActiveTrack(track.id)
+    const groups = await repository.getGroups(track.id)
+    await repository.setActiveGroup(groups[1]!.id)
+    expect((await repository.getActiveTrack())?.nextProblem?.slug).toBe(
+      'valid-parentheses',
+    )
+    expect(
+      (await repository.getProgressByTrack([track.id])).get(track.id)
+        ?.completedCount,
+    ).toBe(0)
+    await insertReviewAttempt(db, {
+      id: 'suspended-success',
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt: new Date(1000),
+    })
+    expect(
+      (await repository.getMemberships(track.id))[0]?.completion.status,
+    ).toBe('completed')
+  })
+
   it('removes only the requested membership and compacts its group order', async () => {
     const { db } = await createTestDb()
     const repository = createTracksRepository(db)
@@ -372,7 +610,7 @@ describe('TracksRepository', () => {
     })
   })
 
-  it('does not let suspended practice state remove a catalog track problem', async () => {
+  it('keeps suspended questions in the catalog total while excluding them from Next', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
@@ -395,9 +633,7 @@ describe('TracksRepository', () => {
 
     const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
 
-    expect(activeTrack?.nextProblem).toMatchObject({
-      slug: 'two-sum',
-    })
+    expect(activeTrack?.nextProblem).toBeNull()
     expect(activeTrack?.progress).toEqual({
       completedCount: 0,
       totalCount: 1,

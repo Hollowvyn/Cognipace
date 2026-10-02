@@ -52,6 +52,7 @@ export async function readSnapshotState(
 }
 
 export const RECOVERY_KEY = 'cognipace_db_recovery_topics_v1'
+export const TRACK_RECOVERY_KEY = 'cognipace_db_recovery_tracks_v1'
 
 const recoveryRecordSchema = z.strictObject({
   version: z.literal(1),
@@ -85,10 +86,11 @@ export async function preserveRecovery(
   storage: SnapshotStorage,
   raw: Record<string, unknown>,
   now: Date,
+  recoveryKey: typeof RECOVERY_KEY | typeof TRACK_RECOVERY_KEY = RECOVERY_KEY,
 ) {
-  const existingValues = await storage.get([RECOVERY_KEY])
-  if (Object.hasOwn(existingValues, RECOVERY_KEY)) {
-    const existing = existingValues[RECOVERY_KEY]
+  const existingValues = await storage.get([recoveryKey])
+  if (Object.hasOwn(existingValues, recoveryKey)) {
+    const existing = existingValues[recoveryKey]
     const candidate = recoveryRecordSchema.safeParse(existing)
     if (
       candidate.success &&
@@ -101,6 +103,6 @@ export async function preserveRecovery(
   }
 
   await storage.set({
-    [RECOVERY_KEY]: { version: 1, raw, savedAt: now.toISOString() },
+    [recoveryKey]: { version: 1, raw, savedAt: now.toISOString() },
   })
 }

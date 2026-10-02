@@ -42,6 +42,82 @@ const settingsValue = JSON.stringify({
 })
 
 describe('backup service', () => {
+  it('exports and restores v5 external-progress policy without derived progress rows', async () => {
+    const source = await createTestDb({ now })
+    await insertCustomState(source.db)
+    await source.db.update(tracks).set({ allowExternalProgress: true })
+
+    const backup = await exportFullBackup(source.db, { exportedAt: now })
+
+    expect(backup.schemaVersion).toBe(5)
+    expect(backup.data.tracks.tracks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'custom-track',
+          allowExternalProgress: true,
+        }),
+      ]),
+    )
+    const target = await createTestDb({ now })
+    await restoreFullBackup(target.db, backup)
+
+    expect(await target.db.select().from(tracks)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'custom-track',
+          allowExternalProgress: true,
+        }),
+      ]),
+    )
+    const restored = await exportFullBackup(target.db, { exportedAt: now })
+    expect(restored.data.tracks.progress).toEqual(backup.data.tracks.progress)
+    expect(restored.data.practice.reviewAttempts).toEqual(
+      backup.data.practice.reviewAttempts,
+    )
+  })
+
+  it('restores v4 tracks with external progress disabled and preserves practice history', async () => {
+    const source = await createTestDb({ now })
+    await insertCustomState(source.db)
+    const current = await exportFullBackup(source.db, { exportedAt: now })
+    const legacy = {
+      ...current,
+      schemaVersion: 4,
+      data: {
+        ...current.data,
+        tracks: {
+          ...current.data.tracks,
+          tracks: current.data.tracks.tracks.map((track) =>
+            Object.fromEntries(
+              Object.entries(track).filter(
+                ([key]) => key !== 'allowExternalProgress',
+              ),
+            ),
+          ),
+        },
+      },
+    }
+    const target = await createTestDb({ now })
+    await insertCustomState(target.db)
+    await target.db.update(tracks).set({ allowExternalProgress: true })
+
+    await restoreFullBackup(target.db, legacy)
+
+    expect(await target.db.select().from(tracks)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'custom-track',
+          allowExternalProgress: false,
+        }),
+      ]),
+    )
+    const restored = await exportFullBackup(target.db, { exportedAt: now })
+    expect(restored.data.practice.reviewAttempts).toEqual(
+      current.data.practice.reviewAttempts,
+    )
+    expect(restored.data.tracks.progress).toEqual(current.data.tracks.progress)
+  })
+
   it('exports a versioned CogniPace backup including problems and tracks', async () => {
     const { db } = await createTestDb({ now })
     await insertCustomState(db)
@@ -379,6 +455,7 @@ describe('backup service', () => {
                 title: 'Other Track',
                 description: null,
                 dueAt: null,
+                allowExternalProgress: false,
                 createdAt: now.toISOString(),
                 updatedAt: now.toISOString(),
               },
@@ -418,6 +495,7 @@ describe('backup service', () => {
                 title: 'Other Track',
                 description: null,
                 dueAt: null,
+                allowExternalProgress: false,
                 createdAt: now.toISOString(),
                 updatedAt: now.toISOString(),
               },

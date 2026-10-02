@@ -12,6 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-02-track-editor-external-progress-design.md`](./specs/2026-10-02-track-editor-external-progress-design.md): approved vertical Track editor, Change button menu, and opt-in continuous external progress, including preserving migrations and backup v5.
 - [`specs/2026-09-26-topics-foundation-library-filtering-design.md`](./specs/2026-09-26-topics-foundation-library-filtering-design.md): approved design for typed topic relationships, deterministic aliases, preserving upgrades, and Library filtering by descendants with Any/All matching.
 - [`specs/2026-09-26-non-destructive-content-import-design.md`](./specs/2026-09-26-non-destructive-content-import-design.md): approved design implemented in this branch for a versioned JSON content format, additive problem/track/company/topic imports, read-only previews, partial validation, and atomic database application; human browser proof remains pending before merge.
 - [`specs/2026-09-13-private-chrome-web-store-release-design.md`](./specs/2026-09-13-private-chrome-web-store-release-design.md): approved design for a private trusted-tester Chrome Web Store item, Recall Stack listing assets, accurate privacy and permission disclosures, Store build validation, manual first publication, and natural update proof.
@@ -44,6 +45,9 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-02-track-editor-phase-1.md`](./plans/2026-10-02-track-editor-phase-1.md): full-width groups and questions, accessible Change menu, and external progress form fields.
+- [`plans/2026-10-02-track-editor-phase-2.md`](./plans/2026-10-02-track-editor-phase-2.md): appended migration, preserving v7/v8 upgrades, backup v5, and additive import compatibility.
+- [`plans/2026-10-02-track-editor-phase-3.md`](./plans/2026-10-02-track-editor-phase-3.md): shared effective completion, correction/reset behavior, provenance, validation, and handoff.
 - [`plans/2026-09-26-topics-implementation.md`](./plans/2026-09-26-topics-implementation.md): master implementation map for the approved topic foundation and Library filtering design, linking three ordered phase plans.
 - [`plans/2026-09-26-topics-phase-1-preserving-upgrades.md`](./plans/2026-09-26-topics-phase-1-preserving-upgrades.md): implementation plan for retaining existing snapshots, recognizing supported upgrades, and publishing staged data only after preparation and validation succeed.
 - [`plans/2026-09-26-topics-phase-2-foundation.md`](./plans/2026-09-26-topics-phase-2-foundation.md): implementation plan for canonical identities, aliases, typed relationships, reconciliation, backup v4, and Library read models.
@@ -81,6 +85,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 ## Reading Guidance
 
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
+
+## Handoffs
+
+- [`handoffs/2026-10-02-track-editor-external-progress.md`](./handoffs/2026-10-02-track-editor-external-progress.md): implementation, validation evidence, compatibility and rollback notes, and required human smoke proof.
 
 ## Audits
 

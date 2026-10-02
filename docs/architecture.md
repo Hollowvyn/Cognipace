@@ -464,18 +464,19 @@ assignments after alias resolution. LeetCode capture writes use merge semantics:
 captured page topics are resolved and added to the existing direct topic set
 without clearing local or manual topics.
 
-Backup schema version 4 exports typed relations as
+Backup schema version 5 exports typed relations as
 `{ sourceTopicId, targetTopicId, kind, createdAt, updatedAt }` alongside
-`topics` and `topicAliases`. Import accepts backup versions 1 through 4 and
-normalizes v1-v3 into the v4 shape before validation; v3's untyped parent/child
+`topics` and `topicAliases`, and requires `allowExternalProgress` on track rows.
+Import accepts backup versions 1 through 5 and normalizes v1-v4 tracks to false
+before current validation; v3's untyped parent/child
 edges become `broader` edges with child as source and parent as target. Unknown
 future versions are rejected. Sync keeps its envelope version
 and its existing dirty-local, overwrite-confirmation, and authorization rules,
-but a client that only understands backup v3 cannot read newly exported v4
+but a client that only understands backup v4 cannot read newly exported v5
 backups.
 
 Automatic database upgrade is a separate, deliberately narrow compatibility
-path: only the exact 0000–0007 migration SQL prefix allowlisted in
+path: only the exact shipped 0000–0007 and 0000–0008 migration SQL prefixes allowlisted in
 `src/platform/db/snapshot-upgrade.ts` may upgrade automatically to the current
 schema. The Problems reconciliation callback runs on the staged database after
 incremental SQL and before snapshot publication. It preserves direct
@@ -483,6 +484,34 @@ assignments and custom aliases, validates the complete registry, and retains
 the old snapshot and fingerprint in the local recovery record. Unsupported
 fingerprints or a reconciliation collision fail without replacing the stored
 snapshot.
+
+Migration 0009 adds the default-false track setting. The upgrade validates the
+entire supported baseline schema, applies only missing migrations, checks
+integrity, and publishes the staged snapshot last. The v8 Track upgrade uses
+`cognipace_db_recovery_tracks_v1`, preserving the earlier Topics recovery record
+alongside the v8 original. Each recovery slot rejects overwriting a different
+original; a retry with the same original is supported. Failed upgrades retain the
+active stored snapshot and all recovery copies. Shipped migration SQL is never
+rewritten.
+
+### Effective Track Completion
+
+Tracks persists `allowExternalProgress` alongside each track and retains its
+owned `track_problem_progress` ledger. The feature's completion read model gives
+owned completion precedence, then optionally derives external completion from
+the latest remaining successful review (`hard`, `good`, or `easy`), ordered by
+review time and attempt ID. It does not use aggregate practice status or the last
+rating. Membership rows and catalog totals share this resolver; Next selects the
+first incomplete, non-suspended membership in explicit group/problem order.
+Successful review evidence is read in batches for requested slugs, including
+editor eligibility previews, with no synthetic progress writes.
+
+Practice writes new owned progress only in Study Plan mode. Review corrections
+reconcile existing ledger rows linked to that attempt regardless of current mode
+or active track, without resurrecting deleted progress. Track reset deletes its
+ledger and disables external progress in one transaction. Existing practice and
+track invalidation refreshes Tracks and app-shell guidance. Content import v1
+remains additive: new tracks default false and existing settings are preserved.
 
 ## Query Invalidation
 

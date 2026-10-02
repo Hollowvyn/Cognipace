@@ -9,6 +9,7 @@ import {
   serializedActiveTrackSchema,
   trackCompletedRatingSchema,
   trackProblemRowSchema,
+  trackForEditResponseSchema,
   tracksClearActiveTrackRequestSchema,
   tracksCreateTrackRequestSchema,
   tracksDeleteTrackRequestSchema,
@@ -20,6 +21,75 @@ import {
 } from './tracks-contracts'
 
 describe('tracks runtime contracts', () => {
+  it('defaults external progress off and accepts only a boolean setting', () => {
+    const request = {
+      surface: 'dashboard',
+      title: 'Interview',
+      groups: [{ title: 'Main', problemSlugs: [] }],
+    }
+    expect(tracksCreateTrackRequestSchema.parse(request)).toHaveProperty(
+      'allowExternalProgress',
+      false,
+    )
+    expect(
+      tracksCreateTrackRequestSchema.parse({
+        ...request,
+        allowExternalProgress: true,
+      }),
+    ).toHaveProperty('allowExternalProgress', true)
+    expect(
+      tracksUpdateTrackRequestSchema.safeParse({
+        ...request,
+        trackId: 'interview',
+        allowExternalProgress: 'true',
+      }).success,
+    ).toBe(false)
+  })
+
+  it('retains external eligibility in the edit response and completion provenance', () => {
+    expect(
+      trackForEditResponseSchema.parse({
+        track: null,
+        groups: [],
+        problemRows: [],
+        externalProgressProblemSlugs: ['two-sum'],
+      }),
+    ).toHaveProperty('externalProgressProblemSlugs', ['two-sum'])
+    expect(
+      trackForEditResponseSchema.parse({
+        track: null,
+        groups: [],
+        problemRows: [],
+      }),
+    ).toHaveProperty('externalProgressProblemSlugs', [])
+    const row = createTrackProblemRow()
+    const external = {
+      ...row,
+      membership: {
+        ...row.membership,
+        completion: {
+          status: 'completed',
+          source: 'external',
+          completedAt: '2026-01-01T00:00:00.000Z',
+          completedRating: 'good',
+          reviewAttemptId: 'review-1',
+        },
+      },
+    }
+    expect(
+      trackProblemRowSchema.parse(external).membership.completion,
+    ).toHaveProperty('source', 'external')
+    expect(
+      trackProblemRowSchema.safeParse({
+        ...external,
+        membership: {
+          ...external.membership,
+          completion: { ...external.membership.completion, source: 'invented' },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
   it('requires a dashboard track and problem for membership removal', () => {
     const request = {
       surface: 'dashboard',

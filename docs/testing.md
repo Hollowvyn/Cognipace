@@ -498,7 +498,7 @@ existing Library, capture, and backup flows:
    as `Tree / Graph` in a disposable problem. Save, reload, and edit again;
    confirm Unicode and slash text survive lookup and persistence.
 4. Export a backup and inspect only the disposable fixture's taxonomy rows.
-   Confirm it declares schema version 4 and typed relations have source,
+   Confirm it declares schema version 5 and typed relations have source,
    target, and kind fields. Import that file into another disposable profile
    and verify assignments, aliases, and both relation kinds round-trip.
 
@@ -508,7 +508,7 @@ redact topic values, settings, fingerprints, and all snapshot or recovery bytes
 from shared proof. Such screenshots do not prove the v7 migration or collision
 recovery behavior; the Vitest command above covers those internal paths. Record
 the populated-database upgrade and recovery evidence from Phase 1 separately,
-and the backup v4 export/import evidence from Phase 2 separately. Do not treat
+and the current backup export/import evidence separately. Do not treat
 the Library filtering recording as proof of either migration or backup
 compatibility.
 
@@ -543,6 +543,62 @@ group and problem order without being reordered by due state. In Study Plan mode
 `hard`, `good`, and `easy` complete track problems; `again` neither completes an
 incomplete problem nor clears an earlier completion. Free Practice does not write
 active-track progress.
+
+#### Vertical Track Editor And External Progress
+
+Human realtime happy-path and edge-case smoke with screenshots or a recording
+is required before PR review or merge. Use a disposable profile for reset,
+restore, and correction cases.
+
+1. Open New Track and edit a populated track at desktop and narrow widths.
+   Confirm every group and question title wraps, the selected group's Library
+   picker is immediately above its questions, and the footer stays reachable.
+   Rename, add/reorder groups and questions, remove an empty group, and confirm
+   non-empty and final groups cannot be removed. Save an invalid empty group
+   title and confirm that group expands with its title field visible.
+2. Open Change by mouse and keyboard. Check full destination titles, Arrow keys,
+   Home/End, Enter/Space selection, Escape without closing the modal, outside
+   click and Tab dismissal. Move a question and confirm it appends to the
+   destination, disappears from the source, and focus remains useful. Check a
+   menu near the modal footer with enough groups to scroll, including at 320px.
+3. Successfully solve a question before creating a track. Create two tracks
+   sharing it, enabling Allow external progress in only one. Confirm the editor
+   preview, completion count, expanded External progress rating/date, Next, and
+   popup guidance agree; the default-off track remains incomplete. Save/reopen
+   both settings and test turning the option off and back on.
+4. In Free Practice, save a future `hard`, `good`, or `easy` for another member of
+   an inactive opted-in track. Confirm credit without changing the default-off
+   track. Save a later separate `again` and confirm earlier success still counts.
+   In a separate correction case, update the latest successful review to `again`,
+   then back to a successful rating; check removal/restoration, including fallback
+   to another historical success.
+5. Complete a question in Study Plan mode, switch mode or active track, and
+   correct the linked review. Confirm the original owned completion updates and
+   expanded details say Completed in this track. Reset the original track, then
+   correct its old review and confirm deleted owned progress is not resurrected.
+6. Suspend an incomplete question and confirm Next skips it while total count
+   remains. Move/reorder/remove memberships and confirm totals and Next still
+   use explicit whole-track order. Due review scheduling must remain unchanged.
+7. Reset an opted-in track. Confirm the dialog explains that external progress
+   turns off, the count becomes zero, and practice history remains. Re-enable to
+   restore historical credit. Reset global practice for a question and confirm
+   its evidence disappears from every opted-in track.
+8. Export a v5 backup with an enabled track; restore into a disposable profile
+   and confirm the flag and raw history survive. Restore v1-v4 fixtures and
+   confirm flags default false. Re-import content v1 and confirm an existing
+   enabled flag stays enabled while new imported tracks default off. Run the
+   existing authorized sync smoke with v5 data if testing configured sync.
+
+Bounded database upgrade proof is automated using frozen populated v7 and v8
+fixtures. Run `npm run test -- src/platform/db/instance.test.ts
+src/platform/db/snapshot-upgrade.test.ts src/testing/db-foundation.test.ts`.
+For actual extension upgrade smoke, prepare those disposable historical profiles
+and capture their data before/after loading the new build. Check recovery retry,
+unsupported fingerprints, and retained originals on failed upgrades. Confirm the
+v8 Track upgrade preserves its original in the Track recovery slot alongside an
+existing v7 Topics recovery copy. A different original already in the same slot
+blocks overwrite; never discard it to bypass this condition. Agent component
+screenshots do not replace human extension/runtime or upgrade proof.
 
 #### Track Table Pagination
 

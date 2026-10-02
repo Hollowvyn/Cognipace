@@ -21,7 +21,7 @@ import {
   seedTopicRelations,
 } from '@/platform/db/topic-taxonomy-seed'
 
-export const backupSchemaVersion = 4
+export const backupSchemaVersion = 5
 
 export const minimumSupportedBackupSchemaVersion = 1
 
@@ -146,7 +146,9 @@ export const backupReviewAttemptRowSchema = z.strictObject({
   updatedAt: isoDatetimeSchema,
 })
 
-export const backupTrackRowSchema = z.strictObject({
+// Freeze the track format shipped in v1–v4. New fields must not loosen a
+// legacy payload or silently enable a policy that did not exist in that version.
+const backupTrackV4RowSchema = z.strictObject({
   id: trackIdSchema,
   slug: z.string().trim().min(1),
   title: z.string(),
@@ -154,6 +156,10 @@ export const backupTrackRowSchema = z.strictObject({
   dueAt: isoDatetimeSchema.nullable(),
   createdAt: isoDatetimeSchema,
   updatedAt: isoDatetimeSchema,
+})
+
+export const backupTrackRowSchema = backupTrackV4RowSchema.extend({
+  allowExternalProgress: z.boolean(),
 })
 
 export const backupTrackGroupRowSchema = z.strictObject({
@@ -247,7 +253,11 @@ export const backupTracksDataSchema = z.strictObject({
   session: z.array(backupTrackSessionRowSchema),
 })
 
-const backupTracksDataV1Schema = backupTracksDataSchema.extend({
+const backupTracksDataV4Schema = backupTracksDataSchema.extend({
+  tracks: z.array(backupTrackV4RowSchema),
+})
+
+const backupTracksDataV1Schema = backupTracksDataV4Schema.extend({
   progress: z.array(backupTrackProgressV1RowSchema),
 })
 
@@ -264,7 +274,11 @@ export const backupDataSchema = z.strictObject({
   settings: z.array(backupSettingsKvRowSchema),
 })
 
-const backupDataV3Schema = backupDataSchema.extend({
+const backupDataV4Schema = backupDataSchema.extend({
+  tracks: backupTracksDataV4Schema,
+})
+
+const backupDataV3Schema = backupDataV4Schema.extend({
   topicRelations: z.array(backupTopicRelationV3RowSchema),
 })
 
@@ -277,7 +291,7 @@ const backupDataV2Schema = z.strictObject({
   problemTopics: z.array(backupProblemTopicRowSchema),
   problemCompanies: z.array(backupProblemCompanyRowSchema),
   practice: backupPracticeDataSchema,
-  tracks: backupTracksDataSchema,
+  tracks: backupTracksDataV4Schema,
   settings: z.array(backupSettingsKvRowSchema),
 })
 
@@ -309,6 +323,11 @@ const backupFileV2Schema = backupFileSchema.extend({
 const backupFileV3Schema = backupFileSchema.extend({
   schemaVersion: z.literal(3),
   data: backupDataV3Schema,
+})
+
+const backupFileV4Schema = backupFileSchema.extend({
+  schemaVersion: z.literal(4),
+  data: backupDataV4Schema,
 })
 
 export const backupRequestSchema = z.strictObject({
@@ -355,6 +374,7 @@ export type BackupFile = z.infer<typeof backupFileSchema>
 type BackupFileV1 = z.infer<typeof backupFileV1Schema>
 type BackupFileV2 = z.infer<typeof backupFileV2Schema>
 type BackupFileV3 = z.infer<typeof backupFileV3Schema>
+type BackupFileV4 = z.infer<typeof backupFileV4Schema>
 export type BackupData = z.infer<typeof backupDataSchema>
 export type BackupRequest = z.infer<typeof backupRequestSchema>
 export type BackupPayloadRequest = z.infer<typeof backupPayloadRequestSchema>
@@ -382,15 +402,19 @@ export function parseBackupFileForCurrentApp(input: unknown): BackupFile {
   }
 
   if (envelope.schemaVersion === 1) {
-    return normalizeBackupV1ToV4(backupFileV1Schema.parse(input))
+    return normalizeBackupV1ToCurrent(backupFileV1Schema.parse(input))
   }
 
   if (envelope.schemaVersion === 2) {
-    return normalizeBackupV2ToV4(backupFileV2Schema.parse(input))
+    return normalizeBackupV2ToCurrent(backupFileV2Schema.parse(input))
   }
 
   if (envelope.schemaVersion === 3) {
-    return normalizeBackupV3ToV4(backupFileV3Schema.parse(input))
+    return normalizeBackupV3ToCurrent(backupFileV3Schema.parse(input))
+  }
+
+  if (envelope.schemaVersion === 4) {
+    return normalizeBackupV4ToV5(backupFileV4Schema.parse(input))
   }
 
   const backup = backupFileSchema.parse(input)
@@ -399,12 +423,12 @@ export function parseBackupFileForCurrentApp(input: unknown): BackupFile {
   return backup
 }
 
-function normalizeBackupV1ToV4(backup: BackupFileV1): BackupFile {
+function normalizeBackupV1ToCurrent(backup: BackupFileV1): BackupFile {
   const groupsById = new Map(
     backup.data.tracks.groups.map((group) => [group.id, group]),
   )
 
-  return normalizeBackupV2ToV4({
+  return normalizeBackupV2ToCurrent({
     ...backup,
     schemaVersion: 2,
     data: {
@@ -435,7 +459,7 @@ function normalizeBackupV1ToV4(backup: BackupFileV1): BackupFile {
   })
 }
 
-function normalizeBackupV2ToV4(backup: BackupFileV2): BackupFile {
+function normalizeBackupV2ToCurrent(backup: BackupFileV2): BackupFile {
   const v3 = backupFileV3Schema.parse({
     ...backup,
     schemaVersion: 3,
@@ -450,10 +474,10 @@ function normalizeBackupV2ToV4(backup: BackupFileV2): BackupFile {
       topicRelations: [],
     },
   })
-  return normalizeBackupV3ToV4(v3)
+  return normalizeBackupV3ToCurrent(v3)
 }
 
-function normalizeBackupV3ToV4(backup: BackupFileV3): BackupFile {
+function normalizeBackupV3ToCurrent(backup: BackupFileV3): BackupFile {
   const catalogue = {
     topics: seedTopics,
     aliases: seedTopicAliases,
@@ -474,11 +498,33 @@ function normalizeBackupV3ToV4(backup: BackupFileV3): BackupFile {
     },
     { legacy: true, now: backup.exportedAt, catalogue },
   )
-  return backupFileSchema.parse({
+  return normalizeBackupV4ToV5(
+    backupFileV4Schema.parse({
+      ...backup,
+      schemaVersion: 4,
+      data: { ...backup.data, ...taxonomy },
+    }),
+  )
+}
+
+function normalizeBackupV4ToV5(backup: BackupFileV4): BackupFile {
+  const normalized = backupFileSchema.parse({
     ...backup,
     schemaVersion: backupSchemaVersion,
-    data: { ...backup.data, ...taxonomy },
+    data: {
+      ...backup.data,
+      tracks: {
+        ...backup.data.tracks,
+        tracks: backup.data.tracks.tracks.map((track) => ({
+          ...track,
+          allowExternalProgress: false,
+        })),
+      },
+    },
   })
+  buildTopicLookup(normalized.data.topics, normalized.data.topicAliases)
+  buildTopicGraph(normalized.data.topics, normalized.data.topicRelations)
+  return normalized
 }
 
 export function createBackupSummary(backup: BackupFile): BackupSummary {
