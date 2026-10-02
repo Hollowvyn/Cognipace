@@ -1165,6 +1165,35 @@ describe('TracksScreen', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('clears removal pending state if the row is collapsed while saving', async () => {
+    const user = userEvent.setup()
+    let finishRemoval: () => void = () => undefined
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'tracks.getWorkspace')
+        return Promise.resolve(twoGroupWorkspace)
+      if (method === 'tracks.removeProblem')
+        return new Promise<null>((resolve) => {
+          finishRemoval = () => resolve(null)
+        })
+      return Promise.resolve(null)
+    })
+    renderTracksScreen()
+    await user.click(
+      await screen.findByRole('button', { name: 'Expand Two Sum' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Remove from track' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse Two Sum' }))
+    finishRemoval()
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(3))
+    await user.click(screen.getByRole('button', { name: 'Expand Two Sum' }))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Remove from track' }),
+      ).toBeEnabled(),
+    )
+    expect(screen.getByRole('button', { name: 'Suspend' })).toBeEnabled()
+  })
+
   it('expands problem rows with reusable practice actions and no global Delete', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockImplementation((method) => {
