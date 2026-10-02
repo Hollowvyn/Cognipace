@@ -186,13 +186,3 @@ export const practiceResetScheduleRequestSchema = z.object({
 export type PracticeResetScheduleRequest = z.infer<
   typeof practiceResetScheduleRequestSchema
 >
-
-export const practiceUpdateCurrentLogRequestSchema = z.object({
-  surface: practiceRuntimeSurfaceSchema,
-  problemSlug: z.string(),
-  log: practiceLogPatchSchema,
-})
-
-export type PracticeUpdateCurrentLogRequest = z.infer<
-  typeof practiceUpdateCurrentLogRequestSchema
->

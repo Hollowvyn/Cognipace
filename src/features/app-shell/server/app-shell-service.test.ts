@@ -6,7 +6,7 @@ import { createPracticeRepository } from '@/features/practice/data/practice-repo
 import { createSettingsRepository } from '@/features/settings/data/settings-repository'
 import { updateSettings } from '@/features/settings/server/settings-service'
 import { recordActiveTrackProblemCompletion } from '@/features/tracks/server/tracks-service'
-import { tracks, trackSession } from '@/platform/db/schema'
+import { problemPractice, tracks, trackSession } from '@/platform/db/schema'
 import { createTestDb } from '@/platform/db/test-db'
 
 import {
@@ -272,14 +272,14 @@ describe('app-shell service', () => {
 
   it('composes overlay payload with current problem practice details', async () => {
     const handle = await createTestDb()
-    const practiceRepository = createPracticeRepository(handle.db)
-
-    await practiceRepository.updateCurrentPracticeLog({
+    await handle.db.insert(problemPractice).values({
       problemSlug: 'two-sum',
-      log: {
-        interviewPattern: 'Hash map',
-        notes: 'Track complements.',
-      },
+      status: 'new',
+      interviewPattern: 'Hash map',
+      notes: 'Track complements.',
+      firstSeenAt: 0,
+      createdAt: 0,
+      updatedAt: 0,
     })
 
     const payload = await getOverlayPayload(handle, 'two-sum')

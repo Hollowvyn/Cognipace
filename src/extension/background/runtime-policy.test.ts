@@ -371,15 +371,5 @@ describe('runtime-policy', () => {
         },
       ),
     ).not.toThrow()
-    expect(() =>
-      assertCanSenderCallExtensionMethod(
-        'practice.updateCurrentLog',
-        'content-script',
-        {
-          tab: { id: 7 },
-          url: 'https://leetcode.com/problems/two-sum/',
-        },
-      ),
-    ).not.toThrow()
   })
 })

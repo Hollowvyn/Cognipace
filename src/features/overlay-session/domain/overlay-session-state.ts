@@ -2,13 +2,6 @@ import type { OverlayNextStep } from '@/features/app-shell'
 import type { AssessmentLockReason } from '@/features/assessment'
 import type { ReviewRating } from '@/lib/fsrs'
 
-import {
-  createEmptyOverlayDraft,
-  overlayDraftsEqual,
-  type OverlayDraftField,
-  type OverlayDraftLog,
-} from './overlay-draft'
-
 export type OverlayVisualMode = 'collapsed' | 'expanded' | 'docked'
 export type OverlayReviewStatus =
   | 'draft'
@@ -30,7 +23,6 @@ export type OverlayFeedback = {
 
 export type OverlaySubmittedSession = {
   rating: ReviewRating
-  draft: OverlayDraftLog
   elapsedSeconds: number | null
   isCorrect: boolean
   lockReason: AssessmentLockReason | null
@@ -46,8 +38,6 @@ export type OverlaySessionState = {
   activeProblemSlug: string | null
   visualMode: OverlayVisualMode
   reviewStatus: OverlayReviewStatus
-  draft: OverlayDraftLog
-  persistedDraft: OverlayDraftLog
   selectedRating: ReviewRating
   ratingLockReason: AssessmentLockReason | null
   submittedSession: OverlaySubmittedSession | null
@@ -60,19 +50,16 @@ export type OverlaySessionAction =
   | {
       type: 'problem-loaded'
       problemSlug: string
-      draft: OverlayDraftLog
       selectedRating: ReviewRating
     }
   | {
       type: 'problem-context-refreshed'
       problemSlug: string
-      draft: OverlayDraftLog
       selectedRating: ReviewRating
       submittedSession: OverlaySubmittedSession | null
     }
   | { type: 'page-changed' }
   | { type: 'set-visual-mode'; visualMode: OverlayVisualMode }
-  | { type: 'set-draft-field'; field: OverlayDraftField; value: string }
   | { type: 'set-selected-rating'; rating: ReviewRating }
   | { type: 'ai-preselect-rating'; rating: ReviewRating }
   | { type: 'save-started' }
@@ -93,10 +80,8 @@ export type OverlaySessionAction =
   | { type: 'next-step-loading' }
   | { type: 'next-step-loaded'; nextStep: OverlayNextStep | null }
   | { type: 'next-step-error'; message: string }
-  | { type: 'draft-persisted'; draft: OverlayDraftLog }
   | {
       type: 'restart-local-session'
-      draft: OverlayDraftLog
       selectedRating: ReviewRating
     }
   | { type: 'set-feedback'; feedback: OverlayFeedback | null }
@@ -105,8 +90,6 @@ export const initialOverlaySessionState: OverlaySessionState = {
   activeProblemSlug: null,
   visualMode: 'collapsed',
   reviewStatus: 'draft',
-  draft: createEmptyOverlayDraft(),
-  persistedDraft: createEmptyOverlayDraft(),
   selectedRating: 'good',
   ratingLockReason: null,
   submittedSession: null,
@@ -124,8 +107,6 @@ export function overlaySessionReducer(
       return {
         ...initialOverlaySessionState,
         activeProblemSlug: action.problemSlug,
-        draft: action.draft,
-        persistedDraft: action.draft,
         selectedRating: action.selectedRating,
       }
     case 'problem-context-refreshed':
@@ -133,7 +114,6 @@ export function overlaySessionReducer(
         state.activeProblemSlug !== action.problemSlug ||
         state.reviewStatus === 'saving' ||
         state.reviewStatus === 'updating' ||
-        hasUnpersistedDraftChanges(state) ||
         hasSubmittedSessionChanges(state)
       ) {
         return state
@@ -141,8 +121,6 @@ export function overlaySessionReducer(
 
       return {
         ...state,
-        draft: action.draft,
-        persistedDraft: action.draft,
         selectedRating:
           action.submittedSession?.rating ?? action.selectedRating,
         submittedSession:
@@ -160,14 +138,6 @@ export function overlaySessionReducer(
         ...state,
         visualMode: action.visualMode,
       }
-    case 'set-draft-field':
-      return withDerivedReviewStatus({
-        ...state,
-        draft: {
-          ...state.draft,
-          [action.field]: action.value,
-        },
-      })
     case 'set-selected-rating':
       if (state.ratingLockReason) {
         return state
@@ -210,8 +180,6 @@ export function overlaySessionReducer(
         ...state,
         visualMode: 'expanded',
         reviewStatus: 'submitted-clean',
-        draft: action.snapshot.draft,
-        persistedDraft: action.snapshot.draft,
         selectedRating: action.snapshot.rating,
         ratingLockReason: action.snapshot.lockReason,
         submittedSession: action.snapshot,
@@ -222,8 +190,6 @@ export function overlaySessionReducer(
       return {
         ...state,
         reviewStatus: 'submitted-clean',
-        draft: action.snapshot.draft,
-        persistedDraft: action.snapshot.draft,
         selectedRating: action.snapshot.rating,
         ratingLockReason: action.snapshot.lockReason,
         submittedSession: action.snapshot,
@@ -262,17 +228,10 @@ export function overlaySessionReducer(
           message: action.message,
         },
       }
-    case 'draft-persisted':
-      return {
-        ...state,
-        persistedDraft: action.draft,
-      }
     case 'restart-local-session':
       return {
         ...state,
         reviewStatus: 'draft',
-        draft: action.draft,
-        persistedDraft: action.draft,
         selectedRating: action.selectedRating,
         ratingLockReason: null,
         submittedSession: null,
@@ -295,14 +254,7 @@ export function hasSubmittedSessionChanges(state: OverlaySessionState) {
     return false
   }
 
-  return (
-    state.selectedRating !== state.submittedSession.rating ||
-    !overlayDraftsEqual(state.draft, state.submittedSession.draft)
-  )
-}
-
-export function hasUnpersistedDraftChanges(state: OverlaySessionState) {
-  return !overlayDraftsEqual(state.draft, state.persistedDraft)
+  return state.selectedRating !== state.submittedSession.rating
 }
 
 function withDerivedReviewStatus(

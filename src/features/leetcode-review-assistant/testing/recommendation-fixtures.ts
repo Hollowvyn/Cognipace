@@ -177,7 +177,6 @@ export function makeRecallSessionContext(
     previousRating: 'good',
     bestElapsedSeconds: 1200,
     latestAttempt: baseLatestAttempt,
-    currentDraftHasChanges: false,
     ...overrides,
   }
 }
@@ -190,7 +189,6 @@ export function makeFirstSolveSessionContext(): OverlayAssessmentSessionContext 
     previousRating: null,
     bestElapsedSeconds: null,
     latestAttempt: null,
-    currentDraftHasChanges: false,
   }
 }
 

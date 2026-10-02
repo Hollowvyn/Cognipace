@@ -89,10 +89,14 @@ Current behavior:
 - target-time awareness
 - quick submit preparation from the collapsed state
 - expanded submit, fail, update, restart, and rating controls
-- structured draft fields managed through the overlay session
+- focused review controls without structured-log or notes editing
 - settings access from the overlay
 - compact expanded-mode Help access that opens a YouTube search for the current problem in a new tab
 - page metadata and problem context sync through content-script/runtime messages
+
+Submission notes stay in LeetCode. Existing saved CogniPace log fields remain
+preserved in local practice history, backups, and sync; overlay review saves and
+rating updates do not edit those fields.
 
 ### Dashboard
 

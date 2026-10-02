@@ -2198,7 +2198,6 @@ describe('background handler registration', () => {
         previousRating: null,
         bestElapsedSeconds: null,
         latestAttempt: null,
-        currentDraftHasChanges: false,
       },
     }
 
