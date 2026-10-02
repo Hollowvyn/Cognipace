@@ -22,6 +22,7 @@ import {
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 
 import { ProblemLibraryScreen } from './problem-library-screen'
+import { ProblemBulkActionBar } from './problem-bulk-action-bar'
 
 vi.mock('@/extension/messaging', () => ({
   sendMessage: vi.fn(),
@@ -988,6 +989,471 @@ describe('ProblemLibraryScreen', () => {
       'problems.bulkUpdateProblems',
       expect.anything(),
     )
+  })
+
+  it('contains confirmation focus and returns focus to the row opener', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockResolvedValue(libraryResponse)
+    renderProblemLibrary()
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Expand Two Sum' }),
+    )
+    const opener = screen.getByRole('button', { name: 'Delete' })
+    await user.click(opener)
+    const dialog = screen.getByRole('dialog', { name: 'Delete problem?' })
+    const cancel = within(dialog).getByRole('button', { name: 'Cancel' })
+    const confirm = within(dialog).getByRole('button', {
+      name: 'Delete Problem',
+    })
+
+    expect(cancel).toHaveFocus()
+    await user.tab()
+    expect(confirm).toHaveFocus()
+    await user.tab()
+    expect(cancel).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(confirm).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(dialog).not.toBeInTheDocument()
+    expect(opener).toHaveFocus()
+  })
+
+  it('keeps confirmation focus and cancellation locked while deleting', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockImplementation((method) =>
+      method === 'problems.deleteProblem'
+        ? new Promise(() => undefined)
+        : Promise.resolve(libraryResponse),
+    )
+    renderProblemLibrary()
+    await user.click(
+      await screen.findByRole('button', { name: 'Expand Two Sum' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    const dialog = screen.getByRole('dialog', { name: 'Delete problem?' })
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Delete Problem' }),
+    )
+
+    await waitFor(() => expect(dialog).toHaveAttribute('aria-busy', 'true'))
+    expect(dialog).toHaveFocus()
+    await user.tab()
+    expect(dialog).toHaveFocus()
+    await user.keyboard('{Escape}')
+    await user.click(dialog.parentElement as HTMLElement)
+    expect(dialog).toBeVisible()
+    expect(
+      within(dialog).getByRole('button', { name: 'Cancel' }),
+    ).toBeDisabled()
+  })
+
+  it('contains bulk metadata focus as enabled controls change and restores its opener', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockResolvedValue(libraryResponse)
+    renderProblemLibrary()
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'Select Two Sum' }),
+    )
+    const opener = screen.getByRole('button', { name: 'Edit Metadata' })
+    await user.click(opener)
+    const dialog = screen.getByRole('dialog', {
+      name: 'Edit selected metadata',
+    })
+    const first = within(dialog).getByRole('checkbox', {
+      name: 'Set difficulty',
+    })
+    const cancel = within(dialog).getByRole('button', { name: 'Cancel' })
+
+    expect(cancel).toHaveFocus()
+    await user.tab()
+    expect(first).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(cancel).toHaveFocus()
+    await user.click(first)
+    const confirm = within(dialog).getByRole('button', {
+      name: 'Update Problems',
+    })
+    confirm.focus()
+    await user.tab()
+    expect(first).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(confirm).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(dialog).not.toBeInTheDocument()
+    expect(opener).toHaveFocus()
+  })
+
+  it.each([
+    ['topics', 'Topics', 'topic'],
+    ['companies', 'Companies', 'company'],
+  ] as const)(
+    'keeps bulk metadata focus inside after removing a focused %s pill',
+    async (field, inputLabel, itemName) => {
+      const user = userEvent.setup()
+      vi.mocked(sendMessage).mockResolvedValue(libraryResponse)
+      renderProblemLibrary()
+      await user.click(
+        await screen.findByRole('checkbox', { name: 'Select Two Sum' }),
+      )
+      await user.click(screen.getByRole('button', { name: 'Edit Metadata' }))
+      const dialog = screen.getByRole('dialog', {
+        name: 'Edit selected metadata',
+      })
+      await user.click(
+        within(dialog).getByRole('checkbox', { name: `Replace ${field}` }),
+      )
+      await user.type(
+        within(dialog).getByLabelText(inputLabel),
+        'Focus Label{Enter}',
+      )
+      const remove = within(dialog).getByRole('button', {
+        name: `Remove ${itemName} Focus Label`,
+      })
+      remove.focus()
+      await user.keyboard('[Space]')
+      expect(remove).not.toBeInTheDocument()
+      expect(within(dialog).getByLabelText(inputLabel)).toHaveFocus()
+      await user.tab()
+      expect(dialog.contains(document.activeElement)).toBe(true)
+      await user.tab({ shift: true })
+      expect(dialog.contains(document.activeElement)).toBe(true)
+    },
+  )
+
+  it('locks bulk metadata controls, focus and dismissal while an update is pending', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockImplementation((method) =>
+      method === 'problems.bulkUpdateProblems'
+        ? new Promise(() => undefined)
+        : Promise.resolve(libraryResponse),
+    )
+    renderProblemLibrary()
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'Select Two Sum' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Edit Metadata' }))
+    const dialog = screen.getByRole('dialog', {
+      name: 'Edit selected metadata',
+    })
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: 'Set difficulty' }),
+    )
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Update Problems' }),
+    )
+
+    await waitFor(() => expect(dialog).toHaveAttribute('aria-busy', 'true'))
+    expect(dialog).toHaveFocus()
+    expect(
+      within(dialog).getByRole('checkbox', { name: 'Set difficulty' }),
+    ).toBeDisabled()
+    await user.tab()
+    expect(dialog).toHaveFocus()
+    await user.keyboard('{Escape}')
+    await user.click(dialog.parentElement as HTMLElement)
+    expect(dialog).toBeVisible()
+  })
+
+  it.each([
+    ['Delete', 'Delete problem?', 'Delete Problem', 'problems.deleteProblem'],
+    [
+      'Reset Schedule',
+      'Reset schedule?',
+      'Reset Schedule',
+      'practice.resetSchedule',
+    ],
+  ] as const)(
+    'shows %s row failures inside the active dialog with retry and clean cancellation',
+    async (openerName, title, confirmName, method) => {
+      const user = userEvent.setup()
+      let reject = true
+      vi.mocked(sendMessage).mockImplementation((requestedMethod) => {
+        if (requestedMethod === method && reject) {
+          return Promise.reject(new Error('Row mutation failed.'))
+        }
+        return Promise.resolve(libraryResponse)
+      })
+      renderProblemLibrary()
+      await user.click(
+        await screen.findByRole('button', { name: 'Expand Two Sum' }),
+      )
+      const opener = screen.getByRole('button', { name: openerName })
+      await user.click(opener)
+      let dialog = screen.getByRole('dialog', { name: title })
+      await user.click(
+        within(dialog).getByRole('button', { name: confirmName }),
+      )
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Row mutation failed.',
+      )
+      expect(screen.getAllByRole('alert')).toHaveLength(1)
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(opener).toHaveFocus()
+      await user.click(opener)
+      dialog = screen.getByRole('dialog', { name: title })
+      expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+      reject = false
+      await user.click(
+        within(dialog).getByRole('button', { name: confirmName }),
+      )
+      await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    },
+  )
+
+  it.each([
+    ['Delete Problems', 'Delete selected problems?', 'problems.bulkDelete'],
+    ['Reset Schedule', 'Reset selected schedules?', 'practice.resetSchedule'],
+  ] as const)(
+    'shows %s bulk failures inside confirmation and retries without losing selection',
+    async (confirmName, title, method) => {
+      const user = userEvent.setup()
+      let reject = true
+      vi.mocked(sendMessage).mockImplementation((requestedMethod) => {
+        if (requestedMethod === method && reject) {
+          return Promise.reject(new Error('Bulk mutation failed.'))
+        }
+        return Promise.resolve(libraryResponse)
+      })
+      renderProblemLibrary()
+      await user.click(
+        await screen.findByRole('checkbox', { name: 'Select Two Sum' }),
+      )
+      const opener = screen.getByRole('button', { name: confirmName })
+      await user.click(opener)
+      const dialog = screen.getByRole('dialog', { name: title })
+      await user.click(
+        within(dialog).getByRole('button', { name: confirmName }),
+      )
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Bulk mutation failed.',
+      )
+      expect(screen.getAllByRole('alert')).toHaveLength(1)
+      expect(
+        screen.getByRole('checkbox', { name: 'Select Two Sum' }),
+      ).toBeChecked()
+      reject = false
+      await user.click(
+        within(dialog).getByRole('button', { name: confirmName }),
+      )
+      await waitFor(() => expect(dialog).not.toBeInTheDocument())
+      expect(
+        screen.getByRole('checkbox', { name: 'Select Two Sum' }),
+      ).not.toBeChecked()
+    },
+  )
+
+  it('shows bulk metadata failure inside the dialog and retains edits for retry', async () => {
+    const user = userEvent.setup()
+    let reject = true
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'problems.bulkUpdateProblems' && reject) {
+        return Promise.reject(new Error('Metadata mutation failed.'))
+      }
+      return Promise.resolve(libraryResponse)
+    })
+    renderProblemLibrary()
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'Select Two Sum' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Edit Metadata' }))
+    const dialog = screen.getByRole('dialog', {
+      name: 'Edit selected metadata',
+    })
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: 'Set difficulty' }),
+    )
+    await user.selectOptions(
+      within(dialog).getByLabelText('Difficulty'),
+      'hard',
+    )
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Update Problems' }),
+    )
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Metadata mutation failed.',
+    )
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(within(dialog).getByLabelText('Difficulty')).toHaveValue('hard')
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeEnabled()
+    reject = false
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Update Problems' }),
+    )
+    await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    expect(sendMessage).toHaveBeenCalledWith('problems.bulkUpdateProblems', {
+      surface: 'dashboard',
+      problemSlugs: ['two-sum'],
+      set: { difficulty: 'hard' },
+    })
+  })
+
+  it('keeps bulk dialog focus and edits when the visible selection changes', async () => {
+    const user = userEvent.setup()
+    const { wrapper } = createQueryTestHarness()
+    const props = {
+      onClearSelection: vi.fn(),
+      options: libraryResponse.options,
+      selectedRows: libraryResponse.rows.slice(0, 2),
+    }
+    vi.mocked(sendMessage).mockResolvedValue(undefined)
+    const { rerender } = render(<ProblemBulkActionBar {...props} />, {
+      wrapper,
+    })
+    const opener = screen.getByRole('button', { name: 'Edit Metadata' })
+    await user.click(opener)
+    const dialog = screen.getByRole('dialog', {
+      name: 'Edit selected metadata',
+    })
+    const difficulty = within(dialog).getByRole('checkbox', {
+      name: 'Set difficulty',
+    })
+    await user.click(difficulty)
+    await user.selectOptions(
+      within(dialog).getByLabelText('Difficulty'),
+      'hard',
+    )
+    const confirm = within(dialog).getByRole('button', {
+      name: 'Update Problems',
+    })
+    confirm.focus()
+
+    rerender(
+      <ProblemBulkActionBar
+        {...props}
+        selectedRows={props.selectedRows.slice(0, 1)}
+      />,
+    )
+    expect(confirm).toHaveFocus()
+    expect(dialog).toHaveTextContent('1 selected problems')
+    expect(within(dialog).getByLabelText('Difficulty')).toHaveValue('hard')
+    await user.tab()
+    expect(difficulty).toHaveFocus()
+    await user.click(confirm)
+    await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    expect(sendMessage).toHaveBeenCalledWith('problems.bulkUpdateProblems', {
+      surface: 'dashboard',
+      problemSlugs: ['two-sum'],
+      set: { difficulty: 'hard' },
+    })
+    expect(opener).toHaveFocus()
+  })
+
+  it.each([
+    [
+      'Edit Metadata',
+      'Edit selected metadata',
+      'Update Problems',
+      'problems.bulkUpdateProblems',
+    ],
+    [
+      'Delete Problems',
+      'Delete selected problems?',
+      'Delete Problems',
+      'problems.bulkDelete',
+    ],
+    [
+      'Reset Schedule',
+      'Reset selected schedules?',
+      'Reset Schedule',
+      'practice.resetSchedule',
+    ],
+  ] as const)(
+    'clears bulk dialog state when selection becomes empty for %s',
+    async (openerName, title, confirmName, method) => {
+      const user = userEvent.setup()
+      const { wrapper } = createQueryTestHarness()
+      const props = {
+        onClearSelection: vi.fn(),
+        options: libraryResponse.options,
+        selectedRows: libraryResponse.rows.slice(0, 1),
+      }
+      vi.mocked(sendMessage).mockImplementation((requestedMethod) =>
+        requestedMethod === method
+          ? Promise.reject(new Error('Bulk mutation failed.'))
+          : Promise.resolve(undefined),
+      )
+      const { rerender } = render(<ProblemBulkActionBar {...props} />, {
+        wrapper,
+      })
+      for (const failBeforeClearingSelection of [false, true]) {
+        await user.click(screen.getByRole('button', { name: openerName }))
+        const dialog = screen.getByRole('dialog', { name: title })
+        if (openerName === 'Edit Metadata') {
+          await user.click(
+            within(dialog).getByRole('checkbox', { name: 'Set difficulty' }),
+          )
+          await user.selectOptions(
+            within(dialog).getByLabelText('Difficulty'),
+            'hard',
+          )
+        }
+        if (failBeforeClearingSelection) {
+          await user.click(
+            within(dialog).getByRole('button', { name: confirmName }),
+          )
+          expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+            'Bulk mutation failed.',
+          )
+        }
+
+        rerender(<ProblemBulkActionBar {...props} selectedRows={[]} />)
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+        rerender(<ProblemBulkActionBar {...props} />)
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      }
+      await user.click(screen.getByRole('button', { name: openerName }))
+      const reopenedDialog = screen.getByRole('dialog', { name: title })
+      expect(
+        within(reopenedDialog).queryByRole('alert'),
+      ).not.toBeInTheDocument()
+      if (openerName === 'Edit Metadata') {
+        expect(
+          within(reopenedDialog).getByRole('checkbox', {
+            name: 'Set difficulty',
+          }),
+        ).not.toBeChecked()
+        expect(within(reopenedDialog).getByLabelText('Difficulty')).toHaveValue(
+          'unknown',
+        )
+      }
+    },
+  )
+
+  it('clears a cancelled bulk metadata error before reopening another bulk action', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockImplementation((method) =>
+      method === 'problems.bulkUpdateProblems'
+        ? Promise.reject(new Error('Metadata mutation failed.'))
+        : Promise.resolve(libraryResponse),
+    )
+    renderProblemLibrary()
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'Select Two Sum' }),
+    )
+    const opener = screen.getByRole('button', { name: 'Edit Metadata' })
+    await user.click(opener)
+    const dialog = screen.getByRole('dialog', {
+      name: 'Edit selected metadata',
+    })
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: 'Set difficulty' }),
+    )
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Update Problems' }),
+    )
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Metadata mutation failed.',
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(opener).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'Delete Problems' }))
+    expect(
+      within(screen.getByRole('dialog')).queryByRole('alert'),
+    ).not.toBeInTheDocument()
   })
 })
 

@@ -91,6 +91,7 @@ export function ProblemLabelInput({
 
   function removeLabel(labelToRemove: string) {
     onChange(labels.filter((currentLabel) => currentLabel !== labelToRemove))
+    inputRef.current?.focus()
   }
 
   function commitDraft() {

@@ -855,3 +855,15 @@ review or merge for the cleanup branch.
   and verify the choice remains or stale save is cancelled. Repeat manual quick
   submit, failed/strict timing locks, unavailable provider and stalled response
   body; timeout must remain visible and secrets redacted.
+- Library dialogs: open row and bulk confirmations and bulk metadata editing.
+  Verify initial Cancel focus, Tab/Shift+Tab containment, Escape cancellation and
+  focus returning to the opener. Delay saving and confirm fields and dismissal
+  stay locked. Reject saving, confirm the error is visible inside the dialog,
+  and retry with the metadata draft intact. Cancel and reopen; the old error must
+  be cleared. Change the selection and verify the new action has no stale error.
+  Remove a focused topic/company pill and confirm focus returns to its input.
+  Empty the selection through a refresh, then select another row; an old dialog
+  must stay closed until explicitly reopened.
+- Tracks reset: verify the shared confirmation retains keyboard containment,
+  pending dismissal locks and opener focus restoration, then confirm the reset
+  changes only the disposable track's progress.

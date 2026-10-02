@@ -71,7 +71,7 @@ export function ProblemRowPracticeActions({
 
   return (
     <>
-      {error ? (
+      {error && !isResetConfirmationOpen ? (
         <InlineStatus className="basis-full" role="alert" tone="danger">
           {error}
         </InlineStatus>
@@ -96,7 +96,10 @@ export function ProblemRowPracticeActions({
       </Button>
       <Button
         disabled={isDisabled}
-        onClick={() => setIsResetConfirmationOpen(true)}
+        onClick={() => {
+          setError(null)
+          setIsResetConfirmationOpen(true)
+        }}
         size="sm"
         variant="ghost"
       >
@@ -107,7 +110,11 @@ export function ProblemRowPracticeActions({
         <ProblemConfirmationDialog
           confirmLabel="Reset Schedule"
           description="This clears the FSRS schedule and review history for this problem."
-          onCancel={() => setIsResetConfirmationOpen(false)}
+          error={error}
+          onCancel={() => {
+            setError(null)
+            setIsResetConfirmationOpen(false)
+          }}
           onConfirm={() => {
             void confirmReset()
           }}
@@ -165,7 +172,7 @@ export function ProblemRowDeleteAction({
 
   return (
     <>
-      {error ? (
+      {error && !isDeleteConfirmationOpen ? (
         <InlineStatus className="basis-full" role="alert" tone="danger">
           {error}
         </InlineStatus>
@@ -173,7 +180,10 @@ export function ProblemRowDeleteAction({
       <Button
         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
         disabled={isDisabled}
-        onClick={() => setIsDeleteConfirmationOpen(true)}
+        onClick={() => {
+          setError(null)
+          setIsDeleteConfirmationOpen(true)
+        }}
         size="sm"
         variant="ghost"
       >
@@ -184,7 +194,11 @@ export function ProblemRowDeleteAction({
         <ProblemConfirmationDialog
           confirmLabel="Delete Problem"
           description="This permanently deletes this problem and its practice data."
-          onCancel={() => setIsDeleteConfirmationOpen(false)}
+          error={error}
+          onCancel={() => {
+            setError(null)
+            setIsDeleteConfirmationOpen(false)
+          }}
           onConfirm={() => {
             void confirmDelete()
           }}

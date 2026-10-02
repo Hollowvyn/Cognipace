@@ -10,13 +10,13 @@ Approved design: [cleanup](../specs/2026-10-02-ponytail-cleanup-design.md).
 
 ## Task 1: Specific modal focus and error paths
 
-**Files:** `src/features/problems/components/library/problem-confirmation-dialog.tsx`, `problem-bulk-metadata-dialog.tsx`, `problem-bulk-action-bar.tsx`; `src/features/problems/components/problem-row/problem-row-actions.tsx`; associated maintained suites and `src/features/tracks/components` confirmation consumers/tests; existing generic focus helper only if reusable.
+**Files:** `src/features/problems/components/library/problem-confirmation-dialog.tsx`, `problem-bulk-metadata-dialog.tsx`, `problem-bulk-action-bar.tsx`; `src/features/problems/components/problem-row/problem-row-actions.tsx`; associated maintained suites and `src/features/tracks/components` confirmation consumers/tests; existing generic focus helper only if reusable. Independent review reproduced focus loss when a selected topic/company pill unmounts; include the one-line input-focus repair in `src/features/problems/components/form/problem-label-input.tsx` and two maintained Library regressions.
 
-- [ ] Reproduce Tab/Shift+Tab escaping confirmation and bulk metadata dialogs. Add maintained tests for initial focus, wrapping, Escape, pending cancellation and restoring the opener on close. Include Tracks reset confirmation and selection changes.
-- [ ] Reproduce row/bulk rejection rendering behind the still-open dialog. Add maintained rejection-path tests before changing error placement.
-- [ ] Apply existing proven modal focus behavior to these flows, using a small shared helper only if it reduces real duplication without creating a general modal framework. Preserve styling, reduced motion, pending locks and cancellation. If using native `showModal`, fetch current platform docs and handle supported test environment explicitly; do not claim jsdom proves browser top-layer behavior.
-- [ ] Pass the relevant mutation error into the active dialog and render its alert with retry/cancel available after rejection. Clear stale error at the existing action lifecycle boundaries. Cover successful retry and cancellation, including bulk metadata.
-- [ ] Run `rtk npm test -- src/features/problems/components src/features/tracks/components --run`; format and lint owned files. Root independently reviews.
+- [x] Reproduce Tab/Shift+Tab escaping confirmation and bulk metadata dialogs. Add maintained tests for initial focus, wrapping, Escape, pending cancellation and restoring the opener on close. Include Tracks reset confirmation and selection changes.
+- [x] Reproduce row/bulk rejection rendering behind the still-open dialog. Add maintained rejection-path tests before changing error placement.
+- [x] Apply existing proven modal focus behavior to these flows, using a small shared helper only if it reduces real duplication without creating a general modal framework. Preserve styling, reduced motion, pending locks and cancellation. If using native `showModal`, fetch current platform docs and handle supported test environment explicitly; do not claim jsdom proves browser top-layer behavior.
+- [x] Pass the relevant mutation error into the active dialog and render its alert with retry/cancel available after rejection. Clear stale error at the existing action lifecycle boundaries. Cover successful retry and cancellation, including bulk metadata.
+- [x] Run `rtk npm test -- src/features/problems/components src/features/tracks/components --run`; format and lint owned files. Root independently reviews.
 
 ## Task 2: Scoped compatible dependency remediation
 

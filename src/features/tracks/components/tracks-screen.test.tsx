@@ -1096,6 +1096,42 @@ describe('TracksScreen', () => {
     ).toBeDisabled()
   })
 
+  it('contains problem reset focus in Tracks and shows retryable errors in its dialog', async () => {
+    const user = userEvent.setup()
+    let reject = true
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'tracks.getWorkspace')
+        return Promise.resolve(twoGroupWorkspace)
+      if (method === 'practice.resetSchedule' && reject)
+        return Promise.reject(new Error('Reset failed.'))
+      return Promise.resolve(null)
+    })
+    renderTracksScreen()
+    await user.click(
+      await screen.findByRole('button', { name: 'Expand Two Sum' }),
+    )
+    const opener = screen.getByRole('button', { name: 'Reset Schedule' })
+    await user.click(opener)
+    const dialog = screen.getByRole('dialog', { name: 'Reset schedule?' })
+    const cancel = within(dialog).getByRole('button', { name: 'Cancel' })
+    const confirm = within(dialog).getByRole('button', {
+      name: 'Reset Schedule',
+    })
+    expect(cancel).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(confirm).toHaveFocus()
+    await user.tab()
+    expect(cancel).toHaveFocus()
+    await user.click(confirm)
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Reset failed.',
+    )
+    reject = false
+    await user.click(confirm)
+    await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    expect(opener).toHaveFocus()
+  })
+
   it('removes a problem from its current track and refreshes the workspace', async () => {
     const user = userEvent.setup()
     let removed = false

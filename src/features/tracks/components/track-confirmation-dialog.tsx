@@ -1,8 +1,9 @@
 import { Loader2 } from 'lucide-react'
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { InlineStatus } from '@/components/ui/inline-status'
+import { useModalFocus } from '@/components/ui/use-modal-focus'
 
 export function TrackConfirmationDialog({
   confirmLabel,
@@ -21,73 +22,13 @@ export function TrackConfirmationDialog({
   pending: boolean
   title: string
 }) {
-  const cancelButtonRef = useRef<HTMLButtonElement>(null)
-  const dialogRef = useRef<HTMLElement>(null)
+  const { cancelButtonRef, dialogRef, handleKeyDown } = useModalFocus({
+    onCancel,
+    pending,
+  })
   const titleId = `track-confirmation-${title.toLowerCase().replace(/\W+/g, '-')}`
   const descriptionId = `${titleId}-description`
   const errorId = `${titleId}-error`
-
-  useEffect(() => {
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null
-    const dialog = dialogRef.current
-    const initialFocusTarget =
-      cancelButtonRef.current ??
-      (dialog ? getFocusableElements(dialog)[0] : null)
-
-    initialFocusTarget?.focus()
-
-    return () => {
-      previouslyFocused?.focus()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (pending) {
-      dialogRef.current?.focus()
-    }
-  }, [pending])
-
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape' && !pending) {
-      event.preventDefault()
-      onCancel()
-      return
-    }
-
-    if (event.key !== 'Tab') {
-      return
-    }
-
-    const dialog = dialogRef.current
-    const focusableElements = dialog ? getFocusableElements(dialog) : []
-
-    if (focusableElements.length === 0) {
-      event.preventDefault()
-      dialog?.focus()
-      return
-    }
-
-    const firstElement = focusableElements[0]
-    const lastElement = focusableElements[focusableElements.length - 1]
-
-    if (!firstElement || !lastElement) {
-      return
-    }
-
-    if (event.shiftKey && document.activeElement === firstElement) {
-      event.preventDefault()
-      lastElement.focus()
-      return
-    }
-
-    if (!event.shiftKey && document.activeElement === lastElement) {
-      event.preventDefault()
-      firstElement.focus()
-    }
-  }
 
   return (
     <div
@@ -159,20 +100,4 @@ export function TrackConfirmationDialog({
       </section>
     </div>
   )
-}
-
-const focusableSelector = [
-  'a[href]',
-  'button:not([disabled])',
-  'textarea:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',')
-
-function getFocusableElements(element: HTMLElement) {
-  return Array.from(element.querySelectorAll<HTMLElement>(focusableSelector))
-    .filter((candidate) => !candidate.hasAttribute('disabled'))
-    .filter((candidate) => candidate.getAttribute('aria-hidden') !== 'true')
-    .filter((candidate) => candidate.tabIndex >= 0)
 }

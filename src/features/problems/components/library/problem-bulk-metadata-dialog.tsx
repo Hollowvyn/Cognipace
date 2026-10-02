@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { InlineStatus } from '@/components/ui/inline-status'
+import { useModalFocus } from '@/components/ui/use-modal-focus'
 import {
   problemDifficulties,
   type ProblemDifficulty,
@@ -31,19 +33,24 @@ const defaultEnabledFields = {
 } as const satisfies EnabledFields
 
 export function ProblemBulkMetadataDialog({
+  error,
   onCancel,
   onSubmit,
   options,
   pending,
   selectedCount,
 }: {
+  error?: ReactNode | undefined
   onCancel: () => void
   onSubmit: (set: BulkMetadataSet) => void
   options: ProblemLibraryOptions
   pending: boolean
   selectedCount: number
 }) {
-  const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const { cancelButtonRef, dialogRef, handleKeyDown } = useModalFocus({
+    onCancel,
+    pending,
+  })
   const [enabledFields, setEnabledFields] =
     useState<EnabledFields>(defaultEnabledFields)
   const [companyLabels, setCompanyLabels] = useState<string[]>([])
@@ -51,10 +58,6 @@ export function ProblemBulkMetadataDialog({
   const [isPremium, setIsPremium] = useState(false)
   const [topicLabels, setTopicLabels] = useState<string[]>([])
   const canSubmit = Object.values(enabledFields).some(Boolean)
-
-  useEffect(() => {
-    cancelButtonRef.current?.focus()
-  }, [])
 
   function setEnabled(field: keyof EnabledFields, enabled: boolean) {
     setEnabledFields((current) => ({ ...current, [field]: enabled }))
@@ -85,11 +88,7 @@ export function ProblemBulkMetadataDialog({
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-background/75 p-4"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && !pending) {
-          onCancel()
-        }
-      }}
+      onKeyDown={handleKeyDown}
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) {
           event.preventDefault()
@@ -100,11 +99,18 @@ export function ProblemBulkMetadataDialog({
       }}
     >
       <section
-        aria-describedby="problem-bulk-metadata-description"
+        aria-busy={pending || undefined}
+        aria-describedby={
+          error
+            ? 'problem-bulk-metadata-description problem-bulk-metadata-error'
+            : 'problem-bulk-metadata-description'
+        }
         aria-labelledby="problem-bulk-metadata-title"
         aria-modal="true"
-        className="grid max-h-[min(42rem,calc(100vh-2rem))] w-full max-w-2xl gap-4 overflow-y-auto rounded-[var(--cp-panel-radius)] border border-border bg-card p-[var(--cp-panel-padding)] text-card-foreground shadow-surface"
+        className="grid max-h-[min(42rem,calc(100vh-2rem))] w-full max-w-2xl gap-4 overflow-y-auto rounded-[var(--cp-panel-radius)] border border-border bg-card p-[var(--cp-panel-padding)] text-card-foreground shadow-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
       >
         <div className="grid gap-2">
           <h2
@@ -122,7 +128,7 @@ export function ProblemBulkMetadataDialog({
           </p>
         </div>
 
-        <div className="grid gap-4">
+        <fieldset className="m-0 grid gap-4 border-0 p-0" disabled={pending}>
           <BulkFieldToggle
             checked={enabledFields.difficulty}
             label="Set difficulty"
@@ -211,8 +217,17 @@ export function ProblemBulkMetadataDialog({
               ) : null}
             </div>
           ) : null}
-        </div>
+        </fieldset>
 
+        {error ? (
+          <InlineStatus
+            id="problem-bulk-metadata-error"
+            role="alert"
+            tone="danger"
+          >
+            {error}
+          </InlineStatus>
+        ) : null}
         <div className="flex flex-wrap justify-end gap-2">
           <Button
             disabled={pending}
