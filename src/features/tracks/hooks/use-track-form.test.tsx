@@ -171,6 +171,45 @@ describe('useTrackForm initial draft behavior', () => {
 })
 
 describe('useTrackForm problem movement', () => {
+  it('keeps the payload intact when all groups collapse and preserves that state through reorder and removal', () => {
+    const source = createTrackForEditResponse({
+      groups: [
+        { id: 'first', title: 'First', position: 1, problemSlugs: ['two-sum'] },
+        { id: 'empty', title: 'Empty', position: 2, problemSlugs: [] },
+      ],
+    })
+    const { result } = renderHook(() => useTrackForm(source))
+    const payload = result.current.payload
+    act(() =>
+      result.current.dispatch({ type: 'toggle-group', groupKey: 'first' }),
+    )
+    expect(result.current.state.selectedGroupKey).toBeNull()
+    expect(result.current.selectedGroup).toBeNull()
+    expect(result.current.payload).toEqual(payload)
+    act(() =>
+      result.current.dispatch({
+        type: 'move-group',
+        groupKey: 'first',
+        direction: 'down',
+      }),
+    )
+    expect(result.current.state.selectedGroupKey).toBeNull()
+    act(() =>
+      result.current.dispatch({ type: 'remove-group', groupKey: 'empty' }),
+    )
+    expect(result.current.state.selectedGroupKey).toBeNull()
+    act(() =>
+      result.current.dispatch({ type: 'select-group', groupKey: 'first' }),
+    )
+    expect(result.current.selectedGroup?.key).toBe('first')
+    act(() =>
+      result.current.dispatch({ type: 'toggle-group', groupKey: 'first' }),
+    )
+    act(() => result.current.dispatch({ type: 'add-group' }))
+    expect(result.current.selectedGroup?.key).toBe('new-group-3')
+    expect(result.current.state.selectedGroupKey).toBe('new-group-3')
+  })
+
   it('moves a problem from one group to another', () => {
     const problemRows = [
       row('two-sum', 'Two Sum', { difficulty: 'easy' }),

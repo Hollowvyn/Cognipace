@@ -211,10 +211,12 @@ state. Tracks can contain groups and ordered problem memberships.
 
 The create/edit modal uses full-width ordered group sections. Select a group to
 expand its Library problem picker and question list; Rename reveals its title
-field. Question titles and difficulty remain visible, and the Change button
-opens a menu for moving a question to another group. Moving appends it to the
-destination without changing the source selection. Empty groups may be removed
-when another group remains.
+field. Click an expanded header again to collapse it; all groups may be closed.
+Opening another group closes the previous one. Rename, New Group, and an invalid
+group title on Save open the relevant section. Question titles and difficulty
+remain visible, and the Change button opens a menu for moving a question to
+another group. Moving appends it to the destination without changing the source
+selection. Empty groups may be removed when another group remains.
 
 Every track group's problem table uses Library-style pagination with a fixed
 15 problems per page. The footer shows the page size and visible range;

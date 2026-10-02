@@ -553,9 +553,14 @@ restore, and correction cases.
 1. Open New Track and edit a populated track at desktop and narrow widths.
    Confirm every group and question title wraps, the selected group's Library
    picker is immediately above its questions, and the footer stays reachable.
+   Click the open group header to collapse it, leaving all groups closed; click,
+   Enter, or Space reopens it. Confirm header focus remains after collapse and
+   opening another group closes the previous one. Rename and New Group open
+   their title field, and saving with all groups closed retains every question.
    Rename, add/reorder groups and questions, remove an empty group, and confirm
    non-empty and final groups cannot be removed. Save an invalid empty group
-   title and confirm that group expands with its title field visible.
+   title, collapse all groups, then Save and confirm that group expands with its
+   title field visible.
 2. Open Change by mouse and keyboard. Check full destination titles, Arrow keys,
    Home/End, Enter/Space selection, Escape without closing the modal, outside
    click and Tab dismissal. Move a question and confirm it appends to the

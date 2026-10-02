@@ -369,34 +369,38 @@ function TrackFormFields({
           groups={state.groups}
           nextGroupNumber={state.nextGroupNumber}
           renamingGroupKey={renamingGroupKey}
-          selectedGroupKey={selectedGroup.key}
+          selectedGroupKey={state.selectedGroupKey}
           setRenamingGroupKey={setRenamingGroupKey}
           showErrors={submitAttempted}
         >
-          <TrackProblemSearch
-            dispatch={dispatch}
-            groups={state.groups}
-            inputRef={searchInputRef}
-            isSearchFocused={isSearchFocused}
-            setSearchFocused={setSearchFocused}
-            problemRows={availableProblemRows}
-            searchQuery={searchQuery}
-            selectedGroup={selectedGroup}
-            setSearchQuery={setSearchQuery}
-          />
-          <SelectedGroupProblems
-            dispatch={dispatch}
-            eligibleProblemSlugs={
-              state.allowExternalProgress ? eligibleProblemSlugs : new Set()
-            }
-            groups={state.groups}
-            problemRowsBySlug={problemRowsBySlug}
-            onFocusSearch={() => {
-              searchInputRef.current?.focus()
-              setSearchFocused(false)
-            }}
-            selectedGroup={selectedGroup}
-          />
+          {selectedGroup ? (
+            <>
+              <TrackProblemSearch
+                dispatch={dispatch}
+                groups={state.groups}
+                inputRef={searchInputRef}
+                isSearchFocused={isSearchFocused}
+                setSearchFocused={setSearchFocused}
+                problemRows={availableProblemRows}
+                searchQuery={searchQuery}
+                selectedGroup={selectedGroup}
+                setSearchQuery={setSearchQuery}
+              />
+              <SelectedGroupProblems
+                dispatch={dispatch}
+                eligibleProblemSlugs={
+                  state.allowExternalProgress ? eligibleProblemSlugs : new Set()
+                }
+                groups={state.groups}
+                problemRowsBySlug={problemRowsBySlug}
+                onFocusSearch={() => {
+                  searchInputRef.current?.focus()
+                  setSearchFocused(false)
+                }}
+                selectedGroup={selectedGroup}
+              />
+            </>
+          ) : null}
         </TrackGroupList>
       </div>
 
@@ -544,7 +548,7 @@ function TrackGroupList({
   groups: readonly TrackFormGroupState[]
   nextGroupNumber: number
   renamingGroupKey: string | null
-  selectedGroupKey: string
+  selectedGroupKey: string | null
   setRenamingGroupKey: (groupKey: string | null) => void
   showErrors: boolean
 }) {
@@ -592,8 +596,8 @@ function TrackGroupList({
                   aria-expanded={isSelected}
                   className="grid min-w-0 justify-items-start gap-1 rounded-[var(--cp-control-radius)] px-1 py-1 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => {
-                    dispatch({ groupKey: group.key, type: 'select-group' })
-                    if (!isSelected) setRenamingGroupKey(null)
+                    dispatch({ groupKey: group.key, type: 'toggle-group' })
+                    setRenamingGroupKey(null)
                   }}
                   type="button"
                 >

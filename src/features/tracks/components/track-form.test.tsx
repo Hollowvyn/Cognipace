@@ -560,6 +560,76 @@ describe('TrackForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Create failed')
   })
 
+  it.each(['create', 'edit'] as const)(
+    'allows every group to collapse and reopen by click or keyboard in %s mode',
+    async (mode) => {
+      const user = userEvent.setup()
+      mockTrackFormRuntime(
+        mode === 'create' ? createTrackDefaults() : createEditResponse(),
+      )
+      renderTrackForm(
+        <TrackForm
+          {...(mode === 'edit'
+            ? { mode: 'edit', trackId: 'leetcode-75' }
+            : { mode: 'create' })}
+          onCancel={vi.fn()}
+          onSaved={vi.fn()}
+        />,
+      )
+      const header = await screen.findByRole('button', {
+        name: mode === 'create' ? 'Select Main' : 'Select Arrays and Hashing',
+      })
+      expect(header).toHaveAttribute('aria-expanded', 'true')
+      await user.click(header)
+      expect(header).toHaveAttribute('aria-expanded', 'false')
+      expect(header).toHaveFocus()
+      expect(
+        screen.queryByLabelText('Search Library problems'),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('region', { name: 'Selected problem rows' }),
+      ).not.toBeInTheDocument()
+      await user.keyboard('{Enter}')
+      expect(header).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByLabelText('Search Library problems')).toBeVisible()
+      await user.keyboard(' ')
+      expect(header).toHaveAttribute('aria-expanded', 'false')
+      await user.click(header)
+      expect(header).toHaveAttribute('aria-expanded', 'true')
+    },
+  )
+
+  it('opens a collapsed group for Rename and exits rename when its header collapses it', async () => {
+    const user = userEvent.setup()
+    mockTrackFormRuntime(createEditResponse())
+    renderTrackForm(
+      <TrackForm
+        mode="edit"
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+        trackId="leetcode-75"
+      />,
+    )
+    const header = await screen.findByRole('button', {
+      name: 'Select Arrays and Hashing',
+    })
+    await user.click(header)
+    await user.click(
+      screen.getByRole('button', { name: 'Rename Arrays and Hashing' }),
+    )
+    expect(header).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText('Group title')).toHaveFocus()
+    await user.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText('Group title')).not.toBeInTheDocument()
+    await user.click(header)
+    expect(screen.queryByLabelText('Group title')).not.toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', { name: 'Rename Arrays and Hashing' }),
+    )
+    expect(screen.getByLabelText('Group title')).toBeVisible()
+  })
+
   it('expands one full-width group section and requires an explicit rename action', async () => {
     const user = userEvent.setup()
     mockTrackFormRuntime(createEditResponse())
@@ -961,6 +1031,12 @@ describe('TrackForm', () => {
         name: 'Select Arrays and Hashing',
       }),
     )
+    await user.click(
+      within(groups).getByRole('button', { name: 'Select Arrays and Hashing' }),
+    )
+    expect(
+      screen.queryByLabelText('Search Library problems'),
+    ).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'SAVE' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

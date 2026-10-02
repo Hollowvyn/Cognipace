@@ -131,3 +131,20 @@ The approved preview is implemented with complete titles, working menus,
 consistent create/edit flows, accurate external-progress drafts, and passing
 focused tests. Human realtime happy-path/edge-case smoke and screenshot or
 recording proof remain required before review or merge.
+
+## Follow-up: Collapse The Open Group
+
+The user requested this correction after trying the implemented editor. Allow
+zero expanded groups while retaining the existing one-open-group behavior.
+Header clicks toggle; Rename, New Group, and invalid-title Save explicitly open
+the relevant group. Collapse changes only local form presentation.
+
+- [x] Add failing component tests for click/keyboard collapse and reopen in
+      create/edit mode, Rename reopening, and invalid-title Save from all closed.
+- [x] Add a hook regression that collapse preserves the mutation payload,
+      reorder/removal preserves all closed, and New Group opens the new section.
+- [x] Make selectedGroupKey nullable and add toggle-group, retaining select-group
+      for explicit opening. Render no question/search panel while all closed.
+- [x] Run focused form/hook/routes tests, required check/build/format, and an
+      implemented-component browser check. Update current docs and handoff;
+      human extension smoke and visual proof remain pending before review/merge.

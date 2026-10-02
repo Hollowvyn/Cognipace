@@ -55,8 +55,10 @@ global review history.
   option. Place **Allow external progress** alongside these track options in both
   create and edit. New, seeded, imported, and existing tracks default to off.
 - Replace the two panes with ordered, full-width group sections. Reuse the
-  existing selected-group state so one section is expanded at a time. A selected
-  section stays expanded; choosing another section changes the editor context.
+  existing selected-group state so at most one section is expanded at a time.
+  User-approved follow-up: clicking the expanded header collapses it, allowing
+  all sections to be closed; choosing another section changes the editor context.
+  Rename, New Group, and invalid-title Save explicitly open the relevant section.
 - Each header shows the entire wrapping group title, count, and the existing
   rename, move-up, move-down, and remove-empty-group actions. Retain the rule that
   the last group and a nonempty group cannot be removed.

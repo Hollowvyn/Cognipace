@@ -99,7 +99,8 @@ Use the **Vertical Track Editor And External Progress** flow in
 `dist/chrome-mv3` in a disposable profile for reset/restore cases.
 
 - [ ] Create/edit at desktop and 320px; complete group/question titles, rename,
-      Library add, order, group removal, and invalid title reveal.
+      Library add, order, group removal, and invalid title reveal. Collapse every
+      group, reopen by click/Enter/Space, and save without losing questions.
 - [ ] Change menu mouse/keyboard, full destination titles, Escape/Tab/outside,
       source focus, footer flip/scroll, and moving the final source question.
 - [ ] Historical solve counts only when enabled; save/reopen and toggle off/on;
@@ -139,7 +140,67 @@ cannot read the new snapshot fingerprint or v5 backup; use a compatible
 pre-upgrade original/export with that build, or retain the new build to export
 data. Never rewrite shipped SQL or discard recovery copies to force a downgrade.
 
-## Completion Evidence
+## Follow-up: Allow All Groups To Collapse
+
+The user requested that clicking the expanded group header collapse it without
+requiring another group to open. This refines the original design. Form selection
+now permits null, and header toggling is separate from explicit opening for
+Rename, New Group, and invalid-title Save. Local collapse does not modify the
+payload, question order, membership, or persisted progress.
+
+Five regression expectations failed before the fix. The updated focused command
+passes 90 tests across form, hook, and routes:
+
+```sh
+rtk npm run test -- src/features/tracks/components/track-form.test.tsx src/features/tracks/hooks/use-track-form.test.tsx src/app/dashboard/routes.test.tsx
+```
+
+Read-only review found no issues. The initial follow-up combined check caught a
+TypeScript error in the parameterized create/edit test's props; the fixture now
+uses the discriminated mode/trackId pair. Production build, standalone lint,
+and formatting passed. No database or runtime-contract changes were needed.
+
+Final follow-up `rtk npm run check` passed **187 files / 1,932 tests**, including
+database checks, WXT type generation, TypeScript, ESLint, and the full suite.
+The production build contains the collapse fix in `dist/chrome-mv3`.
+
+Passed follow-up commands:
+
+```sh
+rtk npm run lint
+rtk npm run check
+rtk npm run build
+rtk npm run format
+rtk proxy npx prettier --check src/features/tracks/components/track-form.tsx src/features/tracks/components/track-form.test.tsx src/features/tracks/hooks/use-track-form.ts src/features/tracks/hooks/use-track-form.test.tsx docs/product.md docs/testing.md docs/superpowers/specs/2026-10-02-track-editor-external-progress-design.md docs/superpowers/plans/2026-10-02-track-editor-phase-1.md docs/superpowers/handoffs/2026-10-02-track-editor-external-progress.md
+rtk git diff --check
+```
+
+Implemented-component browser verification passed using:
+
+```sh
+rtk proxy node /private/tmp/track-editor-implemented-harness/serve.mjs
+rtk proxy node /private/tmp/check-track-editor-collapse.cjs
+```
+
+The harness uses actual TrackForm, RouteModal, and app styles with extension
+messaging and persistence mocked. Create/edit modes at 736px and 320px passed
+click/Enter/Space collapse and reopen, header focus retention, all-closed Save
+without changing groups/order, Rename reopening, and New Group opening with
+title focus. No browser errors or horizontal overflow were recorded. Sandbox
+restrictions initially blocked the local server and Chrome; the same commands
+succeeded with approved escalation. An ambiguous temporary test locator was
+corrected before the passing browser run. The server is stopped.
+
+- [Collapsed desktop groups](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-collapse-desktop.png)
+- [Collapsed narrow groups](/Users/tobiolutimehin/.codex/visualizations/2026/10/02/01a0faff-55d2-73b2-8f3c-51d28ee99646/track-editor-collapse-mobile.png)
+
+Human installed-extension smoke with visual proof remains pending before PR
+review or merge. `rtk npm run zip` remains skipped because packaging behavior
+is unchanged; `rtk npm run db:generate` was not repeated for the collapse fix
+because it does not touch schema or persistence. Combined check includes
+`rtk npm run db:check`.
+
+## Initial Feature Completion Evidence
 
 Final `rtk npm run check` passed **187 files / 1,928 tests**. It includes database
 migration checks, WXT type generation, TypeScript, ESLint, and the full suite.
