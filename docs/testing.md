@@ -558,8 +558,9 @@ is required before review or merge:
 2. Collapse and reopen the collection with the heading and chevron, then use
    New Track and Import tracks. Confirm the actions do not collapse the
    collection. Check the narrow layout, long titles, zero progress, and a
-   completed track. With no active track, confirm all available tracks remain
-   visible; with no tracks, confirm both create and import are available.
+   completed track. With no active track, confirm the collection starts expanded
+   and can still collapse/reopen using the heading, chevron, Enter, and Space;
+   with no tracks, confirm both create and import are available.
 3. Open Import tracks, download the template, author a disposable track, and
    choose that file. Inspect its groups and additions in the preview before
    applying. Confirm the new track appears in All tracks, the count updates,
@@ -580,6 +581,30 @@ is required before review or merge:
    > Check Tab and Escape during pending apply/retry and after each result; the
    > status keeps focus during writes, a save failure focuses Retry saving, and a
    > saved import focuses the result without exposing background navigation.
+
+#### Track Card Preview
+
+Human installed-extension happy-path and edge-case smoke with screenshot or
+recording proof is required before PR review or merge:
+
+1. Click a track card's title, description, progress, and spare summary space.
+   Confirm its inline preview toggles; Enter and Space on the Preview control
+   do the same and keep focus. Opening an inactive track must not activate it,
+   change the active group, or change progress. Collapse/reopen All tracks with
+   and without an active track; the count and create/import actions remain.
+2. Inspect a populated preview. Confirm ordered group headers and question
+   order match Edit Track, the first group starts open, each group can collapse,
+   and complete titles, difficulty, and topic labels wrap at narrow widths.
+   A long curriculum scrolls inside the compact preview. Inspect empty groups
+   and a track with unavailable question metadata; stored slugs remain visible.
+3. Use Set active, Clear Active, Edit, Reset Progress, and Delete from the card.
+   They must retain their existing behavior without toggling the preview. Cancel
+   reset/delete and verify the preview and focus remain usable. Edit and save a
+   group's questions, then reopen the preview and verify fresh content.
+4. With controlled slow or failed preview reads, close while loading, check
+   the error and Retry preview, then retry. Focus returns to the Preview control
+   before the temporary retry button disappears. Opening a preview performs
+   only the existing read and never a track mutation.
 
 #### Vertical Track Editor And External Progress
 

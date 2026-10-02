@@ -219,6 +219,13 @@ apply and while a committed import still needs its browser-storage save retried.
 The Tracks feature remains responsible for activation; importing does not
 activate a track.
 
+The All tracks collection's inline card preview belongs to Tracks. It mounts
+the existing useTrackForEdit query only when opened and renders each group's
+explicit problem order against the returned Library metadata. It shares the
+existing track query cache and invalidation path, performs no writes, and
+does not change track/group selection. Its collapsible group sections reuse
+the editor's visual hierarchy without rendering editing controls.
+
 The dashboard-only runtime methods are `imports.preview`, `imports.apply`, and
 `imports.retryPersistence`. Their request and response payloads use Zod
 contracts, and sender authorization checks the actual dashboard sender. All

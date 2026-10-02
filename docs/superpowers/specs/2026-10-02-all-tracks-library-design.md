@@ -8,8 +8,8 @@ prototype and the template-first import flow.
 All tracks reads as the complete local study collection. Its heading has a
 library icon, a larger serif title, a track-count pill, a distinct tonal
 header, New Track, and a small accessible Import tracks icon. The collection
-starts expanded and can be collapsed when an active track exists; it remains
-forced open when there is no active track. Adding a track reopens the collection.
+starts expanded and can be collapsed whether or not an active track exists.
+Adding a track reopens the collection.
 
 Track rows retain their order, descriptions, progress, target dates, and
 management actions. The active row has a primary-colored border and leading
@@ -17,6 +17,26 @@ accent, a tinted background, and a filled Active badge with a check icon.
 Inactive rows remain legible, show a progress bar and completed/total values,
 and offer an explicit Set active button. Empty Tracks also exposes import.
 The active workspace and curriculum progression retain their responsibilities.
+
+## Track Card Preview Follow-Up
+
+The user requested this follow-up after trying the implementation, referencing
+the group presentation in merged PR #180. Their existing instruction to
+implement trusted routine design choices applies to this scoped extension.
+
+Clicking a track card's summary toggles a compact inline preview. A semantic
+button covers the summary, supports Enter/Space, exposes expansion state, and
+shows a chevron. Existing Set active, Clear Active, Edit, Reset Progress, and
+Delete controls remain independently usable and do not toggle the preview.
+
+Load the existing Tracks read query only when a preview opens. Display ordered
+groups as full-width shaded collapsible headers, with the first group open.
+Inside, show ordered full question titles, difficulty, and direct topic labels
+as flat divided rows. Keep the preview's content height bounded and scrollable
+for long curricula. Empty groups and failed/loading reads have explicit states
+and Retry is available. This read-only preview neither activates a track nor
+changes its active group, progression, or stored content. All preview toggles
+keep keyboard focus on their control.
 
 ## Import Interaction
 

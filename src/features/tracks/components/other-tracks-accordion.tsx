@@ -11,6 +11,7 @@ import { useSetActiveTrack } from '../api/tracks-api'
 import type { SerializedTrackWorkspaceRow } from '../api/tracks-contracts'
 import { getTrackTargetStatus } from '../domain'
 import { TrackActions, type RenderTrackEditAction } from './track-actions'
+import { TrackCardPreview } from './track-card-preview'
 
 export function OtherTracksAccordion({
   activeTrackId,
@@ -32,9 +33,8 @@ export function OtherTracksAccordion({
   const [error, setError] = useState<string | null>(null)
   const previousTrackCountRef = useRef(tracks.length)
   const setActiveTrack = useSetActiveTrack()
-  const isForcedOpen = activeTrackId === null
-  const isOpen = isForcedOpen || isExpandedByUser
-  const canToggle = tracks.length > 0 && !isForcedOpen
+  const isOpen = isExpandedByUser
+  const canToggle = tracks.length > 0
 
   useEffect(() => {
     const previousTrackCount = previousTrackCountRef.current
@@ -112,22 +112,9 @@ export function OtherTracksAccordion({
             <IconButton
               aria-controls={collectionId}
               aria-expanded={isOpen}
-              disabled={isForcedOpen}
-              label={
-                isForcedOpen
-                  ? 'All tracks shown'
-                  : isOpen
-                    ? 'Hide all tracks'
-                    : 'Show all tracks'
-              }
+              label={isOpen ? 'Hide all tracks' : 'Show all tracks'}
               onClick={() => setIsExpandedByUser((current) => !current)}
-              tooltip={
-                isForcedOpen
-                  ? 'All tracks shown'
-                  : isOpen
-                    ? 'Hide all tracks'
-                    : 'Show all tracks'
-              }
+              tooltip={isOpen ? 'Hide all tracks' : 'Show all tracks'}
               variant="ghost"
             >
               {isOpen ? (
@@ -183,6 +170,9 @@ function OtherTrackRow({
   row: SerializedTrackWorkspaceRow
 }) {
   const titleId = useId()
+  const previewId = useId()
+  const previewToggleRef = useRef<HTMLButtonElement>(null)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const targetStatus = getTrackTargetStatus({
     dueAt: row.track.dueAt,
     generatedAt,
@@ -193,71 +183,106 @@ function OtherTrackRow({
     <article
       aria-labelledby={titleId}
       className={cn(
-        'grid min-w-0 gap-3 rounded-[var(--cp-control-radius)] border border-transparent border-l-4 px-3 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-4',
+        'min-w-0 rounded-[var(--cp-control-radius)] border border-transparent border-l-4',
         isActive
           ? 'border-primary/50 border-l-primary bg-primary/10'
           : 'border-t-border',
       )}
     >
-      <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h3
-            className="m-0 min-w-0 break-words text-base font-bold leading-tight text-foreground"
-            id={titleId}
-          >
-            {row.track.title}
-          </h3>
-          {isActive ? (
-            <Badge
-              className="shrink-0 rounded-full border-primary bg-primary text-primary-foreground"
-              tone="success"
+      <div className="relative grid min-w-0 gap-3 px-3 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-4">
+        <button
+          aria-controls={previewId}
+          aria-expanded={isPreviewOpen}
+          aria-label={`Preview ${row.track.title}`}
+          className="absolute inset-0 cursor-pointer rounded-[var(--cp-control-radius)] transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          onClick={() => setIsPreviewOpen((current) => !current)}
+          ref={previewToggleRef}
+          type="button"
+        />
+        <div className="pointer-events-none relative min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h3
+              className="m-0 min-w-0 break-words text-base font-bold leading-tight text-foreground"
+              id={titleId}
             >
-              <Check aria-hidden="true" className="size-3" />
-              Active
-            </Badge>
-          ) : null}
-        </div>
-        {row.track.description ? (
-          <p className="m-0 mt-1 line-clamp-2 text-[length:var(--cp-badge-font-size)] leading-snug text-muted-foreground">
-            {row.track.description}
-          </p>
-        ) : null}
-        <div className="mt-3 grid gap-2 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
-          <ProgressText row={row} />
-          {targetStatus.catalogLabel ? (
-            <span
-              className={cn(
-                targetStatus.tone === 'danger' && 'text-destructive',
-              )}
-              data-cp-tone={
-                targetStatus.tone === 'danger' ? 'danger' : undefined
-              }
-            >
-              {targetStatus.catalogLabel}
+              {row.track.title}
+            </h3>
+            {isActive ? (
+              <Badge
+                className="shrink-0 rounded-full border-primary bg-primary text-primary-foreground"
+                tone="success"
+              >
+                <Check aria-hidden="true" className="size-3" />
+                Active
+              </Badge>
+            ) : null}
+            <span className="ml-auto flex shrink-0 items-center gap-1 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
+              Preview
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  'size-4 transition-transform',
+                  isPreviewOpen && 'rotate-180',
+                )}
+              />
             </span>
+          </div>
+          {row.track.description ? (
+            <p className="m-0 mt-1 line-clamp-2 text-[length:var(--cp-badge-font-size)] leading-snug text-muted-foreground">
+              {row.track.description}
+            </p>
           ) : null}
+          <div className="mt-3 grid gap-2 text-[length:var(--cp-badge-font-size)] text-muted-foreground">
+            <ProgressText row={row} />
+            {targetStatus.catalogLabel ? (
+              <span
+                className={cn(
+                  targetStatus.tone === 'danger' && 'text-destructive',
+                )}
+                data-cp-tone={
+                  targetStatus.tone === 'danger' ? 'danger' : undefined
+                }
+              >
+                {targetStatus.catalogLabel}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="relative">
+          <TrackActions
+            ariaLabel={`${row.track.title} catalog actions`}
+            className="justify-start md:justify-end"
+            renderEditTrackAction={renderEditTrackAction}
+            setActiveAction={
+              isActive ? null : (
+                <Button
+                  aria-label={`Set ${row.track.title} active`}
+                  disabled={disabled}
+                  onClick={onSetActive}
+                  size="sm"
+                  variant="outline"
+                >
+                  Set active
+                </Button>
+              )
+            }
+            showClearActive={isActive}
+            track={row.track}
+          />
         </div>
       </div>
-      <TrackActions
-        ariaLabel={`${row.track.title} catalog actions`}
-        className="justify-start md:justify-end"
-        renderEditTrackAction={renderEditTrackAction}
-        setActiveAction={
-          isActive ? null : (
-            <Button
-              aria-label={`Set ${row.track.title} active`}
-              disabled={disabled}
-              onClick={onSetActive}
-              size="sm"
-              variant="outline"
-            >
-              Set active
-            </Button>
-          )
-        }
-        showClearActive={isActive}
-        track={row.track}
-      />
+      {isPreviewOpen ? (
+        <section
+          aria-label={`${row.track.title} preview`}
+          className="border-t border-border px-3 py-4 md:px-4"
+          id={previewId}
+        >
+          <TrackCardPreview
+            onRetry={() => previewToggleRef.current?.focus()}
+            trackId={row.track.id}
+          />
+        </section>
+      ) : null}
     </article>
   )
 }
