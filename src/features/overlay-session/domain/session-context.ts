@@ -2,11 +2,6 @@ import type { OverlayAppShellData } from '@/features/app-shell'
 import type { AssessmentPracticeContext } from '@/features/assessment'
 import type { ReviewRating } from '@/lib/fsrs'
 
-import {
-  hasUnpersistedDraftChanges,
-  type OverlaySessionState,
-} from './overlay-session-state'
-
 export type OverlayAssessmentContext = OverlayAppShellData['overlay']
 
 export type OverlaySubmissionSource =
@@ -34,7 +29,6 @@ export type OverlayAssessmentSessionContext = {
 
 export type DeriveOverlayAssessmentSessionContextInput = {
   context: OverlayAssessmentContext
-  overlay: OverlaySessionState
   submissionSource: OverlaySubmissionSource
   timerUsed: boolean
 }
@@ -61,7 +55,8 @@ export function deriveOverlayAssessmentSessionContext(
           occurredAt: Date.parse(latestAttempt.reviewedAt),
         }
       : null,
-    currentDraftHasChanges: hasUnpersistedDraftChanges(input.overlay),
+    // Retained for compatibility with the assessment runtime contract.
+    currentDraftHasChanges: false,
   }
 }
 

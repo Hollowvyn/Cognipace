@@ -96,7 +96,7 @@ Not every feature needs every folder. Add only the folder needed for the change.
   historical charts, current retention health, fragile knowledge, future load,
   and explainable readiness. It owns chart presentation contracts but not
   practice persistence or FSRS scheduling.
-- `overlay-session`: LeetCode overlay UI state, timer, draft fields, page sync,
+- `overlay-session`: LeetCode overlay UI state, timer, page sync,
   submission automation, and review action orchestration.
 - `practice`: FSRS-backed practice state, review logs, scheduling details,
   suspension, resets, and current log updates.
@@ -603,7 +603,7 @@ When adding or changing data dependencies:
 ### Change Overlay Behavior
 
 1. Start in `src/app/overlay/overlay-app.tsx` for composition changes.
-2. Use `src/features/overlay-session` for overlay UI state, timer, drafts, page
+2. Use `src/features/overlay-session` for overlay UI state, timer, page
    sync, submission automation, and review actions.
 3. Use `src/features/leetcode-capture` for page metadata, content, and
    submission result reads.
@@ -611,7 +611,11 @@ When adding or changing data dependencies:
 5. Use `src/features/problems` for problem upserts from page data.
 6. Preserve content-script-only access for LeetCode read methods in
    `runtime-policy.ts`.
-7. Test collapsed, expanded, docked, timer, draft, save, and page-sync behavior
+   The overlay does not own editable practice logs. Its review save and override
+   requests omit log patches, preserving historical fields through Practice.
+   The assessment request retains `currentDraftHasChanges: false` for contract
+   compatibility.
+7. Test collapsed, expanded, docked, timer, rating update, save, and page-sync behavior
    when the change touches those flows.
 
 ### Add Or Change External API Calls

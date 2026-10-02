@@ -1,13 +1,6 @@
 export { formatOverlayDateTime, formatOverlayDuration } from './overlay-format'
 export {
-  createOverlayDraftFromLog,
-  toPracticeLogPatch,
-  type OverlayDraftField,
-  type OverlayDraftLog,
-} from './overlay-draft'
-export {
   hasSubmittedSessionChanges,
-  hasUnpersistedDraftChanges,
   initialOverlaySessionState,
   overlaySessionReducer,
   type OverlayFeedback,

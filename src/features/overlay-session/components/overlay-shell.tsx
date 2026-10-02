@@ -12,7 +12,6 @@ export function OverlayShell({
   actions,
   aiRecommendation,
   context,
-  draft,
   feedback,
   location,
   metadata,
@@ -56,7 +55,6 @@ export function OverlayShell({
         view={{
           aiRecommendation,
           context,
-          draft,
           elapsedSeconds: timer.elapsedSeconds,
           helpSearchQuery,
           isOverTarget: timer.isOverTarget,

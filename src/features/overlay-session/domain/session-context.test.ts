@@ -3,11 +3,6 @@ import { describe, expect, it } from 'vitest'
 import type { OverlayAppShellData } from '@/features/app-shell'
 import type { SerializedPracticeDetails } from '@/features/practice'
 
-import { createEmptyOverlayDraft } from './overlay-draft'
-import {
-  initialOverlaySessionState,
-  type OverlaySessionState,
-} from './overlay-session-state'
 import {
   deriveOverlayAssessmentSessionContext,
   toAssessmentPracticeContext,
@@ -97,21 +92,27 @@ function makeContext(
   }
 }
 
-function makeOverlay(
-  patch: Partial<OverlaySessionState> = {},
-): OverlaySessionState {
-  return {
-    ...initialOverlaySessionState,
-    activeProblemSlug: 'two-sum',
-    ...patch,
-  }
-}
-
 describe('deriveOverlayAssessmentSessionContext', () => {
+  it('reports no editable log draft even when historical notes exist', () => {
+    const result = deriveOverlayAssessmentSessionContext({
+      context: makeContext(
+        makePractice({
+          currentLog: {
+            ...makePractice().currentLog,
+            notes: 'Historical note.',
+          },
+        }),
+      ),
+      submissionSource: 'manual-overlay',
+      timerUsed: false,
+    })
+    expect(result.currentDraftHasChanges).toBe(false)
+  })
+
   it('marks first-solve when latestAttempt is null', () => {
     const result = deriveOverlayAssessmentSessionContext({
       context: makeContext(makePractice()),
-      overlay: makeOverlay(),
+
       submissionSource: 'manual-overlay',
       timerUsed: true,
     })
@@ -121,7 +122,7 @@ describe('deriveOverlayAssessmentSessionContext', () => {
   it('marks recall-review when latestAttempt is present', () => {
     const result = deriveOverlayAssessmentSessionContext({
       context: makeContext(makePractice({ latestAttempt: baseAttempt })),
-      overlay: makeOverlay(),
+
       submissionSource: 'manual-overlay',
       timerUsed: true,
     })
@@ -131,7 +132,7 @@ describe('deriveOverlayAssessmentSessionContext', () => {
   it('marks first-solve when practice record is absent entirely', () => {
     const result = deriveOverlayAssessmentSessionContext({
       context: makeContext(null),
-      overlay: makeOverlay(),
+
       submissionSource: 'manual-overlay',
       timerUsed: true,
     })
@@ -149,7 +150,7 @@ describe('deriveOverlayAssessmentSessionContext', () => {
       expect(
         deriveOverlayAssessmentSessionContext({
           context: makeContext(null),
-          overlay: makeOverlay(),
+
           submissionSource: source,
           timerUsed: false,
         }).submissionSource,
@@ -161,7 +162,7 @@ describe('deriveOverlayAssessmentSessionContext', () => {
     expect(
       deriveOverlayAssessmentSessionContext({
         context: makeContext(null),
-        overlay: makeOverlay(),
+
         submissionSource: 'manual-overlay',
         timerUsed: used,
       }).timerUsed,
@@ -191,7 +192,7 @@ describe('deriveOverlayAssessmentSessionContext', () => {
           },
         }),
       ),
-      overlay: makeOverlay(),
+
       submissionSource: 'manual-overlay',
       timerUsed: true,
     })
@@ -204,7 +205,7 @@ describe('deriveOverlayAssessmentSessionContext', () => {
   it('projects latestAttempt into the five session fields with epoch occurredAt', () => {
     const result = deriveOverlayAssessmentSessionContext({
       context: makeContext(makePractice({ latestAttempt: baseAttempt })),
-      overlay: makeOverlay(),
+
       submissionSource: 'manual-overlay',
       timerUsed: true,
     })
@@ -224,7 +225,7 @@ describe('deriveOverlayAssessmentSessionContext', () => {
           latestAttempt: { ...baseAttempt, isCorrect: null, rating: 'hard' },
         }),
       ),
-      overlay: makeOverlay(),
+
       submissionSource: 'manual-overlay',
       timerUsed: true,
     })
@@ -238,7 +239,7 @@ describe('deriveOverlayAssessmentSessionContext', () => {
           latestAttempt: { ...baseAttempt, isCorrect: null, rating: 'again' },
         }),
       ),
-      overlay: makeOverlay(),
+
       submissionSource: 'manual-overlay',
       timerUsed: true,
     })
@@ -249,36 +250,11 @@ describe('deriveOverlayAssessmentSessionContext', () => {
     expect(
       deriveOverlayAssessmentSessionContext({
         context: makeContext(makePractice()),
-        overlay: makeOverlay(),
+
         submissionSource: 'manual-overlay',
         timerUsed: true,
       }).latestAttempt,
     ).toBeNull()
-  })
-
-  it('reports currentDraftHasChanges true when draft differs from persistedDraft', () => {
-    const persistedDraft = createEmptyOverlayDraft()
-    const draft = { ...persistedDraft, notes: 'unsaved' }
-    expect(
-      deriveOverlayAssessmentSessionContext({
-        context: makeContext(makePractice()),
-        overlay: makeOverlay({ draft, persistedDraft }),
-        submissionSource: 'manual-overlay',
-        timerUsed: true,
-      }).currentDraftHasChanges,
-    ).toBe(true)
-  })
-
-  it('reports currentDraftHasChanges false when draft equals persistedDraft', () => {
-    const draft = createEmptyOverlayDraft()
-    expect(
-      deriveOverlayAssessmentSessionContext({
-        context: makeContext(makePractice()),
-        overlay: makeOverlay({ draft, persistedDraft: draft }),
-        submissionSource: 'manual-overlay',
-        timerUsed: true,
-      }).currentDraftHasChanges,
-    ).toBe(false)
   })
 })
 

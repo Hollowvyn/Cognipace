@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { OverlayNextStep } from '@/features/app-shell'
 
-import { toPracticeLogPatch } from './overlay-draft'
 import {
   hasSubmittedSessionChanges,
-  hasUnpersistedDraftChanges,
   initialOverlaySessionState,
   overlaySessionReducer,
   type OverlaySessionState,
@@ -13,15 +11,7 @@ import {
 } from './overlay-session-state'
 
 describe('overlaySessionReducer', () => {
-  it('loads a problem with the practice draft and selected rating', () => {
-    const draft = {
-      interviewPattern: 'Two pointers',
-      languages: 'TypeScript',
-      notes: 'Watch overflow.',
-      spaceComplexity: 'O(1)',
-      timeComplexity: 'O(n)',
-    }
-
+  it('loads a problem with the selected rating', () => {
     const state = overlaySessionReducer(
       {
         ...initialOverlaySessionState,
@@ -32,15 +22,12 @@ describe('overlaySessionReducer', () => {
       {
         type: 'problem-loaded',
         problemSlug: 'two-sum',
-        draft,
         selectedRating: 'hard',
       },
     )
 
     expect(state).toMatchObject({
       activeProblemSlug: 'two-sum',
-      draft,
-      persistedDraft: draft,
       feedback: null,
       reviewStatus: 'draft',
       selectedRating: 'hard',
@@ -48,7 +35,7 @@ describe('overlaySessionReducer', () => {
     })
   })
 
-  it('derives submitted dirty and clean status from rating and draft changes', () => {
+  it('derives submitted dirty and clean status from rating changes', () => {
     const submittedState = createSubmittedState()
 
     const changedRatingState = overlaySessionReducer(submittedState, {
@@ -82,23 +69,6 @@ describe('overlaySessionReducer', () => {
     expect(nextState).toBe(state)
   })
 
-  it('marks draft persistence independently from review submission', () => {
-    const dirtyState = overlaySessionReducer(initialOverlaySessionState, {
-      type: 'set-draft-field',
-      field: 'notes',
-      value: 'Carry this draft.',
-    })
-
-    expect(hasUnpersistedDraftChanges(dirtyState)).toBe(true)
-
-    const persistedState = overlaySessionReducer(dirtyState, {
-      type: 'draft-persisted',
-      draft: dirtyState.draft,
-    })
-
-    expect(hasUnpersistedDraftChanges(persistedState)).toBe(false)
-  })
-
   it('maps submit success into a locked submitted session with next step state', () => {
     const snapshot = createSubmittedSession({
       lockReason: 'hard-mode-overtime',
@@ -125,20 +95,13 @@ describe('overlaySessionReducer', () => {
   })
 
   it('restarts local session without carrying submitted state', () => {
-    const restartDraft = {
-      ...initialOverlaySessionState.draft,
-      notes: 'Keep current persisted note.',
-    }
     const state = overlaySessionReducer(createSubmittedState(), {
       type: 'restart-local-session',
-      draft: restartDraft,
       selectedRating: 'hard',
     })
 
     expect(state).toMatchObject({
       reviewStatus: 'draft',
-      draft: restartDraft,
-      persistedDraft: restartDraft,
       selectedRating: 'hard',
       ratingLockReason: null,
       submittedSession: null,
@@ -230,7 +193,6 @@ describe('overlaySessionReducer', () => {
     const afterProblemLoaded = overlaySessionReducer(touchedState, {
       type: 'problem-loaded',
       problemSlug: 'two-sum',
-      draft: initialOverlaySessionState.draft,
       selectedRating: 'good',
     })
     expect(afterProblemLoaded.userTouchedRating).toBe(false)
@@ -242,7 +204,6 @@ describe('overlaySessionReducer', () => {
 
     const afterRestart = overlaySessionReducer(touchedState, {
       type: 'restart-local-session',
-      draft: initialOverlaySessionState.draft,
       selectedRating: 'good',
     })
     expect(afterRestart.userTouchedRating).toBe(false)
@@ -255,29 +216,10 @@ describe('overlaySessionReducer', () => {
     const afterContextRefreshed = overlaySessionReducer(submittedTouchedState, {
       type: 'problem-context-refreshed',
       problemSlug: 'two-sum',
-      draft: submittedTouchedState.draft,
       selectedRating: submittedTouchedState.selectedRating,
       submittedSession: submittedTouchedState.submittedSession,
     })
     expect(afterContextRefreshed.userTouchedRating).toBe(false)
-  })
-
-  it('normalizes empty structured log values for practice writes', () => {
-    expect(
-      toPracticeLogPatch({
-        interviewPattern: '  Sliding window  ',
-        languages: '',
-        notes: '   ',
-        spaceComplexity: ' O(1) ',
-        timeComplexity: 'O(n)',
-      }),
-    ).toEqual({
-      interviewPattern: 'Sliding window',
-      languages: null,
-      notes: null,
-      spaceComplexity: 'O(1)',
-      timeComplexity: 'O(n)',
-    })
   })
 })
 
@@ -288,8 +230,6 @@ function createSubmittedState(
 
   return {
     ...initialOverlaySessionState,
-    draft: snapshot.draft,
-    persistedDraft: snapshot.draft,
     reviewStatus: 'submitted-clean',
     selectedRating: snapshot.rating,
     ratingLockReason: snapshot.lockReason,
@@ -300,13 +240,7 @@ function createSubmittedState(
 function createSubmittedSession(
   overrides: Partial<OverlaySubmittedSession> = {},
 ): OverlaySubmittedSession {
-  const draft = {
-    ...initialOverlaySessionState.draft,
-    notes: 'Saved note.',
-  }
-
   return {
-    draft,
     elapsedSeconds: 95,
     isCorrect: true,
     lockReason: null,

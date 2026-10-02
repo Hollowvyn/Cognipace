@@ -129,14 +129,14 @@ describe('ExpandedOverlay', () => {
     expect(link).not.toHaveAttribute('rel')
   })
 
-  it('locks post-submit log editing for failed attempts', () => {
+  it('keeps failed attempts locked', () => {
     renderExpanded({
       view: {
         overlay: createFailedSubmittedOverlay(),
       },
     })
 
-    expect(screen.getByLabelText('Notes')).toBeDisabled()
+    expect(screen.queryByLabelText('Notes')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Update' })).toBeDisabled()
   })
 
@@ -172,18 +172,22 @@ describe('ExpandedOverlay', () => {
     ).toBeInTheDocument()
   })
 
-  it('places the Help shelf before the structured log', () => {
+  it('keeps Help without structured-log controls', () => {
     renderExpanded()
 
-    const help = screen.getByRole('region', { name: 'Help' })
-    const structuredLog = screen.getByRole('region', {
-      name: 'Structured Log',
-    })
-
+    expect(screen.getByRole('region', { name: 'Help' })).toBeInTheDocument()
     expect(
-      help.compareDocumentPosition(structuredLog) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+      screen.queryByRole('region', { name: 'Structured Log' }),
+    ).not.toBeInTheDocument()
+    for (const label of [
+      'Interview Pattern',
+      'Time Complexity',
+      'Space Complexity',
+      'Languages',
+      'Notes',
+    ]) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
+    }
   })
 })
 
@@ -216,11 +220,6 @@ function createProps(
     view: {
       aiRecommendation: { status: 'idle' },
       context: createOverlayContext(),
-      draft: {
-        clearField: vi.fn(),
-        hasUnpersistedChanges: false,
-        setField: vi.fn(),
-      },
       elapsedSeconds: 0,
       helpSearchQuery: 'Two Sum',
       isOverTarget: false,
@@ -247,7 +246,6 @@ function createSubmittedOverlay(
     activeProblemSlug: 'two-sum',
     reviewStatus: 'submitted-clean',
     submittedSession: {
-      draft: initialOverlaySessionState.draft,
       elapsedSeconds: 95,
       isCorrect: true,
       lockReason: null,
@@ -263,7 +261,6 @@ function createFailedSubmittedOverlay(): ExpandedOverlayProps['view']['overlay']
     ratingLockReason: 'failed',
     selectedRating: 'again',
     submittedSession: {
-      draft: initialOverlaySessionState.draft,
       elapsedSeconds: null,
       isCorrect: false,
       lockReason: 'failed',

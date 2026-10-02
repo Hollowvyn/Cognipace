@@ -652,6 +652,23 @@ describe('practice core', () => {
       interviewPattern: 'Hash map',
       notes: 'Saved before solving.',
     })
+
+    await repository.overrideLastReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'hard',
+    })
+    const updated = await repository.getPracticeDetails('two-sum')
+
+    expect(updated.currentLog).toMatchObject({
+      interviewPattern: 'Hash map',
+      notes: 'Saved before solving.',
+    })
+    expect(updated.latestAttempt?.log).toMatchObject({
+      interviewPattern: 'Hash map',
+      notes: 'Saved before solving.',
+    })
+    expect(updated.latestAttempt?.rating).toBe('hard')
+    expect(updated.reviewCount).toBe(1)
   })
 
   it('reset clears schedule history while preserving log and suspension by default', async () => {

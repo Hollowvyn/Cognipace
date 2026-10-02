@@ -289,10 +289,8 @@ describe('useLeetCodeOverlaySession', () => {
       rating: 'good',
       elapsedSeconds: null,
       isCorrect: true,
-      log: {
-        interviewPattern: null,
-      },
     })
+    expect(latestSavedReviewRequest()).not.toHaveProperty('log')
     expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
   })
 
@@ -371,30 +369,6 @@ describe('useLeetCodeOverlaySession', () => {
       isCorrect: true,
     })
     expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
-  })
-
-  it('hydrates submitted review state from saved practice details', async () => {
-    vi.mocked(saveReviewResultViaRuntime).mockResolvedValueOnce(
-      createSavedPracticeDetails({
-        latestAttempt: {
-          log: {
-            ...emptyPracticeLog,
-            notes: 'Trimmed note.',
-          },
-        },
-      }),
-    )
-    const { result } = await renderReadySession()
-
-    act(() => {
-      result.current.draft.setField('notes', '  Trimmed note.  ')
-    })
-    await runOverlayAction(result.current.actions.submitReview)
-
-    expect(result.current.overlay.submittedSession?.draft.notes).toBe(
-      'Trimmed note.',
-    )
-    expect(result.current.overlay.persistedDraft.notes).toBe('Trimmed note.')
   })
 
   it('keeps a saved review submitted when the next-step refresh fails', async () => {
@@ -564,11 +538,12 @@ describe('useLeetCodeOverlaySession', () => {
     act(() => {
       result.current.actions.selectRating('hard')
     })
-    act(() => {
-      result.current.draft.setField('notes', 'Need to revisit overflow cases.')
-    })
     await runOverlayAction(result.current.actions.updateReview)
 
+    expect(latestSavedReviewRequest()).not.toHaveProperty('log')
+    expect(
+      vi.mocked(overrideLastReviewResultViaRuntime).mock.calls[0]?.[0],
+    ).not.toHaveProperty('log')
     expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
     expect(overrideLastReviewResultViaRuntime).toHaveBeenCalledOnce()
     expect(
@@ -576,35 +551,28 @@ describe('useLeetCodeOverlaySession', () => {
     ).toMatchObject({
       problemSlug: 'two-sum',
       rating: 'hard',
-      log: {
-        notes: 'Need to revisit overflow cases.',
-      },
     })
   })
 
-  it('persists dirty drafts when collapsing without creating a review attempt', async () => {
-    const { result } = await renderReadySession()
-
-    act(() => {
-      result.current.draft.setField('notes', 'Carry this draft.')
-    })
-    act(() => {
-      result.current.actions.collapse()
-    })
-
-    await waitFor(() => {
-      expect(updateCurrentPracticeLogViaRuntime).toHaveBeenCalled()
-    })
-
-    expect(latestPracticeLogUpdateRequest()).toMatchObject({
-      surface: 'content-script',
-      problemSlug: 'two-sum',
-      log: {
-        notes: 'Carry this draft.',
-      },
-    })
-    expect(saveReviewResultViaRuntime).not.toHaveBeenCalled()
-  })
+  it.each(['collapse', 'dock'] as const)(
+    'does not write historical logs when using %s',
+    async (action) => {
+      const { result } = await renderReadySession({
+        practice: createPracticeDetails({
+          currentLog: { ...emptyPracticeLog, notes: 'Keep this saved note.' },
+        }),
+      })
+      act(() => {
+        result.current.actions[action]()
+      })
+      await flushEffects()
+      expect(updateCurrentPracticeLogViaRuntime).not.toHaveBeenCalled()
+      expect(saveReviewResultViaRuntime).not.toHaveBeenCalled()
+      expect(result.current.context?.practice?.currentLog.notes).toBe(
+        'Keep this saved note.',
+      )
+    },
+  )
 
   it('asks the background service worker to open dashboard settings', async () => {
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
@@ -650,76 +618,6 @@ describe('useLeetCodeOverlaySession', () => {
       ),
     )
   })
-
-  it('rehydrates a clean overlay draft from same-problem DB refreshes', async () => {
-    const { queryClient, result } = await renderReadySession()
-    vi.mocked(getOverlayAppShellDataViaRuntime).mockResolvedValueOnce(
-      createOverlayData({
-        practice: createPracticeDetails({
-          currentLog: {
-            ...emptyPracticeLog,
-            notes: 'Server-saved note.',
-          },
-        }),
-      }),
-    )
-
-    await act(async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.appShell.all,
-      })
-    })
-
-    await waitFor(() => {
-      expect(result.current.overlay.draft.notes).toBe('Server-saved note.')
-    })
-    expect(result.current.overlay.persistedDraft.notes).toBe(
-      'Server-saved note.',
-    )
-  })
-
-  it.each([
-    {
-      outcome: 'result',
-      finishDraftPersist: (deferred: DeferredPracticeDetails) =>
-        deferred.resolve(createPracticeDetails()),
-    },
-    {
-      outcome: 'error',
-      finishDraftPersist: (deferred: DeferredPracticeDetails) =>
-        deferred.reject(new Error('Old draft failed.')),
-    },
-  ] as const)(
-    'ignores an in-flight draft persist $outcome after page navigation',
-    async ({ finishDraftPersist }) => {
-      const deferredDraftPersist = createDeferred<SerializedPracticeDetails>()
-      vi.mocked(updateCurrentPracticeLogViaRuntime).mockReturnValueOnce(
-        deferredDraftPersist.promise,
-      )
-      const { invalidateQueries, result } = await renderReadySession()
-
-      act(() => {
-        result.current.draft.setField('notes', 'Old page draft.')
-      })
-      act(() => {
-        result.current.actions.collapse()
-      })
-      await waitFor(() =>
-        expect(updateCurrentPracticeLogViaRuntime).toHaveBeenCalledOnce(),
-      )
-
-      emitNextPage()
-      await act(async () => {
-        finishDraftPersist(deferredDraftPersist)
-        await deferredDraftPersist.promise.catch(() => undefined)
-      })
-
-      expect(result.current.status).toBe('reading-page')
-      expect(result.current.overlay.persistedDraft.notes).toBe('')
-      expect(result.current.overlay.feedback).toBeNull()
-      expect(invalidateQueries).not.toHaveBeenCalled()
-    },
-  )
 
   it.each([
     {
@@ -810,15 +708,15 @@ describe('useLeetCodeOverlaySession', () => {
 
     const payload = latestSavedReviewRequest()
     expectNoAiLeak(payload)
-    expectLogKeysAreOverlayDraft(payload)
+    expect(payload).not.toHaveProperty('log')
   })
 
   it('excludes AI-authored text from the update review payload', async () => {
     // The update path (overrideLastReviewResultViaRuntime) intentionally
     // does not consult the AI runtime — unlike saveAcceptedReview, which
     // calls maybeApplyAiRecommendation. This test pins that down: even
-    // with AI fully wired and ready, the override payload carries only
-    // the user-typed draft.
+    // with AI fully wired and ready, the override payload carries
+    // only rating and review facts.
     setSendMessageRecommendationReady()
     const { result } = await renderReadySession({
       aiAssessmentAvailable: true,
@@ -827,9 +725,6 @@ describe('useLeetCodeOverlaySession', () => {
     await runOverlayAction(result.current.actions.submitReview)
     act(() => {
       result.current.actions.selectRating('hard')
-    })
-    act(() => {
-      result.current.draft.setField('notes', 'User-typed note.')
     })
     await runOverlayAction(result.current.actions.updateReview)
 
@@ -841,51 +736,12 @@ describe('useLeetCodeOverlaySession', () => {
       throw new Error('Expected an override review request.')
     }
     expectNoAiLeak(payload)
-    expectLogKeysAreOverlayDraft(payload)
-  })
-
-  it('excludes AI-authored text from the draft persistence payload', async () => {
-    setSendMessageRecommendationReady()
-    const { result } = await renderReadySession({
-      aiAssessmentAvailable: true,
-      autoDetectSolved: true,
-    })
-
-    emitSubmissionResult()
-
-    await waitFor(() => {
-      expect(result.current.aiRecommendation.status).toBe('ready')
-    })
-
-    // Restart the session so we're back in draft mode (auto-save already
-    // submitted the result; persistDraftIfNeeded only fires when there's no
-    // submittedSession AND the draft has unpersisted changes).
-    act(() => {
-      result.current.actions.restartLocalSession()
-    })
-
-    act(() => {
-      result.current.draft.setField('notes', 'Carry this draft.')
-    })
-    act(() => {
-      result.current.actions.collapse()
-    })
-
-    await waitFor(() => {
-      expect(updateCurrentPracticeLogViaRuntime).toHaveBeenCalled()
-    })
-
-    const payload = latestPracticeLogUpdateRequest()
-    expectNoAiLeak(payload)
-    expectLogKeysAreOverlayDraft(payload)
+    expect(payload).not.toHaveProperty('log')
   })
 })
 
 type RenderedOverlaySession = ReturnType<typeof renderOverlaySession>
 type DeferredReviewResult = ReturnType<
-  typeof createDeferred<SerializedPracticeDetails>
->
-type DeferredPracticeDetails = ReturnType<
   typeof createDeferred<SerializedPracticeDetails>
 >
 
@@ -972,20 +828,6 @@ function latestAssessmentRecommendationRequest() {
 
   if (!request) {
     throw new Error('Expected an assessment recommendation request.')
-  }
-
-  return request
-}
-
-function latestPracticeLogUpdateRequest() {
-  expect(updateCurrentPracticeLogViaRuntime).toHaveBeenCalled()
-
-  const request = vi
-    .mocked(updateCurrentPracticeLogViaRuntime)
-    .mock.calls.at(-1)?.[0]
-
-  if (!request) {
-    throw new Error('Expected a practice log update request.')
   }
 
   return request
@@ -1286,22 +1128,5 @@ function expectNoAiLeak(payload: unknown): void {
   const serialized = JSON.stringify(payload)
   for (const probe of AI_PROBES) {
     expect(serialized).not.toContain(probe)
-  }
-}
-
-function expectLogKeysAreOverlayDraft(payload: { log?: unknown }): void {
-  if (payload.log == null) {
-    return
-  }
-  const allowedKeys = [
-    'interviewPattern',
-    'timeComplexity',
-    'spaceComplexity',
-    'languages',
-    'notes',
-  ]
-  const logKeys = Object.keys(payload.log)
-  for (const key of logKeys) {
-    expect(allowedKeys).toContain(key)
   }
 }

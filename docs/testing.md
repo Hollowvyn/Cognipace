@@ -607,7 +607,8 @@ smoke testing.
 1. Open a LeetCode problem page in Chrome.
 2. Confirm the CogniPace overlay appears after page context is read.
 3. Start, pause, and reset the timer.
-4. Expand the overlay.
+4. Expand the overlay. Confirm Structured Log, Interview Pattern, Time
+   Complexity, Space Complexity, Languages, and Notes controls are absent.
 5. Focus the Help shelf’s YouTube action, confirm its tooltip, activate it, and
    confirm a new tab opens with the current problem title.
 6. From `chrome://extensions`, reload the CogniPace extension to clear its
@@ -622,14 +623,22 @@ smoke testing.
 10. Select a rating or use fail.
 11. Submit or update a review.
 12. Dock and restore the overlay.
+13. Happy path: submit a timed review, change its rating, and use Update. Confirm
+    only one attempt remains and next-review/track guidance refreshes.
+14. Edge path: load a problem with existing saved structured-log values, submit
+    an untimed review, then update its rating. Export a backup and verify those
+    saved values remain. Restore an older backup with notes and repeat.
+15. Confirm collapse/dock/restore and SPA navigation work before and after
+    submission, including a failed attempt with locked rating.
 
 Expected: the overlay remains recoverable, does not dominate the LeetCode page,
 the Help action is keyboard accessible and opens the title/slug search without
 replacing LeetCode, and saved review results update CogniPace state.
 
 For this behavior-changing overlay update, a human engineer must run the title
-happy path and slug-fallback edge path and attach screenshot or screen-recording
-proof before PR review or merge. Automated checks do not replace that proof.
+happy path, slug-fallback edge path, and structured-log removal/preservation
+flows above and attach screenshot or screen-recording proof before PR review or
+merge. Automated checks do not replace that proof.
 
 ### Cross-Surface Refresh
 
