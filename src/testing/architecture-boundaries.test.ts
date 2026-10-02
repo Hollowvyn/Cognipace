@@ -215,14 +215,16 @@ describe('architecture boundaries', () => {
 })
 
 function sourceFiles(directories: string[]) {
-  return directories.flatMap((directory) =>
-    walk(join(srcRoot, directory)).filter(
+  return directories.flatMap((directory) => {
+    const path = join(srcRoot, directory)
+    if (!statSync(path, { throwIfNoEntry: false })) return []
+    return walk(path).filter(
       (file) =>
         (file.endsWith('.ts') || file.endsWith('.tsx')) &&
         !file.endsWith('.test.ts') &&
         !file.endsWith('.test.tsx'),
-    ),
-  )
+    )
+  })
 }
 
 function productionSourceFiles() {

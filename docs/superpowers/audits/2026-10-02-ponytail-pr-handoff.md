@@ -56,6 +56,11 @@ The approved design and original audit document the scope and findings.
 
 - [x] `rtk proxy npm run check` passed after the final Ponytail review: DB
       check, typecheck, lint and 187 files / 1985 tests under Vitest 4.1.11.
+- [x] Clean-checkout CI regression: with the empty local `src/hooks` directory
+      removed, `rtk proxy npm test -- src/testing/architecture-boundaries.test.ts --run`
+      reproduced two missing-directory failures. The scanner now skips an absent
+      optional root while retaining future hooks coverage; the focused suite
+      passed 15 tests and the full `check` passed again with the directory absent.
 - [x] `rtk proxy npm run lint` passed.
 - [x] `rtk proxy npm run db:check` passed.
 - [x] `rtk proxy npm run build` passed: 3.86 MB production extension.

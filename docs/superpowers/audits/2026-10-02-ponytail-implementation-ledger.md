@@ -228,3 +228,14 @@ passed. Focused chart, overlay, Problems/Tracks, provider and URL tests also
 passed before the full check. `rtk proxy npm run db:generate` remains skipped
 because schema did not change; realtime human Chrome/Gist/provider smoke and
 redacted visual proof remain pending before PR review or merge.
+
+The first fresh-checkout GitHub `Check` job then exposed a local-only empty
+`src/hooks` directory: both architecture scans called `statSync` on that path,
+which Git does not preserve once its last tracked file is removed. Removing the
+empty local directory reproduced the two CI failures with
+`rtk proxy npm test -- src/testing/architecture-boundaries.test.ts --run`.
+`sourceFiles` now skips only a missing top-level scan root and still scans hooks
+if the directory returns. The same focused command passed 15 tests after the
+fix; `rtk proxy npm run lint`, `rtk proxy npm run format`, and
+`rtk proxy npm run check` passed again with the directory absent (187 files /
+1985 tests). The production source and package artifacts did not change.
