@@ -6,6 +6,12 @@ sections form the public v1 content-import contract and can be used
 independently or together in Settings > Data Management. Content import is
 separate from CogniPace's full-backup format.
 
+Tracks > All tracks also offers an Import tracks icon. That dialog starts with
+the downloadable track-only template, then uses the same file preview,
+diagnostics, and explicit apply workflow. It accepts the v1 contract described
+here, including accompanying question metadata, and does not automatically
+activate imported tracks.
+
 The checked-in [JSON Schema](../public/import/cognipace-content-v1.schema.json)
 is intended for editors and authoring tools. Ready-to-copy files are in
 [`public/import/examples`](../public/import/examples/):

@@ -123,9 +123,9 @@ describe('TracksScreen', () => {
     renderTracksScreen()
 
     expect(
-      await screen.findByRole('heading', { name: 'LeetCode 75' }),
+      await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 }),
     ).toBeVisible()
-    expect(screen.getByText('Core interview practice.')).toBeVisible()
+    expect(screen.getAllByText('Core interview practice.')[0]).toBeVisible()
     const progressSummary = screen.getByLabelText('Track progress summary')
     expect(within(progressSummary).getByText('Progress')).toBeVisible()
     expect(within(progressSummary).getByText('1 of 3')).toBeVisible()
@@ -219,7 +219,7 @@ describe('TracksScreen', () => {
     renderTracksScreen()
 
     expect(
-      await screen.findByRole('heading', { name: 'LeetCode 75' }),
+      await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 }),
     ).toBeVisible()
     const allTracksActions = screen.getByLabelText('All tracks actions')
 
@@ -228,7 +228,7 @@ describe('TracksScreen', () => {
     ).toHaveAttribute('href', '#/tracks/new')
     expect(
       within(allTracksActions).getByRole('button', {
-        name: 'Show all tracks',
+        name: 'Hide all tracks',
       }),
     ).toBeVisible()
   })
@@ -273,10 +273,6 @@ describe('TracksScreen', () => {
     expect(targetSummary).toHaveAttribute('data-cp-tone', 'success')
     expect(screen.queryByText('Due Jun 15, 2026')).not.toBeInTheDocument()
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Show all tracks' }),
-    )
-
     expect(screen.getAllByText('Target Jun 15 · 14 days left')).toHaveLength(1)
   })
 
@@ -315,7 +311,6 @@ describe('TracksScreen', () => {
   })
 
   it('marks overdue track targets without making the row an error state', async () => {
-    const user = userEvent.setup()
     const activeTrack = twoGroupWorkspace.activeTrack
 
     if (!activeTrack) {
@@ -347,8 +342,6 @@ describe('TracksScreen', () => {
     expect(targetSummary).toHaveAttribute('data-cp-tone', 'danger')
     expect(within(targetSummary).getByText('Overdue')).toBeVisible()
     expect(within(targetSummary).getByText('11 days late')).toBeVisible()
-
-    await user.click(screen.getByRole('button', { name: 'Show all tracks' }))
 
     const overdueMetadata = screen.getAllByText(
       'Target May 21 · Overdue · 11 days late',
@@ -619,36 +612,51 @@ describe('TracksScreen', () => {
     })
   })
 
-  it('keeps all tracks collapsed by default and marks the active row when expanded', async () => {
+  it('shows the complete collection by default and can collapse it', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce(twoGroupWorkspace)
     renderTracksScreen()
 
-    const allTracksButton = await screen.findByRole('button', {
-      name: 'Show all tracks',
+    const collection = await screen.findByRole('region', { name: 'All tracks' })
+    expect(
+      within(collection).getByRole('heading', { name: 'All tracks' }),
+    ).toBeVisible()
+    expect(within(collection).getByText('2 tracks')).toBeVisible()
+    expect(
+      within(collection).getByText('Your complete study collection'),
+    ).toBeVisible()
+    const activeRow = within(collection).getByRole('article', {
+      name: 'LeetCode 75',
     })
-    expect(screen.getByText('All tracks')).toBeVisible()
-    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
-
-    await user.click(allTracksButton)
-
+    expect(within(activeRow).getByText('Active')).toBeVisible()
     expect(
-      screen.getByRole('button', { name: 'Hide all tracks' }),
-    ).toBeVisible()
-    const activeRowActions = screen.getByLabelText(
-      'LeetCode 75 catalog actions',
-    )
-    expect(screen.getByText('Active')).toBeVisible()
-    expect(
-      within(activeRowActions).getByRole('button', { name: 'Clear Active' }),
-    ).toBeVisible()
-    expect(
-      within(activeRowActions).getByRole('link', { name: 'Edit Track' }),
+      within(activeRow).getByRole('link', { name: 'Edit Track' }),
     ).toHaveAttribute('href', '#/tracks/leetcode-75/edit')
+    const otherRow = within(collection).getByRole('article', {
+      name: 'Grind 75',
+    })
+    expect(
+      within(otherRow).getByRole('button', { name: 'Set Grind 75 active' }),
+    ).toHaveTextContent('Set active')
+    expect(
+      within(otherRow).getByRole('progressbar', {
+        name: 'Grind 75 completion',
+      }),
+    ).toHaveAttribute('aria-valuenow', '13')
+    const toggle = within(collection).getByRole('button', {
+      name: 'Hide all tracks',
+    })
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(
+      document.getElementById(toggle.getAttribute('aria-controls') ?? ''),
+    ).toContainElement(otherRow)
+    await user.click(toggle)
+    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show all tracks' }))
     expect(screen.getByText('Grind 75')).toBeVisible()
   })
 
-  it('opens all tracks when a track is added after the catalog mounts', () => {
+  it('reopens a collapsed collection when a track is added', async () => {
     const activeTrackRow = twoGroupWorkspace.tracks.find(
       (row) => row.track.id === 'leetcode-75',
     )
@@ -672,6 +680,9 @@ describe('TracksScreen', () => {
     }
 
     const { rerender } = renderOtherTracksAccordion(initialTracks)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Hide all tracks' }),
+    )
 
     expect(screen.queryByText('Fresh Track')).not.toBeInTheDocument()
     expect(
@@ -686,12 +697,13 @@ describe('TracksScreen', () => {
     ).toBeVisible()
   })
 
-  it('toggles all tracks when the accordion header row is clicked', async () => {
+  it('toggles all tracks when the collection heading is clicked', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce(twoGroupWorkspace)
     renderTracksScreen()
 
     expect(await screen.findByText('All tracks')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Hide all tracks' }))
     expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
 
     await user.click(screen.getByText('All tracks'))
@@ -720,9 +732,9 @@ describe('TracksScreen', () => {
       within(allTracksActions).getByRole('link', { name: 'New Track' }),
     )
 
-    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
+    expect(screen.getByText('Grind 75')).toBeVisible()
     expect(
-      screen.getByRole('button', { name: 'Show all tracks' }),
+      screen.getByRole('button', { name: 'Hide all tracks' }),
     ).toBeVisible()
   })
 
@@ -748,11 +760,10 @@ describe('TracksScreen', () => {
   })
 
   it('keeps all tracks actions available when expanded', async () => {
-    const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce(twoGroupWorkspace)
     renderTracksScreen()
 
-    await user.click(await screen.findByText('All tracks'))
+    await screen.findByText('All tracks')
     const activeRowActions = screen.getByLabelText(
       'LeetCode 75 catalog actions',
     )
@@ -769,7 +780,7 @@ describe('TracksScreen', () => {
       }),
     ).not.toBeInTheDocument()
     expect(screen.getByText('Grind 75')).toBeVisible()
-    expect(screen.getByText('10 of 75')).toBeVisible()
+    expect(screen.getByText('10 of 75 completed')).toBeVisible()
     expect(screen.getByLabelText('Grind 75 progress: 10 of 75')).toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Set Grind 75 active' }),
@@ -791,9 +802,7 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Show all tracks' }),
-    )
+    await screen.findByRole('button', { name: 'Hide all tracks' })
     await user.click(
       screen.getByRole('button', { name: 'Set Grind 75 active' }),
     )
@@ -819,10 +828,10 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
-    const clearActiveButton = screen.getByRole('button', {
-      name: 'Clear Active',
-    })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
+    const clearActiveButton = within(
+      screen.getByLabelText('LeetCode 75 track actions'),
+    ).getByRole('button', { name: 'Clear Active' })
     const activeHeaderActions = screen.getByLabelText(
       'LeetCode 75 track actions',
     )
@@ -858,9 +867,7 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Show all tracks' }),
-    )
+    await screen.findByRole('button', { name: 'Hide all tracks' })
 
     const actions = screen.getByLabelText('Grind 75 catalog actions')
 
@@ -913,9 +920,14 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
 
-    await user.click(screen.getByRole('button', { name: 'Reset Progress' }))
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Reset Progress' },
+      ),
+    )
     const resetDialog = screen.getByRole('dialog', {
       name: 'Reset track progress?',
     })
@@ -928,7 +940,12 @@ describe('TracksScreen', () => {
       trackId: 'leetcode-75',
     })
 
-    await user.click(screen.getByRole('button', { name: 'Delete Track' }))
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Delete Track' },
+      ),
+    )
     const deleteDialog = screen.getByRole('dialog', { name: 'Delete track?' })
     expect(deleteDialog).toBeVisible()
     await user.click(
@@ -960,9 +977,14 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
 
-    await user.click(screen.getByRole('button', { name: 'Reset Progress' }))
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Reset Progress' },
+      ),
+    )
     const resetDialog = screen.getByRole('dialog', {
       name: 'Reset track progress?',
     })
@@ -976,7 +998,12 @@ describe('TracksScreen', () => {
       within(resetDialog).getByRole('button', { name: 'Cancel' }),
     )
 
-    await user.click(screen.getByRole('button', { name: 'Delete Track' }))
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Delete Track' },
+      ),
+    )
     const deleteDialog = screen.getByRole('dialog', { name: 'Delete track?' })
     await user.click(
       within(deleteDialog).getByRole('button', { name: 'Delete Track' }),
@@ -998,8 +1025,10 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
-    const resetButton = screen.getByRole('button', { name: 'Reset Progress' })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
+    const resetButton = within(
+      screen.getByLabelText('LeetCode 75 track actions'),
+    ).getByRole('button', { name: 'Reset Progress' })
 
     await user.click(resetButton)
     const resetDialog = screen.getByRole('dialog', {
@@ -1042,8 +1071,10 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
-    const resetButton = screen.getByRole('button', { name: 'Reset Progress' })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
+    const resetButton = within(
+      screen.getByLabelText('LeetCode 75 track actions'),
+    ).getByRole('button', { name: 'Reset Progress' })
 
     await user.click(resetButton)
 
@@ -1077,8 +1108,13 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
-    await user.click(screen.getByRole('button', { name: 'Reset Progress' }))
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Reset Progress' },
+      ),
+    )
 
     const resetDialog = screen.getByRole('dialog', {
       name: 'Reset track progress?',

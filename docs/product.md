@@ -107,7 +107,12 @@ Current behavior:
 - Library manages problem rows, filters, details, create/edit modals, and problem
   practice actions.
 - Tracks manages active track workspace, groups, ordered problems, progress,
-  create/edit, activation, deletion, and reset progress.
+  create/edit, activation, deletion, and reset progress. Its expanded All tracks
+  collection shows every available track, emphasizes the active track, and
+  offers explicit activation, New Track, and a compact Import tracks action.
+  Import tracks opens a template-first dialog with a downloadable track JSON
+  example, file selection, preview, diagnostics, and explicit apply. Imported
+  tracks are not automatically activated.
 - Settings manages persisted user preferences through a dirty-state form workflow.
 - Data Management in Settings exports full local backups, validates and restores
   full backups, imports versioned content files, configures optional GitHub Gist

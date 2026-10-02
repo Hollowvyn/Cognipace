@@ -202,13 +202,22 @@ UI hook or surface action
 
 ### Content Import
 
-The `imports` feature owns the v1 content format and Settings workflow; the
+The `imports` feature owns the v1 content format and shared import workflow in
+Settings and the Tracks import modal; the
 complete public contract is in [docs/import-format.md](import-format.md). It
 uses the existing database schema and owner repositories: Problems persists
 questions, companies, topics, and their direct question associations; Tracks
 persists tracks, groups, and ordered question memberships. Content import adds
 to those existing records and does not change the full-backup format or require
 a schema migration.
+
+The dashboard route `/tracks/import` composes the existing import panel with a
+track-focused template and file chooser. It uses the same preview/apply/retry
+controller and accepts the existing v1 content contract, including accompanying
+question metadata. Close, Escape, and backdrop dismissal are disabled during
+apply and while a committed import still needs its browser-storage save retried.
+The Tracks feature remains responsible for activation; importing does not
+activate a track.
 
 The dashboard-only runtime methods are `imports.preview`, `imports.apply`, and
 `imports.retryPersistence`. Their request and response payloads use Zod

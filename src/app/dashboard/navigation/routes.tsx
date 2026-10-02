@@ -27,6 +27,7 @@ import {
 import { SettingsPage } from '../screens/settings-page'
 import {
   EditTrackModalPage,
+  ImportTracksModalPage,
   NewLibrarySelectionTrackModalPage,
   NewTrackModalPage,
 } from '../screens/track-modal-pages'
@@ -56,6 +57,13 @@ const trackNewRoute = createRoute({
   path: dashboardModalRouteMeta.trackNew.relativePath,
   component: NewTrackModalPage,
   staticData: dashboardModalRouteMeta.trackNew.staticData,
+})
+
+const trackImportRoute = createRoute({
+  getParentRoute: () => tracksRoute,
+  path: dashboardModalRouteMeta.trackImport.relativePath,
+  component: ImportTracksModalPage,
+  staticData: dashboardModalRouteMeta.trackImport.staticData,
 })
 
 const trackEditRoute = createRoute({
@@ -136,6 +144,7 @@ const devSmokeRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   overviewRoute,
   tracksRoute.addChildren([
+    trackImportRoute,
     trackNewRoute,
     trackEditRoute,
     trackProblemEditRoute,

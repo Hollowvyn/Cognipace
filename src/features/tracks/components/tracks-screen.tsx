@@ -18,12 +18,14 @@ import {
 import { OtherTracksAccordion } from './other-tracks-accordion'
 
 export interface TracksScreenProps {
+  importTrackAction?: ReactNode
   newTrackAction: ReactNode
   renderEditProblemAction: RenderProblemEditAction
   renderEditTrackAction: RenderTrackEditAction
 }
 
 export function TracksScreen({
+  importTrackAction,
   newTrackAction,
   renderEditProblemAction,
   renderEditTrackAction,
@@ -47,6 +49,7 @@ export function TracksScreen({
 
   return (
     <TracksWorkspaceView
+      importTrackAction={importTrackAction}
       newTrackAction={newTrackAction}
       renderEditProblemAction={renderEditProblemAction}
       renderEditTrackAction={renderEditTrackAction}
@@ -56,18 +59,25 @@ export function TracksScreen({
 }
 
 function TracksWorkspaceView({
+  importTrackAction,
   newTrackAction,
   renderEditProblemAction,
   renderEditTrackAction,
   workspace,
 }: {
+  importTrackAction?: ReactNode
   newTrackAction: ReactNode
   renderEditProblemAction: RenderProblemEditAction
   renderEditTrackAction: RenderTrackEditAction
   workspace: TrackWorkspaceResponse
 }) {
   if (workspace.tracks.length === 0) {
-    return <NoTracksState newTrackAction={newTrackAction} />
+    return (
+      <NoTracksState
+        importTrackAction={importTrackAction}
+        newTrackAction={newTrackAction}
+      />
+    )
   }
 
   if (!workspace.activeTrack) {
@@ -75,6 +85,7 @@ function TracksWorkspaceView({
       <TracksFrame>
         <NoActiveTrackState />
         <OtherTracksAccordion
+          importTrackAction={importTrackAction}
           activeTrackId={null}
           generatedAt={workspace.generatedAt}
           newTrackAction={newTrackAction}
@@ -97,6 +108,7 @@ function TracksWorkspaceView({
         rows={workspace.activeTrackRows}
       />
       <OtherTracksAccordion
+        importTrackAction={importTrackAction}
         activeTrackId={workspace.activeTrack.track.id}
         generatedAt={workspace.generatedAt}
         newTrackAction={newTrackAction}
@@ -135,7 +147,13 @@ function TracksErrorState({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-function NoTracksState({ newTrackAction }: { newTrackAction: ReactNode }) {
+function NoTracksState({
+  importTrackAction,
+  newTrackAction,
+}: {
+  importTrackAction?: ReactNode
+  newTrackAction: ReactNode
+}) {
   return (
     <TracksFrame>
       <Surface className="grid w-full gap-3">
@@ -144,11 +162,14 @@ function NoTracksState({ newTrackAction }: { newTrackAction: ReactNode }) {
             No tracks yet.
           </h2>
           <p className="m-0 max-w-2xl text-[length:var(--cp-copy-font-size)] leading-relaxed text-muted-foreground">
-            Create a track to organize ordered groups and start a focused
-            practice path.
+            Create or import a track to organize ordered groups and start a
+            focused practice path.
           </p>
         </div>
-        <div>{newTrackAction}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          {newTrackAction}
+          {importTrackAction}
+        </div>
       </Surface>
     </TracksFrame>
   )
