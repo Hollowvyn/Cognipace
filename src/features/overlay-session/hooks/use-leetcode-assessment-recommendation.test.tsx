@@ -434,6 +434,23 @@ describe('useLeetCodeAssessmentRecommendation', () => {
     expect(actions).toEqual([])
   })
 
+  it('keeps the deterministic rating when the recommendation says not to update', async () => {
+    sendMessageMock.mockResolvedValueOnce(
+      makeReadyResponse(makeRecommendation({ shouldUpdateRating: false })),
+    )
+    const { options, actions } = makeOptions({
+      submissionResult: makeSubmissionResult(),
+    })
+    const { result } = renderHook(
+      (props) => useLeetCodeAssessmentRecommendation(props),
+      { initialProps: options },
+    )
+
+    await waitFor(() => expect(result.current.state.status).toBe('ready'))
+
+    expect(actions).toEqual([])
+  })
+
   it('11. does not dispatch when ratingLockReason is set, but state still becomes ready', async () => {
     const submissionResult = makeSubmissionResult()
     const ready = makeReadyResponse(

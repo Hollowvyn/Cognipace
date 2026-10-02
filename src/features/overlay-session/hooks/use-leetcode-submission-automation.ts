@@ -31,6 +31,7 @@ export function useLeetCodeSubmissionAutomation({
   const autoStartedProblemSlugRef = useRef<string | null>(null)
   const handledResultKeysRef = useRef(new Set<string>())
   const pendingResultKeysRef = useRef(new Set<string>())
+  const lastAttemptedResultRef = useRef<LeetCodeSubmissionResult | null>(null)
   const reviewStatusRef = useRef(reviewStatus)
   const saveResultRef = useRef(saveLeetCodeSubmissionResult)
   const startTimerRef = useRef(startTimer)
@@ -55,6 +56,7 @@ export function useLeetCodeSubmissionAutomation({
     autoStartedProblemSlugRef.current = null
     handledResultKeysRef.current.clear()
     pendingResultKeysRef.current.clear()
+    lastAttemptedResultRef.current = null
   }, [activeProblemSlug])
 
   useEffect(() => {
@@ -79,7 +81,8 @@ export function useLeetCodeSubmissionAutomation({
 
     if (
       handledResultKeysRef.current.has(resultKey) ||
-      pendingResultKeysRef.current.has(resultKey)
+      pendingResultKeysRef.current.has(resultKey) ||
+      lastAttemptedResultRef.current === submissionResult
     ) {
       return
     }
@@ -102,6 +105,7 @@ export function useLeetCodeSubmissionAutomation({
       return
     }
 
+    lastAttemptedResultRef.current = submissionResult
     pendingResultKeysRef.current.add(resultKey)
     void saveResultRef
       .current(submissionResult)
@@ -113,7 +117,13 @@ export function useLeetCodeSubmissionAutomation({
       .finally(() => {
         pendingResultKeysRef.current.delete(resultKey)
       })
-  }, [autoDetectSolved, problemSlug, submissionResult, submittedSession])
+  }, [
+    autoDetectSolved,
+    problemSlug,
+    reviewStatus,
+    submissionResult,
+    submittedSession,
+  ])
 }
 
 function isReviewMutating(reviewStatus: OverlayReviewStatus) {

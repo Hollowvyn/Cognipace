@@ -128,32 +128,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     onProblemLoaded: handleProblemLoaded,
   })
 
-  const recommendationResetRef = useRef<() => void>(() => undefined)
-  const handleRestart = useCallback(() => {
-    recommendationResetRef.current()
-  }, [])
-
-  const actions = useOverlayReviewActions({
-    contextRef: pageSync.latestContextRef,
-    dispatch,
-    overlayRef: latestOverlayRef,
-    refreshContext: pageSync.refreshContext,
-    syncTokenRef: pageSync.syncTokenRef,
-    timer,
-    onRestart: handleRestart,
-  })
-
-  useLeetCodeSubmissionAutomation({
-    activeProblemSlug: overlay.activeProblemSlug,
-    autoDetectSolved: pageSync.context?.automation.autoDetectSolved ?? false,
-    problemSlug: pageSync.context?.problem?.problemSlug ?? null,
-    reviewStatus: overlay.reviewStatus,
-    saveLeetCodeSubmissionResult: actions.saveLeetCodeSubmissionResult,
-    startTimer: timer.start,
-    submittedSession: overlay.submittedSession,
-    submissionResult: pageSync.submission.result,
-  })
-
   const targetSeconds = getTargetSeconds(pageSync.context)
   const elapsedSeconds = timer.elapsedSeconds
 
@@ -173,9 +147,27 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     dispatch,
   })
 
-  useEffect(() => {
-    recommendationResetRef.current = recommendation.reset
-  }, [recommendation.reset])
+  const actions = useOverlayReviewActions({
+    contextRef: pageSync.latestContextRef,
+    dispatch,
+    overlayRef: latestOverlayRef,
+    refreshContext: pageSync.refreshContext,
+    syncTokenRef: pageSync.syncTokenRef,
+    timer,
+    onRestart: recommendation.reset,
+    requestSubmissionRecommendation: recommendation.requestRecommendation,
+  })
+
+  useLeetCodeSubmissionAutomation({
+    activeProblemSlug: overlay.activeProblemSlug,
+    autoDetectSolved: pageSync.context?.automation.autoDetectSolved ?? false,
+    problemSlug: pageSync.context?.problem?.problemSlug ?? null,
+    reviewStatus: overlay.reviewStatus,
+    saveLeetCodeSubmissionResult: actions.saveLeetCodeSubmissionResult,
+    startTimer: timer.start,
+    submittedSession: overlay.submittedSession,
+    submissionResult: pageSync.submission.result,
+  })
 
   return {
     location: pageSync.location,

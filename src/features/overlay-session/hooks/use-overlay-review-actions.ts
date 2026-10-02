@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+
 import {
   evaluateLeetCodeAssessment,
   type LeetCodeAssessmentDecision,
@@ -31,6 +33,7 @@ import {
 import type { OverlaySessionAction } from '../domain/overlay-session-state'
 import type { OverlayTimerController } from './use-overlay-timer'
 import type { LeetCodeOverlayContext } from './use-leetcode-page-sync'
+import type { UseLeetCodeAssessmentRecommendationResult } from './use-leetcode-assessment-recommendation'
 
 type LatestRef<T> = {
   current: T
@@ -45,6 +48,7 @@ type SaveAssessmentInput = {
   decision: AcceptedAssessmentDecision
   session: ReturnType<typeof deriveOverlayAssessmentSessionContext>
   submission: RecommendLeetCodeAssessmentRequest['submission']
+  submissionResult?: LeetCodeSubmissionResult
 }
 
 type UseOverlayReviewActionsOptions = {
@@ -58,6 +62,7 @@ type UseOverlayReviewActionsOptions = {
   syncTokenRef: LatestRef<number>
   timer: OverlayTimerController
   onRestart?: () => void
+  requestSubmissionRecommendation: UseLeetCodeAssessmentRecommendationResult['requestRecommendation']
 }
 
 export type OverlayReviewActions = {
@@ -88,7 +93,9 @@ export function useOverlayReviewActions({
   syncTokenRef,
   timer,
   onRestart,
+  requestSubmissionRecommendation,
 }: UseOverlayReviewActionsOptions): OverlayReviewActions {
+  const sessionGenerationRef = useRef(0)
   async function refreshNextStep(problemSlug: string, saveToken: number) {
     dispatch({ type: 'next-step-loading' })
 
@@ -341,11 +348,13 @@ export function useOverlayReviewActions({
       decision,
       session,
       submission: toAssessmentSubmission(result),
+      submissionResult: result,
     })
   }
 
   async function saveAcceptedReview(input: SaveAssessmentInput) {
     const saveToken = syncTokenRef.current
+    const saveGeneration = sessionGenerationRef.current
     const currentContext = contextRef.current
     const problem = currentContext?.problem
     const currentOverlay = overlayRef.current
@@ -358,6 +367,16 @@ export function useOverlayReviewActions({
 
     try {
       const decision = await maybeApplyAiRecommendation(input)
+      if (
+        syncTokenRef.current !== saveToken ||
+        sessionGenerationRef.current !== saveGeneration
+      ) {
+        return false
+      }
+      if (!decision) {
+        dispatch({ type: 'save-cancelled' })
+        return false
+      }
       const details = await saveReviewResultViaRuntime({
         surface: 'content-script',
         problemSlug: problem.problemSlug,
@@ -368,7 +387,10 @@ export function useOverlayReviewActions({
         log: toPracticeLogPatch(currentOverlay.draft),
       })
 
-      if (syncTokenRef.current !== saveToken) {
+      if (
+        syncTokenRef.current !== saveToken ||
+        sessionGenerationRef.current !== saveGeneration
+      ) {
         return false
       }
 
@@ -386,7 +408,10 @@ export function useOverlayReviewActions({
       await refreshNextStep(problem.problemSlug, saveToken)
       return true
     } catch (error) {
-      if (syncTokenRef.current !== saveToken) {
+      if (
+        syncTokenRef.current !== saveToken ||
+        sessionGenerationRef.current !== saveGeneration
+      ) {
         return false
       }
 
@@ -461,6 +486,7 @@ export function useOverlayReviewActions({
   }
 
   function restartLocalSession() {
+    sessionGenerationRef.current += 1
     timer.reset()
     const currentPractice = contextRef.current?.practice
     const nextDraft = createOverlayDraftFromLog(currentPractice?.currentLog)
@@ -509,7 +535,8 @@ export function useOverlayReviewActions({
     decision,
     session,
     submission,
-  }: SaveAssessmentInput): Promise<AcceptedAssessmentDecision> {
+    submissionResult,
+  }: SaveAssessmentInput): Promise<AcceptedAssessmentDecision | null> {
     const currentContext = contextRef.current
     const problem = currentContext?.problem
 
@@ -524,38 +551,47 @@ export function useOverlayReviewActions({
 
     let response: Awaited<
       ReturnType<typeof recommendLeetCodeAssessmentViaRuntime>
-    >
+    > | null
     try {
-      response = await recommendLeetCodeAssessmentViaRuntime({
-        surface: 'content-script',
-        problemSlug: problem.problemSlug,
-        submissionFingerprint: createSubmissionFingerprint({
-          problemSlug: problem.problemSlug,
-          decision,
-          session,
-          submission,
-        }),
-        problem: {
-          slug: problem.problemSlug,
-          title: problem.title,
-          difficulty: problem.difficulty,
-          topics: [],
-        },
-        submission,
-        timing: {
-          elapsedSeconds: decision.elapsedSeconds,
-          targetSeconds: decision.targetSeconds,
-          timerUsed: session.timerUsed,
-        },
-        deterministicDecision: decision,
-        sessionContext: session,
-      })
+      response = submissionResult
+        ? await requestSubmissionRecommendation(submissionResult)
+        : await recommendLeetCodeAssessmentViaRuntime({
+            surface: 'content-script',
+            problemSlug: problem.problemSlug,
+            submissionFingerprint: createSubmissionFingerprint({
+              problemSlug: problem.problemSlug,
+              decision,
+              session,
+              submission,
+            }),
+            problem: {
+              slug: problem.problemSlug,
+              title: problem.title,
+              difficulty: problem.difficulty,
+              topics: [],
+            },
+            submission,
+            timing: {
+              elapsedSeconds: decision.elapsedSeconds,
+              targetSeconds: decision.targetSeconds,
+              timerUsed: session.timerUsed,
+            },
+            deterministicDecision: decision,
+            sessionContext: session,
+          })
     } catch {
-      return decision
+      response = null
+    }
+
+    if (submissionResult && response === null) return null
+
+    if (overlayRef.current.userTouchedRating) {
+      const rating = overlayRef.current.selectedRating
+      return { ...decision, rating, isCorrect: rating !== 'again' }
     }
 
     if (
-      response.status !== 'ready' ||
+      response?.status !== 'ready' ||
       !response.recommendation.shouldUpdateRating ||
       response.recommendation.recommendedRating === decision.rating
     ) {

@@ -422,6 +422,17 @@ UI text.
    review shows `Due today`, a future review shows `Scheduled`, and an
    unstarted problem shows `New`.
 7. Confirm the combined overdue-plus-due-today count is labeled `Reviews Due`.
+8. Create a problem with a bare slug and a canonical LeetCode problem URL.
+   Reject a foreign-host problem URL, LeetCode Explore URL and malformed URL;
+   repeat in Track input and confirm no `https` problem is inserted.
+9. Create/edit/bulk-set `Meta` and `Meta!` company labels, then a case/whitespace
+   variation. Reload and verify distinct labels retain distinct associations,
+   while an unambiguous normalized variation reuses the existing company ID.
+   Restore two case-distinct legacy labels and verify editing an exact label
+   preserves its association; an ambiguous variation must show an error.
+10. With a restored mixed-case custom topic ID, import its lowercase ID and
+    verify reuse rather than duplication. Change its label between preview and
+    apply, and confirm stale preview returns without writes.
 
 Expected: Library reflects persisted problem metadata and remains usable after
 reloading the extension. Track problem rows use the same review-status labels.
@@ -600,7 +611,10 @@ and required before review or merge:
 9. Confirm Recent Overdue Backlog has a watch zone at five problems: values at
    or below five render in the healthy green treatment, values above five use
    the attention yellow treatment, and its tooltip reports the bucket's
-   threshold status. Unknown/reconstructable history must not be made up.
+   threshold status. Unknown/reconstructable history must not be made up. A card due earlier today
+   must count as due today in Upcoming Load and zero in today's overdue backlog;
+   a prior selected-timezone calendar date must count as overdue. Repeat at a
+   timezone boundary.
 10. Confirm Upcoming Review Load always shows its fixed next 14 calendar days,
     including when the selected historical range is unready.
 11. In Retention Health, hover and keyboard-focus a point to inspect the
@@ -821,3 +835,23 @@ Full verification:
 npm run check
 npm run format
 ```
+
+### Ponytail Regression Smoke
+
+Use disposable data and existing opt-in provider/sync flows. The human engineer
+must attach redacted happy-path and edge-case screenshots/recording before PR
+review or merge for the cleanup branch.
+
+- Data Management: replace a slow-reading/validating backup with another file;
+  confirm filename, summary and restored payload all belong to the latest file.
+  Repeat with a late rejection and confirm the current valid file stays ready.
+- LeetCode capture: start offline, verify the overlay becomes ready from available
+  page data, reconnect and refresh/hydrate. Confirm remote metadata/content
+  replaces fallback and successful reads remain deduplicated. Navigate while
+  reading and verify no stale content or error enters the new problem.
+- AI: enable configured assessment and auto-detection, submit Accepted, and verify
+  one watcher recommendation request and agreement between displayed/saved
+  rating. Select a rating while the provider is pending, navigate or restart,
+  and verify the choice remains or stale save is cancelled. Repeat manual quick
+  submit, failed/strict timing locks, unavailable provider and stalled response
+  body; timeout must remain visible and secrets redacted.

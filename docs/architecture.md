@@ -345,6 +345,14 @@ confirmation dialog. The `enabled` flag controls automatic sync only; manual
 directional actions remain available whenever token and Gist configuration are
 present.
 
+The overlay recommendation hook owns one watcher assessment promise per
+submission. Automatic review saving consumes the same captured request/result
+that supplies the displayed recommendation; manual actions retain their own
+assessment flow. Rating locks, user choices and navigation/restart guards remain
+in the overlay owner. The shared provider deadline covers headers and response
+body consumption, including error bodies; external cancellation and timeout
+remain distinct from invalid output.
+
 ## External APIs And Secrets
 
 External network calls use request declarations over `src/platform/http`. REST

@@ -39,9 +39,8 @@ export async function requestJson<T>(
     },
   }
 
-  let response: Response
   try {
-    response = await fetchWithTimeout(
+    return await fetchWithTimeout(
       url,
       {
         method: 'POST',
@@ -57,12 +56,11 @@ export async function requestJson<T>(
           ? { externalSignal: request.signal }
           : {}),
       },
+      (response) => handleResponse(response, request, startedAt),
     )
   } catch (error) {
     return handleFetchException(error, request, startedAt)
   }
-
-  return handleResponse(response, request, startedAt)
 }
 
 async function handleResponse<T>(
@@ -204,6 +202,7 @@ function handleFetchException<T>(
   request: GenAiGenerateJsonRequest<T>,
   startedAt: number,
 ): GenAiGenerateJsonResult<T> {
+  if (request.signal?.aborted && error === request.signal.reason) throw error
   if (error instanceof GenAiTimeoutError) {
     return {
       status: 'error',

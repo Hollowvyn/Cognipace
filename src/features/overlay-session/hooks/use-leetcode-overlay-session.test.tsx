@@ -373,6 +373,30 @@ describe('useLeetCodeOverlaySession', () => {
     expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
   })
 
+  it('preserves a manual rating choice made before a pending provider failure', async () => {
+    const deferred =
+      createDeferred<ReturnType<typeof buildReadyAssessmentResponse>>()
+    vi.mocked(recommendLeetCodeAssessmentViaRuntime).mockReturnValueOnce(
+      deferred.promise,
+    )
+    const { result } = await renderReadySession({ aiAssessmentAvailable: true })
+    let save!: Promise<void>
+    act(() => {
+      save = result.current.actions.prepareQuickSubmit()
+    })
+    await waitFor(() =>
+      expect(recommendLeetCodeAssessmentViaRuntime).toHaveBeenCalledOnce(),
+    )
+
+    act(() => result.current.actions.selectRating('easy'))
+    await act(async () => {
+      deferred.reject(new Error('Provider unavailable.'))
+      await save
+    })
+
+    expect(latestSavedReviewRequest().rating).toBe('easy')
+  })
+
   it('hydrates submitted review state from saved practice details', async () => {
     vi.mocked(saveReviewResultViaRuntime).mockResolvedValueOnce(
       createSavedPracticeDetails({
@@ -480,6 +504,265 @@ describe('useLeetCodeOverlaySession', () => {
       isCorrect: true,
     })
   })
+
+  it('shares one pending recommendation between automatic save and display', async () => {
+    const deferred =
+      createDeferred<ReturnType<typeof buildReadyAssessmentResponse>>()
+    vi.mocked(sendMessage).mockReturnValueOnce(deferred.promise)
+    vi.mocked(recommendLeetCodeAssessmentViaRuntime).mockReturnValueOnce(
+      deferred.promise,
+    )
+    vi.mocked(saveReviewResultViaRuntime).mockImplementation((request) =>
+      Promise.resolve(
+        createSavedPracticeDetails({
+          latestAttempt: { rating: request.rating },
+        }),
+      ),
+    )
+    const { result } = await renderReadySession({
+      aiAssessmentAvailable: true,
+      autoDetectSolved: true,
+    })
+
+    emitSubmissionResult()
+    await waitFor(() => {
+      expect(result.current.aiRecommendation.status).toBe('pending')
+    })
+    expect(
+      vi.mocked(sendMessage).mock.calls.length +
+        vi.mocked(recommendLeetCodeAssessmentViaRuntime).mock.calls.length,
+    ).toBe(1)
+    expect(saveReviewResultViaRuntime).not.toHaveBeenCalled()
+
+    const request = vi.mocked(sendMessage).mock.calls[0]?.[1] as
+      | RecommendLeetCodeAssessmentRequest
+      | undefined
+    await act(async () => {
+      deferred.resolve(
+        buildReadyAssessmentResponse(request!.submissionFingerprint),
+      )
+      await deferred.promise
+    })
+
+    await waitFor(() => {
+      expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
+    })
+    expect(result.current.aiRecommendation).toMatchObject({
+      status: 'ready',
+      recommendation: { recommendedRating: 'hard' },
+    })
+    expect(latestSavedReviewRequest().rating).toBe('hard')
+    expect(result.current.overlay.selectedRating).toBe('hard')
+    expect(result.current.overlay.submittedSession?.rating).toBe('hard')
+    expect(request?.sessionContext).toMatchObject({
+      submissionSource: 'leetcode-watcher',
+    })
+    expect(request?.problem.topics).toEqual(['array'])
+  })
+
+  it('keeps the user rating selected while the automatic recommendation is pending', async () => {
+    const deferred =
+      createDeferred<ReturnType<typeof buildReadyAssessmentResponse>>()
+    vi.mocked(sendMessage).mockReturnValueOnce(deferred.promise)
+    vi.mocked(recommendLeetCodeAssessmentViaRuntime).mockReturnValueOnce(
+      deferred.promise,
+    )
+    vi.mocked(saveReviewResultViaRuntime).mockImplementation((request) =>
+      Promise.resolve(
+        createSavedPracticeDetails({
+          latestAttempt: { rating: request.rating },
+        }),
+      ),
+    )
+    const { result } = await renderReadySession({
+      aiAssessmentAvailable: true,
+      autoDetectSolved: true,
+    })
+    emitSubmissionResult()
+    await waitFor(() =>
+      expect(result.current.aiRecommendation.status).toBe('pending'),
+    )
+
+    act(() => result.current.actions.selectRating('easy'))
+    await act(async () => {
+      deferred.resolve(buildReadyAssessmentResponse('pending-result'))
+      await deferred.promise
+    })
+
+    await waitFor(() =>
+      expect(result.current.overlay.reviewStatus).toBe('submitted-clean'),
+    )
+    expect(latestSavedReviewRequest().rating).toBe('easy')
+    expect(result.current.overlay.selectedRating).toBe('easy')
+  })
+
+  it('displays a recommendation without changing the saved rating when updating is declined', async () => {
+    vi.mocked(sendMessage).mockResolvedValueOnce({
+      ...buildReadyAssessmentResponse('declined-update'),
+      recommendation: makeValidRecommendation({
+        recommendedRating: 'hard',
+        shouldUpdateRating: false,
+      }),
+    })
+    const { result } = await renderReadySession({
+      aiAssessmentAvailable: true,
+      autoDetectSolved: true,
+    })
+
+    emitSubmissionResult()
+    await waitFor(() =>
+      expect(result.current.overlay.reviewStatus).toBe('submitted-clean'),
+    )
+
+    expect(result.current.aiRecommendation.status).toBe('ready')
+    expect(latestSavedReviewRequest().rating).toBe('good')
+    expect(result.current.overlay.selectedRating).toBe('good')
+    expect(sendMessage).toHaveBeenCalledOnce()
+    expect(recommendLeetCodeAssessmentViaRuntime).not.toHaveBeenCalled()
+  })
+
+  it.each(['unavailable', 'rejected'] as const)(
+    'uses deterministic automatic saving when the shared recommendation is %s',
+    async (outcome) => {
+      if (outcome === 'rejected') {
+        vi.mocked(sendMessage).mockRejectedValueOnce(
+          new Error('Provider unavailable.'),
+        )
+      }
+      const { result } = await renderReadySession({
+        aiAssessmentAvailable: true,
+        autoDetectSolved: true,
+      })
+
+      emitSubmissionResult()
+      await waitFor(() =>
+        expect(result.current.overlay.reviewStatus).toBe('submitted-clean'),
+      )
+
+      expect(latestSavedReviewRequest().rating).toBe('good')
+      expect(result.current.aiRecommendation.status).toBe(
+        outcome === 'rejected' ? 'error' : 'unavailable',
+      )
+      expect(sendMessage).toHaveBeenCalledOnce()
+      expect(recommendLeetCodeAssessmentViaRuntime).not.toHaveBeenCalled()
+    },
+  )
+
+  it('reuses the shared recommendation when retrying a failed automatic save', async () => {
+    setSendMessageRecommendationReady()
+    vi.mocked(saveReviewResultViaRuntime)
+      .mockRejectedValueOnce(new Error('Review save failed.'))
+      .mockResolvedValueOnce(
+        createSavedPracticeDetails({ latestAttempt: { rating: 'hard' } }),
+      )
+    const { result } = await renderReadySession({
+      aiAssessmentAvailable: true,
+      autoDetectSolved: true,
+    })
+    const submission = createSubmissionResult()
+
+    emitSubmissionResult(submission)
+    await waitFor(() =>
+      expect(result.current.overlay.feedback?.message).toBe(
+        'Review save failed.',
+      ),
+    )
+    emitSubmissionResult({ ...submission })
+    await waitFor(() =>
+      expect(result.current.overlay.reviewStatus).toBe('submitted-clean'),
+    )
+
+    expect(saveReviewResultViaRuntime).toHaveBeenCalledTimes(2)
+    expect(
+      vi
+        .mocked(saveReviewResultViaRuntime)
+        .mock.calls.map(([request]) => request.rating),
+    ).toEqual(['hard', 'hard'])
+    expect(sendMessage).toHaveBeenCalledOnce()
+    expect(recommendLeetCodeAssessmentViaRuntime).not.toHaveBeenCalled()
+  })
+
+  it('saves the latest distinct submission when it supersedes a pending recommendation', async () => {
+    const first =
+      createDeferred<ReturnType<typeof buildReadyAssessmentResponse>>()
+    const second =
+      createDeferred<ReturnType<typeof buildReadyAssessmentResponse>>()
+    vi.mocked(sendMessage)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    vi.mocked(saveReviewResultViaRuntime).mockImplementation((request) =>
+      Promise.resolve(
+        createSavedPracticeDetails({
+          latestAttempt: { rating: request.rating },
+        }),
+      ),
+    )
+    const { result } = await renderReadySession({
+      aiAssessmentAvailable: true,
+      autoDetectSolved: true,
+    })
+    emitSubmissionResult(createSubmissionResult({ submissionId: 'first' }))
+    await waitFor(() =>
+      expect(result.current.overlay.reviewStatus).toBe('saving'),
+    )
+    emitSubmissionResult(createSubmissionResult({ submissionId: 'second' }))
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(2))
+
+    await act(async () => {
+      first.resolve(buildReadyAssessmentResponse('first'))
+      await first.promise
+    })
+    expect(saveReviewResultViaRuntime).not.toHaveBeenCalled()
+
+    await act(async () => {
+      second.resolve(buildReadyAssessmentResponse('second'))
+      await second.promise
+    })
+    await waitFor(() =>
+      expect(result.current.overlay.reviewStatus).toBe('submitted-clean'),
+    )
+    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
+    expect(latestSavedReviewRequest().rating).toBe('hard')
+    expect(result.current.aiRecommendation).toMatchObject({
+      status: 'ready',
+      recommendation: { recommendedRating: 'hard' },
+    })
+  })
+
+  it.each(['navigation', 'restart'] as const)(
+    'does not save an old submission when %s occurs while AI is pending',
+    async (change) => {
+      const deferred =
+        createDeferred<ReturnType<typeof buildReadyAssessmentResponse>>()
+      vi.mocked(sendMessage).mockReturnValueOnce(deferred.promise)
+      vi.mocked(recommendLeetCodeAssessmentViaRuntime).mockReturnValueOnce(
+        deferred.promise,
+      )
+      const { result } = await renderReadySession({
+        aiAssessmentAvailable: true,
+        autoDetectSolved: true,
+      })
+      emitSubmissionResult()
+      await waitFor(() =>
+        expect(result.current.aiRecommendation.status).toBe('pending'),
+      )
+
+      if (change === 'navigation') {
+        emitNextPage()
+      } else {
+        act(() => result.current.actions.restartLocalSession())
+      }
+      await act(async () => {
+        deferred.resolve(buildReadyAssessmentResponse('old-result'))
+        await deferred.promise
+      })
+      await flushEffects()
+
+      expect(saveReviewResultViaRuntime).not.toHaveBeenCalled()
+      expect(result.current.aiRecommendation.status).toBe('idle')
+      expect(result.current.overlay.submittedSession).toBeNull()
+    },
+  )
 
   it('auto-saves failed LeetCode submission results as Again', async () => {
     const { result } = await renderReadySession({ autoDetectSolved: true })
@@ -742,6 +1025,10 @@ describe('useLeetCodeOverlaySession', () => {
       const { result } = await renderReadySession()
 
       const savePromise = runOverlayAction(result.current.actions.submitReview)
+
+      await waitFor(() =>
+        expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce(),
+      )
 
       emitNextPage()
       finishSave(deferredSave)
