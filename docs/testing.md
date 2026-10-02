@@ -552,7 +552,9 @@ is required before review or merge:
 
 1. Open Tracks with multiple tracks. Confirm All tracks starts expanded, its
    count includes the active track, and the active row has a strong outline,
-   tinted background, and filled Active badge. Check each row's title,
+   tinted background, and filled Active badge. Confirm the collection heading
+   uses the dashboard's bold sans-serif family while retaining its larger size.
+   Check each row's title,
    description, completed/total count, and progress bar. Select an inactive
    track with Set active and confirm both the collection and workspace update.
 2. Collapse and reopen the collection with the heading and chevron, then use

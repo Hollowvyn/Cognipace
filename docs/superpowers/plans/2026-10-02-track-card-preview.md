@@ -190,3 +190,51 @@ live visual proof. The supplied human screenshot is preserved byte-for-byte at
 `docs/superpowers/evidence/2026-10-02-all-tracks/installed-preview-before-framing.png`
 and is labeled as the installed preview before this framing/accordion change.
 Keep the PR draft until final human smoke and updated visual proof are attached.
+
+## Collection Heading Typography Follow-Up
+
+The user approved matching All tracks to the dashboard's bold sans-serif
+headings. Replace only the generic serif family and semibold weight, keeping
+the larger collection title, icon, count, and container hierarchy.
+
+- [x] Use the existing `font-sans` token and `font-bold` in
+      `src/features/tracks/components/other-tracks-accordion.tsx`, retaining
+      `text-2xl`. Update the design spec and docs/testing.md to record this
+      approved choice and its visual smoke check.
+- [x] Run the existing focused Tracks/route tests, required lint/check/build,
+      touched-file Prettier, and diff check. No new tests that assert CSS classes
+      are needed for this presentation-only adjustment.
+- [x] Update draft PR #183 and verify the running dev server serves the new
+      heading in the user's installed extension folder. Final human visual
+      proof remains pending.
+
+### Typography Verification Record
+
+Existing focused coverage passed 103 tests across two files. `npm run lint`
+passed; `npm run check` passed database consistency, typecheck, lint, and 1,960
+tests across 187 files. `npm run build` passed with the existing non-blocking
+chunk-size warning. Prettier and diff checks passed. Localhost verification
+confirmed `font-sans text-2xl font-bold`, removal of `font-serif`, and the
+installed dev dashboard's connection to port 3000. This is source verification;
+the final installed-extension visual check is still pending.
+
+Commands executed through `rtk proxy` with the project's Node v24.20.0 PATH:
+
+```sh
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
+npm run lint
+npm run check
+npm run build
+npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+rtk git diff --check
+```
+
+Skipped `npm run zip` because packaging is unchanged. Skipped
+`npm run db:generate` because no schema changed; database consistency passed
+inside `npm run check`. No new tests were added for this reversible font-class
+adjustment. Existing behavior coverage and the human visual smoke checklist
+remain the relevant checks. The already running dev server serves the updated
+heading; browser automation remains unable to claim extension URLs.

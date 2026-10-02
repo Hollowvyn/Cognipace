@@ -6,10 +6,15 @@ prototype and the template-first import flow.
 ## Outcome
 
 All tracks reads as the complete local study collection. Its heading has a
-library icon, a larger serif title, a track-count pill, a distinct tonal
+library icon, a larger bold sans-serif title, a track-count pill, a distinct tonal
 header, New Track, and a small accessible Import tracks icon. The collection
 starts expanded and can be collapsed whether or not an active track exists.
 Adding a track reopens the collection.
+
+After comparing the installed heading with dashboard typography, the user
+approved using the existing system sans-serif family and bold weight. Retain
+the larger collection title and existing header hierarchy; do not introduce a
+fallback serif or load new font assets for this component.
 
 Track rows retain their order, descriptions, progress, target dates, and
 management actions. The active row has a primary-colored border and leading

@@ -84,7 +84,7 @@ export function OtherTracksAccordion({
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="m-0 font-serif text-2xl font-semibold leading-tight text-foreground">
+              <h2 className="m-0 font-sans text-2xl font-bold leading-tight text-foreground">
                 <button
                   aria-controls={collectionId}
                   aria-expanded={isOpen}
