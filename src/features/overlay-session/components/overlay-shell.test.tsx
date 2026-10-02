@@ -231,11 +231,6 @@ function createSession(
       },
       aiAssessmentAvailable: false,
     },
-    draft: {
-      clearField: vi.fn(),
-      hasUnpersistedChanges: false,
-      setField: vi.fn(),
-    },
     feedback: null,
     location: null,
     metadata: null,

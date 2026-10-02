@@ -155,7 +155,7 @@ Do not add folders preemptively.
 | Area               | Owns                                                                    | Main files                    |
 | ------------------ | ----------------------------------------------------------------------- | ----------------------------- |
 | `app-shell`        | surface read models, popup controller/view mapping                      | `features/app-shell/*`        |
-| `overlay-session`  | LeetCode overlay state, timer, draft, mode UI, review actions           | `features/overlay-session/*`  |
+| `overlay-session`  | LeetCode overlay state, timer, mode UI, review actions                  | `features/overlay-session/*`  |
 | `practice`         | FSRS review writes, attempts, cards, practice logs                      | `features/practice/*`         |
 | `problems`         | problem identity, normalization, catalog upsert, problem context        | `features/problems/*`         |
 | `queue`            | daily queue policy and recommendation composition                       | `features/queue/*`            |

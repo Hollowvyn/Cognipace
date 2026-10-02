@@ -13,19 +13,15 @@ import {
   overrideLastReviewResultViaRuntime,
   saveReviewResultViaRuntime,
   type SerializedPracticeDetails,
-  updateCurrentPracticeLogViaRuntime,
 } from '@/features/practice'
 import type { ReviewRating } from '@/lib/fsrs'
 import type { LeetCodeSubmissionResult } from '@/lib/leetcode'
 import { readErrorMessage } from '@/utils/errors'
 
 import {
-  createOverlayDraftFromLog,
   deriveOverlayAssessmentSessionContext,
   hasSubmittedSessionChanges,
-  hasUnpersistedDraftChanges,
   toAssessmentPracticeContext,
-  toPracticeLogPatch,
   type OverlayFeedback,
   type OverlaySessionState,
   type OverlaySubmittedSession,
@@ -125,59 +121,12 @@ export function useOverlayReviewActions({
     }
   }
 
-  async function persistDraftIfNeeded() {
-    const draftToken = syncTokenRef.current
-    const currentContext = contextRef.current
-    const currentOverlay = overlayRef.current
-    const problem = currentContext?.problem
-
-    if (
-      !problem ||
-      !hasUnpersistedDraftChanges(currentOverlay) ||
-      currentOverlay.reviewStatus === 'saving' ||
-      currentOverlay.reviewStatus === 'updating'
-    ) {
-      return
-    }
-
-    try {
-      const details = await updateCurrentPracticeLogViaRuntime({
-        surface: 'content-script',
-        problemSlug: problem.problemSlug,
-        log: toPracticeLogPatch(currentOverlay.draft),
-      })
-
-      if (syncTokenRef.current !== draftToken) {
-        return
-      }
-
-      dispatch({
-        type: 'draft-persisted',
-        draft: createOverlayDraftFromLog(details.currentLog),
-      })
-    } catch (error) {
-      if (syncTokenRef.current !== draftToken) {
-        return
-      }
-
-      dispatch({
-        type: 'set-feedback',
-        feedback: {
-          tone: 'danger',
-          message: error instanceof Error ? error.message : String(error),
-        },
-      })
-    }
-  }
-
   function collapse() {
     dispatch({ type: 'set-visual-mode', visualMode: 'collapsed' })
-    void persistDraftIfNeeded()
   }
 
   function dock() {
     dispatch({ type: 'set-visual-mode', visualMode: 'docked' })
-    void persistDraftIfNeeded()
   }
 
   function expand() {
@@ -199,7 +148,6 @@ export function useOverlayReviewActions({
 
     const session = deriveOverlayAssessmentSessionContext({
       context: currentContext,
-      overlay: overlayRef.current,
       submissionSource: 'collapsed-quick',
       timerUsed: timer.hasStarted(),
     })
@@ -236,7 +184,6 @@ export function useOverlayReviewActions({
 
     const session = deriveOverlayAssessmentSessionContext({
       context: currentContext,
-      overlay: overlayRef.current,
       submissionSource: 'manual-overlay',
       timerUsed: timer.hasStarted(),
     })
@@ -274,7 +221,6 @@ export function useOverlayReviewActions({
 
     const session = deriveOverlayAssessmentSessionContext({
       context: currentContext,
-      overlay: overlayRef.current,
       submissionSource: 'manual-overlay',
       timerUsed: timer.hasStarted(),
     })
@@ -313,7 +259,6 @@ export function useOverlayReviewActions({
 
     const session = deriveOverlayAssessmentSessionContext({
       context: currentContext,
-      overlay: overlayRef.current,
       submissionSource: 'leetcode-watcher',
       timerUsed: timer.hasStarted(),
     })
@@ -384,7 +329,6 @@ export function useOverlayReviewActions({
         reviewMode: 'leetcode',
         elapsedSeconds: decision.elapsedSeconds,
         isCorrect: decision.isCorrect,
-        log: toPracticeLogPatch(currentOverlay.draft),
       })
 
       if (
@@ -452,7 +396,6 @@ export function useOverlayReviewActions({
         rating,
         elapsedSeconds: submittedSession.elapsedSeconds,
         isCorrect: rating !== 'again',
-        log: toPracticeLogPatch(currentOverlay.draft),
       })
 
       if (syncTokenRef.current !== saveToken) {
@@ -489,7 +432,6 @@ export function useOverlayReviewActions({
     sessionGenerationRef.current += 1
     timer.reset()
     const currentPractice = contextRef.current?.practice
-    const nextDraft = createOverlayDraftFromLog(currentPractice?.currentLog)
     const selectedRating =
       currentPractice?.latestAttempt?.rating ??
       currentPractice?.practice?.lastRating ??
@@ -497,7 +439,6 @@ export function useOverlayReviewActions({
 
     dispatch({
       type: 'restart-local-session',
-      draft: nextDraft,
       selectedRating,
     })
     onRestart?.()
@@ -686,7 +627,6 @@ function createSubmittedSnapshotFromPracticeDetails(
 
   return {
     rating: latestAttempt.rating,
-    draft: createOverlayDraftFromLog(latestAttempt.log),
     elapsedSeconds: latestAttempt.elapsedSeconds,
     isCorrect: latestAttempt.isCorrect ?? latestAttempt.rating !== 'again',
     lockReason,

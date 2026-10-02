@@ -10,7 +10,6 @@ import type {
   ResetPracticeScheduleInput,
   SaveReviewResultInput,
   SetPracticeSuspendedInput,
-  UpdatePracticeLogInput,
 } from '../domain'
 
 export function getPracticeDetails(
@@ -48,13 +47,6 @@ export function resetPracticeSchedule(
   input: ResetPracticeScheduleInput,
 ) {
   return resetPracticeScheduleWithTrackProgress(db, input)
-}
-
-export function updateCurrentPracticeLog(
-  db: Db,
-  input: UpdatePracticeLogInput,
-) {
-  return createPracticeRepository(db).updateCurrentPracticeLog(input)
 }
 
 export {

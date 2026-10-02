@@ -8,7 +8,6 @@ import type { ReviewRating } from '@/lib/fsrs'
 
 import type { AssessmentRecommendationState } from '../../..'
 
-import type { OverlayDraftField } from '../../../domain'
 import {
   hasSubmittedSessionChanges,
   type OverlaySessionState,
@@ -23,18 +22,12 @@ import {
 } from './overlay-context-strip'
 import { OverlayHeader } from './overlay-header'
 import { OverlayHelpSection } from './overlay-help-section'
-import { OverlayLogFields } from './overlay-log-fields'
 import { OverlayNextCard } from './overlay-next-card'
 import { OverlayTimerCard } from './overlay-timer-card'
 
 type ExpandedOverlayViewModel = {
   aiRecommendation: AssessmentRecommendationState
   context: OverlayAppShellData['overlay'] | null
-  draft: {
-    clearField: (field: OverlayDraftField) => void
-    hasUnpersistedChanges: boolean
-    setField: (field: OverlayDraftField, value: string) => void
-  }
   elapsedSeconds: number
   helpSearchQuery: string | null
   isOverTarget: boolean
@@ -74,7 +67,6 @@ export function ExpandedOverlay({
   const {
     aiRecommendation,
     context,
-    draft,
     elapsedSeconds,
     helpSearchQuery,
     isOverTarget,
@@ -101,7 +93,6 @@ export function ExpandedOverlay({
   const submitted = Boolean(overlay.submittedSession)
   const isMutating =
     overlay.reviewStatus === 'saving' || overlay.reviewStatus === 'updating'
-  const isSubmittedLocked = submitted && Boolean(overlay.ratingLockReason)
   const showUntimedWarning =
     !submitted &&
     context?.timing.requireSolveTime === true &&
@@ -171,14 +162,6 @@ export function ExpandedOverlay({
             ) : null}
 
             <OverlayHelpSection searchQuery={helpSearchQuery} />
-
-            <OverlayLogFields
-              disabled={isMutating || isSubmittedLocked}
-              draft={overlay.draft}
-              hasUnpersistedChanges={draft.hasUnpersistedChanges}
-              onClearField={draft.clearField}
-              onFieldChange={draft.setField}
-            />
           </div>
         </div>
 

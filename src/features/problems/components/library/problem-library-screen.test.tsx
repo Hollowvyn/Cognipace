@@ -70,6 +70,43 @@ describe('ProblemLibraryScreen', () => {
     expect(screen.getByRole('link', { name: 'New Problem' })).toBeVisible()
   })
 
+  it('hides page controls when the selected page size fits all rows', async () => {
+    const user = userEvent.setup()
+    const response = createProblemLibraryResponse()
+    vi.mocked(sendMessage).mockResolvedValueOnce({
+      ...response,
+      rows: Array.from({ length: 31 }, (_, index) => ({
+        ...response.rows[0]!,
+        problem: createSerializedProblem({
+          slug: `problem-${index + 1}`,
+          title: `Problem ${index + 1}`,
+        }),
+      })),
+      summary: { ...response.summary, totalCount: 31, filteredCount: 31 },
+    })
+    renderProblemLibrary()
+
+    expect(await screen.findByText('1-20 of 31')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Next page' })).toBeEnabled()
+    const pageSize = screen.getByRole('combobox', { name: 'Rows per page' })
+    await user.selectOptions(pageSize, '50')
+
+    expect(pageSize).toHaveValue('50')
+    expect(screen.getByText('1-31 of 31')).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Previous page' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Next page' }),
+    ).not.toBeInTheDocument()
+
+    await user.selectOptions(pageSize, '20')
+    expect(screen.getByText('1-20 of 31')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(screen.getByText('21-31 of 31')).toBeVisible()
+  })
+
   it('filters Library rows by search and metadata controls', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce(libraryResponse)

@@ -1,6 +1,8 @@
 # PR-ready handoff: fix(app): repair data recovery and simplify live feature paths
 
-Branch: `codex/ponytail-codebase-audit`. Baseline: `709957e`.
+Branch: `codex/ponytail-codebase-audit`. Audit baseline: `709957e`.
+PR base refreshed to `f3e6d73` (main, version 2.0.0); upstream structured-log
+removal and track pagination are preserved.
 Scope and approval: [design](../specs/2026-10-02-ponytail-cleanup-design.md).
 Detailed commands, red/green evidence and review results:
 [implementation ledger](2026-10-02-ponytail-implementation-ledger.md).
@@ -32,7 +34,7 @@ to that action. No Chrome permission, integration scope or schema migration is
 introduced. SQL migration files and backup schema version are unchanged.
 
 Release impact: a `fix` title signals a patch release through the existing
-Release Please workflow. This branch does not bump version 1.4.0 or change CI,
+Release Please workflow. This branch preserves main's version 2.0.0 and does not change CI,
 GitHub secrets, check names, release packaging or store publication.
 
 Recovery: the additive local snapshot dirty marker is written with changed
@@ -49,12 +51,13 @@ The approved design and original audit document the scope and findings.
 
 ## Testing
 
-- [x] `rtk proxy npm run check` passed: DB check, typecheck, lint and 185 files /
+- [x] `rtk proxy npm run check` passed after integrating current main: DB check,
+      typecheck, lint and 186 files /
       1985 tests under patched Vitest 4.1.11.
 - [x] `rtk proxy npm run lint` passed.
 - [x] `rtk proxy npm run db:check` passed.
-- [x] `rtk proxy npm run build` passed: 3.87 MB production extension.
-- [x] `rtk proxy npm run store:check` passed: version 1.4.0, four icons.
+- [x] `rtk proxy npm run build` passed: 3.86 MB production extension.
+- [x] `rtk proxy npm run store:check` passed: version 2.0.0, four icons.
 - [x] `rtk proxy npm run zip` passed: 1.25 MB archive.
 - [x] `rtk proxy npm run format` passed; explicit planning-artifact Prettier
       check also passed (full command in ledger).
@@ -83,4 +86,5 @@ The approved design and original audit document the scope and findings.
 Pending human redacted screenshots or recording for every changed happy-path
 and edge-case behavior above. This is required before PR review or merge by
 [agent governance](../../agent-governance.md#manual-smoke-checklist).
-No PR, push, merge, publication or user-owned chat was created.
+Create as a draft while human smoke and visual proof remain pending. No review
+request, merge or release publication is authorized by the PR-creation request.

@@ -66,7 +66,6 @@ const validRequest = {
       elapsedSeconds: 1200,
       occurredAt: Date.parse('2026-05-30T10:00:00.000Z'),
     },
-    currentDraftHasChanges: false,
   },
 }
 

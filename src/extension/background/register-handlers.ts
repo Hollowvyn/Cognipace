@@ -93,7 +93,6 @@ import {
   practiceResetScheduleRequestSchema,
   practiceSaveReviewResultRequestSchema,
   practiceSetSuspendedRequestSchema,
-  practiceUpdateCurrentLogRequestSchema,
 } from '@/features/practice/api/practice-contracts'
 import {
   serializeNormalizedPracticeState,
@@ -105,7 +104,6 @@ import {
   resetPracticeSchedule,
   saveReviewResultWithTrackProgress,
   setPracticeSuspended,
-  updateCurrentPracticeLog,
 } from '@/features/practice/server/practice-service'
 import {
   bulkDeleteProblems,
@@ -850,31 +848,6 @@ export function registerBackgroundHandlers() {
         const details = await resetPracticeSchedule(db, {
           problemSlug: request.problemSlug,
           keepLog: request.keepLog,
-        })
-
-        return serializePracticeDetails(details)
-      },
-      () =>
-        broadcastPracticeInvalidation({
-          problemSlug: request.problemSlug,
-          source: request.surface,
-        }),
-    )
-  })
-
-  onMessage('practice.updateCurrentLog', ({ data, sender }) => {
-    const request = practiceUpdateCurrentLogRequestSchema.parse(data)
-
-    assertCanSenderCallExtensionMethod(
-      'practice.updateCurrentLog',
-      request.surface,
-      sender,
-    )
-    return runDbMutation(
-      async (db) => {
-        const details = await updateCurrentPracticeLog(db, {
-          problemSlug: request.problemSlug,
-          log: request.log,
         })
 
         return serializePracticeDetails(details)

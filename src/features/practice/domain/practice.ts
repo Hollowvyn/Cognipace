@@ -80,11 +80,6 @@ export interface ResetPracticeScheduleInput {
   keepLog?: boolean | undefined
 }
 
-export interface UpdatePracticeLogInput {
-  problemSlug: ProblemSlug
-  log: PracticeLogFields
-}
-
 export interface ReviewResult {
   problemSlug: ProblemSlug
   cardId: string

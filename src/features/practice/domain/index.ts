@@ -22,7 +22,6 @@ export {
   type ResetPracticeScheduleInput,
   type SaveReviewResultInput,
   type SetPracticeSuspendedInput,
-  type UpdatePracticeLogInput,
 } from './practice'
 
 export {

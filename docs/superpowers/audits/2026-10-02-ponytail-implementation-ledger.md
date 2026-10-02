@@ -37,8 +37,9 @@ each phase plan and `docs/testing.md`.
 
 `rtk npm run db:generate` is skipped because no schema migration is approved.
 Live Gist/provider calls are skipped during deterministic automated validation;
-use existing authorized opt-in flows for human integration proof. No PR, push,
-merge or publication has been performed.
+use existing authorized opt-in flows for human integration proof. At the initial
+implementation handoff no PR, push, merge or publication had been performed.
+The subsequent human PR request and base refresh are recorded below.
 
 ## Phase 1 implementation evidence
 
@@ -173,4 +174,37 @@ Implementation commits: `1a557ea` (data safety), `dd05169` (catalog/capture),
 `ed85b29` (AI/deadline), `41c14ab` (deletions), `c189c08` (dialogs), `83c7f06`
 (dependencies). Approval/design was recorded in `9803e57`. Final handoff is in
 [PR-ready context](2026-10-02-ponytail-pr-handoff.md); human proof and exact
-skipped commands/reasons remain listed above. No PR/push/merge/publication.
+skipped commands/reasons remain listed above. No PR/push/merge/publication had
+occurred at that implementation checkpoint.
+
+## PR preparation and current-main integration
+
+The human subsequently requested PR creation. Fresh `rtk proxy git fetch origin`
+found main advanced by `fbdda25` (remove structured-log editing), `94e88d3`
+(track pagination) and `f3e6d73` (release 2.0.0). A merge preview found two
+conflicts in the assessment owner and composed hook tests. Current main was
+integrated without reverting its behavior: the shared request/result owner and
+manual-rating failure regression remain, while the removed structured-log
+argument and obsolete log-draft test stay removed. Automatic merges preserve
+the new pagination and version 2.0.0. The lockfile graph was compared against
+`83c7f06` and differs only in the project version; no new dependency changes.
+
+Fresh integration validation:
+
+- `rtk proxy npm test -- src/features/overlay-session src/features/leetcode-review-assistant src/features/problems/components/library/problem-library-screen.test.tsx src/features/tracks/components --run > /private/tmp/cognipace-ponytail-pr-focused.log 2>&1`: passed 23 files / 306 tests.
+- `rtk proxy npm run typecheck > /private/tmp/cognipace-ponytail-pr-typecheck.log 2>&1`: passed.
+- `rtk proxy npm run lint > /private/tmp/cognipace-ponytail-pr-lint.log 2>&1`: passed.
+- `rtk proxy npm run check > /private/tmp/cognipace-ponytail-pr-check.log 2>&1`: passed DB check, typecheck, lint and 186 files / 1985 tests.
+- `rtk proxy npm run build > /private/tmp/cognipace-ponytail-pr-build.log 2>&1`: passed, 3.86 MB.
+- `rtk proxy npm run store:check > /private/tmp/cognipace-ponytail-pr-store.log 2>&1`: passed, version 2.0.0 and four icons.
+
+- `rtk proxy npm run zip > /private/tmp/cognipace-ponytail-pr-zip.log 2>&1`: passed, `dist/cognipace-2.0.0-chrome.zip`, 1.25 MB.
+- `rtk proxy npm run format > /private/tmp/cognipace-ponytail-pr-format.log 2>&1`: passed.
+- `rtk proxy npx prettier --check --ignore-path /dev/null docs/architecture.md docs/testing.md docs/superpowers/audits/2026-10-02-ponytail-implementation-ledger.md docs/superpowers/audits/2026-10-02-ponytail-pr-handoff.md`: passed after the final handoff edits.
+
+Scope measurement against
+the refreshed PR base remains 2428 net production lines removed (674 additions /
+3102 deletions in 53 files). Audit findings, dependency exposure assessment,
+schema/permission safety and human-proof requirements remain unchanged. PR is
+created as a draft while human happy-path/edge-case smoke and screenshots are
+pending; no ready-for-review request or remote merge is performed.

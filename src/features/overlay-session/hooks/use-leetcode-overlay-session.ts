@@ -7,7 +7,6 @@ import type {
 } from '@/lib/leetcode'
 
 import {
-  createOverlayDraftFromLog,
   initialOverlaySessionState,
   overlaySessionReducer,
   type OverlaySubmittedSession,
@@ -23,10 +22,6 @@ import {
   type OverlaySyncStatus,
 } from './use-leetcode-page-sync'
 import {
-  useOverlayDraft,
-  type OverlayDraftController,
-} from './use-overlay-draft'
-import {
   useOverlayReviewActions,
   type OverlayReviewActions,
 } from './use-overlay-review-actions'
@@ -40,7 +35,6 @@ export type LeetCodeOverlaySession = {
   status: OverlaySyncStatus
   feedback: string | null
   overlay: OverlaySessionState
-  draft: OverlayDraftController
   timer: {
     elapsedSeconds: number
     targetSeconds: number
@@ -57,7 +51,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     overlaySessionReducer,
     initialOverlaySessionState,
   )
-  const draft = useOverlayDraft(overlay, dispatch)
   const latestOverlayRef = useRef(overlay)
   const timerResetRef = useRef(timer.reset)
 
@@ -79,7 +72,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
       dispatch({
         type: 'problem-loaded',
         problemSlug: problem.problemSlug,
-        draft: createOverlayDraftFromLog(nextContext.practice?.currentLog),
         selectedRating:
           nextContext.practice?.latestAttempt?.rating ??
           nextContext.practice?.practice?.lastRating ??
@@ -100,7 +92,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
       dispatch({
         type: 'problem-context-refreshed',
         problemSlug: problem.problemSlug,
-        draft: createOverlayDraftFromLog(nextContext.practice?.currentLog),
         selectedRating:
           nextContext.practice?.latestAttempt?.rating ??
           nextContext.practice?.practice?.lastRating ??
@@ -176,7 +167,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     status: pageSync.status,
     feedback: pageSync.feedback,
     overlay,
-    draft,
     timer: {
       elapsedSeconds,
       targetSeconds,
@@ -210,7 +200,6 @@ function createSubmittedSessionFromContext(
 
   return {
     rating: latestAttempt.rating,
-    draft: createOverlayDraftFromLog(latestAttempt.log),
     elapsedSeconds: latestAttempt.elapsedSeconds,
     isCorrect: latestAttempt.isCorrect ?? latestAttempt.rating !== 'again',
     lockReason,

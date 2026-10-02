@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.0.0](https://github.com/Hollowvyn/Cognipace/compare/v1.4.0...v2.0.0) (2026-10-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **overlay:** remove structured-log editing ([#175](https://github.com/Hollowvyn/Cognipace/issues/175))
+
+### Features
+
+* **imports:** add non-destructive content imports ([#172](https://github.com/Hollowvyn/Cognipace/issues/172)) ([df6d189](https://github.com/Hollowvyn/Cognipace/commit/df6d1897430c4e14b43a17ed16b1fefc2f4cc260))
+* **overlay:** remove structured-log editing ([#175](https://github.com/Hollowvyn/Cognipace/issues/175)) ([fbdda25](https://github.com/Hollowvyn/Cognipace/commit/fbdda2583e02952fde6fcf2c0876d9a0a95c4434))
+* **tracks:** add remove-from-track action ([#174](https://github.com/Hollowvyn/Cognipace/issues/174)) ([709957e](https://github.com/Hollowvyn/Cognipace/commit/709957e616d4e7c99a119734fd240db643d33613))
+
+
+### Bug Fixes
+
+* **tracks:** paginate problem tables at 15 rows ([#176](https://github.com/Hollowvyn/Cognipace/issues/176)) ([94e88d3](https://github.com/Hollowvyn/Cognipace/commit/94e88d325c6a46068e1625379db46b217905616d))
+
 ## [1.4.0](https://github.com/Hollowvyn/Cognipace/compare/v1.3.2...v1.4.0) (2026-09-26)
 
 

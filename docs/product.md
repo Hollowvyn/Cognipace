@@ -89,10 +89,14 @@ Current behavior:
 - target-time awareness
 - quick submit preparation from the collapsed state
 - expanded submit, fail, update, restart, and rating controls
-- structured draft fields managed through the overlay session
+- focused review controls without structured-log or notes editing
 - settings access from the overlay
 - compact expanded-mode Help access that opens a YouTube search for the current problem in a new tab
 - page metadata and problem context sync through content-script/runtime messages
+
+Submission notes stay in LeetCode. Existing saved CogniPace log fields remain
+preserved in local practice history, backups, and sync; overlay review saves and
+rating updates do not edit those fields.
 
 ### Dashboard
 
@@ -204,6 +208,12 @@ author topic aliases or hierarchy relations, which remain deferred.
 Tracks owns curriculum progression. Track completion is separate from global
 practice history, and active track/session state is local database state. Tracks
 can contain groups and ordered problem memberships.
+
+Every track group's problem table uses Library-style pagination with a fixed
+15 problems per page. The footer shows the page size and visible range;
+Previous/Next controls appear only when there is more than one page in Tracks
+and Library. Switching track or group starts at the first page; paging preserves
+the group's explicit problem order and does not change track progression.
 
 Expanded track problem rows offer **Remove from track** beside Edit. Removal
 only affects that track membership and its track completion; the Library

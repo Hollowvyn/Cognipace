@@ -183,7 +183,6 @@ export function useLeetCodeAssessmentRecommendation(
 
       const sessionContext = deriveOverlayAssessmentSessionContext({
         context: currentContext,
-        overlay: overlayStateRef.current,
         submissionSource: 'leetcode-watcher',
         timerUsed: timingRef.current.timerUsed,
       })

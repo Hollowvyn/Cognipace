@@ -564,6 +564,29 @@ group and problem order without being reordered by due state. In Study Plan mode
 incomplete problem nor clears an earlier completion. Free Practice does not write
 active-track progress.
 
+#### Track Table Pagination
+
+Human realtime happy-path and edge-case smoke with screenshots or a recording
+is required before review or merge:
+
+1. Select a group with more than 15 problems. Confirm exactly 15 problems on the
+   first page, “Rows per page: 15”, a correct range count, and disabled Previous.
+   Page forward and back; confirm the last partial page, disabled Next, and
+   original membership order numbers. Expand a problem on each page and check
+   its details, edit/practice actions, and LeetCode link.
+2. From a later page, switch groups and tracks. Confirm each starts on page one
+   with collapsed details. Verify groups with 1, 8, or exactly 15 problems show
+   the page size and correct range with no Previous/Next controls. Empty groups
+   retain their empty state without pagination.
+3. In a disposable 16-problem group, remove the only problem on page two.
+   Confirm the table returns to the valid first page with 15 problems and
+   “1-15 of 15” with no Previous/Next controls. Refresh practice state within a
+   larger group and confirm the current page remains selected. Track progress
+   and Next still reflect the full track rather than just the visible page.
+4. In Library, verify its 20/30/50 page-size choices and selected-row bulk actions
+   still work with the shared footer. Previous/Next controls appear only for
+   multiple pages; single-page results retain the page-size selector and range.
+
 #### Remove From Track
 
 Human happy-path and edge-case smoke with screenshots or a recording is pending
@@ -647,7 +670,8 @@ smoke testing.
 1. Open a LeetCode problem page in Chrome.
 2. Confirm the CogniPace overlay appears after page context is read.
 3. Start, pause, and reset the timer.
-4. Expand the overlay.
+4. Expand the overlay. Confirm Structured Log, Interview Pattern, Time
+   Complexity, Space Complexity, Languages, and Notes controls are absent.
 5. Focus the Help shelf’s YouTube action, confirm its tooltip, activate it, and
    confirm a new tab opens with the current problem title.
 6. From `chrome://extensions`, reload the CogniPace extension to clear its
@@ -662,14 +686,22 @@ smoke testing.
 10. Select a rating or use fail.
 11. Submit or update a review.
 12. Dock and restore the overlay.
+13. Happy path: submit a timed review, change its rating, and use Update. Confirm
+    only one attempt remains and next-review/track guidance refreshes.
+14. Edge path: load a problem with existing saved structured-log values, submit
+    an untimed review, then update its rating. Export a backup and verify those
+    saved values remain. Restore an older backup with notes and repeat.
+15. Confirm collapse/dock/restore and SPA navigation work before and after
+    submission, including a failed attempt with locked rating.
 
 Expected: the overlay remains recoverable, does not dominate the LeetCode page,
 the Help action is keyboard accessible and opens the title/slug search without
 replacing LeetCode, and saved review results update CogniPace state.
 
 For this behavior-changing overlay update, a human engineer must run the title
-happy path and slug-fallback edge path and attach screenshot or screen-recording
-proof before PR review or merge. Automated checks do not replace that proof.
+happy path, slug-fallback edge path, and structured-log removal/preservation
+flows above and attach screenshot or screen-recording proof before PR review or
+merge. Automated checks do not replace that proof.
 
 ### Cross-Surface Refresh
 
