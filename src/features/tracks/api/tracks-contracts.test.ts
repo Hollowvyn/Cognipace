@@ -13,12 +13,34 @@ import {
   tracksCreateTrackRequestSchema,
   tracksDeleteTrackRequestSchema,
   tracksGetWorkspaceRequestSchema,
+  tracksRemoveProblemRequestSchema,
   tracksResetTrackProgressRequestSchema,
   tracksSetActiveTrackRequestSchema,
   tracksUpdateTrackRequestSchema,
 } from './tracks-contracts'
 
 describe('tracks runtime contracts', () => {
+  it('requires a dashboard track and problem for membership removal', () => {
+    const request = {
+      surface: 'dashboard',
+      trackId: 'leetcode-75',
+      problemSlug: 'two-sum',
+    }
+    expect(tracksRemoveProblemRequestSchema.safeParse(request).success).toBe(
+      true,
+    )
+    for (const patch of [
+      { surface: 'popup' },
+      { trackId: '' },
+      { problemSlug: '' },
+    ]) {
+      expect(
+        tracksRemoveProblemRequestSchema.safeParse({ ...request, ...patch })
+          .success,
+      ).toBe(false)
+    }
+  })
+
   it('accepts a valid active track response without legacy active flags', () => {
     const parsed = serializedActiveTrackSchema.parse(
       createSerializedActiveTrack(),

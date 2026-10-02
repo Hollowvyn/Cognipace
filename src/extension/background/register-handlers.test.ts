@@ -14,6 +14,7 @@ import {
   tracksDeleteTrackRequestSchema,
   tracksGetTrackForEditRequestSchema,
   tracksGetWorkspaceRequestSchema,
+  tracksRemoveProblemRequestSchema,
   tracksResetTrackProgressRequestSchema,
   tracksSetActiveGroupRequestSchema,
   tracksSetActiveTrackRequestSchema,
@@ -119,6 +120,7 @@ const backgroundMocks = vi.hoisted(() => {
     overrideLastReviewResultWithTrackProgress: vi.fn(),
     overrideLastReviewResult: vi.fn(),
     resetPracticeSchedule: vi.fn(),
+    removeTrackProblem: vi.fn(),
     resetTrackProgress: vi.fn(),
     saveReviewResultWithTrackProgress: vi.fn(),
     saveReviewResult: vi.fn(),
@@ -284,6 +286,7 @@ vi.mock('@/features/tracks/server/tracks-service', () => ({
   getWorkspace: backgroundMocks.getWorkspace,
   recordActiveTrackProblemCompletion:
     backgroundMocks.recordActiveTrackProblemCompletion,
+  removeTrackProblem: backgroundMocks.removeTrackProblem,
   resetTrackProgress: backgroundMocks.resetTrackProgress,
   setActiveGroup: backgroundMocks.setActiveGroup,
   setActiveTrack: backgroundMocks.setActiveTrack,
@@ -1481,6 +1484,19 @@ describe('background handler registration', () => {
   })
 
   it('flushes and broadcasts tracks plus problems invalidation after management writes', async () => {
+    await expectTrackWrite({
+      method: 'tracks.removeProblem',
+      request: {
+        surface: 'dashboard',
+        trackId: 'leetcode-75',
+        problemSlug: 'two-sum',
+      },
+      schema: tracksRemoveProblemRequestSchema,
+      service: backgroundMocks.removeTrackProblem,
+      expectedResponse: null,
+      expectedTags: ['tracks', 'problems'],
+    })
+
     await expectTrackWrite({
       method: 'tracks.createTrack',
       request: createTrackRequest(),

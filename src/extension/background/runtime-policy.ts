@@ -54,6 +54,7 @@ const methodSurfaceAccess = {
   'tracks.createTrack': ['dashboard'],
   'tracks.updateTrack': ['dashboard'],
   'tracks.deleteTrack': ['dashboard'],
+  'tracks.removeProblem': ['dashboard'],
   'tracks.resetTrackProgress': ['dashboard'],
   'settings.getSettings': ['popup', 'dashboard'],
   'settings.updateSettings': ['popup', 'dashboard'],

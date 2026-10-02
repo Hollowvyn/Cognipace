@@ -22,11 +22,13 @@ export function ProblemRowActionsBar({ children }: { children: ReactNode }) {
 
 export function ProblemRowPracticeActions({
   disabled = false,
+  afterEditAction,
   onPendingChange,
   renderEditProblemAction,
   row,
 }: {
   disabled?: boolean | undefined
+  afterEditAction?: ReactNode
   onPendingChange?: ((isPending: boolean) => void) | undefined
   renderEditProblemAction: RenderProblemEditAction
   row: ProblemLibraryRow
@@ -75,6 +77,7 @@ export function ProblemRowPracticeActions({
         </InlineStatus>
       ) : null}
       {renderEditProblemAction(row.problem)}
+      {afterEditAction}
       <Button
         disabled={isDisabled}
         onClick={() => {

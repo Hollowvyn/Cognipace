@@ -412,6 +412,52 @@ export class TracksRepository {
     })
   }
 
+  async removeProblem(
+    trackId: string,
+    problemSlug: string,
+    now = new Date(),
+  ): Promise<void> {
+    await this.db.transaction(async (transactionDb) => {
+      const track = await readTrackById(transactionDb, trackId)
+      if (!track) {
+        throw new Error(`Cannot update missing track "${trackId}".`)
+      }
+      const membership = (await readMemberships(transactionDb, track.id)).find(
+        (row) => row.problemSlug === problemSlug,
+      )
+      if (!membership) return
+
+      await transactionDb
+        .delete(trackGroupProblems)
+        .where(
+          and(
+            eq(trackGroupProblems.trackId, track.id),
+            eq(trackGroupProblems.problemSlug, problemSlug),
+          ),
+        )
+      const remaining = await transactionDb
+        .select()
+        .from(trackGroupProblems)
+        .where(eq(trackGroupProblems.trackGroupId, membership.groupId))
+        .orderBy(asc(trackGroupProblems.position))
+      for (const [index, row] of remaining.entries()) {
+        await transactionDb
+          .update(trackGroupProblems)
+          .set({ position: index + 1 })
+          .where(
+            and(
+              eq(trackGroupProblems.trackGroupId, membership.groupId),
+              eq(trackGroupProblems.problemSlug, row.problemSlug),
+            ),
+          )
+      }
+      await transactionDb
+        .update(tracks)
+        .set({ updatedAt: now.getTime() })
+        .where(eq(tracks.id, track.id))
+    })
+  }
+
   async deleteTrack(trackId: string, now = new Date()): Promise<void> {
     await this.db.transaction(async (transactionDb) => {
       const sessionRows = await transactionDb

@@ -29,6 +29,7 @@ import type {
   TracksDeleteTrackRequest,
   TracksGetTrackForEditRequest,
   TracksGetWorkspaceRequest,
+  TracksRemoveProblemRequest,
   TracksResetTrackProgressRequest,
   TracksSetActiveGroupRequest,
   TracksSetActiveTrackRequest,
@@ -212,6 +213,16 @@ export async function updateTrack(
     surface: request.surface,
     trackId: request.trackId,
   })
+}
+
+export async function removeTrackProblem(
+  db: Db,
+  request: TracksRemoveProblemRequest,
+): Promise<void> {
+  await createTracksRepository(db).removeProblem(
+    request.trackId,
+    request.problemSlug,
+  )
 }
 
 export async function deleteTrack(

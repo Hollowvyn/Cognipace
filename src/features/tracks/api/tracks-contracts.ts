@@ -253,6 +253,16 @@ export type TracksDeleteTrackRequest = z.infer<
   typeof tracksDeleteTrackRequestSchema
 >
 
+export const tracksRemoveProblemRequestSchema = z.strictObject({
+  surface: trackDashboardSurfaceSchema,
+  trackId: trackIdSchema,
+  problemSlug: problemSlugSchema,
+})
+
+export type TracksRemoveProblemRequest = z.infer<
+  typeof tracksRemoveProblemRequestSchema
+>
+
 export const tracksResetTrackProgressRequestSchema = z.object({
   surface: trackDashboardSurfaceSchema,
   trackId: trackIdSchema,

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   fsrsCards,
+  problems,
   problemPractice,
   reviewAttempts,
   trackGroupProblems,
@@ -17,6 +18,125 @@ import type { Db } from '@/platform/db'
 import { createTracksRepository } from './tracks-repository'
 
 describe('TracksRepository', () => {
+  it('removes only the requested membership and compacts its group order', async () => {
+    const { db } = await createTestDb()
+    const repository = createTracksRepository(db)
+    const track = await repository.createTrack({
+      title: 'Removal test',
+      description: null,
+      dueAt: null,
+      groups: [
+        {
+          title: 'Main',
+          problemSlugs: [
+            'two-sum',
+            'two-sum-ii-input-array-is-sorted',
+            'valid-parentheses',
+          ],
+        },
+      ],
+    })
+    const other = await repository.createTrack({
+      title: 'Other removal test',
+      description: null,
+      dueAt: null,
+      groups: [
+        { title: 'Main', problemSlugs: ['two-sum-ii-input-array-is-sorted'] },
+      ],
+    })
+    await insertReviewAttempt(db, {
+      id: 'removal-review',
+      problemSlug: 'two-sum-ii-input-array-is-sorted',
+      rating: 'good',
+      reviewedAt: new Date(1000),
+    })
+    await db.insert(problemPractice).values({
+      problemSlug: 'two-sum-ii-input-array-is-sorted',
+      status: 'mastered',
+      firstSeenAt: 1000,
+      lastSeenAt: 1000,
+      lastReviewedAt: 1000,
+      lastRating: 'good',
+      solvedCount: 1,
+      attemptCount: 1,
+      isSuspended: false,
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+    await db.insert(trackProblemProgress).values(
+      [track.id, other.id].map((trackId) => ({
+        trackId,
+        problemSlug: 'two-sum-ii-input-array-is-sorted',
+        reviewAttemptId: 'removal-review',
+        completedAt: 1000,
+        completedRating: 'good',
+        createdAt: 1000,
+        updatedAt: 1000,
+      })),
+    )
+    const practiceBefore = await db.select().from(problemPractice)
+    const reviewsBefore = await db.select().from(reviewAttempts)
+    const cardsBefore = await db.select().from(fsrsCards)
+    await repository.removeProblem(track.id, 'two-sum-ii-input-array-is-sorted')
+    expect(
+      (await repository.getMemberships(track.id)).map((row) => [
+        row.problemSlug,
+        row.problemPosition,
+      ]),
+    ).toEqual([
+      ['two-sum', 1],
+      ['valid-parentheses', 2],
+    ])
+    expect(await repository.getMemberships(other.id)).toHaveLength(1)
+    expect(
+      await db
+        .select()
+        .from(trackProblemProgress)
+        .where(eq(trackProblemProgress.trackId, track.id)),
+    ).toEqual([])
+    expect(
+      await db
+        .select()
+        .from(trackProblemProgress)
+        .where(eq(trackProblemProgress.trackId, other.id)),
+    ).toHaveLength(1)
+
+    expect(
+      await db
+        .select()
+        .from(problems)
+        .where(eq(problems.slug, 'two-sum-ii-input-array-is-sorted')),
+    ).toHaveLength(1)
+    expect(await db.select().from(problemPractice)).toEqual(practiceBefore)
+    expect(await db.select().from(reviewAttempts)).toEqual(reviewsBefore)
+    expect(await db.select().from(fsrsCards)).toEqual(cardsBefore)
+    await repository.removeProblem(track.id, 'two-sum-ii-input-array-is-sorted')
+    expect(await repository.getMemberships(track.id)).toHaveLength(2)
+  })
+
+  it('keeps the final empty group and rejects a missing track', async () => {
+    const { db } = await createTestDb()
+    const repository = createTracksRepository(db)
+    const track = await repository.createTrack({
+      title: 'Empty removal test',
+      description: null,
+      dueAt: null,
+      groups: [{ title: 'Main', problemSlugs: ['two-sum'] }],
+    })
+    await repository.setActiveTrack(track.id)
+    await repository.removeProblem(track.id, 'two-sum')
+    expect(await repository.getGroups(track.id)).toHaveLength(1)
+    expect(await repository.getMemberships(track.id)).toEqual([])
+    expect(await repository.getActiveTrack()).toMatchObject({
+      track: { id: track.id },
+      nextProblem: null,
+      progress: { completedCount: 0, totalCount: 0, percent: 0 },
+    })
+    await expect(
+      repository.removeProblem('missing', 'two-sum'),
+    ).rejects.toThrow(/missing track/)
+  })
+
   it('reads active track context with nullable due date', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
