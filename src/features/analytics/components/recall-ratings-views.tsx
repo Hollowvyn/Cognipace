@@ -100,6 +100,7 @@ export function ObservedRecallVsFsrsView({
                 inspectionResetKey={`${series.observed}:${series.estimate}`}
                 name="Observed Recall vs FSRS Estimate chart"
                 rows={rows}
+                startAtFirstPoint
                 timeFrame={timeFrame}
                 tooltip={(row) => (
                   <RecallTooltip

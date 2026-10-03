@@ -7,6 +7,16 @@ covers Recall, Practice Rhythm, and Ratings Mix; the latest
 supersedes Memory's full-window exception. The exact frozen artifacts below
 remain unchanged design history.
 
+The later [Recall left-clearance adjustment](2026-10-02-analytics-layout-polish-design.md#approved-follow-up-recall-left-clearance)
+starts Recall's X domain at the first retained interval's actual midpoint when
+at least two intervals remain, with 12px of left scale clearance and the
+original last interval's end boundary. Marks retain their true calendar
+midpoints; sparse ticks show dates within the displayed domain, while tooltip
+and Table retain full intervals. A singleton keeps its original interval domain
+and centered marker. Series toggles cannot shift the domain, and the other
+three charts keep their existing X domains and padding. This follow-up does
+not change the frozen spacing record below.
+
 Status: human-approved visual design, archived exactly on 2026-10-02.
 The four historical charts are now implemented locally; see the
 [implementation handoff](../handoffs/2026-10-02-analytics-historical-charts.md)

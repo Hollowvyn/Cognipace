@@ -95,7 +95,7 @@ describe('Phase 2 historical analytics views', () => {
       document.querySelectorAll('.recharts-xAxis-tick-labels text'),
     ).map((node) => node.textContent)
 
-    expect(xAxisLabels).toEqual(['08/01', '08/02', '08/03', '08/04'])
+    expect(xAxisLabels).toEqual(['08/02', '08/03', '08/04'])
   })
 
   it('describes supported Memory Strength quartiles as whiskers', () => {

@@ -65,6 +65,7 @@ export interface HistoricalChartProps<Row extends HistoricalChartRow> {
   initialIndex?: number
   inspectionResetKey?: string
   chartRoleDescription?: string
+  startAtFirstPoint?: boolean
 }
 
 export function HistoricalChart<Row extends HistoricalChartRow>({
@@ -80,6 +81,7 @@ export function HistoricalChart<Row extends HistoricalChartRow>({
   initialIndex = 0,
   inspectionResetKey = '',
   chartRoleDescription,
+  startAtFirstPoint = false,
 }: HistoricalChartProps<Row>) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const descriptionId = useId()
@@ -104,7 +106,12 @@ export function HistoricalChart<Row extends HistoricalChartRow>({
     inspection.resetKey === inspectionResetKey &&
     inspection.visible &&
     rows.length > 0
-  const model = buildHistoricalChartModel(rows, timeFrame)
+  const model = buildHistoricalChartModel(
+    rows,
+    timeFrame,
+    640,
+    startAtFirstPoint,
+  )
   const selectedRow = model.rows[index] ?? null
   const select = useCallback(
     (nextIndex: number, nextVisible = true) =>
@@ -146,7 +153,11 @@ export function HistoricalChart<Row extends HistoricalChartRow>({
         role="img"
       >
         <desc id={descriptionId}>{description}</desc>
-        <HistoricalXAxis rows={rows} timeFrame={timeFrame} />
+        <HistoricalXAxis
+          rows={rows}
+          startAtFirstPoint={startAtFirstPoint}
+          timeFrame={timeFrame}
+        />
         {yAxes.map((axis) => (
           <YAxis
             allowDataOverflow
@@ -183,12 +194,19 @@ export function HistoricalChart<Row extends HistoricalChartRow>({
 function HistoricalXAxis<Row extends HistoricalChartRow>({
   rows,
   timeFrame,
+  startAtFirstPoint,
 }: {
   rows: readonly Row[]
   timeFrame?: HistoricalChartTimeFrame | undefined
+  startAtFirstPoint: boolean
 }) {
   const plot = usePlotArea()
-  const model = buildHistoricalChartModel(rows, timeFrame, plot?.width ?? 576)
+  const model = buildHistoricalChartModel(
+    rows,
+    timeFrame,
+    plot?.width ?? 576,
+    startAtFirstPoint,
+  )
   return (
     <XAxis
       allowDataOverflow
@@ -197,6 +215,10 @@ function HistoricalXAxis<Row extends HistoricalChartRow>({
       domain={model.domain}
       height={50}
       interval={0}
+      padding={{
+        left: startAtFirstPoint && rows.length > 1 ? 12 : 0,
+        right: 0,
+      }}
       label={{
         value: `Local date · ${historicalGroupingLabel(timeFrame).toLowerCase()}`,
         position: 'insideBottom',

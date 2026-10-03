@@ -330,6 +330,13 @@ The first four historical panels have these implemented meanings and controls:
   recalled and paired-review counts remain available. A bucket with either a
   known observed recall or FSRS estimate supports the retained activity window,
   including a measured 0% rate. Series toggles do not change that window.
+  With at least two retained intervals, its calendar X domain begins at the
+  first interval's actual midpoint with 12px of left scale clearance, placing
+  the first marker close to the axis origin. The last interval's end remains
+  the domain's right boundary. A singleton keeps its original interval domain
+  and centered marker. Sparse ticks show true dates within the displayed
+  domain; tooltip and Table retain each full interval. Series toggles do not
+  shift the domain.
 - **Memory Strength** shows median reconstructed post-review FSRS stability in
   days. Discrete Q1–Q3 whiskers show the middle 50% only when the bucket has at
   least four eligible reviews and known quartiles. The duration scale fits all
@@ -359,7 +366,9 @@ The first four historical panels have these implemented meanings and controls:
 
 These four panels use sparse calendar-date axis labels without dropping retained
 chart rows. Bucket marks sit at the midpoint of their actual local-date interval,
-including shortened edge intervals. Labels use MM/DD in the report's as-of
+including shortened edge intervals. Memory Strength, Practice Rhythm, and
+Ratings Mix keep their existing interval-boundary X domains and padding.
+Labels use MM/DD in the report's as-of
 year and MM/DD/YY for other years; cross-year tooltip intervals show both years.
 Pointer or tap position selects the nearest retained original bucket. A native
 focusable inspection button provides the same tooltip through keyboard focus,

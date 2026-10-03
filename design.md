@@ -191,7 +191,7 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   in inspection. Reducing tick density must not reduce observations.
 - Keep axis quantities and units explicit, horizontal grid lines quiet, and
   top/bottom clearance sufficient for boundary markers and low whiskers. Retain
-  supplied serialized domains and independent scales; only Memory Strength's
+  supplied serialized value-axis domains and independent scales; only Memory Strength's
   duration fit changes in this iteration.
 - Inspection starts with the tooltip hidden. Pointer movement and taps select
   the nearest retained original bucket. A native focusable button covering the
@@ -208,6 +208,13 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   preserve shared sample counts, and keep the accessible description aligned
   with both, one, or neither series visible. Either known rate, including 0%,
   supports the activity window; toggling series must not reshape that window.
+  With at least two retained intervals, start Recall's numeric X domain at the
+  first interval's actual midpoint and use 12px of left scale clearance. Keep
+  the last interval's end boundary and all marks' true calendar midpoints.
+  Sparse ticks reflect dates inside this domain; the full interval remains in
+  tooltip and Table. Series switches must not shift the domain. A singleton
+  keeps its original interval domain and centered marker. Memory Strength,
+  Practice Rhythm, and Ratings Mix retain their existing X domains and padding.
 - Memory Strength uses a clear median line and discrete Q1–Q3 whiskers with a
   compact Median/Middle 50% key. Render whiskers only with at least four eligible
   reviews and known quartiles. Fit all finite median/Q1/Q3 extrema by choosing

@@ -3,7 +3,8 @@
 PR: [#184](https://github.com/Hollowvyn/Cognipace/pull/184) (draft).
 
 Current status: implemented, with empty-edge trimming on all four historical
-charts. Human installed-extension smoke remains pending before review or merge.
+charts and 12px of left clearance before the first Recall marker. Human
+installed-extension smoke remains pending before review or merge.
 
 Original implementation checkpoint: saved locally on `codex/analytics-layout-polish`.
 The user approved the chart previews and explicitly requested implementation
@@ -25,6 +26,8 @@ shared across charts and exact-value tables.
   bridges, a target caption above the plot, and compact native series controls.
   Hiding a series removes its curve, markers, and inspected rate together.
   Signed differences use serialized values, with no permanent bottom detail row.
+  With at least two retained intervals, its X domain starts at the first actual
+  midpoint with 12px left clearance; singleton interval bounds stay intact.
 - Memory Strength uses discrete supported Q1–Q3 whiskers and median markers.
   Its fitted duration domain preserves every finite extremum, low-value
   clearance, and an actual two-day minimum. The approved 0.5–44 day example
@@ -349,3 +352,83 @@ checklist now includes Memory's trimmed edges, internal gaps, small cohorts,
 single/all-empty medians, and preserved scale/whiskers. The PR stays draft.
 This is a patch presentation change; reverting the Memory follow-up restores
 the previous display window without a migration or recovery step.
+
+## Follow-Up: Recall Left Clearance
+
+The user requested that the first Recall point sit closer to the left axis.
+The focused design and plan were committed in `30cc46b` before implementation.
+Recall now enables the shared frame/model's default-off `startAtFirstPoint`
+option. With at least two retained intervals, its domain starts at the first
+interval's existing calendar midpoint, ends at the last interval's original
+end, and uses 12px of left scale padding. Source rows, values, midpoint
+coordinates, full tooltip/Table ranges, internal gaps, and series-independent
+window selection are unchanged. A singleton retains its nonzero original
+interval domain and centered marker. Memory, Practice, and Ratings keep their
+default interval-boundary domains and zero scale padding.
+
+Calendar tick generation floors the displayed domain start before selecting
+day-center ticks, so fractional midpoint bounds cannot shift calendar labels.
+For the first 09/09–09/11 interval, Recall's first axis label is 09/10 while
+inspection and Table retain 09/09–09/11. Model regressions cover one-, two-,
+three-, and seven-day first intervals, true tick coordinates, immutable rows,
+and singleton/empty fallback. The component regression verifies exact 12px
+clearance, full first interval, stable series switches, and Table dates.
+
+The initial red run had **5 expected failures / 27 passes**. The first broader
+run exposed two test expectations: the new switch test queried checkbox rather
+than the existing native button, and an older test expected a date outside the
+shorter displayed domain. Both were corrected. The first full check caught
+`exactOptionalPropertyTypes` rejecting explicit undefined XAxis padding; the
+prop now always supplies actual left/right numbers, matching the previous
+zero-padding default outside multi-interval Recall. After that final source
+edit, **6 focused files / 75 tests**, independent lint, full check
+**191 files / 2,002 tests**, production build, formatting, and whitespace
+checks passed. Independent review found no remaining substantive issues.
+Existing jsdom scroll notices and the build's large-chunk warning are nonfatal.
+
+Exact validation commands for this follow-up (repeated runs included above):
+
+```sh
+rtk npm run test -- src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/recall-ratings-views.test.tsx
+rtk npm run test -- src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/charts/historical-chart.test.tsx src/features/analytics/components/recall-ratings-views.test.tsx src/features/analytics/components/memory-practice-views.test.tsx src/features/analytics/components/historical-views.test.tsx src/features/analytics/components/analytics-screen.test.tsx
+rtk npm run lint
+rtk npm run check
+rtk npm run build
+rtk npm run format
+rtk proxy npx prettier --write src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/recall-ratings-views.test.tsx
+rtk proxy npx prettier --write src/features/analytics/components/charts/historical-chart-model.ts src/features/analytics/components/charts/historical-chart.tsx src/features/analytics/components/recall-ratings-views.tsx
+rtk proxy npx prettier --write src/features/analytics/components/recall-ratings-views.test.tsx src/features/analytics/components/historical-views.test.tsx
+rtk proxy npx prettier --write src/features/analytics/components/charts/historical-chart.tsx
+rtk proxy npx prettier --ignore-path /dev/null --write docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/specs/2026-10-02-analytics-recall-approved-design.md
+rtk proxy npx prettier --ignore-path /dev/null --check docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/specs/2026-10-02-analytics-recall-approved-design.md
+rtk proxy git diff --check -- docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/specs/2026-10-02-analytics-recall-approved-design.md
+rtk proxy npx prettier --ignore-path /dev/null --write docs/superpowers/specs/2026-10-02-analytics-layout-polish-design.md docs/superpowers/plans/2026-10-02-analytics-historical-charts.md docs/superpowers/handoffs/2026-10-02-analytics-historical-charts.md
+rtk proxy npx prettier --ignore-path /dev/null --check docs/superpowers/specs/2026-10-02-analytics-layout-polish-design.md docs/superpowers/plans/2026-10-02-analytics-historical-charts.md docs/superpowers/handoffs/2026-10-02-analytics-historical-charts.md
+rtk proxy git diff --check
+```
+
+Browser proof reused the actual production components, styles, and unchanged
+[empty-edge fixture entry](assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt).
+At 1440px dark and 320px light, the Recall SVG matched its 1122px and 270px
+hosts respectively; the first circle's center was exactly 12px from the left
+grid boundary in both. Sparse labels were 09/10, 09/17, and 09/26. Home showed
+the full 09/09–09/11 interval with 5/6 recalled, 83.3% observed, 90% estimated,
+and −6.7 percentage points. Arrow navigation still inspected the unavailable
+09/15–09/17 interval. Hiding/restoring FSRS kept the same clearance and dates.
+At 320px the page client/scroll widths were both 320px. Saved ordinary viewport
+pixels were inspected directly; frozen design assets and earlier proof remain
+unchanged. Temporary viewport overrides, preview tab, and fixture server were
+cleaned up after verification.
+
+- [Recall left clearance, wide dark](assets/2026-10-02-analytics-historical-charts/recall-left-clearance-dark.jpg)
+- [Recall left clearance, narrow light](assets/2026-10-02-analytics-historical-charts/recall-left-clearance-narrow-light.jpg)
+
+Skipped: `rtk npm run zip` because packaging/release behavior is unchanged;
+`rtk npm run db:generate` because no schema changed (`db:check` passed inside
+`check`). Human installed-extension happy-path and sparse-history edge-case
+smoke remain pending before PR review or merge. The updated Dashboard Analytics
+checklist requires wide/narrow first-point clearance, ordinary/active glyphs
+at 0% and 100%, unchanged full interval inspection, stable toggles, and the
+singleton fallback. Agent fixture proof does not replace that human smoke.
+Draft PR #184 remains the delivery target. This is a patch presentation change;
+reverting the Recall follow-up restores prior spacing without a migration.

@@ -302,6 +302,14 @@ The owners in that flow are:
   coordinates, supported markers, and one native inspection control.
   `historical-chart-model.ts` positions immutable serialized rows at their
   calendar midpoint and selects sparse ticks independently of observations.
+  The frame/model's default-off `startAtFirstPoint` option is enabled only for
+  Recall. With at least two retained intervals, it uses the first midpoint as
+  the X domain's start, retains the last interval's end, and gives the first
+  point 12px of left scale clearance. Marks keep their actual calendar
+  midpoints; sparse ticks stay within the displayed domain. A singleton keeps
+  its original interval domain and centered marker. Other charts retain the
+  default interval-boundary domain and padding. Series visibility cannot shift
+  Recall's domain.
   Its shared `trimHistoricalEmptyEdges` helper returns a contiguous slice for
   all four historical views; each view defines its own support predicate.
   Recall accepts either known rate independently of series toggles, Memory
@@ -315,7 +323,7 @@ The owners in that flow are:
   inspection and the shared seven-row `historical-table.tsx` alternative, which
   use the same retained rows as the chart.
   Memory Strength alone uses the fitted duration-scale helper; the other
-  supplied domains remain unchanged. Scoped presentation styles live in
+  supplied value-axis domains remain unchanged. Scoped presentation styles live in
   `src/styles/analytics.css`, enabled by the panel's `historical` option.
 - `src/lib/leetcode/domain/problem-url.ts` owns canonical problem URLs; the
   retention details and fragile-knowledge rows use `createLeetCodeProblemUrl`

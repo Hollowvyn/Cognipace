@@ -115,6 +115,7 @@ export function buildHistoricalChartModel<Row extends HistoricalChartRow>(
   rows: readonly Row[],
   timeFrame?: HistoricalChartTimeFrame,
   width = 640,
+  startAtFirstPoint = false,
 ) {
   const positionedRows: PositionedHistoricalRow<Row>[] = rows.map((row) => {
     const startX = historicalDayOrdinal(row.bucketStart)
@@ -122,9 +123,14 @@ export function buildHistoricalChartModel<Row extends HistoricalChartRow>(
     return { ...row, startX, endX, x: (startX + endX) / 2 }
   })
   const domain: [number, number] = positionedRows.length
-    ? [positionedRows[0]!.startX, positionedRows.at(-1)!.endX]
+    ? [
+        startAtFirstPoint && positionedRows.length > 1
+          ? positionedRows[0]!.x
+          : positionedRows[0]!.startX,
+        positionedRows.at(-1)!.endX,
+      ]
     : [0, 1]
-  const firstDay = domain[0]
+  const firstDay = Math.floor(domain[0])
   const lastDay = domain[1] - 1
   const span = lastDay - firstDay
   const longestLabel = Math.max(

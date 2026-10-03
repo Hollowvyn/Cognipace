@@ -72,6 +72,45 @@ function row(start: string, end = start) {
 }
 
 describe('historical calendar chart model', () => {
+  it.each([1, 2, 3, 7])(
+    'can start at the first midpoint for a %i-day interval without moving points or calendar ticks',
+    (intervalDays) => {
+      const original = [
+        row('2026-09-01', `2026-09-${String(intervalDays).padStart(2, '0')}`),
+        row('2026-09-08', '2026-09-14'),
+      ]
+      const full = buildHistoricalChartModel(original, timeFrame, 640)
+      const fitted = buildHistoricalChartModel(original, timeFrame, 640, true)
+      expect(fitted.domain).toEqual([full.rows[0]!.x, full.domain[1]])
+      expect(fitted.rows).toEqual(full.rows)
+      expect(fitted.ticks.length).toBeGreaterThan(0)
+      for (const tick of fitted.ticks) {
+        expect(tick).toBeGreaterThanOrEqual(fitted.domain[0])
+        expect(tick).toBeLessThanOrEqual(fitted.domain[1])
+        expect(tick % 1).toBe(0.5)
+      }
+      expect(fitted.formatTick(fitted.ticks[0]!)).toBe(
+        formatHistoricalDate(
+          `2026-09-${String(1 + Math.floor(intervalDays / 2)).padStart(2, '0')}`,
+          timeFrame,
+        ),
+      )
+      expect(original[0]).not.toHaveProperty('x')
+    },
+  )
+
+  it('keeps the actual singleton interval and empty fallback when starting at the first point is requested', () => {
+    for (const original of [[], [row('2026-09-09', '2026-09-11')]]) {
+      expect(buildHistoricalChartModel(original, timeFrame, 210, true)).toEqual(
+        expect.objectContaining({
+          domain: buildHistoricalChartModel(original, timeFrame, 210).domain,
+          ticks: buildHistoricalChartModel(original, timeFrame, 210).ticks,
+          rows: buildHistoricalChartModel(original, timeFrame, 210).rows,
+        }),
+      )
+    }
+  })
+
   it('distinguishes a complete shortened edge from an in-progress interval', () => {
     const weekly = { ...timeFrame, requestedDays: 90 }
     expect(

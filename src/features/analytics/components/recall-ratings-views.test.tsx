@@ -115,6 +115,40 @@ beforeEach(() => {
 })
 
 describe('Recall approved historical presentation', () => {
+  it('starts the first Recall point 12px from the left axis while keeping its full interval and stable switches', async () => {
+    const user = userEvent.setup()
+    render(
+      <ObservedRecallVsFsrsView
+        timeFrame={timeFrame}
+        view={recallView([recallRow(0), recallRow(1), recallRow(2)])}
+      />,
+    )
+    const plotLeft = Number(
+      screen
+        .getByTestId('historical-chart-grid')
+        .querySelector('line')!
+        .getAttribute('x1'),
+    )
+    const firstX = () =>
+      Number(
+        screen
+          .getByTestId('observed-recall-marker-0')
+          .querySelector('circle')!
+          .getAttribute('cx'),
+      )
+    expect(firstX() - plotLeft).toBeCloseTo(12)
+    expect(screen.getByText('09/10')).toBeVisible()
+    const inspect = screen.getByRole('button', {
+      name: 'Inspect Observed Recall vs FSRS Estimate chart',
+    })
+    fireEvent.keyDown(inspect, { key: 'Home' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/09–09/11')
+    await user.click(screen.getByRole('button', { name: 'FSRS estimate' }))
+    expect(firstX() - plotLeft).toBeCloseTo(12)
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(screen.getByRole('rowheader', { name: '09/09–09/11' })).toBeVisible()
+  })
+
   it('distinguishes measured shapes and missing bridges without unknown markers', () => {
     render(
       <ObservedRecallVsFsrsView

@@ -703,6 +703,15 @@ the fixture case.
 7. In Observed Recall vs FSRS Estimate, confirm a solid observed line with
    circle markers, an opaque short-dashed estimate with diamonds, visibly longer
    missing-evidence bridges, and a configured target caption above the data.
+   With at least two retained intervals, verify the first marker sits 12px from
+   the plot's left axis at both wide and narrow widths. The domain starts at
+   that interval's actual midpoint and still ends at the last interval's end;
+   ticks must represent true dates within this domain. For example, a first
+   09/09–09/11 interval starts the domain at 09/10, while its tooltip and Table
+   still show 09/09–09/11. Inspect a first point at 0% or 100% and confirm its
+   ordinary and active circle/diamond remain fully visible. A singleton keeps
+   its original interval domain and centered marker. Memory Strength, Practice
+   Rhythm, and Ratings Mix retain their existing X domains and padding.
    Compare tooltip and Table recalled/paired counts, rate values, signed
    observed-minus-estimate difference, evidence, and reconstruction provenance.
    The difference must reflect the supplied value rather than subtraction of
@@ -711,7 +720,8 @@ the fixture case.
    curve, markers, and tooltip rate hide together; the signed difference appears
    only with both series visible. Shared sample counts and the target remain,
    and the accessible description matches the visible series. The retained
-   window and its dates must remain fixed while toggling, even when an edge
+   window, X domain, first-point clearance, and dates must remain fixed while
+   toggling, even when an edge
    bucket has only one known rate. A measured 0% edge remains supported.
 9. In Memory Strength, inspect a bucket with at least four eligible reviews and
    one with fewer than four. Only the supported bucket gets discrete Q1–Q3
