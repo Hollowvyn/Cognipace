@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { defaultAnalyticsTargets } from '@/features/settings/domain'
 
 import {
   normalizeFsrsSchedulingOptions,
@@ -73,6 +74,262 @@ function event(
 }
 
 describe('buildHistoricalAnalyticsViews', () => {
+  it('retains invalid-only outer bucket exclusions and uses local-calendar partial intervals', () => {
+    const asOf = new Date('2026-03-08T07:30:00Z')
+    const localOptions = optionsForComparison(asOf, 'America/New_York')
+    const firstBucket = localOptions.buckets[0]!
+    const firstOutcomes = buildHistoricalAnalyticsViews(
+      [
+        event({
+          id: 'invalid-first',
+          problemSlug: 'invalid',
+          rating: 'invalid',
+          reviewedAt: new Date(firstBucket.start.getTime() + 1000),
+        }),
+        event({
+          id: 'local-before-midnight',
+          problemSlug: 'before',
+          rating: 'again',
+          reviewedAt: new Date('2026-03-08T04:30:00Z'),
+        }),
+        event({
+          id: 'local-partial',
+          problemSlug: 'partial',
+          rating: 'good',
+          reviewedAt: asOf,
+        }),
+        event({
+          id: 'future',
+          problemSlug: 'future',
+          rating: 'easy',
+          reviewedAt: new Date(asOf.getTime() + 1000),
+        }),
+      ],
+      localOptions,
+    ).firstAttemptOutcomes
+    expect(firstOutcomes.rows[0]).toMatchObject({
+      excludedInvalidRatings: 1,
+      validFirstAttempts: 0,
+      firstAttemptSuccess: null,
+      firstAttemptGoodEasy: null,
+      evidence: 'not-measured',
+    })
+    expect(firstOutcomes.rows.at(-2)).toMatchObject({
+      bucketStart: '2026-03-07',
+      bucketEnd: '2026-03-07',
+      validFirstAttempts: 1,
+      firstAttemptSuccess: 0,
+      firstAttemptGoodEasy: 0,
+      isPartial: false,
+    })
+    expect(firstOutcomes.rows.at(-1)).toMatchObject({
+      bucketStart: '2026-03-08',
+      bucketEnd: '2026-03-08',
+      validFirstAttempts: 1,
+      firstAttemptSuccess: 1,
+      firstAttemptGoodEasy: 1,
+      isPartial: true,
+    })
+    expect(firstOutcomes.totals).toMatchObject({
+      recordedFirstAttempts: 3,
+      excludedInvalidRatings: 1,
+      validFirstAttempts: 2,
+      firstAttemptSuccess: 0.5,
+      firstAttemptGoodEasy: 0.5,
+    })
+  })
+  it('selects raw first records before rating and report filters and weights the valid denominators across buckets', () => {
+    const secondDay = new Date('2026-08-02T12:00:00Z')
+    const firstOutcomes = buildHistoricalAnalyticsViews(
+      [
+        ...['again', 'invalid', 'hard', 'good', 'good'].map((rating, index) =>
+          event({
+            id: `first-${index}`,
+            problemSlug: `problem-${index}`,
+            rating,
+            reviewedAt: index < 2 ? options.start : secondDay,
+          }),
+        ),
+        event({
+          id: 'invalid-retry',
+          problemSlug: 'problem-1',
+          cardId: 'another-mode',
+          rating: 'easy',
+          reviewedAt: secondDay,
+        }),
+        event({ id: 'c-later', problemSlug: 'c', rating: 'good' }),
+        event({
+          id: 'c-earlier',
+          problemSlug: 'c',
+          rating: 'hard',
+          reviewedAt: new Date('2026-07-31T12:00:00Z'),
+        }),
+      ],
+      options,
+    ).firstAttemptOutcomes
+    expect(firstOutcomes.rows).toMatchObject([
+      {
+        recordedFirstAttempts: 2,
+        excludedInvalidRatings: 1,
+        validFirstAttempts: 1,
+        again: 1,
+        hardGoodEasy: 0,
+        goodEasy: 0,
+        firstAttemptSuccess: 0,
+        firstAttemptGoodEasy: 0,
+        evidence: 'measured',
+      },
+      {
+        recordedFirstAttempts: 3,
+        excludedInvalidRatings: 0,
+        validFirstAttempts: 3,
+        hardGoodEasy: 3,
+        goodEasy: 2,
+        firstAttemptSuccess: 1,
+        firstAttemptGoodEasy: 2 / 3,
+        evidence: 'measured',
+      },
+    ])
+    expect(firstOutcomes.totals).toMatchObject({
+      again: 1,
+      hard: 1,
+      good: 2,
+      easy: 0,
+      recordedFirstAttempts: 5,
+      excludedInvalidRatings: 1,
+      validFirstAttempts: 4,
+      hardGoodEasy: 3,
+      goodEasy: 2,
+      firstAttemptSuccess: 0.75,
+      firstAttemptGoodEasy: 0.5,
+    })
+  })
+
+  it('recomputes first outcomes from corrections, deleted initials, and restored chronology', () => {
+    const first = event({ id: 'first', rating: 'again' })
+    const later = event({
+      id: 'later',
+      rating: 'easy',
+      reviewedAt: new Date('2026-08-02T12:00:00Z'),
+    })
+    for (const [history, success, goodEasy] of [
+      [[later, { ...first, rating: 'hard' }], 1, 0],
+      [[later], 1, 1],
+      [[later, first], 0, 0],
+    ] as const) {
+      expect(
+        buildHistoricalAnalyticsViews(history, options).firstAttemptOutcomes
+          .totals,
+      ).toMatchObject({
+        firstAttemptSuccess: success,
+        firstAttemptGoodEasy: goodEasy,
+      })
+    }
+  })
+
+  it('emits no repeat pair from initial-only card history', () => {
+    const views = buildHistoricalAnalyticsViews(
+      [event(), event({ id: 'another', cardId: 'another' })],
+      options,
+    )
+    expect(
+      views.observedRecallVsFsrs.rows.every(
+        (row) =>
+          row.pairedReviews === 0 &&
+          row.observedRecall === null &&
+          row.fsrsEstimate === null,
+      ),
+    ).toBe(true)
+    expect(views.memoryStrength.rows[0]?.eligibleReviews).toBe(2)
+    expect(views.practiceRhythm.rows[0]?.validRatings).toBe(2)
+  })
+
+  it('uses a pre-range initial to pair the following repeat without counting the initial', () => {
+    const initial = event({
+      id: 'initial',
+      reviewedAt: new Date('2026-07-31T12:00:00Z'),
+    })
+    const repeat = event({ id: 'repeat', rating: 'again' })
+    const views = buildHistoricalAnalyticsViews([repeat, initial], options)
+    expect(views.observedRecallVsFsrs.rows[0]).toMatchObject({
+      pairedReviews: 1,
+      recalledCount: 0,
+      observedRecall: 0,
+      evidence: 'measured',
+    })
+    expect(views.observedRecallVsFsrs.rows[0]?.fsrsEstimate).toBeGreaterThan(0)
+  })
+
+  it.each([0, 1])('fits both personal percentage targets at %s', (target) => {
+    const views = buildHistoricalAnalyticsViews([event()], {
+      ...options,
+      analyticsTargets: {
+        ...defaultAnalyticsTargets,
+        targetRecall: target,
+        targetReviewSuccess: target,
+      },
+    })
+
+    expect(views.observedRecallVsFsrs.targetRecall).toBe(target)
+    expect(views.practiceRhythm.targetReviewSuccess).toBe(target)
+    for (const scale of [
+      views.observedRecallVsFsrs.scale,
+      views.practiceRhythm.percentageScale,
+    ]) {
+      expect(scale.domain[0]).toBeLessThanOrEqual(target)
+      expect(scale.domain[1]).toBeGreaterThanOrEqual(target)
+      expect(scale.ticks).toContain(target)
+    }
+  })
+
+  it('keeps personal targets independent of FSRS retention and preserves observations and unrelated views when all four goals change', () => {
+    const reviews = [
+      event(),
+      event({ id: 'again', rating: 'again' }),
+      event({ id: 'hard', rating: 'hard' }),
+    ]
+    const retentionOptions = {
+      ...options,
+      fsrsOptions: normalizeFsrsSchedulingOptions({ targetRetention: 0.8 }),
+    }
+    const before = buildHistoricalAnalyticsViews(reviews, retentionOptions)
+    expect(before.observedRecallVsFsrs.targetRecall).toBe(0.9)
+    expect(before.practiceRhythm.targetReviewSuccess).toBe(0.9)
+    expect(before.retentionMap.targetRetention).toBe(0.8)
+    expect(before.observedRecallVsFsrs).not.toHaveProperty('targetRetention')
+    const after = buildHistoricalAnalyticsViews(reviews, {
+      ...retentionOptions,
+      analyticsTargets: {
+        ...defaultAnalyticsTargets,
+        targetRecall: 0.1,
+        targetReviewSuccess: 1,
+        targetFirstAttemptSuccess: 0,
+        targetFirstAttemptGoodEasy: 1,
+      },
+    })
+
+    expect(after).toEqual({
+      ...before,
+      observedRecallVsFsrs: {
+        ...before.observedRecallVsFsrs,
+        targetRecall: 0.1,
+        scale: after.observedRecallVsFsrs.scale,
+      },
+      practiceRhythm: {
+        ...before.practiceRhythm,
+        targetReviewSuccess: 1,
+        percentageScale: after.practiceRhythm.percentageScale,
+      },
+      firstAttemptOutcomes: {
+        ...before.firstAttemptOutcomes,
+        targetFirstAttemptSuccess: 0,
+        targetFirstAttemptGoodEasy: 1,
+        scale: after.firstAttemptOutcomes.scale,
+      },
+    })
+    expect(after.firstAttemptOutcomes.scale.domain).toEqual([0, 1])
+  })
+
   it('pairs rating-derived recalled outcomes with the FSRS estimate from the exact reviews', () => {
     const views = buildHistoricalAnalyticsViews(
       [
@@ -87,9 +344,9 @@ describe('buildHistoricalAnalyticsViews', () => {
     )
 
     expect(views.observedRecallVsFsrs.rows[0]).toMatchObject({
-      recalledCount: 1,
-      pairedReviews: 2,
-      observedRecall: 0.5,
+      recalledCount: 0,
+      pairedReviews: 1,
+      observedRecall: 0,
       provenance: 'reconstructed',
     })
     expect(views.observedRecallVsFsrs.rows[0]?.fsrsEstimate).not.toBeNull()

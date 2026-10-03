@@ -1,5 +1,7 @@
-import { Line } from 'recharts'
-import type { LineDrawShapeProps } from 'recharts'
+import { useState } from 'react'
+import { createPortal } from 'react-dom'
+import { DefaultZIndexes, Line, ZIndexLayer } from 'recharts'
+import type { DotItemDotProps, LineDrawShapeProps } from 'recharts'
 
 import { classifyLineContinuity } from '../../domain/chart-buckets'
 import { DASHED_LINE_EVIDENCE_LABEL } from './chart-shared'
@@ -17,6 +19,11 @@ export interface LineSegmentsProps<T extends Record<string, unknown>> {
   dataKey: keyof T & string
   seriesKey: string
   showMeasuredDots?: boolean
+  markerShape?: 'circle' | 'diamond'
+  markerFill?: string
+  activeIndex?: number | null
+  bridgeDasharray?: string
+  bridgeStrokeWidth?: number
   stroke: string
   strokeDasharray?: string
   strokeWidth?: number
@@ -130,11 +137,78 @@ function createBridgeShape(testId: string) {
   }
 }
 
+function createMeasuredMarker({
+  activeIndex,
+  fill,
+  shape,
+  stroke,
+  testId,
+  target,
+}: {
+  activeIndex: number | null | undefined
+  fill: string
+  shape: 'circle' | 'diamond' | undefined
+  stroke: string
+  testId: string
+  target: SVGGElement | null
+}) {
+  return function MeasuredMarker({ cx, cy, index, value }: DotItemDotProps) {
+    if (getNumericValue(value) === null || cx === undefined || cy === undefined)
+      return null
+    const active = index === activeIndex
+    const radius = active ? 5 : shape === 'circle' ? 4 : 3.5
+    const markerStrokeWidth =
+      shape === 'diamond'
+        ? active
+          ? 2
+          : 1.5
+        : active
+          ? 3
+          : shape === 'circle'
+            ? 2.5
+            : 2
+    return target
+      ? createPortal(
+          <g
+            aria-hidden="true"
+            data-active-marker={active}
+            data-marker-shape={shape ?? 'circle'}
+            data-testid={`${testId}-marker-${index}`}
+          >
+            {shape === 'diamond' ? (
+              <path
+                d={`M${cx},${cy - radius}L${cx + radius},${cy}L${cx},${cy + radius}L${cx - radius},${cy}Z`}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={markerStrokeWidth}
+              />
+            ) : (
+              <circle
+                cx={cx}
+                cy={cy}
+                fill={fill}
+                r={radius}
+                stroke={stroke}
+                strokeWidth={markerStrokeWidth}
+              />
+            )}
+          </g>,
+          target,
+        )
+      : null
+  }
+}
+
 export function LineSegments<T extends Record<string, unknown>>({
   data,
   dataKey,
   seriesKey,
   showMeasuredDots = false,
+  markerShape,
+  markerFill,
+  activeIndex,
+  bridgeDasharray = '5 5',
+  bridgeStrokeWidth,
   stroke,
   strokeDasharray,
   strokeWidth = 2.5,
@@ -142,8 +216,23 @@ export function LineSegments<T extends Record<string, unknown>>({
   type = 'monotone',
   yAxisId,
 }: LineSegmentsProps<T>) {
+  const [markerLayer, setMarkerLayer] = useState<SVGGElement | null>(null)
   const segments = buildLineSegments(data, dataKey)
   const semanticTooltipSourceTestId = `${testId}-semantic-tooltip-source`
+  const customMarkers =
+    markerShape !== undefined ||
+    markerFill !== undefined ||
+    activeIndex !== undefined
+  const measuredMarker = customMarkers
+    ? createMeasuredMarker({
+        activeIndex,
+        fill: markerFill ?? 'var(--color-card)',
+        shape: markerShape,
+        stroke,
+        testId,
+        target: markerLayer,
+      })
+    : { fill: 'var(--color-card)', r: 3.5, stroke, strokeWidth: 2 }
 
   if (segments.length === 0) return null
 
@@ -157,11 +246,7 @@ export function LineSegments<T extends Record<string, unknown>>({
           showMeasuredDots ? `${testId}-markers` : semanticTooltipSourceTestId
         }
         dataKey={dataKey as never}
-        dot={
-          showMeasuredDots
-            ? { fill: 'var(--color-card)', r: 3.5, stroke, strokeWidth: 2 }
-            : false
-        }
+        dot={showMeasuredDots ? measuredMarker : false}
         isAnimationActive={false}
         legendType="none"
         name={seriesKey}
@@ -172,13 +257,21 @@ export function LineSegments<T extends Record<string, unknown>>({
         {...(yAxisId === undefined ? {} : { yAxisId })}
       />
       {segments.map((segment) => {
+        // Recharts draws a singleton dot even when dot={false}. The semantic
+        // marker line already owns this point in the optional marker mode.
+        if (
+          showMeasuredDots &&
+          customMarkers &&
+          segment.fromIndex === segment.toIndex
+        )
+          return null
         const segmentTestId =
           segment.fromIndex === segment.toIndex
             ? `${testId}-single-${segment.fromIndex}`
             : `${testId}-${segment.kind}-${segment.fromIndex}-${segment.toIndex}`
 
         const segmentStrokeDasharray =
-          segment.kind === 'bridge' ? '5 5' : strokeDasharray
+          segment.kind === 'bridge' ? bridgeDasharray : strokeDasharray
 
         return (
           <Line
@@ -197,7 +290,8 @@ export function LineSegments<T extends Record<string, unknown>>({
                 string as never
             }
             dot={
-              segment.fromIndex === segment.toIndex
+              segment.fromIndex === segment.toIndex &&
+              !(showMeasuredDots && customMarkers)
                 ? { r: 4, stroke, strokeWidth: 1 }
                 : false
             }
@@ -214,13 +308,26 @@ export function LineSegments<T extends Record<string, unknown>>({
                   shape: createBridgeShape(segmentTestId),
                 }
               : {})}
-            strokeWidth={strokeWidth}
+            strokeWidth={
+              segment.kind === 'bridge'
+                ? (bridgeStrokeWidth ?? strokeWidth)
+                : strokeWidth
+            }
             tooltipType="none"
             type={type}
             {...(yAxisId === undefined ? {} : { yAxisId })}
           />
         )
       })}
+      {showMeasuredDots && customMarkers ? (
+        <ZIndexLayer zIndex={DefaultZIndexes.scatter}>
+          <g
+            aria-hidden="true"
+            data-testid={`${testId}-marker-layer`}
+            ref={setMarkerLayer}
+          />
+        </ZIndexLayer>
+      ) : null}
     </>
   )
 }

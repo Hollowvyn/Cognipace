@@ -727,61 +727,302 @@ and required before review or merge:
 
 ### Dashboard Analytics
 
-1. Open the dashboard.
-2. Navigate to Analytics.
-3. Test 14, 30, and 90 days from the range control. Confirm their historical
-   bucket labels are respectively daily, three-day, and weekly; the selected
-   range stays selected unless you explicitly choose another one.
-4. With enough eligible local history, confirm the historical chart story
-   renders. If older leading buckets have no evidence, confirm the effective-
-   window copy explains the usable part of the selected range rather than
-   drawing a fabricated value from the range start.
-5. For a range or metric that is not ready, confirm the compact warning
-   identifies the evidence shortfall, reports its progress in buckets/
-   assessments where applicable, and offers a shorter ready range only as an
-   explicit link. The page must not silently switch ranges, and any available
-   chart points must remain visible.
-6. Check a line chart with missing-evidence gaps. It should use a dashed bridge
-   from one measured point to the next valid point; absent buckets remain
-   unknown and have no fabricated marker or tooltip value. A one-point chart
-   remains visible with “Not enough data for a trend yet.”
-7. In Practice Rhythm, confirm every bucket after the first supported practice
-   bucket remains in the chart. A week with no reviews has zero review volume,
-   while its correctness line remains unknown unless correctness evidence
-   exists.
-8. Confirm Recall Quality, Practice Rhythm, Ratings Mix, Where to Focus, and
-   Memory Strength communicate their defined data meanings. Practice Rhythm is
-   review volume plus observed correctness; it must not claim causation.
-9. Confirm Recent Overdue Backlog has a watch zone at five problems: values at
-   or below five render in the healthy green treatment, values above five use
-   the attention yellow treatment, and its tooltip reports the bucket's
-   threshold status. Unknown/reconstructable history must not be made up.
-10. Confirm Upcoming Review Load always shows its fixed next 14 calendar days,
+Run this flow against the locally built extension, with separate disposable
+ready-history and sparse-history datasets. Ready history must contain enough
+eligible samples to show all four historical cards and supported Memory
+Strength quartiles. Sparse history must include empty beginning and ending
+buckets, internal missing buckets, measured 0% rates, one measured point, no
+valid ratings in a period, count-only intervals, known zero counts, and mixed
+practice/rating readiness. Include a
+current partial bucket and a cross-year report date when preparing the test
+data. If a cross-year report date cannot be exercised in the local extension at
+test time, record that exact smoke case as pending; fixture proof covers only
+the fixture case.
+
+The merged Practice Rhythm flow, including happy-path and edge-case realtime
+smoke, remains required and pending before PR review or merge. The human engineer
+must use the installed rebuilt extension and attach screenshots or a recording;
+production-component fixture images are separate proof. Record any interval-union
+or cross-year edge that cannot be exercised in the installed extension as an
+exact pending case.
+
+1. Run `npm run build`, load `dist/chrome-mv3` in Chrome, and click CogniPace's
+   reload button in `chrome://extensions` after the build. Reopen the dashboard
+   and navigate to Analytics so the smoke uses the rebuilt local extension and
+   its runtime, rather than a fixture page or an already-open stale dashboard.
+2. In both datasets, choose 14, 30, and 90 days. Confirm daily, three-day, and
+   weekly grouping respectively, and verify the selected range remains selected
+   until explicitly changed. Available charts remain visible under a readiness
+   warning; a suggested shorter ready range changes selection only when its
+   link is activated.
+3. Check the report's selected timezone and as-of context, sparse calendar-date
+   ticks, and full bucket intervals in inspection. Marks use each supplied
+   interval's midpoint, including shortened edge intervals. Tick labels use
+   MM/DD in the report's as-of year and /YY for another year; a cross-year
+   tooltip interval shows both years. The current partial interval is marked
+   in progress, with no future observations.
+   All four historical charts must remove only unsupported beginning and ending
+   buckets from Chart, Table, and inspection while retaining all internal gaps.
+   Recall's window starts/ends with either known rate; Memory's starts/ends with
+   a finite median, including zero or sub-day values; Practice's starts/ends
+   with positive completed reviews, positive valid-rating counts in either
+   source view, or a finite supplied success rate including 0%. Confirm the selected range,
+   period totals, readiness, serialized scales, and report time remain
+   unchanged.
+4. In each chart, move the pointer across the plot and tap near its left,
+   middle, and right buckets. The nearest retained original bucket must be
+   inspected, including an internal empty bucket. Confirm no permanent bottom
+   detail row is added and the tooltip remains hidden before interaction.
+5. Tab to each chart's native inspection button. Check visible focus,
+   Left/Right arrows, Home/End, Enter/Space, and Escape. Keyboard inspection
+   exposes the same exact bucket values as pointer/tap inspection; Escape and
+   blur hide the tooltip. A quiet selected guide must not create a measured
+   marker or value for unknown evidence.
+6. Inspect the first and last measured values and extremes near axis bounds.
+   Circle/diamond markers and low whiskers must remain visible with sufficient
+   clearance. Missing-evidence bridges connect measured neighbors only; an
+   unknown bucket keeps its unavailable value. A single point remains visible
+   with “Not enough data for a trend yet.”
+7. In Recall vs FSRS Estimate, confirm repeat-only copy, a solid observed line with
+   circle markers, an opaque short-dashed estimate with diamonds, visibly longer
+   missing-evidence bridges, and the saved Target Recall button above the data.
+   With at least two retained intervals, verify the first marker sits 12px from
+   the plot's left axis at both wide and narrow widths. The domain starts at
+   that interval's actual midpoint and still ends at the last interval's end;
+   ticks must represent true dates within this domain. For example, a first
+   09/09–09/11 interval starts the domain at 09/10, while its tooltip and Table
+   still show 09/09–09/11. Inspect a first point at 0% or 100% and confirm its
+   ordinary and active circle/diamond remain fully visible. A singleton keeps
+   its original interval domain and centered marker. Memory Strength and Practice
+   Rhythm retain their interval-boundary X domains and padding.
+   Compare tooltip and Table recalled/paired counts, rate values, signed
+   observed-minus-estimate difference, evidence, and reconstruction provenance.
+   The difference must reflect the supplied value rather than subtraction of
+   rounded displayed rates.
+8. Toggle each Recall series with pointer and keyboard, then hide both. The
+   curve, markers, and tooltip rate hide together; the signed difference appears
+   only with both series visible. Shared sample counts and the target remain,
+   and the accessible description matches the visible series. The retained
+   window, X domain, first-point clearance, and dates must remain fixed while
+   toggling, even when an edge
+   bucket has only one known rate. A measured 0% edge remains supported.
+9. In Memory Strength, inspect a bucket with at least four eligible reviews and
+   one with fewer than four. Only the supported bucket gets discrete Q1–Q3
+   whiskers; known medians remain available in both. Confirm the Median/Middle
+   50% key, reconstructed stability in days, eligible count, median change, and
+   unavailable quartiles agree between tooltip and Table. A finite median must
+   retain an edge bucket even without quartiles or four eligible reviews.
+10. Check Memory Strength with sub-day, equal/single, and widely spread values.
+    Its fitted duration domain must contain every finite median/Q1/Q3 extremum,
+    leave an actual minimum two-day window, and keep low ranges and markers
+    readable. No connected shaded range may imply quartiles across an
+    unsupported bucket. Empty edge buckets must be absent, while internal
+    unavailable buckets remain inspectable. A single finite median retains its
+    original interval and single-point guidance; wholly unavailable medians
+    show the explicit empty state.
+11. Confirm one full-width Practice Rhythm card combines exact supplied shares
+    in bottom-to-top Easy, Good, Hard, Again order with a thin, straight neutral
+    completed-review line and measured markers. The left axis is fixed at
+    0–100% and labeled Rating share (%); the supplied independent right axis is
+    labeled Reviews. The Good + Easy upper boundary expresses Review Success,
+    with no separate success curve. The saved Target Review Success reference
+    uses the left percentage axis; its compact editor remains above the plot in
+    empty, sparse, Chart, and Table states. Test goals at 0% and 100% and confirm
+    they do not change rating geometry, count scale, rows, or dates. Completed
+    reviews must remain independently supplied rather than derived from valid
+    ratings. The visible copy explains association rather than causation, and
+    that a count-line crossing with the target has no percentage meaning.
+12. Inspect the merged interval union, including count-only and rating-only
+    intervals where supplied. Rows must match by ID plus exact start/end dates,
+    preserving an absent counterpart as unavailable rather than borrowing a
+    neighboring row or substituting zero. Chart, inspection, and Table trim only
+    unsupported outer intervals; positive completed-review or valid-rating
+    counts and finite supplied success including 0% retain an edge. Known zero
+    counts remain measured observations in the retained window, while missing
+    counts have no measured marker. Every internal gap remains inspectable.
+    Unavailable composition uses full-height neutral gray diagonal hatching; a
+    populated bucket's zero category stays zero-height. Only Easy, Good, Hard,
+    and Again are rating categories.
+13. Compare the shared tooltip and Table with exact stacked geometry. Both must
+    retain completed reviews, each rating count and precise share, Good + Easy
+    numerator/valid-rating denominator, supplied success, target, each metric's
+    evidence, full interval, timezone/as-of, and complete/in-progress context.
+    Centered whole-percent labels stay at 12px only when they fit without count
+    line or target collisions; rounded totals of 99% or 101% must not alter
+    shares. Toggle Reviews with pointer and keyboard: the count line, markers,
+    right axis, and tooltip count hide/show together, and accessible copy follows
+    that state. Dates, retained rows, target, Table counts, and category geometry
+    remain fixed. Confirm distinct practice/rating readiness warnings, the
+    selected-period Hard + Again summary, evidence-gated prior-period comparison,
+    and wholly unsupported-period empty state remain truthful.
+14. Switch each of the four historical panels between Chart and Table. When more than
+    seven rows exist, confirm seven rows per page, Previous/Next boundary
+    states, and page reset after a range change. Inspect full interval,
+    complete/in-progress state, grouping, report time, and evidence context
+    across both views. Confirm Chart and Table use the same retained activity
+    window, and wholly unsupported periods show their explicit empty state.
+    Practice's Table retains all supplied counts/shares and unavailable states
+    when Reviews is hidden in Chart; its target control remains reachable.
+    Change range while a tooltip is visible to check that selection resets or
+    clamps to the new rows without stale values.
+15. Repeat ready and sparse paths at wide and 320px dashboard widths in both
+    light and dark themes. Check axis/key contrast, sparse ticks, control
+    reachability, tap coordinates, keyboard focus, table scrolling, and
+    the First Outcomes/Recall responsive pair, full-width Practice, and
+    Memory/Topic stacking. There must
+    be no horizontal document overflow. Include neighboring panels with different
+    readiness messages; plots and controls must retain usable alignment without
+    overlap or clipped labels.
+16. Reload the built extension again and reopen Analytics. Confirm the local
+    data and expected values remain available, and repeat a range change and
+    keyboard inspection through the extension runtime.
+17. Confirm Recent Overdue Backlog still has a watch zone at five problems:
+    values at or below five use healthy green, values above five use attention
+    yellow, and its tooltip reports threshold status. Unknown/reconstructable
+    history must not be made up.
+18. Confirm Upcoming Review Load still shows its fixed next 14 calendar days,
     including when the selected historical range is unready.
-11. In Retention Health, hover and keyboard-focus a point to inspect the
-    preview, pin its details, tab through the dialog controls, press Escape,
-    and dismiss it by clicking outside. Confirm its LeetCode action opens the
-    matching canonical problem in a new tab.
-12. In Fragile Knowledge, confirm exactly five rows appear per page when there
-    are more than five rows, Previous/Next and the live row range update
-    correctly, and every visible problem link opens its canonical LeetCode
-    problem in a new tab.
-13. Exercise sparse and unknown history: verify readiness context rather than
-    invented trends, while Recall Quality, Practice Rhythm, Memory Strength,
-    Recent Overdue Backlog, Retention Health, Fragile Knowledge, and Upcoming
-    Review Load remain usable. Repeat the happy path and sparse path at a narrow dashboard
-    width; charts, range controls, dialogs, table scrolling, and keyboard focus
-    must remain usable.
+19. In Retention Map, hover and keyboard-focus a point to inspect the preview,
+    pin its details, tab through dialog controls, press Escape, and dismiss by
+    clicking outside. Its LeetCode action opens the matching canonical problem
+    in a new tab.
+20. In Memory Signals by Problem, confirm exactly five rows per page when more
+    than five exist, Previous/Next and the live row range update correctly, and
+    visible problem links open canonical LeetCode problems in new tabs. Topic
+    Performance and the current-state/workload panels retain their existing
+    treatment while the four historical cards change.
 
 Expected: Analytics loads through the extension runtime without the failed-load
 state, reflects only local practice data, and tells a truthful chart story
 without filling missing evidence.
 
-For this dashboard behavior change, the human engineer must attach screenshot
-or screen-recording proof of both the ready-history happy path and the sparse or
-unready edge path before PR review or merge. This is required by
-`docs/agent-governance.md`; automated checks do not replace real-time extension
-smoke testing.
+#### First Attempt Outcomes and Repeat Recall
+
+The implementation has automated and production-component fixture validation.
+These cases require human realtime smoke in the rebuilt installed extension
+with disposable data and screenshot or recording proof before PR review or
+merge. Record any case that cannot be induced as pending.
+
+- [ ] **First-record selection:** record Again, then Good on one problem; its
+      first-outcome result stays Again. Include Hard and Good first records on
+      two other problems: first success is 2/3 and Good + Easy is 1/3. Include
+      duplicate cards/modes, shuffled history, and tied times to check the
+      earliest raw `(reviewedAt, id)` selection across a problem. An invalid
+      earliest rating excludes that problem and never promotes its later Good.
+      An initial before the selected period prevents a recent repeat from being
+      counted as new. Valid ratings with null/conflicting correctness or missing
+      FSRS logs remain eligible.
+- [ ] **Repeat pairing:** with initial-only history, New Problem Success is
+      available and Recall is empty. Add a recent repeat after a pre-range
+      initial; both Recall curves, Table counts, and readiness must use the same
+      repeat pair and its prior replayed memory state. A genuine zero repeat
+      estimate stays measured. Many first records cannot make repeat Recall
+      ready. Memory, Practice, and Topic populations retain their meanings.
+- [ ] **First graph evidence:** compare mint Hard + Good + Easy circles and
+      thinner solid blue Good + Easy diamonds against the same valid-first
+      denominator. All Again is measured zero; no valid first records is
+      unavailable. Check weighted period totals and full-period invalid-first
+      exclusions, including invalid-only outer buckets trimmed from display.
+      Chart/Table/inspection keep internal gaps, exact rating counts, both rates
+      and goals, evidence, full intervals, partial status, timezone/as-of, and
+      retained-history calculation details. There is no mock difficulty row.
+- [ ] **Independent goals:** both new goals default to 90% even in older
+      two-goal settings. Save either above or below the other, including 29%,
+      0%, and 100%, without changing the old pair or measured data. Equal values
+      draw one neutral shared line; both editors and tooltip values remain.
+      Test invalid fractional/out-of-range drafts, Enter/Escape/focus return,
+      pending/failure/retry, reload, other-tab saves, Settings Save/Reset Defaults,
+      and strict full-backup restore. Reset restores all four goals to 90%.
+      Configured disposable Gist sync uses the existing settings path; record
+      it pending if not exercised.
+- [ ] **Presentation and proof:** test unequal/equal references, series switches,
+      sparse zero, singleton, first-only/repeat-only/empty data, seven-row Table,
+      cross-year labels, pointer/tap and keyboard inspection at 14/30/90 days.
+      Series visibility preserves dates and the fitted scale containing both
+      goals. Both new/Recall plots use first-midpoint/12px clearance for multiple
+      intervals and the original interval domain for one. Check the paired
+      layout and stacked 320px layout in light/dark themes without overflow or
+      clipped controls. Attach screenshots or recording of happy and edge paths.
+
+#### Analytics Chart Targets
+
+The chart-target implementation has automated and component-fixture proof.
+These unchecked cases are required human installed-extension smoke before PR
+review or merge, using
+the rebuilt extension and disposable data from the flow above. Record the
+tested build and exact passed or pending cases; fixture images are separate
+proof.
+
+- [ ] **Independent defaults:** open Analytics with older settings missing the
+      goal fields and an FSRS target retention other than 90%. Both chart goals
+      must be 90%. Record FSRS retention, representative card due dates, Recall
+      and Review Success rates/counts, and Retention Map values before editing
+      goals so the later comparisons use the same practice data.
+- [ ] **Save and cancel:** open Target Recall, confirm its input receives focus,
+      and verify exactly one input with the Hard + Good + Easy hint and current
+      Success limit. Save Recall 80%; Success remains 90%. Open Target Review
+      Success, verify its single focused input and Good + Easy / Recall-limit
+      hint, then save 85%; Recall remains 80%. Both references use the saved
+      result. Change each draft, then Cancel or Escape; the prior pair remains
+      and focus returns to the trigger. Reopen and submit with Enter. Repeat
+      with pointer, keyboard, and touch where available.
+- [ ] **Invalid drafts:** test an empty input, a fractional percentage, -1,
+      101, and Recall 95% with Success 90%. Saving must be blocked without
+      changing either goal or silently adjusting the other goal. The invalid
+      pair says “Review Success target must be at least your Recall target.”
+      Equality, 0%, and 100% are valid when the pair satisfies the rule. Raise
+      Success before raising Recall beyond it; lower Recall before lowering
+      Success below it. With a draft open, change the counterpart from another
+      tab; the input draft stays while its hint and validation refresh. Save
+      must preserve the latest other goal, or reject an invalid merged pair.
+- [ ] **Pending and failure:** use a controlled delayed and rejected
+      `settings.updateSettings` mutation in a disposable local test build and
+      record how it was induced. Confirm Saving and duplicate-submit prevention.
+      A rejected save must keep the prior captions/references and the open
+      draft with a useful error; retry succeeds and Cancel still discards it.
+      If either condition cannot be induced, record that exact case as pending.
+- [ ] **Boundary references:** save 0%/0%, 0%/100%, and 100%/100%. Inspect both
+      named dashed references and accessible descriptions at 0% and 100%; each
+      percentage scale must contain its goal with usable boundary clearance.
+      Practice's goal uses the fixed left rating-share axis and leaves rating
+      geometry and its supplied right review-count scale unchanged. Measured rates, counts, rows, dates,
+      internal gaps, and trimming must match the pre-edit data.
+- [ ] **Range and presentation:** retain a non-default pair while changing
+      14/30/90-day ranges, including switching to an uncached range while a save
+      is pending, toggling Recall series and Practice's Reviews, switching Chart/Table, and
+      opening empty or sparse datasets. The controls remain reachable and the
+      saved pair remains fixed. Repeat closed, open, invalid, and boundary-goal
+      states at wide/narrow widths in light/dark themes; check focus, wrapping,
+      tap targets, axes, keys, and tooltip visibility without clipping.
+- [ ] **Reload and Settings:** save a non-default pair, reload the built
+      extension in `chrome://extensions`, and reopen Analytics. Captions,
+      references, and reopened drafts must use the saved values. Save an
+      unrelated preference in Settings and confirm the pair remains. Use
+      Reset Defaults and confirm both goals return to 90% with the other
+      preferences. Repeat after another tab edits the goals while Settings has
+      an unrelated dirty draft, and immediately after Settings Save while its
+      refresh is pending; no separate Settings section is added.
+- [ ] **Backup and configured sync:** export a full backup with a non-default
+      pair, restore it into a disposable profile, and confirm both saved goals.
+      Restore an older backup without these fields and confirm 90%/90% while
+      unrelated settings retain their stored values. When testing an already
+      configured Gist with disposable profiles, push/pull the pair through the
+      existing settings payload and verify it survives. Use the existing backup
+      and Gist confirmation flows; record unexercised sync as pending.
+- [ ] **FSRS isolation and proof:** compare the recorded retention setting,
+      card due dates, FSRS estimates, Retention Map, readiness, rates, and
+      practice outcomes after changing only chart goals. They must be
+      unchanged. Attach screenshots or a recording of the saved happy path,
+      invalid and failed-save edge paths, wide/narrow light/dark editors, and
+      0%/100% reference clearance before PR review or merge.
+
+The human engineer must record the tested build, datasets, ranges, widths,
+themes, and exact passed or pending cases, then attach screenshot or
+screen-recording proof of the ready-history happy path and sparse/unready edge
+path before PR review or merge. This is required by
+`docs/agent-governance.md`. Automated checks and agent-rendered fixture
+screenshots do not replace human real-time extension smoke or establish that
+this checklist has passed.
 
 ### LeetCode Overlay
 

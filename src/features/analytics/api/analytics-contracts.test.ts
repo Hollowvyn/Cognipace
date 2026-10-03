@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { analyticsChartPointFixtures } from '@/testing/analytics-fixtures'
+import {
+  analyticsChartPointFixtures,
+  createSerializedAnalyticsSummary,
+} from '@/testing/analytics-fixtures'
 
 import {
   analyticsReadinessSchema,
   analyticsRangeSchema,
   analyticsSummaryRequestSchema,
   analyticsSummarySchema,
+  firstAttemptOutcomesViewSchema,
   hardAgainSummarySchema,
   practiceRhythmPointSchema,
   ratingsMixPointSchema,
@@ -44,6 +48,7 @@ function withRequestedReadiness(
 ) {
   return {
     requested,
+    firstAttemptOutcomes: { ...readiness },
     recallQuality: readiness,
     practiceRhythm: readiness,
     ratingsMix: readiness,
@@ -54,7 +59,7 @@ function withRequestedReadiness(
   }
 }
 
-const validSummary: SerializedAnalyticsSummary = {
+const validSummary = createSerializedAnalyticsSummary({
   range: 30,
   generatedAt: '2026-01-15T12:00:00.000Z',
   timeFrame: {
@@ -92,56 +97,7 @@ const validSummary: SerializedAnalyticsSummary = {
   lowSample: false,
   targetRetention: 0.9,
   views: {
-    observedRecallVsFsrs: {
-      rows: [],
-      scale: { domain: [0, 1], ticks: [0, 1] },
-      targetRetention: 0.9,
-    },
-    memoryStrength: {
-      rows: [],
-      scale: { domain: [0, 2], ticks: [0, 1, 2] },
-    },
-    practiceRhythm: {
-      rows: [],
-      countScale: { domain: [0, 1], ticks: [0, 1] },
-      percentageScale: { domain: [0, 1], ticks: [0, 1] },
-    },
-    ratingsMix: {
-      rows: [],
-      selectedHardAgain: 0,
-      selectedValidRatings: 0,
-      comparison: {
-        previousHardAgainShare: null,
-        previousValidRatings: 0,
-        difference: null,
-        direction: null,
-      },
-    },
-    topicPerformance: {
-      rows: [],
-      strongerQualifyingTopics: 0,
-      lowEvidenceTopics: [],
-      additionalLowEvidenceTopics: 0,
-    },
-    retentionMap: {
-      rows: [],
-      totalEligible: 0,
-      statusCounts: { onTarget: 0, watch: 0, needsAttention: 0 },
-      recallScale: { domain: [0, 1], ticks: [0, 1] },
-      durationScale: { domain: [1, 10], ticks: [1, 10] },
-      targetRetention: 0.9,
-    },
-    memorySignals: { rows: [], totalQualifying: 0 },
-    overdueBacklog: {
-      rows: [],
-      knownDays: 0,
-      withinWatchDays: 0,
-      aboveWatchDays: 0,
-      selectedDays: 0,
-      currentBacklog: null,
-      peak: null,
-      scale: { domain: [0, 5], ticks: [0, 5] },
-    },
+    ...createSerializedAnalyticsSummary().views,
     upcomingReviewLoad: {
       rows: Array.from({ length: 14 }, (_, index) => ({
         date: `2026-01-${String(index + 1).padStart(2, '0')}`,
@@ -153,21 +109,39 @@ const validSummary: SerializedAnalyticsSummary = {
     },
   },
   historicalReadiness: withRequestedReadiness(readiness, null),
-  recallQuality: [],
-  practiceRhythm: [],
-  ratingsMix: [],
-  hardAgain: {
-    selectedShare: null,
-    previousShare: null,
-    delta: null,
-    direction: null,
-    sampleSize: 0,
-    previousSampleSize: 0,
-    lowSample: true,
-    previousLowSample: true,
-  },
-  topics: [],
-  stability: [],
+})
+
+const measuredFirstOutcome = {
+  again: 0,
+  hard: 1,
+  good: 0,
+  easy: 0,
+  recordedFirstAttempts: 1,
+  excludedInvalidRatings: 0,
+  validFirstAttempts: 1,
+  hardGoodEasy: 1,
+  goodEasy: 0,
+  firstAttemptSuccess: 1,
+  firstAttemptGoodEasy: 0,
+  evidence: 'measured' as const,
+}
+
+function firstOutcomeView(totals = measuredFirstOutcome) {
+  return {
+    ...validSummary.views.firstAttemptOutcomes,
+    rows: [
+      {
+        ...totals,
+        id: 'first',
+        bucketStart: '2026-01-01',
+        bucketEnd: '2026-01-01',
+        isPartial: true,
+      },
+    ],
+    totals,
+    targetFirstAttemptSuccess: 0,
+    targetFirstAttemptGoodEasy: 1,
+  }
 }
 
 function withoutSummaryField(field: keyof SerializedAnalyticsSummary) {
@@ -177,6 +151,97 @@ function withoutSummaryField(field: keyof SerializedAnalyticsSummary) {
 }
 
 describe('analyticsSummaryRequestSchema', () => {
+  it('requires both first-attempt view and independent readiness', () => {
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...validSummary,
+        views: { ...validSummary.views, firstAttemptOutcomes: undefined },
+      }).success,
+    ).toBe(false)
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...validSummary,
+        historicalReadiness: {
+          ...validSummary.historicalReadiness,
+          firstAttemptOutcomes: undefined,
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each([0, 1])(
+    'accepts measured boundary rates %s with the valid denominator',
+    (rate) => {
+      const totals = {
+        ...measuredFirstOutcome,
+        again: 1 - rate,
+        hard: 0,
+        good: rate,
+        hardGoodEasy: rate,
+        goodEasy: rate,
+        firstAttemptSuccess: rate,
+        firstAttemptGoodEasy: rate,
+      }
+      expect(
+        firstAttemptOutcomesViewSchema.safeParse(firstOutcomeView(totals))
+          .success,
+      ).toBe(true)
+    },
+  )
+
+  it.each([1, 0.123])(
+    'validates independent whole-percent goals at the summary boundary %s',
+    (target) => {
+      expect(
+        analyticsSummarySchema.safeParse({
+          ...validSummary,
+          views: {
+            ...validSummary.views,
+            firstAttemptOutcomes: {
+              ...firstOutcomeView(),
+              targetFirstAttemptGoodEasy: target,
+            },
+          },
+        }).success,
+      ).toBe(target === 1)
+    },
+  )
+
+  it('rejects valid totals that differ from the complete bucket population', () => {
+    expect(
+      firstAttemptOutcomesViewSchema.safeParse({
+        ...firstOutcomeView(),
+        totals: {
+          ...measuredFirstOutcome,
+          recordedFirstAttempts: 2,
+          excludedInvalidRatings: 1,
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each([
+    { validFirstAttempts: -1 },
+    { again: 2 },
+    { recordedFirstAttempts: 3 },
+    { hardGoodEasy: 2 },
+    { goodEasy: 2 },
+    { firstAttemptSuccess: null },
+    { firstAttemptGoodEasy: 0.5 },
+    { evidence: 'not-measured' },
+    { difficulty: 'hard' },
+  ])(
+    'rejects inconsistent counts, rates, evidence, or unsupported fields %j',
+    (invalid) => {
+      const view = firstOutcomeView()
+      expect(
+        firstAttemptOutcomesViewSchema.safeParse({
+          ...view,
+          rows: [{ ...view.rows[0], ...invalid }],
+        }).success,
+      ).toBe(false)
+    },
+  )
   it('requires the feature-owned Ratings Mix and Topic Performance presentation models', () => {
     expect(() =>
       analyticsSummarySchema.parse({
@@ -257,6 +322,72 @@ describe('analyticsSummaryRequestSchema', () => {
 })
 
 describe('analyticsSummarySchema', () => {
+  it('serializes the personal chart targets separately from scheduling retention', () => {
+    const summary = {
+      ...validSummary,
+      targetRetention: 0.8,
+      views: {
+        ...validSummary.views,
+        observedRecallVsFsrs: {
+          ...validSummary.views.observedRecallVsFsrs,
+          targetRecall: 0.75,
+        },
+        practiceRhythm: {
+          ...validSummary.views.practiceRhythm,
+          targetReviewSuccess: 0.95,
+        },
+      },
+    }
+
+    expect(analyticsSummarySchema.parse(summary)).toMatchObject({
+      targetRetention: 0.8,
+      views: {
+        observedRecallVsFsrs: { targetRecall: 0.75 },
+        practiceRhythm: { targetReviewSuccess: 0.95 },
+      },
+    })
+  })
+
+  it.each([-0.01, 1.01, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid personal chart fraction %s',
+    (target) => {
+      for (const view of ['observedRecallVsFsrs', 'practiceRhythm'] as const) {
+        const targetField =
+          view === 'observedRecallVsFsrs'
+            ? 'targetRecall'
+            : 'targetReviewSuccess'
+        expect(
+          analyticsSummarySchema.safeParse({
+            ...validSummary,
+            views: {
+              ...validSummary.views,
+              [view]: { ...validSummary.views[view], [targetField]: target },
+            },
+          }).success,
+        ).toBe(false)
+      }
+    },
+  )
+
+  it('rejects personal Review Success targets below Recall targets', () => {
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...validSummary,
+        views: {
+          ...validSummary.views,
+          observedRecallVsFsrs: {
+            ...validSummary.views.observedRecallVsFsrs,
+            targetRecall: 0.95,
+          },
+          practiceRhythm: {
+            ...validSummary.views.practiceRhythm,
+            targetReviewSuccess: 0.9,
+          },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
   it('requires the Phase 2 historical view presentation models', () => {
     expect(analyticsSummarySchema.safeParse(validSummary).success).toBe(true)
     expect(
@@ -314,6 +445,7 @@ describe('analyticsSummarySchema', () => {
 
     expect(parsed.historicalReadiness).toEqual({
       requested: readiness,
+      firstAttemptOutcomes: readiness,
       recallQuality: readiness,
       practiceRhythm: readiness,
       ratingsMix: readiness,

@@ -192,6 +192,42 @@ function createValidBackupFixture() {
 }
 
 describe('backup contracts', () => {
+  it.each([
+    { targetRecall: 0.825, targetReviewSuccess: 0.955 },
+    {
+      ...defaultUserSettings.analytics,
+      targetFirstAttemptSuccess: 0.29,
+      targetFirstAttemptGoodEasy: 1,
+    },
+  ])('preserves old and current chart preference JSON: %j', (analytics) => {
+    const fixture = createValidBackupFixture()
+    fixture.data.settings[0]!.value = JSON.stringify({
+      ...defaultUserSettings,
+      analytics,
+    })
+    expect(parseBackupFileForCurrentApp(fixture).data.settings).toEqual(
+      fixture.data.settings,
+    )
+  })
+
+  it.each([
+    { targetFirstAttemptSuccess: 0.295 },
+    { targetFirstAttemptGoodEasy: null },
+    { targetRecall: 0.95, targetReviewSuccess: 0.9 },
+  ])(
+    'rejects invalid imported targets instead of applying local recovery: %j',
+    (patch) => {
+      const fixture = createValidBackupFixture()
+      fixture.data.settings[0]!.value = JSON.stringify({
+        ...defaultUserSettings,
+        analytics: { ...defaultUserSettings.analytics, ...patch },
+      })
+      expect(() => parseBackupFileForCurrentApp(fixture)).toThrow(
+        'settings value must contain current UserSettings JSON',
+      )
+    },
+  )
+
   it('parses a valid v5 CogniPace backup and creates summary counts', () => {
     const backup = parseBackupFileForCurrentApp(createValidBackupFixture())
 

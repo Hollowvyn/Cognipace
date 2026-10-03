@@ -142,6 +142,7 @@ export async function getAnalyticsSummary(
       start: periodStart,
       timeZone: presentationTimeFrame.timeZone,
       timeFrame: presentationTimeFrame,
+      analyticsTargets: settings.analytics,
     },
   )
   const currentStateViews = buildCurrentStateAnalyticsViews(
@@ -189,7 +190,16 @@ export async function getAnalyticsSummary(
   )
   const recallReadiness = calculateAnalyticsReadiness({
     requestedDays: range,
-    evidenceCounts: correctnessEvidenceCounts,
+    evidenceCounts: historicalViews.observedRecallVsFsrs.rows.map(
+      (row) => row.pairedReviews,
+    ),
+    bucketKeys: buckets.map((bucket) => bucket.key),
+  })
+  const firstAttemptReadiness = calculateAnalyticsReadiness({
+    requestedDays: range,
+    evidenceCounts: historicalViews.firstAttemptOutcomes.rows.map(
+      (row) => row.validFirstAttempts,
+    ),
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
   const practiceRhythmReadiness = calculateAnalyticsReadiness({
@@ -253,6 +263,7 @@ export async function getAnalyticsSummary(
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
   const historicalReadiness = {
+    firstAttemptOutcomes: firstAttemptReadiness,
     requested: requestedReadiness,
     recallQuality: recallReadiness,
     practiceRhythm: practiceRhythmReadiness,

@@ -1,6 +1,4 @@
 import {
-  createInitialFsrsCard,
-  getRetrievability,
   isReviewRating,
   replayReviewHistorySequence,
   type NormalizedFsrsSchedulingOptions,
@@ -10,6 +8,10 @@ import {
   normalizeTopicLabelList,
   normalizeTopicLookupKey,
 } from '@/features/problems/domain/topic-taxonomy'
+import {
+  defaultAnalyticsTargets,
+  type AnalyticsTargets,
+} from '@/features/settings/domain'
 
 import {
   buildAnalyticsBucketsFromTimeFrame,
@@ -33,6 +35,10 @@ import {
 } from './analytics-scales'
 import type { CurrentStateAnalyticsViews } from './current-state-presentation'
 import type { WorkloadAnalyticsViews } from './workload-presentation'
+import {
+  buildRepeatReviewPairs,
+  selectFirstRecordedAttempts,
+} from './review-cohorts'
 
 export interface HistoricalAnalyticsReviewEvent {
   id: string
@@ -55,6 +61,7 @@ export interface HistoricalPresentationOptions {
   fsrsOptions: NormalizedFsrsSchedulingOptions
   timeZone: string
   timeFrame: AnalyticsTimeFrame
+  analyticsTargets?: AnalyticsTargets
 }
 
 export interface HistoricalPresentationScale {
@@ -74,6 +81,28 @@ export interface ObservedRecallVsFsrsRow {
   difference: number | null
   provenance: 'reconstructed'
   evidence: 'measured' | 'not-measured'
+}
+
+export interface FirstAttemptOutcomeTotals {
+  again: number
+  hard: number
+  good: number
+  easy: number
+  recordedFirstAttempts: number
+  excludedInvalidRatings: number
+  validFirstAttempts: number
+  hardGoodEasy: number
+  goodEasy: number
+  firstAttemptSuccess: number | null
+  firstAttemptGoodEasy: number | null
+  evidence: 'measured' | 'not-measured'
+}
+
+export interface FirstAttemptOutcomeRow extends FirstAttemptOutcomeTotals {
+  id: string
+  bucketStart: string
+  bucketEnd: string
+  isPartial: boolean
 }
 
 export interface MemoryStrengthRow {
@@ -137,10 +166,17 @@ export interface LowEvidenceTopicRow {
 }
 
 export interface HistoricalAnalyticsViews {
+  firstAttemptOutcomes: {
+    rows: FirstAttemptOutcomeRow[]
+    totals: FirstAttemptOutcomeTotals
+    scale: HistoricalPresentationScale
+    targetFirstAttemptSuccess: number
+    targetFirstAttemptGoodEasy: number
+  }
   observedRecallVsFsrs: {
     rows: ObservedRecallVsFsrsRow[]
     scale: HistoricalPresentationScale
-    targetRetention: number
+    targetRecall: number
   }
   memoryStrength: {
     rows: MemoryStrengthRow[]
@@ -150,6 +186,7 @@ export interface HistoricalAnalyticsViews {
     rows: PracticeRhythmRow[]
     countScale: HistoricalPresentationScale
     percentageScale: HistoricalPresentationScale
+    targetReviewSuccess: number
   }
   ratingsMix: {
     rows: RatingsMixRow[]
@@ -180,7 +217,19 @@ export function buildHistoricalAnalyticsViews(
   events: readonly HistoricalAnalyticsReviewEvent[],
   options: HistoricalPresentationOptions,
 ): HistoricalAnalyticsViews {
-  const pairedByEvent = buildPairedReviews(events, options)
+  const pairedByEvent = buildRepeatReviewPairs(events, options)
+  const selectedFirstAttempts = selectFirstRecordedAttempts(events).filter(
+    (event) =>
+      event.reviewedAt >= options.start && event.reviewedAt <= options.end,
+  )
+  const firstAttemptRows = options.buckets.map((bucket) => ({
+    ...bucketRow(bucket, options.end),
+    ...aggregateFirstAttemptOutcomes(
+      selectedFirstAttempts.filter((event) =>
+        inBucket(event.reviewedAt, bucket),
+      ),
+    ),
+  }))
   const stabilityByEvent = buildStabilityObservations(events, options)
   const observedRows = options.buckets.map((bucket) => {
     const pairs = pairedByEvent.filter((pair) =>
@@ -316,68 +365,118 @@ export function buildHistoricalAnalyticsViews(
     rhythmRows.map((row) => row.completedReviews),
   )
 
-  return {
-    observedRecallVsFsrs: {
-      rows: observedRows,
-      scale: percentageScale(
-        observedRows.flatMap((row) => [row.observedRecall, row.fsrsEstimate]),
-        [options.fsrsOptions.targetRetention],
-      ),
-      targetRetention: options.fsrsOptions.targetRetention,
-    },
-    memoryStrength: {
-      rows: memoryRows,
-      scale: toPresentationScale(durationScale),
-    },
-    practiceRhythm: {
-      rows: rhythmRows,
-      countScale: toPresentationScale(countScale),
-      percentageScale: percentageScale(
-        rhythmRows.map((row) => row.reviewSuccess),
-      ),
-    },
-    ratingsMix: {
-      rows: ratingsMixRows,
-      selectedHardAgain,
-      selectedValidRatings,
-      comparison: buildRatingsMixComparison(
-        events,
-        options,
+  return applyHistoricalChartTargets(
+    {
+      firstAttemptOutcomes: {
+        rows: firstAttemptRows,
+        totals: aggregateFirstAttemptOutcomes(selectedFirstAttempts),
+      },
+      observedRecallVsFsrs: {
+        rows: observedRows,
+      },
+      memoryStrength: {
+        rows: memoryRows,
+        scale: toPresentationScale(durationScale),
+      },
+      practiceRhythm: {
+        rows: rhythmRows,
+        countScale: toPresentationScale(countScale),
+      },
+      ratingsMix: {
+        rows: ratingsMixRows,
         selectedHardAgain,
         selectedValidRatings,
+        comparison: buildRatingsMixComparison(
+          events,
+          options,
+          selectedHardAgain,
+          selectedValidRatings,
+        ),
+      },
+      topicPerformance,
+      retentionMap: {
+        rows: [],
+        totalEligible: 0,
+        statusCounts: { onTarget: 0, watch: 0, needsAttention: 0 },
+        recallScale: { domain: [0, 1] as const, ticks: [0, 1] },
+        durationScale: { domain: [1, 10] as const, ticks: [1, 10] },
+        targetRetention: options.fsrsOptions.targetRetention,
+      },
+      memorySignals: { rows: [], totalQualifying: 0 },
+      overdueBacklog: {
+        rows: [],
+        knownDays: 0,
+        withinWatchDays: 0,
+        aboveWatchDays: 0,
+        selectedDays: 0,
+        currentBacklog: null,
+        peak: null,
+        scale: { domain: [0, 5] as const, ticks: [0, 5] },
+      },
+      upcomingReviewLoad: {
+        rows: Array.from({ length: 14 }, (_, index) => ({
+          date: addAnalyticsCalendarDays(
+            options.timeFrame.buckets.at(-1)?.endKey ?? '1970-01-01',
+            index,
+          ),
+          dueCount: 0,
+          overdueCount: 0,
+          today: index === 0,
+        })),
+        scale: { domain: [0, 1] as const, ticks: [0, 1] },
+      },
+    },
+    options.analyticsTargets ?? defaultAnalyticsTargets,
+  )
+}
+
+type HistoricalChartTargetViews = {
+  firstAttemptOutcomes: Pick<
+    HistoricalAnalyticsViews['firstAttemptOutcomes'],
+    'rows' | 'totals'
+  >
+  observedRecallVsFsrs: Pick<
+    HistoricalAnalyticsViews['observedRecallVsFsrs'],
+    'rows'
+  >
+  practiceRhythm: Pick<HistoricalAnalyticsViews['practiceRhythm'], 'rows'>
+}
+
+export function applyHistoricalChartTargets<
+  T extends HistoricalChartTargetViews,
+>(views: T, targets: AnalyticsTargets) {
+  return {
+    ...views,
+    firstAttemptOutcomes: {
+      ...views.firstAttemptOutcomes,
+      targetFirstAttemptSuccess: targets.targetFirstAttemptSuccess,
+      targetFirstAttemptGoodEasy: targets.targetFirstAttemptGoodEasy,
+      scale: percentageScale(
+        views.firstAttemptOutcomes.rows.flatMap((row) => [
+          row.firstAttemptSuccess,
+          row.firstAttemptGoodEasy,
+        ]),
+        [targets.targetFirstAttemptSuccess, targets.targetFirstAttemptGoodEasy],
       ),
     },
-    topicPerformance,
-    retentionMap: {
-      rows: [],
-      totalEligible: 0,
-      statusCounts: { onTarget: 0, watch: 0, needsAttention: 0 },
-      recallScale: { domain: [0, 1], ticks: [0, 1] },
-      durationScale: { domain: [1, 10], ticks: [1, 10] },
-      targetRetention: options.fsrsOptions.targetRetention,
+    observedRecallVsFsrs: {
+      ...views.observedRecallVsFsrs,
+      targetRecall: targets.targetRecall,
+      scale: percentageScale(
+        views.observedRecallVsFsrs.rows.flatMap((row) => [
+          row.observedRecall,
+          row.fsrsEstimate,
+        ]),
+        [targets.targetRecall],
+      ),
     },
-    memorySignals: { rows: [], totalQualifying: 0 },
-    overdueBacklog: {
-      rows: [],
-      knownDays: 0,
-      withinWatchDays: 0,
-      aboveWatchDays: 0,
-      selectedDays: 0,
-      currentBacklog: null,
-      peak: null,
-      scale: { domain: [0, 5], ticks: [0, 5] },
-    },
-    upcomingReviewLoad: {
-      rows: Array.from({ length: 14 }, (_, index) => ({
-        date: addAnalyticsCalendarDays(
-          options.timeFrame.buckets.at(-1)?.endKey ?? '1970-01-01',
-          index,
-        ),
-        dueCount: 0,
-        overdueCount: 0,
-        today: index === 0,
-      })),
-      scale: { domain: [0, 1], ticks: [0, 1] },
+    practiceRhythm: {
+      ...views.practiceRhythm,
+      targetReviewSuccess: targets.targetReviewSuccess,
+      percentageScale: percentageScale(
+        views.practiceRhythm.rows.map((row) => row.reviewSuccess),
+        [targets.targetReviewSuccess],
+      ),
     },
   }
 }
@@ -569,56 +668,30 @@ function uniqueNormalizedTopics(labels: readonly string[]) {
   return [...topics.values()]
 }
 
-function buildPairedReviews(
+export function aggregateFirstAttemptOutcomes(
   events: readonly HistoricalAnalyticsReviewEvent[],
-  options: HistoricalPresentationOptions,
-) {
-  const pairs: Array<{
-    reviewedAt: Date
-    rating: ReviewRating
-    estimate: number
-  }> = []
-  const byCard = new Map<string, ValidHistoricalReviewEvent[]>()
+): FirstAttemptOutcomeTotals {
+  const counts = { again: 0, hard: 0, good: 0, easy: 0 }
   for (const event of events) {
-    if (!hasValidRating(event)) continue
-    const cardEvents = byCard.get(event.cardId) ?? []
-    cardEvents.push(event)
-    byCard.set(event.cardId, cardEvents)
+    if (isReviewRating(event.rating)) counts[event.rating] += 1
   }
-
-  for (const cardEvents of byCard.values()) {
-    const ordered = [...cardEvents].sort(compareEvents)
-    const replayed = replayReviewHistorySequence(
-      ordered.map((event) => ({
-        rating: event.rating,
-        reviewedAt: event.reviewedAt,
-      })),
-      options.fsrsOptions,
-    )
-    for (const [index, event] of ordered.entries()) {
-      if (event.reviewedAt < options.start || event.reviewedAt > options.end)
-        continue
-      const previous =
-        replayed[index - 1]?.card ?? createInitialFsrsCard(event.reviewedAt)
-      const probability = getRetrievability(
-        previous,
-        event.reviewedAt,
-        options.fsrsOptions,
-      )
-      if (
-        Number.isFinite(probability) &&
-        probability >= 0 &&
-        probability <= 1
-      ) {
-        pairs.push({
-          reviewedAt: event.reviewedAt,
-          rating: event.rating,
-          estimate: probability,
-        })
-      }
-    }
+  const validFirstAttempts =
+    counts.again + counts.hard + counts.good + counts.easy
+  const hardGoodEasy = counts.hard + counts.good + counts.easy
+  const goodEasy = counts.good + counts.easy
+  return {
+    ...counts,
+    recordedFirstAttempts: events.length,
+    excludedInvalidRatings: events.length - validFirstAttempts,
+    validFirstAttempts,
+    hardGoodEasy,
+    goodEasy,
+    firstAttemptSuccess:
+      validFirstAttempts === 0 ? null : hardGoodEasy / validFirstAttempts,
+    firstAttemptGoodEasy:
+      validFirstAttempts === 0 ? null : goodEasy / validFirstAttempts,
+    evidence: validFirstAttempts === 0 ? 'not-measured' : 'measured',
   }
-  return pairs
 }
 
 function buildStabilityObservations(
@@ -684,7 +757,7 @@ function bucketRow(bucket: AnalyticsBucket, end: Date) {
 function percentageScale(
   values: readonly (number | null)[],
   references: readonly number[] = [],
-): HistoricalPresentationScale {
+): { domain: [number, number]; ticks: number[] } {
   const domain = buildAdaptivePercentageDomain(
     values.filter((value): value is number => value !== null),
     references,
@@ -693,7 +766,7 @@ function percentageScale(
     { length: Math.round((domain[1] - domain[0]) / 0.05) + 1 },
     (_, index) => Number((domain[0] + index * 0.05).toFixed(2)),
   )
-  return { domain, ticks }
+  return { domain: [domain[0], domain[1]], ticks }
 }
 
 function toPresentationScale(

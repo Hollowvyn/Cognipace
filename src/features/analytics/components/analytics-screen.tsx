@@ -4,7 +4,10 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { InlineStatus } from '@/components/ui/inline-status'
 import { Surface } from '@/components/ui/surface'
-import { useAnalyticsSummary } from '../api/analytics-api'
+import {
+  useAnalyticsSummary,
+  useUpdateAnalyticsTargets,
+} from '../api/analytics-api'
 import type {
   AnalyticsRange,
   SerializedAnalyticsSummary,
@@ -12,11 +15,12 @@ import type {
 import { AnalyticsChartPanel } from './analytics-chart-panel'
 import { AnalyticsMetricRow } from './analytics-metric-row'
 import { AnalyticsReadinessState } from './analytics-readiness-state'
+import { AnalyticsTargetEditor } from './analytics-target-editor'
 import {
   MemoryStrengthView,
+  NewProblemSuccessView,
   ObservedRecallVsFsrsView,
-  PracticeRhythmView,
-  RatingsMixView,
+  PracticeRatingsView,
   TopicPerformanceView,
 } from './historical-views'
 import { MemorySignalsView, RetentionMapView } from './current-state-views'
@@ -66,7 +70,9 @@ export function AnalyticsScreen({
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--cp-surface-gap)]">
-      <AnalyticsMetricRow summary={data} />
+      <div className="w-full max-w-[64rem]">
+        <AnalyticsMetricRow summary={data} />
+      </div>
       <AnalyticsScopeMetadata data={data} />
       {!data.historicalReadiness.requested.ready ? (
         <AnalyticsReadinessState
@@ -96,7 +102,7 @@ function AnalyticsWorkloadStory({
   data: SerializedAnalyticsSummary
 }) {
   return (
-    <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+    <div className="grid w-full min-w-0 max-w-[64rem] gap-4 lg:grid-cols-2">
       <AnalyticsChartPanel
         description="Daily local overdue counts reconstructed from known persisted FSRS review intervals and current card state. Unknown days are deliberately not estimated."
         id="recent-overdue-backlog"
@@ -123,7 +129,7 @@ function AnalyticsCurrentStateStory({
   data: SerializedAnalyticsSummary
 }) {
   return (
-    <div className="grid min-w-0 gap-4">
+    <div className="grid w-full min-w-0 max-w-[64rem] gap-4">
       <AnalyticsChartPanel
         description="Current FSRS retrievability and total target-crossing duration for active reviewed problems. This is model-estimated memory health, not observed recall or a due queue."
         id="retention-map"
@@ -201,48 +207,136 @@ function AnalyticsHistoricalStory({
 }: {
   data: SerializedAnalyticsSummary
 }) {
+  const updateTargets = useUpdateAnalyticsTargets()
+  const targets = {
+    targetRecall: data.views.observedRecallVsFsrs.targetRecall,
+    targetReviewSuccess: data.views.practiceRhythm.targetReviewSuccess,
+    targetFirstAttemptSuccess:
+      data.views.firstAttemptOutcomes.targetFirstAttemptSuccess,
+    targetFirstAttemptGoodEasy:
+      data.views.firstAttemptOutcomes.targetFirstAttemptGoodEasy,
+  }
+  const showRatingReadiness =
+    (!data.historicalReadiness.ratingsMix.ready ||
+      hasTrimmedLeadingHistory(data.historicalReadiness.ratingsMix)) &&
+    JSON.stringify(data.historicalReadiness.ratingsMix) !==
+      JSON.stringify(data.historicalReadiness.practiceRhythm)
   return (
-    <div className="grid min-w-0 gap-4">
+    <div className="cp-analytics-history grid min-w-0 gap-4">
+      <div className="grid w-full min-w-0 max-w-[64rem] gap-4 lg:grid-cols-2">
+        <PhaseTwoPanel
+          historical
+          description="Hard + Good + Easy and Good + Easy outcomes for the same first recorded problems in retained history. These are recorded assessments; hints and earlier exposure are unknown."
+          id="new-problem-success"
+          question="How are your first recorded outcomes changing?"
+          readiness={data.historicalReadiness.firstAttemptOutcomes}
+          title="New Problem Success"
+        >
+          <NewProblemSuccessView
+            targetControl={
+              <>
+                <AnalyticsTargetEditor
+                  targets={targets}
+                  metric="firstAttemptSuccess"
+                  onSave={updateTargets.mutateAsync}
+                />
+                <AnalyticsTargetEditor
+                  targets={targets}
+                  metric="firstAttemptGoodEasy"
+                  onSave={updateTargets.mutateAsync}
+                />
+              </>
+            }
+            timeFrame={data.timeFrame}
+            view={data.views.firstAttemptOutcomes}
+          />
+        </PhaseTwoPanel>
+        <PhaseTwoPanel
+          historical
+          description="Rating-derived recalled outcomes on repeat reviews compared with reconstructed FSRS retrievability immediately before those exact reviews. First recorded reviews build memory for later comparisons."
+          id="observed-recall-vs-fsrs"
+          question="How did recalled repeat outcomes compare with the FSRS estimate?"
+          readiness={data.historicalReadiness.recallQuality}
+          title="Recall vs FSRS Estimate"
+        >
+          <ObservedRecallVsFsrsView
+            targetControl={
+              <AnalyticsTargetEditor
+                targets={targets}
+                metric="recall"
+                onSave={updateTargets.mutateAsync}
+              />
+            }
+            timeFrame={data.timeFrame}
+            view={data.views.observedRecallVsFsrs}
+          />
+        </PhaseTwoPanel>
+      </div>
+
       <PhaseTwoPanel
-        description="Rating-derived recalled outcomes compared with reconstructed FSRS retrievability immediately before those exact reviews."
-        id="observed-recall-vs-fsrs"
-        question="How did recalled review outcomes compare with the FSRS estimate?"
-        readiness={data.historicalReadiness.recallQuality}
-        title="Observed Recall vs FSRS Estimate"
+        historical
+        description="Rating shares and completed review volume move together by time bucket. Good + Easy shows Review Success; the relationship is association only."
+        id="practice-rhythm"
+        question="How did your review ratings change with practice?"
+        readiness={data.historicalReadiness.practiceRhythm}
+        showReadiness={false}
+        title="Practice Rhythm"
       >
-        <ObservedRecallVsFsrsView view={data.views.observedRecallVsFsrs} />
+        <PracticeRatingsView
+          ratingsView={data.views.ratingsMix}
+          targetControl={
+            <AnalyticsTargetEditor
+              targets={targets}
+              metric="reviewSuccess"
+              onSave={updateTargets.mutateAsync}
+            />
+          }
+          timeFrame={data.timeFrame}
+          view={data.views.practiceRhythm}
+        />
+        {showRatingReadiness ? (
+          <div className="mt-3 grid gap-1">
+            <p className="m-0 text-xs font-medium text-muted-foreground">
+              Rating composition evidence
+            </p>
+            <AnalyticsReadinessState
+              compact
+              readiness={data.historicalReadiness.ratingsMix}
+              recommendedRange={null}
+              title="Rating composition"
+            />
+          </div>
+        ) : null}
+        {!data.historicalReadiness.practiceRhythm.ready ? (
+          <div className="mt-3 grid gap-1">
+            {showRatingReadiness ? (
+              <p className="m-0 text-xs font-medium text-muted-foreground">
+                Practice Rhythm evidence
+              </p>
+            ) : null}
+            <AnalyticsReadinessState
+              compact
+              readiness={data.historicalReadiness.practiceRhythm}
+              recommendedRange={null}
+              title="Practice Rhythm"
+            />
+          </div>
+        ) : null}
       </PhaseTwoPanel>
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+      <div className="grid w-full min-w-0 max-w-[64rem] gap-4 lg:grid-cols-2">
         <PhaseTwoPanel
+          historical
           description="FSRS's reconstructed post-review estimate of how long the memories reviewed in each bucket may remain retrievable."
           id="memory-strength"
           question="Are your reviewed memories staying strong for longer?"
           readiness={data.historicalReadiness.stability}
           title="Memory Strength"
         >
-          <MemoryStrengthView view={data.views.memoryStrength} />
-        </PhaseTwoPanel>
-        <PhaseTwoPanel
-          description="Completed review volume and the Good + Easy share move together by time bucket; the relationship is association only."
-          id="practice-rhythm"
-          question="When you practiced more or less, how did Review Success move?"
-          readiness={data.historicalReadiness.practiceRhythm}
-          title="Practice Rhythm"
-        >
-          <PracticeRhythmView view={data.views.practiceRhythm} />
-        </PhaseTwoPanel>
-      </div>
-
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        <PhaseTwoPanel
-          description="The changing share of valid Again, Hard, Good, and Easy review ratings across the selected period."
-          id="ratings-mix"
-          question="How is the balance of your review ratings changing?"
-          readiness={data.historicalReadiness.ratingsMix}
-          title="Ratings Mix"
-        >
-          <RatingsMixView view={data.views.ratingsMix} />
+          <MemoryStrengthView
+            timeFrame={data.timeFrame}
+            view={data.views.memoryStrength}
+          />
         </PhaseTwoPanel>
         <PhaseTwoPanel
           description="Topics ranked by sufficiently sampled Good + Easy Review Success in the selected period; this is not a mastery score."
@@ -264,6 +358,7 @@ function AnalyticsHistoricalStory({
 
 function PhaseTwoPanel({
   description,
+  historical = false,
   id,
   question,
   readiness,
@@ -272,6 +367,7 @@ function PhaseTwoPanel({
   children,
 }: {
   description: string
+  historical?: boolean
   id: string
   question: string
   readiness: SerializedAnalyticsSummary['historicalReadiness']['recallQuality']
@@ -281,12 +377,13 @@ function PhaseTwoPanel({
 }) {
   return (
     <AnalyticsChartPanel
+      historical={historical}
       description={description}
       id={id}
       question={question}
       title={title}
     >
-      {showReadiness && !readiness.ready ? (
+      {!historical && showReadiness && !readiness.ready ? (
         <AnalyticsReadinessState
           compact
           readiness={readiness}
@@ -295,6 +392,16 @@ function PhaseTwoPanel({
         />
       ) : null}
       {children}
+      {historical && showReadiness && !readiness.ready ? (
+        <div className="mt-3">
+          <AnalyticsReadinessState
+            compact
+            readiness={readiness}
+            recommendedRange={null}
+            title={title}
+          />
+        </div>
+      ) : null}
     </AnalyticsChartPanel>
   )
 }

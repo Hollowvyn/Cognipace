@@ -169,3 +169,141 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 - Do not show persistent explanation banners or helper paragraphs in the normal state.
 - Use stateful controls, concise inline feedback, and native tooltips for secondary explanations.
 - The normal populated popup should answer: what to review now, and what to study next.
+
+## CogniPace Analytics Historical Chart Rules
+
+- The implemented historical treatment has four cards: New Problem Success,
+  Recall vs FSRS Estimate, Practice Rhythm with the merged rating composition,
+  and Memory Strength. First outcomes and repeat Recall share a responsive `lg`
+  pair and stack in that order below it, followed by a full-width Practice Rhythm card;
+  Memory Strength and the unchanged Topic Performance view share the next
+  responsive row. Retention Map,
+  Memory Signals, Recent Overdue Backlog, and Upcoming Review Load keep their
+  current treatment until a separate design iteration.
+- Keep the explicit 14-day daily, 30-day three-day, and 90-day weekly grouping
+  and feature-supplied values. All four historical charts trim
+  unsupported beginning and ending buckets only, using the same contiguous activity
+  window for Chart, Table, and inspection. Preserve every internal gap and each
+  retained interval's dates.
+  Readiness does not control trimming. Keep the selected range, period totals,
+  readiness, supplied scales, and report time unchanged; do not fabricate
+  observations.
+- Use a numeric local-calendar axis with marks at each interval's midpoint,
+  including shortened edge buckets. Show sparse date ticks at readable calendar
+  intervals rather than labeling every bucket. Dates use MM/DD in the report's
+  as-of year and /YY outside it; full cross-year intervals include both years
+  in inspection. Reducing tick density must not reduce observations.
+- Keep axis quantities and units explicit, horizontal grid lines quiet, and
+  top/bottom clearance sufficient for boundary markers and low whiskers. Retain
+  independent scales. Memory Strength uses its supplied duration fit; Recall's
+  percentage fit includes its saved target, including 0% and 100%. Practice
+  Rhythm uses a fixed 0–100% rating-share scale on the left and its supplied
+  independent review-count scale on the right. Its goal cannot alter rating
+  geometry or the count scale. The serialized legacy Practice percentage scale
+  remains available for compatibility; the merged plot does not use it.
+- New Problem Success uses mint solid circles for Hard + Good + Easy and a
+  thinner blue solid line with diamonds for Good + Easy. Both rates share one
+  valid-first denominator; the supplied fit includes both curves and goals and
+  never shifts when either series is hidden. Use matching dashed references for
+  unequal goals and one neutral shared reference for equal goals, retaining both
+  compact target buttons and tooltip values. Target First-attempt Success and
+  Target Good + Easy are independent whole-percent preferences; do not show the
+  old Recall/Review Success counterpart hint for them. Keep recorded/valid/
+  excluded-first period counts concise above the plot and the retained-history
+  caveat in calculation details. Never label these outcomes guaranteed unaided
+  solving or add mock difficulty data.
+- The chart-target editor is implemented and has automated/fixture proof;
+  human installed-extension smoke remains pending before review or merge. Place a small native
+  **Target Recall 90%** or **Target Review Success 90%** button above the relevant
+  plot with the target color and a subtle dashed-line key. Replace the generic
+  Recall caption without duplicating it or adding a permanent bottom row.
+  Each button opens a small inline panel with one labeled percentage input
+  for that chart (0–100 in one-point steps), a percent suffix, Save and Cancel
+  in one row. Below it, show a short rating-combination and counterpart-limit
+  hint. Focus its single input; Enter saves and Escape cancels and returns focus.
+  Keep the panel collapsed by default and
+  reachable in Chart/Table, empty, sparse, narrow, light, and dark states.
+  Explain **Review Success target must be at least your Recall target** for an
+  invalid pair; never silently change the other goal. Save only the edited goal
+  and retain the draft when refreshed settings change its counterpart limit.
+  This is an intentionally
+  stricter aspiration, not a rule for measured rates. Show Saving, prevent
+  duplicate submission, and keep failed drafts open with a useful error while
+  retaining the prior saved references. Cancel leaves both goals unchanged.
+- Inspection starts with the tooltip hidden. Pointer movement and taps select
+  the nearest retained original bucket. A native focusable button covering the
+  plot exposes the same values through focus, Left/Right arrows, Home/End, and
+  Enter/Space, with Escape to hide details. Use a quiet vertical selection guide
+  and highlight measured values only. Keep full range, grouping, report time,
+  evidence, and complete/in-progress context in the tooltip; do not add a
+  permanent bottom detail row.
+- Recall compares repeat assessments only and names that population in its
+  question, description, calculation details, and empty state. It uses a solid observed line with circles and an opaque FSRS estimate
+  with short `4 4` dashes and diamonds. Missing-evidence bridges use visibly
+  longer `9 7` dashes. Its dashed reference uses saved Target Recall, independent
+  of FSRS retention, and names that goal in inspection and its accessible
+  description. Keep the editable target caption above the data.
+  Compact native series switches hide the relevant curve, markers, and tooltip
+  rate together. Show the signed difference only when both series are visible,
+  preserve shared sample counts, and keep the accessible description aligned
+  with both, one, or neither series visible. Either known rate, including 0%,
+  supports the activity window; toggling series must not reshape that window.
+  With at least two retained intervals, start Recall's numeric X domain at the
+  first interval's actual midpoint and use 12px of left scale clearance. Keep
+  the last interval's end boundary and all marks' true calendar midpoints.
+  Sparse ticks reflect dates inside this domain; the full interval remains in
+  tooltip and Table. Series switches must not shift the domain. A singleton
+  keeps its original interval domain and centered marker. Memory Strength and
+  Practice Rhythm retain their interval-boundary X domains and padding.
+  New Problem Success uses the same first-midpoint/12px clearance and singleton
+  behavior, with visibility-stable dates and its own activity window.
+- Memory Strength uses a clear median line and discrete Q1–Q3 whiskers with a
+  compact Median/Middle 50% key. Render whiskers only with at least four eligible
+  reviews and known quartiles. Fit all finite median/Q1/Q3 extrema by choosing
+  the larger of 1.2 times their span and two days, then splitting the padding
+  equally above and below. Clamp lower padding at zero without transferring it
+  upward, and enforce an actual minimum two-day window. Preserve all extrema
+  and use readable duration ticks. Keep sub-day values meaningful. A finite
+  median, including zero or a sub-day value, supports the activity window
+  without requiring quartiles or four eligible reviews; that requirement
+  applies only to whiskers.
+- Practice Rhythm stacks exact supplied rating shares bottom to top as Easy,
+  Good, Hard, Again. The upper boundary of Good + Easy expresses Review Success;
+  do not add another success line. Label the fixed left axis Rating share (%)
+  and the right count axis Reviews. Draw supplied completed reviews as a thin,
+  straight neutral line with small measured markers. A known zero count remains
+  an observation, and an unavailable count does not become zero. Completed
+  counts are independent of valid-rating counts and must not be derived from
+  them. The matching dashed Target Review Success reference uses the left
+  percentage axis, with an explicit target name in inspection and its accessible
+  description. Goals at 0% and 100% stay visible. Editing either goal preserves
+  observations, dates, rows, gaps, counts, and trim rules.
+- Join the unchanged Practice Rhythm and Ratings Mix rows by ID and exact
+  start/end interval, retaining intervals supplied by either view and reporting
+  absent counterparts as unavailable. Trim only unsupported outer rows: positive
+  completed reviews, positive valid-rating counts in either view, or finite
+  supplied success including 0% support an edge. Preserve internal gaps in the
+  shared Chart, inspection, and Table slice. Internal unavailable composition
+  uses a full-height neutral gray diagonal hatch; a true zero category in a
+  populated slot stays zero-height. Soften Hard/Again in this chart, keep
+  Easy/Good distinct, and keep all four categories distinct from the neutral
+  missing-composition key. Center contrasting whole-percentage labels at 12px
+  only when they fit without colliding with the count line or target. More
+  precise shares and counts stay in tooltip and Table; rounded labels may total
+  99% or 101% without changing geometry.
+- The shared Practice tooltip includes completed reviews, each rating count and
+  precise share, Good + Easy numerator/valid-rating denominator, supplied success,
+  target, each metric's evidence, full interval, report timezone/as-of, and partial
+  status. A small native Reviews switch hides the count line, markers, right axis,
+  and tooltip count together. It never changes rows, dates, target, or Table
+  values, and accessible chart copy follows the visible state. Retain the
+  selected-period Hard + Again summary, evidence-gated prior-period comparison,
+  and distinct rating/count readiness warnings when they differ. Keep the
+  visible association-only explanation: the two scales compare timing, and a
+  count-line crossing with the target has no percentage meaning.
+- Keep Chart/Table switching and seven-row table pagination. Preserve exact
+  retained rows, feature-owned values, unavailable states, and current-interval
+  context across both views. At narrow widths, reduce ticks and stack the
+  Memory/Topic pair before its axes, keys, and controls become crowded. Keep panel alignment
+  usable when neighboring readiness messages differ, and check light and dark
+  themes.

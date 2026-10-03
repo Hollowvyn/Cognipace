@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
+import { normalizeFsrsSchedulingOptions } from '@/lib/fsrs'
+
 import type {
   ObservedRatingQualityResult,
   HistoricalReadiness,
 } from './summary'
 import type { AnalyticsReadiness } from './analytics-readiness'
-import { buildAnalyticsTimeFrame } from './analytics-time'
+import {
+  buildAnalyticsTimeFrame,
+  type AnalyticsTimeFrame,
+} from './analytics-time'
+import { buildHistoricalAnalyticsViews } from './historical-presentation'
+import { buildAnalyticsBucketsFromTimeFrame } from './analytics-range-policy'
 import { buildObservedRatingQuality, buildAnalyticsSummary } from './summary'
 
 const now = new Date(2026, 0, 15, 12, 0, 0)
@@ -187,13 +194,16 @@ describe('buildAnalyticsSummary', () => {
       sampleSize: 20,
       lowSample: false,
     }
+    const timeFrame = buildAnalyticsTimeFrame({
+      asOf: generatedAt,
+      requestedDays: 30,
+      timeZone: 'UTC',
+    })
+    const views = createHistoricalViews(timeFrame)
     const result = buildAnalyticsSummary({
       generatedAt,
-      timeFrame: buildAnalyticsTimeFrame({
-        asOf: generatedAt,
-        requestedDays: 30,
-        timeZone: 'UTC',
-      }),
+      timeFrame,
+      views,
       reviewDays: 10,
       totalReviews: 42,
       currentStreak: 3,
@@ -212,16 +222,19 @@ describe('buildAnalyticsSummary', () => {
     expect(result.observedRatingSampleSize).toBe(20)
     expect(result.lowSample).toBe(false)
     expect(result.targetRetention).toBe(0.9)
+    expect(result.views).toBe(views)
   })
 
   it('keeps selected-range evidence and metric readiness explicit in the summary', () => {
+    const timeFrame = buildAnalyticsTimeFrame({
+      asOf: now,
+      requestedDays: 90,
+      timeZone: 'UTC',
+    })
     const result = buildAnalyticsSummary({
       generatedAt: now,
-      timeFrame: buildAnalyticsTimeFrame({
-        asOf: now,
-        requestedDays: 90,
-        timeZone: 'UTC',
-      }),
+      timeFrame,
+      views: createHistoricalViews(timeFrame),
       reviewDays: 0,
       totalReviews: 0,
       currentStreak: 0,
@@ -245,6 +258,17 @@ describe('buildAnalyticsSummary', () => {
     })
   })
 })
+
+function createHistoricalViews(timeFrame: AnalyticsTimeFrame) {
+  return buildHistoricalAnalyticsViews([], {
+    buckets: buildAnalyticsBucketsFromTimeFrame(timeFrame),
+    start: new Date(timeFrame.periodStart),
+    end: new Date(timeFrame.asOf),
+    timeZone: timeFrame.timeZone,
+    timeFrame,
+    fsrsOptions: normalizeFsrsSchedulingOptions(),
+  })
+}
 
 function createHistoricalReadiness(
   requestedDays: 14 | 30 | 90,
@@ -277,6 +301,7 @@ function createHistoricalReadiness(
 
   return {
     requested: readiness,
+    firstAttemptOutcomes: readiness,
     recallQuality: readiness,
     practiceRhythm: readiness,
     ratingsMix: readiness,
@@ -317,6 +342,7 @@ function createDetailedHistoricalReadiness(): HistoricalReadiness {
 
   return {
     requested,
+    firstAttemptOutcomes: { ...requested },
     recallQuality,
     practiceRhythm: { ...requested },
     ratingsMix: { ...requested },

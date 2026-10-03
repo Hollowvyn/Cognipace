@@ -1,0 +1,159 @@
+<div id="cp-recall-refined-direction" class="viz-dotted-background">
+  <main class="cr-page" aria-label="Observed Recall and FSRS Estimate preview">
+    <article class="cr-panel">
+      <header class="cr-header">
+        <div><h3>Observed Recall vs FSRS Estimate</h3><p>How did recalled reviews compare with the estimate?</p></div>
+        <div class="cr-switch" aria-label="Recall display"><button type="button" data-mode="chart" aria-pressed="true">Chart</button><button type="button" data-mode="table" aria-pressed="false">Table</button></div>
+      </header>
+      <div class="cr-chart-content">
+        <div class="cr-plot" aria-label="Inspect recall buckets"></div>
+        <div class="cr-key" aria-label="Chart series">
+          <button type="button" data-series="recall" aria-pressed="true"><i class="cr-observed-key" aria-hidden="true"></i>Observed recall</button>
+          <button type="button" data-series="estimate" aria-pressed="true"><i class="cr-estimate-key" aria-hidden="true"></i>FSRS estimate</button>
+          <span><i class="cr-bridge-key" aria-hidden="true"></i>Long dashes: missing buckets</span>
+        </div>
+      </div>
+      <div class="cr-table-content" hidden>
+        <table><caption>Illustrative paired-review samples by 3-day bucket</caption><thead><tr><th>Period</th><th>Recalled / paired</th><th>Observed</th><th>FSRS</th><th>Difference</th></tr></thead><tbody></tbody></table>
+      </div>
+      <details><summary>Calculation details</summary><p>These paired-review counts and rates are illustrative examples. Observed Recall counts Hard, Good and Easy as recalled, and excludes Again. The FSRS estimate is reconstructed retrievability immediately before those exact reviews. Differences use the exact observed fraction minus the estimate, in percentage points; displayed values are rounded. Missing counts and rates are unavailable, and long-dash bridges add no observations. The final 09/30–10/02 bucket is in progress as of 10/02, 2:44 AM.</p></details>
+    </article>
+  </main>
+</div>
+<style>
+  #cp-recall-refined-direction { --cr-bg:light-dark(#f4f6f2,#101513); --cr-panel:light-dark(#ffffff,#1b211e); --cr-text:light-dark(#26382e,#e1e8e3); --cr-muted:light-dark(#59695e,#afbdb4); --cr-border:light-dark(#dce4dc,#3b4840); --cr-grid:light-dark(#e4eae3,#303d34); --cr-observed:light-dark(#34865a,#8fdfa9); --cr-estimate:light-dark(#698475,#a2bdab); --cr-gold:light-dark(#a87906,#ffd449); --cr-active:light-dark(#d9ebde,#a0cdb2); --cr-active-text:light-dark(#214e33,#173c28); color:var(--cr-text); }
+  #cp-recall-refined-direction * { box-sizing:border-box; }
+  #cp-recall-refined-direction .cr-page { width:100%; padding:20px; background:var(--cr-bg); color:var(--cr-text); font-family:"Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:14px; line-height:1.5; }
+  #cp-recall-refined-direction .cr-panel { background:var(--cr-panel); border:1px solid var(--cr-border); border-radius:7px; padding:20px; min-width:0; }
+  #cp-recall-refined-direction h3,#cp-recall-refined-direction p { margin:0; }
+  #cp-recall-refined-direction h3 { font-size:16px; line-height:1.4; font-weight:500; }
+  #cp-recall-refined-direction .cr-header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:12px; }
+  #cp-recall-refined-direction .cr-header p { color:var(--cr-muted); font-size:12px; margin-top:4px; }
+  #cp-recall-refined-direction button { font:inherit; font-size:12px; color:var(--cr-muted); background:transparent; border:0; border-radius:3px; padding:5px 8px; }
+  #cp-recall-refined-direction .cr-switch { flex-shrink:0; display:inline-flex; padding:2px; border:1px solid var(--cr-border); border-radius:5px; background:var(--cr-bg); }
+  #cp-recall-refined-direction .cr-switch button[aria-pressed="true"] { color:var(--cr-active-text); background:var(--cr-active); font-weight:500; }
+  #cp-recall-refined-direction .cr-plot { width:100%; height:310px; position:relative; }
+  #cp-recall-refined-direction .cr-plot svg { display:block; width:100%; height:100%; overflow:visible; }
+  #cp-recall-refined-direction .cr-plot svg text { fill:var(--cr-muted); font-family:inherit; font-size:12px; font-weight:400; }
+  #cp-recall-refined-direction .cr-key { display:flex; gap:8px 18px; align-items:center; flex-wrap:wrap; padding:6px 0; color:var(--cr-muted); font-size:12px; }
+  #cp-recall-refined-direction .cr-key button,#cp-recall-refined-direction .cr-key span { display:inline-flex; align-items:center; gap:7px; }
+  #cp-recall-refined-direction .cr-key button { padding:4px 0; border-radius:0; }
+  #cp-recall-refined-direction .cr-key button[aria-pressed="false"] { opacity:.45; }
+  #cp-recall-refined-direction .cr-key i { width:22px; height:12px; display:inline-block; position:relative; }
+  #cp-recall-refined-direction .cr-observed-key { background:linear-gradient(transparent 5px,var(--cr-observed) 5px,var(--cr-observed) 7px,transparent 7px); }
+  #cp-recall-refined-direction .cr-observed-key::after { content:''; position:absolute; top:2px; left:7px; width:8px; height:8px; border:2px solid var(--cr-observed); border-radius:50%; background:var(--cr-panel); }
+  #cp-recall-refined-direction .cr-estimate-key { background:repeating-linear-gradient(to right,var(--cr-estimate) 0,var(--cr-estimate) 4px,transparent 4px,transparent 8px) center/100% 2px no-repeat; }
+  #cp-recall-refined-direction .cr-estimate-key::after { content:''; position:absolute; left:8px; top:3px; width:6px; height:6px; transform:rotate(45deg); border:1px solid var(--cr-estimate); background:var(--cr-panel); }
+  #cp-recall-refined-direction .cr-bridge-key { background:repeating-linear-gradient(to right,var(--cr-muted) 0,var(--cr-muted) 9px,transparent 9px,transparent 16px) center/100% 1px no-repeat; }
+  #cp-recall-refined-direction details { color:var(--cr-muted); font-size:12px; border-top:1px solid var(--cr-border); padding-top:10px; margin-top:12px; }
+  #cp-recall-refined-direction details p { margin-top:8px; }
+  #cp-recall-refined-direction .cr-table-content { overflow-x:auto; min-width:0; }
+  #cp-recall-refined-direction table { width:100%; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums; }
+  #cp-recall-refined-direction caption { text-align:left; color:var(--cr-muted); padding-bottom:10px; }
+  #cp-recall-refined-direction th { text-align:left; font-weight:500; }
+  #cp-recall-refined-direction td,#cp-recall-refined-direction th { padding:10px 8px; border-bottom:1px solid var(--cr-border); vertical-align:top; }
+  #cp-recall-refined-direction td { text-align:right; }
+  #cp-recall-refined-direction tbody th { font-weight:400; }
+  #cp-recall-refined-direction thead th { color:var(--cr-muted); }
+  #cp-recall-refined-direction .cr-hit { position:absolute; z-index:1; background:transparent; padding:0; border-radius:0; }
+  #cp-recall-refined-direction .cr-tooltip { position:absolute; z-index:2; top:8px; right:8px; max-width:calc(100% - 16px); padding:10px 12px; border:1px solid var(--cr-border); border-radius:5px; background:var(--cr-panel); color:var(--cr-text); font-size:12px; line-height:1.5; pointer-events:none; box-shadow:0 4px 12px color-mix(in srgb,var(--cr-border) 35%,transparent); }
+  #cp-recall-refined-direction .cr-tooltip strong { font-weight:500; }
+  #cp-recall-refined-direction .cr-tooltip .cr-sample-count { display:block; margin-top:5px; font-size:14px; color:var(--cr-text); font-weight:500; font-variant-numeric:tabular-nums; }
+  #cp-recall-refined-direction .cr-tooltip dl { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 18px; margin:7px 0 0; }
+  #cp-recall-refined-direction .cr-tooltip dt { color:var(--cr-muted); }
+  #cp-recall-refined-direction .cr-tooltip dd { margin:0; text-align:right; font-variant-numeric:tabular-nums; }
+  #cp-recall-refined-direction .cr-tooltip p { margin-top:4px; }
+  #cp-recall-refined-direction .cr-tooltip small { display:block; color:var(--cr-muted); font-size:12px; margin-top:4px; }
+  #cp-recall-refined-direction .cr-sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  #cp-recall-refined-direction [hidden] { display:none !important; }
+  @media(max-width:430px) { #cp-recall-refined-direction .cr-page { padding:12px; } #cp-recall-refined-direction .cr-panel { padding:12px; } #cp-recall-refined-direction .cr-header { flex-direction:column; gap:10px; } #cp-recall-refined-direction .cr-switch { align-self:flex-end; } #cp-recall-refined-direction .cr-plot { height:280px; } #cp-recall-refined-direction .cr-key { gap:5px 12px; } }
+  @media(pointer:coarse) { #cp-recall-refined-direction button { min-width:44px; min-height:44px; } }
+</style>
+<script>
+(() => {
+  const root=document.getElementById('cp-recall-refined-direction');
+  const host=root.querySelector('.cr-plot');
+  const referenceYear=2026;
+  const buckets=[
+    {start:'2026-09-09',end:'2026-09-11',recalled:5,paired:6,recall:5/6*100,estimate:90,difference:-6.666666666667},
+    {start:'2026-09-12',end:'2026-09-14',recalled:12,paired:14,recall:12/14*100,estimate:85,difference:.714285714286},
+    {start:'2026-09-15',end:'2026-09-17',recalled:null,paired:null,recall:null,estimate:null,difference:null},
+    {start:'2026-09-18',end:'2026-09-20',recalled:3,paired:4,recall:3/4*100,estimate:47,difference:28},
+    {start:'2026-09-21',end:'2026-09-23',recalled:2,paired:2,recall:2/2*100,estimate:75,difference:25},
+    {start:'2026-09-24',end:'2026-09-26',recalled:3,paired:5,recall:3/5*100,estimate:69,difference:-9},
+    {start:'2026-09-27',end:'2026-09-29',recalled:null,paired:null,recall:null,estimate:null,difference:null},
+    {start:'2026-09-30',end:'2026-10-02',recalled:6,paired:8,recall:6/8*100,estimate:76,difference:-1,partial:true}
+  ];
+  const active={recall:true,estimate:true};
+  let selected=3;
+  let tooltipVisible=false;
+  const ns='http://www.w3.org/2000/svg';
+  function compactDate(iso,forceYear=false){const [year,month,day]=iso.split('-');return `${month}/${day}${forceYear||Number(year)!==referenceYear?`/${year.slice(-2)}`:''}`;}
+  function range(d){const cross=d.start.slice(0,4)!==d.end.slice(0,4);return d.start===d.end?compactDate(d.start):`${compactDate(d.start,cross)}–${compactDate(d.end,cross)}`;}
+  function dayIso(day){return day<=21?`2026-09-${String(day+9).padStart(2,'0')}`:`2026-10-${String(day-21).padStart(2,'0')}`;}
+  function number(value){return Number.isInteger(value)?String(value):value.toFixed(1);}
+  function rate(value){return value===null?'Unavailable':`${number(value)}%`;}
+  function difference(d){if(d.difference===null)return 'Unavailable';return `${d.difference>0?'+':''}${number(d.difference)} pp`;}
+  function counts(d){return d.recalled===null||d.paired===null?'Unavailable':`${d.recalled} / ${d.paired}`;}
+  function el(tag,attrs={},content){const node=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([key,value])=>node.setAttribute(key,String(value)));if(content!==undefined)node.textContent=content;return node;}
+  function add(svg,tag,attrs={},content){const node=el(tag,attrs,content);svg.appendChild(node);return node;}
+  function text(svg,x,y,value,anchor='start',attrs={}){return add(svg,'text',{x,y,'text-anchor':anchor,...attrs},value);}
+  function line(svg,x1,y1,x2,y2,stroke,attrs={}){return add(svg,'line',{x1,y1,x2,y2,stroke,'stroke-width':1,...attrs});}
+  function description(index){const d=buckets[index];const rows=[];if(active.recall)rows.push(['Observed Recall',rate(d.recall)]);if(active.estimate)rows.push(['FSRS Estimate',rate(d.estimate)]);if(active.recall&&active.estimate)rows.push(['Observed − estimate',difference(d)]);rows.push(['Configured target','87%']);const sample=d.paired===null?'Recalled / paired: Unavailable':`${d.recalled} recalled / ${d.paired} paired reviews`;const fields=[`Illustrative sample: ${sample}`,...rows.map(([name,value])=>`${name}: ${value}`)];if(d.recall===null&&d.estimate===null)fields.push('No usable paired evidence in this sample bucket');return {heading:`${range(d)} · 3-day summary`,sample,rows,fields,context:d.partial?'In progress · as of 10/02, 2:44 AM':'Complete interval · as of 10/02, 2:44 AM'};}
+  const tbody=root.querySelector('tbody');
+  buckets.forEach(d=>{const tr=document.createElement('tr');[`${range(d)}${d.partial?' (in progress)':''}`,counts(d),rate(d.recall),rate(d.estimate),difference(d)].forEach((value,index)=>{const cell=document.createElement(index===0?'th':'td');if(index===0)cell.scope='row';cell.textContent=value;tr.appendChild(cell);});tbody.appendChild(tr);});
+  root.querySelectorAll('button,summary').forEach(node=>node.classList.add('cursor-interaction'));
+  function draw(){
+    const width=host.getBoundingClientRect().width;if(width<=0)return;
+    const height=host.clientHeight,box={left:64,right:width-18,top:32,bottom:height-50};
+    const visibleSeries=[active.recall?'Observed Recall is shown as a solid line with circles':null,active.estimate?'FSRS Estimate is shown with short dashes and diamonds':null].filter(Boolean).join('; ')||'Both data series are hidden';
+    const bridgeDescription=active.recall||active.estimate?'Long-dash bridges span missing buckets. ':'';
+    const svg=el('svg',{viewBox:`0 0 ${width} ${height}`,role:'img','aria-label':`${visibleSeries}. ${bridgeDescription}The scale spans 20 to 100 percent; target retention is 87 percent. Three-day buckets and paired-review values are illustrative.`});
+    add(svg,'title',{},'Observed Recall vs FSRS Estimate');
+    const xDay=day=>box.left+8+day/23*(box.right-box.left-16);
+    const x=index=>xDay(1+index*3);
+    const y=value=>box.bottom-8-(value-20)/80*(box.bottom-box.top-16);
+    add(svg,'rect',{x:box.left,y:box.top,width:box.right-box.left,height:box.bottom-box.top,fill:'none','data-chart-frame':''});
+    [20,40,60,80,100].forEach(value=>{line(svg,box.left,y(value),box.right,y(value),'var(--cr-grid)');text(svg,box.left-12,y(value)+4,`${value}%`,'end');});
+    text(svg,box.left,14,'Recall (%)','start',{'data-axis':'y','class':'axis-title'});
+    line(svg,box.right-103,10,box.right-86,10,'var(--cr-gold)',{'stroke-dasharray':'5 5',opacity:.65});
+    text(svg,box.right,14,'Target 87%','end');
+    line(svg,box.left,y(87),box.right,y(87),'var(--cr-gold)',{'stroke-dasharray':'5 5',opacity:.8});
+    const ticks=width<340?[0,14,23]:[0,7,14,21];
+    ticks.forEach((day,index)=>text(svg,xDay(day),box.bottom+23,compactDate(dayIso(day)),index===0?'start':index===ticks.length-1?'end':'middle'));
+    text(svg,(box.left+box.right)/2,box.bottom+45,'Local date','middle',{'data-axis':'x','class':'axis-title'});
+    function series(field){if(!active[field])return;const observed=field==='recall';const color=observed?'var(--cr-observed)':'var(--cr-estimate)';let previous=null;buckets.forEach((d,index)=>{if(d[field]===null)return;if(previous!==null){const bridge=index-previous>1;add(svg,'path',{d:`M${x(previous)},${y(buckets[previous][field])}L${x(index)},${y(d[field])}`,fill:'none',stroke:color,'stroke-width':bridge?1.5:observed?2.5:1.8,'stroke-dasharray':bridge?'9 7':(observed?'':'4 4'),'stroke-linecap':'round',opacity:1,'data-evidence':bridge?'missing-bridge':'measured'});}previous=index;if(observed)add(svg,'circle',{cx:x(index),cy:y(d[field]),r:4,fill:'var(--cr-panel)',stroke:color,'stroke-width':2.5});else add(svg,'path',{d:`M${x(index)},${y(d[field])-3.5}l3.5,3.5 -3.5,3.5 -3.5,-3.5 Z`,fill:'var(--cr-panel)',stroke:color,'stroke-width':1.5,opacity:1});});}
+    series('estimate');series('recall');
+    const guide=add(svg,'line',{'data-chart-hover-guide':'',stroke:'var(--cr-border)','stroke-width':1,'stroke-dasharray':'2 4',y1:box.top,y2:box.bottom,'pointer-events':'none'});
+    const activeMarks=add(svg,'g',{'data-chart-active-marks':'','pointer-events':'none'});
+    const hit=document.createElement('button');hit.type='button';hit.className='cr-hit cursor-interaction';hit.setAttribute('data-chart-hit','');hit.setAttribute('data-chart-hover-overlay','bucket');Object.assign(hit.style,{left:`${box.left}px`,top:`${box.top}px`,width:`${box.right-box.left}px`,height:`${box.bottom-box.top}px`});
+    const tooltip=document.createElement('div');tooltip.className='cr-tooltip';tooltip.id='cr-refined-bucket-tooltip';tooltip.setAttribute('role','tooltip');hit.setAttribute('aria-describedby',tooltip.id);
+    const live=document.createElement('span');live.className='cr-sr-only';live.setAttribute('aria-live','polite');
+    function inspect(index,announce=false){
+      selected=index;const d=buckets[index],content=description(index);
+      tooltip.replaceChildren();const heading=document.createElement('strong');heading.textContent=content.heading;tooltip.appendChild(heading);
+      const sampleLabel=document.createElement('small');sampleLabel.textContent='Illustrative paired-review sample';tooltip.appendChild(sampleLabel);
+      const sample=document.createElement('strong');sample.className='cr-sample-count';sample.textContent=content.sample;tooltip.appendChild(sample);
+      const values=document.createElement('dl');content.rows.forEach(([name,value])=>{const label=document.createElement('dt');label.textContent=name;const result=document.createElement('dd');result.textContent=value;values.append(label,result);});tooltip.appendChild(values);
+      if(d.recall===null&&d.estimate===null){const missing=document.createElement('small');missing.textContent='No usable paired evidence in this bucket';tooltip.appendChild(missing);}
+      const context=document.createElement('small');context.textContent=content.context;tooltip.appendChild(context);tooltip.hidden=!tooltipVisible;
+      const selectedOnRight=x(index)>(box.left+box.right)/2;tooltip.style.left=selectedOnRight?'8px':'auto';tooltip.style.right=selectedOnRight?'auto':'8px';
+      guide.setAttribute('x1',x(index));guide.setAttribute('x2',x(index));guide.style.display='';
+      activeMarks.replaceChildren();
+      if(active.recall&&d.recall!==null)add(activeMarks,'circle',{cx:x(index),cy:y(d.recall),r:5,fill:'var(--cr-panel)',stroke:'var(--cr-observed)','stroke-width':3,'data-chart-hover-marker':'recall'});
+      if(active.estimate&&d.estimate!==null)add(activeMarks,'path',{d:`M${x(index)},${y(d.estimate)-5}l5,5 -5,5 -5,-5 Z`,fill:'var(--cr-panel)',stroke:'var(--cr-estimate)','stroke-width':2,'data-chart-hover-marker':'estimate'});
+      hit.setAttribute('aria-label',`${content.heading}. ${content.fields.join('. ')}. ${content.context}. Use Left and Right arrow keys to inspect adjacent buckets.`);
+      if(announce)live.textContent=`${content.heading}. ${content.fields.join('. ')}. ${content.context}`;
+    }
+    const show=()=>{tooltipVisible=true;inspect(selected);};
+    const hide=()=>{tooltipVisible=false;inspect(selected);};
+    function nearestBucket(event){const px=event.clientX-host.getBoundingClientRect().left;const day=(px-box.left-8)/(box.right-box.left-16)*23;return Math.max(0,Math.min(7,Math.round((day-1)/3)));}
+    hit.addEventListener('pointerenter',show);hit.addEventListener('pointermove',event=>inspect(nearestBucket(event)));hit.addEventListener('pointerdown',event=>{tooltipVisible=true;inspect(nearestBucket(event),true);});hit.addEventListener('pointerleave',()=>{if(!hit.matches(':focus'))hide();});hit.addEventListener('focus',show);hit.addEventListener('blur',hide);hit.addEventListener('click',event=>{tooltipVisible=true;inspect(event.detail>0?nearestBucket(event):selected,true);});hit.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();tooltipVisible=true;inspect(Math.max(0,Math.min(7,selected+(event.key==='ArrowRight'?1:-1))),true);}if(event.key==='Escape')hide();});
+    host.replaceChildren(svg,hit,tooltip,live);inspect(selected);
+  }
+  root.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{const chart=button.dataset.mode==='chart';root.querySelector('.cr-chart-content').hidden=!chart;root.querySelector('.cr-table-content').hidden=chart;root.querySelectorAll('[data-mode]').forEach(peer=>peer.setAttribute('aria-pressed',String(peer===button)));tooltipVisible=false;if(chart)draw();}));
+  root.querySelectorAll('[data-series]').forEach(button=>button.addEventListener('click',()=>{active[button.dataset.series]=!active[button.dataset.series];button.setAttribute('aria-pressed',String(active[button.dataset.series]));tooltipVisible=false;draw();}));
+  new ResizeObserver(draw).observe(host);
+  draw();
+})();
+</script>

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { setAiProviderSecret } from '@/features/genai/server/genai-settings-service'
 import { defaultUserSettings } from '@/features/settings/domain'
+import { createSettingsRepository } from '@/features/settings/data/settings-repository'
 import {
   companies,
   fsrsCards,
@@ -34,6 +35,13 @@ const now = new Date('2026-05-25T12:00:00.000Z')
 const timestamp = now.getTime()
 const settingsValue = JSON.stringify({
   ...defaultUserSettings,
+  analytics: {
+    targetRecall: 0.8,
+    targetReviewSuccess: 0.95,
+    targetFirstAttemptSuccess: 0.29,
+    targetFirstAttemptGoodEasy: 1,
+  },
+  review: { ...defaultUserSettings.review, targetRetention: 0.75 },
   practice: {
     ...defaultUserSettings.practice,
     dailyGoal: 5,
@@ -174,6 +182,9 @@ describe('backup repository', () => {
     await db.delete(settingsKv)
 
     await clearAndRestoreBackupData(db, backupData, now)
+    await expect(createSettingsRepository(db).getSettings()).resolves.toEqual(
+      JSON.parse(settingsValue),
+    )
 
     expect(await db.select().from(reviewAttempts)).toHaveLength(1)
     expect(await db.select().from(settingsKv)).toHaveLength(1)
@@ -202,39 +213,51 @@ describe('backup repository', () => {
     ).toHaveLength(1)
   })
 
-  it('rejects invalid restore data before changing existing rows', async () => {
-    const { db } = await createTestDb({ now })
-    await insertCustomState(db)
-    const invalidSettings = [
-      {
-        key: 'user-settings',
-        value: '{"practice":{"dailyGoal":"invalid"}}',
-        updatedAt: now.toISOString(),
+  it.each([
+    '{"practice":{"dailyGoal":"invalid"}}',
+    JSON.stringify({
+      ...defaultUserSettings,
+      analytics: {
+        ...defaultUserSettings.analytics,
+        targetFirstAttemptSuccess: 0.295,
       },
-    ] satisfies BackupData['settings']
-    const invalidBackupData = {
-      ...(await createBackupRepository(db).readBackupData()),
-      settings: invalidSettings,
-    }
+    }),
+  ])(
+    'rejects invalid settings before changing existing rows: %s',
+    async (value) => {
+      const { db } = await createTestDb({ now })
+      await insertCustomState(db)
+      const invalidSettings = [
+        {
+          key: 'user-settings',
+          value,
+          updatedAt: now.toISOString(),
+        },
+      ] satisfies BackupData['settings']
+      const invalidBackupData = {
+        ...(await createBackupRepository(db).readBackupData()),
+        settings: invalidSettings,
+      }
 
-    await expect(
-      clearAndRestoreBackupData(db, invalidBackupData, now),
-    ).rejects.toThrow(/settings value must contain current UserSettings JSON/)
+      await expect(
+        clearAndRestoreBackupData(db, invalidBackupData, now),
+      ).rejects.toThrow(/settings value must contain current UserSettings JSON/)
 
-    expect(
-      await db
-        .select()
-        .from(problems)
-        .where(eq(problems.slug, 'custom-problem')),
-    ).toHaveLength(1)
-    expect(await db.select().from(settingsKv)).toEqual([
-      {
-        key: 'user-settings',
-        value: settingsValue,
-        updatedAt: timestamp,
-      },
-    ])
-  })
+      expect(
+        await db
+          .select()
+          .from(problems)
+          .where(eq(problems.slug, 'custom-problem')),
+      ).toHaveLength(1)
+      expect(await db.select().from(settingsKv)).toEqual([
+        {
+          key: 'user-settings',
+          value: settingsValue,
+          updatedAt: timestamp,
+        },
+      ])
+    },
+  )
 
   it('resets to fresh install data, clears custom data, and clears settings', async () => {
     const { db } = await createTestDb({ now })

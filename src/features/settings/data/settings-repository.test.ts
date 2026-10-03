@@ -8,6 +8,80 @@ import { defaultUserSettings } from '../domain'
 import { createSettingsRepository } from './settings-repository'
 
 describe('SettingsRepository', () => {
+  it.each([
+    ['targetRecall', 'targetReviewSuccess', 0.85, 0.95],
+    ['targetReviewSuccess', 'targetRecall', 0.95, 0.85],
+    ['targetFirstAttemptSuccess', 'targetFirstAttemptGoodEasy', 0.29, 1],
+    ['targetFirstAttemptGoodEasy', 'targetFirstAttemptSuccess', 1, 0.29],
+  ] as const)(
+    'merges %s against the latest other goals',
+    async (field, counterpart, value, externalValue) => {
+      const handle = await createTestDb({ seed: false })
+      const repository = createSettingsRepository(handle.db)
+      const external = createSettingsRepository(handle.db)
+      const original = await repository.updateSettings({
+        analytics: {
+          targetRecall: 0.8,
+          targetReviewSuccess: 0.9,
+          targetFirstAttemptSuccess: 0.8,
+          targetFirstAttemptGoodEasy: 0.6,
+        },
+        practice: { dailyGoal: 12 },
+        review: { targetRetention: 0.75 },
+      })
+      await external.updateSettings({
+        analytics: { [counterpart]: externalValue },
+      })
+      const saved = await repository.updateSettings({
+        analytics: { [field]: value },
+      })
+      expect(saved).toEqual({
+        ...original,
+        analytics: {
+          ...original.analytics,
+          [counterpart]: externalValue,
+          [field]: value,
+        },
+      })
+      await expect(external.getSettings()).resolves.toEqual(saved)
+      const rows = await handle.db.select().from(settingsKv)
+      expect(rows).toHaveLength(1)
+      expect(JSON.parse(rows[0]!.value)).toEqual(saved)
+    },
+  )
+
+  it('rejects invalid target patches without writing, then persists an atomic upward pair', async () => {
+    const handle = await createTestDb({ seed: false })
+    const repository = createSettingsRepository(handle.db)
+    const original = await repository.updateSettings({
+      practice: { dailyGoal: 12 },
+      analytics: { targetRecall: 0.8, targetReviewSuccess: 0.95 },
+    })
+    const rowsBefore = await handle.db.select().from(settingsKv)
+    for (const analytics of [
+      { targetRecall: 0.96 },
+      { targetReviewSuccess: 0.79 },
+      { targetFirstAttemptSuccess: 0.295 },
+    ]) {
+      await expect(
+        repository.updateSettings({ analytics, practice: { dailyGoal: 20 } }),
+      ).rejects.toThrow()
+      expect(await handle.db.select().from(settingsKv)).toEqual(rowsBefore)
+    }
+    const saved = await repository.updateSettings({
+      analytics: { targetRecall: 0.96, targetReviewSuccess: 0.98 },
+    })
+    expect(saved).toEqual({
+      ...original,
+      analytics: {
+        ...original.analytics,
+        targetRecall: 0.96,
+        targetReviewSuccess: 0.98,
+      },
+    })
+    await expect(repository.getSettings()).resolves.toEqual(saved)
+  })
+
   it('returns defaults when no settings row exists', async () => {
     const handle = await createTestDb({ seed: false })
 

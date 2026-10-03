@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { analyticsTargetsSchema } from '@/features/settings/domain'
 
 export const analyticsRangeSchema = z.union([
   z.literal(14),
@@ -168,6 +169,94 @@ export const observedRecallVsFsrsRowSchema = historicalRowBaseSchema.extend({
   evidence: z.enum(['measured', 'not-measured']),
 })
 
+const firstAttemptOutcomeFields = {
+  again: countSchema,
+  hard: countSchema,
+  good: countSchema,
+  easy: countSchema,
+  recordedFirstAttempts: countSchema,
+  excludedInvalidRatings: countSchema,
+  validFirstAttempts: countSchema,
+  hardGoodEasy: countSchema,
+  goodEasy: countSchema,
+  firstAttemptSuccess: nullablePercentageSchema,
+  firstAttemptGoodEasy: nullablePercentageSchema,
+  evidence: z.enum(['measured', 'not-measured']),
+}
+
+const firstAttemptOutcomeCountsSchema = z.object(firstAttemptOutcomeFields)
+
+function validateFirstAttemptOutcomes(
+  value: z.infer<typeof firstAttemptOutcomeCountsSchema>,
+  context: z.RefinementCtx,
+) {
+  const valid = value.again + value.hard + value.good + value.easy
+  const hardGoodEasy = value.hard + value.good + value.easy
+  const goodEasy = value.good + value.easy
+  const expected = {
+    validFirstAttempts: valid,
+    recordedFirstAttempts: valid + value.excludedInvalidRatings,
+    hardGoodEasy,
+    goodEasy,
+    firstAttemptSuccess: valid === 0 ? null : hardGoodEasy / valid,
+    firstAttemptGoodEasy: valid === 0 ? null : goodEasy / valid,
+    evidence: valid === 0 ? 'not-measured' : 'measured',
+  }
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    if (value[key as keyof typeof value] !== expectedValue) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'First-attempt outcomes must match their rating counts and availability.',
+        path: [key],
+      })
+    }
+  }
+}
+
+export const firstAttemptOutcomeRowSchema = historicalRowBaseSchema
+  .extend(firstAttemptOutcomeFields)
+  .strict()
+  .superRefine(validateFirstAttemptOutcomes)
+
+export const firstAttemptOutcomeTotalsSchema = firstAttemptOutcomeCountsSchema
+  .strict()
+  .superRefine(validateFirstAttemptOutcomes)
+
+export const firstAttemptOutcomesViewSchema = z
+  .object({
+    rows: z.array(firstAttemptOutcomeRowSchema),
+    totals: firstAttemptOutcomeTotalsSchema,
+    scale: analyticsScaleSchema,
+    targetFirstAttemptSuccess: percentageSchema,
+    targetFirstAttemptGoodEasy: percentageSchema,
+  })
+  .strict()
+  .superRefine((view, context) => {
+    for (const key of [
+      'again',
+      'hard',
+      'good',
+      'easy',
+      'recordedFirstAttempts',
+      'excludedInvalidRatings',
+      'validFirstAttempts',
+      'hardGoodEasy',
+      'goodEasy',
+    ] as const) {
+      if (
+        view.totals[key] !== view.rows.reduce((sum, row) => sum + row[key], 0)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'First-attempt period totals must aggregate all supplied buckets.',
+          path: ['totals', key],
+        })
+      }
+    }
+  })
+
 export const memoryStrengthRowSchema = historicalRowBaseSchema.extend({
   medianStrengthDays: z.number().positive().nullable(),
   q1: z.number().positive().nullable(),
@@ -280,10 +369,11 @@ const upcomingReviewLoadViewRowSchema = z.object({
 
 export const analyticsViewsSchema = z
   .object({
+    firstAttemptOutcomes: firstAttemptOutcomesViewSchema,
     observedRecallVsFsrs: z.object({
       rows: z.array(observedRecallVsFsrsRowSchema),
       scale: analyticsScaleSchema,
-      targetRetention: percentageSchema,
+      targetRecall: percentageSchema,
     }),
     memoryStrength: z.object({
       rows: z.array(memoryStrengthRowSchema),
@@ -293,6 +383,7 @@ export const analyticsViewsSchema = z
       rows: z.array(practiceRhythmRowSchema),
       countScale: analyticsScaleSchema,
       percentageScale: analyticsScaleSchema,
+      targetReviewSuccess: percentageSchema,
     }),
     ratingsMix: z.object({
       rows: z.array(ratingsMixRowSchema),
@@ -334,6 +425,28 @@ export const analyticsViewsSchema = z
     }),
   })
   .superRefine((views, context) => {
+    const targets = analyticsTargetsSchema.safeParse({
+      targetRecall: views.observedRecallVsFsrs.targetRecall,
+      targetReviewSuccess: views.practiceRhythm.targetReviewSuccess,
+      targetFirstAttemptSuccess:
+        views.firstAttemptOutcomes.targetFirstAttemptSuccess,
+      targetFirstAttemptGoodEasy:
+        views.firstAttemptOutcomes.targetFirstAttemptGoodEasy,
+    })
+    if (!targets.success) {
+      for (const issue of targets.error.issues) {
+        context.addIssue({
+          ...issue,
+          path:
+            issue.path[0] === 'targetRecall'
+              ? ['observedRecallVsFsrs', 'targetRecall']
+              : issue.path[0] === 'targetReviewSuccess'
+                ? ['practiceRhythm', 'targetReviewSuccess']
+                : ['firstAttemptOutcomes', ...issue.path],
+        })
+      }
+    }
+
     const { rows } = views.upcomingReviewLoad
     if (!rows[0]?.today || rows.filter((row) => row.today).length !== 1) {
       context.addIssue({
@@ -354,6 +467,7 @@ export const analyticsViewsSchema = z
 export type AnalyticsViews = z.infer<typeof analyticsViewsSchema>
 
 export const historicalReadinessSchema = z.object({
+  firstAttemptOutcomes: analyticsReadinessSchema,
   requested: analyticsReadinessSchema,
   recallQuality: analyticsReadinessSchema,
   practiceRhythm: analyticsReadinessSchema,

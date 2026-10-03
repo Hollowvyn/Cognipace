@@ -1,0 +1,249 @@
+<div id="cp-memory-practice-direction" class="viz-carousel viz-dotted-background" aria-label="Memory Strength scale comparison">
+  <section data-variant="Fitted scale" aria-label="Fitted linear scale, recommended Memory Strength treatment">
+    <main class="cp-page" aria-label="Memory Strength and Practice Rhythm preview">
+      <div class="cp-grid">
+        <article class="cp-panel" data-view="memory">
+          <header class="cp-panel-header"><div><h3>Memory Strength</h3><p>Are reviewed memories staying strong for longer?</p></div><div class="cp-switch" aria-label="Memory strength display"><button type="button" aria-pressed="true" data-mode="chart">Chart</button><button type="button" aria-pressed="false" data-mode="table">Table</button></div></header>
+          <div class="cp-chart-content"><div class="cp-plot cp-tall" data-chart="memory"></div><div class="cp-legend"><span><i class="cp-median-key"></i>Median</span><span><i class="cp-whisker"></i>Middle 50% · Q1–Q3</span></div></div>
+          <div class="cp-table-content" hidden><table><caption>Illustrative stability samples by 3-day bucket</caption><thead><tr><th>Period</th><th>Median</th><th>Middle 50%</th></tr></thead><tbody data-table="memory"></tbody></table></div>
+          <p class="cp-panel-note">Illustrative values · ranges require at least 4 eligible reviews.</p>
+          <details><summary>Calculation details</summary><p>Reconstructed post-review FSRS stability, in days. The median is separate from its bucket's Q1–Q3 range. Smaller samples show only the median. The latest 09/30–10/02 bucket is in progress as of 10/02, 2:44 AM. Values and eligible sample counts are illustrative.</p></details>
+        </article>
+        <article class="cp-panel" data-view="practice">
+          <header class="cp-panel-header"><div><h3>Practice Rhythm</h3><p>How did volume and Review Success move?</p></div><div class="cp-switch" aria-label="Practice rhythm display"><button type="button" aria-pressed="true" data-mode="chart">Chart</button><button type="button" aria-pressed="false" data-mode="table">Table</button></div></header>
+          <div class="cp-chart-content"><div class="cp-plot cp-tall" data-chart="practice"></div><div class="cp-legend"><span><i class="cp-block cp-volume-key"></i>Reviews · left axis</span><span><i class="cp-line cp-mint"></i>Review Success · right axis</span></div></div>
+          <div class="cp-table-content" hidden><table><caption>Illustrative practice samples by 3-day bucket</caption><thead><tr><th>Period</th><th>Completed</th><th>Success</th></tr></thead><tbody data-table="practice"></tbody></table></div>
+          <p class="cp-panel-note">Association, not causation · illustrative values.</p>
+          <details><summary>Calculation details</summary><p>Completed review volume and the Good + Easy share use the same 3-day buckets. Axes show different units. Missing success values remain absent, while zero completed volume remains zero. Dashed bridges span missing buckets without creating observations. The latest bucket is in progress as of 10/02, 2:44 AM.</p></details>
+        </article>
+      </div>
+    </main>
+  </section>
+  <section data-variant="Current scale" aria-label="Current linear scale for comparison" hidden></section>
+</div>
+<style>
+  #cp-memory-practice-direction { --cp-bg: light-dark(#f4f6f2,#101513); --cp-panel: light-dark(#ffffff,#1b211e); --cp-text: light-dark(#26382e,#e1e8e3); --cp-muted: light-dark(#59695e,#afbdb4); --cp-border: light-dark(#dce4dc,#3b4840); --cp-grid: light-dark(#e4eae3,#303d34); --cp-mint: light-dark(#34865a,#8fdfa9); --cp-estimate: light-dark(#507c65,#b1d7be); --cp-teal: light-dark(#258e86,#5bdcc9); --cp-gold: light-dark(#a87906,#ffd449); --cp-pink: light-dark(#c06a65,#fbb0aa); --cp-active: light-dark(#d9ebde,#a0cdb2); --cp-active-text: light-dark(#214e33,#173c28); --cp-watch-fill: light-dark(#fcf5dd,#302d1e); --cp-safe-fill: light-dark(#edf5ee,#202c24); --cp-attention-fill: light-dark(#fcf0ec,#2b2522); color:var(--cp-text); }
+  #cp-memory-practice-direction .cp-page { box-sizing:border-box; width:100%; padding:22px; background:var(--cp-bg); color:var(--cp-text); font-family:"Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:14px; line-height:1.5; }
+  #cp-memory-practice-direction * { box-sizing:border-box; }
+  #cp-memory-practice-direction h1,#cp-memory-practice-direction h2,#cp-memory-practice-direction h3,#cp-memory-practice-direction p { margin:0; }
+  #cp-memory-practice-direction h1 { font-size:28px; line-height:1.2; font-weight:500; }
+  #cp-memory-practice-direction h2 { font-size:18px; font-weight:500; }
+  #cp-memory-practice-direction h3 { font-size:16px; line-height:1.4; font-weight:500; }
+  #cp-memory-practice-direction .cp-page-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  #cp-memory-practice-direction .cp-kicker { color:var(--cp-muted); font-size:12px; margin-bottom:5px; }
+  #cp-memory-practice-direction .cp-preview { padding:5px 10px; background:var(--cp-panel); border:1px solid var(--cp-border); border-radius:5px; color:var(--cp-muted); font-size:12px; white-space:nowrap; }
+  #cp-memory-practice-direction .cp-meta { color:var(--cp-muted); margin:12px 0 20px; font-size:12px; }
+  #cp-memory-practice-direction .cp-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  #cp-memory-practice-direction .cp-stats>div { padding:16px 18px; border:1px solid var(--cp-border); border-radius:7px; background:var(--cp-panel); }
+  #cp-memory-practice-direction .cp-stats span { display:block; color:var(--cp-muted); font-size:12px; }
+  #cp-memory-practice-direction .cp-stats strong { display:block; font-size:28px; font-weight:500; line-height:1.5; font-variant-numeric:tabular-nums; }
+  #cp-memory-practice-direction .cp-stats small { display:block; color:var(--cp-muted); font-size:12px; }
+  #cp-memory-practice-direction .cp-note { color:var(--cp-muted); font-size:12px; padding:12px 0 0; }
+  #cp-memory-practice-direction .cp-group { margin-top:24px; }
+  #cp-memory-practice-direction .cp-section-heading { display:flex; align-items:baseline; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  #cp-memory-practice-direction .cp-section-heading>span { color:var(--cp-muted); font-size:12px; }
+  #cp-memory-practice-direction .cp-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:stretch; }
+  #cp-memory-practice-direction .cp-span { grid-column:1/-1; }
+  #cp-memory-practice-direction .cp-panel { min-width:0; background:var(--cp-panel); border:1px solid var(--cp-border); border-radius:7px; padding:16px; display:flex; flex-direction:column; }
+  #cp-memory-practice-direction .cp-panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; min-height:72px; }
+  #cp-memory-practice-direction .cp-span .cp-panel-header { min-height:56px; }
+  #cp-memory-practice-direction .cp-panel-header>div:first-child { min-width:0; }
+  #cp-memory-practice-direction .cp-panel-header p { color:var(--cp-muted); margin-top:3px; font-size:12px; }
+  #cp-memory-practice-direction .cp-switch { display:inline-flex; flex-shrink:0; background:var(--cp-bg); border:1px solid var(--cp-border); border-radius:5px; padding:2px; }
+  #cp-memory-practice-direction button { font:inherit; font-size:12px; color:var(--cp-muted); background:transparent; border:0; padding:5px 8px; border-radius:3px; }
+  #cp-memory-practice-direction .cp-switch button[aria-pressed="true"] { color:var(--cp-active-text); background:var(--cp-active); font-weight:500; }
+  #cp-memory-practice-direction button:disabled { opacity:.45; }
+  #cp-memory-practice-direction .cp-chart-content { min-width:0; }
+  #cp-memory-practice-direction .cp-plot { height:var(--cp-plot-height,240px); width:100%; }
+  #cp-memory-practice-direction .cp-plot.cp-inspectable { position:relative; }
+  #cp-memory-practice-direction .cp-bucket-hit { position:absolute; z-index:1; border-radius:0; padding:0; background:transparent; }
+  #cp-memory-practice-direction .cp-bucket-tooltip { position:absolute; z-index:2; top:8px; right:8px; max-width:calc(100% - 16px); padding:10px 12px; border:1px solid var(--cp-border); border-radius:5px; background:var(--cp-panel); color:var(--cp-text); font-size:12px; line-height:1.5; pointer-events:none; box-shadow:0 4px 12px color-mix(in srgb,var(--cp-border) 35%,transparent); }
+  #cp-memory-practice-direction .cp-bucket-tooltip strong { font-weight:500; }
+  #cp-memory-practice-direction .cp-bucket-tooltip p { margin-top:3px; }
+  #cp-memory-practice-direction .cp-bucket-tooltip small { display:block; margin-top:4px; color:var(--cp-muted); font-size:12px; }
+  #cp-memory-practice-direction .cp-plot.cp-tall { height:calc(var(--cp-plot-height,240px) + 50px); }
+  #cp-memory-practice-direction .cp-plot.cp-map { height:calc(var(--cp-plot-height,240px) + 40px); }
+  #cp-memory-practice-direction .cp-small-multiples { display:grid; grid-template-rows:1fr 1fr; gap:6px; }
+  #cp-memory-practice-direction .cp-plot svg { display:block; width:100%; height:100%; overflow:visible; }
+  #cp-memory-practice-direction .cp-plot svg text { fill:var(--cp-muted); font-family:inherit; font-size:12px; font-weight:400; }
+  #cp-memory-practice-direction .cp-plot svg .cp-axis-title { fill:var(--cp-muted); }
+  #cp-memory-practice-direction .cp-plot svg .cp-value { fill:var(--cp-text); font-weight:500; }
+  #cp-memory-practice-direction .cp-legend { display:flex; align-items:center; gap:8px 16px; flex-wrap:wrap; min-height:30px; color:var(--cp-muted); font-size:12px; }
+  #cp-memory-practice-direction .cp-legend>span { display:inline-flex; align-items:center; gap:6px; }
+  #cp-memory-practice-direction .cp-legend i { display:inline-block; flex-shrink:0; }
+  #cp-memory-practice-direction .cp-line { width:18px; height:0; border-top:2px solid var(--cp-mint); }
+  #cp-memory-practice-direction .cp-estimate { border-color:var(--cp-estimate); border-top-style:dashed; }
+  #cp-memory-practice-direction .cp-target { border-color:var(--cp-gold); border-top-style:dashed; }
+  #cp-memory-practice-direction .cp-dot { width:8px; height:8px; border-radius:50%; background:var(--cp-mint); }
+  #cp-memory-practice-direction .cp-block { width:9px; height:10px; background:var(--cp-mint); }
+  #cp-memory-practice-direction .cp-whisker { width:9px; height:13px; border-top:1px solid var(--cp-estimate); border-bottom:1px solid var(--cp-estimate); background:linear-gradient(to right,transparent 44%,var(--cp-estimate) 44%,var(--cp-estimate) 56%,transparent 56%); }
+  #cp-memory-practice-direction .cp-median-key { width:18px; height:12px; position:relative; background:linear-gradient(transparent 5px,var(--cp-mint) 5px,var(--cp-mint) 7px,transparent 7px); }
+  #cp-memory-practice-direction .cp-median-key::after { content:''; position:absolute; left:5px; top:2px; width:8px; height:8px; border-radius:50%; background:var(--cp-mint); }
+  #cp-memory-practice-direction .cp-iqr-key { width:14px; height:14px; border-top:1px solid var(--cp-estimate); border-bottom:1px solid var(--cp-estimate); background:color-mix(in srgb,var(--cp-estimate) 24%,transparent); }
+  #cp-memory-practice-direction .cp-volume-key { background:var(--cp-estimate); opacity:.4; }
+  #cp-memory-practice-direction .cp-pink { background:var(--cp-pink); }
+  #cp-memory-practice-direction .cp-gold { background:var(--cp-gold); }
+  #cp-memory-practice-direction .cp-teal { background:var(--cp-teal); }
+  #cp-memory-practice-direction .cp-diamond { width:8px; height:8px; transform:rotate(45deg); background:var(--cp-gold); }
+  #cp-memory-practice-direction .cp-triangle { width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:9px solid var(--cp-pink); }
+  #cp-memory-practice-direction .cp-hatch { width:10px; height:10px; background:repeating-linear-gradient(135deg,var(--cp-pink),var(--cp-pink) 3px,var(--cp-panel) 3px,var(--cp-panel) 4px); }
+  #cp-memory-practice-direction details { margin-top:12px; color:var(--cp-muted); font-size:12px; border-top:1px solid var(--cp-border); padding-top:10px; }
+  #cp-memory-practice-direction details p { padding-top:8px; }
+  #cp-memory-practice-direction .cp-region-key { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 16px; margin:12px 0 0; }
+  #cp-memory-practice-direction .cp-region-key dt { color:var(--cp-text); }
+  #cp-memory-practice-direction .cp-region-key dd { margin:0; }
+  #cp-memory-practice-direction .cp-panel-note { font-size:12px; color:var(--cp-muted); margin-top:8px; }
+  #cp-memory-practice-direction .cp-inline-summary { display:flex; flex-wrap:wrap; gap:4px 14px; color:var(--cp-text); font-size:12px; min-height:30px; margin-bottom:4px; }
+  #cp-memory-practice-direction .cp-inline-summary>span { color:var(--cp-muted); }
+  #cp-memory-practice-direction .cp-count { font-size:12px; color:var(--cp-muted); white-space:nowrap; }
+  #cp-memory-practice-direction .cp-table-content { overflow-x:auto; min-width:0; }
+  #cp-memory-practice-direction table { width:100%; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums; }
+  #cp-memory-practice-direction table caption { text-align:left; color:var(--cp-muted); padding-bottom:10px; }
+  #cp-memory-practice-direction th { text-align:left; font-weight:500; }
+  #cp-memory-practice-direction td,#cp-memory-practice-direction th { padding:10px 8px; border-bottom:1px solid var(--cp-border); vertical-align:top; }
+  #cp-memory-practice-direction thead th { color:var(--cp-muted); }
+  #cp-memory-practice-direction td:not(:first-child) { text-align:right; }
+  #cp-memory-practice-direction tbody th { font-weight:400; }
+  #cp-memory-practice-direction .cp-rank { width:48px; }
+  #cp-memory-practice-direction .cp-signals tbody td:last-child { text-align:left; }
+  #cp-memory-practice-direction .cp-signal-tags { display:flex; flex-wrap:wrap; gap:5px 12px; }
+  #cp-memory-practice-direction .cp-signal-tags>span { color:var(--cp-muted); white-space:nowrap; }
+  #cp-memory-practice-direction .cp-signal-tags>span:first-child { color:var(--cp-text); }
+  #cp-memory-practice-direction .cp-pagination { display:flex; justify-content:space-between; align-items:center; gap:10px; padding-top:12px; color:var(--cp-muted); font-size:12px; }
+  #cp-memory-practice-direction .cp-pagination>div { display:flex; gap:6px; }
+  #cp-memory-practice-direction .cp-pagination button { border:1px solid var(--cp-border); }
+  #cp-memory-practice-direction .cp-visually-hidden { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  #cp-memory-practice-direction .cp-wide .cp-history-grid { grid-template-columns:1fr; }
+  #cp-memory-practice-direction .cp-wide .cp-panel-header { min-height:56px; }
+  #cp-memory-practice-direction [hidden] { display:none !important; }
+  @media(max-width:700px) { #cp-memory-practice-direction .cp-grid { grid-template-columns:1fr; } #cp-memory-practice-direction .cp-panel-header { min-height:56px; } #cp-memory-practice-direction .cp-page { padding:18px; } #cp-memory-practice-direction .cp-section-heading { gap:3px; flex-direction:column; } }
+  @media(max-width:430px) { #cp-memory-practice-direction .cp-page { padding:12px; } #cp-memory-practice-direction .cp-stats { grid-template-columns:1fr; gap:8px; } #cp-memory-practice-direction .cp-stats>div { display:grid; grid-template-columns:1fr auto; gap:0 12px; padding:12px; } #cp-memory-practice-direction .cp-stats strong { grid-column:2; grid-row:1/3; font-size:24px; } #cp-memory-practice-direction .cp-stats small { grid-column:1; } #cp-memory-practice-direction .cp-preview { white-space:normal; max-width:90px; text-align:center; } #cp-memory-practice-direction .cp-panel { padding:12px; } #cp-memory-practice-direction .cp-panel-header { flex-direction:column; gap:8px; min-height:84px; } #cp-memory-practice-direction .cp-span .cp-panel-header { min-height:84px; } #cp-memory-practice-direction .cp-switch { align-self:flex-end; } #cp-memory-practice-direction .cp-signals th,#cp-memory-practice-direction .cp-signals td { padding:9px 4px; } #cp-memory-practice-direction .cp-signals th:first-child,#cp-memory-practice-direction .cp-signals td:first-child { width:30px; } #cp-memory-practice-direction .cp-pagination { flex-wrap:wrap; } #cp-memory-practice-direction .cp-signals .cp-panel-header { min-height:72px; } }
+  @media(pointer:coarse) { #cp-memory-practice-direction button { min-height:44px; min-width:44px; } }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('cp-memory-practice-direction');
+  const firstPage = root.querySelector('.cp-page');
+  const wideSection = root.querySelector('[data-variant="Current scale"]');
+  const widePage = firstPage.cloneNode(true);
+  widePage.classList.add('cp-whisker-variant');
+  widePage.querySelectorAll('[id]').forEach(el => { el.id += '-wide'; });
+  widePage.querySelectorAll('[aria-labelledby]').forEach(el => { el.setAttribute('aria-labelledby', el.getAttribute('aria-labelledby') + '-wide'); });
+  wideSection.appendChild(widePage);
+  root.querySelectorAll('button,summary').forEach(el => el.classList.add('cursor-interaction'));
+  const ns = 'http://www.w3.org/2000/svg';
+  let uniqueId = 0;
+  const reportYear = 2026;
+  function compactDate(iso,forceYear=false) {const [year,month,day]=iso.split('-');return `${month}/${day}${forceYear||Number(year)!==reportYear?`/${year.slice(-2)}`:''}`;}
+  function compactRange(start,end) {const crossYear=start.slice(0,4)!==end.slice(0,4);return start===end?compactDate(start):`${compactDate(start,crossYear)}–${compactDate(end,crossYear)}`;}
+  function dayIso(day) {return day<=21?`2026-09-${String(day+9).padStart(2,'0')}`:`2026-10-${String(day-21).padStart(2,'0')}`;}
+  const buckets = [
+    {tick:'Sep 9',range:'Sep 9–11',recall:83,estimate:90,median:3,low:1,high:12,n:6,success:83,ratings:[1,0,1,4]},
+    {tick:'Sep 12',range:'Sep 12–14',recall:86,estimate:85,median:20,low:2,high:44,n:14,success:71,ratings:[2,2,7,3]},
+    {tick:'Sep 15',range:'Sep 15–17',recall:null,estimate:null,median:null,low:null,high:null,n:0,success:null,ratings:[0,0,0,0]},
+    {tick:'Sep 18',range:'Sep 18–20',recall:75,estimate:47,median:1,low:.5,high:3,n:4,success:0,ratings:[1,3,0,0]},
+    {tick:'Sep 21',range:'Sep 21–23',recall:100,estimate:75,median:16,low:7,high:24,n:2,success:50,ratings:[0,1,1,0]},
+    {tick:'Sep 24',range:'Sep 24–26',recall:60,estimate:69,median:3,low:1,high:8,n:5,success:60,ratings:[2,0,1,2]},
+    {tick:'Sep 27',range:'Sep 27–29',recall:null,estimate:null,median:null,low:null,high:null,n:0,success:null,ratings:[0,0,0,0]},
+    {tick:'Sep 30',range:'Sep 30–Oct 2',recall:75,estimate:76,median:12,low:5,high:19,n:8,success:25,ratings:[2,4,1,1]}
+  ];
+  buckets.forEach((bucket,index)=>{bucket.start=dayIso(index*3);bucket.end=dayIso(index*3+2);bucket.range=compactRange(bucket.start,bucket.end);bucket.partial=index===buckets.length-1;});
+  const backlog = [8,8,8,9,9,10,10,7,9,1,3,3,4,4,5,5,6,6,5,7,6,6,7,8,5,8,8,8,6,5];
+  const due = [3,3,1,0,0,1,0,0,1,0,0,0,0,0];
+  const topics = [['Binary Search',27],['Array',36],['Hash Table',67],['Two Pointers',90]];
+  const retention = [[.6,60],[1.9,71],[4,79],[17,86],[.08,100],[2,100],[5.4,87],[8,90],[22,88],[34,100],[42,99],[48,96],[52,91],[60,98],[62,87],[68,90],[71,99],[80,100],[82,94],[100,100],[108,91],[132,93],[170,97],[190,94],[250,100],[278,98],[310,95],[390,99],[460,99],[570,96]];
+  const signals = [
+    ['Put Boxes Into the Warehouse II',['Below recall 60%','11d overdue','Low durability 0.6d']],
+    ['Put Boxes Into the Warehouse I',['Below recall 71%','11d overdue','Low durability 1.9d']],
+    ['Search in Rotated Sorted Array',['Below recall 79%','10d overdue','Low durability 4d']],
+    ['LRU Cache',['Below recall 86%']],
+    ['Set Matrix Zeroes',['7d overdue']],
+    ['Illustrative problem',['Overdue']],
+    ['Illustrative problem',['Low durability']],
+    ['Illustrative problem',['Low durability']]
+  ];
+  function element(tag,attrs={},content) { const node=document.createElementNS(ns,tag); Object.entries(attrs).forEach(([k,v])=>node.setAttribute(k,String(v))); if(content!==undefined) node.textContent=content; return node; }
+  function append(svg,tag,attrs={},content) { const node=element(tag,attrs,content);svg.appendChild(node);return node; }
+  function line(svg,x1,y1,x2,y2,stroke='var(--cp-grid)',extra={}) { return append(svg,'line',{x1,y1,x2,y2,stroke,'stroke-width':1,...extra}); }
+  function text(svg,x,y,value,anchor='start',extra={}) { return append(svg,'text',{x,y,'text-anchor':anchor,...extra},value); }
+  function svgFor(host,height,label) { const width=Math.max(230,host.getBoundingClientRect().width); const svg=element('svg',{viewBox:`0 0 ${width} ${height}`,role:'img','aria-label':label}); append(svg,'title',{},label); return {svg,width,height}; }
+  function selectedTicks(length,width) { if(width<340)return [0,Math.round((length-1)/2),length-1]; if(width<580)return [0,Math.round((length-1)/3),Math.round(2*(length-1)/3),length-1];return Array.from({length},(_,i)=>i); }
+  function frame(svg,width,height,domain,ticks,unit,options={}) {
+    const left=options.left||64,right=options.right||18,top=options.top||30,bottom=options.bottom||50;
+    const box={left,right:width-right,top,bottom:height-bottom};
+    const quantitativeTop=box.top+(options.topInset||0),quantitativeBottom=box.bottom-(options.bottomInset||0);
+    const y=v=>quantitativeBottom-(v-domain[0])/(domain[1]-domain[0])*(quantitativeBottom-quantitativeTop);
+    append(svg,'rect',{x:box.left,y:box.top,width:box.right-box.left,height:box.bottom-box.top,fill:'none',stroke:'var(--cp-grid)','data-chart-frame':''});
+    ticks.forEach(v=>{line(svg,box.left,y(v),box.right,y(v));text(svg,box.left-10,y(v)+4,`${v}${unit}`,'end');});
+    text(svg,box.left,14,options.yTitle||'', 'start',{'class':'cp-axis-title','data-axis':'y'});
+    return {box,y};
+  }
+  function calendarPosition(box,padding=10) {
+    return day=>box.left+padding+day/23*(box.right-box.left-padding*2);
+  }
+  function periodAxis(svg,box,count,width,title='Local date',padding=10) {
+    const calendarX=calendarPosition(box,padding);
+    const ticks=width<340?[0,14,23]:[0,7,14,21];
+    ticks.forEach((day,index)=>{const label=compactDate(dayIso(day));text(svg,calendarX(day),box.bottom+21,label,index===0?'start':index===ticks.length-1?'end':'middle');});
+    text(svg,(box.left+box.right)/2,box.bottom+43,'Local date · 3-day summaries','middle',{'class':'cp-axis-title','data-axis':'x'});
+    return i=>calendarX(1+i*3);
+  }
+  function pathFrom(values,x,y,field) {let result='';let open=false;values.forEach((d,i)=>{const v=typeof d==='number'?d:d[field];if(v===null||v===undefined){open=false;return;}result+=`${open?'L':'M'}${x(i)},${y(v)} `;open=true;});return result;}
+  function dataLine(svg,values,x,y,field,color,dash) {let previous=null;values.forEach((d,i)=>{const v=d[field];if(v===null)return;if(previous!==null){const bridge=i-previous>1;append(svg,'path',{d:`M${x(previous)},${y(values[previous][field])}L${x(i)},${y(v)}`,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':bridge?(field==='estimate'?'2 6':'3 5'):(dash||''),'stroke-linejoin':'round','stroke-linecap':'round','data-gap-bridge':String(bridge)});}previous=i;const attrs={fill:'var(--cp-panel)',stroke:color,'stroke-width':2,'data-tooltip':`${d.range}: ${v}${field==='median'?' days':'%'}`};if(field==='estimate')append(svg,'path',{d:`M${x(i)},${y(v)-3.5}l3.5,3.5 -3.5,3.5 -3.5,-3.5 Z`,...attrs});else append(svg,'circle',{cx:x(i),cy:y(v),r:3,...attrs});});}
+  function drawRecall(host) { const {svg,width,height}=svgFor(host,host.clientHeight,'Observed recall and FSRS estimate by review bucket, target 87 percent. Dashed bridges span missing buckets without adding observations.');const {box,y}=frame(svg,width,height,[20,104],[20,40,60,80,100],'%',{yTitle:'Recall (%)'});const x=periodAxis(svg,box,8,width);line(svg,box.left,y(87),box.right,y(87),'var(--cp-gold)',{'stroke-dasharray':'4 4'});dataLine(svg,buckets,x,y,'estimate','var(--cp-estimate)','4 4');dataLine(svg,buckets,x,y,'recall','var(--cp-mint)');host.replaceChildren(svg); }
+  function drawMemory(host) {const fitted=host.closest('[data-variant]').dataset.variant==='Fitted scale';const ceiling=fitted?50:80;const ticks=fitted?[0,10,20,30,40,50]:[0,20,40,60,80];const {svg,width,height}=svgFor(host,host.clientHeight,`Median FSRS stability in days with discrete Q1 to Q3 whiskers, on a zero to ${ceiling} day linear scale. At least four eligible reviews are needed for a range. Values and counts are illustrative.`);const {box,y}=frame(svg,width,height,[0,ceiling],ticks,'d',{yTitle:'Stability (days)',bottomInset:10,topInset:6});const x=periodAxis(svg,box,8,width);const rangeWidth=Math.min(20,(box.right-box.left)/8*.55);buckets.forEach((d,i)=>{if(d.median===null||d.n<4)return;line(svg,x(i),y(d.low),x(i),y(d.high),'var(--cp-estimate)',{'stroke-width':1.5});line(svg,x(i)-rangeWidth/2,y(d.high),x(i)+rangeWidth/2,y(d.high),'var(--cp-estimate)',{'stroke-width':1.5});line(svg,x(i)-rangeWidth/2,y(d.low),x(i)+rangeWidth/2,y(d.low),'var(--cp-estimate)',{'stroke-width':1.5});});dataLine(svg,buckets,x,y,'median','var(--cp-mint)');svg.querySelectorAll('circle').forEach(dot=>{dot.setAttribute('r','4');dot.setAttribute('fill','var(--cp-mint)');dot.setAttribute('stroke','var(--cp-panel)');dot.setAttribute('stroke-width','1.5');});host.replaceChildren(svg);}
+  function drawPractice(host) {const {svg,width,height}=svgFor(host,host.clientHeight,'Mixed Practice Rhythm chart. Muted bars show completed reviews on the left axis; a line shows Good plus Easy percent on the right axis, on the same bucket timeline. Association, not causation.');const {box,y}=frame(svg,width,height,[-.5,20.5],[0,5,10,15,20],'',{yTitle:'Reviews',right:50});const ySuccess=value=>box.bottom-(value+2.5)/105*(box.bottom-box.top);const bw=Math.min(30,(box.right-box.left)/8*.62);const x=periodAxis(svg,box,8,width,'Local date',bw/2+3);buckets.forEach((d,i)=>append(svg,'rect',{x:x(i)-bw/2,y:y(d.n),width:bw,height:y(0)-y(d.n),rx:2,fill:'var(--cp-estimate)',opacity:.4,'data-tooltip':`${d.range}: ${d.n} completed reviews`}));[0,25,50,75,100].forEach(value=>text(svg,box.right+10,ySuccess(value)+4,`${value}%`));text(svg,width-10,14,'Success (%)','end',{'class':'cp-axis-title','data-axis':'y-right'});dataLine(svg,buckets,x,ySuccess,'success','var(--cp-mint)');host.replaceChildren(svg);}
+  function drawRatings(host) {const {svg,width,height}=svgFor(host,host.clientHeight,'Share of Again, Hard, Good, and Easy ratings by review bucket.');const {box,y}=frame(svg,width,height,[0,100],[0,25,50,75,100],'%',{yTitle:'Rating share (%)'});const bw=Math.min(36,(box.right-box.left)/8*.7);const x=periodAxis(svg,box,8,width,'Review bucket',bw/2+3);const colors=['var(--cp-pink)','var(--cp-gold)','var(--cp-teal)','var(--cp-mint)'];buckets.forEach((d,i)=>{let total=0;d.ratings.forEach((n,j)=>{if(!n)return;const percent=n/d.n*100;append(svg,'rect',{x:x(i)-bw/2,y:y(total+percent),width:bw,height:y(total)-y(total+percent),fill:colors[j],'data-tooltip':`${d.range}: ${['Again','Hard','Good','Easy'][j]} ${n} of ${d.n}`});total+=percent;});});host.replaceChildren(svg);}
+  function drawTopics(host) {const {svg,width,height}=svgFor(host,host.clientHeight,'Topic Review Success: Binary Search 27 percent, Array 36 percent, Hash Table 67 percent, Two Pointers 90 percent.');const left=width<360?102:112,right=width-26,top=35,bottom=height-50;append(svg,'rect',{x:left,y:top,width:right-left,height:bottom-top,fill:'none',stroke:'var(--cp-grid)','data-chart-frame':''});const x=v=>left+v/100*(right-left);[0,25,50,75,100].forEach(v=>{line(svg,x(v),top,x(v),bottom);text(svg,x(v),bottom+21,`${v}%`,v===0?'start':v===100?'end':'middle');});text(svg,left,14,'Topic','start',{'class':'cp-axis-title','data-axis':'y'});text(svg,(left+right)/2,bottom+43,'Review Success (%)','middle',{'class':'cp-axis-title','data-axis':'x'});const row=(bottom-top)/4;topics.forEach(([name,value],i)=>{const center=top+row*(i+.5);text(svg,left-10,center+4,name,'end');append(svg,'rect',{x:left,y:center-12,width:x(value)-left,height:24,rx:3,fill:'var(--cp-gold)','data-tooltip':`${name}: ${value}% Review Success`});text(svg,Math.min(x(value)+8,right-2),center+4,`${value}%`,value>80?'end':'start',{'class':'cp-value'});});host.replaceChildren(svg);}
+  function drawRetention(host) {const {svg,width,height}=svgFor(host,host.clientHeight,'Current estimated recall against logarithmic durability in days. Target 87 percent and one week are reference lines. Sample points illustrate layout.');const {box,y}=frame(svg,width,height,[35,103],[35,50,65,80,100],'%',{yTitle:'Current recall (%)',top:34,bottom:62});const x=v=>box.left+8+(Math.log10(v)+2)/5*(box.right-box.left-16);append(svg,'rect',{x:box.left,y:y(87),width:box.right-box.left,height:box.bottom-y(87),fill:'var(--cp-attention-fill)',opacity:.7});append(svg,'rect',{x:box.left,y:y(87),width:box.right-box.left,height:y(77)-y(87),fill:'var(--cp-watch-fill)'});append(svg,'rect',{x:box.left,y:box.top,width:box.right-box.left,height:y(87)-box.top,fill:'var(--cp-safe-fill)'});[.01,.1,1,10,100,1000].forEach((v,i)=>{line(svg,x(v),box.top,x(v),box.bottom);if(width>480||i%2===0||i===5)text(svg,x(v),box.bottom+23,`${v}d`,i===0?'start':i===5?'end':'middle');});line(svg,box.left,y(87),box.right,y(87),'var(--cp-gold)',{'stroke-dasharray':'4 4'});line(svg,x(7),box.top,x(7),box.bottom,'var(--cp-gold)',{'stroke-dasharray':'4 4'});text(svg,box.right,24,'Target 87%','end',{'class':'cp-value'});text(svg,x(7),box.bottom+43,'1 week','middle',{'class':'cp-value'});text(svg,(box.left+box.right)/2,height-2,'Time above target (days · log scale)','middle',{'class':'cp-axis-title','data-axis':'x'});retention.forEach(([d,r],i)=>{const attrs={'data-tooltip':`Illustrative problem: ${r}% recall, ${d} days durability`};if(i<2)append(svg,'path',{d:`M${x(d)},${y(r)-6} l6,11 h-12 Z`,fill:'var(--cp-pink)',...attrs});else if(i<4)append(svg,'path',{d:`M${x(d)},${y(r)-6} l6,6 -6,6 -6,-6 Z`,fill:'var(--cp-gold)',...attrs});else append(svg,'circle',{cx:x(d),cy:y(r),r:4.5,fill:'var(--cp-mint)',...attrs});});host.replaceChildren(svg);}
+  function drawBacklog(host) {const {svg,width,height}=svgFor(host,host.clientHeight,'Daily overdue backlog over the selected 30 days, watch-zone threshold five problems.');const {box,y}=frame(svg,width,height,[0,20],[0,5,10,15,20],'',{yTitle:'Overdue problems'});append(svg,'rect',{x:box.left,y:y(5),width:box.right-box.left,height:box.bottom-y(5),fill:'var(--cp-safe-fill)'});line(svg,box.left,y(5),box.right,y(5),'var(--cp-gold)',{'stroke-dasharray':'4 4'});const x=i=>box.left+3+i/29*(box.right-box.left-6);let path=`M${x(0)},${y(backlog[0])}`;for(let i=1;i<30;i++)path+=`H${x(i)}V${y(backlog[i])}`;append(svg,'path',{d:path,fill:'none',stroke:'var(--cp-gold)','stroke-width':2,'stroke-linejoin':'round'});for(let i=1;i<30;i++){if(backlog[i-1]<=5&&backlog[i]<=5)append(svg,'path',{d:`M${x(i-1)},${y(backlog[i-1])}H${x(i)}V${y(backlog[i])}`,fill:'none',stroke:'var(--cp-mint)','stroke-width':2});}const ticks=width<340?[0,14,29]:[0,7,14,21,29];ticks.forEach(i=>text(svg,x(i),box.bottom+21,compactDate(i===29?'2026-10-02':`2026-09-${String(i+3).padStart(2,'0')}`),i===0?'start':i===29?'end':'middle'));text(svg,(box.left+box.right)/2,box.bottom+43,'Local date','middle',{'class':'cp-axis-title','data-axis':'x'});host.replaceChildren(svg);}
+  function drawLoad(host) {const {svg,width,height}=svgFor(host,host.clientHeight,'Scheduled review load for October 2 through October 15. Today has three due and five overdue.');const {box,y}=frame(svg,width,height,[0,10],[0,2,4,6,8,10],'',{yTitle:'Scheduled problems'});const patternId=`cp-overdue-${++uniqueId}`;const defs=append(svg,'defs');const pattern=append(defs,'pattern',{id:patternId,patternUnits:'userSpaceOnUse',width:6,height:6,patternTransform:'rotate(45)'});append(pattern,'rect',{width:6,height:6,fill:'var(--cp-pink)'});line(pattern,0,0,0,6,'var(--cp-panel)',{'stroke-width':1.5});const bw=Math.min(24,(box.right-box.left)/14*.72);const x=i=>box.left+bw/2+3+i/13*(box.right-box.left-bw-6);due.forEach((n,i)=>{const overdue=i===0?5:0;const date=compactDate(`2026-10-${String(i+2).padStart(2,'0')}`);if(overdue)append(svg,'rect',{x:x(i)-bw/2,y:y(overdue),width:bw,height:box.bottom-y(overdue),fill:`url(#${patternId})`,'data-tooltip':`${date}: 5 overdue`});if(n)append(svg,'rect',{x:x(i)-bw/2,y:y(n+overdue),width:bw,height:y(overdue)-y(n+overdue),fill:'var(--cp-mint)','data-tooltip':`${date}: ${n} due`});});(width<340?[0,6,13]:[0,4,8,13]).forEach(i=>text(svg,x(i),box.bottom+21,compactDate(`2026-10-${String(i+2).padStart(2,'0')}`),i===0?'start':i===13?'end':'middle'));text(svg,(box.left+box.right)/2,box.bottom+43,'Local date','middle',{'class':'cp-axis-title','data-axis':'x'});host.replaceChildren(svg);}
+  function bucketDescription(view,index) {
+    const d=buckets[index],percent=value=>value===null?'Unavailable':`${value}%`;
+    let fields=[];
+    if(view==='recall')fields=[`Observed Recall: ${percent(d.recall)}`,`FSRS Estimate: ${percent(d.estimate)}`,`Target retention: 87%`];
+    if(view==='memory'){fields=d.median===null?['Median stability: Unavailable','Middle 50%: Unavailable']:[`Median stability: ${d.median}d`,d.n>=4?`Q1: ${d.low}d · Q3: ${d.high}d`:'Middle 50%: Unavailable (needs 4 eligible reviews)'];fields.push(`Eligible reviews: ${d.n} (illustrative)`);}
+    if(view==='practice')fields=[`Review volume: ${d.n}`,`Review Success: ${percent(d.success)}`,`Good + Easy: ${d.ratings[2]+d.ratings[3]} of ${d.n} valid ratings (illustrative)`];
+    if(view==='ratings'){fields=d.n?d.ratings.map((n,i)=>`${['Again','Hard','Good','Easy'][i]}: ${n} (${Math.round(n/d.n*100)}%)`):['Rating shares: Unavailable'];fields.push(`Valid ratings: ${d.n}`);}
+    const context=d.partial?'In progress through 10/02, 2:44 AM.':'Complete 3-day interval.';
+    if(d.n===0)fields.push('No reviews in this sample bucket; unavailable values are not zero.');
+    return {heading:`${d.range} · 3-day summary`,fields,context:`${context} Illustrative values.`};
+  }
+  function installBucketInspection(host) {
+    const view=host.dataset.chart,panel=host.closest('.cp-panel');
+    const firstSvg=host.querySelector('svg'),frameNode=firstSvg.querySelector('[data-chart-frame]');
+    const box={left:Number(frameNode.getAttribute('x')),right:Number(frameNode.getAttribute('x'))+Number(frameNode.getAttribute('width'))};
+    const plotWidth=box.right-box.left;
+    const padding=view==='practice'?Math.min(30,plotWidth/8*.62)/2+3:view==='ratings'?Math.min(36,plotWidth/8*.7)/2+3:10;
+    const calendarX=calendarPosition(box,padding);
+    host.classList.add('cp-inspectable');
+    const hit=document.createElement('button');hit.type='button';hit.className='cp-bucket-hit cursor-interaction';hit.setAttribute('data-chart-hit','');
+    Object.assign(hit.style,{left:`${box.left}px`,top:'30px',width:`${plotWidth}px`,height:`${host.clientHeight-80}px`});
+    const tooltip=document.createElement('div');tooltip.className='cp-bucket-tooltip';tooltip.id=`cp-bucket-detail-${++uniqueId}`;tooltip.role='tooltip';tooltip.hidden=true;hit.setAttribute('aria-describedby',tooltip.id);
+    const live=document.createElement('span');live.className='cp-visually-hidden';live.setAttribute('aria-live','polite');
+    function inspect(index,announce=false){panel.dataset.bucketIndex=String(index);const description=bucketDescription(view,index);tooltip.replaceChildren();const heading=document.createElement('strong');heading.textContent=description.heading;tooltip.appendChild(heading);description.fields.forEach(value=>{const p=document.createElement('p');p.textContent=value;tooltip.appendChild(p);});const context=document.createElement('small');context.textContent=description.context;tooltip.appendChild(context);hit.setAttribute('aria-label',`${description.heading}. ${description.fields.join('. ')}. ${description.context} Use left and right arrow keys to inspect adjacent buckets.`);host.querySelectorAll('svg').forEach(svg=>{let guide=svg.querySelector('[data-bucket-guide]');if(!guide)guide=append(svg,'line',{'data-bucket-guide':'',stroke:'var(--cp-muted)','stroke-width':1,'stroke-dasharray':'2 4','pointer-events':'none'});const frame=svg.querySelector('[data-chart-frame]');Object.entries({x1:calendarX(1+index*3),x2:calendarX(1+index*3),y1:frame.getAttribute('y'),y2:Number(frame.getAttribute('y'))+Number(frame.getAttribute('height'))}).forEach(([key,value])=>guide.setAttribute(key,value));guide.style.display=tooltip.hidden?'none':'';});if(announce)live.textContent=`${description.heading}. ${description.fields.join('. ')}. ${description.context}`;}
+    const show=()=>{tooltip.hidden=false;inspect(Number(panel.dataset.bucketIndex||0));};
+    const hide=()=>{if(!hit.matches(':focus')){tooltip.hidden=true;host.querySelectorAll('[data-bucket-guide]').forEach(guide=>guide.style.display='none');}};
+    hit.addEventListener('pointerenter',show);
+    hit.addEventListener('pointermove',event=>{const x=event.clientX-host.getBoundingClientRect().left;const day=(x-box.left-padding)/(plotWidth-padding*2)*23;inspect(Math.max(0,Math.min(7,Math.round((day-1)/3))));});
+    hit.addEventListener('pointerleave',hide);hit.addEventListener('focus',show);hit.addEventListener('blur',()=>{tooltip.hidden=true;host.querySelectorAll('[data-bucket-guide]').forEach(guide=>guide.style.display='none');});
+    hit.addEventListener('click',()=>{show();inspect(Number(panel.dataset.bucketIndex||0),true);});
+    hit.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();tooltip.hidden=false;const step=event.key==='ArrowRight'?1:-1;inspect(Math.max(0,Math.min(7,Number(panel.dataset.bucketIndex||0)+step)),true);}if(event.key==='Escape'){tooltip.hidden=true;host.querySelectorAll('[data-bucket-guide]').forEach(guide=>guide.style.display='none');}});
+    host.append(hit,tooltip,live);inspect(Number(panel.dataset.bucketIndex||0));
+  }
+  const baseDraws={recall:drawRecall,memory:drawMemory,practice:drawPractice,ratings:drawRatings,topics:drawTopics,retention:drawRetention,backlog:drawBacklog,load:drawLoad};
+  const draws=Object.fromEntries(Object.entries(baseDraws).map(([name,draw])=>[name,host=>{draw(host);if(['recall','memory','practice','ratings'].includes(name))installBucketInspection(host);} ]));
+  const pct=v=>v===null?'—':`${v}%`;
+  function row(values) {const tr=document.createElement('tr');values.forEach((value,i)=>{const cell=document.createElement(i===0?'th':'td');if(i===0)cell.scope='row';cell.textContent=value;tr.appendChild(cell);});return tr;}
+  root.querySelectorAll('[data-table]').forEach(table=>{const kind=table.dataset.table;if(kind==='backlog'){[0,7,9,14,21,29].forEach(i=>table.appendChild(row([compactDate(i===29?'2026-10-02':`2026-09-${String(i+3).padStart(2,'0')}`),backlog[i]])));return;}if(kind==='load'){due.forEach((n,i)=>table.appendChild(row([compactDate(`2026-10-${String(i+2).padStart(2,'0')}`),n,i===0?5:0])));return;}buckets.forEach(d=>{const range=`${d.range}${d.partial?' (in progress)':''}`;const values=kind==='recall'?[range,pct(d.recall),pct(d.estimate),'87%']:kind==='memory'?[range,d.median===null?'—':`${d.median}d`,d.low===null?'—':d.n<4?'Unavailable (<4 reviews)':`${d.low}–${d.high}d`]:kind==='practice'?[range,d.n,pct(d.success)]:[range,...d.ratings];table.appendChild(row(values));});});
+  root.querySelectorAll('.cp-signals').forEach(panel=>{let page=0;const render=()=>{const tbody=panel.querySelector('[data-signals]');tbody.replaceChildren();signals.slice(page*5,page*5+5).forEach(([name,tags],index)=>{const tr=row([page*5+index+1,name,'']);tr.children[0].setAttribute('scope','row');tr.children[1].style.color='var(--cp-estimate)';const tagWrap=document.createElement('div');tagWrap.className='cp-signal-tags';tags.forEach(tag=>{const span=document.createElement('span');span.textContent=tag;tagWrap.appendChild(span);});tr.children[2].appendChild(tagWrap);tbody.appendChild(tr);});panel.querySelector('[data-page-count]').textContent=`Showing ${page*5+1}–${Math.min(page*5+5,8)} of 8${page?' · remaining rows illustrative':''}`;panel.querySelector('[data-page="previous"]').disabled=page===0;panel.querySelector('[data-page="next"]').disabled=page===1;};panel.querySelector('[data-page="previous"]').addEventListener('click',()=>{page=0;render();});panel.querySelector('[data-page="next"]').addEventListener('click',()=>{page=1;render();});render();});
+  root.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{const panel=button.closest('.cp-panel');const isChart=button.dataset.mode==='chart';panel.querySelector('.cp-chart-content').hidden=!isChart;panel.querySelector('.cp-table-content').hidden=isChart;panel.querySelectorAll('[data-mode]').forEach(peer=>peer.setAttribute('aria-pressed',String(peer===button)));if(isChart)panel.querySelectorAll('[data-chart]').forEach(host=>draws[host.dataset.chart](host));}));
+  function redraw() {root.querySelectorAll('[data-chart]').forEach(host=>{if(host.getBoundingClientRect().width>0)draws[host.dataset.chart](host);});}
+  const observer=new ResizeObserver(entries=>entries.forEach(({target})=>{if(target.getBoundingClientRect().width>0)draws[target.dataset.chart](target);}));
+  root.querySelectorAll('[data-chart]').forEach(host=>observer.observe(host));
+  redraw();
+  if(globalThis.Tweak) [firstPage,widePage].forEach(page=>{const settings={plotHeight:240};const tweak=new Tweak({container:page,onChange:()=>{page.style.setProperty('--cp-plot-height',`${settings.plotHeight}px`);redraw();}});tweak.addSlider(settings,'plotHeight',{label:'Supporting plot height',min:220,max:320,step:10,unit:'px',reference:'analytics.plotHeight'});});
+  const stageObserver=new ResizeObserver(()=>{const heights=Array.from(root.children).filter(el=>el.matches('[data-variant]')).map(el=>el.scrollHeight);const max=Math.max(...heights);if(max>0)root.style.setProperty('--cp-stage-min',`${max}px`);});
+  stageObserver.observe(firstPage);stageObserver.observe(widePage);
+})();
+</script>

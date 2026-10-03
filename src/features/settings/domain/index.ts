@@ -1,6 +1,8 @@
 export {
+  analyticsTargetsSchema,
   createUserSettingsPatch,
   dailyGoalSchema,
+  defaultAnalyticsTargets,
   defaultUserSettings,
   deriveNextThemeMode,
   hasUserSettingsChanges,
@@ -15,6 +17,7 @@ export {
   userSettingsPatchSchema,
   userSettingsSchema,
   userSettingsSchemaVersion,
+  type AnalyticsTargets,
   type ReviewOrder,
   type StudyMode,
   type ThemeMode,

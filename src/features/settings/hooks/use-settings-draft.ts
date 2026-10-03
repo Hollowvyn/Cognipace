@@ -7,6 +7,7 @@ import type { GenAiProviderId } from '@/features/genai'
 import { useSettings, useUpdateSettings } from '../api/settings-api'
 import {
   createUserSettingsPatch,
+  defaultAnalyticsTargets,
   defaultUserSettings,
   hasUserSettingsChanges,
   type StudyMode,
@@ -206,18 +207,16 @@ export function useSettingsDraft(): SettingsDraftController {
     setPendingMutation('resetDefaults')
 
     try {
-      const patch = createUserSettingsPatch(state.saved, defaultUserSettings)
-
-      if (!patch) {
-        dispatch({ type: 'saved', settings: defaultUserSettings })
-      } else {
-        const savedSettings = await updateSettings.mutateAsync({
-          surface: 'dashboard',
-          patch,
-        })
-
-        dispatch({ type: 'saved', settings: savedSettings })
+      const patch = {
+        ...createUserSettingsPatch(state.saved, defaultUserSettings),
+        analytics: defaultAnalyticsTargets,
       }
+      const savedSettings = await updateSettings.mutateAsync({
+        surface: 'dashboard',
+        patch,
+      })
+
+      dispatch({ type: 'saved', settings: savedSettings })
 
       dispatch({
         type: 'set-status',

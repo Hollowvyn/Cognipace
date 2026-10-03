@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { genAiProviderIds } from '@/features/genai'
+import { genAiProviderIds } from '@/features/genai/domain'
 
 export const reviewOrderSchema = z.enum([
   'dueFirst',
@@ -10,6 +10,41 @@ export const reviewOrderSchema = z.enum([
 export const studyModeSchema = z.enum(['studyPlan', 'freePractice'])
 export const themeModeSchema = z.enum(['system', 'light', 'dark'])
 export const userSettingsSchemaVersion = 1
+
+const analyticsTargetFractionSchema = z.number().finite().min(0).max(1)
+const firstAttemptTargetFractionSchema = analyticsTargetFractionSchema.refine(
+  (fraction) =>
+    Math.abs(fraction * 100 - Math.round(fraction * 100)) <=
+    Number.EPSILON * 100,
+  'Use a whole percentage',
+)
+const analyticsTargetsShape = {
+  targetRecall: analyticsTargetFractionSchema,
+  targetReviewSuccess: analyticsTargetFractionSchema,
+  targetFirstAttemptSuccess: firstAttemptTargetFractionSchema,
+  targetFirstAttemptGoodEasy: firstAttemptTargetFractionSchema,
+}
+
+export const analyticsTargetsSchema = z
+  .object({
+    ...analyticsTargetsShape,
+    targetFirstAttemptSuccess: firstAttemptTargetFractionSchema.default(0.9),
+    targetFirstAttemptGoodEasy: firstAttemptTargetFractionSchema.default(0.9),
+  })
+  .strict()
+  .refine((targets) => targets.targetReviewSuccess >= targets.targetRecall, {
+    message: 'Review Success target must be at least your Recall target.',
+    path: ['targetReviewSuccess'],
+  })
+
+export type AnalyticsTargets = z.infer<typeof analyticsTargetsSchema>
+
+export const defaultAnalyticsTargets: AnalyticsTargets = {
+  targetRecall: 0.9,
+  targetReviewSuccess: 0.9,
+  targetFirstAttemptSuccess: 0.9,
+  targetFirstAttemptGoodEasy: 0.9,
+}
 
 export const timeOfDaySchema = z
   .string()
@@ -148,6 +183,7 @@ export const userSettingsSchema = z
     schemaVersion: z
       .literal(userSettingsSchemaVersion)
       .default(userSettingsSchemaVersion),
+    analytics: analyticsTargetsSchema.default(defaultAnalyticsTargets),
     appearance: appearanceSettingsSchema.default({ themeMode: 'system' }),
     practice: practiceSettingsSchema,
     review: reviewSettingsSchema,
@@ -164,6 +200,7 @@ export const userSettingsSchema = z
 
 export const userSettingsPatchSchema = z
   .object({
+    analytics: z.object(analyticsTargetsShape).partial().strict().optional(),
     appearance: appearanceSettingsPatchSchema.optional(),
     practice: z
       .object({
@@ -219,6 +256,7 @@ export type ThemeMode = z.infer<typeof themeModeSchema>
 
 export const defaultUserSettings: UserSettings = {
   schemaVersion: userSettingsSchemaVersion,
+  analytics: defaultAnalyticsTargets,
   appearance: {
     themeMode: 'system',
   },
@@ -259,14 +297,14 @@ export const defaultUserSettings: UserSettings = {
 }
 
 export function parseStoredUserSettings(value: unknown): UserSettings {
-  const appearanceSafeValue = createAppearanceSafeStoredValue(value)
-  const parsed = userSettingsSchema.safeParse(appearanceSafeValue)
+  const safeStoredValue = createSafeStoredValue(value)
+  const parsed = userSettingsSchema.safeParse(safeStoredValue)
 
   if (parsed.success) {
     return parsed.data
   }
 
-  const patch = userSettingsPatchSchema.safeParse(appearanceSafeValue)
+  const patch = userSettingsPatchSchema.safeParse(safeStoredValue)
 
   if (patch.success) {
     return mergeStoredUserSettingsPatch(patch.data) ?? defaultUserSettings
@@ -275,19 +313,38 @@ export function parseStoredUserSettings(value: unknown): UserSettings {
   return defaultUserSettings
 }
 
-function createAppearanceSafeStoredValue(value: unknown): unknown {
+function createSafeStoredValue(value: unknown): unknown {
   if (!isRecord(value)) {
     return value
   }
 
   const appearance = appearanceSettingsSchema.safeParse(value.appearance)
+  const analytics = analyticsTargetsSchema.safeParse(
+    isRecord(value.analytics)
+      ? {
+          ...value.analytics,
+          targetFirstAttemptSuccess: recoverStoredFirstAttemptTarget(
+            value.analytics.targetFirstAttemptSuccess,
+          ),
+          targetFirstAttemptGoodEasy: recoverStoredFirstAttemptTarget(
+            value.analytics.targetFirstAttemptGoodEasy,
+          ),
+        }
+      : value.analytics,
+  )
 
   return {
     ...value,
+    analytics: analytics.success ? analytics.data : defaultAnalyticsTargets,
     appearance: appearance.success
       ? appearance.data
       : defaultUserSettings.appearance,
   }
+}
+
+function recoverStoredFirstAttemptTarget(value: unknown): number {
+  const parsed = firstAttemptTargetFractionSchema.safeParse(value)
+  return parsed.success ? parsed.data : 0.9
 }
 
 export function mergeUserSettings(
@@ -315,6 +372,10 @@ function createMergedUserSettings(
     ...current,
     ...patch,
     schemaVersion: userSettingsSchemaVersion,
+    analytics: {
+      ...current.analytics,
+      ...patch.analytics,
+    },
     appearance: {
       ...current.appearance,
       ...patch.appearance,
@@ -370,6 +431,33 @@ export function createUserSettingsPatch(
   draft: UserSettings,
 ): UserSettingsPatch | null {
   const patch: UserSettingsPatch = {}
+
+  const analyticsPatch: NonNullable<UserSettingsPatch['analytics']> = {}
+  if (saved.analytics.targetRecall !== draft.analytics.targetRecall) {
+    analyticsPatch.targetRecall = draft.analytics.targetRecall
+  }
+  if (
+    saved.analytics.targetReviewSuccess !== draft.analytics.targetReviewSuccess
+  ) {
+    analyticsPatch.targetReviewSuccess = draft.analytics.targetReviewSuccess
+  }
+  if (
+    saved.analytics.targetFirstAttemptSuccess !==
+    draft.analytics.targetFirstAttemptSuccess
+  ) {
+    analyticsPatch.targetFirstAttemptSuccess =
+      draft.analytics.targetFirstAttemptSuccess
+  }
+  if (
+    saved.analytics.targetFirstAttemptGoodEasy !==
+    draft.analytics.targetFirstAttemptGoodEasy
+  ) {
+    analyticsPatch.targetFirstAttemptGoodEasy =
+      draft.analytics.targetFirstAttemptGoodEasy
+  }
+  if (hasObjectKeys(analyticsPatch)) {
+    patch.analytics = analyticsPatch
+  }
 
   const appearancePatch: NonNullable<UserSettingsPatch['appearance']> = {}
   if (saved.appearance.themeMode !== draft.appearance.themeMode) {

@@ -12,6 +12,14 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): approved two-rate first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall, with the selected preview preserved verbatim; implemented with automated and production-component proof; required human installed-extension smoke remains pending before review or merge.
+- [`specs/2026-10-03-analytics-practice-ratings-merge-design.md`](./specs/2026-10-03-analytics-practice-ratings-merge-design.md): approved merged Practice Rhythm chart with exact stacked shares, independent completed-review line, saved Success target, and interval union; its three-card layout is historical context superseded by the first-attempt/repeat pair above.
+- [`specs/2026-10-02-analytics-chart-targets-design.md`](./specs/2026-10-02-analytics-chart-targets-design.md): approved independent saved Recall/Review Success goals, compact graph editors, Settings/backup/configured sync ownership, and unchanged FSRS behavior; implemented with automated/fixture proof; human extension smoke remains pending.
+- [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): earlier four-chart historical treatment and exact design snapshots, retained as implementation history; the first-attempt/repeat design now owns the four-card historical layout and later panels remain deferred.
+- [`specs/2026-10-02-analytics-recall-approved-design.md`](./specs/2026-10-02-analytics-recall-approved-design.md): exact approved Recall source, screenshots, and checksums.
+- [`specs/2026-10-02-analytics-memory-practice-approved-design.md`](./specs/2026-10-02-analytics-memory-practice-approved-design.md): exact approved fitted Memory Strength and earlier Practice Rhythm snapshots, preserved as historical context.
+- [`specs/2026-10-02-analytics-ratings-mix-approved-design.md`](./specs/2026-10-02-analytics-ratings-mix-approved-design.md): exact earlier standalone Ratings Mix snapshot, missing-period hatch, and segment labels, preserved as historical context.
+
 - [`specs/2026-10-02-track-editor-external-progress-design.md`](./specs/2026-10-02-track-editor-external-progress-design.md): approved vertical Track editor, Change button menu, and opt-in continuous external progress, including preserving migrations and backup v5.
 - [`specs/2026-09-26-topics-foundation-library-filtering-design.md`](./specs/2026-09-26-topics-foundation-library-filtering-design.md): approved design for typed topic relationships, deterministic aliases, preserving upgrades, and Library filtering by descendants with Any/All matching.
 - [`specs/2026-09-26-non-destructive-content-import-design.md`](./specs/2026-09-26-non-destructive-content-import-design.md): approved design implemented in this branch for a versioned JSON content format, additive problem/track/company/topic imports, read-only previews, partial validation, and atomic database application; human browser proof remains pending before merge.
@@ -44,6 +52,13 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-03-analytics-cleanup.md`](./plans/2026-10-03-analytics-cleanup.md): approved deletion pass for superseded renderers and their tests, unused chart metadata, summary fallback, and duplicate cache/Settings test setup; exact approved visual artifacts remain preserved.
+- [`plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md`](./plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md): phased cohort/API, Settings goals, and graph implementation plan for the approved first-attempt/repeat split; executed with independent specification/code-quality review and preserved production-component proof; human installed-extension smoke remains pending.
+- [`plans/2026-10-03-analytics-practice-ratings-merge.md`](./plans/2026-10-03-analytics-practice-ratings-merge.md): approved phase-sized plan for the pure interval join, merged chart, dashboard composition, automated validation, production-component proof, and required human installed-extension smoke.
+- [`plans/2026-10-02-analytics-compact-target-editors.md`](./plans/2026-10-02-analytics-compact-target-editors.md): user-directed refinement to one small input per graph, independent partial saves, current counterpart constraints, and refreshed production-component proof.
+- [`plans/2026-10-02-analytics-chart-targets.md`](./plans/2026-10-02-analytics-chart-targets.md): approved phase-sized implementation plan for the saved pair, target-aware models/cache, compact editors, validation, and required human extension smoke; execution complete with human extension smoke pending.
+- [`plans/2026-10-02-analytics-historical-charts.md`](./plans/2026-10-02-analytics-historical-charts.md): completed implementation plan for the first four historical charts, inspection, tables, scoped layout, and validation.
 
 - [`plans/2026-10-02-track-editor-phase-1.md`](./plans/2026-10-02-track-editor-phase-1.md): full-width groups and questions, accessible Change menu, and external progress form fields.
 - [`plans/2026-10-02-track-editor-phase-2.md`](./plans/2026-10-02-track-editor-phase-2.md): appended migration, preserving v7/v8 upgrades, backup v5, and additive import compatibility.
@@ -87,6 +102,14 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-03-analytics-first-attempts-and-repeat-recall.md`](./handoffs/2026-10-03-analytics-first-attempts-and-repeat-recall.md): first-recorded outcome rates, independent saved goals, repeat-only paired Recall, validation and production-component screenshots, and required human installed-extension smoke pending before review or merge.
+
+- [`handoffs/2026-10-03-analytics-practice-ratings-merge.md`](./handoffs/2026-10-03-analytics-practice-ratings-merge.md): merged chart implementation, interval and visibility validation, production-component proof, and required human installed-extension happy-path and edge-case smoke pending before review or merge.
+- [`handoffs/2026-10-02-analytics-compact-target-editors.md`](./handoffs/2026-10-02-analytics-compact-target-editors.md): single-target compact controls, safe partial saves, review and validation results, and new fixture screenshots; human installed-extension smoke remains pending.
+- [`handoffs/2026-10-02-analytics-chart-targets.md`](./handoffs/2026-10-02-analytics-chart-targets.md): saved graph goals, pair validation, cache/reset race fixes, automated checks and production-component proof; human installed-extension smoke remains pending.
+
+- [`handoffs/2026-10-02-analytics-historical-charts.md`](./handoffs/2026-10-02-analytics-historical-charts.md): implemented charts, automated validation, component screenshots, and pending human extension smoke.
 
 - [`handoffs/2026-10-02-track-editor-external-progress.md`](./handoffs/2026-10-02-track-editor-external-progress.md): implementation, validation evidence, compatibility and rollback notes, and required human smoke proof.
 

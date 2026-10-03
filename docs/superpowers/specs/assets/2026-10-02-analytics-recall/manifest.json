@@ -1,0 +1,175 @@
+{
+  "status": "human-approved design snapshot; application implementation pending",
+  "approved_on": "2026-10-02",
+  "approval_quote": "we have what we need",
+  "approval_scope": "Final refined Recall preview, after removal of the redundant bottom selected-detail row.",
+  "source_policy": "Frozen byte-for-byte copies of the approved inline source and its clean and tooltip screenshots. Do not format or overwrite frozen artifacts.",
+  "report": {
+    "as_of_local": "2026-10-02T02:44:00",
+    "timezone": "America/New_York",
+    "reference_year": 2026
+  },
+  "fixture_policy": "Illustrative paired-review counts and percentages; not recovered screenshot counts and not a recalculation of live extension data. Exact observed fractions determine plotted observed percentages. Differences in the frozen source are precomputed before display rounding.",
+  "fixture": [
+    {
+      "bucket_start": "2026-09-09",
+      "bucket_end": "2026-09-11",
+      "recalled_count": 5,
+      "paired_reviews": 6,
+      "observed_recall_exact_fraction": "5/6",
+      "observed_recall_percent": 83.33333333333334,
+      "fsrs_estimate_percent": 90,
+      "difference_percent_points_in_frozen_source": -6.666666666667,
+      "difference_exact_fraction_percent_points": "-20/3",
+      "in_progress": false
+    },
+    {
+      "bucket_start": "2026-09-12",
+      "bucket_end": "2026-09-14",
+      "recalled_count": 12,
+      "paired_reviews": 14,
+      "observed_recall_exact_fraction": "12/14",
+      "observed_recall_percent": 85.71428571428571,
+      "fsrs_estimate_percent": 85,
+      "difference_percent_points_in_frozen_source": 0.714285714286,
+      "difference_exact_fraction_percent_points": "5/7",
+      "in_progress": false
+    },
+    {
+      "bucket_start": "2026-09-15",
+      "bucket_end": "2026-09-17",
+      "recalled_count": null,
+      "paired_reviews": null,
+      "observed_recall_exact_fraction": null,
+      "observed_recall_percent": null,
+      "fsrs_estimate_percent": null,
+      "difference_percent_points_in_frozen_source": null,
+      "difference_exact_fraction_percent_points": null,
+      "in_progress": false
+    },
+    {
+      "bucket_start": "2026-09-18",
+      "bucket_end": "2026-09-20",
+      "recalled_count": 3,
+      "paired_reviews": 4,
+      "observed_recall_exact_fraction": "3/4",
+      "observed_recall_percent": 75.0,
+      "fsrs_estimate_percent": 47,
+      "difference_percent_points_in_frozen_source": 28.0,
+      "difference_exact_fraction_percent_points": "28",
+      "in_progress": false
+    },
+    {
+      "bucket_start": "2026-09-21",
+      "bucket_end": "2026-09-23",
+      "recalled_count": 2,
+      "paired_reviews": 2,
+      "observed_recall_exact_fraction": "2/2",
+      "observed_recall_percent": 100.0,
+      "fsrs_estimate_percent": 75,
+      "difference_percent_points_in_frozen_source": 25.0,
+      "difference_exact_fraction_percent_points": "25",
+      "in_progress": false
+    },
+    {
+      "bucket_start": "2026-09-24",
+      "bucket_end": "2026-09-26",
+      "recalled_count": 3,
+      "paired_reviews": 5,
+      "observed_recall_exact_fraction": "3/5",
+      "observed_recall_percent": 60.0,
+      "fsrs_estimate_percent": 69,
+      "difference_percent_points_in_frozen_source": -9.0,
+      "difference_exact_fraction_percent_points": "-9",
+      "in_progress": false
+    },
+    {
+      "bucket_start": "2026-09-27",
+      "bucket_end": "2026-09-29",
+      "recalled_count": null,
+      "paired_reviews": null,
+      "observed_recall_exact_fraction": null,
+      "observed_recall_percent": null,
+      "fsrs_estimate_percent": null,
+      "difference_percent_points_in_frozen_source": null,
+      "difference_exact_fraction_percent_points": null,
+      "in_progress": false
+    },
+    {
+      "bucket_start": "2026-09-30",
+      "bucket_end": "2026-10-02",
+      "recalled_count": 6,
+      "paired_reviews": 8,
+      "observed_recall_exact_fraction": "6/8",
+      "observed_recall_percent": 75.0,
+      "fsrs_estimate_percent": 76,
+      "difference_percent_points_in_frozen_source": -1.0,
+      "difference_exact_fraction_percent_points": "-1",
+      "in_progress": true
+    }
+  ],
+  "approved_visual_rules": {
+    "domain_percent": [
+      20,
+      100
+    ],
+    "ticks_percent": [
+      20,
+      40,
+      60,
+      80,
+      100
+    ],
+    "target_percent": 87,
+    "default_selected_bucket": {
+      "start": "2026-09-18",
+      "end": "2026-09-20"
+    },
+    "default_chart_view": true,
+    "default_tooltip_visible": false,
+    "observed": "Solid mint line and circle markers; active circle radius 5px and stroke width 3px.",
+    "fsrs": "Opaque short-dashed line and diamond markers; active diamond radius 5px and stroke width 2px.",
+    "missing_evidence": "Long-dash bridges connect next measured points; missing buckets never get markers or invented values.",
+    "inspection": "One neutral selected-bucket guide and paired active markers; counts, rates, signed difference, target, full interval and as-of context appear only in the structured tooltip. No bottom selected-detail row and no between-point gap connector.",
+    "sample_count_visibility": "Shared paired-review cohort counts remain contextual when a series is hidden; hidden series rates and the comparison difference follow series visibility.",
+    "dates": "Sparse calendar MM/DD ticks. Append /YY outside the report year and both years for cross-year ranges. Tooltips and table retain full interval endpoints.",
+    "unknowns": "Unavailable counts and rates remain unavailable, not zero.",
+    "controls": "Native Chart/Table and series buttons, nearest-bucket pointer/touch selection, Left/Right keyboard navigation, Escape tooltip dismissal, and dynamic SVG accessibility description."
+  },
+  "production_mapping": {
+    "rows": "AnalyticsViews.observedRecallVsFsrs.rows",
+    "fields": [
+      "bucketStart",
+      "bucketEnd",
+      "isPartial",
+      "recalledCount",
+      "pairedReviews",
+      "observedRecall",
+      "fsrsEstimate",
+      "difference",
+      "provenance",
+      "evidence"
+    ],
+    "difference": "Use serialized difference (fractional units) and multiply by 100 for percentage points. Do not subtract rounded displayed percentages.",
+    "scale": "Use existing serialized adaptive percentage domain and ticks; 20–100% is this fixture, not a new fixed production scale."
+  },
+  "files": {
+    "approved-fragment.html": {
+      "bytes": 20495,
+      "sha256": "82f427f4351c19fb923f28aec38fa5a12d0bdc3026f18c7694b3d653cd3648df"
+    },
+    "approved-preview.jpg": {
+      "bytes": 29719,
+      "sha256": "884c1a490f6864ba1afa50f2ea336bb94c441f4160884251a504daca557d8b4a"
+    },
+    "approved-tooltip.jpg": {
+      "bytes": 37107,
+      "sha256": "a01d3bd019ce570c9d7c1521e683f38f863698135780bdb7d05577bcdc536b12"
+    },
+    "approved-standalone.html": {
+      "bytes": 93853,
+      "sha256": "b08c7f1f7c2a09a9f12f6520e2c8f1c730a5de59bb18bc4f7b3e70e863c50286"
+    }
+  },
+  "checksum_policy": "SHA-256 covers the four frozen artifacts. This metadata manifest is not self-hashed."
+}

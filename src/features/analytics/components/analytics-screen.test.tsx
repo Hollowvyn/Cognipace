@@ -4,10 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { sendMessage } from '@/extension/messaging'
+import { defaultUserSettings } from '@/features/settings/domain'
 import type {
   ReadinessFailure,
   SerializedAnalyticsSummary,
 } from '@/features/analytics/api/analytics-contracts'
+import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 import { metricDefinitions } from '../domain/metric-definitions'
 
@@ -24,39 +26,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 function createUnreadyHistoricalReadiness() {
-  const readiness = {
-    ready: false,
-    requestedDays: 30,
-    bucketDays: 3,
-    requestedBuckets: 10,
-    effectiveBuckets: 0,
-    effectiveStart: null,
-    assessments: 0,
-    minimumAssessments: 24,
-    activeBuckets: 0,
-    minimumActiveBuckets: 0,
-    longestGap: 0,
-    maximumGap: 2,
-    gapRuns: 0,
-    maximumGapRuns: 1,
-    failingReasons: [
-      'no-evidence',
-      'insufficient-span',
-      'insufficient-assessments',
-      'insufficient-active-buckets',
-    ] as ReadinessFailure[],
-  }
-
-  return {
-    requested: readiness,
-    recallQuality: readiness,
-    practiceRhythm: readiness,
-    ratingsMix: readiness,
-    topics: readiness,
-    stability: readiness,
-    overdueBacklog: readiness,
-    recommendedRange: null,
-  }
+  return createSerializedAnalyticsSummary().historicalReadiness
 }
 
 function createReadyHistoricalReadiness() {
@@ -76,6 +46,7 @@ function createReadyHistoricalReadiness() {
     ...historicalReadiness,
     requested: ready,
     recallQuality: { ...ready },
+    firstAttemptOutcomes: { ...ready },
     practiceRhythm: { ...ready },
     ratingsMix: { ...ready },
     topics: { ...ready },
@@ -86,8 +57,7 @@ function createReadyHistoricalReadiness() {
 }
 
 function baseAnalyticsSummary(): SerializedAnalyticsSummary {
-  return {
-    range: 30,
+  return createSerializedAnalyticsSummary({
     generatedAt: '2026-01-15T12:00:00.000Z',
     timeFrame: {
       asOf: '2026-01-15T12:00:00.000Z',
@@ -109,90 +79,9 @@ function baseAnalyticsSummary(): SerializedAnalyticsSummary {
     },
     reviewDays: 42,
     totalReviews: 381,
-    currentStreak: 7,
     observedRatingQuality: { value: 0.72, sampleSize: 58, lowSample: false },
-    predictedRecall: { value: null, sampleSize: 0, lowSample: true },
     observedRatingSampleSize: 58,
-    lowSample: false,
-    targetRetention: 0.9,
-    views: {
-      observedRecallVsFsrs: {
-        rows: [],
-        scale: { domain: [0, 1], ticks: [0, 1] },
-        targetRetention: 0.9,
-      },
-      memoryStrength: {
-        rows: [],
-        scale: { domain: [0, 2], ticks: [0, 1, 2] },
-      },
-      practiceRhythm: {
-        rows: [],
-        countScale: { domain: [0, 1], ticks: [0, 1] },
-        percentageScale: { domain: [0, 1], ticks: [0, 1] },
-      },
-      ratingsMix: {
-        rows: [],
-        selectedHardAgain: 0,
-        selectedValidRatings: 0,
-        comparison: {
-          previousHardAgainShare: null,
-          previousValidRatings: 0,
-          difference: null,
-          direction: null,
-        },
-      },
-      topicPerformance: {
-        rows: [],
-        strongerQualifyingTopics: 0,
-        lowEvidenceTopics: [],
-        additionalLowEvidenceTopics: 0,
-      },
-      retentionMap: {
-        rows: [],
-        totalEligible: 0,
-        statusCounts: { onTarget: 0, watch: 0, needsAttention: 0 },
-        recallScale: { domain: [0, 1], ticks: [0, 1] },
-        durationScale: { domain: [1, 10], ticks: [1, 10] },
-        targetRetention: 0.9,
-      },
-      memorySignals: { rows: [], totalQualifying: 0 },
-      overdueBacklog: {
-        rows: [],
-        knownDays: 0,
-        withinWatchDays: 0,
-        aboveWatchDays: 0,
-        selectedDays: 0,
-        currentBacklog: null,
-        peak: null,
-        scale: { domain: [0, 5], ticks: [0, 5] },
-      },
-      upcomingReviewLoad: {
-        rows: Array.from({ length: 14 }, (_, index) => ({
-          date: `1970-01-${String(index + 1).padStart(2, '0')}`,
-          dueCount: 0,
-          overdueCount: 0,
-          today: index === 0,
-        })),
-        scale: { domain: [0, 1], ticks: [0, 1] },
-      },
-    },
-    historicalReadiness: createUnreadyHistoricalReadiness(),
-    recallQuality: [],
-    practiceRhythm: [],
-    ratingsMix: [],
-    hardAgain: {
-      selectedShare: null,
-      previousShare: null,
-      delta: null,
-      direction: null,
-      sampleSize: 0,
-      previousSampleSize: 0,
-      lowSample: true,
-      previousLowSample: true,
-    },
-    topics: [],
-    stability: [],
-  }
+  })
 }
 
 function createAnalyticsSummary(
@@ -206,55 +95,6 @@ function readyAnalyticsSummary(
 ): SerializedAnalyticsSummary {
   return createAnalyticsSummary({
     historicalReadiness: createReadyHistoricalReadiness(),
-    recallQuality: [
-      {
-        bucketStart: '2026-01-14',
-        bucketEnd: '2026-01-14',
-        observedRecall: 0.78,
-        predictedRecall: 0.84,
-        targetRetention: 0.9,
-        reviewCount: 12,
-        eligibleSampleSize: 12,
-      },
-    ],
-    practiceRhythm: [
-      {
-        bucketStart: '2026-01-12',
-        bucketEnd: '2026-01-14',
-        reviewCount: 4,
-        observedCorrectness: 0.78,
-        sampleSize: 12,
-        associationOnly: true,
-      },
-    ],
-    ratingsMix: [
-      {
-        bucketStart: '2026-01-14',
-        bucketEnd: '2026-01-14',
-        again: 1,
-        hard: 2,
-        good: 6,
-        easy: 3,
-        total: 12,
-        hardAgainShare: 0.25,
-      },
-    ],
-    topics: [
-      {
-        topic: 'Graphs',
-        recallQuality: 0.61,
-        sampleSize: 12,
-        lowSample: false,
-      },
-    ],
-    stability: [
-      {
-        bucketStart: '2026-01-12',
-        bucketEnd: '2026-01-14',
-        medianStabilityDays: 8.2,
-        sampleSize: 12,
-      },
-    ],
     ...overrides,
   })
 }
@@ -263,6 +103,50 @@ describe('AnalyticsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
+
+  it.each([
+    ['targetRecall', 'Recall', 'Recall vs FSRS Estimate', 80],
+    ['targetReviewSuccess', 'Review Success', 'Practice Rhythm', 95],
+    [
+      'targetFirstAttemptSuccess',
+      'First-attempt Success',
+      'New Problem Success',
+      29,
+    ],
+    ['targetFirstAttemptGoodEasy', 'Good + Easy', 'New Problem Success', 29],
+  ] as const)(
+    'wires %s through empty Chart/Table views and saves only its key',
+    async (field, name, panel, percent) => {
+      const user = userEvent.setup()
+      const summary = baseAnalyticsSummary()
+      const value = percent / 100
+      const analytics = { ...defaultUserSettings.analytics, [field]: value }
+      // Hold refetch so captions must update from the saved settings.
+      vi.mocked(sendMessage)
+        .mockReturnValue(new Promise(() => {}))
+        .mockResolvedValueOnce(summary)
+        .mockResolvedValueOnce({ ...defaultUserSettings, analytics })
+      renderAnalyticsScreen()
+      const region = await screen.findByRole('region', { name: panel })
+      const label = `Target ${name}`
+      await user.click(within(region).getByRole('tab', { name: 'Table' }))
+      await user.click(
+        within(region).getByRole('button', { name: `${label} 90%` }),
+      )
+      const input = screen.getByLabelText(`${label} (%)`)
+      await user.clear(input)
+      await user.type(input, `${percent}{Enter}`)
+      expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+        surface: 'dashboard',
+        patch: { analytics: { [field]: value } },
+      })
+      expect(
+        await within(region).findByRole('button', {
+          name: `${label} ${percent}%`,
+        }),
+      ).toBeVisible()
+    },
+  )
 
   it('renders loading state while analytics data is pending', () => {
     vi.mocked(sendMessage).mockReturnValueOnce(new Promise(() => {}))
@@ -381,6 +265,7 @@ describe('AnalyticsScreen', () => {
     vi.mocked(sendMessage).mockResolvedValueOnce(
       readyAnalyticsSummary({
         views: {
+          ...baseAnalyticsSummary().views,
           observedRecallVsFsrs: {
             rows: [
               {
@@ -398,61 +283,7 @@ describe('AnalyticsScreen', () => {
               },
             ],
             scale: { domain: [0.6, 1], ticks: [0.6, 0.8, 1] },
-            targetRetention: 0.9,
-          },
-          memoryStrength: {
-            rows: [],
-            scale: { domain: [0, 2], ticks: [0, 1, 2] },
-          },
-          practiceRhythm: {
-            rows: [],
-            countScale: { domain: [0, 1], ticks: [0, 1] },
-            percentageScale: { domain: [0, 1], ticks: [0, 1] },
-          },
-          ratingsMix: {
-            rows: [],
-            selectedHardAgain: 0,
-            selectedValidRatings: 0,
-            comparison: {
-              previousHardAgainShare: null,
-              previousValidRatings: 0,
-              difference: null,
-              direction: null,
-            },
-          },
-          topicPerformance: {
-            rows: [],
-            strongerQualifyingTopics: 0,
-            lowEvidenceTopics: [],
-            additionalLowEvidenceTopics: 0,
-          },
-          retentionMap: {
-            rows: [],
-            totalEligible: 0,
-            statusCounts: { onTarget: 0, watch: 0, needsAttention: 0 },
-            recallScale: { domain: [0, 1], ticks: [0, 1] },
-            durationScale: { domain: [1, 10], ticks: [1, 10] },
-            targetRetention: 0.9,
-          },
-          memorySignals: { rows: [], totalQualifying: 0 },
-          overdueBacklog: {
-            rows: [],
-            knownDays: 0,
-            withinWatchDays: 0,
-            aboveWatchDays: 0,
-            selectedDays: 0,
-            currentBacklog: null,
-            peak: null,
-            scale: { domain: [0, 5], ticks: [0, 5] },
-          },
-          upcomingReviewLoad: {
-            rows: Array.from({ length: 14 }, (_, index) => ({
-              date: `1970-01-${String(index + 1).padStart(2, '0')}`,
-              dueCount: 0,
-              overdueCount: 0,
-              today: index === 0,
-            })),
-            scale: { domain: [0, 1], ticks: [0, 1] },
+            targetRecall: 0.9,
           },
         },
       }),
@@ -462,28 +293,49 @@ describe('AnalyticsScreen', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'Observed Recall vs FSRS Estimate',
+        name: 'Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
     expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(7)
     expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(7)
-    expect(screen.getByRole('region', { name: 'Ratings Mix' })).toBeVisible()
+    expect(
+      screen.queryByRole('region', { name: 'Ratings Mix' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('renders Ratings Mix and Topic Performance with their semantic Chart and Table alternatives', async () => {
-    vi.mocked(sendMessage).mockResolvedValueOnce(readyAnalyticsSummary())
-
-    renderAnalyticsScreen()
-
-    expect(
-      await screen.findByRole('region', { name: 'Ratings Mix' }),
-    ).toBeVisible()
-    expect(
-      screen.getByRole('region', { name: 'Topic Performance' }),
-    ).toBeVisible()
-    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(7)
-    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(7)
-  })
+  it.each([true, false])(
+    'distinguishes rating readiness when Practice readiness is %s',
+    async (practiceReady) => {
+      const summary = readyAnalyticsSummary()
+      const needs12 = summary.historicalReadiness.ratingsMix
+      needs12.ready = false
+      needs12.assessments = 12
+      needs12.failingReasons = ['insufficient-assessments']
+      if (!practiceReady) summary.historicalReadiness.practiceRhythm = needs12
+      summary.historicalReadiness.ratingsMix = practiceReady
+        ? needs12
+        : createUnreadyHistoricalReadiness().ratingsMix
+      vi.mocked(sendMessage).mockResolvedValueOnce(summary)
+      renderAnalyticsScreen()
+      const ratingWarning = await screen.findByLabelText(
+        'Rating composition readiness',
+      )
+      expect(screen.getByText('Rating composition evidence')).toBeVisible()
+      expect(ratingWarning).toHaveTextContent(
+        practiceReady
+          ? '12 more assessments needed.'
+          : 'Complete your first eligible review to begin this view.',
+      )
+      const practiceWarning = screen.queryByLabelText(
+        'Practice Rhythm readiness',
+      )
+      if (practiceReady) expect(practiceWarning).not.toBeInTheDocument()
+      else {
+        expect(screen.getByText('Practice Rhythm evidence')).toBeVisible()
+        expect(practiceWarning).toHaveTextContent('12 more assessments needed.')
+      }
+    },
+  )
 
   it('uses Topic Performance qualifying evidence instead of legacy correctness readiness', async () => {
     const summary = readyAnalyticsSummary()
@@ -554,7 +406,7 @@ describe('AnalyticsScreen', () => {
 
     expect(
       await screen.findByRole('region', {
-        name: 'Observed Recall vs FSRS Estimate',
+        name: 'Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
     expect(screen.getByLabelText('30-day analytics readiness')).toBeVisible()
@@ -589,6 +441,7 @@ describe('AnalyticsScreen', () => {
         historicalReadiness: {
           requested: readiness,
           recallQuality: readiness,
+          firstAttemptOutcomes: readiness,
           practiceRhythm: readiness,
           ratingsMix: readiness,
           topics: readiness,
@@ -611,7 +464,7 @@ describe('AnalyticsScreen', () => {
     ).toHaveAttribute('href', expect.stringContaining('range=30'))
     expect(
       await screen.findByRole('region', {
-        name: 'Observed Recall vs FSRS Estimate',
+        name: 'Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
     expect(
@@ -647,6 +500,7 @@ describe('AnalyticsScreen', () => {
         historicalReadiness: {
           requested: readiness,
           recallQuality: readiness,
+          firstAttemptOutcomes: readiness,
           practiceRhythm: readiness,
           ratingsMix: readiness,
           topics: readiness,
@@ -676,14 +530,26 @@ describe('AnalyticsScreen', () => {
       failingReasons: ['insufficient-assessments'] as ReadinessFailure[],
     }
 
-    vi.mocked(sendMessage).mockResolvedValueOnce(
-      readyAnalyticsSummary({
-        historicalReadiness: {
-          ...historicalReadiness,
-          practiceRhythm,
-        },
-      }),
-    )
+    const summary = readyAnalyticsSummary({
+      historicalReadiness: {
+        ...historicalReadiness,
+        practiceRhythm,
+      },
+    })
+    summary.views.practiceRhythm.rows = [
+      {
+        id: '2026-01-12',
+        bucketStart: '2026-01-12',
+        bucketEnd: '2026-01-14',
+        isPartial: false,
+        completedReviews: 4,
+        goodEasy: 3,
+        validRatings: 4,
+        reviewSuccess: 0.75,
+        evidence: 'measured',
+      },
+    ]
+    vi.mocked(sendMessage).mockResolvedValueOnce(summary)
 
     renderAnalyticsScreen()
 
@@ -696,6 +562,15 @@ describe('AnalyticsScreen', () => {
     expect(
       screen.getByRole('region', { name: 'Practice Rhythm' }),
     ).toBeVisible()
+    const chart = screen.getByRole('button', {
+      name: 'Inspect Practice Rhythm chart',
+    })
+    const warning = screen.getByRole('status', {
+      name: 'Practice Rhythm readiness',
+    })
+    expect(
+      chart.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(
       screen.queryByRole('region', { name: 'Ratings mix' }),
     ).not.toBeInTheDocument()
@@ -708,22 +583,45 @@ describe('AnalyticsScreen', () => {
 
     expect(
       await screen.findByRole('region', {
-        name: 'Observed Recall vs FSRS Estimate',
+        name: 'Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
     expect(
       within(
         screen.getByRole('region', {
-          name: 'Observed Recall vs FSRS Estimate',
+          name: 'Recall vs FSRS Estimate',
         }),
       ).getByText(
         /reconstructed FSRS retrievability immediately before those exact reviews/,
       ),
     ).toBeVisible()
+    const first = screen.getByRole('region', { name: 'New Problem Success' })
+    const recall = screen.getByRole('region', {
+      name: 'Recall vs FSRS Estimate',
+    })
+    expect(first.parentElement).toBe(recall.parentElement)
+    expect(first.parentElement).toHaveClass('lg:grid-cols-2')
+    expect(
+      within(first).getByText('How are your first recorded outcomes changing?'),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('region', { name: 'Practice Rhythm' }).parentElement,
+    ).not.toBe(first.parentElement)
+    expect(
+      screen.getByRole('region', { name: 'Memory Strength' }).parentElement,
+    ).toBe(
+      screen.getByRole('region', { name: 'Topic Performance' }).parentElement,
+    )
     const chartRegionNames = [
-      'Observed Recall vs FSRS Estimate',
-      'Memory Strength',
+      'New Problem Success',
+      'Recall vs FSRS Estimate',
       'Practice Rhythm',
+      'Memory Strength',
+      'Topic Performance',
+      'Retention Map',
+      'Memory Signals by Problem',
+      'Recent Overdue Backlog',
+      'Upcoming Review Load',
     ]
     const regionOrder = screen.getAllByRole('region').map((region) => {
       const labelledBy = region.getAttribute('aria-labelledby')
@@ -741,7 +639,7 @@ describe('AnalyticsScreen', () => {
     })
     expect(
       within(practiceRhythm).getByText(
-        /Completed review volume and the Good \+ Easy share/,
+        /Rating shares and completed review volume/,
       ),
     ).toBeVisible()
     expect(screen.queryByText(/practice days \/ week/i)).not.toBeInTheDocument()
@@ -756,27 +654,34 @@ describe('AnalyticsScreen', () => {
     ).not.toBeInTheDocument()
   })
 
+  it.each([
+    ['firstAttemptOutcomes', 'New Problem Success', 'Recall vs FSRS Estimate'],
+    ['recallQuality', 'Recall vs FSRS Estimate', 'New Problem Success'],
+  ] as const)(
+    'keeps %s readiness independent of the other cohort',
+    async (key, unreadyTitle, readyTitle) => {
+      const summary = readyAnalyticsSummary()
+      summary.historicalReadiness[key] = createUnreadyHistoricalReadiness()[key]
+      vi.mocked(sendMessage).mockResolvedValueOnce(summary)
+      renderAnalyticsScreen()
+      expect(
+        await screen.findByLabelText(`${unreadyTitle} readiness`),
+      ).toBeVisible()
+      expect(
+        screen.queryByLabelText(`${readyTitle} readiness`),
+      ).not.toBeInTheDocument()
+    },
+  )
+
   it('renders chart-level empty states when the service is ready but a series is empty', async () => {
-    vi.mocked(sendMessage).mockResolvedValueOnce(
-      readyAnalyticsSummary({
-        views: {
-          ...baseAnalyticsSummary().views,
-          observedRecallVsFsrs: {
-            ...baseAnalyticsSummary().views.observedRecallVsFsrs,
-            rows: [],
-          },
-        },
-      }),
-    )
-
+    vi.mocked(sendMessage).mockResolvedValueOnce(readyAnalyticsSummary())
     renderAnalyticsScreen()
-
     const recallPanel = await screen.findByRole('region', {
-      name: 'Observed Recall vs FSRS Estimate',
+      name: 'Recall vs FSRS Estimate',
     })
     expect(
       within(recallPanel).getByText(
-        'No reviews in this period have both a valid rating and an FSRS estimate.',
+        'No repeat reviews in this period have both a valid rating and an FSRS estimate. First recorded reviews build memory for later comparisons.',
       ),
     ).toBeVisible()
     expect(

@@ -5,7 +5,9 @@ import { sendMessage } from '@/extension/messaging'
 import { queryKeys } from '@/platform/query/query-keys'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 
-import { defaultUserSettings } from '../domain'
+import { useSettings } from '../api/settings-api'
+import { settingsUpdateRequestSchema } from '../api/settings-contracts'
+import { defaultUserSettings, mergeUserSettings } from '../domain'
 import { useSettingsDraft } from './use-settings-draft'
 
 vi.mock('@/extension/messaging', () => ({
@@ -16,6 +18,144 @@ describe('useSettingsDraft', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
+
+  it('resets a successful local Save while its Settings refetch is still pending', async () => {
+    let storedSettings = defaultUserSettings
+    let readCount = 0
+    let finishRefetch: (() => void) | undefined
+    vi.mocked(sendMessage).mockImplementation((method, payload) => {
+      if (method === 'settings.getSettings') {
+        readCount += 1
+        return readCount === 1
+          ? Promise.resolve(storedSettings)
+          : new Promise<typeof defaultUserSettings>((resolve) => {
+              finishRefetch = () => resolve(storedSettings)
+            })
+      }
+      if (method === 'settings.updateSettings') {
+        const { patch } = settingsUpdateRequestSchema.parse(payload)
+        storedSettings = mergeUserSettings(storedSettings, patch)
+        return Promise.resolve(storedSettings)
+      }
+      return Promise.reject(new Error(`Unexpected method ${method}`))
+    })
+    const { queryClient, wrapper } = createQueryTestHarness()
+    const { result } = renderHook(() => useSettingsDraft(), { wrapper })
+    await waitFor(() => {
+      expect(result.current.draft).toEqual(defaultUserSettings)
+    })
+    act(() => {
+      result.current.actions.setNumberInput('dailyGoal', '9')
+    })
+    await act(async () => {
+      await result.current.actions.save()
+    })
+    await waitFor(() => {
+      expect(readCount).toBeGreaterThan(1)
+      expect(result.current.draft?.practice.dailyGoal).toBe(9)
+    })
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toEqual(
+      defaultUserSettings,
+    )
+
+    await act(async () => {
+      await result.current.actions.resetDefaults()
+    })
+
+    expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+      surface: 'dashboard',
+      patch: {
+        practice: { dailyGoal: defaultUserSettings.practice.dailyGoal },
+        analytics: defaultUserSettings.analytics,
+      },
+    })
+    expect(storedSettings).toEqual(defaultUserSettings)
+    expect(result.current.draft).toEqual(defaultUserSettings)
+    act(() => {
+      finishRefetch?.()
+    })
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryState(queryKeys.settings.all)?.fetchStatus,
+      ).toBe('idle')
+    })
+  })
+
+  it.each(['save', 'resetDefaults'] as const)(
+    '%s uses externally refreshed targets without replacing a dirty draft',
+    async (action) => {
+      let storedSettings = defaultUserSettings
+      vi.mocked(sendMessage).mockImplementation((method, payload) => {
+        if (method === 'settings.getSettings')
+          return Promise.resolve(storedSettings)
+        if (method === 'settings.updateSettings') {
+          storedSettings = mergeUserSettings(
+            storedSettings,
+            settingsUpdateRequestSchema.parse(payload).patch,
+          )
+          return Promise.resolve(storedSettings)
+        }
+        return Promise.reject(new Error(`Unexpected method ${method}`))
+      })
+      const { queryClient, wrapper } = createQueryTestHarness()
+      const { result } = renderHook(
+        () => ({
+          controller: useSettingsDraft(),
+          latestSettings: useSettings(),
+        }),
+        { wrapper },
+      )
+      await waitFor(() =>
+        expect(result.current.controller.draft).toEqual(defaultUserSettings),
+      )
+      act(() =>
+        result.current.controller.actions.setNumberInput('dailyGoal', '9'),
+      )
+      const refreshedTargets = {
+        ...defaultUserSettings.analytics,
+        targetRecall: 0.8,
+        targetReviewSuccess: 0.9,
+        targetFirstAttemptSuccess: 0.29,
+        targetFirstAttemptGoodEasy: 1,
+      }
+      storedSettings = { ...defaultUserSettings, analytics: refreshedTargets }
+      act(() => {
+        queryClient.setQueryData(queryKeys.settings.all, storedSettings)
+      })
+      await waitFor(() =>
+        expect(result.current.latestSettings.data?.analytics).toEqual(
+          refreshedTargets,
+        ),
+      )
+      expect(result.current.controller.draft?.analytics).toEqual(
+        defaultUserSettings.analytics,
+      )
+      expect(result.current.controller.draft?.practice.dailyGoal).toBe(9)
+      expect(result.current.controller.canResetDefaults).toBe(true)
+
+      await act(async () => result.current.controller.actions[action]())
+
+      expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+        surface: 'dashboard',
+        patch:
+          action === 'save'
+            ? { practice: { dailyGoal: 9 } }
+            : { analytics: defaultUserSettings.analytics },
+      })
+      expect(storedSettings).toEqual({
+        ...defaultUserSettings,
+        analytics:
+          action === 'save' ? refreshedTargets : defaultUserSettings.analytics,
+        practice: {
+          ...defaultUserSettings.practice,
+          dailyGoal:
+            action === 'save' ? 9 : defaultUserSettings.practice.dailyGoal,
+        },
+      })
+      expect(result.current.controller.draft).toEqual(storedSettings)
+      expect(result.current.controller.hasChanges).toBe(false)
+    },
+  )
 
   it('tracks edits, validates numeric input, and discards to saved settings', async () => {
     vi.mocked(sendMessage).mockResolvedValue(defaultUserSettings)
@@ -425,6 +565,7 @@ describe('useSettingsDraft', () => {
     expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
       surface: 'dashboard',
       patch: {
+        analytics: defaultUserSettings.analytics,
         practice: { dailyGoal: defaultUserSettings.practice.dailyGoal },
         reminders: { daily: { enabled: false } },
       },

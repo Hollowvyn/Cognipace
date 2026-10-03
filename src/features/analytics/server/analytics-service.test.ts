@@ -26,6 +26,69 @@ import { analyticsSummarySchema } from '../api/analytics-contracts'
 import { getAnalyticsSummary } from './analytics-service'
 
 describe('getAnalyticsSummary dashboard views', () => {
+  it('makes first-attempt readiness independent from an initial-only Recall cohort and reads persisted goals without changing cards or evidence', async () => {
+    const handle = await createTestDb({ seed: false })
+    const now = new Date('2026-08-14T12:00:00Z')
+    for (let index = 0; index < 14; index += 1) {
+      const slug = `new-problem-${index}`
+      await insertAnalyticsProblem(handle.db, slug, slug, [])
+      await insertAnalyticsHistory(handle.db, slug, {
+        id: `${slug}:default`,
+        dates: [new Date(Date.UTC(2026, 7, index + 1, 12))],
+        ratings: ['hard'],
+        correct: [true],
+        dueAt: new Date('2026-08-15T12:00:00Z'),
+        stability: 4,
+        difficulty: 4,
+      })
+    }
+    await updateSettings(handle.db, { review: { targetRetention: 0.85 } })
+    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    expect(summary.historicalReadiness).toMatchObject({
+      firstAttemptOutcomes: { ready: true, assessments: 14, activeBuckets: 14 },
+      recallQuality: { ready: false, assessments: 0, activeBuckets: 0 },
+    })
+    expect(summary.recallQuality).toEqual([])
+    expect(summary.predictedRecall.sampleSize).toBe(0)
+    expect(summary.views.firstAttemptOutcomes.totals).toMatchObject({
+      validFirstAttempts: 14,
+      hardGoodEasy: 14,
+      goodEasy: 0,
+      firstAttemptSuccess: 1,
+      firstAttemptGoodEasy: 0,
+    })
+    const cardsBefore = await handle.db.select().from(fsrsCards)
+
+    await updateSettings(handle.db, {
+      analytics: {
+        targetRecall: 0,
+        targetReviewSuccess: 1,
+        targetFirstAttemptSuccess: 0,
+        targetFirstAttemptGoodEasy: 1,
+      },
+    })
+    const after = await getAnalyticsSummary(handle.db, { range: 14, now })
+
+    expect(after.views).toMatchObject({
+      retentionMap: summary.views.retentionMap,
+      observedRecallVsFsrs: { targetRecall: 0 },
+      practiceRhythm: {
+        ...summary.views.practiceRhythm,
+        targetReviewSuccess: 1,
+        percentageScale: { domain: [0, 1] },
+      },
+      firstAttemptOutcomes: {
+        ...summary.views.firstAttemptOutcomes,
+        targetFirstAttemptSuccess: 0,
+        targetFirstAttemptGoodEasy: 1,
+        scale: { domain: [0, 1] },
+      },
+    })
+    expect(after.targetRetention).toBe(0.85)
+    expect(after.views.observedRecallVsFsrs.scale.domain[0]).toBe(0)
+    expect(await handle.db.select().from(fsrsCards)).toEqual(cardsBefore)
+  })
+
   it.each([14, 30, 90] as const)(
     'retains the selected %s-day range in the readiness contract',
     async (range) => {
@@ -97,9 +160,9 @@ describe('getAnalyticsSummary dashboard views', () => {
       (point) => point.bucketStart === '2026-08-02',
     )
 
-    expect(summary.predictedRecall.sampleSize).toBe(2)
+    expect(summary.predictedRecall.sampleSize).toBe(1)
     expect(summary.predictedRecall.lowSample).toBe(true)
-    expect(day).toMatchObject({ reviewCount: 2 })
+    expect(day).toMatchObject({ reviewCount: 1 })
   })
 
   it('excludes future-dated reviews from observed rating quality', async () => {
@@ -296,7 +359,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     )
 
     expect(summary.targetRetention).toBe(0.85)
-    expect(summary.predictedRecall.sampleSize).toBe(11)
+    expect(summary.predictedRecall.sampleSize).toBe(10)
     expect(summary.predictedRecall.lowSample).toBe(false)
     expect(summary.predictedRecall.value).not.toBeNull()
     expect(summary.hardAgain).toMatchObject({
@@ -408,7 +471,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     ).toBe(true)
   })
 
-  it('keeps recall quality unready when valid ratings have no persisted correctness', async () => {
+  it('uses paired repeat ratings for Recall readiness even without persisted correctness', async () => {
     const handle = await createTestDb({ seed: false })
     const now = new Date('2026-08-13T12:00:00.000Z')
     const dates = Array.from({ length: 24 }, (_, index) => {
@@ -441,17 +504,16 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
     expect(summary.historicalReadiness.recallQuality).toMatchObject({
       ready: false,
-      assessments: 0,
-      activeBuckets: 0,
+      assessments: 23,
+      activeBuckets: 8,
     })
     expect(summary.historicalReadiness.recallQuality.failingReasons).toContain(
-      'no-evidence',
+      'insufficient-assessments',
     )
     expect(summary.recallQuality.length).toBeGreaterThan(0)
     expect(
       summary.recallQuality.every(
-        (point) =>
-          point.observedRecall === null && point.predictedRecall !== null,
+        (point) => point.observedRecall === 1 && point.predictedRecall !== null,
       ),
     ).toBe(true)
   })
@@ -587,19 +649,25 @@ describe('getAnalyticsSummary dashboard views', () => {
 
     for (const readiness of [
       summary.historicalReadiness.requested,
-      summary.historicalReadiness.recallQuality,
       summary.historicalReadiness.practiceRhythm,
       summary.historicalReadiness.topics,
       summary.historicalReadiness.stability,
     ]) {
       expect(readiness).toMatchObject({ assessments: 7, activeBuckets: 7 })
     }
+    expect(summary.historicalReadiness.recallQuality).toMatchObject({
+      assessments: 6,
+      activeBuckets: 6,
+    })
+    expect(summary.historicalReadiness.firstAttemptOutcomes).toMatchObject({
+      assessments: 0,
+    })
     expect(
       summary.recallQuality.reduce(
         (count, point) => count + point.eligibleSampleSize,
         0,
       ),
-    ).toBe(7)
+    ).toBe(6)
     expect(
       summary.practiceRhythm.reduce(
         (count, point) => count + point.reviewCount,
@@ -655,7 +723,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
   })
 
-  it('counts only persisted correctness observations for recall quality readiness', async () => {
+  it('counts the exact paired repeat cohort for recall quality readiness', async () => {
     const handle = await createTestDb({ seed: false })
     const now = new Date('2026-08-13T12:00:00.000Z')
     const dates = Array.from({ length: 14 }, (_, index) => {
@@ -691,8 +759,8 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
     expect(summary.historicalReadiness.recallQuality).toMatchObject({
       ready: true,
-      assessments: 12,
-      activeBuckets: 12,
+      assessments: 13,
+      activeBuckets: 13,
     })
   })
 
@@ -977,10 +1045,16 @@ describe('getAnalyticsSummary dashboard views', () => {
       timeZone: 'America/New_York',
     })
 
-    expect(summary.recallQuality[0]).toMatchObject({
+    expect(summary.recallQuality).toEqual([])
+    expect(
+      summary.views.firstAttemptOutcomes.rows.find(
+        (row) => row.validFirstAttempts > 0,
+      ),
+    ).toMatchObject({
       bucketStart: '2026-03-07',
       bucketEnd: '2026-03-07',
-      reviewCount: 1,
+      validFirstAttempts: 1,
+      isPartial: false,
     })
     expect(summary.views.upcomingReviewLoad.rows[0]).toMatchObject({
       date: '2026-03-08',

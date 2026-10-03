@@ -278,7 +278,12 @@ creates a fresh migrated and seeded database.
 
 ### Analytics Read Models And Chart Story
 
-Analytics is a feature-owned, read-only calculation. The background Analytics
+Analytics calculations remain feature-owned and read-only. The only editable
+Analytics behavior is the small chart-goal preference pair owned by Settings.
+The chart-target and merged Practice Rhythm implementations and automated/fixture
+validation are recorded in their handoffs; human installed-extension happy-path
+and edge-case smoke with screenshot or recording proof remains pending before
+review or merge. The background Analytics
 service reads the full review history once for a request, together with the
 current FSRS cards and supporting local state; chart components do not make
 per-chart database calls. Its data flow is:
@@ -300,6 +305,14 @@ The owners in that flow are:
 - `src/features/analytics/domain/analytics-readiness.ts` derives the effective
   window and readiness gates. `S`, `A`, `G`, `K`, and `E` mean eligible
   assessments, active buckets, longest gap, gap runs, and effective buckets.
+- `src/features/analytics/domain/review-cohorts.ts` selects the earliest raw
+  retained event per problem before validity/range filters and constructs
+  repeat-only FSRS pairs from full per-card valid-rating replay. An invalid first
+  event is not promoted, and replay index zero never enters Recall. Both legacy
+  and historical Recall builders and their readiness consume the same pairs.
+  `historical-presentation.ts` supplies first-outcome counts, weighted totals,
+  exclusions, rates, targets, and scale; first-outcome readiness counts valid
+  selected first events independently of paired repeats.
 - `src/features/analytics/domain/chart-buckets.ts` and
   `src/features/analytics/domain/chart-data.ts` aggregate each metric only from
   eligible evidence, preserve unknown buckets as `null`, and classify solid or
@@ -307,19 +320,122 @@ The owners in that flow are:
   buckets after its first supported bucket.
 - `src/features/analytics/api/analytics-contracts.ts` validates the serialized
   read model with Zod before it crosses the extension runtime boundary.
-- `src/features/analytics/components/charts/chart-definitions.ts` is the typed
-  chart catalogue: title, question, data meaning, eligibility, aggregation,
-  semantic series, and sparse-state copy. `LineSegments` in
+- Settings owns defaulted `analytics.targetRecall` and
+  `analytics.targetReviewSuccess` fractions in its existing JSON preferences,
+  both 0.9 by default. Full-pair validation requires finite values from 0
+  through 1 and Success greater than or equal to Recall; this is a goal rule,
+  never a rule for measured chart rates. Missing older fields use defaults;
+  malformed stored analytics falls back only to analytics defaults. Explicit
+  deep merge and validated patches preserve unrelated preferences and save
+  the pair atomically. Analytics' target mutation reuses `useUpdateSettings`,
+  `settings.updateSettings`, the Settings repository, and existing query
+  invalidation. Each graph sends only its edited target property; the Settings
+  transaction merges against the latest stored counterpart before validating
+  the pair. UI validates against current props without discarding an active
+  draft when the counterpart refreshes. Successful saved results update cached
+  chart goals, Recall's fitted percentage scale, and the compatible legacy
+  Practice percentage scale; failed saves leave those caches unchanged. The
+  merged Practice composition uses a fixed `[0, 1]` presentation scale, so goal
+  edits cannot alter its rating geometry or supplied count scale. No new runtime
+  method, table, migration, Chrome permission, or Settings page section is
+  needed. Settings Save preserves the pair; Reset Defaults restores 0.9/0.9.
+  The user explicitly approved inclusion in existing backup export/restore and
+  configured Gist settings payloads, without a new sync mechanism.
+- Settings also owns `analytics.targetFirstAttemptSuccess` and
+  `analytics.targetFirstAttemptGoodEasy`, each defaulting to 0.9 on a whole-percent
+  fraction grid. They are independent of each other and of the existing pair.
+  Missing fields default independently, malformed local new fields recover
+  independently, and strict imports reject malformed supplied values. The
+  existing partial mutation updates references and the fitted first-outcome
+  scale across all cached ranges without changing rows, totals, or readiness.
+  Reset Defaults restores all four targets. The new serialized first-outcome
+  schema validates rating/count/numerator/rate/evidence coherence and totals
+  against the full untrimmed rows before runtime transport.
+- Historical view components own their chart descriptions and semantic series.
+  `LineSegments` in
   `src/features/analytics/components/charts/line-segments.tsx` renders measured
   runs and dashed next-valid-point bridges without interpolating data.
+- The four historical cards use New Problem Success from
+  `new-problem-success-view.tsx`, Recall from `recall-ratings-views.tsx`, Memory
+  Strength from `memory-practice-views.tsx`, and the merged
+  `practice-ratings-view.tsx`. `analytics-screen.tsx` places New Problem Success
+  and Recall in a responsive `lg` pair, Practice in a full-width card, then
+  Memory and the unchanged Topic view in a responsive
+  pair. Later current-state/workload panels retain their existing treatment.
+  The screen retains the Settings-owned Review Success editor and exposes
+  distinct rating/count readiness warnings when they differ.
+  Their feature-local `historical-chart.tsx`
+  frame uses the public Recharts plot and axis scales for numeric calendar
+  coordinates, supported markers, and one native inspection control.
+  `historical-chart-model.ts` positions immutable serialized rows at their
+  calendar midpoint and selects sparse ticks independently of observations.
+  The frame/model's default-off `startAtFirstPoint` option is enabled only for
+  Recall and New Problem Success. With at least two retained intervals, it uses the first midpoint as
+  the X domain's start, retains the last interval's end, and gives the first
+  point 12px of left scale clearance. Marks keep their actual calendar
+  midpoints; sparse ticks stay within the displayed domain. A singleton keeps
+  its original interval domain and centered marker. Other charts retain the
+  default interval-boundary domain and padding. Series visibility cannot shift
+  either graph's domain.
+  The shared `trimHistoricalEmptyEdges` helper returns a contiguous slice for
+  all four historical cards. First outcomes accepts either known rate, including
+  zero; Recall accepts either known rate independently of series
+  toggles; Memory accepts a finite `medianStrengthDays` including zero or sub-day
+  values. Memory's window predicate
+  does not require quartiles or four eligible reviews; those govern whiskers
+  only. Empty internal rows stay in the slice; wholly unsupported rows produce
+  the existing empty state.
+  Exact original date ranges, report timezone, counts, and evidence stay in
+  inspection and the shared seven-row `historical-table.tsx` alternative, which
+  use the same retained rows as the chart.
+  Memory Strength uses the fitted duration-scale helper. Recall's serialized
+  `targetRecall` participates in its percentage-scale fit, including goals at 0
+  or 1. The merged Practice reference uses its fixed left percentage axis,
+  preserving the independent supplied right count scale. The
+  feature-owned native editor saves preferences above the plot; drawing
+  primitives do not persist data. Goal edits cannot change rows, dates, gaps,
+  observations, counts, trim rules, or FSRS scheduling/Retention Map outputs.
+  The current FSRS `targetRetention` remains intact outside the personal chart
+  references. Scoped presentation styles live in
+  `src/styles/analytics.css`, enabled by the panel's `historical` option.
+  New Problem Success uses distinct scoped mint/blue tokens for its two solid
+  curves and matching references, with one neutral reference when goals are
+  equal. Both target editors and tooltip goals remain available in that state.
+- `src/features/analytics/components/practice-ratings-model.ts` is the pure
+  presentation join for unchanged `views.practiceRhythm` and `views.ratingsMix`.
+  It keys rows by ID plus exact `bucketStart`/`bucketEnd`, sorts their interval
+  union, and retains original source objects. An absent counterpart is
+  unavailable; known completed-review zero remains zero. The contiguous retained
+  window starts/ends with positive completed reviews, positive valid-rating
+  counts in either view, or finite supplied Practice success including zero.
+  Internal gaps remain; selected-period totals, comparison, readiness, report
+  metadata, and serialized scales are untouched. No runtime contract, schema,
+  persistence, scheduling, permissions, or sync change is needed.
+  `practice-ratings-view.tsx` renders exact supplied Easy/Good/Hard/Again shares
+  bottom to top on the fixed percentage axis. The Good + Easy boundary expresses
+  Review Success without a duplicate success curve. Supplied completed reviews
+  use a thin straight neutral line and measured markers on `view.countScale`,
+  independently of valid-rating counts. Missing composition is hatched, while a
+  known zero category remains zero-height. Shared inspection/Table rows retain
+  completed counts, precise rating counts/shares, Good + Easy numerator and
+  valid-rating denominator, supplied success, target, each metric's evidence,
+  full interval, partial state, timezone, and report time. The native Reviews
+  switch hides the line, markers, right axis, and tooltip count together, without
+  changing dates, rows, target, or Table values. The selected-period challenging
+  summary and evidence-gated prior comparison remain below the view. The chart
+  explains association only: count-line crossings with a percentage target
+  carry no percentage meaning.
 - `src/lib/leetcode/domain/problem-url.ts` owns canonical problem URLs; the
   retention details and fragile-knowledge rows use `createLeetCodeProblemUrl`
   rather than constructing links in chart components.
 
 The Analytics service applies the range policy, calculates readiness separately
-for each metric's eligibility rules, trims only unsupported leading history, and
-then builds its Zod-validated summary. Historical readiness is exposed as
-confidence context; it does not suppress available Recall Quality, Practice
+for each metric's eligibility rules, and builds its Zod-validated summary.
+Legacy summary series may trim unsupported leading history. All four historical
+views additionally trim unsupported edges at the component presentation boundary,
+preserving the service response, selected-period totals, readiness, supplied
+scales, report time, and internal gaps. Historical readiness is exposed as
+confidence context; it does not suppress available New Problem Success, Recall Quality, Practice
 Rhythm, Memory Strength, or Recent Overdue Backlog points. Current Retention
 Health, Fragile Knowledge, and the fixed 14-day Upcoming Review Load do not
 depend on the historical range being ready.
