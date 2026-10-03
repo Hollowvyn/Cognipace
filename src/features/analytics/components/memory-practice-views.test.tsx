@@ -256,6 +256,11 @@ describe('approved Memory Strength and Practice Rhythm views', () => {
         medianChangeDays: null,
         evidence: 'not-measured',
       }),
+      memoryRow({
+        id: 'later',
+        bucketStart: '2026-09-09',
+        bucketEnd: '2026-09-11',
+      }),
     ]
     rows.forEach(Object.freeze)
     render(
@@ -583,28 +588,107 @@ describe('empty edge trimming boundaries', () => {
     expect(screen.getAllByRole('rowheader')).toHaveLength(3)
   })
 
-  it('leaves Memory Strength edge rows available for inspection', () => {
-    const rows = [
+  it('trims Memory to finite medians, preserving its internal gaps, fitted scale, and source rows', async () => {
+    const user = userEvent.setup()
+    const rows = Array.from({ length: 5 }, (_, index) =>
       memoryRow({
-        id: 'empty-first',
+        id: `period-${index}`,
+        bucketStart: `2026-09-${String(3 + index * 3).padStart(2, '0')}`,
+        bucketEnd: `2026-09-${String(5 + index * 3).padStart(2, '0')}`,
         medianStrengthDays: null,
         q1: null,
         q3: null,
         eligibleReviews: 0,
+        medianChangeDays: null,
+        evidence: 'not-measured',
       }),
+    )
+    // Counts or stray quartiles cannot create a plotted median at an edge.
+    rows[0] = { ...rows[0]!, eligibleReviews: 4, q1: 1, q3: 8 }
+    rows[1] = {
+      ...rows[1]!,
+      medianStrengthDays: 0,
+      eligibleReviews: 1,
+      evidence: 'measured',
+    }
+    rows[3] = {
+      ...rows[3]!,
+      medianStrengthDays: 0.5,
+      q1: 0.2,
+      q3: 1,
+      eligibleReviews: 4,
+      evidence: 'measured',
+    }
+    rows[4] = { ...rows[4]!, eligibleReviews: 4, q1: 1, q3: 8 }
+    const fittedScale = buildAdaptiveDurationScale([0, 0.2, 0.5, 1])
+    const scale: AnalyticsViews['memoryStrength']['scale'] = {
+      domain: [...fittedScale.domain],
+      ticks: [...fittedScale.ticks],
+    }
+    const original = structuredClone({ rows, scale })
+    rows.forEach(Object.freeze)
+    Object.freeze(rows)
+    Object.freeze(scale.domain)
+    Object.freeze(scale.ticks)
+    Object.freeze(scale)
+    render(<MemoryStrengthView timeFrame={timeFrame} view={{ rows, scale }} />)
+    expect(screen.getByTestId('memory-strength-marker-0')).toBeVisible()
+    expect(screen.getByTestId('memory-strength-marker-2')).toBeVisible()
+    expect(screen.getByTestId('memory-strength-bridge-0-2')).toBeVisible()
+    expect(
+      screen.queryByTestId('memory-strength-whisker-period-1'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByTestId('memory-strength-whisker-period-3'),
+    ).toHaveAttribute('data-q1', '0.2')
+    expect(scale.domain).toEqual([0, 2])
+    expect(screen.getByText('2.0d')).toBeVisible()
+    const inspect = screen.getByRole('button', {
+      name: 'Inspect Memory Strength chart',
+    })
+    fireEvent.keyDown(inspect, { key: 'Home' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/06–09/08')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Median strength: 0.0d',
+    )
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Eligible reviews: 1')
+    fireEvent.keyDown(inspect, { key: 'ArrowRight' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/09–09/11')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Median strength: Unavailable',
+    )
+    fireEvent.keyDown(inspect, { key: 'End' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/12–09/14')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Median strength: 0.5d',
+    )
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(
+      screen.getAllByRole('rowheader').map((row) => row.textContent),
+    ).toEqual(['09/06–09/08', '09/09–09/11', '09/12–09/14'])
+    expect({ rows, scale }).toEqual(original)
+  })
+
+  it('retains a lone small-cohort Memory median between empty edges with its real interval', async () => {
+    const user = userEvent.setup()
+    const rows = [
+      memoryRow({ medianStrengthDays: null, q1: null, q3: null }),
       memoryRow({
-        id: 'measured',
+        id: 'single',
         bucketStart: '2026-09-06',
         bucketEnd: '2026-09-08',
+        medianStrengthDays: 0.25,
+        q1: null,
+        q3: null,
+        eligibleReviews: 1,
       }),
       memoryRow({
-        id: 'empty-last',
+        id: 'empty-end',
         bucketStart: '2026-09-09',
         bucketEnd: '2026-09-11',
         medianStrengthDays: null,
         q1: null,
         q3: null,
-        eligibleReviews: 0,
       }),
     ]
     render(
@@ -613,13 +697,41 @@ describe('empty edge trimming boundaries', () => {
         view={{ rows, scale: memoryScale }}
       />,
     )
+    expect(screen.getByTestId('memory-strength-marker-0')).toBeVisible()
+    expect(screen.getByText('Not enough data for a trend yet.')).toBeVisible()
     const inspect = screen.getByRole('button', {
       name: 'Inspect Memory Strength chart',
     })
     fireEvent.keyDown(inspect, { key: 'Home' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('09/03–09/05')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/06–09/08')
     fireEvent.keyDown(inspect, { key: 'End' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('09/09–09/11')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/06–09/08')
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(screen.getAllByRole('rowheader')).toHaveLength(1)
+    expect(screen.getByRole('rowheader', { name: '09/06–09/08' })).toBeVisible()
+  })
+
+  it('reports wholly unavailable Memory history without chart or table observations', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryStrengthView
+        timeFrame={timeFrame}
+        view={{
+          rows: [memoryRow({ medianStrengthDays: null })],
+          scale: memoryScale,
+        }}
+      />,
+    )
+    expect(
+      screen.getByText(
+        'No valid post-review FSRS stability is available in this period.',
+      ),
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Inspect Memory Strength chart' }),
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(screen.queryByRole('rowheader')).not.toBeInTheDocument()
   })
 })
 

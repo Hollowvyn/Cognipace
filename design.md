@@ -177,10 +177,10 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   Memory Signals, Recent Overdue Backlog, and Upcoming Review Load keep their
   current treatment until a separate design iteration.
 - Keep the explicit 14-day daily, 30-day three-day, and 90-day weekly grouping
-  and feature-supplied values. Recall, Practice Rhythm, and Ratings Mix trim
+  and feature-supplied values. All four historical charts trim
   empty beginning and ending buckets only, using the same contiguous activity
   window for Chart, Table, and inspection. Preserve every internal gap and each
-  retained interval's dates. Memory Strength retains its supplied rows.
+  retained interval's dates.
   Readiness does not control trimming. Keep the selected range, period totals,
   readiness, supplied scales, and report time unchanged; do not fabricate
   observations.
@@ -214,7 +214,10 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   the larger of 1.2 times their span and two days, then splitting the padding
   equally above and below. Clamp lower padding at zero without transferring it
   upward, and enforce an actual minimum two-day window. Preserve all extrema
-  and use readable duration ticks. Keep sub-day values meaningful.
+  and use readable duration ticks. Keep sub-day values meaningful. A finite
+  median, including zero or a sub-day value, supports the activity window
+  without requiring quartiles or four eligible reviews; that requirement
+  applies only to whiskers.
 - Practice Rhythm uses muted review-volume columns and a clear mint Review
   Success line in one mixed plot. Label Reviews on the left and Review Success
   (%) on the right. Measured success receives markers; unknown success receives

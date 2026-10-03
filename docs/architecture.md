@@ -303,15 +303,17 @@ The owners in that flow are:
   `historical-chart-model.ts` positions immutable serialized rows at their
   calendar midpoint and selects sparse ticks independently of observations.
   Its shared `trimHistoricalEmptyEdges` helper returns a contiguous slice for
-  Recall, Practice Rhythm, and Ratings Mix; each view defines its own support
-  predicate. Recall accepts either known rate independently of series toggles,
+  all four historical views; each view defines its own support predicate.
+  Recall accepts either known rate independently of series toggles, Memory
+  accepts a finite `medianStrengthDays` including zero or sub-day values,
   Practice accepts completed reviews, valid ratings, or a finite success rate
-  including zero, and Ratings accepts valid ratings. Empty internal rows stay
-  in the slice; wholly unsupported rows produce the existing empty state.
+  including zero, and Ratings accepts valid ratings. Memory's window predicate
+  does not require quartiles or four eligible reviews; those govern whiskers
+  only. Empty internal rows stay in the slice; wholly unsupported rows produce
+  the existing empty state.
   Exact original date ranges, report timezone, counts, and evidence stay in
   inspection and the shared seven-row `historical-table.tsx` alternative, which
-  use the same retained rows as the chart. Memory Strength retains all supplied
-  rows.
+  use the same retained rows as the chart.
   Memory Strength alone uses the fitted duration-scale helper; the other
   supplied domains remain unchanged. Scoped presentation styles live in
   `src/styles/analytics.css`, enabled by the panel's `historical` option.
@@ -321,11 +323,10 @@ The owners in that flow are:
 
 The Analytics service applies the range policy, calculates readiness separately
 for each metric's eligibility rules, and builds its Zod-validated summary.
-Legacy summary series may trim unsupported leading history. Recall, Practice
-Rhythm, and Ratings Mix additionally trim empty edges at the component
-presentation boundary, preserving the service response, selected-period
-totals, readiness, supplied scales, report time, and internal gaps. Memory
-Strength's row set is unchanged. Historical readiness is exposed as
+Legacy summary series may trim unsupported leading history. All four historical
+views additionally trim empty edges at the component presentation boundary,
+preserving the service response, selected-period totals, readiness, supplied
+scales, report time, and internal gaps. Historical readiness is exposed as
 confidence context; it does not suppress available Recall Quality, Practice
 Rhythm, Memory Strength, or Recent Overdue Backlog points. Current Retention
 Health, Fragile Knowledge, and the fixed 14-day Upcoming Review Load do not

@@ -678,13 +678,14 @@ the fixture case.
    MM/DD in the report's as-of year and /YY for another year; a cross-year
    tooltip interval shows both years. The current partial interval is marked
    in progress, with no future observations.
-   Recall, Practice Rhythm, and Ratings Mix must remove only empty beginning
-   and ending buckets from Chart, Table, and inspection while retaining all
-   internal gaps. Recall's window starts/ends with either known rate; Practice's
-   starts/ends with completed reviews, valid ratings, or a finite success rate
-   including 0%; Ratings starts/ends with valid ratings. Confirm the selected
-   range, period totals, readiness, serialized scales, and report time remain
-   unchanged. Memory Strength must keep its supplied row set.
+   All four historical charts must remove only empty beginning and ending
+   buckets from Chart, Table, and inspection while retaining all internal gaps.
+   Recall's window starts/ends with either known rate; Memory's starts/ends with
+   a finite median, including zero or sub-day values; Practice's starts/ends
+   with completed reviews, valid ratings, or a finite success rate including
+   0%; Ratings starts/ends with valid ratings. Confirm the selected range,
+   period totals, readiness, serialized scales, and report time remain
+   unchanged.
 4. In each chart, move the pointer across the plot and tap near its left,
    middle, and right buckets. The nearest retained original bucket must be
    inspected, including an internal empty bucket. Confirm no permanent bottom
@@ -716,12 +717,16 @@ the fixture case.
    one with fewer than four. Only the supported bucket gets discrete Q1–Q3
    whiskers; known medians remain available in both. Confirm the Median/Middle
    50% key, reconstructed stability in days, eligible count, median change, and
-   unavailable quartiles agree between tooltip and Table.
+   unavailable quartiles agree between tooltip and Table. A finite median must
+   retain an edge bucket even without quartiles or four eligible reviews.
 10. Check Memory Strength with sub-day, equal/single, and widely spread values.
     Its fitted duration domain must contain every finite median/Q1/Q3 extremum,
     leave an actual minimum two-day window, and keep low ranges and markers
     readable. No connected shaded range may imply quartiles across an
-    unsupported bucket. Empty edges in Memory Strength remain as supplied.
+    unsupported bucket. Empty edge buckets must be absent, while internal
+    unavailable buckets remain inspectable. A single finite median retains its
+    original interval and single-point guidance; wholly unavailable medians
+    show the explicit empty state.
 11. In Practice Rhythm, confirm muted completed-review bars and a mint Review
     Success line share one plot, with Reviews on the left and Review Success
     (%) on the right. Tooltip and Table must report completed reviews and the

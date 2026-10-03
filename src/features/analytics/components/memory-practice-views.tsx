@@ -36,9 +36,10 @@ export function MemoryStrengthView({
   view: AnalyticsViews['memoryStrength']
   timeFrame?: HistoricalChartTimeFrame | undefined
 }) {
-  const hasValues = view.rows.some((row) =>
+  const rows = trimHistoricalEmptyEdges(view.rows, (row) =>
     isFiniteValue(row.medianStrengthDays),
   )
+  const hasValues = rows.length > 0
   return (
     <div className="cp-historical-view grid min-w-0 gap-2">
       <ChartTable
@@ -55,7 +56,7 @@ export function MemoryStrengthView({
                 description={`Median post-review FSRS stability with supported Q1–Q3 ranges. Scale: ${formatDays(view.scale.domain[0])}–${formatDays(view.scale.domain[1])}. Ranges require at least four eligible reviews. Dashed lines cross periods with no eligible evidence. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
                 height={290}
                 name="Memory Strength chart"
-                rows={view.rows}
+                rows={rows}
                 timeFrame={timeFrame}
                 tooltip={(row) => (
                   <MemoryTooltip row={row} timeFrame={timeFrame} />
@@ -93,9 +94,8 @@ export function MemoryStrengthView({
               <MemoryLegend />
               <ChartTrendNote
                 pointCount={
-                  view.rows.filter((row) =>
-                    isFiniteValue(row.medianStrengthDays),
-                  ).length
+                  rows.filter((row) => isFiniteValue(row.medianStrengthDays))
+                    .length
                 }
               />
             </div>
@@ -127,8 +127,8 @@ export function MemoryStrengthView({
                 'Evidence',
                 'Period context',
               ]}
-              resetKey={view.rows.map((row) => row.id).join('|')}
-              rows={view.rows}
+              resetKey={rows.map((row) => row.id).join('|')}
+              rows={rows}
             />
             <ReportContext timeFrame={timeFrame} />
           </div>

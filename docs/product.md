@@ -292,13 +292,12 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
 - The implemented range choices are 14 days with daily buckets, 30 days with
   three-day buckets, and 90 days with weekly buckets. The selection is always
   explicit and never silently changes to a shorter period.
-- Observed Recall vs FSRS Estimate, Practice Rhythm, and Ratings Mix trim only
-  empty beginning and ending buckets from their presentation. Chart, Table,
-  and inspection share the contiguous first-supported through last-supported
+- All four historical panels trim only empty beginning and ending buckets from
+  their presentation. Chart, Table, and inspection share the contiguous
+  first-supported through last-supported
   slice, preserving every internal gap and each retained bucket's exact dates
-  and values. Memory Strength retains its supplied rows. Trimming does not
-  change the selected range, service data, selected-period totals, readiness,
-  supplied scales, or report time.
+  and values. Trimming does not change the selected range, service data,
+  selected-period totals, readiness, supplied scales, or report time.
 - Readiness's effective evidence window describes usable history separately
   from those rows; it does not control trimming or authorize invented values.
   When the selected range is not ready, the page explains the relevant evidence
@@ -337,7 +336,9 @@ The first four historical panels have these implemented meanings and controls:
   finite median and quartile values with padding and a minimum two-day window;
   it preserves the observed extrema rather than forcing a broad fixed scale.
   Tooltip and Table retain eligible counts, median change, evidence, and
-  reconstruction provenance.
+  reconstruction provenance. A finite median supports the retained activity
+  window, including zero and sub-day values, without requiring quartiles or
+  four eligible reviews. The four-review requirement applies only to whiskers.
 - **Practice Rhythm** places completed-review bars and a Review Success line in
   one plot with independent axes: Reviews on the left and Review Success (%)
   on the right. Review Success is Good + Easy divided by valid ratings; tooltip

@@ -2,8 +2,8 @@
 
 PR: [#184](https://github.com/Hollowvyn/Cognipace/pull/184) (draft).
 
-Current status: implemented, with empty-edge trimming added in the follow-up
-below. Human installed-extension smoke remains pending before review or merge.
+Current status: implemented, with empty-edge trimming on all four historical
+charts. Human installed-extension smoke remains pending before review or merge.
 
 Original implementation checkpoint: saved locally on `codex/analytics-layout-polish`.
 The user approved the chart previews and explicitly requested implementation
@@ -279,3 +279,73 @@ checklist in [docs/testing.md](../../testing.md) explicitly covers empty edges,
 retained middle gaps, 0%/partial cohorts, Chart/Table windows, and untrimmed
 Memory Strength. This is a patch presentation change; reverting the follow-up
 implementation restores the previous window without data migration or recovery.
+
+## Follow-Up: Memory Strength Empty Edges
+
+The user then approved the same empty-edge treatment for Memory Strength.
+This supersedes the previous follow-up's Memory exception. The approved design
+and focused plan were committed in `3104ba0` before source implementation.
+All four historical views now use the contiguous first-supported through
+last-supported slice for Chart, Table, and inspection.
+
+Memory's support predicate is a finite `medianStrengthDays`. Missing quartiles
+or fewer than four eligible reviews cannot discard a known median; those
+conditions govern whiskers only. Internal unavailable periods remain in place.
+Finite zero is retained defensively at the view boundary; validated runtime
+stability remains positive and its contract is unchanged. Source rows, exact
+dates/values, fitted serialized duration scale, discrete whisker eligibility,
+report context, readiness, and service data remain unchanged.
+
+The new component regressions cover both trimmed ends, internal unavailable
+inspection and bridges, frozen input and scale, small cohorts, sub-day medians,
+singleton guidance/real intervals, all-null history, and Chart/Table parity.
+The initial red run had **3 expected failures / 10 passes**. After the change,
+**4 focused files / 47 tests** passed. Independent review found no behavior
+issues and caught a test-only readonly scale typing mismatch before the full
+check; the fixture now copies the domain/ticks into the existing mutable
+contract shape. Full validation passed **191 files / 1,996 tests**, independent
+lint, production build, formatting, and whitespace checks. Existing jsdom
+scroll notices and the build's large-chunk warning remain nonfatal.
+
+Exact validation commands for this follow-up:
+
+```sh
+rtk npm run test -- src/features/analytics/components/memory-practice-views.test.tsx
+rtk npm run test -- src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/memory-practice-views.test.tsx src/features/analytics/components/historical-views.test.tsx src/features/analytics/components/analytics-screen.test.tsx
+rtk npm run lint
+rtk npm run check
+rtk npm run build
+rtk npm run format
+rtk proxy npx prettier --write src/features/analytics/components/memory-practice-views.tsx src/features/analytics/components/memory-practice-views.test.tsx
+rtk proxy npx prettier --write --ignore-path /dev/null docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/specs/2026-10-02-analytics-memory-practice-approved-design.md docs/superpowers/specs/2026-10-02-analytics-recall-approved-design.md docs/superpowers/specs/2026-10-02-analytics-ratings-mix-approved-design.md
+rtk proxy npx prettier --check --ignore-path /dev/null docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/specs/2026-10-02-analytics-memory-practice-approved-design.md docs/superpowers/specs/2026-10-02-analytics-recall-approved-design.md docs/superpowers/specs/2026-10-02-analytics-ratings-mix-approved-design.md
+rtk proxy npx prettier --ignore-path /dev/null --write docs/superpowers/specs/2026-10-02-analytics-layout-polish-design.md docs/superpowers/plans/2026-10-02-analytics-historical-charts.md docs/superpowers/handoffs/2026-10-02-analytics-historical-charts.md
+rtk proxy npx prettier --ignore-path /dev/null --check docs/superpowers/specs/2026-10-02-analytics-layout-polish-design.md docs/superpowers/plans/2026-10-02-analytics-historical-charts.md docs/superpowers/handoffs/2026-10-02-analytics-historical-charts.md
+rtk proxy git diff --check
+```
+
+Browser proof reused the actual production components and the archived
+[empty-edge fixture entry](assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt).
+With ten supplied intervals, Memory now displays **09/09–09/26** instead of
+**09/03–10/02**, retaining the internal **09/15–09/17** unavailable period.
+Home/End selected the exact first/last supported intervals, arrow inspection
+still exposed the middle gap, and Table contained the same six retained rows.
+The supplied 0–50-day duration scale and four supported quartile ranges stayed
+unchanged. At 1440px the Memory SVG matched its 532px host; at 320px it matched
+its 270px host, and page scroll width stayed 320px. Ordinary viewport capture
+bytes were saved and inspected directly; frozen design assets and earlier proof
+images remain unchanged. A transient Recharts zero-dimension warning appeared
+on Chart tab remount; subsequent measured bounds and saved viewport captures
+confirmed the settled layout.
+
+- [Memory trimmed, wide dark](assets/2026-10-02-analytics-historical-charts/memory-edge-trim-dark.jpg)
+- [Memory trimmed, narrow light](assets/2026-10-02-analytics-historical-charts/memory-edge-trim-narrow-light.jpg)
+
+Skipped: `rtk npm run zip` because packaging/release behavior is unchanged;
+`rtk npm run db:generate` because no schema changed (`db:check` passed inside
+`check`). Human installed-extension happy-path and sparse-history edge-case
+smoke remain pending before PR review or merge. The current Dashboard Analytics
+checklist now includes Memory's trimmed edges, internal gaps, small cohorts,
+single/all-empty medians, and preserved scale/whiskers. The PR stays draft.
+This is a patch presentation change; reverting the Memory follow-up restores
+the previous display window without a migration or recovery step.
