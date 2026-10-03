@@ -464,3 +464,27 @@ the behavior of the live extension.
 Suggested implementation PR title: `fix(analytics): improve chart layout and readability`.
 This is a dashboard presentation fix with no persisted-data migration. Reverting
 the presentation changes restores the previous UI without affecting local data.
+
+## Approved Follow-Up: Empty Edge Trimming
+
+On 2026-10-02, after draft PR #184 was created, the user explicitly requested
+trimming empty beginning and ending periods from the first, third, and fourth
+charts while retaining gaps in the middle. This supersedes the earlier
+full-supplied-window rule for Recall, Practice Rhythm, and Ratings Mix. Memory
+Strength retains its current window; frozen approved snapshot assets remain
+historical and unchanged.
+
+Trim only contiguous empty prefixes/suffixes in the feature presentation layer.
+Recall retains a period with either known observed recall or an FSRS estimate,
+including measured zero. Practice retains completed reviews, valid ratings, or
+a known Review Success value, including 0%; review activity without eligible
+ratings remains visible. Ratings Mix retains periods with valid ratings,
+including all-Again periods and zero category shares. Internal empty periods
+retain their bridges, zero-volume slots, unavailable tooltips, or gray hatching.
+
+Chart, Table, and inspection use the same surviving row slice and calendar
+bounds. Trimming is independent of Recall series visibility, so toggles cannot
+move dates. Empty/all-empty input remains an explicit empty state, and a single
+supported interval remains visible with single-point guidance. Original row
+objects, grouping, serialized scales, selected-period totals/comparisons,
+readiness, report dates, and runtime/persisted data remain unchanged.

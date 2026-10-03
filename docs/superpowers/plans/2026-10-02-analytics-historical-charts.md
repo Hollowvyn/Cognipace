@@ -133,3 +133,34 @@ All four implemented charts match the approved treatments, preserve exact
 feature-owned values and missing evidence, and are usable with pointer,
 keyboard and narrow layouts. Required automated checks and fixture visual
 proof are recorded honestly. Later-panel design work remains deferred.
+
+## Follow-Up: Trim Empty Edges (Approved 2026-10-02)
+
+The user supplied the exact change; see the master design's approved follow-up.
+This is a focused presentation adjustment on draft PR #184.
+
+- [ ] Add a generic immutable `trimHistoricalEmptyEdges(rows, hasData)` helper
+      in `charts/historical-chart-model.ts`. Find the first/last supported row
+      and return that inclusive slice, or `[]` when none are supported.
+- [ ] Add model regressions for leading/trailing empties, internal gaps,
+      measured zero, one supported interval, empty/all-empty input, unchanged
+      object identities, and calendar bounds after trimming.
+- [ ] Use the helper in `recall-ratings-views.tsx` and `memory-practice-views.tsx`
+      for Recall, Ratings, and Practice only. Predicates are Recall either rate
+      known; Practice positive completed reviews/valid ratings or known success;
+      Ratings positive valid ratings. Use surviving rows for Chart/Table,
+      inspection, reset keys, and trend counts; leave Memory untouched.
+- [ ] Update focused component tests for Home/End at retained endpoints, unknown
+      middle inspection, 0%/activity without success, preserved totals, and
+      untrimmed Memory. Update superseded leading-slot fixtures to internal gaps.
+- [ ] Update current product/architecture/design/testing authority and handoff;
+      preserve exact approved archive assets.
+- [ ] Capture the actual production components with leading/internal/trailing
+      empty fixtures; verify the endpoints, middle gap, and Memory window.
+- [ ] Run focused tests, then `rtk npm run lint`, `rtk npm run check`,
+      `rtk npm run build`, `rtk npm run format`, explicit ignored Markdown
+      formatting, and `rtk proxy git diff --check`. Record skipped zip/schema
+      generation and pending human extension smoke with reasons.
+- [ ] Save a Conventional Commit, push the existing PR branch, and update draft
+      PR #184's description and proof. Keep human smoke pending before review
+      or merge.
