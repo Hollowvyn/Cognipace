@@ -192,3 +192,28 @@ Memory Strength follow-up. Continue on draft PR #184's existing branch.
 
 Done when all four historical charts trim only empty edges, Memory's fitted
 scale and whiskers remain unchanged, and automated/fixture proof is recorded.
+
+## Follow-Up: Recall Left Clearance (Approved 2026-10-02)
+
+The user requested less space before the first Recall point. Apply the master
+design's Recall-only midpoint domain and 12px clearance on draft PR #184.
+
+- [ ] Add focused model/component regressions for the first point's clearance,
+      preserved midpoint/interval dates, true sparse calendar ticks, shortened
+      first intervals, singleton/empty fallback, and unchanged default charts.
+- [ ] Add a default-off `startAtFirstPoint` option to `HistoricalChart` and its
+      model; use it only in `ObservedRecallVsFsrsView`. Pass the same domain
+      policy to the visible X axis and keep the right boundary unchanged.
+- [ ] Update current authority docs and append validation/manual smoke context
+      to the handoff; keep previous design/proof assets as history.
+- [ ] Verify the real Recall components at wide dark and narrow light widths,
+      including marker clearance, full Home interval, middle gaps, and toggles.
+      Save new ordinary viewport screenshot bytes.
+- [ ] Run focused chart/model/Recall/screen tests, then `rtk npm run lint`,
+      `rtk npm run check`, `rtk npm run build`, `rtk npm run format`, touched
+      Markdown Prettier checks, and `rtk proxy git diff --check`.
+- [ ] Review, commit, push, and update draft PR #184. Keep human installed-
+      extension smoke pending before review/merge and record exact skips.
+
+Done when the first Recall marker has 12px left clearance, dates and gaps remain
+truthful, and the other three charts preserve their existing presentation.

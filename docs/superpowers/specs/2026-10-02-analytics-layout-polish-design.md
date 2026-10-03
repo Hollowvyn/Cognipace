@@ -505,3 +505,18 @@ exact row values and dates, report context, and service response unchanged.
 Wholly unsupported history keeps the existing explicit empty state, and a
 single supported median keeps its actual interval and single-point guidance.
 Do not modify the frozen approved preview assets or the later panels.
+
+## Approved Follow-Up: Recall Left Clearance
+
+The user requested that the first Recall point sit much closer to the left
+origin of the X axis. For Recall with at least two retained intervals, start
+the numeric time domain at the first interval's existing calendar midpoint,
+with 12px of left clearance for its circle/diamond. Keep the last interval's
+existing end boundary. Preserve every row's midpoint, exact interval dates,
+values, internal gaps, selected-period context, and Y scale. Calendar ticks
+reflect the displayed domain; full bucket intervals remain in tooltip/Table.
+
+This is a Recall-only option on the shared historical frame/model. Other
+charts retain their current domain and padding. A singleton keeps its original
+nonzero interval domain and centered point. Series switches cannot alter the
+retained window or its clearance. Preserve the frozen approved assets.
