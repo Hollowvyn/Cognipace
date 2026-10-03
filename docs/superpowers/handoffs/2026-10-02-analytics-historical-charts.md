@@ -260,9 +260,14 @@ arrow navigation still inspected **09/15–09/17** as unavailable. Practice End
 reported the final retained cohort; Memory Home still inspected its supplied
 empty beginning. Ratings Table contained the same six retained intervals.
 The 320px light-theme check had no page overflow and preserved the middle gray
-stripe. Screenshots were saved after responsive layout settled.
+stripe. Live SVG bounds matched their measured chart hosts. The full-page
+capture returned saved pixels with shrunken SVG plots despite correct live
+rendering; the wide proof was replaced with two ordinary viewport captures.
+The saved viewport images were inspected directly after capture. No production
+chart sizing change was needed.
 
 - [Wide trimmed charts, dark](assets/2026-10-02-analytics-historical-charts/edge-trim-dark.jpg)
+- [Lower trimmed charts, dark](assets/2026-10-02-analytics-historical-charts/edge-trim-lower-dark.jpg)
 - [Narrow trimmed Ratings, light](assets/2026-10-02-analytics-historical-charts/edge-trim-narrow-light.jpg)
 - [Follow-up fixture entry](assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt)
 
