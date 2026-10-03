@@ -169,7 +169,6 @@ describe('runtime-policy', () => {
       'tracks.getWorkspace',
       'tracks.getTrackForEdit',
       'tracks.setActiveTrack',
-      'tracks.setActiveGroup',
       'tracks.clearActiveTrack',
       'tracks.createTrack',
       'tracks.updateTrack',

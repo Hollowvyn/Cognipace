@@ -52,7 +52,6 @@ import {
   tracksRemoveProblemRequestSchema,
   tracksResetTrackProgressRequestSchema,
   tracksRequestSchema,
-  tracksSetActiveGroupRequestSchema,
   tracksSetActiveTrackRequestSchema,
   tracksUpdateTrackRequestSchema,
   trackWorkspaceResponseSchema,
@@ -143,7 +142,6 @@ import {
   getWorkspace,
   removeTrackProblem,
   resetTrackProgress,
-  setActiveGroup,
   setActiveTrack,
   updateTrack,
 } from '@/features/tracks/server/tracks-service'
@@ -1025,28 +1023,6 @@ export function registerBackgroundHandlers() {
     return runDbMutation(
       async (db) => {
         await clearActiveTrack(db, request)
-
-        return tracksNullResponseSchema.parse(null)
-      },
-      () =>
-        broadcastTracksInvalidation({
-          source: request.surface,
-          tags: ['tracks'],
-        }),
-    )
-  })
-
-  onMessage('tracks.setActiveGroup', ({ data, sender }) => {
-    const request = tracksSetActiveGroupRequestSchema.parse(data)
-
-    assertCanSenderCallExtensionMethod(
-      'tracks.setActiveGroup',
-      request.surface,
-      sender,
-    )
-    return runDbMutation(
-      async (db) => {
-        await setActiveGroup(db, request)
 
         return tracksNullResponseSchema.parse(null)
       },

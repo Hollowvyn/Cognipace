@@ -31,7 +31,6 @@ import type {
   TracksGetWorkspaceRequest,
   TracksRemoveProblemRequest,
   TracksResetTrackProgressRequest,
-  TracksSetActiveGroupRequest,
   TracksSetActiveTrackRequest,
   TracksUpdateTrackRequest,
   TrackForEditResponse,
@@ -153,20 +152,6 @@ export async function clearActiveTrack(
   if (request.surface === 'dashboard') {
     await createTracksRepository(db).clearActiveTrack()
   }
-}
-
-export async function setActiveGroup(
-  db: Db,
-  request: TracksSetActiveGroupRequest,
-): Promise<void> {
-  const repository = createTracksRepository(db)
-  const session = await repository.getSession()
-
-  if (session.activeTrack?.id !== request.trackId) {
-    throw new Error('Cannot set a group outside the requested active track.')
-  }
-
-  await repository.setActiveGroup(request.groupId)
 }
 
 export async function createTrack(
@@ -334,7 +319,10 @@ async function readActiveTrackGuidance(
   return {
     activeTrack: {
       track: session.activeTrack,
-      activeGroup: session.activeGroup ?? activeTrackGroups[0] ?? null,
+      activeGroup:
+        activeTrackGroups.find(
+          (group) => group.id === nextRow?.membership.groupId,
+        ) ?? null,
       progress: readCatalogProgress(catalog, session.activeTrack.id),
       nextProblem: nextRow?.problem ?? null,
     },

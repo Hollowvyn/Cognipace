@@ -246,8 +246,15 @@ Remaining problems keep their relative order, and empty groups remain editable.
 
 The active track's `Next` target is the first incomplete, non-suspended
 membership in explicit group and problem order. FSRS due state does not reorder
-track progression; due reviews remain a separate review target. Selecting an
-active group changes the workspace view without retargeting `Next`.
+track progression; due reviews remain a separate review target. Popup and
+dashboard current-chapter guidance identify that next membership's group, with
+no current chapter when no eligible question remains. Selecting a group tab
+changes only the workspace view for the current visit without retargeting `Next`
+or saving a browsing selection. Reopening Tracks or switching active tracks
+refreshes guidance and starts on the next question's group, falling back to the
+first group when there is no next question. Refetching preserves a valid browsing
+tab; removing that group selects the next question's group or first group for
+the rest of the visit.
 
 While Study Plan mode is active and the problem belongs to the active track,
 `hard`, `good`, and `easy` reviews complete that track problem. `again` does not

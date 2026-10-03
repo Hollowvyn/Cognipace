@@ -238,16 +238,6 @@ export type TracksClearActiveTrackRequest = z.infer<
   typeof tracksClearActiveTrackRequestSchema
 >
 
-export const tracksSetActiveGroupRequestSchema = z.object({
-  surface: trackDashboardSurfaceSchema,
-  trackId: trackIdSchema,
-  groupId: trackGroupIdSchema,
-})
-
-export type TracksSetActiveGroupRequest = z.infer<
-  typeof tracksSetActiveGroupRequestSchema
->
-
 export const tracksDeleteTrackRequestSchema = z.object({
   surface: trackDashboardSurfaceSchema,
   trackId: trackIdSchema,

@@ -33,7 +33,7 @@ export function TracksScreen({
   const workspaceQuery = useTrackWorkspace({ surface: 'dashboard' })
   const workspace = workspaceQuery.data
 
-  if (workspaceQuery.isPending) {
+  if (workspaceQuery.isPending || !workspaceQuery.isFetchedAfterMount) {
     return <TracksLoadingState />
   }
 
@@ -84,6 +84,7 @@ function TracksWorkspaceView({
     <TracksFrame>
       {workspace.activeTrack ? (
         <ActiveTrackWorkspace
+          key={workspace.activeTrack.track.id}
           activeTrack={workspace.activeTrack}
           dueCount={workspace.dueCount}
           generatedAt={workspace.generatedAt}

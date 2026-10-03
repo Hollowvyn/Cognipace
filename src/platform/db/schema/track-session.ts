@@ -9,6 +9,7 @@ export const trackSession = sqliteTable('track_session', {
   activeTrackId: text('active_track_id').references(() => tracks.id, {
     onDelete: 'set null',
   }),
+  // ponytail: legacy snapshot/backup field; remove with a preserving migration and compatible backup readers.
   activeGroupId: text('active_group_id').references(() => trackGroups.id, {
     onDelete: 'set null',
   }),

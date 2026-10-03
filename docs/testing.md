@@ -223,6 +223,9 @@ Use one of these entry points:
    badge.
 8. When the metric includes overdue and due-today cards, confirm its label is
    `Reviews Due`.
+9. In Tracks, browse a different group from the next question's group. Reopen
+   the popup and confirm the active-track group badge still belongs to its
+   `Up next` question. Capture a screenshot or recording of this comparison.
 
 Expected: the popup stays compact, does not jump around during feedback, and
 keeps recommendation guidance separate from track guidance. Review timing
@@ -536,6 +539,21 @@ compatibility.
    earlier ordered problem.
 9. Reset track progress only when intentionally testing reset behavior; confirm
    the completed count returns to zero.
+10. Browse a group other than the next question's group. Confirm its rows and
+    pagination remain usable while popup guidance and Overview's Current chapter
+    and Next up badge show the next question's group. Navigate away and return:
+    Tracks starts on that group, with the selected tab revealed in the strip.
+    Also leave Tracks, advance Next from another surface, and return within
+    30 seconds; confirm fresh guidance selects the new Next group.
+11. Edge cases: refetch while browsing another group and confirm it stays
+    selected; remove the browsed group and confirm fallback to Next's group,
+    then advance Next and confirm that valid fallback tab stays selected;
+    switch tracks and back and confirm selection resets. Complete or suspend
+    the last eligible question in a group and confirm question and chapter
+    advance together. With every question completed or suspended, confirm no
+    current-chapter badge is shown and the first group remains browsable. Also
+    check an empty track and Free Practice mode. Attach screenshot or recording
+    proof for the happy path and edge cases before review or merge.
 
 Expected: active track state, group state, problem order, and track progress are
 local and update the dashboard without changing global practice history unless a

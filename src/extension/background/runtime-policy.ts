@@ -49,7 +49,6 @@ const methodSurfaceAccess = {
   'tracks.getTrackForEdit': ['dashboard'],
   'tracks.setActiveTrack': ['dashboard'],
   'tracks.clearActiveTrack': ['dashboard'],
-  'tracks.setActiveGroup': ['dashboard'],
   'tracks.createTrack': ['dashboard'],
   'tracks.updateTrack': ['dashboard'],
   'tracks.deleteTrack': ['dashboard'],

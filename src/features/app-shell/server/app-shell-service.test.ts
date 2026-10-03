@@ -119,6 +119,31 @@ describe('app-shell service', () => {
     ])
   })
 
+  it.each(['popup', 'dashboard'] as const)(
+    'uses the next problem group for %s guidance after another tab was persisted',
+    async (surface) => {
+      const handle = await createTestDb({
+        now: new Date('2026-01-01T00:00:00.000Z'),
+      })
+
+      await handle.db
+        .update(trackSession)
+        .set({ activeGroupId: 'bytebytego-coding-patterns-101:intervals' })
+        .where(eq(trackSession.id, 'active'))
+
+      const payload =
+        surface === 'popup'
+          ? await getPopupPayload(handle)
+          : await getDashboardPayload(handle)
+
+      expect(payload.activeTrack).toMatchObject({
+        state: 'ready',
+        groupTitle: 'Two Pointers',
+        nextProblem: { problemSlug: 'two-sum-ii-input-array-is-sorted' },
+      })
+    },
+  )
+
   it('serializes the active track due date when present', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
@@ -174,6 +199,7 @@ describe('app-shell service', () => {
     expect(payloadAfterLedgerCompletion.activeTrack).toMatchObject({
       state: 'exhausted',
       trackId: 'leetcode-75',
+      groupTitle: null,
       detail: 'No more problems in track.',
       progress: {
         completedCount: 1,

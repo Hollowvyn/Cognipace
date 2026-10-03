@@ -640,6 +640,23 @@ first incomplete, non-suspended membership in explicit group/problem order.
 Successful review evidence is read in batches for requested slugs, including
 editor eligibility previews, with no synthetic progress writes.
 
+Active-track guidance derives its current group from Next's membership, or null
+when no eligible question remains. Workspace group tabs are local browsing
+state, initialized from that guidance on mount and reset when the active track
+changes; browsing does not write the persisted session group or affect shell
+guidance.
+
+The session persists only the active track choice. The legacy
+`track_session.active_group_id` column remains solely for existing database
+snapshots and backup compatibility; live session models ignore it and new
+sessions store null. Remove it in a future preserving migration with compatible
+readers for older backups. The obsolete group-selection runtime command and
+mutation path have been removed.
+
+The Tracks service owns active-track guidance. The repository supplies catalog
+progress, ordered memberships, and the selected track without a second Next
+resolver or unused session metadata.
+
 Practice writes new owned progress only in Study Plan mode. Review corrections
 reconcile existing ledger rows linked to that attempt regardless of current mode
 or active track, without resurrecting deleted progress. Track reset deletes its

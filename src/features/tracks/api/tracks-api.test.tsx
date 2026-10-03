@@ -17,7 +17,6 @@ import {
   useDeleteTrack,
   useRemoveTrackProblem,
   useResetTrackProgress,
-  useSetActiveGroup,
   useSetActiveTrack,
   useTrackForEdit,
   useTrackWorkspace,
@@ -28,7 +27,6 @@ import type {
   TracksDeleteTrackRequest,
   TracksRemoveProblemRequest,
   TracksResetTrackProgressRequest,
-  TracksSetActiveGroupRequest,
   TracksSetActiveTrackRequest,
   TracksUpdateTrackRequest,
 } from './tracks-contracts'
@@ -110,7 +108,7 @@ describe('tracks API hooks', () => {
     expect(sendMessage).toHaveBeenCalledWith('tracks.getTrackForEdit', request)
   })
 
-  it('invalidates track queries after active track and group mutations', async () => {
+  it('invalidates track queries after active track mutations', async () => {
     await expectTrackMutation({
       method: 'tracks.setActiveTrack',
       request: {
@@ -119,17 +117,6 @@ describe('tracks API hooks', () => {
       } satisfies TracksSetActiveTrackRequest,
       response: null,
       useHook: useSetActiveTrack,
-      invalidatedQueryKeys: [['tracks'], ['app-shell-data']],
-    })
-    await expectTrackMutation({
-      method: 'tracks.setActiveGroup',
-      request: {
-        surface: 'dashboard',
-        trackId: 'leetcode-75',
-        groupId: 'leetcode-75:arrays-hashing',
-      } satisfies TracksSetActiveGroupRequest,
-      response: null,
-      useHook: useSetActiveGroup,
       invalidatedQueryKeys: [['tracks'], ['app-shell-data']],
     })
     await expectTrackMutation({

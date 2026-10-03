@@ -71,10 +71,6 @@ describe('TracksRepository', () => {
     })
     expect(progress.get(independent.id)?.completedCount).toBe(0)
     expect(await db.select().from(trackProblemProgress)).toEqual([])
-    await repository.setActiveTrack(external.id)
-    expect((await repository.getActiveTrack())?.nextProblem?.slug).toBe(
-      'valid-parentheses',
-    )
   })
 
   it('uses the latest remaining success with deterministic provenance and prefers owned completion', async () => {
@@ -211,18 +207,15 @@ describe('TracksRepository', () => {
     ).toBe('incomplete')
   })
 
-  it('keeps Next in whole-track order and skips suspended questions without erasing completion', async () => {
+  it('retains external completion for suspended memberships', async () => {
     const { db } = await createTestDb()
     const repository = createTracksRepository(db)
     const track = await repository.createTrack({
-      title: 'Ordered external',
+      title: 'Suspended external',
       description: null,
       dueAt: null,
       allowExternalProgress: true,
-      groups: [
-        { title: 'First', problemSlugs: ['two-sum', 'valid-parentheses'] },
-        { title: 'Last', problemSlugs: ['two-sum-ii-input-array-is-sorted'] },
-      ],
+      groups: [{ title: 'Main', problemSlugs: ['two-sum'] }],
     })
     await db.insert(problemPractice).values({
       problemSlug: 'two-sum',
@@ -235,12 +228,6 @@ describe('TracksRepository', () => {
       createdAt: 0,
       updatedAt: 0,
     })
-    await repository.setActiveTrack(track.id)
-    const groups = await repository.getGroups(track.id)
-    await repository.setActiveGroup(groups[1]!.id)
-    expect((await repository.getActiveTrack())?.nextProblem?.slug).toBe(
-      'valid-parentheses',
-    )
     expect(
       (await repository.getProgressByTrack([track.id])).get(track.id)
         ?.completedCount,
@@ -361,74 +348,37 @@ describe('TracksRepository', () => {
       dueAt: null,
       groups: [{ title: 'Main', problemSlugs: ['two-sum'] }],
     })
-    await repository.setActiveTrack(track.id)
     await repository.removeProblem(track.id, 'two-sum')
     expect(await repository.getGroups(track.id)).toHaveLength(1)
     expect(await repository.getMemberships(track.id)).toEqual([])
-    expect(await repository.getActiveTrack()).toMatchObject({
-      track: { id: track.id },
-      nextProblem: null,
-      progress: { completedCount: 0, totalCount: 0, percent: 0 },
+    expect(
+      (await repository.getProgressByTrack([track.id])).get(track.id),
+    ).toEqual({
+      completedCount: 0,
+      totalCount: 0,
+      percent: 0,
     })
     await expect(
       repository.removeProblem('missing', 'two-sum'),
     ).rejects.toThrow(/missing track/)
   })
 
-  it('reads active track context with nullable due date', async () => {
+  it('reads track metadata with a nullable due date and no legacy active flag', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
     const repository = createTracksRepository(handle.db)
 
-    const activeTrack = await repository.getActiveTrack()
+    const track = await repository.getTrackById(
+      'bytebytego-coding-patterns-101',
+    )
 
-    expect(activeTrack).toMatchObject({
-      track: {
-        id: 'bytebytego-coding-patterns-101',
-        title: 'ByteByteGo Coding Patterns 101',
-        dueAt: null,
-      },
-      activeGroup: {
-        title: 'Two Pointers',
-      },
-      progress: {
-        completedCount: 0,
-        totalCount: 101,
-        percent: 0,
-      },
-      nextProblem: {
-        slug: 'two-sum-ii-input-array-is-sorted',
-      },
+    expect(track).toMatchObject({
+      id: 'bytebytego-coding-patterns-101',
+      title: 'ByteByteGo Coding Patterns 101',
+      dueAt: null,
     })
-  })
-
-  it('returns null when the active session has no active track', async () => {
-    const handle = await createTestDb({
-      now: new Date('2026-01-01T00:00:00.000Z'),
-    })
-
-    await handle.db
-      .update(trackSession)
-      .set({
-        activeTrackId: null,
-        activeGroupId: null,
-      })
-      .where(eq(trackSession.id, 'active'))
-
-    const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
-
-    expect(activeTrack).toBeNull()
-  })
-
-  it('does not expose legacy track active flags', async () => {
-    const handle = await createTestDb({
-      now: new Date('2026-01-01T00:00:00.000Z'),
-    })
-
-    const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
-
-    expect(activeTrack?.track).not.toHaveProperty('isActive')
+    expect(track).not.toHaveProperty('isActive')
   })
 
   it('maps track due date from storage', async () => {
@@ -442,9 +392,11 @@ describe('TracksRepository', () => {
       .set({ dueAt: dueAt.getTime() })
       .where(eq(tracks.id, 'bytebytego-coding-patterns-101'))
 
-    const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
+    const track = await createTracksRepository(handle.db).getTrackById(
+      'bytebytego-coding-patterns-101',
+    )
 
-    expect(activeTrack?.track.dueAt).toEqual(dueAt)
+    expect(track?.dueAt).toEqual(dueAt)
   })
 
   it('summarizes catalog progress without reading practice state', async () => {
@@ -453,7 +405,6 @@ describe('TracksRepository', () => {
     })
     const timestamp = new Date('2026-01-01T08:00:00.000Z').getTime()
 
-    await makeLeetCodeActive(handle.db)
     await handle.db.insert(trackGroups).values({
       id: 'leetcode-75:stack',
       trackId: 'leetcode-75',
@@ -482,19 +433,14 @@ describe('TracksRepository', () => {
       updatedAt: timestamp,
     })
 
-    const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
+    const catalog = await createTracksRepository(handle.db).getTrackCatalog()
 
-    expect(activeTrack?.progress).toEqual({
+    expect(
+      catalog.find((item) => item.track.id === 'leetcode-75')?.progress,
+    ).toEqual({
       completedCount: 0,
       totalCount: 2,
       percent: 0,
-    })
-    expect(activeTrack?.activeGroup).toMatchObject({
-      id: 'leetcode-75:arrays-hashing',
-      title: 'Arrays and Hashing',
-    })
-    expect(activeTrack?.nextProblem).toMatchObject({
-      slug: 'two-sum',
     })
   })
 
@@ -504,7 +450,6 @@ describe('TracksRepository', () => {
     })
     const timestamp = new Date('2026-01-01T08:00:00.000Z').getTime()
 
-    await makeLeetCodeActive(handle.db)
     await handle.db.insert(trackGroups).values({
       id: 'leetcode-75:stack',
       trackId: 'leetcode-75',
@@ -541,9 +486,11 @@ describe('TracksRepository', () => {
       updatedAt: timestamp,
     })
 
-    const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
+    const progress = await createTracksRepository(handle.db).getProgressByTrack(
+      ['leetcode-75'],
+    )
 
-    expect(activeTrack?.progress).toEqual({
+    expect(progress.get('leetcode-75')).toEqual({
       completedCount: 1,
       totalCount: 2,
       percent: 50,
@@ -580,7 +527,7 @@ describe('TracksRepository', () => {
     expect(rows).toEqual([])
   })
 
-  it('restores the persisted active track and active group', async () => {
+  it('restores the persisted active track', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
@@ -593,30 +540,22 @@ describe('TracksRepository', () => {
       })
       .where(eq(trackSession.id, 'active'))
 
-    const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
+    const session = await createTracksRepository(handle.db).getSession()
 
-    expect(activeTrack).toMatchObject({
-      track: {
+    expect(session).toMatchObject({
+      activeTrack: {
         id: 'grind-75',
         title: 'Grind 75',
-      },
-      activeGroup: {
-        id: 'grind-75:stack',
-        title: 'Stack',
-      },
-      nextProblem: {
-        slug: 'valid-parentheses',
       },
     })
   })
 
-  it('keeps suspended questions in the catalog total while excluding them from Next', async () => {
+  it('keeps suspended questions in the catalog total', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
     const timestamp = new Date('2026-01-01T08:00:00.000Z').getTime()
 
-    await makeLeetCodeActive(handle.db)
     await handle.db.insert(problemPractice).values({
       problemSlug: 'two-sum',
       status: 'suspended',
@@ -631,17 +570,18 @@ describe('TracksRepository', () => {
       updatedAt: timestamp,
     })
 
-    const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
+    const progress = await createTracksRepository(handle.db).getProgressByTrack(
+      ['leetcode-75'],
+    )
 
-    expect(activeTrack?.nextProblem).toBeNull()
-    expect(activeTrack?.progress).toEqual({
+    expect(progress.get('leetcode-75')).toEqual({
       completedCount: 0,
       totalCount: 1,
       percent: 0,
     })
   })
 
-  it('reads catalog rows ordered by created date then title with active summary', async () => {
+  it('reads catalog rows ordered by created date then title with progress', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
@@ -654,9 +594,7 @@ describe('TracksRepository', () => {
       'grind-75',
       'leetcode-75',
     ])
-    expect(catalog.map((item) => item.isActive)).toEqual([true, false, false])
-    expect(catalog.find((item) => item.isActive)).toMatchObject({
-      activeGroupId: 'bytebytego-coding-patterns-101:two-pointers',
+    expect(catalog[0]).toMatchObject({
       progress: {
         completedCount: 0,
         totalCount: 101,
@@ -668,10 +606,15 @@ describe('TracksRepository', () => {
     })
   })
 
-  it('reads the selected active track and group from the session', async () => {
+  it('reads the selected active track without restoring legacy group selection', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
+
+    await handle.db
+      .update(trackSession)
+      .set({ activeGroupId: 'bytebytego-coding-patterns-101:intervals' })
+      .where(eq(trackSession.id, 'active'))
 
     const session = await createTracksRepository(handle.db).getSession()
 
@@ -680,11 +623,8 @@ describe('TracksRepository', () => {
         id: 'bytebytego-coding-patterns-101',
         title: 'ByteByteGo Coding Patterns 101',
       },
-      activeGroup: {
-        id: 'bytebytego-coding-patterns-101:two-pointers',
-        title: 'Two Pointers',
-      },
     })
+    expect(session).not.toHaveProperty('activeGroup')
   })
 
   it('does not fall back to a track row when the session has no active track', async () => {
@@ -704,9 +644,7 @@ describe('TracksRepository', () => {
 
     await expect(repository.getSession()).resolves.toMatchObject({
       activeTrack: null,
-      activeGroup: null,
     })
-    await expect(repository.getActiveTrack()).resolves.toBeNull()
   })
 
   it('orders groups by their persisted position', async () => {
@@ -762,7 +700,7 @@ describe('TracksRepository', () => {
     })
   })
 
-  it('sets the active track to its first group and writes both session ids', async () => {
+  it('activates a track without persisting a browsing group', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
@@ -788,14 +726,12 @@ describe('TracksRepository', () => {
       activeTrack: {
         id: 'grind-75',
       },
-      activeGroup: {
-        id: 'grind-75:arrays',
-      },
     })
+    expect(session).not.toHaveProperty('activeGroup')
     expect(rows).toMatchObject([
       {
         activeTrackId: 'grind-75',
-        activeGroupId: 'grind-75:arrays',
+        activeGroupId: null,
       },
     ])
   })
@@ -815,7 +751,6 @@ describe('TracksRepository', () => {
 
     expect(session).toMatchObject({
       activeTrack: null,
-      activeGroup: null,
     })
     expect(rows).toMatchObject([
       {
@@ -823,26 +758,6 @@ describe('TracksRepository', () => {
         activeGroupId: null,
       },
     ])
-  })
-
-  it('rejects setting an active group outside the current active track', async () => {
-    const handle = await createTestDb({
-      now: new Date('2026-01-01T00:00:00.000Z'),
-    })
-    const repository = createTracksRepository(handle.db)
-
-    await expect(repository.setActiveGroup('grind-75:stack')).rejects.toThrow(
-      /active track/i,
-    )
-
-    await expect(repository.getSession()).resolves.toMatchObject({
-      activeTrack: {
-        id: 'bytebytego-coding-patterns-101',
-      },
-      activeGroup: {
-        id: 'bytebytego-coding-patterns-101:two-pointers',
-      },
-    })
   })
 
   it('creates a Main group when creating a track with no groups', async () => {

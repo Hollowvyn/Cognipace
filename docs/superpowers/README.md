@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
+
 - [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): approved two-rate first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall, with the selected preview preserved verbatim; implemented with automated and production-component proof; required human installed-extension smoke remains pending before review or merge.
 - [`specs/2026-10-03-analytics-practice-ratings-merge-design.md`](./specs/2026-10-03-analytics-practice-ratings-merge-design.md): approved merged Practice Rhythm chart with exact stacked shares, independent completed-review line, saved Success target, and interval union; its three-card layout is historical context superseded by the first-attempt/repeat pair above.
 - [`specs/2026-10-02-analytics-chart-targets-design.md`](./specs/2026-10-02-analytics-chart-targets-design.md): approved independent saved Recall/Review Success goals, compact graph editors, Settings/backup/configured sync ownership, and unchanged FSRS behavior; implemented with automated/fixture proof; human extension smoke remains pending.
@@ -52,6 +54,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-03-next-question-group.md`](./plans/2026-10-03-next-question-group.md): focused service and workspace regression plan for membership-derived chapter guidance, local tabs, and required human extension smoke.
 
 - [`plans/2026-10-03-analytics-cleanup.md`](./plans/2026-10-03-analytics-cleanup.md): approved deletion pass for superseded renderers and their tests, unused chart metadata, summary fallback, and duplicate cache/Settings test setup; exact approved visual artifacts remain preserved.
 - [`plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md`](./plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md): phased cohort/API, Settings goals, and graph implementation plan for the approved first-attempt/repeat split; executed with independent specification/code-quality review and preserved production-component proof; human installed-extension smoke remains pending.
@@ -102,6 +106,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-03-next-question-group.md`](./handoffs/2026-10-03-next-question-group.md): membership-derived chapter guidance, local workspace browsing, regression evidence, and required human extension smoke proof.
 
 - [`handoffs/2026-10-03-analytics-first-attempts-and-repeat-recall.md`](./handoffs/2026-10-03-analytics-first-attempts-and-repeat-recall.md): first-recorded outcome rates, independent saved goals, repeat-only paired Recall, validation and production-component screenshots, and required human installed-extension smoke pending before review or merge.
 

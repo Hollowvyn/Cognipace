@@ -10,6 +10,7 @@ import {
   trackGroups,
   trackProblemProgress,
   trackSession,
+  tracks,
 } from '@/platform/db/schema'
 import { createTestDb } from '@/platform/db/test-db'
 import type { Db } from '@/platform/db'
@@ -79,6 +80,10 @@ describe('tracks service', () => {
       (await getWorkspace(db, { surface: 'dashboard' })).activeTrack?.progress
         .completedCount,
     ).toBe(0)
+    expect(await getActiveTrack(db)).toMatchObject({
+      progress: { completedCount: 0, totalCount: 2, percent: 0 },
+      nextProblem: { slug: 'two-sum' },
+    })
   })
 
   it('returns the active track in study-plan mode', async () => {
@@ -91,10 +96,97 @@ describe('tracks service', () => {
     expect(activeTrack).toMatchObject({
       track: {
         id: 'bytebytego-coding-patterns-101',
+        title: 'ByteByteGo Coding Patterns 101',
+        dueAt: null,
+      },
+      activeGroup: {
+        title: 'Two Pointers',
+      },
+      progress: {
+        completedCount: 0,
+        totalCount: 101,
+        percent: 0,
       },
       nextProblem: {
         slug: 'two-sum-ii-input-array-is-sorted',
       },
+    })
+  })
+
+  it('maps the stored due date in active-track guidance', async () => {
+    const { db } = await createTestDb()
+    const dueAt = new Date('2026-03-01T00:00:00.000Z')
+
+    await db
+      .update(tracks)
+      .set({ dueAt: dueAt.getTime() })
+      .where(eq(tracks.id, 'bytebytego-coding-patterns-101'))
+
+    expect((await getActiveTrack(db))?.track.dueAt).toEqual(dueAt)
+  })
+
+  it('returns no guidance when the session has no active track', async () => {
+    const { db } = await createTestDb()
+
+    await db
+      .update(trackSession)
+      .set({ activeTrackId: null })
+      .where(eq(trackSession.id, 'active'))
+
+    await expect(getActiveTrack(db)).resolves.toBeNull()
+    await expect(
+      getWorkspace(db, { surface: 'dashboard' }),
+    ).resolves.toMatchObject({
+      activeTrack: null,
+      activeTrackGroups: [],
+      activeTrackRows: [],
+      dueCount: 0,
+    })
+  })
+
+  it('restores the persisted active track and derives its next group', async () => {
+    const { db } = await createTestDb()
+
+    await db
+      .update(trackSession)
+      .set({ activeTrackId: 'grind-75', activeGroupId: 'grind-75:stack' })
+      .where(eq(trackSession.id, 'active'))
+
+    expect(await getActiveTrack(db)).toMatchObject({
+      track: { id: 'grind-75', title: 'Grind 75' },
+      activeGroup: { id: 'grind-75:stack', title: 'Stack' },
+      progress: { completedCount: 0, totalCount: 1, percent: 0 },
+      nextProblem: { slug: 'valid-parentheses' },
+    })
+  })
+
+  it('returns empty-track guidance without a next problem or current group', async () => {
+    const { db } = await createTestDb()
+    const edit = await createTrack(db, {
+      surface: 'dashboard',
+      title: 'Empty track',
+      description: null,
+      dueAt: null,
+      allowExternalProgress: false,
+      setActive: true,
+      groups: [{ title: 'Main', problemSlugs: [] }],
+    })
+
+    expect(await getActiveTrack(db)).toMatchObject({
+      track: { id: edit.track!.id },
+      activeGroup: null,
+      nextProblem: null,
+      progress: { completedCount: 0, totalCount: 0, percent: 0 },
+    })
+    expect(await getWorkspace(db, { surface: 'dashboard' })).toMatchObject({
+      activeTrack: {
+        activeGroup: null,
+        nextProblem: null,
+        progress: { completedCount: 0, totalCount: 0, percent: 0 },
+      },
+      activeTrackGroups: [{ title: 'Main' }],
+      activeTrackRows: [],
+      dueCount: 0,
     })
   })
 
@@ -110,6 +202,41 @@ describe('tracks service', () => {
     })
 
     await expect(getActiveTrack(handle.db)).resolves.toBeNull()
+  })
+
+  it('uses the next membership group instead of the persisted browsing group', async () => {
+    const handle = await createTestDb({
+      now: new Date('2026-01-01T00:00:00.000Z'),
+    })
+
+    await makeLeetCodeActive(handle.db)
+    await addActiveTrackMembership(handle.db, {
+      groupId: 'leetcode-75:stack',
+      groupTitle: 'Stack',
+      problemSlug: 'valid-parentheses',
+      groupPosition: 2,
+    })
+    await handle.db
+      .update(trackSession)
+      .set({ activeGroupId: 'leetcode-75:stack' })
+      .where(eq(trackSession.id, 'active'))
+
+    const workspace = await getWorkspace(handle.db, {
+      surface: 'dashboard',
+    })
+    const activeTrack = await getActiveTrack(handle.db)
+
+    expect(workspace.activeTrack).toMatchObject({
+      activeGroup: { id: 'leetcode-75:arrays-hashing' },
+      nextProblem: { slug: 'two-sum' },
+    })
+    expect(activeTrack).toMatchObject({
+      activeGroup: { id: 'leetcode-75:arrays-hashing' },
+      nextProblem: { slug: 'two-sum' },
+    })
+    expect(await handle.db.select().from(trackSession)).toMatchObject([
+      { activeGroupId: 'leetcode-75:stack' },
+    ])
   })
 
   it('reads the management workspace even in free-practice mode', async () => {
@@ -329,6 +456,11 @@ describe('tracks service', () => {
     ])
     expect(workspace.dueCount).toBe(0)
     expect(workspace.activeTrack?.nextProblem?.slug).toBe('valid-parentheses')
+    expect(workspace.activeTrack?.activeGroup?.id).toBe('leetcode-75:stack')
+    expect(await getActiveTrack(handle.db)).toMatchObject({
+      activeGroup: { id: 'leetcode-75:stack' },
+      nextProblem: { slug: 'valid-parentheses' },
+    })
   })
 
   it('skips suspended incomplete problems and returns no next problem when the track is complete', async () => {
@@ -352,6 +484,8 @@ describe('tracks service', () => {
       }),
     ).resolves.toMatchObject({
       activeTrack: {
+        activeGroup: { id: 'leetcode-75:stack' },
+        progress: { completedCount: 0, totalCount: 2, percent: 0 },
         nextProblem: {
           slug: 'valid-parentheses',
         },
@@ -375,12 +509,37 @@ describe('tracks service', () => {
       }),
     ).resolves.toMatchObject({
       activeTrack: {
+        activeGroup: null,
         nextProblem: null,
+        progress: { completedCount: 1, totalCount: 1, percent: 100 },
       },
     })
   })
 
-  it('uses the ordered workspace next-problem algorithm for direct active-track reads', async () => {
+  it('returns no current group when all remaining problems are suspended', async () => {
+    const handle = await createTestDb({
+      now: new Date('2026-01-01T00:00:00.000Z'),
+    })
+
+    await makeLeetCodeActive(handle.db)
+    await suspendProblem(handle.db, 'two-sum')
+
+    expect(
+      await getWorkspace(handle.db, { surface: 'dashboard' }),
+    ).toMatchObject({
+      activeTrack: {
+        activeGroup: null,
+        nextProblem: null,
+        progress: { completedCount: 0, totalCount: 1, percent: 0 },
+      },
+    })
+    expect(await getActiveTrack(handle.db)).toMatchObject({
+      activeGroup: null,
+      nextProblem: null,
+    })
+  })
+
+  it('keeps whole-track order after suspension regardless of persisted group or due state', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
@@ -392,6 +551,17 @@ describe('tracks service', () => {
       problemSlug: 'valid-parentheses',
       groupPosition: 2,
     })
+    await handle.db.insert(trackGroupProblems).values({
+      trackGroupId: 'leetcode-75:arrays-hashing',
+      trackId: 'leetcode-75',
+      problemSlug: 'two-sum-ii-input-array-is-sorted',
+      position: 2,
+    })
+    await suspendProblem(handle.db, 'two-sum')
+    await handle.db
+      .update(trackSession)
+      .set({ activeGroupId: 'leetcode-75:stack' })
+      .where(eq(trackSession.id, 'active'))
     await makeProblemDue(handle.db, 'valid-parentheses', {
       now: new Date('2026-01-10T12:00:00.000Z'),
     })
@@ -401,7 +571,11 @@ describe('tracks service', () => {
       new Date('2026-01-10T12:00:00.000Z'),
     )
 
-    expect(activeTrack?.nextProblem?.slug).toBe('two-sum')
+    expect(activeTrack).toMatchObject({
+      activeGroup: { id: 'leetcode-75:arrays-hashing' },
+      nextProblem: { slug: 'two-sum-ii-input-array-is-sorted' },
+      progress: { completedCount: 0, totalCount: 3, percent: 0 },
+    })
   })
 
   it('returns create defaults and searchable Library problem rows for a new track', async () => {
@@ -510,7 +684,7 @@ describe('tracks service', () => {
     expect(sessionRows).toMatchObject([
       {
         activeTrackId: 'dynamic-plan',
-        activeGroupId: 'dynamic-plan:main',
+        activeGroupId: null,
       },
     ])
   })

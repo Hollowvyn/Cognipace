@@ -13,7 +13,6 @@ import type {
   TracksGetWorkspaceRequest,
   TracksRemoveProblemRequest,
   TracksResetTrackProgressRequest,
-  TracksSetActiveGroupRequest,
   TracksSetActiveTrackRequest,
   TracksUpdateTrackRequest,
 } from './tracks-contracts'
@@ -44,10 +43,6 @@ export function clearActiveTrackViaRuntime(
   request: TracksClearActiveTrackRequest,
 ) {
   return sendMessage('tracks.clearActiveTrack', request)
-}
-
-export function setActiveGroupViaRuntime(request: TracksSetActiveGroupRequest) {
-  return sendMessage('tracks.setActiveGroup', request)
 }
 
 export function createTrackViaRuntime(request: TracksCreateTrackRequest) {
@@ -85,6 +80,7 @@ export function useTrackWorkspace(request: TracksGetWorkspaceRequest) {
   return useQuery({
     queryKey: tracksQueryKeys.workspace(request.at),
     queryFn: () => getTrackWorkspaceViaRuntime(request),
+    refetchOnMount: 'always',
   })
 }
 
@@ -101,10 +97,6 @@ export function useSetActiveTrack() {
 
 export function useClearActiveTrack() {
   return useTrackMutation(clearActiveTrackViaRuntime, ['tracks'])
-}
-
-export function useSetActiveGroup() {
-  return useTrackMutation(setActiveGroupViaRuntime, ['tracks'])
 }
 
 export function useCreateTrack() {
