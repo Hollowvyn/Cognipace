@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -22,6 +23,7 @@ import {
 } from '@/testing/track-fixtures'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 
+import { tracksQueryKeys } from '../api/tracks-api'
 import { OtherTracksAccordion } from './other-tracks-accordion'
 import { TracksScreen } from './tracks-screen'
 
@@ -428,7 +430,7 @@ describe('TracksScreen', () => {
     }
   })
 
-  it('reveals the newly selected group after the workspace is invalidated', async () => {
+  it('reveals the locally selected group without mutating the session', async () => {
     const user = userEvent.setup()
     const { mock: scrollIntoView, restore: restoreScrollIntoView } =
       mockElementScrollIntoView()
@@ -437,18 +439,9 @@ describe('TracksScreen', () => {
       const initialWorkspace = createFourGroupWorkspace(
         'leetcode-75:arrays-hashing',
       )
-      const updatedWorkspace = createFourGroupWorkspace(
-        'leetcode-75:dynamic-programming',
-      )
-      let currentWorkspace = initialWorkspace
-
       vi.mocked(sendMessage).mockImplementation((method) => {
         if (method === 'tracks.getWorkspace') {
-          return Promise.resolve(currentWorkspace)
-        }
-
-        if (method === 'tracks.setActiveGroup') {
-          currentWorkspace = updatedWorkspace
+          return Promise.resolve(initialWorkspace)
         }
 
         return Promise.resolve(null)
@@ -483,6 +476,7 @@ describe('TracksScreen', () => {
           name: 'Dynamic Programming, 0 of 1 completed',
         }),
       )
+      expect(sendMessage).toHaveBeenCalledTimes(1)
     } finally {
       restoreScrollIntoView()
     }
@@ -580,7 +574,7 @@ describe('TracksScreen', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
 
-  it('sets the active group from the group buttons', async () => {
+  it('browses groups locally and reopens on the next question group', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockImplementation((method) => {
       if (method === 'tracks.getWorkspace') {
@@ -590,7 +584,7 @@ describe('TracksScreen', () => {
       return Promise.resolve(null)
     })
 
-    renderTracksScreen()
+    const view = renderTracksScreen()
 
     await user.click(
       await screen.findByRole('tab', {
@@ -598,11 +592,253 @@ describe('TracksScreen', () => {
       }),
     )
 
-    expect(sendMessage).toHaveBeenCalledWith('tracks.setActiveGroup', {
-      surface: 'dashboard',
-      trackId: 'leetcode-75',
-      groupId: 'leetcode-75:dynamic-programming',
+    expect(getTrackProblemRow('Maximum Subarray')).toBeVisible()
+    expect(queryTrackProblemRow('Two Sum')).toBeNull()
+    expect(screen.getByText('Two Sum')).toBeVisible()
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+
+    view.unmount()
+    renderTracksScreen()
+
+    expect(await getTrackProblemRowAsync('Two Sum')).toBeVisible()
+    expect(
+      screen.getByRole('tab', { name: /Arrays and Hashing/ }),
+    ).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('preserves the initial browsing group when Next advances on refetch', async () => {
+    let workspace = twoGroupWorkspace
+    vi.mocked(sendMessage).mockImplementation(() => Promise.resolve(workspace))
+    const { queryClient } = renderTracksScreen()
+    expect(await getTrackProblemRowAsync('Two Sum')).toBeVisible()
+
+    workspace = {
+      ...twoGroupWorkspace,
+      activeTrack: {
+        ...twoGroupWorkspace.activeTrack!,
+        activeGroup: twoGroupWorkspace.activeTrackGroups[1]!,
+        nextProblem: twoGroupWorkspace.activeTrackRows[2]!.problem,
+      },
+    }
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tracksQueryKeys.workspace(),
+      })
     })
+    expect(
+      (await screen.findAllByRole('link', { name: 'Maximum Subarray' }))[0],
+    ).toBeVisible()
+    expect(
+      screen.getByRole('tab', { name: /Arrays and Hashing/ }),
+    ).toHaveAttribute('aria-selected', 'true')
+    expect(getTrackProblemRow('Two Sum')).toBeVisible()
+  })
+
+  it.each(['fresh', 'invalidated'] as const)(
+    'reopens on the new Next group using the same %s workspace cache',
+    async (cacheState) => {
+      let workspace = twoGroupWorkspace
+      vi.mocked(sendMessage).mockImplementation(() =>
+        Promise.resolve(workspace),
+      )
+      const harness = createQueryTestHarness()
+      harness.queryClient.setDefaultOptions({
+        ...harness.queryClient.getDefaultOptions(),
+        queries: {
+          ...harness.queryClient.getDefaultOptions().queries,
+          staleTime: 30_000,
+        },
+      })
+      const view = renderTracksScreen(harness)
+      expect(await getTrackProblemRowAsync('Two Sum')).toBeVisible()
+      view.unmount()
+
+      workspace = {
+        ...twoGroupWorkspace,
+        activeTrack: {
+          ...twoGroupWorkspace.activeTrack!,
+          activeGroup: twoGroupWorkspace.activeTrackGroups[1]!,
+          nextProblem: twoGroupWorkspace.activeTrackRows[2]!.problem,
+        },
+      }
+      if (cacheState === 'invalidated') {
+        await act(async () => {
+          await harness.queryClient.invalidateQueries({
+            queryKey: tracksQueryKeys.workspace(),
+          })
+        })
+      }
+
+      renderTracksScreen(harness)
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('tab', { name: /Dynamic Programming/ }),
+        ).toHaveAttribute('aria-selected', 'true')
+      })
+      expect(getTrackProblemRow('Maximum Subarray')).toBeVisible()
+      expect(queryTrackProblemRow('Two Sum')).toBeNull()
+      expect(
+        within(screen.getByLabelText('Next metric')).getByRole('link', {
+          name: 'Maximum Subarray',
+        }),
+      ).toBeVisible()
+    },
+  )
+
+  it('preserves browsing on refetch and falls back when that group is removed', async () => {
+    const user = userEvent.setup()
+    let workspace = twoGroupWorkspace
+    vi.mocked(sendMessage).mockImplementation(() => Promise.resolve(workspace))
+    const { queryClient } = renderTracksScreen()
+    await user.click(
+      await screen.findByRole('tab', { name: /Dynamic Programming/ }),
+    )
+
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tracksQueryKeys.workspace(),
+      })
+    })
+    expect(getTrackProblemRow('Maximum Subarray')).toBeVisible()
+    expect(
+      screen.getByRole('tab', { name: /Dynamic Programming/ }),
+    ).toHaveAttribute('aria-selected', 'true')
+
+    workspace = {
+      ...twoGroupWorkspace,
+      activeTrackGroups: twoGroupWorkspace.activeTrackGroups.slice(0, 1),
+      activeTrackRows: twoGroupWorkspace.activeTrackRows.slice(0, 2),
+    }
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tracksQueryKeys.workspace(),
+      })
+    })
+    expect(await getTrackProblemRowAsync('Two Sum')).toBeVisible()
+    expect(queryTrackProblemRow('Maximum Subarray')).toBeNull()
+  })
+
+  it('preserves the fallback browsing group when Next advances after group removal', async () => {
+    const user = userEvent.setup()
+    const graphGroup = createSerializedTrackGroup({
+      id: 'leetcode-75:graphs',
+      title: 'Graphs',
+      position: 3,
+    })
+    const graphRow = createTrackProblemRow({
+      problem: twoGroupWorkspace.activeTrackRows[1]!.problem,
+      membership: {
+        trackId: 'leetcode-75',
+        groupId: graphGroup.id,
+        groupTitle: graphGroup.title,
+        groupPosition: graphGroup.position,
+        problemPosition: 1,
+        completion: { status: 'incomplete', reviewAttemptId: null },
+      },
+    })
+    let workspace = {
+      ...twoGroupWorkspace,
+      activeTrackGroups: [...twoGroupWorkspace.activeTrackGroups, graphGroup],
+      activeTrackRows: [
+        twoGroupWorkspace.activeTrackRows[0]!,
+        twoGroupWorkspace.activeTrackRows[2]!,
+        graphRow,
+      ],
+    }
+    vi.mocked(sendMessage).mockImplementation(() => Promise.resolve(workspace))
+    const { queryClient } = renderTracksScreen()
+    await user.click(
+      await screen.findByRole('tab', { name: /Dynamic Programming/ }),
+    )
+    expect(getTrackProblemRow('Maximum Subarray')).toBeVisible()
+
+    workspace = {
+      ...workspace,
+      activeTrackGroups: [twoGroupWorkspace.activeTrackGroups[0]!, graphGroup],
+      activeTrackRows: [twoGroupWorkspace.activeTrackRows[0]!, graphRow],
+    }
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tracksQueryKeys.workspace(),
+      })
+    })
+    expect(await getTrackProblemRowAsync('Two Sum')).toBeVisible()
+    expect(
+      screen.getByRole('tab', { name: /Arrays and Hashing/ }),
+    ).toHaveAttribute('aria-selected', 'true')
+
+    workspace = {
+      ...workspace,
+      activeTrack: {
+        ...workspace.activeTrack!,
+        activeGroup: graphGroup,
+        nextProblem: graphRow.problem,
+      },
+    }
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tracksQueryKeys.workspace(),
+      })
+    })
+    expect(
+      await within(screen.getByLabelText('Next metric')).findByRole('link', {
+        name: 'Binary Search',
+      }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('tab', { name: /Arrays and Hashing/ }),
+    ).toHaveAttribute('aria-selected', 'true')
+    expect(getTrackProblemRow('Two Sum')).toBeVisible()
+    expect(queryTrackProblemRow('Binary Search')).toBeNull()
+  })
+
+  it('resets browsing when the active track changes and changes back', async () => {
+    const user = userEvent.setup()
+    let workspace = twoGroupWorkspace
+    vi.mocked(sendMessage).mockImplementation(() => Promise.resolve(workspace))
+    const { queryClient } = renderTracksScreen()
+    await user.click(
+      await screen.findByRole('tab', { name: /Dynamic Programming/ }),
+    )
+    expect(getTrackProblemRow('Maximum Subarray')).toBeVisible()
+
+    const otherGroup = createSerializedTrackGroup({
+      id: 'other:main',
+      trackId: 'other',
+    })
+    workspace = createTrackWorkspaceResponse({
+      activeTrack: {
+        track: createSerializedTrack({
+          id: 'other',
+          slug: 'other',
+          title: 'Other track',
+        }),
+        activeGroup: otherGroup,
+        nextProblem: null,
+        progress: { completedCount: 0, totalCount: 0, percent: 0 },
+      },
+      activeTrackGroups: [otherGroup],
+      activeTrackRows: [],
+    })
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tracksQueryKeys.workspace(),
+      })
+    })
+    expect(
+      await screen.findByRole('heading', { name: 'Other track', level: 2 }),
+    ).toBeVisible()
+    workspace = twoGroupWorkspace
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tracksQueryKeys.workspace(),
+      })
+    })
+    expect(await getTrackProblemRowAsync('Two Sum')).toBeVisible()
+    expect(
+      screen.getByRole('tab', { name: /Arrays and Hashing/ }),
+    ).toHaveAttribute('aria-selected', 'true')
   })
 
   it('shows the complete collection by default and can collapse it', async () => {
@@ -785,10 +1021,6 @@ describe('TracksScreen', () => {
       'tracks.setActiveTrack',
       expect.anything(),
     )
-    expect(sendMessage).not.toHaveBeenCalledWith(
-      'tracks.setActiveGroup',
-      expect.anything(),
-    )
     toggle.focus()
     await user.keyboard(' ')
     expect(
@@ -829,9 +1061,10 @@ describe('TracksScreen', () => {
       screen.queryByRole('region', { name: 'LeetCode 75 preview' }),
     ).not.toBeInTheDocument()
     expect(leetcodeToggle).toHaveFocus()
-    for (const method of ['tracks.setActiveTrack', 'tracks.setActiveGroup']) {
-      expect(sendMessage).not.toHaveBeenCalledWith(method, expect.anything())
-    }
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'tracks.setActiveTrack',
+      expect.anything(),
+    )
   })
 
   it('closes a track preview when the collection collapses', async () => {
@@ -1481,10 +1714,10 @@ function mockWorkspaceAndTrackPreview() {
   })
 }
 
-function renderTracksScreen() {
-  const { wrapper } = createQueryTestHarness()
+function renderTracksScreen(harness = createQueryTestHarness()) {
+  const { queryClient, wrapper } = harness
 
-  return render(
+  const view = render(
     <TracksScreen
       newTrackAction={
         <Button asChild size="sm">
@@ -1515,6 +1748,8 @@ function renderTracksScreen() {
     />,
     { wrapper },
   )
+
+  return { ...view, queryClient }
 }
 
 const trackPreview = createTrackForEditResponse({

@@ -53,13 +53,7 @@ export class TracksRepository {
       return null
     }
 
-    const preferredGroup =
-      session.activeGroup ??
-      (await readFirstGroup(this.db, session.activeTrack.id))
-    const next = await this.getNextProblemInTrack(
-      session.activeTrack.id,
-      preferredGroup,
-    )
+    const next = await this.getNextProblemInTrack(session.activeTrack.id)
     const progressByTrack = await this.getProgressByTrack([
       session.activeTrack.id,
     ])
@@ -86,10 +80,6 @@ export class TracksRepository {
       track: mapTrack(trackRow),
       progress: progressByTrack.get(trackRow.id) ?? emptyProgress(),
       isActive: session.activeTrack?.id === trackRow.id,
-      activeGroupId:
-        session.activeTrack?.id === trackRow.id
-          ? (session.activeGroup?.id ?? null)
-          : null,
     }))
   }
 
@@ -167,7 +157,6 @@ export class TracksRepository {
         throw new Error(`Cannot activate missing track "${trackId}".`)
       }
 
-      const firstGroup = await readFirstGroup(transactionDb, track.id)
       const timestamp = now.getTime()
 
       await transactionDb
@@ -175,7 +164,7 @@ export class TracksRepository {
         .values({
           id: activeTrackSessionId,
           activeTrackId: track.id,
-          activeGroupId: firstGroup?.id ?? null,
+          activeGroupId: null,
           startedAt: timestamp,
           updatedAt: timestamp,
         })
@@ -183,7 +172,7 @@ export class TracksRepository {
           target: trackSession.id,
           set: {
             activeTrackId: track.id,
-            activeGroupId: firstGroup?.id ?? null,
+            activeGroupId: null,
             startedAt: timestamp,
             updatedAt: timestamp,
           },
@@ -191,7 +180,6 @@ export class TracksRepository {
 
       return {
         activeTrack: track,
-        activeGroup: firstGroup,
         startedAt: new Date(timestamp),
         updatedAt: new Date(timestamp),
       }
@@ -222,50 +210,9 @@ export class TracksRepository {
 
       return {
         activeTrack: null,
-        activeGroup: null,
         startedAt: new Date(timestamp),
         updatedAt: new Date(timestamp),
       }
-    })
-  }
-
-  async setActiveGroup(
-    groupId: string,
-    now = new Date(),
-  ): Promise<TrackSessionState> {
-    return this.db.transaction(async (transactionDb) => {
-      const sessionRows = await transactionDb
-        .select()
-        .from(trackSession)
-        .where(eq(trackSession.id, activeTrackSessionId))
-        .limit(1)
-      const session = sessionRows[0]
-
-      if (!session?.activeTrackId) {
-        throw new Error('Cannot set an active group without an active track.')
-      }
-
-      const group = await readGroupByIdForTrack(
-        transactionDb,
-        groupId,
-        session.activeTrackId,
-      )
-
-      if (!group) {
-        throw new Error(
-          'Cannot set an active group outside the current active track.',
-        )
-      }
-
-      await transactionDb
-        .update(trackSession)
-        .set({
-          activeGroupId: group.id,
-          updatedAt: now.getTime(),
-        })
-        .where(eq(trackSession.id, activeTrackSessionId))
-
-      return readSessionState(transactionDb)
     })
   }
 
@@ -656,10 +603,7 @@ export class TracksRepository {
     })
   }
 
-  private async getNextProblemInTrack(
-    trackId: string,
-    preferredGroup: TrackGroup | null,
-  ): Promise<{
+  private async getNextProblemInTrack(trackId: string): Promise<{
     group: TrackGroup | null
     problem: Problem | null
   }> {
@@ -701,7 +645,7 @@ export class TracksRepository {
     }
 
     return {
-      group: preferredGroup ?? groups[0] ?? null,
+      group: null,
       problem: null,
     }
   }
@@ -731,7 +675,6 @@ async function readSessionState(db: TracksReadDb): Promise<TrackSessionState> {
   if (!session) {
     return {
       activeTrack: null,
-      activeGroup: null,
       startedAt: new Date(0),
       updatedAt: new Date(0),
     }
@@ -740,47 +683,12 @@ async function readSessionState(db: TracksReadDb): Promise<TrackSessionState> {
   const activeTrack = session.activeTrackId
     ? await readTrackById(db, session.activeTrackId)
     : null
-  const activeGroup =
-    activeTrack && session.activeGroupId
-      ? await readGroupByIdForTrack(db, session.activeGroupId, activeTrack.id)
-      : null
 
   return {
     activeTrack,
-    activeGroup,
     startedAt: new Date(session.startedAt),
     updatedAt: new Date(session.updatedAt),
   }
-}
-
-async function readGroupByIdForTrack(
-  db: TracksReadDb,
-  groupId: string,
-  trackId: string,
-): Promise<TrackGroup | null> {
-  const rows = await db
-    .select()
-    .from(trackGroups)
-    .where(
-      and(eq(trackGroups.id, groupId.trim()), eq(trackGroups.trackId, trackId)),
-    )
-    .limit(1)
-
-  return rows[0] ? mapTrackGroup(rows[0]) : null
-}
-
-async function readFirstGroup(
-  db: TracksReadDb,
-  trackId: string,
-): Promise<TrackGroup | null> {
-  const rows = await db
-    .select()
-    .from(trackGroups)
-    .where(eq(trackGroups.trackId, trackId))
-    .orderBy(asc(trackGroups.position))
-    .limit(1)
-
-  return rows[0] ? mapTrackGroup(rows[0]) : null
 }
 
 async function readGroups(

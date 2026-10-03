@@ -728,7 +728,7 @@ export async function seedInitialCatalog(db: Db, now = new Date()) {
     .values({
       id: 'active',
       activeTrackId: byteByteGo101TrackId,
-      activeGroupId: `${byteByteGo101TrackId}:two-pointers`,
+      activeGroupId: null,
       startedAt: timestamp,
       updatedAt: timestamp,
     })

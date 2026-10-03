@@ -19,7 +19,6 @@ import { Surface } from '@/components/ui/surface'
 import { createLeetCodeProblemUrl } from '@/lib/leetcode'
 import { cn } from '@/utils/cn'
 
-import { useSetActiveGroup } from '../api/tracks-api'
 import type {
   SerializedActiveTrack,
   SerializedTrack,
@@ -50,7 +49,17 @@ export function ActiveTrackWorkspace({
   renderEditTrackAction: RenderTrackEditAction
   rows: readonly TrackProblemRow[]
 }) {
-  const activeGroupId = activeTrack.activeGroup?.id ?? groups[0]?.id ?? null
+  const defaultGroupId =
+    groups.find((group) => group.id === activeTrack.activeGroup?.id)?.id ??
+    groups[0]?.id ??
+    null
+  const [selectedGroupId, setSelectedGroupId] = useState(defaultGroupId)
+  const activeGroupId = groups.some((group) => group.id === selectedGroupId)
+    ? selectedGroupId
+    : defaultGroupId
+  if (selectedGroupId !== activeGroupId) {
+    setSelectedGroupId(activeGroupId)
+  }
   const activeRows = activeGroupId
     ? rows.filter((row) => row.membership.groupId === activeGroupId)
     : rows
@@ -68,6 +77,7 @@ export function ActiveTrackWorkspace({
         activeGroupId={activeGroupId}
         groupProgressById={groupProgressById}
         groups={groups}
+        onSelectGroup={setSelectedGroupId}
         trackId={activeTrack.track.id}
       />
       {groups.length === 0 ? (
@@ -276,15 +286,15 @@ function ActiveTrackGroups({
   activeGroupId,
   groupProgressById,
   groups,
+  onSelectGroup,
   trackId,
 }: {
   activeGroupId: string | null
   groupProgressById: ReadonlyMap<string, TrackGroupProgress>
   groups: readonly SerializedTrackGroup[]
+  onSelectGroup: (groupId: string) => void
   trackId: string
 }) {
-  const setActiveGroup = useSetActiveGroup()
-  const [error, setError] = useState<string | null>(null)
   const tabListRef = useRef<HTMLDivElement | null>(null)
   const [scrollState, setScrollState] = useState({
     canScrollLeft: false,
@@ -352,35 +362,8 @@ function ActiveTrackGroups({
     return null
   }
 
-  async function selectGroup(groupId: string) {
-    if (groupId === activeGroupId) {
-      return
-    }
-
-    setError(null)
-
-    try {
-      await setActiveGroup.mutateAsync({
-        groupId,
-        surface: 'dashboard',
-        trackId,
-      })
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : 'Failed to change active group.',
-      )
-    }
-  }
-
   return (
     <div className="min-w-0 border-t border-border px-4 py-3 md:px-5 lg:px-7">
-      {error ? (
-        <InlineStatus className="mb-3" role="alert" tone="danger">
-          {error}
-        </InlineStatus>
-      ) : null}
       <div className="relative min-w-0">
         {scrollState.canScrollLeft ? (
           <TrackGroupScrollButton
@@ -424,10 +407,9 @@ function ActiveTrackGroups({
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
                 )}
-                disabled={setActiveGroup.isPending}
                 key={group.id}
                 onClick={() => {
-                  void selectGroup(group.id)
+                  onSelectGroup(group.id)
                 }}
                 role="tab"
                 ref={isActive ? activeTabRef : undefined}

@@ -112,6 +112,41 @@ describe('tracks service', () => {
     await expect(getActiveTrack(handle.db)).resolves.toBeNull()
   })
 
+  it('uses the next membership group instead of the persisted browsing group', async () => {
+    const handle = await createTestDb({
+      now: new Date('2026-01-01T00:00:00.000Z'),
+    })
+
+    await makeLeetCodeActive(handle.db)
+    await addActiveTrackMembership(handle.db, {
+      groupId: 'leetcode-75:stack',
+      groupTitle: 'Stack',
+      problemSlug: 'valid-parentheses',
+      groupPosition: 2,
+    })
+    await handle.db
+      .update(trackSession)
+      .set({ activeGroupId: 'leetcode-75:stack' })
+      .where(eq(trackSession.id, 'active'))
+
+    const workspace = await getWorkspace(handle.db, {
+      surface: 'dashboard',
+    })
+    const activeTrack = await getActiveTrack(handle.db)
+
+    expect(workspace.activeTrack).toMatchObject({
+      activeGroup: { id: 'leetcode-75:arrays-hashing' },
+      nextProblem: { slug: 'two-sum' },
+    })
+    expect(activeTrack).toMatchObject({
+      activeGroup: { id: 'leetcode-75:arrays-hashing' },
+      nextProblem: { slug: 'two-sum' },
+    })
+    expect(await handle.db.select().from(trackSession)).toMatchObject([
+      { activeGroupId: 'leetcode-75:stack' },
+    ])
+  })
+
   it('reads the management workspace even in free-practice mode', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
@@ -329,6 +364,11 @@ describe('tracks service', () => {
     ])
     expect(workspace.dueCount).toBe(0)
     expect(workspace.activeTrack?.nextProblem?.slug).toBe('valid-parentheses')
+    expect(workspace.activeTrack?.activeGroup?.id).toBe('leetcode-75:stack')
+    expect(await getActiveTrack(handle.db)).toMatchObject({
+      activeGroup: { id: 'leetcode-75:stack' },
+      nextProblem: { slug: 'valid-parentheses' },
+    })
   })
 
   it('skips suspended incomplete problems and returns no next problem when the track is complete', async () => {
@@ -352,6 +392,7 @@ describe('tracks service', () => {
       }),
     ).resolves.toMatchObject({
       activeTrack: {
+        activeGroup: { id: 'leetcode-75:stack' },
         nextProblem: {
           slug: 'valid-parentheses',
         },
@@ -375,8 +416,32 @@ describe('tracks service', () => {
       }),
     ).resolves.toMatchObject({
       activeTrack: {
+        activeGroup: null,
         nextProblem: null,
       },
+    })
+  })
+
+  it('returns no current group when all remaining problems are suspended', async () => {
+    const handle = await createTestDb({
+      now: new Date('2026-01-01T00:00:00.000Z'),
+    })
+
+    await makeLeetCodeActive(handle.db)
+    await suspendProblem(handle.db, 'two-sum')
+
+    expect(
+      await getWorkspace(handle.db, { surface: 'dashboard' }),
+    ).toMatchObject({
+      activeTrack: {
+        activeGroup: null,
+        nextProblem: null,
+        progress: { completedCount: 0, totalCount: 1 },
+      },
+    })
+    expect(await getActiveTrack(handle.db)).toMatchObject({
+      activeGroup: null,
+      nextProblem: null,
     })
   })
 
@@ -510,7 +575,7 @@ describe('tracks service', () => {
     expect(sessionRows).toMatchObject([
       {
         activeTrackId: 'dynamic-plan',
-        activeGroupId: 'dynamic-plan:main',
+        activeGroupId: null,
       },
     ])
   })

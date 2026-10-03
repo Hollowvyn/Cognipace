@@ -16,7 +16,6 @@ import {
   tracksGetWorkspaceRequestSchema,
   tracksRemoveProblemRequestSchema,
   tracksResetTrackProgressRequestSchema,
-  tracksSetActiveGroupRequestSchema,
   tracksSetActiveTrackRequestSchema,
   tracksUpdateTrackRequestSchema,
   trackWorkspaceResponseSchema,
@@ -124,7 +123,6 @@ const backgroundMocks = vi.hoisted(() => {
     resetTrackProgress: vi.fn(),
     saveReviewResultWithTrackProgress: vi.fn(),
     saveReviewResult: vi.fn(),
-    setActiveGroup: vi.fn(),
     setPracticeSuspended: vi.fn(),
     setActiveTrack: vi.fn(),
     getSettings: vi.fn(),
@@ -288,7 +286,6 @@ vi.mock('@/features/tracks/server/tracks-service', () => ({
     backgroundMocks.recordActiveTrackProblemCompletion,
   removeTrackProblem: backgroundMocks.removeTrackProblem,
   resetTrackProgress: backgroundMocks.resetTrackProgress,
-  setActiveGroup: backgroundMocks.setActiveGroup,
   setActiveTrack: backgroundMocks.setActiveTrack,
   clearActiveTrack: backgroundMocks.clearActiveTrack,
   updateTrack: backgroundMocks.updateTrack,
@@ -453,7 +450,6 @@ describe('background handler registration', () => {
       undefined,
     )
     backgroundMocks.saveReviewResult.mockResolvedValue(undefined)
-    backgroundMocks.setActiveGroup.mockResolvedValue(undefined)
     backgroundMocks.setPracticeSuspended.mockResolvedValue(practiceDetails)
     backgroundMocks.setActiveTrack.mockResolvedValue(undefined)
     backgroundMocks.clearActiveTrack.mockResolvedValue(undefined)
@@ -1454,19 +1450,6 @@ describe('background handler registration', () => {
       },
       schema: tracksSetActiveTrackRequestSchema,
       service: backgroundMocks.setActiveTrack,
-      expectedResponse: null,
-      expectedTags: ['tracks'],
-    })
-
-    await expectTrackWrite({
-      method: 'tracks.setActiveGroup',
-      request: {
-        surface: 'dashboard',
-        trackId: 'leetcode-75',
-        groupId: 'leetcode-75:arrays-hashing',
-      },
-      schema: tracksSetActiveGroupRequestSchema,
-      service: backgroundMocks.setActiveGroup,
       expectedResponse: null,
       expectedTags: ['tracks'],
     })

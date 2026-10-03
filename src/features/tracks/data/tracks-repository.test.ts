@@ -237,7 +237,10 @@ describe('TracksRepository', () => {
     })
     await repository.setActiveTrack(track.id)
     const groups = await repository.getGroups(track.id)
-    await repository.setActiveGroup(groups[1]!.id)
+    await db
+      .update(trackSession)
+      .set({ activeGroupId: groups[1]!.id })
+      .where(eq(trackSession.id, 'active'))
     expect((await repository.getActiveTrack())?.nextProblem?.slug).toBe(
       'valid-parentheses',
     )
@@ -580,7 +583,7 @@ describe('TracksRepository', () => {
     expect(rows).toEqual([])
   })
 
-  it('restores the persisted active track and active group', async () => {
+  it('restores the persisted active track with its group derived from Next', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
@@ -634,6 +637,7 @@ describe('TracksRepository', () => {
     const activeTrack = await createTracksRepository(handle.db).getActiveTrack()
 
     expect(activeTrack?.nextProblem).toBeNull()
+    expect(activeTrack?.activeGroup).toBeNull()
     expect(activeTrack?.progress).toEqual({
       completedCount: 0,
       totalCount: 1,
@@ -656,7 +660,6 @@ describe('TracksRepository', () => {
     ])
     expect(catalog.map((item) => item.isActive)).toEqual([true, false, false])
     expect(catalog.find((item) => item.isActive)).toMatchObject({
-      activeGroupId: 'bytebytego-coding-patterns-101:two-pointers',
       progress: {
         completedCount: 0,
         totalCount: 101,
@@ -668,10 +671,15 @@ describe('TracksRepository', () => {
     })
   })
 
-  it('reads the selected active track and group from the session', async () => {
+  it('reads the selected active track without restoring legacy group selection', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
+
+    await handle.db
+      .update(trackSession)
+      .set({ activeGroupId: 'bytebytego-coding-patterns-101:intervals' })
+      .where(eq(trackSession.id, 'active'))
 
     const session = await createTracksRepository(handle.db).getSession()
 
@@ -680,11 +688,8 @@ describe('TracksRepository', () => {
         id: 'bytebytego-coding-patterns-101',
         title: 'ByteByteGo Coding Patterns 101',
       },
-      activeGroup: {
-        id: 'bytebytego-coding-patterns-101:two-pointers',
-        title: 'Two Pointers',
-      },
     })
+    expect(session).not.toHaveProperty('activeGroup')
   })
 
   it('does not fall back to a track row when the session has no active track', async () => {
@@ -704,7 +709,6 @@ describe('TracksRepository', () => {
 
     await expect(repository.getSession()).resolves.toMatchObject({
       activeTrack: null,
-      activeGroup: null,
     })
     await expect(repository.getActiveTrack()).resolves.toBeNull()
   })
@@ -762,7 +766,7 @@ describe('TracksRepository', () => {
     })
   })
 
-  it('sets the active track to its first group and writes both session ids', async () => {
+  it('activates a track without persisting a browsing group', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
     })
@@ -788,14 +792,12 @@ describe('TracksRepository', () => {
       activeTrack: {
         id: 'grind-75',
       },
-      activeGroup: {
-        id: 'grind-75:arrays',
-      },
     })
+    expect(session).not.toHaveProperty('activeGroup')
     expect(rows).toMatchObject([
       {
         activeTrackId: 'grind-75',
-        activeGroupId: 'grind-75:arrays',
+        activeGroupId: null,
       },
     ])
   })
@@ -815,7 +817,6 @@ describe('TracksRepository', () => {
 
     expect(session).toMatchObject({
       activeTrack: null,
-      activeGroup: null,
     })
     expect(rows).toMatchObject([
       {
@@ -823,26 +824,6 @@ describe('TracksRepository', () => {
         activeGroupId: null,
       },
     ])
-  })
-
-  it('rejects setting an active group outside the current active track', async () => {
-    const handle = await createTestDb({
-      now: new Date('2026-01-01T00:00:00.000Z'),
-    })
-    const repository = createTracksRepository(handle.db)
-
-    await expect(repository.setActiveGroup('grind-75:stack')).rejects.toThrow(
-      /active track/i,
-    )
-
-    await expect(repository.getSession()).resolves.toMatchObject({
-      activeTrack: {
-        id: 'bytebytego-coding-patterns-101',
-      },
-      activeGroup: {
-        id: 'bytebytego-coding-patterns-101:two-pointers',
-      },
-    })
   })
 
   it('creates a Main group when creating a track with no groups', async () => {
