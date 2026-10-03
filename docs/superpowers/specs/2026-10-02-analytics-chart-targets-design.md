@@ -36,12 +36,14 @@ Rhythm. Use the existing target color and a subtle dashed-line key. Replace
 Recall's generic target caption with the explicit editable caption; avoid a
 duplicate caption or permanent bottom detail row.
 
-Clicking either button opens the same compact inline editor inside that chart,
-with both labeled percentage inputs, Save, and Cancel. Focus the target for
-the chart that opened it. Both goals are visible because they have a shared
-validation rule. The editor is collapsed by default and remains available
-with sparse or empty chart data. Native inputs support keyboard and touch.
-Enter submits; Escape cancels and returns focus to the trigger.
+User-directed refinement on 2026-10-02 replaces the original two-field panel
+with a smaller single-target editor in each chart. Clicking the button opens
+one percentage input for that chart, Save, and Cancel. Focus that input. Recall
+shows Hard + Good + Easy and its maximum allowed by the saved Review Success
+goal; Practice shows Good + Easy and its minimum allowed by the saved Recall
+goal. The editor is collapsed by default and remains available with sparse or
+empty chart data. Native inputs support keyboard and touch. Enter submits;
+Escape cancels and returns focus to the trigger.
 
 Use whole percentages from 0 through 100 in one-point steps. Both independent
 goals default to 90%; do not copy the user's live FSRS retention value into
@@ -49,7 +51,10 @@ them. Explain each rating combination in the editor. If Success is below
 Recall, show **Review Success target must be at least your Recall target**
 and prevent saving. Do not silently alter the other goal.
 
-Saving persists the pair atomically. Show a saving state and prevent duplicate
+Saving sends only the edited goal as a partial analytics patch. Settings merges
+it with the latest persisted counterpart and validates/writes the pair
+atomically. A refreshed counterpart updates the editor's hint and validation
+without replacing the active draft. Show a saving state and prevent duplicate
 submissions. Update chart goals from the successful saved result; a failed
 save retains the prior pair and leaves the draft open with a useful error.
 Cancel changes neither persisted values nor reference lines. Reopening or
@@ -128,3 +133,5 @@ cover this historically excluded Markdown path. Skipped `rtk npm run db:check`,
 packaging changes were implemented at that checkpoint. The subsequent
 implementation validation is recorded in the handoff; human extension smoke
 proof remains pending.
+
+Compact-editor refinement implementation is tracked in the [follow-up plan](../plans/2026-10-02-analytics-compact-target-editors.md). The original paired-editor proof remains archived in its handoff and Git history.
