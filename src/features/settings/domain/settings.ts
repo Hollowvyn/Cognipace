@@ -12,13 +12,25 @@ export const themeModeSchema = z.enum(['system', 'light', 'dark'])
 export const userSettingsSchemaVersion = 1
 
 const analyticsTargetFractionSchema = z.number().finite().min(0).max(1)
+const firstAttemptTargetFractionSchema = analyticsTargetFractionSchema.refine(
+  (fraction) =>
+    Math.abs(fraction * 100 - Math.round(fraction * 100)) <=
+    Number.EPSILON * 100,
+  'Use a whole percentage',
+)
 const analyticsTargetsShape = {
   targetRecall: analyticsTargetFractionSchema,
   targetReviewSuccess: analyticsTargetFractionSchema,
+  targetFirstAttemptSuccess: firstAttemptTargetFractionSchema,
+  targetFirstAttemptGoodEasy: firstAttemptTargetFractionSchema,
 }
 
 export const analyticsTargetsSchema = z
-  .object(analyticsTargetsShape)
+  .object({
+    ...analyticsTargetsShape,
+    targetFirstAttemptSuccess: firstAttemptTargetFractionSchema.default(0.9),
+    targetFirstAttemptGoodEasy: firstAttemptTargetFractionSchema.default(0.9),
+  })
   .strict()
   .refine((targets) => targets.targetReviewSuccess >= targets.targetRecall, {
     message: 'Review Success target must be at least your Recall target.',
@@ -30,6 +42,8 @@ export type AnalyticsTargets = z.infer<typeof analyticsTargetsSchema>
 export const defaultAnalyticsTargets: AnalyticsTargets = {
   targetRecall: 0.9,
   targetReviewSuccess: 0.9,
+  targetFirstAttemptSuccess: 0.9,
+  targetFirstAttemptGoodEasy: 0.9,
 }
 
 export const timeOfDaySchema = z
@@ -305,7 +319,19 @@ function createSafeStoredValue(value: unknown): unknown {
   }
 
   const appearance = appearanceSettingsSchema.safeParse(value.appearance)
-  const analytics = analyticsTargetsSchema.safeParse(value.analytics)
+  const analytics = analyticsTargetsSchema.safeParse(
+    isRecord(value.analytics)
+      ? {
+          ...value.analytics,
+          targetFirstAttemptSuccess: recoverStoredFirstAttemptTarget(
+            value.analytics.targetFirstAttemptSuccess,
+          ),
+          targetFirstAttemptGoodEasy: recoverStoredFirstAttemptTarget(
+            value.analytics.targetFirstAttemptGoodEasy,
+          ),
+        }
+      : value.analytics,
+  )
 
   return {
     ...value,
@@ -314,6 +340,11 @@ function createSafeStoredValue(value: unknown): unknown {
       ? appearance.data
       : defaultUserSettings.appearance,
   }
+}
+
+function recoverStoredFirstAttemptTarget(value: unknown): number {
+  const parsed = firstAttemptTargetFractionSchema.safeParse(value)
+  return parsed.success ? parsed.data : 0.9
 }
 
 export function mergeUserSettings(
@@ -409,6 +440,20 @@ export function createUserSettingsPatch(
     saved.analytics.targetReviewSuccess !== draft.analytics.targetReviewSuccess
   ) {
     analyticsPatch.targetReviewSuccess = draft.analytics.targetReviewSuccess
+  }
+  if (
+    saved.analytics.targetFirstAttemptSuccess !==
+    draft.analytics.targetFirstAttemptSuccess
+  ) {
+    analyticsPatch.targetFirstAttemptSuccess =
+      draft.analytics.targetFirstAttemptSuccess
+  }
+  if (
+    saved.analytics.targetFirstAttemptGoodEasy !==
+    draft.analytics.targetFirstAttemptGoodEasy
+  ) {
+    analyticsPatch.targetFirstAttemptGoodEasy =
+      draft.analytics.targetFirstAttemptGoodEasy
   }
   if (hasObjectKeys(analyticsPatch)) {
     patch.analytics = analyticsPatch

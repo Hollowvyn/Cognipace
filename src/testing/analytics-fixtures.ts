@@ -55,6 +55,7 @@ function createHistoricalReadiness(): SerializedAnalyticsSummary['historicalRead
 
   return {
     requested: readiness,
+    firstAttemptOutcomes: { ...readiness },
     recallQuality: { ...readiness },
     practiceRhythm: { ...readiness },
     ratingsMix: { ...readiness },
@@ -98,6 +99,26 @@ export function createSerializedAnalyticsSummary(
     lowSample: false,
     targetRetention: 0.9,
     views: {
+      firstAttemptOutcomes: {
+        rows: [],
+        totals: {
+          again: 0,
+          hard: 0,
+          good: 0,
+          easy: 0,
+          recordedFirstAttempts: 0,
+          excludedInvalidRatings: 0,
+          validFirstAttempts: 0,
+          hardGoodEasy: 0,
+          goodEasy: 0,
+          firstAttemptSuccess: null,
+          firstAttemptGoodEasy: null,
+          evidence: 'not-measured',
+        },
+        scale: { domain: [0, 1], ticks: [0, 1] },
+        targetFirstAttemptSuccess: 0.9,
+        targetFirstAttemptGoodEasy: 0.9,
+      },
       observedRecallVsFsrs: {
         rows: [],
         scale: { domain: [0, 1], ticks: [0, 1] },

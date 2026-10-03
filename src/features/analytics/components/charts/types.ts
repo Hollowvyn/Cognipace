@@ -4,6 +4,8 @@ export type AnalyticsChartSemanticColor =
   | 'var(--cp-analytics-again)'
   | 'var(--cp-analytics-attention)'
   | 'var(--cp-analytics-easy)'
+  | 'var(--cp-analytics-first-success)'
+  | 'var(--cp-analytics-first-good-easy)'
   | 'var(--cp-analytics-good)'
   | 'var(--cp-analytics-hard)'
   | 'var(--cp-analytics-healthy)'

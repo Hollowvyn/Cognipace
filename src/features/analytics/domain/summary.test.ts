@@ -203,6 +203,21 @@ describe('buildAnalyticsSummary', () => {
 
     expect(result.views.observedRecallVsFsrs.targetRecall).toBe(0.9)
     expect(result.views.practiceRhythm.targetReviewSuccess).toBe(0.9)
+    expect(result.views.firstAttemptOutcomes).toMatchObject({
+      rows: [],
+      targetFirstAttemptSuccess: 0.9,
+      targetFirstAttemptGoodEasy: 0.9,
+      totals: {
+        recordedFirstAttempts: 0,
+        excludedInvalidRatings: 0,
+        validFirstAttempts: 0,
+        hardGoodEasy: 0,
+        goodEasy: 0,
+        firstAttemptSuccess: null,
+        firstAttemptGoodEasy: null,
+        evidence: 'not-measured',
+      },
+    })
     expect(result.targetRetention).toBe(0.8)
     expect(result.views.retentionMap.targetRetention).toBe(0.8)
   })
@@ -305,6 +320,7 @@ function createHistoricalReadiness(
 
   return {
     requested: readiness,
+    firstAttemptOutcomes: readiness,
     recallQuality: readiness,
     practiceRhythm: readiness,
     ratingsMix: readiness,
@@ -345,6 +361,7 @@ function createDetailedHistoricalReadiness(): HistoricalReadiness {
 
   return {
     requested,
+    firstAttemptOutcomes: { ...requested },
     recallQuality,
     practiceRhythm: { ...requested },
     ratingsMix: { ...requested },

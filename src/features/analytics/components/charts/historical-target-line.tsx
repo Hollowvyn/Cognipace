@@ -4,10 +4,12 @@ export function HistoricalTargetLine({
   value,
   yAxisId = 0,
   testId,
+  stroke = 'var(--cp-analytics-target)',
 }: {
   value: number
   yAxisId?: string | number
   testId: string
+  stroke?: string
 }) {
   const plot = usePlotArea()
   const yScale = useYAxisScale(yAxisId)
@@ -17,7 +19,7 @@ export function HistoricalTargetLine({
   return (
     <g aria-hidden="true" data-testid={testId}>
       <line
-        stroke="var(--cp-analytics-target)"
+        stroke={stroke}
         strokeDasharray="5 5"
         strokeOpacity={0.8}
         x1={plot.x}

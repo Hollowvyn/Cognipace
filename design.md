@@ -172,15 +172,16 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 
 ## CogniPace Analytics Historical Chart Rules
 
-- The implemented historical treatment has three cards: Observed Recall vs FSRS
-  Estimate, Practice Rhythm with the merged rating composition, and Memory
-  Strength. Recall comes first, followed by a full-width Practice Rhythm card;
+- The implemented historical treatment has four cards: New Problem Success,
+  Recall vs FSRS Estimate, Practice Rhythm with the merged rating composition,
+  and Memory Strength. First outcomes and repeat Recall share a responsive `lg`
+  pair and stack in that order below it, followed by a full-width Practice Rhythm card;
   Memory Strength and the unchanged Topic Performance view share the next
   responsive row. Retention Map,
   Memory Signals, Recent Overdue Backlog, and Upcoming Review Load keep their
   current treatment until a separate design iteration.
 - Keep the explicit 14-day daily, 30-day three-day, and 90-day weekly grouping
-  and feature-supplied values. All three historical charts trim
+  and feature-supplied values. All four historical charts trim
   unsupported beginning and ending buckets only, using the same contiguous activity
   window for Chart, Table, and inspection. Preserve every internal gap and each
   retained interval's dates.
@@ -200,6 +201,17 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   independent review-count scale on the right. Its goal cannot alter rating
   geometry or the count scale. The serialized legacy Practice percentage scale
   remains available for compatibility; the merged plot does not use it.
+- New Problem Success uses mint solid circles for Hard + Good + Easy and a
+  thinner blue solid line with diamonds for Good + Easy. Both rates share one
+  valid-first denominator; the supplied fit includes both curves and goals and
+  never shifts when either series is hidden. Use matching dashed references for
+  unequal goals and one neutral shared reference for equal goals, retaining both
+  compact target buttons and tooltip values. Target First-attempt Success and
+  Target Good + Easy are independent whole-percent preferences; do not show the
+  old Recall/Review Success counterpart hint for them. Keep recorded/valid/
+  excluded-first period counts concise above the plot and the retained-history
+  caveat in calculation details. Never label these outcomes guaranteed unaided
+  solving or add mock difficulty data.
 - The chart-target editor is implemented and has automated/fixture proof;
   human installed-extension smoke remains pending before review or merge. Place a small native
   **Target Recall 90%** or **Target Review Success 90%** button above the relevant
@@ -225,7 +237,8 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   and highlight measured values only. Keep full range, grouping, report time,
   evidence, and complete/in-progress context in the tooltip; do not add a
   permanent bottom detail row.
-- Recall uses a solid observed line with circles and an opaque FSRS estimate
+- Recall compares repeat assessments only and names that population in its
+  question, description, calculation details, and empty state. It uses a solid observed line with circles and an opaque FSRS estimate
   with short `4 4` dashes and diamonds. Missing-evidence bridges use visibly
   longer `9 7` dashes. Its dashed reference uses saved Target Recall, independent
   of FSRS retention, and names that goal in inspection and its accessible
@@ -242,6 +255,8 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   tooltip and Table. Series switches must not shift the domain. A singleton
   keeps its original interval domain and centered marker. Memory Strength and
   Practice Rhythm retain their interval-boundary X domains and padding.
+  New Problem Success uses the same first-midpoint/12px clearance and singleton
+  behavior, with visibility-stable dates and its own activity window.
 - Memory Strength uses a clear median line and discrete Q1–Q3 whiskers with a
   compact Median/Middle 50% key. Render whiskers only with at least four eligible
   reviews and known quartiles. Fit all finite median/Q1/Q3 extrema by choosing

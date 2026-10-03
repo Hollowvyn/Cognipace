@@ -2,7 +2,10 @@ import { isReviewRating } from '@/lib/fsrs'
 import { defaultAnalyticsTargets } from '@/features/settings/domain'
 
 import type { AnalyticsReadiness } from './analytics-readiness'
-import type { HistoricalAnalyticsViews } from './historical-presentation'
+import {
+  aggregateFirstAttemptOutcomes,
+  type HistoricalAnalyticsViews,
+} from './historical-presentation'
 import type { AnalyticsTimeFrame } from './analytics-time'
 
 export interface ObservedRatingQualityResult {
@@ -44,6 +47,7 @@ export interface AnalyticsSummaryInput {
 }
 
 export interface HistoricalReadiness {
+  firstAttemptOutcomes: AnalyticsReadiness
   requested: AnalyticsReadiness
   recallQuality: AnalyticsReadiness
   practiceRhythm: AnalyticsReadiness
@@ -151,6 +155,15 @@ function emptyHistoricalViews(
   targetRetention: number,
 ): HistoricalAnalyticsViews {
   return {
+    firstAttemptOutcomes: {
+      rows: [],
+      totals: aggregateFirstAttemptOutcomes([]),
+      scale: { domain: [0, 1], ticks: [0, 1] },
+      targetFirstAttemptSuccess:
+        defaultAnalyticsTargets.targetFirstAttemptSuccess,
+      targetFirstAttemptGoodEasy:
+        defaultAnalyticsTargets.targetFirstAttemptGoodEasy,
+    },
     observedRecallVsFsrs: {
       rows: [],
       scale: { domain: [0, 1], ticks: [0, 1] },

@@ -19,6 +19,89 @@ describe('useSettingsDraft', () => {
     vi.clearAllMocks()
   })
 
+  it('recognizes and resets only non-default first-attempt goals through Settings', async () => {
+    let storedSettings = {
+      ...defaultUserSettings,
+      analytics: {
+        ...defaultUserSettings.analytics,
+        targetFirstAttemptSuccess: 0.29,
+        targetFirstAttemptGoodEasy: 1,
+      },
+    }
+    vi.mocked(sendMessage).mockImplementation((method, payload) => {
+      if (method === 'settings.getSettings')
+        return Promise.resolve(storedSettings)
+      if (method === 'settings.updateSettings') {
+        const { patch } = settingsUpdateRequestSchema.parse(payload)
+        storedSettings = mergeUserSettings(storedSettings, patch)
+        return Promise.resolve(storedSettings)
+      }
+      return Promise.reject(new Error(`Unexpected method ${method}`))
+    })
+    const { wrapper } = createQueryTestHarness()
+    const { result } = renderHook(() => useSettingsDraft(), { wrapper })
+    await waitFor(() => expect(result.current.draft).toEqual(storedSettings))
+
+    expect(result.current.canResetDefaults).toBe(true)
+    await act(async () => {
+      await result.current.actions.resetDefaults()
+    })
+
+    expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+      surface: 'dashboard',
+      patch: { analytics: defaultUserSettings.analytics },
+    })
+    expect(storedSettings).toEqual(defaultUserSettings)
+    expect(result.current.canResetDefaults).toBe(false)
+    expect(result.current.hasChanges).toBe(false)
+  })
+
+  it('preserves both first-attempt goals on Settings Save after an external refresh', async () => {
+    let storedSettings = defaultUserSettings
+    vi.mocked(sendMessage).mockImplementation((method, payload) => {
+      if (method === 'settings.getSettings')
+        return Promise.resolve(storedSettings)
+      if (method === 'settings.updateSettings') {
+        const { patch } = settingsUpdateRequestSchema.parse(payload)
+        storedSettings = mergeUserSettings(storedSettings, patch)
+        return Promise.resolve(storedSettings)
+      }
+      return Promise.reject(new Error(`Unexpected method ${method}`))
+    })
+    const { queryClient, wrapper } = createQueryTestHarness()
+    const { result } = renderHook(() => useSettingsDraft(), { wrapper })
+    await waitFor(() =>
+      expect(result.current.draft).toEqual(defaultUserSettings),
+    )
+    act(() => {
+      result.current.actions.setNumberInput('dailyGoal', '9')
+    })
+    storedSettings = {
+      ...storedSettings,
+      analytics: {
+        ...storedSettings.analytics,
+        targetFirstAttemptSuccess: 0.29,
+        targetFirstAttemptGoodEasy: 1,
+      },
+    }
+    act(() => {
+      queryClient.setQueryData(queryKeys.settings.all, storedSettings)
+    })
+    await act(async () => {
+      await result.current.actions.save()
+    })
+
+    expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+      surface: 'dashboard',
+      patch: { practice: { dailyGoal: 9 } },
+    })
+    expect(result.current.draft).toEqual(storedSettings)
+    expect(result.current.draft?.analytics).toMatchObject({
+      targetFirstAttemptSuccess: 0.29,
+      targetFirstAttemptGoodEasy: 1,
+    })
+  })
+
   it('resets a successful local Save while its Settings refetch is still pending', async () => {
     let storedSettings = defaultUserSettings
     let readCount = 0
@@ -85,13 +168,17 @@ describe('useSettingsDraft', () => {
     {
       action: 'save' as const,
       expectedPatch: { practice: { dailyGoal: 9 } },
-      expectedTargets: { targetRecall: 0.8, targetReviewSuccess: 0.9 },
+      expectedTargets: {
+        ...defaultUserSettings.analytics,
+        targetRecall: 0.8,
+        targetReviewSuccess: 0.9,
+      },
       expectedDailyGoal: 9,
     },
     {
       action: 'resetDefaults' as const,
       expectedPatch: { analytics: defaultUserSettings.analytics },
-      expectedTargets: { targetRecall: 0.9, targetReviewSuccess: 0.9 },
+      expectedTargets: defaultUserSettings.analytics,
       expectedDailyGoal: defaultUserSettings.practice.dailyGoal,
     },
   ])(
@@ -126,7 +213,11 @@ describe('useSettingsDraft', () => {
 
       storedSettings = {
         ...storedSettings,
-        analytics: { targetRecall: 0.8, targetReviewSuccess: 0.9 },
+        analytics: {
+          ...defaultUserSettings.analytics,
+          targetRecall: 0.8,
+          targetReviewSuccess: 0.9,
+        },
       }
       act(() => {
         queryClient.setQueryData(queryKeys.settings.all, storedSettings)
@@ -164,7 +255,11 @@ describe('useSettingsDraft', () => {
   it('preserves saved analytics targets when saving unrelated Settings fields', async () => {
     const currentSettings = {
       ...defaultUserSettings,
-      analytics: { targetRecall: 0.8, targetReviewSuccess: 0.95 },
+      analytics: {
+        ...defaultUserSettings.analytics,
+        targetRecall: 0.8,
+        targetReviewSuccess: 0.95,
+      },
     }
     const savedSettings = {
       ...currentSettings,
@@ -205,7 +300,11 @@ describe('useSettingsDraft', () => {
   it('resets chart targets through Settings even when they are the only non-default values', async () => {
     const currentSettings = {
       ...defaultUserSettings,
-      analytics: { targetRecall: 0.8, targetReviewSuccess: 0.95 },
+      analytics: {
+        ...defaultUserSettings.analytics,
+        targetRecall: 0.8,
+        targetReviewSuccess: 0.95,
+      },
     }
     let storedSettings = currentSettings
     vi.mocked(sendMessage).mockImplementation((method) => {
@@ -231,12 +330,11 @@ describe('useSettingsDraft', () => {
 
     expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
       surface: 'dashboard',
-      patch: { analytics: { targetRecall: 0.9, targetReviewSuccess: 0.9 } },
+      patch: { analytics: defaultUserSettings.analytics },
     })
-    expect(result.current.draft?.analytics).toEqual({
-      targetRecall: 0.9,
-      targetReviewSuccess: 0.9,
-    })
+    expect(result.current.draft?.analytics).toEqual(
+      defaultUserSettings.analytics,
+    )
     expect(result.current.canResetDefaults).toBe(false)
     expect(result.current.hasChanges).toBe(false)
   })

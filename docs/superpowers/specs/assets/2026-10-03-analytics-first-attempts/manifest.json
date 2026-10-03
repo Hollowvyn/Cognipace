@@ -5,5 +5,5 @@
   "savedSourceSha256": "3d771e73adf26db354889c88b49ed92a01ef804dac911de2ff4b14f1476c90c2",
   "data": "Illustrative",
   "subsequentTextApproval": "Two independent first-attempt targets, separate from repeat Recall and Review Success; equal target percentages share one reference line with both labels.",
-  "status": "Design reference; production implementation pending; no browser inspection proof is claimed."
+  "status": "Preserved design reference; production implementation and separate production-component proof are recorded in the first-attempts/repeat-recall handoff. No browser inspection proof of this design reference is claimed."
 }

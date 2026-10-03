@@ -1,6 +1,4 @@
 import {
-  createInitialFsrsCard,
-  getRetrievability,
   isReviewRating,
   replayReviewHistorySequence,
   type NormalizedFsrsSchedulingOptions,
@@ -37,6 +35,10 @@ import {
 } from './analytics-scales'
 import type { CurrentStateAnalyticsViews } from './current-state-presentation'
 import type { WorkloadAnalyticsViews } from './workload-presentation'
+import {
+  buildRepeatReviewPairs,
+  selectFirstRecordedAttempts,
+} from './review-cohorts'
 
 export interface HistoricalAnalyticsReviewEvent {
   id: string
@@ -79,6 +81,28 @@ export interface ObservedRecallVsFsrsRow {
   difference: number | null
   provenance: 'reconstructed'
   evidence: 'measured' | 'not-measured'
+}
+
+export interface FirstAttemptOutcomeTotals {
+  again: number
+  hard: number
+  good: number
+  easy: number
+  recordedFirstAttempts: number
+  excludedInvalidRatings: number
+  validFirstAttempts: number
+  hardGoodEasy: number
+  goodEasy: number
+  firstAttemptSuccess: number | null
+  firstAttemptGoodEasy: number | null
+  evidence: 'measured' | 'not-measured'
+}
+
+export interface FirstAttemptOutcomeRow extends FirstAttemptOutcomeTotals {
+  id: string
+  bucketStart: string
+  bucketEnd: string
+  isPartial: boolean
 }
 
 export interface MemoryStrengthRow {
@@ -142,6 +166,13 @@ export interface LowEvidenceTopicRow {
 }
 
 export interface HistoricalAnalyticsViews {
+  firstAttemptOutcomes: {
+    rows: FirstAttemptOutcomeRow[]
+    totals: FirstAttemptOutcomeTotals
+    scale: HistoricalPresentationScale
+    targetFirstAttemptSuccess: number
+    targetFirstAttemptGoodEasy: number
+  }
   observedRecallVsFsrs: {
     rows: ObservedRecallVsFsrsRow[]
     scale: HistoricalPresentationScale
@@ -186,7 +217,19 @@ export function buildHistoricalAnalyticsViews(
   events: readonly HistoricalAnalyticsReviewEvent[],
   options: HistoricalPresentationOptions,
 ): HistoricalAnalyticsViews {
-  const pairedByEvent = buildPairedReviews(events, options)
+  const pairedByEvent = buildRepeatReviewPairs(events, options)
+  const selectedFirstAttempts = selectFirstRecordedAttempts(events).filter(
+    (event) =>
+      event.reviewedAt >= options.start && event.reviewedAt <= options.end,
+  )
+  const firstAttemptRows = options.buckets.map((bucket) => ({
+    ...bucketRow(bucket, options.end),
+    ...aggregateFirstAttemptOutcomes(
+      selectedFirstAttempts.filter((event) =>
+        inBucket(event.reviewedAt, bucket),
+      ),
+    ),
+  }))
   const stabilityByEvent = buildStabilityObservations(events, options)
   const observedRows = options.buckets.map((bucket) => {
     const pairs = pairedByEvent.filter((pair) =>
@@ -324,6 +367,10 @@ export function buildHistoricalAnalyticsViews(
 
   return applyHistoricalChartTargets(
     {
+      firstAttemptOutcomes: {
+        rows: firstAttemptRows,
+        totals: aggregateFirstAttemptOutcomes(selectedFirstAttempts),
+      },
       observedRecallVsFsrs: {
         rows: observedRows,
       },
@@ -384,6 +431,10 @@ export function buildHistoricalAnalyticsViews(
 }
 
 type HistoricalChartTargetViews = {
+  firstAttemptOutcomes: Pick<
+    HistoricalAnalyticsViews['firstAttemptOutcomes'],
+    'rows' | 'totals'
+  >
   observedRecallVsFsrs: Pick<
     HistoricalAnalyticsViews['observedRecallVsFsrs'],
     'rows'
@@ -396,6 +447,18 @@ export function applyHistoricalChartTargets<
 >(views: T, targets: AnalyticsTargets) {
   return {
     ...views,
+    firstAttemptOutcomes: {
+      ...views.firstAttemptOutcomes,
+      targetFirstAttemptSuccess: targets.targetFirstAttemptSuccess,
+      targetFirstAttemptGoodEasy: targets.targetFirstAttemptGoodEasy,
+      scale: percentageScale(
+        views.firstAttemptOutcomes.rows.flatMap((row) => [
+          row.firstAttemptSuccess,
+          row.firstAttemptGoodEasy,
+        ]),
+        [targets.targetFirstAttemptSuccess, targets.targetFirstAttemptGoodEasy],
+      ),
+    },
     observedRecallVsFsrs: {
       ...views.observedRecallVsFsrs,
       targetRecall: targets.targetRecall,
@@ -605,56 +668,30 @@ function uniqueNormalizedTopics(labels: readonly string[]) {
   return [...topics.values()]
 }
 
-function buildPairedReviews(
+export function aggregateFirstAttemptOutcomes(
   events: readonly HistoricalAnalyticsReviewEvent[],
-  options: HistoricalPresentationOptions,
-) {
-  const pairs: Array<{
-    reviewedAt: Date
-    rating: ReviewRating
-    estimate: number
-  }> = []
-  const byCard = new Map<string, ValidHistoricalReviewEvent[]>()
+): FirstAttemptOutcomeTotals {
+  const counts = { again: 0, hard: 0, good: 0, easy: 0 }
   for (const event of events) {
-    if (!hasValidRating(event)) continue
-    const cardEvents = byCard.get(event.cardId) ?? []
-    cardEvents.push(event)
-    byCard.set(event.cardId, cardEvents)
+    if (isReviewRating(event.rating)) counts[event.rating] += 1
   }
-
-  for (const cardEvents of byCard.values()) {
-    const ordered = [...cardEvents].sort(compareEvents)
-    const replayed = replayReviewHistorySequence(
-      ordered.map((event) => ({
-        rating: event.rating,
-        reviewedAt: event.reviewedAt,
-      })),
-      options.fsrsOptions,
-    )
-    for (const [index, event] of ordered.entries()) {
-      if (event.reviewedAt < options.start || event.reviewedAt > options.end)
-        continue
-      const previous =
-        replayed[index - 1]?.card ?? createInitialFsrsCard(event.reviewedAt)
-      const probability = getRetrievability(
-        previous,
-        event.reviewedAt,
-        options.fsrsOptions,
-      )
-      if (
-        Number.isFinite(probability) &&
-        probability >= 0 &&
-        probability <= 1
-      ) {
-        pairs.push({
-          reviewedAt: event.reviewedAt,
-          rating: event.rating,
-          estimate: probability,
-        })
-      }
-    }
+  const validFirstAttempts =
+    counts.again + counts.hard + counts.good + counts.easy
+  const hardGoodEasy = counts.hard + counts.good + counts.easy
+  const goodEasy = counts.good + counts.easy
+  return {
+    ...counts,
+    recordedFirstAttempts: events.length,
+    excludedInvalidRatings: events.length - validFirstAttempts,
+    validFirstAttempts,
+    hardGoodEasy,
+    goodEasy,
+    firstAttemptSuccess:
+      validFirstAttempts === 0 ? null : hardGoodEasy / validFirstAttempts,
+    firstAttemptGoodEasy:
+      validFirstAttempts === 0 ? null : goodEasy / validFirstAttempts,
+    evidence: validFirstAttempts === 0 ? 'not-measured' : 'measured',
   }
-  return pairs
 }
 
 function buildStabilityObservations(

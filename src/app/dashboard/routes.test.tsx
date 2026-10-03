@@ -249,6 +249,7 @@ describe('dashboard routes', () => {
       },
       historicalReadiness: {
         requested: readiness,
+        firstAttemptOutcomes: readiness,
         recallQuality: readiness,
         practiceRhythm: readiness,
         ratingsMix: readiness,

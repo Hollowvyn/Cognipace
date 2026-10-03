@@ -51,6 +51,7 @@ function createUnreadyHistoricalReadiness() {
   return {
     requested: readiness,
     recallQuality: readiness,
+    firstAttemptOutcomes: readiness,
     practiceRhythm: readiness,
     ratingsMix: readiness,
     topics: readiness,
@@ -77,6 +78,7 @@ function createReadyHistoricalReadiness() {
     ...historicalReadiness,
     requested: ready,
     recallQuality: { ...ready },
+    firstAttemptOutcomes: { ...ready },
     practiceRhythm: { ...ready },
     ratingsMix: { ...ready },
     topics: { ...ready },
@@ -117,6 +119,26 @@ function baseAnalyticsSummary(): SerializedAnalyticsSummary {
     lowSample: false,
     targetRetention: 0.9,
     views: {
+      firstAttemptOutcomes: {
+        rows: [],
+        totals: {
+          again: 0,
+          hard: 0,
+          good: 0,
+          easy: 0,
+          recordedFirstAttempts: 0,
+          excludedInvalidRatings: 0,
+          validFirstAttempts: 0,
+          hardGoodEasy: 0,
+          goodEasy: 0,
+          firstAttemptSuccess: null,
+          firstAttemptGoodEasy: null,
+          evidence: 'not-measured',
+        },
+        scale: { domain: [0, 1], ticks: [0, 1] },
+        targetFirstAttemptSuccess: 0.9,
+        targetFirstAttemptGoodEasy: 0.9,
+      },
       observedRecallVsFsrs: {
         rows: [],
         scale: { domain: [0, 1], ticks: [0, 1] },
@@ -266,10 +288,146 @@ describe('AnalyticsScreen', () => {
     vi.clearAllMocks()
   })
 
+  it('pairs the first-outcome and repeat-only cards while leaving other chart rows intact', async () => {
+    vi.mocked(sendMessage).mockResolvedValueOnce(readyAnalyticsSummary())
+    renderAnalyticsScreen()
+    const first = await screen.findByRole('region', {
+      name: 'New Problem Success',
+    })
+    const recall = screen.getByRole('region', {
+      name: 'Recall vs FSRS Estimate',
+    })
+    expect(first.parentElement).toBe(recall.parentElement)
+    expect(first.parentElement).toHaveClass('lg:grid-cols-2')
+    expect(
+      first.compareDocumentPosition(recall) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      within(first).getByText('How are your first recorded outcomes changing?'),
+    ).toBeVisible()
+    expect(
+      within(recall).getByText(
+        /^Rating-derived recalled outcomes on repeat reviews/,
+      ),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('region', { name: 'Practice Rhythm' }).parentElement,
+    ).not.toBe(first.parentElement)
+    expect(
+      screen.getByRole('region', { name: 'Memory Strength' }).parentElement,
+    ).toBe(
+      screen.getByRole('region', { name: 'Topic Performance' }).parentElement,
+    )
+  })
+
+  it('shows independent first-outcome and repeat readiness with the initial-only recall explanation', async () => {
+    const firstReady = createReadyHistoricalReadiness()
+    const repeatUnready = createUnreadyHistoricalReadiness().recallQuality
+    vi.mocked(sendMessage).mockResolvedValueOnce(
+      readyAnalyticsSummary({
+        historicalReadiness: { ...firstReady, recallQuality: repeatUnready },
+      }),
+    )
+    renderAnalyticsScreen()
+    const first = await screen.findByRole('region', {
+      name: 'New Problem Success',
+    })
+    const recall = screen.getByRole('region', {
+      name: 'Recall vs FSRS Estimate',
+    })
+    expect(
+      within(first).queryByRole('status', {
+        name: 'New Problem Success readiness',
+      }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(recall).getByRole('status', {
+        name: 'Recall vs FSRS Estimate readiness',
+      }),
+    ).toBeVisible()
+    expect(
+      within(recall).getByText(
+        'No repeat reviews in this period have both a valid rating and an FSRS estimate. First recorded reviews build memory for later comparisons.',
+      ),
+    ).toBeVisible()
+    expect(
+      within(first).getByRole('button', {
+        name: 'Target First-attempt Success 90%',
+      }),
+    ).toBeVisible()
+  })
+
+  it('keeps both first-attempt goals editable in an empty table and sends only the edited key', async () => {
+    const user = userEvent.setup()
+    const summary = baseAnalyticsSummary()
+    const saved = {
+      ...defaultUserSettings,
+      analytics: {
+        ...defaultUserSettings.analytics,
+        targetFirstAttemptGoodEasy: 0.29,
+      },
+    }
+    vi.mocked(sendMessage)
+      .mockResolvedValue({
+        ...summary,
+        views: {
+          ...summary.views,
+          firstAttemptOutcomes: {
+            ...summary.views.firstAttemptOutcomes,
+            targetFirstAttemptGoodEasy: 0.29,
+          },
+        },
+      })
+      .mockResolvedValueOnce(summary)
+      .mockResolvedValueOnce(saved)
+    renderAnalyticsScreen()
+    const first = await screen.findByRole('region', {
+      name: 'New Problem Success',
+    })
+    await user.click(within(first).getByRole('tab', { name: 'Table' }))
+    expect(
+      within(first).getByRole('button', {
+        name: 'Target First-attempt Success 90%',
+      }),
+    ).toBeVisible()
+    await user.click(
+      within(first).getByRole('button', { name: 'Target Good + Easy 90%' }),
+    )
+    await user.clear(screen.getByLabelText('Target Good + Easy (%)'))
+    await user.type(
+      screen.getByLabelText('Target Good + Easy (%)'),
+      '29{Enter}',
+    )
+    expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+      surface: 'dashboard',
+      patch: { analytics: { targetFirstAttemptGoodEasy: 0.29 } },
+    })
+    expect(
+      await within(first).findByRole('button', {
+        name: 'Target Good + Easy 29%',
+      }),
+    ).toHaveFocus()
+    expect(
+      within(first).getByRole('button', {
+        name: 'Target First-attempt Success 90%',
+      }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Target Recall 90%' }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Target Review Success 90%' }),
+    ).toBeVisible()
+  })
+
   it('edits saved goals in empty charts and keeps the controls available in Table view', async () => {
     const user = userEvent.setup()
     const summary = baseAnalyticsSummary()
-    const analytics = { targetRecall: 0.8, targetReviewSuccess: 0.9 }
+    const analytics = {
+      ...defaultUserSettings.analytics,
+      targetRecall: 0.8,
+      targetReviewSuccess: 0.9,
+    }
     const savedSummary = {
       ...summary,
       views: {
@@ -287,7 +445,7 @@ describe('AnalyticsScreen', () => {
 
     renderAnalyticsScreen()
     const recall = await screen.findByRole('region', {
-      name: 'Observed Recall vs FSRS Estimate',
+      name: 'Recall vs FSRS Estimate',
     })
     const practice = screen.getByRole('region', { name: 'Practice Rhythm' })
     await user.click(
@@ -438,6 +596,7 @@ describe('AnalyticsScreen', () => {
     vi.mocked(sendMessage).mockResolvedValueOnce(
       readyAnalyticsSummary({
         views: {
+          ...baseAnalyticsSummary().views,
           observedRecallVsFsrs: {
             rows: [
               {
@@ -520,11 +679,11 @@ describe('AnalyticsScreen', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'Observed Recall vs FSRS Estimate',
+        name: 'Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
-    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(6)
-    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(6)
+    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(7)
+    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(7)
     expect(
       screen.queryByRole('region', { name: 'Ratings Mix' }),
     ).not.toBeInTheDocument()
@@ -544,8 +703,8 @@ describe('AnalyticsScreen', () => {
     expect(
       screen.queryByRole('region', { name: 'Ratings Mix' }),
     ).not.toBeInTheDocument()
-    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(6)
-    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(6)
+    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(7)
+    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(7)
   })
 
   it('keeps independent rating readiness and the target in the merged card', async () => {
@@ -695,7 +854,7 @@ describe('AnalyticsScreen', () => {
 
     expect(
       await screen.findByRole('region', {
-        name: 'Observed Recall vs FSRS Estimate',
+        name: 'Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
     expect(screen.getByLabelText('30-day analytics readiness')).toBeVisible()
@@ -730,6 +889,7 @@ describe('AnalyticsScreen', () => {
         historicalReadiness: {
           requested: readiness,
           recallQuality: readiness,
+          firstAttemptOutcomes: readiness,
           practiceRhythm: readiness,
           ratingsMix: readiness,
           topics: readiness,
@@ -752,7 +912,7 @@ describe('AnalyticsScreen', () => {
     ).toHaveAttribute('href', expect.stringContaining('range=30'))
     expect(
       await screen.findByRole('region', {
-        name: 'Observed Recall vs FSRS Estimate',
+        name: 'Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
     expect(
@@ -788,6 +948,7 @@ describe('AnalyticsScreen', () => {
         historicalReadiness: {
           requested: readiness,
           recallQuality: readiness,
+          firstAttemptOutcomes: readiness,
           practiceRhythm: readiness,
           ratingsMix: readiness,
           topics: readiness,
@@ -870,20 +1031,21 @@ describe('AnalyticsScreen', () => {
 
     expect(
       await screen.findByRole('region', {
-        name: 'Observed Recall vs FSRS Estimate',
+        name: 'Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
     expect(
       within(
         screen.getByRole('region', {
-          name: 'Observed Recall vs FSRS Estimate',
+          name: 'Recall vs FSRS Estimate',
         }),
       ).getByText(
         /reconstructed FSRS retrievability immediately before those exact reviews/,
       ),
     ).toBeVisible()
     const chartRegionNames = [
-      'Observed Recall vs FSRS Estimate',
+      'New Problem Success',
+      'Recall vs FSRS Estimate',
       'Practice Rhythm',
       'Memory Strength',
     ]
@@ -934,11 +1096,11 @@ describe('AnalyticsScreen', () => {
     renderAnalyticsScreen()
 
     const recallPanel = await screen.findByRole('region', {
-      name: 'Observed Recall vs FSRS Estimate',
+      name: 'Recall vs FSRS Estimate',
     })
     expect(
       within(recallPanel).getByText(
-        'No reviews in this period have both a valid rating and an FSRS estimate.',
+        'No repeat reviews in this period have both a valid rating and an FSRS estimate. First recorded reviews build memory for later comparisons.',
       ),
     ).toBeVisible()
     expect(

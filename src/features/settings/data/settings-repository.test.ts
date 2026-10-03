@@ -8,6 +8,77 @@ import { defaultUserSettings } from '../domain'
 import { createSettingsRepository } from './settings-repository'
 
 describe('SettingsRepository', () => {
+  it('keeps all other goals when separate clients save first-attempt goals', async () => {
+    const handle = await createTestDb({ seed: false })
+    const firstClient = createSettingsRepository(handle.db)
+    const secondClient = createSettingsRepository(handle.db)
+    const original = await firstClient.updateSettings({
+      analytics: {
+        targetRecall: 0.825,
+        targetReviewSuccess: 0.955,
+        targetFirstAttemptSuccess: 0.8,
+        targetFirstAttemptGoodEasy: 0.6,
+      },
+      review: { targetRetention: 0.75 },
+    })
+
+    await secondClient.updateSettings({
+      analytics: { targetFirstAttemptGoodEasy: 1 },
+    })
+    const saved = await firstClient.updateSettings({
+      analytics: { targetFirstAttemptSuccess: 0.29 },
+    })
+
+    expect(saved).toEqual({
+      ...original,
+      analytics: {
+        ...original.analytics,
+        targetFirstAttemptSuccess: 0.29,
+        targetFirstAttemptGoodEasy: 1,
+      },
+    })
+    await expect(
+      createSettingsRepository(handle.db).getSettings(),
+    ).resolves.toEqual(saved)
+  })
+
+  it('recovers one malformed stored first-attempt goal and preserves the other saved goals', async () => {
+    const handle = await createTestDb({ seed: false })
+    const analytics = {
+      targetRecall: 0.825,
+      targetReviewSuccess: 0.955,
+      targetFirstAttemptSuccess: 0.295,
+      targetFirstAttemptGoodEasy: 0.29,
+    }
+    await handle.db.insert(settingsKv).values({
+      key: 'user-settings',
+      value: JSON.stringify({ ...defaultUserSettings, analytics }),
+      updatedAt: 1,
+    })
+
+    await expect(
+      createSettingsRepository(handle.db).getSettings(),
+    ).resolves.toEqual({
+      ...defaultUserSettings,
+      analytics: { ...analytics, targetFirstAttemptSuccess: 0.9 },
+    })
+  })
+
+  it('rejects malformed first-attempt patches atomically', async () => {
+    const handle = await createTestDb({ seed: false })
+    const repository = createSettingsRepository(handle.db)
+    await repository.updateSettings({ practice: { dailyGoal: 12 } })
+    const rowsBefore = await handle.db.select().from(settingsKv)
+
+    await expect(
+      repository.updateSettings({
+        analytics: { targetFirstAttemptSuccess: 0.295 },
+        practice: { dailyGoal: 20 },
+      }),
+    ).rejects.toThrow()
+    expect(await handle.db.select().from(settingsKv)).toEqual(rowsBefore)
+  })
+
   it('reads old settings with independent default analytics targets', async () => {
     const handle = await createTestDb({ seed: false })
     const oldSettings = {
@@ -25,7 +96,7 @@ describe('SettingsRepository', () => {
       createSettingsRepository(handle.db).getSettings(),
     ).resolves.toEqual({
       ...oldSettings,
-      analytics: { targetRecall: 0.9, targetReviewSuccess: 0.9 },
+      analytics: defaultUserSettings.analytics,
     })
   })
 
@@ -45,6 +116,7 @@ describe('SettingsRepository', () => {
     expect(rows[0]?.updatedAt).toBe(savedAt.getTime())
     expect(JSON.parse(rows[0]!.value)).toEqual(saved)
     expect(saved.analytics).toEqual({
+      ...defaultUserSettings.analytics,
       targetRecall: 0.95,
       targetReviewSuccess: 0.98,
     })
@@ -105,7 +177,10 @@ describe('SettingsRepository', () => {
       await externalRepository.updateSettings({ analytics: externalPatch })
       const saved = await repository.updateSettings({ analytics: editedPatch })
 
-      expect(saved).toEqual({ ...original, analytics: expected })
+      expect(saved).toEqual({
+        ...original,
+        analytics: { ...original.analytics, ...expected },
+      })
       await expect(repository.getSettings()).resolves.toEqual(saved)
       const rows = await handle.db.select().from(settingsKv)
       expect(rows).toHaveLength(1)

@@ -57,6 +57,12 @@
     --cp-analytics-predicted: light-dark(#698475, #a2bdab);
   }
 
+  .cp-historical-first-outcomes {
+    --cp-analytics-first-success: light-dark(#248575, #82dbb9);
+    --cp-analytics-first-good-easy: light-dark(#477cae, #83b7ea);
+    --cp-analytics-first-shared-target: light-dark(#6f7d84, #aebbc0);
+  }
+
   .cp-historical-practice-ratings {
     --cp-analytics-hard: light-dark(#d5bb77, #ccb777);
     --cp-analytics-again: light-dark(#d6a5a1, #cba5a2);

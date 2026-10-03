@@ -1,7 +1,10 @@
 # First Attempt Outcomes and Repeat Recall
 
 Status: the user approved the two-outcome design and separate first-attempt
-targets on October 3, 2026. Production implementation has not started.
+targets on October 3, 2026. Production implementation is complete; automated
+validation and production-component proof are recorded in the
+[handoff](../handoffs/2026-10-03-analytics-first-attempts-and-repeat-recall.md).
+Required human installed-extension smoke remains pending before review or merge.
 
 ## Purpose and approved direction
 

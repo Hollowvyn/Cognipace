@@ -32,6 +32,53 @@ const healthy = 'var(--cp-analytics-healthy)' as const
 const attention = 'var(--cp-analytics-attention)' as const
 
 export const analyticsChartDefinitions = {
+  firstAttemptOutcomes: {
+    id: 'new-problem-success',
+    title: 'New Problem Success',
+    question: 'How are your first recorded outcomes changing?',
+    metricMeaning:
+      'Hard + Good + Easy and Good + Easy outcomes divide by the same valid first-recorded rating population in retained history.',
+    series: [
+      {
+        key: 'firstAttemptSuccess',
+        label: 'Hard + Good + Easy',
+        mark: 'line',
+        color: 'var(--cp-analytics-first-success)',
+      },
+      {
+        key: 'firstAttemptGoodEasy',
+        label: 'Good + Easy',
+        mark: 'line',
+        color: 'var(--cp-analytics-first-good-easy)',
+      },
+      {
+        key: 'targetFirstAttemptSuccess',
+        label: 'Target First-attempt Success',
+        mark: 'reference-line',
+        color: 'var(--cp-analytics-first-success)',
+      },
+      {
+        key: 'targetFirstAttemptGoodEasy',
+        label: 'Target Good + Easy',
+        mark: 'reference-line',
+        color: 'var(--cp-analytics-first-good-easy)',
+      },
+    ],
+    tooltipFields: [
+      { key: 'firstAttemptSuccess', label: 'Hard + Good + Easy' },
+      { key: 'firstAttemptGoodEasy', label: 'Good + Easy' },
+      { key: 'validFirstAttempts', label: 'Valid first recorded outcomes' },
+      { key: 'recordedFirstAttempts', label: 'Recorded first attempts' },
+      { key: 'excludedInvalidRatings', label: 'Excluded invalid ratings' },
+      {
+        key: 'targetFirstAttemptSuccess',
+        label: 'Target First-attempt Success',
+      },
+      { key: 'targetFirstAttemptGoodEasy', label: 'Target Good + Easy' },
+    ],
+    interpretationWarning:
+      'Recorded assessment outcomes do not prove unassisted solving or first-ever exposure.',
+  },
   recallQuality: {
     id: 'recall-quality',
     title: 'Recall quality',

@@ -3,6 +3,43 @@ import { describe, expect, it } from 'vitest'
 import { analyticsChartDefinitions } from './chart-definitions'
 
 describe('analytics chart definitions', () => {
+  it('describes first outcomes as two rating-based rates in the same first-recorded cohort', () => {
+    expect(analyticsChartDefinitions.firstAttemptOutcomes).toMatchObject({
+      id: 'new-problem-success',
+      title: 'New Problem Success',
+      question: 'How are your first recorded outcomes changing?',
+      series: [
+        {
+          key: 'firstAttemptSuccess',
+          label: 'Hard + Good + Easy',
+          mark: 'line',
+          color: 'var(--cp-analytics-first-success)',
+        },
+        {
+          key: 'firstAttemptGoodEasy',
+          label: 'Good + Easy',
+          mark: 'line',
+          color: 'var(--cp-analytics-first-good-easy)',
+        },
+        {
+          key: 'targetFirstAttemptSuccess',
+          label: 'Target First-attempt Success',
+          mark: 'reference-line',
+          color: 'var(--cp-analytics-first-success)',
+        },
+        {
+          key: 'targetFirstAttemptGoodEasy',
+          label: 'Target Good + Easy',
+          mark: 'reference-line',
+          color: 'var(--cp-analytics-first-good-easy)',
+        },
+      ],
+    })
+    expect(
+      analyticsChartDefinitions.firstAttemptOutcomes.metricMeaning,
+    ).toContain('same valid first-recorded')
+  })
+
   it('keeps the live chart series aligned with their serialized keys', () => {
     expect(analyticsChartDefinitions.recallQuality.series).toEqual([
       expect.objectContaining({

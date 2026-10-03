@@ -1,0 +1,6 @@
+@import '../../src/app/styles.css';
+@source '../../src';
+@source './proof.tsx';
+.proof-content { max-width: 1120px; margin:auto; padding:24px 20px; }
+.proof-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:12px 20px; }
+@media(max-width:430px) { .proof-content { padding:12px 8px; } .proof-controls { padding:12px 8px; } }

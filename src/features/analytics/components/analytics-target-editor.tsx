@@ -8,7 +8,38 @@ import { readErrorMessage } from '@/utils/errors'
 
 import { formatPercent } from './charts/chart-shared'
 
-type TargetMetric = 'recall' | 'reviewSuccess'
+const targetMetrics = {
+  recall: {
+    key: 'targetRecall',
+    label: 'Target Recall',
+    color: 'var(--cp-analytics-target)',
+    hint: (targets: AnalyticsTargets) =>
+      `Hard + Good + Easy · Up to Review Success ${formatPercent(targets.targetReviewSuccess)}.`,
+  },
+  reviewSuccess: {
+    key: 'targetReviewSuccess',
+    label: 'Target Review Success',
+    color: 'var(--cp-analytics-target)',
+    hint: (targets: AnalyticsTargets) =>
+      `Good + Easy · At least Recall ${formatPercent(targets.targetRecall)}.`,
+  },
+  firstAttemptSuccess: {
+    key: 'targetFirstAttemptSuccess',
+    label: 'Target First-attempt Success',
+    color: 'var(--cp-analytics-first-success)',
+    hint: () =>
+      'Hard + Good + Easy · Valid first recorded outcomes. Independent goal.',
+  },
+  firstAttemptGoodEasy: {
+    key: 'targetFirstAttemptGoodEasy',
+    label: 'Target Good + Easy',
+    color: 'var(--cp-analytics-first-good-easy)',
+    hint: () =>
+      'Good + Easy · Valid first recorded outcomes. Independent goal.',
+  },
+} as const
+
+type TargetMetric = keyof typeof targetMetrics
 
 interface AnalyticsTargetEditorProps {
   targets: AnalyticsTargets
@@ -27,13 +58,14 @@ export function AnalyticsTargetEditor({
   onSave,
 }: AnalyticsTargetEditorProps) {
   const id = useId()
-  const key = metric === 'recall' ? 'targetRecall' : 'targetReviewSuccess'
-  const label = metric === 'recall' ? 'Target Recall' : 'Target Review Success'
+  const { key, label, hint: readHint, color } = targetMetrics[metric]
   const value = targets[key]
-  const hint =
-    metric === 'recall'
-      ? `Hard + Good + Easy · Up to Review Success ${formatPercent(targets.targetReviewSuccess)}.`
-      : `Good + Easy · At least Recall ${formatPercent(targets.targetRecall)}.`
+  const hint = readHint(targets)
+  const referenceColor =
+    (metric === 'firstAttemptSuccess' || metric === 'firstAttemptGoodEasy') &&
+    targets.targetFirstAttemptSuccess === targets.targetFirstAttemptGoodEasy
+      ? 'var(--cp-analytics-first-shared-target)'
+      : color
   const triggerRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const savingRef = useRef(false)
@@ -100,7 +132,7 @@ export function AnalyticsTargetEditor({
         <span
           aria-hidden="true"
           className="w-5 shrink-0 border-t border-dashed"
-          style={{ borderColor: 'var(--cp-analytics-target)' }}
+          style={{ borderColor: referenceColor }}
         />
         {label} {formatPercent(value)}
         <span aria-hidden="true" className="text-[10px]">

@@ -12,10 +12,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): approved two-rate first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall, with the selected preview preserved verbatim; production implementation pending.
-- [`specs/2026-10-03-analytics-practice-ratings-merge-design.md`](./specs/2026-10-03-analytics-practice-ratings-merge-design.md): approved merged Practice Rhythm chart with exact stacked shares, independent completed-review line, saved Success target, interval union, and three-card historical layout; earlier exact design snapshots remain historical context.
+- [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): approved two-rate first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall, with the selected preview preserved verbatim; implemented with automated and production-component proof; required human installed-extension smoke remains pending before review or merge.
+- [`specs/2026-10-03-analytics-practice-ratings-merge-design.md`](./specs/2026-10-03-analytics-practice-ratings-merge-design.md): approved merged Practice Rhythm chart with exact stacked shares, independent completed-review line, saved Success target, and interval union; its three-card layout is historical context superseded by the first-attempt/repeat pair above.
 - [`specs/2026-10-02-analytics-chart-targets-design.md`](./specs/2026-10-02-analytics-chart-targets-design.md): approved independent saved Recall/Review Success goals, compact graph editors, Settings/backup/configured sync ownership, and unchanged FSRS behavior; implemented with automated/fixture proof; human extension smoke remains pending.
-- [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): earlier four-chart historical treatment and exact design snapshots, retained as implementation history; the approved merged Practice Rhythm design owns the current three-card historical layout and later panels remain deferred.
+- [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): earlier four-chart historical treatment and exact design snapshots, retained as implementation history; the first-attempt/repeat design now owns the four-card historical layout and later panels remain deferred.
 - [`specs/2026-10-02-analytics-recall-approved-design.md`](./specs/2026-10-02-analytics-recall-approved-design.md): exact approved Recall source, screenshots, and checksums.
 - [`specs/2026-10-02-analytics-memory-practice-approved-design.md`](./specs/2026-10-02-analytics-memory-practice-approved-design.md): exact approved fitted Memory Strength and earlier Practice Rhythm snapshots, preserved as historical context.
 - [`specs/2026-10-02-analytics-ratings-mix-approved-design.md`](./specs/2026-10-02-analytics-ratings-mix-approved-design.md): exact earlier standalone Ratings Mix snapshot, missing-period hatch, and segment labels, preserved as historical context.
@@ -53,7 +53,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
-- [`plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md`](./plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md): phased cohort/API, Settings goals, and graph implementation plan for the approved first-attempt/repeat split; written-spec review and execution pending.
+- [`plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md`](./plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md): phased cohort/API, Settings goals, and graph implementation plan for the approved first-attempt/repeat split; executed with independent specification/code-quality review and preserved production-component proof; human installed-extension smoke remains pending.
 - [`plans/2026-10-03-analytics-practice-ratings-merge.md`](./plans/2026-10-03-analytics-practice-ratings-merge.md): approved phase-sized plan for the pure interval join, merged chart, dashboard composition, automated validation, production-component proof, and required human installed-extension smoke.
 - [`plans/2026-10-02-analytics-compact-target-editors.md`](./plans/2026-10-02-analytics-compact-target-editors.md): user-directed refinement to one small input per graph, independent partial saves, current counterpart constraints, and refreshed production-component proof.
 - [`plans/2026-10-02-analytics-chart-targets.md`](./plans/2026-10-02-analytics-chart-targets.md): approved phase-sized implementation plan for the saved pair, target-aware models/cache, compact editors, validation, and required human extension smoke; execution complete with human extension smoke pending.
@@ -101,6 +101,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-03-analytics-first-attempts-and-repeat-recall.md`](./handoffs/2026-10-03-analytics-first-attempts-and-repeat-recall.md): first-recorded outcome rates, independent saved goals, repeat-only paired Recall, validation and production-component screenshots, and required human installed-extension smoke pending before review or merge.
 
 - [`handoffs/2026-10-03-analytics-practice-ratings-merge.md`](./handoffs/2026-10-03-analytics-practice-ratings-merge.md): merged chart implementation, interval and visibility validation, production-component proof, and required human installed-extension happy-path and edge-case smoke pending before review or merge.
 - [`handoffs/2026-10-02-analytics-compact-target-editors.md`](./handoffs/2026-10-02-analytics-compact-target-editors.md): single-target compact controls, safe partial saves, review and validation results, and new fixture screenshots; human installed-extension smoke remains pending.

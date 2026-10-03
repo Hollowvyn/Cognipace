@@ -11,6 +11,7 @@ export {
 } from './recall-ratings-views'
 export { MemoryStrengthView, PracticeRhythmView } from './memory-practice-views'
 export { PracticeRatingsView } from './practice-ratings-view'
+export { NewProblemSuccessView } from './new-problem-success-view'
 
 const chartDimension = { width: 640, height: 288 }
 

@@ -118,6 +118,29 @@ function event(
 }
 
 describe('analytics chart-data builders', () => {
+  it('uses the same repeat rating cohort for both legacy recall rates despite nullable or conflicting correctness', () => {
+    const reviews = [
+      event({ id: 'initial', reviewedAt: new Date('2026-07-31T12:00:00Z') }),
+      event({ id: 'repeat-again', rating: 'again', isCorrect: true }),
+      event({
+        id: 'repeat-hard',
+        rating: 'hard',
+        isCorrect: null,
+        reviewedAt: new Date('2026-08-01T13:00:00Z'),
+      }),
+      event({ id: 'new-card', cardId: 'new-card', rating: 'easy' }),
+    ]
+    const points = buildRecallQualityPoints(reviews, options)
+    expect(points[0]).toMatchObject({
+      reviewCount: 2,
+      eligibleSampleSize: 2,
+      observedRecall: 0.5,
+    })
+    expect(buildPredictedRecallSamples(reviews, options)).toHaveLength(2)
+    expect(
+      buildRecallQualityPoints([event({ isCorrect: null })], options),
+    ).toEqual([])
+  })
   it('describes persisted correctness without inventing retry exclusion', () => {
     expect(metricDefinitions.observedCorrectness.label).toBe(
       'Observed correctness',
@@ -155,6 +178,15 @@ describe('analytics chart-data builders', () => {
   it('builds daily observed and pre-review predicted recall with null empty samples', () => {
     const points = buildRecallQualityPoints(
       [
+        event({
+          id: 'prior-one',
+          reviewedAt: new Date('2026-07-31T12:00:00Z'),
+        }),
+        event({
+          id: 'prior-two',
+          cardId: 'card-2',
+          reviewedAt: new Date('2026-07-31T12:00:00Z'),
+        }),
         event(),
         event({
           id: '2',
@@ -224,7 +256,14 @@ describe('analytics chart-data builders', () => {
     })
 
     expect(
-      buildRecallQualityPoints([validReview, invalidRating], options)[0],
+      buildRecallQualityPoints(
+        [
+          event({ id: 'prior', reviewedAt: new Date('2026-07-31T12:00:00Z') }),
+          validReview,
+          invalidRating,
+        ],
+        options,
+      )[0],
     ).toMatchObject({
       reviewCount: 1,
       eligibleSampleSize: 1,
@@ -258,8 +297,7 @@ describe('analytics chart-data builders', () => {
       [event({ isCorrect: null })],
       options,
     )
-    expect(points[0]!.observedRecall).toBeNull()
-    expect(points[2]!.reviewCount).toBe(0)
+    expect(points).toEqual([])
   })
 
   it('keeps every post-start practice bucket and reports no-practice buckets as zero', () => {
@@ -349,20 +387,15 @@ describe('analytics chart-data builders', () => {
       repeatReview.reviewedAt,
       fsrsOptions,
     )
-    const expectedBeforeSecondCardReview = getRetrievability(
-      createInitialFsrsCard(secondCardReview.reviewedAt),
-      secondCardReview.reviewedAt,
-      fsrsOptions,
-    )
-
-    expect(points[2]!.predictedRecall).toBeCloseTo(expectedBeforeRepeat)
-    expect(points[1]!.predictedRecall).toBeCloseTo(
-      expectedBeforeSecondCardReview,
-    )
-    expect(points.map((point) => point.reviewCount)).toEqual([1, 1, 1])
+    expect(points[0]!.predictedRecall).toBeCloseTo(expectedBeforeRepeat)
+    expect(points[0]).toMatchObject({
+      bucketStart: '2026-08-03',
+      reviewCount: 1,
+      observedRecall: 0,
+    })
   })
 
-  it('returns one predicted-recall sample for every same-day review', () => {
+  it('returns one predicted-recall sample for every same-day repeat review', () => {
     const firstReview = event({
       id: 'same-day-1',
       reviewedAt: new Date('2026-08-02T12:00:00.000Z'),
@@ -383,13 +416,13 @@ describe('analytics chart-data builders', () => {
       options,
     )
 
-    expect(samples).toHaveLength(2)
+    expect(samples).toHaveLength(1)
     expect(samples.every((sample) => sample.date === '2026-08-02')).toBe(true)
     expect(
       points.find((point) => point.bucketStart === '2026-08-02'),
     ).toMatchObject({
       bucketStart: '2026-08-02',
-      reviewCount: 2,
+      reviewCount: 1,
     })
     expect(
       points.find((point) => point.bucketStart === '2026-08-02')
@@ -458,7 +491,7 @@ describe('analytics chart-data builders', () => {
       buildRecallQualityPoints(events, adaptiveOptions).map(
         (point) => point.reviewCount,
       ),
-    ).toEqual([6, 4, 8])
+    ).toEqual([5, 0, 0])
     expect(buildRatingsMixPoints(events, adaptiveOptions)[0]).toMatchObject({
       again: 1,
       hard: 1,
@@ -501,7 +534,19 @@ describe('analytics chart-data builders', () => {
       }),
     ]
 
-    expect(buildRecallQualityPoints(events, bucketOptions)).toMatchObject([
+    expect(
+      buildRecallQualityPoints(
+        [
+          event({
+            id: 'eligible-prior',
+            cardId: 'eligible-card',
+            reviewedAt: new Date('2026-07-31T12:00:00Z'),
+          }),
+          ...events,
+        ],
+        bucketOptions,
+      ),
+    ).toMatchObject([
       { bucketStart: '2026-08-04', reviewCount: 1 },
       {
         bucketStart: '2026-08-07',
@@ -545,7 +590,24 @@ describe('analytics chart-data builders', () => {
       }),
     ]
 
-    expect(buildRecallQualityPoints(events, bucketOptions)).toMatchObject([
+    expect(
+      buildRecallQualityPoints(
+        [
+          event({
+            id: 'first-prior',
+            cardId: 'first-card',
+            reviewedAt: new Date('2026-07-31T12:00:00Z'),
+          }),
+          event({
+            id: 'third-prior',
+            cardId: 'third-card',
+            reviewedAt: new Date('2026-07-31T12:00:00Z'),
+          }),
+          ...events,
+        ],
+        bucketOptions,
+      ),
+    ).toMatchObject([
       { bucketStart: '2026-08-01', reviewCount: 1 },
       { bucketStart: '2026-08-04', reviewCount: 0, observedRecall: null },
       { bucketStart: '2026-08-07', reviewCount: 1 },

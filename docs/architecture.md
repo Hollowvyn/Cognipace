@@ -289,6 +289,14 @@ The owners in that flow are:
 - `src/features/analytics/domain/analytics-readiness.ts` derives the effective
   window and readiness gates. `S`, `A`, `G`, `K`, and `E` mean eligible
   assessments, active buckets, longest gap, gap runs, and effective buckets.
+- `src/features/analytics/domain/review-cohorts.ts` selects the earliest raw
+  retained event per problem before validity/range filters and constructs
+  repeat-only FSRS pairs from full per-card valid-rating replay. An invalid first
+  event is not promoted, and replay index zero never enters Recall. Both legacy
+  and historical Recall builders and their readiness consume the same pairs.
+  `historical-presentation.ts` supplies first-outcome counts, weighted totals,
+  exclusions, rates, targets, and scale; first-outcome readiness counts valid
+  selected first events independently of paired repeats.
 - `src/features/analytics/domain/chart-buckets.ts` and
   `src/features/analytics/domain/chart-data.ts` aggregate each metric only from
   eligible evidence, preserve unknown buckets as `null`, and classify solid or
@@ -317,15 +325,27 @@ The owners in that flow are:
   needed. Settings Save preserves the pair; Reset Defaults restores 0.9/0.9.
   The user explicitly approved inclusion in existing backup export/restore and
   configured Gist settings payloads, without a new sync mechanism.
+- Settings also owns `analytics.targetFirstAttemptSuccess` and
+  `analytics.targetFirstAttemptGoodEasy`, each defaulting to 0.9 on a whole-percent
+  fraction grid. They are independent of each other and of the existing pair.
+  Missing fields default independently, malformed local new fields recover
+  independently, and strict imports reject malformed supplied values. The
+  existing partial mutation updates references and the fitted first-outcome
+  scale across all cached ranges without changing rows, totals, or readiness.
+  Reset Defaults restores all four targets. The new serialized first-outcome
+  schema validates rating/count/numerator/rate/evidence coherence and totals
+  against the full untrimmed rows before runtime transport.
 - `src/features/analytics/components/charts/chart-definitions.ts` is the typed
   chart catalogue: title, question, data meaning, eligibility, aggregation,
   semantic series, and sparse-state copy. `LineSegments` in
   `src/features/analytics/components/charts/line-segments.tsx` renders measured
   runs and dashed next-valid-point bridges without interpolating data.
-- The three historical cards use Recall from `recall-ratings-views.tsx`, Memory
+- The four historical cards use New Problem Success from
+  `new-problem-success-view.tsx`, Recall from `recall-ratings-views.tsx`, Memory
   Strength from `memory-practice-views.tsx`, and the merged
-  `practice-ratings-view.tsx`. `analytics-screen.tsx` places Recall and Practice
-  in full-width cards, then Memory and the unchanged Topic view in a responsive
+  `practice-ratings-view.tsx`. `analytics-screen.tsx` places New Problem Success
+  and Recall in a responsive `lg` pair, Practice in a full-width card, then
+  Memory and the unchanged Topic view in a responsive
   pair. Later current-state/workload panels retain their existing treatment.
   The screen retains the Settings-owned Review Success editor and exposes
   distinct rating/count readiness warnings when they differ.
@@ -335,15 +355,16 @@ The owners in that flow are:
   `historical-chart-model.ts` positions immutable serialized rows at their
   calendar midpoint and selects sparse ticks independently of observations.
   The frame/model's default-off `startAtFirstPoint` option is enabled only for
-  Recall. With at least two retained intervals, it uses the first midpoint as
+  Recall and New Problem Success. With at least two retained intervals, it uses the first midpoint as
   the X domain's start, retains the last interval's end, and gives the first
   point 12px of left scale clearance. Marks keep their actual calendar
   midpoints; sparse ticks stay within the displayed domain. A singleton keeps
   its original interval domain and centered marker. Other charts retain the
   default interval-boundary domain and padding. Series visibility cannot shift
-  Recall's domain.
+  either graph's domain.
   The shared `trimHistoricalEmptyEdges` helper returns a contiguous slice for
-  all three historical cards. Recall accepts either known rate independently of series
+  all four historical cards. First outcomes accepts either known rate, including
+  zero; Recall accepts either known rate independently of series
   toggles; Memory accepts a finite `medianStrengthDays` including zero or sub-day
   values. Memory's window predicate
   does not require quartiles or four eligible reviews; those govern whiskers
@@ -362,6 +383,9 @@ The owners in that flow are:
   The current FSRS `targetRetention` remains intact outside the personal chart
   references. Scoped presentation styles live in
   `src/styles/analytics.css`, enabled by the panel's `historical` option.
+  New Problem Success uses distinct scoped mint/blue tokens for its two solid
+  curves and matching references, with one neutral reference when goals are
+  equal. Both target editors and tooltip goals remain available in that state.
 - `src/features/analytics/components/practice-ratings-model.ts` is the pure
   presentation join for unchanged `views.practiceRhythm` and `views.ratingsMix`.
   It keys rows by ID plus exact `bucketStart`/`bucketEnd`, sorts their interval
@@ -392,11 +416,11 @@ The owners in that flow are:
 
 The Analytics service applies the range policy, calculates readiness separately
 for each metric's eligibility rules, and builds its Zod-validated summary.
-Legacy summary series may trim unsupported leading history. All three historical
+Legacy summary series may trim unsupported leading history. All four historical
 views additionally trim unsupported edges at the component presentation boundary,
 preserving the service response, selected-period totals, readiness, supplied
 scales, report time, and internal gaps. Historical readiness is exposed as
-confidence context; it does not suppress available Recall Quality, Practice
+confidence context; it does not suppress available New Problem Success, Recall Quality, Practice
 Rhythm, Memory Strength, or Recent Overdue Backlog points. Current Retention
 Health, Fragile Knowledge, and the fixed 14-day Upcoming Review Load do not
 depend on the historical range being ready.

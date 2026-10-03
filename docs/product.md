@@ -288,7 +288,8 @@ inspection. Its calculations remain read-only and derived from local practice
 state. The narrowly editable chart goals are Settings-owned preferences; they
 do not introduce hosted reporting or account behavior.
 
-The chart-target and merged Practice Rhythm behaviors below are implemented.
+The first-attempt outcomes, repeat-only Recall, chart targets, and merged
+Practice Rhythm behaviors below are implemented.
 Automated and production-component fixture validation are recorded in their
 handoffs; required human installed-extension happy-path and edge-case smoke
 with screenshot or recording proof remains pending before review or merge.
@@ -321,12 +322,24 @@ configured Gist sync as normal settings. It changes neither FSRS scheduling,
 cards, due dates, reconstruction, Retention Map, readiness, nor practice
 outcomes.
 
+New Problem Success has two additional independent saved goals:
+Target First-attempt Success (Hard + Good + Easy) and Target Good + Easy.
+Each defaults to 90% and accepts whole percentages from 0 through 100.
+Neither constrains the other or the existing Recall/Review Success goals.
+Both use the same compact editor and one-key save path; equal goals draw one
+neutral shared reference while keeping both editors and tooltip values.
+Missing older fields default individually. Malformed local new fields recover
+individually without resetting a valid existing pair; backup validation remains
+strict. Settings Save preserves all four goals, and Reset Defaults restores all
+four to 90%. The new goals use the existing settings backup and configured sync
+paths and never change measured outcomes or FSRS schedules.
+
 Historical Analytics uses adaptive presentation buckets and evidence gates:
 
 - The implemented range choices are 14 days with daily buckets, 30 days with
   three-day buckets, and 90 days with weekly buckets. The selection is always
   explicit and never silently changes to a shorter period.
-- All three historical panels trim only unsupported beginning and ending buckets from
+- All four historical panels trim only unsupported beginning and ending buckets from
   their presentation. Chart, Table, and inspection share the contiguous
   first-supported through last-supported
   slice, preserving every internal gap and each retained bucket's exact dates
@@ -352,14 +365,40 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
   buckets, a gap that is too long, or too many gaps. Readiness is guidance for
   confidence, not a reason to hide an otherwise available chart.
 
-The three historical cards have these metric meanings and controls. Recall
-comes first, followed by a full-width Practice Rhythm card. Memory Strength and
+The four historical cards have these metric meanings and controls. New Problem
+Success and Recall vs FSRS Estimate share a responsive row, stacked in that
+order on narrow screens, followed by a full-width Practice Rhythm card. Memory Strength and
 the unchanged Topic Performance view share the next responsive row; later
 current-state and workload panels keep their existing treatment.
 
-- **Observed Recall vs FSRS Estimate** pairs valid rating-derived recalled
+- **New Problem Success** shows the first retained recorded assessment per
+  problem across all cards and modes. Selection uses raw history ordered by
+  assessment time and ID before rating or selected-period filters. An invalid
+  earliest rating is excluded and never replaced by a later attempt. Again
+  counts as failure; correctness flags and missing FSRS logs do not exclude a
+  valid rating. This describes retained recorded history, not guaranteed
+  unaided solving of an unfamiliar question.
+  Hard + Good + Easy uses mint circles and Good + Easy uses a thinner solid
+  blue line with diamonds. Both divide by the same valid-first count, including
+  measured zero. Period totals are weighted by counts rather than averaged
+  bucket rates, and full-period invalid-first exclusions remain visible when
+  unsupported outer intervals are trimmed. Readiness uses valid first records
+  independently of repeat Recall. The fitted scale includes both curves and
+  both saved references; series switches preserve its scale and activity
+  window. Chart, Table, and inspection share exact counts, both rates and goals,
+  evidence, dates, partial status, and report context. Calculation details
+  explain the retained-history limitation. The first-point clearance and
+  singleton behavior match Recall.
+- **Recall vs FSRS Estimate** pairs valid rating-derived recalled
   outcomes (Hard, Good, or Easy) with reconstructed FSRS retrievability
-  immediately before the same reviews. Observed recall uses a solid line and
+  immediately before the same repeat reviews. Each card's complete valid-rating
+  history is replayed, including initial and pre-range records for state; its
+  first replayed assessment is never emitted. Both curves, compatible summary
+  series, and Recall readiness use the exact same eligible pairs. Null or
+  conflicting correctness flags do not change this rating-derived population;
+  a genuine zero FSRS estimate remains valid. Initial-only history leaves this
+  graph empty while New Problem Success can remain available.
+  Observed recall uses a solid line and
   circle markers; the FSRS estimate uses short dashes and diamond markers.
   Longer dashes bridge missing evidence. The dashed Target Recall reference
   uses the saved personal goal, with an explicit editable caption, tooltip, and
@@ -421,7 +460,7 @@ current-state and workload panels keep their existing treatment.
   crossing with the percentage target has no percentage meaning. A wholly
   unsupported selected period shows the explicit empty state.
 
-These three panels use sparse calendar-date axis labels without dropping retained
+These four panels use sparse calendar-date axis labels without dropping retained
 chart rows. Bucket marks sit at the midpoint of their actual local-date interval,
 including shortened edge intervals. Memory Strength and Practice Rhythm keep
 their interval-boundary X domains and padding.
@@ -439,8 +478,8 @@ Topic Performance, Retention Map, Memory Signals, Recent Overdue Backlog, and
 Upcoming Review Load retain their current treatments; their next visual
 iteration is deferred.
 
-Historical readiness does not hide useful analytics. Observed Recall vs FSRS
-Estimate, Practice Rhythm, Memory Strength, and Recent Overdue Backlog keep
+Historical readiness does not hide useful analytics. New Problem Success,
+Recall vs FSRS Estimate, Practice Rhythm, Memory Strength, and Recent Overdue Backlog keep
 showing available points when a historical selected range is unready; a
 one-point series says that it is not enough for a trend yet. Retention Map,
 Memory Signals by Problem, and the fixed 14-day Upcoming Review Load remain

@@ -7,6 +7,7 @@ import {
   analyticsRangeSchema,
   analyticsSummaryRequestSchema,
   analyticsSummarySchema,
+  firstAttemptOutcomesViewSchema,
   hardAgainSummarySchema,
   practiceRhythmPointSchema,
   ratingsMixPointSchema,
@@ -44,6 +45,7 @@ function withRequestedReadiness(
 ) {
   return {
     requested,
+    firstAttemptOutcomes: { ...readiness },
     recallQuality: readiness,
     practiceRhythm: readiness,
     ratingsMix: readiness,
@@ -92,6 +94,26 @@ const validSummary: SerializedAnalyticsSummary = {
   lowSample: false,
   targetRetention: 0.9,
   views: {
+    firstAttemptOutcomes: {
+      rows: [],
+      totals: {
+        again: 0,
+        hard: 0,
+        good: 0,
+        easy: 0,
+        recordedFirstAttempts: 0,
+        excludedInvalidRatings: 0,
+        validFirstAttempts: 0,
+        hardGoodEasy: 0,
+        goodEasy: 0,
+        firstAttemptSuccess: null,
+        firstAttemptGoodEasy: null,
+        evidence: 'not-measured',
+      },
+      scale: { domain: [0, 1], ticks: [0, 1] },
+      targetFirstAttemptSuccess: 0.9,
+      targetFirstAttemptGoodEasy: 0.9,
+    },
     observedRecallVsFsrs: {
       rows: [],
       scale: { domain: [0, 1], ticks: [0, 1] },
@@ -178,6 +200,162 @@ function withoutSummaryField(field: keyof SerializedAnalyticsSummary) {
 }
 
 describe('analyticsSummaryRequestSchema', () => {
+  it('requires both first-attempt view and independent readiness', () => {
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...validSummary,
+        views: { ...validSummary.views, firstAttemptOutcomes: undefined },
+      }).success,
+    ).toBe(false)
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...validSummary,
+        historicalReadiness: {
+          ...validSummary.historicalReadiness,
+          firstAttemptOutcomes: undefined,
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each([0, 1])(
+    'accepts measured zero and full success using the same validated denominator %s',
+    (rate) => {
+      const totals = {
+        again: 1 - rate,
+        hard: 0,
+        good: rate,
+        easy: 0,
+        recordedFirstAttempts: 1,
+        excludedInvalidRatings: 0,
+        validFirstAttempts: 1,
+        hardGoodEasy: rate,
+        goodEasy: rate,
+        firstAttemptSuccess: rate,
+        firstAttemptGoodEasy: rate,
+        evidence: 'measured',
+      }
+      expect(
+        firstAttemptOutcomesViewSchema.safeParse({
+          rows: [
+            {
+              ...totals,
+              id: 'bucket',
+              bucketStart: '2026-01-01',
+              bucketEnd: '2026-01-01',
+              isPartial: true,
+            },
+          ],
+          totals,
+          scale: { domain: [0, 1], ticks: [0, 1] },
+          targetFirstAttemptSuccess: 0,
+          targetFirstAttemptGoodEasy: 1,
+        }).success,
+      ).toBe(true)
+    },
+  )
+
+  it('accepts independent first-attempt target order and rejects fractional whole-percent goals', () => {
+    const views = {
+      ...validSummary.views,
+      firstAttemptOutcomes: {
+        ...validSummary.views.firstAttemptOutcomes,
+        targetFirstAttemptSuccess: 0,
+        targetFirstAttemptGoodEasy: 1,
+      },
+    }
+    expect(
+      analyticsSummarySchema.safeParse({ ...validSummary, views }).success,
+    ).toBe(true)
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...validSummary,
+        views: {
+          ...views,
+          firstAttemptOutcomes: {
+            ...views.firstAttemptOutcomes,
+            targetFirstAttemptGoodEasy: 0.123,
+          },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects individually valid totals that differ from the complete bucket population', () => {
+    const totals = {
+      again: 1,
+      hard: 0,
+      good: 0,
+      easy: 0,
+      recordedFirstAttempts: 1,
+      excludedInvalidRatings: 0,
+      validFirstAttempts: 1,
+      hardGoodEasy: 0,
+      goodEasy: 0,
+      firstAttemptSuccess: 0,
+      firstAttemptGoodEasy: 0,
+      evidence: 'measured',
+    }
+    expect(
+      firstAttemptOutcomesViewSchema.safeParse({
+        ...validSummary.views.firstAttemptOutcomes,
+        totals,
+      }).success,
+    ).toBe(false)
+  })
+  it.each([
+    { validFirstAttempts: -1 },
+    { again: 2 },
+    { recordedFirstAttempts: 3 },
+    { hardGoodEasy: 2 },
+    { goodEasy: 2 },
+    { firstAttemptSuccess: null },
+    { firstAttemptGoodEasy: 0.5 },
+    { evidence: 'not-measured' },
+    { difficulty: 'hard' },
+  ])(
+    'rejects inconsistent first-attempt counts, rates, evidence, or unsupported fields %j',
+    (invalid) => {
+      const totals = {
+        again: 0,
+        hard: 1,
+        good: 0,
+        easy: 0,
+        recordedFirstAttempts: 1,
+        excludedInvalidRatings: 0,
+        validFirstAttempts: 1,
+        hardGoodEasy: 1,
+        goodEasy: 0,
+        firstAttemptSuccess: 1,
+        firstAttemptGoodEasy: 0,
+        evidence: 'measured',
+      }
+      expect(
+        analyticsSummarySchema.safeParse({
+          ...validSummary,
+          views: {
+            ...validSummary.views,
+            firstAttemptOutcomes: {
+              rows: [
+                {
+                  ...totals,
+                  ...invalid,
+                  id: 'first',
+                  bucketStart: '2026-01-01',
+                  bucketEnd: '2026-01-01',
+                  isPartial: false,
+                },
+              ],
+              totals,
+              scale: { domain: [0, 1], ticks: [0, 1] },
+              targetFirstAttemptSuccess: 0.9,
+              targetFirstAttemptGoodEasy: 0.9,
+            },
+          },
+        }).success,
+      ).toBe(false)
+    },
+  )
   it('requires the feature-owned Ratings Mix and Topic Performance presentation models', () => {
     expect(() =>
       analyticsSummarySchema.parse({
@@ -381,6 +559,7 @@ describe('analyticsSummarySchema', () => {
 
     expect(parsed.historicalReadiness).toEqual({
       requested: readiness,
+      firstAttemptOutcomes: readiness,
       recallQuality: readiness,
       practiceRhythm: readiness,
       ratingsMix: readiness,

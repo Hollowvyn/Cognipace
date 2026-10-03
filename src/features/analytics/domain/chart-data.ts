@@ -1,9 +1,7 @@
 import {
   createInitialFsrsCard,
-  getRetrievability,
   isReviewRating,
   parseSerializedFsrsReviewLogSnapshot,
-  replayReviewHistorySequence,
   scheduleReview,
   type NormalizedFsrsSchedulingOptions,
   type ReviewRating,
@@ -15,6 +13,7 @@ import {
   sumBucketValues,
 } from './chart-buckets'
 import type { AnalyticsBucket } from './analytics-range-policy'
+import { buildRepeatReviewPairs } from './review-cohorts'
 import {
   addAnalyticsCalendarDays,
   getAnalyticsDateKey,
@@ -183,25 +182,13 @@ export function buildRecallQualityPoints(
     reviewCount: 0,
   }))
 
-  for (const event of events) {
-    if (
-      !isWithinRange(event.reviewedAt, options) ||
-      !hasValidReviewRating(event)
-    )
-      continue
-    const point = findBucketPoint(points, event.reviewedAt)
+  for (const pair of buildRepeatReviewPairs(events, options)) {
+    const point = findBucketPoint(points, pair.reviewedAt)
     if (!point) continue
-
     point.reviewCount += 1
-    if (event.isCorrect !== null) {
-      point.observed.denominator += 1
-      if (event.isCorrect) point.observed.numerator += 1
-    }
-  }
-
-  for (const prediction of buildPredictedRecallSamples(events, options)) {
-    const point = findBucketPoint(points, prediction.reviewedAt)
-    if (point) point.predicted.push(prediction.value)
+    point.observed.denominator += 1
+    if (pair.rating !== 'again') point.observed.numerator += 1
+    point.predicted.push(pair.estimate)
   }
 
   return trimLeadingEmptyBuckets(
@@ -226,47 +213,11 @@ export function buildPredictedRecallSamples(
   events: readonly AnalyticsReviewEvent[],
   options: AnalyticsRangeOptions,
 ): PredictedRecallSample[] {
-  const results: PredictedRecallSample[] = []
-  const byCard = new Map<string, AnalyticsReviewEvent[]>()
-  for (const event of events) {
-    const history = byCard.get(event.cardId) ?? []
-    history.push(event)
-    byCard.set(event.cardId, history)
-  }
-  for (const history of byCard.values()) {
-    const orderedHistory = history
-      .filter(hasValidReviewRating)
-      .sort(compareEvents)
-    const replayedReviews = replayReviewHistorySequence(
-      orderedHistory.map((event) => ({
-        reviewedAt: event.reviewedAt,
-        rating: event.rating,
-      })),
-      options.fsrsOptions,
-    )
-
-    for (const [index, event] of orderedHistory.entries()) {
-      const card =
-        replayedReviews[index - 1]?.card ??
-        createInitialFsrsCard(event.reviewedAt)
-      const predicted = getRetrievability(
-        card,
-        event.reviewedAt,
-        options.fsrsOptions,
-      )
-      if (
-        event.reviewedAt >= options.start &&
-        event.reviewedAt <= options.end
-      ) {
-        results.push({
-          date: toAnalyticsDateKey(event.reviewedAt, options.timeZone),
-          reviewedAt: event.reviewedAt,
-          value: predicted,
-        })
-      }
-    }
-  }
-  return results
+  return buildRepeatReviewPairs(events, options).map((pair) => ({
+    date: toAnalyticsDateKey(pair.reviewedAt, options.timeZone),
+    reviewedAt: pair.reviewedAt,
+    value: pair.estimate,
+  }))
 }
 
 export function buildPracticeRhythmPoints(

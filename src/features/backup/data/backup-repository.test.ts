@@ -42,12 +42,61 @@ const settingsValue = JSON.stringify({
 })
 
 describe('backup repository', () => {
+  it('restores older two-key settings and defaults only the missing first-attempt goals', async () => {
+    const source = await createTestDb({ now, seed: false })
+    const target = await createTestDb({ now, seed: false })
+    const analytics = { targetRecall: 0.825, targetReviewSuccess: 0.955 }
+    await source.db.insert(settingsKv).values({
+      key: 'user-settings',
+      value: JSON.stringify({ ...defaultUserSettings, analytics }),
+      updatedAt: timestamp,
+    })
+    const backupData = await createBackupRepository(source.db).readBackupData()
+
+    await clearAndRestoreBackupData(target.db, backupData, now)
+
+    await expect(
+      createSettingsRepository(target.db).getSettings(),
+    ).resolves.toEqual({
+      ...defaultUserSettings,
+      analytics: {
+        ...analytics,
+        targetFirstAttemptSuccess: 0.9,
+        targetFirstAttemptGoodEasy: 0.9,
+      },
+    })
+  })
+
+  it('rejects invalid imported first-attempt goals before clearing stored settings', async () => {
+    const handle = await createTestDb({ now, seed: false })
+    const saved = await createSettingsRepository(handle.db).updateSettings({
+      practice: { dailyGoal: 12 },
+    })
+    const backupData = await createBackupRepository(handle.db).readBackupData()
+    backupData.settings[0]!.value = JSON.stringify({
+      ...saved,
+      analytics: { ...saved.analytics, targetFirstAttemptSuccess: 0.295 },
+    })
+
+    await expect(
+      clearAndRestoreBackupData(handle.db, backupData, now),
+    ).rejects.toThrow('settings value must contain current UserSettings JSON')
+    await expect(
+      createSettingsRepository(handle.db).getSettings(),
+    ).resolves.toEqual(saved)
+  })
+
   it('round-trips saved analytics targets through the existing Settings backup row', async () => {
     const source = await createTestDb({ now, seed: false })
     const target = await createTestDb({ now, seed: false })
     const saved = await createSettingsRepository(source.db).updateSettings(
       {
-        analytics: { targetRecall: 0.8, targetReviewSuccess: 0.95 },
+        analytics: {
+          targetRecall: 0.8,
+          targetReviewSuccess: 0.95,
+          targetFirstAttemptSuccess: 0.29,
+          targetFirstAttemptGoodEasy: 1,
+        },
         review: { targetRetention: 0.75 },
       },
       now,
@@ -55,7 +104,12 @@ describe('backup repository', () => {
     const backupData = await createBackupRepository(source.db).readBackupData()
 
     expect(JSON.parse(backupData.settings[0]!.value)).toMatchObject({
-      analytics: { targetRecall: 0.8, targetReviewSuccess: 0.95 },
+      analytics: {
+        targetRecall: 0.8,
+        targetReviewSuccess: 0.95,
+        targetFirstAttemptSuccess: 0.29,
+        targetFirstAttemptGoodEasy: 1,
+      },
     })
     await clearAndRestoreBackupData(target.db, backupData, now)
 
@@ -86,7 +140,7 @@ describe('backup repository', () => {
       createSettingsRepository(target.db).getSettings(),
     ).resolves.toEqual({
       ...oldSettings,
-      analytics: { targetRecall: 0.9, targetReviewSuccess: 0.9 },
+      analytics: defaultUserSettings.analytics,
     })
   })
 

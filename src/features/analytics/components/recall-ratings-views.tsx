@@ -78,7 +78,7 @@ export function ObservedRecallVsFsrsView({
     ]
       .filter(Boolean)
       .join('; ') || 'Both data series are hidden'
-  const description = `${visibleDescription}. ${series.observed || series.estimate ? 'Long-dash bridges span missing buckets without adding observations. ' : ''}Paired review outcomes and reconstructed FSRS estimates. Scale: ${percent(view.scale.domain[0])}–${percent(view.scale.domain[1])}. Target Recall: ${percent(view.targetRecall)}. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`
+  const description = `${visibleDescription}. ${series.observed || series.estimate ? 'Long-dash bridges span missing buckets without adding observations. ' : ''}Paired repeat review outcomes and reconstructed FSRS estimates. Initial reviews build memory state but do not enter the paired comparison. Scale: ${percent(view.scale.domain[0])}–${percent(view.scale.domain[1])}. Target Recall: ${percent(view.targetRecall)}. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`
 
   return (
     <div className="cp-historical-view cp-historical-recall grid min-w-0 gap-2">
@@ -106,7 +106,7 @@ export function ObservedRecallVsFsrsView({
                 height={310}
                 initialIndex={Math.max(0, Math.floor(rows.length / 2) - 1)}
                 inspectionResetKey={`${series.observed}:${series.estimate}`}
-                name="Observed Recall vs FSRS Estimate chart"
+                name="Recall vs FSRS Estimate chart"
                 rows={rows}
                 startAtFirstPoint
                 timeFrame={timeFrame}
@@ -236,12 +236,12 @@ export function ObservedRecallVsFsrsView({
               />
             </div>
           ) : (
-            <Empty message="No reviews in this period have both a valid rating and an FSRS estimate." />
+            <Empty message="No repeat reviews in this period have both a valid rating and an FSRS estimate. First recorded reviews build memory for later comparisons." />
           )
         }
         table={
           <HistoricalTable
-            caption="Observed Recall vs FSRS Estimate exact values"
+            caption="Recall vs FSRS Estimate exact values"
             cells={(row) => [
               bucketText(row, timeFrame),
               formatCount(row.recalledCount),

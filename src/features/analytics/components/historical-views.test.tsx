@@ -38,14 +38,14 @@ describe('Phase 2 historical analytics views', () => {
 
     expect(
       screen.getByRole('img', {
-        name: 'Observed Recall vs FSRS Estimate chart',
+        name: 'Recall vs FSRS Estimate chart',
       }),
     ).toHaveAccessibleDescription(
       /solid line with circles.*short dashes and diamonds/,
     )
     expect(
       screen.getByRole('button', {
-        name: 'Inspect Observed Recall vs FSRS Estimate chart',
+        name: 'Inspect Recall vs FSRS Estimate chart',
       }),
     ).toBeVisible()
     expect(screen.getByRole('list')).toHaveTextContent('Observed recall')

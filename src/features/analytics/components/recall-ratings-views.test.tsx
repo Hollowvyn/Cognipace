@@ -120,7 +120,7 @@ describe('Recall approved historical presentation', () => {
     expect(screen.getByText('Target Recall 87%')).toBeVisible()
     fireEvent.keyDown(
       screen.getByRole('button', {
-        name: 'Inspect Observed Recall vs FSRS Estimate chart',
+        name: 'Inspect Recall vs FSRS Estimate chart',
       }),
       { key: 'Home' },
     )
@@ -151,7 +151,7 @@ describe('Recall approved historical presentation', () => {
     expect(firstX() - plotLeft).toBeCloseTo(12)
     expect(screen.getByText('09/10')).toBeVisible()
     const inspect = screen.getByRole('button', {
-      name: 'Inspect Observed Recall vs FSRS Estimate chart',
+      name: 'Inspect Recall vs FSRS Estimate chart',
     })
     fireEvent.keyDown(inspect, { key: 'Home' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('09/09–09/11')
@@ -227,7 +227,7 @@ describe('Recall approved historical presentation', () => {
       />,
     )
     const inspect = screen.getByRole('button', {
-      name: 'Inspect Observed Recall vs FSRS Estimate chart',
+      name: 'Inspect Recall vs FSRS Estimate chart',
     })
     fireEvent.focus(inspect)
     const tooltip = screen.getByRole('tooltip')
@@ -287,7 +287,7 @@ describe('Recall approved historical presentation', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     fireEvent.focus(
       screen.getByRole('button', {
-        name: 'Inspect Observed Recall vs FSRS Estimate chart',
+        name: 'Inspect Recall vs FSRS Estimate chart',
       }),
     )
     expect(screen.getByRole('tooltip')).toHaveTextContent('09/18–09/20')
@@ -297,7 +297,7 @@ describe('Recall approved historical presentation', () => {
     const user = userEvent.setup()
     render(<ObservedRecallVsFsrsView view={recallView([recallRow(0)])} />)
     const chart = screen.getByRole('img', {
-      name: 'Observed Recall vs FSRS Estimate chart',
+      name: 'Recall vs FSRS Estimate chart',
     })
     const description = document.getElementById(
       chart.getAttribute('aria-describedby')!,
@@ -311,7 +311,7 @@ describe('Recall approved historical presentation', () => {
     ).toHaveAttribute('aria-pressed', 'false')
     fireEvent.focus(
       screen.getByRole('button', {
-        name: 'Inspect Observed Recall vs FSRS Estimate chart',
+        name: 'Inspect Recall vs FSRS Estimate chart',
       }),
     )
     expect(screen.getByRole('tooltip')).toHaveTextContent(
@@ -589,7 +589,7 @@ describe('historical visible window', () => {
       />,
     )
     const inspect = screen.getByRole('button', {
-      name: 'Inspect Observed Recall vs FSRS Estimate chart',
+      name: 'Inspect Recall vs FSRS Estimate chart',
     })
     fireEvent.keyDown(inspect, { key: 'Home' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('09/12–09/14')

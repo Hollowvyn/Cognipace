@@ -7,9 +7,135 @@ import type { AnalyticsTargets } from '@/features/settings/domain'
 
 import { AnalyticsTargetEditor } from './analytics-target-editor'
 
-const targets = { targetRecall: 0.9, targetReviewSuccess: 0.9 }
+const targets = {
+  targetRecall: 0.9,
+  targetReviewSuccess: 0.9,
+  targetFirstAttemptSuccess: 0.9,
+  targetFirstAttemptGoodEasy: 0.9,
+}
+
+const firstAttemptMetrics = [
+  {
+    metric: 'firstAttemptSuccess',
+    label: 'Target First-attempt Success',
+    key: 'targetFirstAttemptSuccess',
+    hint: /Hard \+ Good \+ Easy.*first recorded/,
+  },
+  {
+    metric: 'firstAttemptGoodEasy',
+    label: 'Target Good + Easy',
+    key: 'targetFirstAttemptGoodEasy',
+    hint: /Good \+ Easy.*first recorded/,
+  },
+] as const
 
 describe('Analytics target editor', () => {
+  it.each(firstAttemptMetrics)(
+    'saves only $metric with Enter and restores focus without comparing goals',
+    async ({ metric, label, key, hint }) => {
+      const user = userEvent.setup()
+      const save = vi.fn().mockResolvedValue(undefined)
+      const independentTargets = {
+        ...targets,
+        targetRecall: 0.75,
+        targetReviewSuccess: 0.85,
+        targetFirstAttemptGoodEasy: 1,
+      }
+      render(
+        <AnalyticsTargetEditor
+          targets={independentTargets}
+          metric={metric}
+          onSave={save}
+        />,
+      )
+      const trigger = screen.getByRole('button', {
+        name: `${label} ${metric === 'firstAttemptSuccess' ? 90 : 100}%`,
+      })
+      await user.click(trigger)
+      const input = screen.getByRole('spinbutton', { name: `${label} (%)` })
+      expect(input).toHaveFocus()
+      expect(screen.getAllByRole('spinbutton')).toHaveLength(1)
+      expect(screen.getByText(hint)).toBeVisible()
+      await user.clear(input)
+      await user.type(input, '29{Enter}')
+      expect(save).toHaveBeenCalledExactlyOnceWith({ [key]: 0.29 })
+      await waitFor(() => expect(trigger).toHaveFocus())
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    },
+  )
+
+  it.each(firstAttemptMetrics)(
+    'keeps a failed $metric draft through refresh and cancellation restores focus',
+    async ({ metric, label }) => {
+      const user = userEvent.setup()
+      const save = vi.fn().mockRejectedValue(new Error('Storage unavailable'))
+      const { rerender } = render(
+        <AnalyticsTargetEditor
+          targets={targets}
+          metric={metric}
+          onSave={save}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: `${label} 90%` }))
+      fireEvent.change(screen.getByLabelText(`${label} (%)`), {
+        target: { value: '100' },
+      })
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Storage unavailable',
+      )
+      rerender(
+        <AnalyticsTargetEditor
+          targets={{
+            ...targets,
+            targetRecall: 0.8,
+            targetFirstAttemptSuccess: 0.7,
+          }}
+          metric={metric}
+          onSave={save}
+        />,
+      )
+      expect(screen.getByLabelText(`${label} (%)`)).toHaveValue(100)
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+      await user.click(screen.getByLabelText(`${label} (%)`))
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+      expect(
+        screen.getByRole('button', {
+          name: `${label} ${metric === 'firstAttemptSuccess' ? 70 : 90}%`,
+        }),
+      ).toHaveFocus()
+    },
+  )
+
+  it.each(firstAttemptMetrics)(
+    'accepts independent extreme goals and rejects fractions for $metric',
+    async ({ metric, label, key }) => {
+      const user = userEvent.setup()
+      const save = vi.fn().mockResolvedValue(undefined)
+      render(
+        <AnalyticsTargetEditor
+          targets={targets}
+          metric={metric}
+          onSave={save}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: `${label} 90%` }))
+      fireEvent.change(screen.getByLabelText(`${label} (%)`), {
+        target: { value: '0' },
+      })
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+      fireEvent.change(screen.getByLabelText(`${label} (%)`), {
+        target: { value: '29.5' },
+      })
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+      fireEvent.change(screen.getByLabelText(`${label} (%)`), {
+        target: { value: '100' },
+      })
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+      expect(save).toHaveBeenCalledExactlyOnceWith({ [key]: 1 })
+    },
+  )
   it.each(['recall', 'reviewSuccess'] as const)(
     'opens only the %s goal and focuses its single field',
     async (metric) => {
@@ -128,12 +254,12 @@ describe('Analytics target editor', () => {
     { metric: 'recall', initial: targets, value: 0 },
     {
       metric: 'recall',
-      initial: { targetRecall: 0.9, targetReviewSuccess: 1 },
+      initial: { ...targets, targetRecall: 0.9, targetReviewSuccess: 1 },
       value: 100,
     },
     {
       metric: 'reviewSuccess',
-      initial: { targetRecall: 0, targetReviewSuccess: 0.9 },
+      initial: { ...targets, targetRecall: 0, targetReviewSuccess: 0.9 },
       value: 0,
     },
     { metric: 'reviewSuccess', initial: targets, value: 100 },
@@ -175,7 +301,7 @@ describe('Analytics target editor', () => {
     })
     rerender(
       <AnalyticsTargetEditor
-        targets={{ targetRecall: 0.8, targetReviewSuccess: 0.8 }}
+        targets={{ ...targets, targetRecall: 0.8, targetReviewSuccess: 0.8 }}
         metric="recall"
         onSave={save}
       />,
@@ -185,7 +311,7 @@ describe('Analytics target editor', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     rerender(
       <AnalyticsTargetEditor
-        targets={{ targetRecall: 0.8, targetReviewSuccess: 0.9 }}
+        targets={{ ...targets, targetRecall: 0.8, targetReviewSuccess: 0.9 }}
         metric="recall"
         onSave={save}
       />,
@@ -243,28 +369,38 @@ describe('Analytics target editor', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
-  it('prevents duplicate submits and cancellation while saving', async () => {
-    const user = userEvent.setup()
-    let resolve!: () => void
-    const save = vi.fn(
-      () =>
-        new Promise<void>((done) => {
-          resolve = done
-        }),
-    )
-    render(
-      <AnalyticsTargetEditor targets={targets} metric="recall" onSave={save} />,
-    )
-    await user.click(screen.getByRole('button', { name: 'Target Recall 90%' }))
-    await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
-    await user.keyboard('{Enter}{Escape}')
-    expect(save).toHaveBeenCalledTimes(1)
-    expect(screen.getByLabelText('Target Recall (%)')).toBeDisabled()
-    resolve()
-    await waitFor(() =>
-      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument(),
-    )
-  })
+  it.each([
+    { metric: 'recall', label: 'Target Recall' },
+    ...firstAttemptMetrics,
+  ] as const)(
+    'prevents duplicate submits and cancellation while saving $metric',
+    async ({ metric, label }) => {
+      const user = userEvent.setup()
+      let resolve!: () => void
+      const save = vi.fn(
+        () =>
+          new Promise<void>((done) => {
+            resolve = done
+          }),
+      )
+      render(
+        <AnalyticsTargetEditor
+          targets={targets}
+          metric={metric}
+          onSave={save}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: `${label} 90%` }))
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+      expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+      await user.keyboard('{Enter}{Escape}')
+      expect(save).toHaveBeenCalledTimes(1)
+      expect(screen.getByLabelText(`${label} (%)`)).toBeDisabled()
+      resolve()
+      await waitFor(() =>
+        expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument(),
+      )
+    },
+  )
 })
