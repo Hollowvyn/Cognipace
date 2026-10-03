@@ -42,7 +42,6 @@ export async function saveReviewResultWithTrackProgress(
 export async function overrideLastReviewResultWithTrackProgress(
   db: Db,
   input: OverrideLastReviewResultInput,
-  settings: UserSettings,
 ): Promise<ReviewResult> {
   return db.transaction(async (transactionDb) => {
     const tx = transactionDb as unknown as Db
@@ -50,14 +49,12 @@ export async function overrideLastReviewResultWithTrackProgress(
       tx,
     ).overrideLastReviewResultInTransaction(input, tx)
 
-    if (settings.practice.mode === 'studyPlan') {
-      await reconcileActiveTrackProblemReviewOverride(tx, {
-        problemSlug: result.problemSlug,
-        rating: result.rating,
-        reviewedAt: result.reviewedAt,
-        reviewAttemptId: result.reviewAttemptId,
-      })
-    }
+    await reconcileActiveTrackProblemReviewOverride(tx, {
+      problemSlug: result.problemSlug,
+      rating: result.rating,
+      reviewedAt: result.reviewedAt,
+      reviewAttemptId: result.reviewAttemptId,
+    })
 
     return result
   })

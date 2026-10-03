@@ -5,13 +5,14 @@ import { setOnMutationHook } from './proxy'
 import { seedInitialCatalog } from './seed'
 import {
   computeFingerprint,
+  FINGERPRINT_KEY,
   deserializeDb,
   serializeDb,
   writeSnapshotToStorage,
 } from './snapshot'
 import {
-  legacyTopicMigrationFingerprint,
-  legacyTopicMigrationSql,
+  selectSnapshotBaselineSql,
+  legacyTrackMigrationFingerprint,
   selectUpgradeSql,
   validateSnapshotSchema,
   assertDatabaseIntegrity,
@@ -20,6 +21,7 @@ import {
   preserveRecovery,
   readSnapshotState,
   type SnapshotStorage,
+  TRACK_RECOVERY_KEY,
 } from './snapshot-state'
 
 const snapshotDebounceMs = 250
@@ -75,7 +77,15 @@ async function openAppDb(options: AppDbOptions, generation: number) {
   const handle = await openSnapshot({
     currentFingerprint: fingerprint,
     read: () => readSnapshotState(storage),
-    preserve: (raw) => preserveRecovery(storage, raw, new Date()),
+    preserve: (raw) =>
+      preserveRecovery(
+        storage,
+        raw,
+        new Date(),
+        raw[FINGERPRINT_KEY] === legacyTrackMigrationFingerprint
+          ? TRACK_RECOVERY_KEY
+          : undefined,
+      ),
     fresh: async () => {
       const freshHandle = await createDb({
         migrationSql,
@@ -105,9 +115,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
       const expectedSql =
         candidateFingerprint === fingerprint
           ? migrationSql
-          : candidateFingerprint === legacyTopicMigrationFingerprint
-            ? legacyTopicMigrationSql
-            : selectUpgradeSql(candidateFingerprint, migrationEntries)
+          : selectSnapshotBaselineSql(candidateFingerprint)
       await validateSnapshotSchema(candidate, expectedSql)
       assertDatabaseIntegrity(candidate)
     },

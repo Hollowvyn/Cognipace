@@ -22,6 +22,89 @@ import {
 } from '@/platform/db/schema'
 
 describe('practice core', () => {
+  it('reconciles only existing linked track progress after switching mode or active track, without resurrecting reset progress', async () => {
+    const { db } = await createTestDb()
+    const tracks = createTracksRepository(db)
+    await tracks.setActiveTrack('leetcode-75')
+    await saveReviewResultWithTrackProgress(
+      db,
+      {
+        problemSlug: 'two-sum',
+        rating: 'easy',
+        reviewedAt: new Date('2026-01-01T10:00:00Z'),
+        reviewAttemptId: 'linked-before-mode',
+      },
+      defaultUserSettings,
+    )
+    await tracks.setActiveTrack('grind-75')
+    await createSettingsRepository(db).updateSettings({
+      practice: { mode: 'freePractice' },
+    })
+    await overrideLastReviewResultWithTrackProgress(db, {
+      problemSlug: 'two-sum',
+      rating: 'again',
+    })
+    expect(
+      (await tracks.getProgressByTrack(['leetcode-75'])).get('leetcode-75')
+        ?.completedCount,
+    ).toBe(0)
+    await overrideLastReviewResultWithTrackProgress(db, {
+      problemSlug: 'two-sum',
+      rating: 'hard',
+    })
+    expect(
+      (await tracks.getProgressByTrack(['leetcode-75'])).get('leetcode-75')
+        ?.completedCount,
+    ).toBe(1)
+    expect(await db.select().from(trackProblemProgress)).toHaveLength(1)
+    await tracks.resetTrackProgress('leetcode-75')
+    await overrideLastReviewResultWithTrackProgress(db, {
+      problemSlug: 'two-sum',
+      rating: 'easy',
+    })
+    expect(await db.select().from(trackProblemProgress)).toEqual([])
+  })
+
+  it('continuously credits inactive opted-in tracks from Free Practice and removes derived credit on global reset', async () => {
+    const { db } = await createTestDb()
+    const tracks = createTracksRepository(db)
+    const track = await tracks.createTrack({
+      title: 'Inactive external',
+      description: null,
+      dueAt: null,
+      allowExternalProgress: true,
+      groups: [{ title: 'Main', problemSlugs: ['two-sum'] }],
+    })
+    const freeSettings = {
+      ...defaultUserSettings,
+      practice: {
+        ...defaultUserSettings.practice,
+        mode: 'freePractice' as const,
+      },
+    }
+    await saveReviewResultWithTrackProgress(
+      db,
+      {
+        problemSlug: 'two-sum',
+        rating: 'good',
+        reviewedAt: new Date('2026-01-01T10:00:00Z'),
+        reviewAttemptId: 'inactive-external-review',
+      },
+      freeSettings,
+    )
+    expect(
+      (await tracks.getMemberships(track.id))[0]?.completion,
+    ).toMatchObject({ status: 'completed', source: 'external' })
+    expect(await db.select().from(trackProblemProgress)).toEqual([])
+    await resetPracticeSchedule(db, { problemSlug: 'two-sum' })
+    expect((await tracks.getMemberships(track.id))[0]?.completion.status).toBe(
+      'incomplete',
+    )
+    expect((await tracks.getTrackById(track.id))?.allowExternalProgress).toBe(
+      true,
+    )
+  })
+
   it('keeps existing FSRS cards unchanged when target retention changes', async () => {
     const handle = await createTestDb()
     const practiceRepository = createPracticeRepository(handle.db)
@@ -852,14 +935,10 @@ describe('practice core', () => {
       defaultUserSettings,
     )
 
-    await overrideLastReviewResultWithTrackProgress(
-      handle.db,
-      {
-        problemSlug: 'two-sum',
-        rating: 'hard',
-      },
-      defaultUserSettings,
-    )
+    await overrideLastReviewResultWithTrackProgress(handle.db, {
+      problemSlug: 'two-sum',
+      rating: 'hard',
+    })
 
     const catalog = await tracksRepository.getTrackCatalog()
     const [progress] = await handle.db.select().from(trackProblemProgress)
@@ -888,14 +967,10 @@ describe('practice core', () => {
       defaultUserSettings,
     )
 
-    await overrideLastReviewResultWithTrackProgress(
-      handle.db,
-      {
-        problemSlug: 'two-sum',
-        rating: 'again',
-      },
-      defaultUserSettings,
-    )
+    await overrideLastReviewResultWithTrackProgress(handle.db, {
+      problemSlug: 'two-sum',
+      rating: 'again',
+    })
 
     const catalog = await tracksRepository.getTrackCatalog()
     const [progress] = await handle.db.select().from(trackProblemProgress)
@@ -927,14 +1002,10 @@ describe('practice core', () => {
       defaultUserSettings,
     )
 
-    await overrideLastReviewResultWithTrackProgress(
-      handle.db,
-      {
-        problemSlug: 'two-sum',
-        rating: 'easy',
-      },
-      defaultUserSettings,
-    )
+    await overrideLastReviewResultWithTrackProgress(handle.db, {
+      problemSlug: 'two-sum',
+      rating: 'easy',
+    })
 
     const catalog = await tracksRepository.getTrackCatalog()
     const [progress] = await handle.db.select().from(trackProblemProgress)

@@ -175,7 +175,10 @@ describe('sync envelope', () => {
       backup: legacyBackup,
     })
 
-    expect(envelope.backup.schemaVersion).toBe(4)
+    expect(envelope.backup.schemaVersion).toBe(backupSchemaVersion)
+    expect(envelope.backup.data.tracks.tracks[0]).toMatchObject({
+      allowExternalProgress: false,
+    })
     expect(envelope.backup.data.tracks.progress).toEqual([
       expect.objectContaining({
         trackId: 'leetcode-75',
@@ -226,7 +229,7 @@ describe('sync envelope', () => {
     })
 
     expect(envelope.syncEnvelopeVersion).toBe(syncEnvelopeVersion)
-    expect(envelope.backup.schemaVersion).toBe(4)
+    expect(envelope.backup.schemaVersion).toBe(backupSchemaVersion)
     expect(envelope.backup.data.topicRelations).toContainEqual(
       expect.objectContaining({
         sourceTopicId: 'hash-table',

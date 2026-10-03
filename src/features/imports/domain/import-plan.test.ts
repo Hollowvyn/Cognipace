@@ -162,6 +162,7 @@ it('plans a large curriculum in source order without practice operations', () =>
 
   expect(plan.changes.catalog.problems).toHaveLength(250)
   expect(plan.changes.curriculum.memberships).toHaveLength(250)
+  expect(plan.changes.curriculum.tracks[0]?.allowExternalProgress).toBe(false)
   expect(plan.changes.curriculum.groups[0]?.position).toBe(1)
   expect(plan.changes.curriculum.memberships[0]?.position).toBe(1)
   expect(
@@ -245,6 +246,7 @@ it('reuses existing track and group identities while preserving their titles', (
     title: 'My Track',
     description: 'Local description',
     dueAt: 42,
+    allowExternalProgress: true,
   })
   state.curriculum.groups.push({
     id: 'local-track-id:arrays',
@@ -273,6 +275,11 @@ it('reuses existing track and group identities while preserving their titles', (
     expect.objectContaining({ kind: 'tracks', identity: 'local-track-id' }),
   )
   expect(state.curriculum.tracks[0]?.title).toBe('My Track')
+  expect(JSON.parse(plan.fingerprintInput)).toMatchObject({
+    relevantState: {
+      curriculum: { tracks: [{ allowExternalProgress: true }] },
+    },
+  })
   expect(state.curriculum.groups[0]?.title).toBe('My Arrays')
 })
 
@@ -284,6 +291,7 @@ it('appends new groups and memberships after local maximum positions', () => {
     title: 'Local',
     description: null,
     dueAt: null,
+    allowExternalProgress: false,
   })
   state.curriculum.groups.push(
     {
@@ -362,6 +370,7 @@ it('preserves an existing problem placement requested in a different group', () 
     title: 'Essentials',
     description: null,
     dueAt: null,
+    allowExternalProgress: false,
   })
   state.curriculum.groups.push(
     {
@@ -410,6 +419,7 @@ it('does not infer child questions from a colliding group but keeps top-level pr
     title: 'Legacy',
     description: null,
     dueAt: null,
+    allowExternalProgress: false,
   })
   state.curriculum.groups.push({
     id: 'new-track:arrays',
@@ -448,6 +458,7 @@ it('blocks a new track whose slug is already another track ID', () => {
     title: 'My Local Track',
     description: null,
     dueAt: null,
+    allowExternalProgress: false,
   })
   const plan = buildImportPlan(
     parse({
@@ -479,6 +490,7 @@ it('does not guess a group identity from a matching existing display title', () 
     title: 'Essentials',
     description: null,
     dueAt: null,
+    allowExternalProgress: false,
   })
   state.curriculum.groups.push({
     id: 'custom-track:legacy-arrays',
@@ -515,6 +527,7 @@ it('allows distinct non-Latin group titles without an empty-key conflict', () =>
     title: 'Essentials',
     description: null,
     dueAt: null,
+    allowExternalProgress: false,
   })
   state.curriculum.groups.push({
     id: 'custom-track:arrays',
@@ -564,6 +577,7 @@ it('detects a repeated non-Latin group title across different slugs', () => {
     title: 'Essentials',
     description: null,
     dueAt: null,
+    allowExternalProgress: false,
   })
   state.curriculum.groups.push({
     id: 'custom-track:graphs',
@@ -894,6 +908,7 @@ it('changes its fingerprint input when relevant stored identities or ordering ch
     title: 'Essentials',
     description: null,
     dueAt: null,
+    allowExternalProgress: false,
   })
   state.curriculum.groups.push({
     id: 'essentials:arrays',

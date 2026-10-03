@@ -354,6 +354,7 @@ describe('content import service', () => {
       expect(existingImportRows(importRowsBefore, importRowsAfter)).toEqual(
         importRowsBefore,
       )
+      expect(importRowsAfter.tracks[0]?.allowExternalProgress).toBe(true)
     } finally {
       handle.rawDb.close()
     }
@@ -735,6 +736,7 @@ async function seedReviewedState(db: Db) {
     title: 'Review Track',
     description: null,
     dueAt: 321,
+    allowExternalProgress: true,
     createdAt: 10,
     updatedAt: 11,
   })

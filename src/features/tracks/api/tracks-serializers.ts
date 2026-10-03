@@ -77,6 +77,9 @@ export function serializeTrackProblemRow(
               completedAt: row.membership.completion.completedAt.toISOString(),
               completedRating: row.membership.completion.completedRating,
               reviewAttemptId: row.membership.completion.reviewAttemptId,
+              ...(row.membership.completion.source
+                ? { source: row.membership.completion.source }
+                : {}),
             }
           : row.membership.completion,
     },
@@ -121,6 +124,7 @@ export function serializeTrackForEdit(
       problemSlugs: group.problemSlugs,
     })),
     problemRows: edit.problemRows,
+    externalProgressProblemSlugs: edit.externalProgressProblemSlugs ?? [],
   })
 }
 
@@ -154,6 +158,7 @@ export interface TrackGroupForEditSerializationInput {
 }
 
 export interface TrackForEditSerializationInput {
+  externalProgressProblemSlugs?: readonly string[]
   track: Track | null
   groups: readonly TrackGroupForEditSerializationInput[]
   problemRows: readonly ProblemLibraryRow[]

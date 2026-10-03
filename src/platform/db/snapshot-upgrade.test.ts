@@ -14,6 +14,11 @@ import {
   frozenLegacyMigrationEntries,
 } from '@/testing/fixtures/topics-legacy-migrations'
 import { computeFingerprint, deserializeDb, serializeDb } from './snapshot'
+import {
+  expectedV8MigrationFingerprint,
+  frozenV8MigrationEntries,
+  frozenV8MigrationSql,
+} from '@/testing/fixtures/tracks-external-progress-legacy-migrations'
 
 const handles: Awaited<ReturnType<typeof createDb>>[] = []
 
@@ -31,6 +36,48 @@ afterEach(() => {
 })
 
 describe('supported topic snapshot upgrade', () => {
+  it('freezes the shipped v8 prefix and selects only its appended migration', () => {
+    const suffix =
+      'ALTER TABLE tracks ADD allow_external_progress integer DEFAULT false NOT NULL;'
+    const entries = [
+      ...frozenV8MigrationEntries,
+      { path: './migrations/0009_external_progress.sql', sql: suffix },
+    ]
+
+    expect(migrationEntries.slice(0, 9)).toEqual(frozenV8MigrationEntries)
+    expect(computeFingerprint(frozenV8MigrationSql)).toBe(
+      expectedV8MigrationFingerprint,
+    )
+    expect(selectUpgradeSql(expectedV8MigrationFingerprint, entries)).toBe(
+      suffix,
+    )
+    expect(() =>
+      selectUpgradeSql(expectedV8MigrationFingerprint, [
+        ...entries.slice(0, 8),
+        { ...entries[8]!, sql: `${entries[8]!.sql}\n-- changed` },
+        entries[9]!,
+      ]),
+    ).toThrow('The supported migration prefix has changed.')
+  })
+
+  it('defaults new and upgraded tracks to independent progress', async () => {
+    const old = await makeDb(frozenV8MigrationSql)
+    old.rawDb.exec(
+      "INSERT INTO tracks (id, slug, title, created_at, updated_at) VALUES ('retained-track', 'retained-track', 'Retained', 11, 12)",
+    )
+    const staged = await makeDb()
+    deserializeDb(staged, serializeDb(old))
+    await validateSnapshotSchema(staged, frozenV8MigrationSql)
+    staged.rawDb.exec(selectUpgradeSql(expectedV8MigrationFingerprint))
+    assertDatabaseIntegrity(staged)
+    expect(
+      staged.rawDb.exec({
+        sql: 'SELECT id, allow_external_progress, created_at, updated_at FROM tracks',
+        returnValue: 'resultRows',
+      }),
+    ).toEqual([['retained-track', 0, 11, 12]])
+  })
+
   it('freezes the eight historical SQL files and their baseline fingerprint', () => {
     expect(migrationEntries.slice(0, 8)).toEqual(frozenLegacyMigrationEntries)
     expect(computeFingerprint(legacyTopicMigrationSql)).toBe(

@@ -96,6 +96,10 @@ export async function getTrackForEdit(
   const problemLibrary = await getProblemLibrary(db, {
     surface: request.surface,
   })
+  const externalProgressProblemSlugs =
+    await repository.getExternalProgressProblemSlugs(
+      problemLibrary.rows.map((row) => row.problem.slug),
+    )
 
   if (!request.trackId) {
     return serializeTrackForEdit({
@@ -108,6 +112,7 @@ export async function getTrackForEdit(
         },
       ],
       problemRows: problemLibrary.rows,
+      externalProgressProblemSlugs,
     })
   }
 
@@ -130,6 +135,7 @@ export async function getTrackForEdit(
       problemSlugs: problemSlugsByGroup.get(group.id) ?? [],
     })),
     problemRows: problemLibrary.rows,
+    externalProgressProblemSlugs,
   })
 }
 
@@ -175,6 +181,7 @@ export async function createTrack(
     const track = await repository.createTrack(
       {
         title: request.title,
+        allowExternalProgress: request.allowExternalProgress,
         description: request.description,
         dueAt: request.dueAt,
         groups: request.groups,
@@ -204,6 +211,7 @@ export async function updateTrack(
   await createTracksRepository(db).updateTrack({
     trackId: request.trackId,
     title: request.title,
+    allowExternalProgress: request.allowExternalProgress,
     description: request.description,
     dueAt: request.dueAt,
     groups: request.groups,

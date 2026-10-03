@@ -26,7 +26,7 @@ import {
   legacyTopicMigrationFingerprint,
   legacyTopicMigrationSql,
 } from './snapshot-upgrade'
-import { RECOVERY_KEY } from './snapshot-state'
+import { RECOVERY_KEY, TRACK_RECOVERY_KEY } from './snapshot-state'
 import {
   bytesToBase64,
   base64ToBytes,
@@ -37,6 +37,11 @@ import {
   serializeDb,
 } from './snapshot'
 import { setOnMutationHook } from './proxy'
+import {
+  expectedV8MigrationFingerprint,
+  frozenV8MigrationSql,
+  frozenV8MigrationEntries,
+} from '@/testing/fixtures/tracks-external-progress-legacy-migrations'
 
 const now = new Date('2026-09-26T12:00:00.000Z')
 const openedHandles: Awaited<ReturnType<typeof getAppDb>>[] = []
@@ -128,6 +133,168 @@ function readOwnedRows(db: Awaited<ReturnType<typeof getAppDb>>) {
 }
 
 describe('app database startup', () => {
+  it('upgrades populated shipped v8 while preserving an earlier v7 recovery and the v8 original', async () => {
+    const storage = installStorage()
+    const legacy = await createDb({
+      migrationSql: legacyTopicMigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    legacy.rawDb.exec(`
+      INSERT INTO problems (slug, title, difficulty, is_premium, created_at, updated_at)
+      VALUES ('v8-question', 'Preserved question', 'hard', 0, 11, 12);
+      INSERT INTO tracks (id, slug, title, description, due_at, created_at, updated_at)
+      VALUES ('v8-track', 'v8-track', 'Preserved track', 'Keep me', 99, 11, 12);
+      INSERT INTO track_groups (id, track_id, title, position, created_at, updated_at)
+      VALUES ('v8-group', 'v8-track', 'Preserved group', 3, 11, 12);
+      INSERT INTO track_group_problems (track_group_id, track_id, problem_slug, position)
+      VALUES ('v8-group', 'v8-track', 'v8-question', 7);
+      INSERT INTO fsrs_cards (id, problem_slug, card_kind, due_at, stability, difficulty, elapsed_days,
+        scheduled_days, learning_steps, reps, lapses, state, last_review_at, created_at, updated_at)
+      VALUES ('v8-card', 'v8-question', 'default', 500, 2, 3, 1, 2, 0, 1, 0, 'review', 22, 11, 12);
+      INSERT INTO review_attempts (id, problem_slug, card_id, rating, review_mode, reviewed_at, created_at, updated_at)
+      VALUES ('v8-review', 'v8-question', 'v8-card', 'easy', 'free-practice', 22, 22, 23);
+      INSERT INTO track_problem_progress (track_id, problem_slug, review_attempt_id, completed_at,
+        completed_rating, created_at, updated_at)
+      VALUES ('v8-track', 'v8-question', 'v8-review', 22, 'easy', 22, 23);
+      INSERT INTO track_session (id, active_track_id, active_group_id, started_at, updated_at)
+      VALUES ('active', 'v8-track', 'v8-group', 11, 12);
+      INSERT INTO settings_kv (key, value, updated_at) VALUES ('v8-proof', '{"preserved":true}', 12);
+    `)
+    const earlierV7Snapshot = bytesToBase64(serializeDb(legacy))
+    legacy.rawDb.exec(frozenV8MigrationEntries[8].sql)
+    const expected = readOwnedRows(legacy)
+    const snapshot = bytesToBase64(serializeDb(legacy))
+    legacy.rawDb.close()
+    storage.values[SNAPSHOT_KEY] = snapshot
+    storage.values[FINGERPRINT_KEY] = expectedV8MigrationFingerprint
+    const existingRecovery = {
+      version: 1,
+      savedAt: now.toISOString(),
+      raw: {
+        [SNAPSHOT_KEY]: earlierV7Snapshot,
+        [FINGERPRINT_KEY]: legacyTopicMigrationFingerprint,
+      },
+    }
+    storage.values[RECOVERY_KEY] = existingRecovery
+
+    let prepared = false
+    const upgraded = await getAppDb({
+      beforePublish: (handle) => {
+        expect(
+          handle.rawDb.exec({
+            sql: 'SELECT allow_external_progress FROM tracks',
+            returnValue: 'resultRows',
+          }),
+        ).toEqual([[0]])
+        expect(storage.values[SNAPSHOT_KEY]).toBe(snapshot)
+        expect(storage.values[TRACK_RECOVERY_KEY]).toMatchObject({
+          raw: {
+            [SNAPSHOT_KEY]: snapshot,
+            [FINGERPRINT_KEY]: expectedV8MigrationFingerprint,
+          },
+        })
+        prepared = true
+        return Promise.resolve()
+      },
+    })
+    openedHandles.push(upgraded)
+
+    expect(prepared).toBe(true)
+    expect(readOwnedRows(upgraded)).toEqual({
+      ...expected,
+      tracks: expected.tracks!.map((row) => [...row, 0]),
+    })
+    expect(storage.values[RECOVERY_KEY]).toEqual(existingRecovery)
+    expect(storage.values[TRACK_RECOVERY_KEY]).toMatchObject({
+      raw: {
+        [SNAPSHOT_KEY]: snapshot,
+        [FINGERPRINT_KEY]: expectedV8MigrationFingerprint,
+      },
+    })
+    expect(storage.values[FINGERPRINT_KEY]).toBe(
+      computeFingerprint(migrationSql),
+    )
+    resetAppDbForTesting()
+    const reopened = await openTestDb()
+    expect(readOwnedRows(reopened)).toEqual(readOwnedRows(upgraded))
+  })
+
+  it.each(['schema', 'publication', 'track recovery collision'] as const)(
+    'retains the v8 original when %s fails',
+    async (failure) => {
+      const storage = installStorage()
+      const legacy = await createDb({
+        migrationSql: frozenV8MigrationSql,
+        locateWasm: createSqliteWasmLocator(),
+      })
+      legacy.rawDb.exec(
+        "INSERT INTO tracks (id, slug, title, created_at, updated_at) VALUES ('kept', 'kept', 'Kept', 11, 12)",
+      )
+      if (failure === 'schema')
+        legacy.rawDb.exec('CREATE TABLE unrecognized (id TEXT)')
+      const snapshot = bytesToBase64(serializeDb(legacy))
+      legacy.rawDb.close()
+      storage.values[SNAPSHOT_KEY] = snapshot
+      storage.values[FINGERPRINT_KEY] = expectedV8MigrationFingerprint
+      storage.rejectActiveSnapshotWrite = failure === 'publication'
+      const earlierRecovery = {
+        version: 1,
+        savedAt: now.toISOString(),
+        raw: {
+          [SNAPSHOT_KEY]: 'earlier v7 original',
+          [FINGERPRINT_KEY]: legacyTopicMigrationFingerprint,
+        },
+      }
+      storage.values[RECOVERY_KEY] = earlierRecovery
+      const earlierTrackRecovery = {
+        version: 1,
+        savedAt: now.toISOString(),
+        raw: {
+          [SNAPSHOT_KEY]: 'another v8 original',
+          [FINGERPRINT_KEY]: expectedV8MigrationFingerprint,
+        },
+      }
+      if (failure === 'track recovery collision')
+        storage.values[TRACK_RECOVERY_KEY] = earlierTrackRecovery
+
+      await expect(getAppDb()).rejects.toThrow(
+        failure === 'schema'
+          ? 'The stored database schema does not match its supported version.'
+          : failure === 'publication'
+            ? 'storage unavailable'
+            : 'An earlier database recovery record must be exported before another upgrade.',
+      )
+      expect(storage.values[SNAPSHOT_KEY]).toBe(snapshot)
+      expect(storage.values[FINGERPRINT_KEY]).toBe(
+        expectedV8MigrationFingerprint,
+      )
+      expect(storage.values[RECOVERY_KEY]).toEqual(earlierRecovery)
+      if (failure === 'track recovery collision')
+        expect(storage.values[TRACK_RECOVERY_KEY]).toEqual(earlierTrackRecovery)
+      else
+        expect(storage.values[TRACK_RECOVERY_KEY]).toMatchObject({
+          raw: {
+            [SNAPSHOT_KEY]: snapshot,
+            [FINGERPRINT_KEY]: expectedV8MigrationFingerprint,
+          },
+        })
+      if (failure === 'publication') {
+        const firstTrackRecovery = storage.values[TRACK_RECOVERY_KEY]
+        storage.rejectActiveSnapshotWrite = false
+        resetAppDbForTesting()
+        const retried = await openTestDb()
+        expect(
+          retried.rawDb.exec({
+            sql: 'SELECT id, allow_external_progress FROM tracks',
+            returnValue: 'resultRows',
+          }),
+        ).toEqual([['kept', 0]])
+        expect(storage.values[RECOVERY_KEY]).toEqual(earlierRecovery)
+        expect(storage.values[TRACK_RECOVERY_KEY]).toEqual(firstTrackRecovery)
+      }
+    },
+  )
+
   it('round-trips seeded problem, review, FSRS, track, and settings data', async () => {
     installStorage()
     const handle = await openTestDb()
@@ -142,6 +309,7 @@ describe('app database startup', () => {
       { appearance: { themeMode: 'dark' } },
       now,
     )
+    handle.rawDb.exec('UPDATE tracks SET allow_external_progress = 1')
     await flushDbSnapshot()
     const expected = readOwnedRows(handle)
     expect(expected.problems).not.toHaveLength(0)
@@ -451,7 +619,10 @@ describe('app database startup', () => {
     openedHandles.push(upgraded)
 
     expect(publishSawReconciledDatabase).toBe(true)
-    expect(readOwnedRows(upgraded)).toEqual(expectedOwnedRows)
+    expect(readOwnedRows(upgraded)).toEqual({
+      ...expectedOwnedRows,
+      tracks: expectedOwnedRows.tracks!.map((row) => [...row, 0]),
+    })
     expect(fakeStorage.values[RECOVERY_KEY]).toMatchObject({
       version: 1,
       raw: {
