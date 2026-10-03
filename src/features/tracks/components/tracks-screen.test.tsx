@@ -439,13 +439,7 @@ describe('TracksScreen', () => {
       const initialWorkspace = createFourGroupWorkspace(
         'leetcode-75:arrays-hashing',
       )
-      vi.mocked(sendMessage).mockImplementation((method) => {
-        if (method === 'tracks.getWorkspace') {
-          return Promise.resolve(initialWorkspace)
-        }
-
-        return Promise.resolve(null)
-      })
+      vi.mocked(sendMessage).mockResolvedValue(initialWorkspace)
       renderTracksScreen()
 
       await screen.findByRole('tab', {
@@ -576,13 +570,7 @@ describe('TracksScreen', () => {
 
   it('browses groups locally and reopens on the next question group', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) => {
-      if (method === 'tracks.getWorkspace') {
-        return Promise.resolve(twoGroupWorkspace)
-      }
-
-      return Promise.resolve(null)
-    })
+    vi.mocked(sendMessage).mockResolvedValue(twoGroupWorkspace)
 
     const view = renderTracksScreen()
 
@@ -642,12 +630,8 @@ describe('TracksScreen', () => {
         Promise.resolve(workspace),
       )
       const harness = createQueryTestHarness()
-      harness.queryClient.setDefaultOptions({
-        ...harness.queryClient.getDefaultOptions(),
-        queries: {
-          ...harness.queryClient.getDefaultOptions().queries,
-          staleTime: 30_000,
-        },
+      harness.queryClient.setQueryDefaults(tracksQueryKeys.workspace(), {
+        staleTime: 30_000,
       })
       const view = renderTracksScreen(harness)
       expect(await getTrackProblemRowAsync('Two Sum')).toBeVisible()

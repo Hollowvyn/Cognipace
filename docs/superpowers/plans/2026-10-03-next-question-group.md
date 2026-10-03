@@ -69,3 +69,15 @@ review or merge; agent tests do not replace that requirement.
 - [x] Run focused Tracks, runtime, backup, and database tests, then
       `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, and touched-file
       Prettier. Record exact results and pending human smoke in the handoff.
+
+## Phase: approved Ponytail review cuts
+
+- [x] Remove unused repository guidance/Next/mapping code, catalog active flag
+      and session lookup, and live session timestamp projections.
+- [x] Preserve guidance assertions through the live service and repository
+      assertions through owning reads; simplify the two component mocks and
+      workspace stale-time configuration.
+- [x] Run focused suites, lint, check, build, touched-file Prettier, and diff
+      checks; obtain a focused review and update the handoff with exact results.
+- [x] Commit and push the validated cuts; update draft PR #185 with the final
+      scope and validation. Human smoke/visual proof remains pending.

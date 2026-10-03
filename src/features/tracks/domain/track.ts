@@ -25,13 +25,10 @@ export interface TrackProgress {
 export interface TrackCatalogItem {
   track: Track
   progress: TrackProgress
-  isActive: boolean
 }
 
 export interface TrackSessionState {
   activeTrack: Track | null
-  startedAt: Date
-  updatedAt: Date
 }
 
 export type TrackCompletedRating = 'hard' | 'good' | 'easy'

@@ -1,14 +1,11 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
 
-import { normalizeProblemDifficulty, type Problem } from '@/features/problems'
 import {
   normalizeLeetCodeSlug,
   parseLeetCodeProblemInput,
 } from '@/lib/leetcode'
 import type { Db } from '@/platform/db'
 import {
-  problems,
-  problemPractice,
   trackGroupProblems,
   trackGroups,
   trackProblemProgress,
@@ -19,7 +16,6 @@ import {
 } from '@/platform/db/schema'
 
 import type {
-  ActiveTrack,
   CreateTrackInput,
   Track,
   TrackCatalogItem,
@@ -46,32 +42,11 @@ export function createTracksRepository(db: Db) {
 export class TracksRepository {
   constructor(private readonly db: Db) {}
 
-  async getActiveTrack(): Promise<ActiveTrack | null> {
-    const session = await this.getSession()
-
-    if (!session.activeTrack) {
-      return null
-    }
-
-    const next = await this.getNextProblemInTrack(session.activeTrack.id)
-    const progressByTrack = await this.getProgressByTrack([
-      session.activeTrack.id,
-    ])
-
-    return {
-      track: session.activeTrack,
-      activeGroup: next.group,
-      progress: progressByTrack.get(session.activeTrack.id) ?? emptyProgress(),
-      nextProblem: next.problem,
-    }
-  }
-
   async getTrackCatalog(): Promise<TrackCatalogItem[]> {
     const trackRows = await this.db
       .select()
       .from(tracks)
       .orderBy(asc(tracks.createdAt), asc(tracks.title))
-    const session = await this.getSession()
     const progressByTrack = await this.getProgressByTrack(
       trackRows.map((track) => track.id),
     )
@@ -79,7 +54,6 @@ export class TracksRepository {
     return trackRows.map((trackRow) => ({
       track: mapTrack(trackRow),
       progress: progressByTrack.get(trackRow.id) ?? emptyProgress(),
-      isActive: session.activeTrack?.id === trackRow.id,
     }))
   }
 
@@ -180,8 +154,6 @@ export class TracksRepository {
 
       return {
         activeTrack: track,
-        startedAt: new Date(timestamp),
-        updatedAt: new Date(timestamp),
       }
     })
   }
@@ -210,8 +182,6 @@ export class TracksRepository {
 
       return {
         activeTrack: null,
-        startedAt: new Date(timestamp),
-        updatedAt: new Date(timestamp),
       }
     })
   }
@@ -602,53 +572,6 @@ export class TracksRepository {
       return true
     })
   }
-
-  private async getNextProblemInTrack(trackId: string): Promise<{
-    group: TrackGroup | null
-    problem: Problem | null
-  }> {
-    const groups = await readGroups(this.db, trackId)
-
-    if (groups.length === 0) {
-      return { group: null, problem: null }
-    }
-
-    const memberships = await this.getMemberships(trackId)
-    const incomplete = memberships.filter(
-      (membership) => membership.completion.status === 'incomplete',
-    )
-    if (incomplete.length > 0) {
-      const candidates = await this.db
-        .select({ problem: problems, isSuspended: problemPractice.isSuspended })
-        .from(problems)
-        .leftJoin(
-          problemPractice,
-          eq(problemPractice.problemSlug, problems.slug),
-        )
-        .where(
-          inArray(
-            problems.slug,
-            incomplete.map((membership) => membership.problemSlug),
-          ),
-        )
-      const bySlug = new Map(candidates.map((row) => [row.problem.slug, row]))
-      for (const membership of incomplete) {
-        const candidate = bySlug.get(membership.problemSlug)
-        if (candidate && !candidate.isSuspended) {
-          return {
-            group:
-              groups.find((group) => group.id === membership.groupId) ?? null,
-            problem: mapProblem(candidate.problem),
-          }
-        }
-      }
-    }
-
-    return {
-      group: null,
-      problem: null,
-    }
-  }
 }
 
 async function readTrackById(
@@ -675,8 +598,6 @@ async function readSessionState(db: TracksReadDb): Promise<TrackSessionState> {
   if (!session) {
     return {
       activeTrack: null,
-      startedAt: new Date(0),
-      updatedAt: new Date(0),
     }
   }
 
@@ -686,8 +607,6 @@ async function readSessionState(db: TracksReadDb): Promise<TrackSessionState> {
 
   return {
     activeTrack,
-    startedAt: new Date(session.startedAt),
-    updatedAt: new Date(session.updatedAt),
   }
 }
 
@@ -1212,17 +1131,6 @@ function mapTrackGroup(row: TrackGroupRow): TrackGroup {
     trackId: row.trackId,
     title: row.title,
     position: row.position,
-  }
-}
-
-function mapProblem(row: typeof problems.$inferSelect): Problem {
-  return {
-    slug: row.slug,
-    title: row.title,
-    difficulty: normalizeProblemDifficulty(row.difficulty),
-    isPremium: row.isPremium,
-    createdAt: new Date(row.createdAt),
-    updatedAt: new Date(row.updatedAt),
   }
 }
 

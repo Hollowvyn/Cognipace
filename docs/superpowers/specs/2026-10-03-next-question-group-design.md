@@ -52,3 +52,12 @@ Add a `ponytail:` debt comment and an architecture cleanup note: remove this
 legacy persisted browsing field in a preserving migration with readers that
 accept older backups. No new persistence mechanism, abstraction, or backup
 version is needed for the current fix.
+
+## Approved Ponytail review cuts
+
+Delete the test-only repository guidance reader, its private Next selector and
+problem mapper, the unused catalog `isActive` field/session lookup, and unused
+live session timestamp projections. Persisted timestamps and backup fields
+remain intact. Keep guidance coverage in the live service suite and repository
+coverage against the owning reads. Simplify the two workspace-only component
+mocks and use query-specific stale-time defaults in the reopening test.
