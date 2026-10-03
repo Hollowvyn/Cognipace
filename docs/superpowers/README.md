@@ -51,6 +51,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-02-analytics-compact-target-editors.md`](./plans/2026-10-02-analytics-compact-target-editors.md): user-directed refinement to one small input per graph, independent partial saves, current counterpart constraints, and refreshed production-component proof.
 - [`plans/2026-10-02-analytics-chart-targets.md`](./plans/2026-10-02-analytics-chart-targets.md): approved phase-sized implementation plan for the saved pair, target-aware models/cache, compact editors, validation, and required human extension smoke; execution complete with human extension smoke pending.
 - [`plans/2026-10-02-analytics-historical-charts.md`](./plans/2026-10-02-analytics-historical-charts.md): completed implementation plan for the first four historical charts, inspection, tables, scoped layout, and validation.
 
@@ -97,6 +98,7 @@ Use these files to understand why work was shaped a certain way. Before changing
 
 ## Handoffs
 
+- [`handoffs/2026-10-02-analytics-compact-target-editors.md`](./handoffs/2026-10-02-analytics-compact-target-editors.md): single-target compact controls, safe partial saves, review and validation results, and new fixture screenshots; human installed-extension smoke remains pending.
 - [`handoffs/2026-10-02-analytics-chart-targets.md`](./handoffs/2026-10-02-analytics-chart-targets.md): saved graph goals, pair validation, cache/reset race fixes, automated checks and production-component proof; human installed-extension smoke remains pending.
 
 - [`handoffs/2026-10-02-analytics-historical-charts.md`](./handoffs/2026-10-02-analytics-historical-charts.md): implemented charts, automated validation, component screenshots, and pending human extension smoke.

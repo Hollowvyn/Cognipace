@@ -18,7 +18,7 @@ export function useUpdateAnalyticsTargets() {
   const updateSettings = useUpdateSettings()
 
   return {
-    mutateAsync: async (targets: AnalyticsTargets) => {
+    mutateAsync: async (targets: Partial<AnalyticsTargets>) => {
       const settings = await updateSettings.mutateAsync({
         surface: 'dashboard',
         patch: { analytics: targets },

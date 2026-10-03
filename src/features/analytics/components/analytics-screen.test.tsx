@@ -298,7 +298,7 @@ describe('AnalyticsScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
       surface: 'dashboard',
-      patch: { analytics },
+      patch: { analytics: { targetRecall: 0.8 } },
     })
     expect(
       await within(recall).findByRole('button', { name: 'Target Recall 80%' }),
@@ -312,7 +312,7 @@ describe('AnalyticsScreen', () => {
         name: 'Target Review Success 90%',
       }),
     )
-    expect(screen.getByLabelText('Target Recall (%)')).toHaveValue(80)
+    expect(screen.getByText(/At least Recall 80%/)).toBeVisible()
     await user.clear(screen.getByLabelText('Target Review Success (%)'))
     await user.type(screen.getByLabelText('Target Review Success (%)'), '70')
     expect(screen.getByRole('alert')).toHaveTextContent(

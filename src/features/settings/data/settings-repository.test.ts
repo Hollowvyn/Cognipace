@@ -78,6 +78,41 @@ describe('SettingsRepository', () => {
     }
   })
 
+  it.each([
+    {
+      field: 'targetRecall',
+      externalPatch: { targetReviewSuccess: 0.95 },
+      editedPatch: { targetRecall: 0.85 },
+      expected: { targetRecall: 0.85, targetReviewSuccess: 0.95 },
+    },
+    {
+      field: 'targetReviewSuccess',
+      externalPatch: { targetRecall: 0.85 },
+      editedPatch: { targetReviewSuccess: 0.95 },
+      expected: { targetRecall: 0.85, targetReviewSuccess: 0.95 },
+    },
+  ])(
+    'preserves a newer counterpart when saving only $field',
+    async ({ externalPatch, editedPatch, expected }) => {
+      const handle = await createTestDb({ seed: false })
+      const repository = createSettingsRepository(handle.db)
+      const externalRepository = createSettingsRepository(handle.db)
+      const original = await repository.updateSettings({
+        analytics: { targetRecall: 0.8, targetReviewSuccess: 0.9 },
+        practice: { dailyGoal: 12 },
+      })
+
+      await externalRepository.updateSettings({ analytics: externalPatch })
+      const saved = await repository.updateSettings({ analytics: editedPatch })
+
+      expect(saved).toEqual({ ...original, analytics: expected })
+      await expect(repository.getSettings()).resolves.toEqual(saved)
+      const rows = await handle.db.select().from(settingsKv)
+      expect(rows).toHaveLength(1)
+      expect(JSON.parse(rows[0]!.value)).toEqual(saved)
+    },
+  )
+
   it('returns defaults when no settings row exists', async () => {
     const handle = await createTestDb({ seed: false })
 

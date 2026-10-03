@@ -11,7 +11,7 @@ const targets = { targetRecall: 0.9, targetReviewSuccess: 0.9 }
 
 describe('Analytics target editor', () => {
   it.each(['recall', 'reviewSuccess'] as const)(
-    'opens both fields and focuses the %s goal',
+    'opens only the %s goal and focuses its single field',
     async (metric) => {
       const user = userEvent.setup()
       render(
@@ -25,37 +25,47 @@ describe('Analytics target editor', () => {
         metric === 'recall' ? 'Target Recall' : 'Target Review Success'
       expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: `${label} 90%` }))
-      expect(
-        screen.getByRole('spinbutton', { name: 'Target Recall (%)' }),
-      ).toHaveValue(90)
-      expect(
-        screen.getByRole('spinbutton', { name: 'Target Review Success (%)' }),
-      ).toHaveValue(90)
+      expect(screen.getAllByRole('spinbutton')).toHaveLength(1)
       expect(
         screen.getByRole('spinbutton', { name: `${label} (%)` }),
       ).toHaveFocus()
-      expect(screen.getByText('Hard + Good + Easy')).toBeVisible()
-      expect(screen.getByText('Good + Easy')).toBeVisible()
+      expect(
+        screen.getByText(
+          metric === 'recall'
+            ? /Hard \+ Good \+ Easy.*Up to Review Success 90%/
+            : /Good \+ Easy.*At least Recall 90%/,
+        ),
+      ).toBeVisible()
     },
   )
 
-  it('rejects an inverted goal pair and never changes the other input silently', async () => {
-    const user = userEvent.setup()
-    const save = vi.fn()
-    render(
-      <AnalyticsTargetEditor targets={targets} metric="recall" onSave={save} />,
-    )
-    await user.click(screen.getByRole('button', { name: 'Target Recall 90%' }))
-    fireEvent.change(screen.getByLabelText('Target Recall (%)'), {
-      target: { value: '95' },
-    })
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Review Success target must be at least your Recall target',
-    )
-    expect(screen.getByLabelText('Target Review Success (%)')).toHaveValue(90)
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(save).not.toHaveBeenCalled()
-  })
+  it.each(['recall', 'reviewSuccess'] as const)(
+    'rejects an invalid %s goal without changing the counterpart',
+    async (metric) => {
+      const user = userEvent.setup()
+      const save = vi.fn()
+      render(
+        <AnalyticsTargetEditor
+          targets={targets}
+          metric={metric}
+          onSave={save}
+        />,
+      )
+      const label =
+        metric === 'recall' ? 'Target Recall' : 'Target Review Success'
+      await user.click(screen.getByRole('button', { name: `${label} 90%` }))
+      fireEvent.change(screen.getByLabelText(`${label} (%)`), {
+        target: { value: metric === 'recall' ? '95' : '80' },
+      })
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Review Success target must be at least your Recall target',
+      )
+      expect(screen.getAllByRole('spinbutton')).toHaveLength(1)
+      expect(screen.getByRole('button', { name: `${label} 90%` })).toBeVisible()
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+      expect(save).not.toHaveBeenCalled()
+    },
+  )
 
   it.each(['', '-1', '101', '80.5'])(
     'rejects invalid whole-percentage text %j',
@@ -81,9 +91,9 @@ describe('Analytics target editor', () => {
     },
   )
 
-  it('saves the pair with Enter and returns focus to the updated caption', async () => {
+  it('saves only Recall with Enter and returns focus to the updated caption', async () => {
     const user = userEvent.setup()
-    const save = vi.fn<(next: AnalyticsTargets) => Promise<void>>(
+    const save = vi.fn<(next: Partial<AnalyticsTargets>) => Promise<void>>(
       async () => {},
     )
     function SavedEditor() {
@@ -94,7 +104,7 @@ describe('Analytics target editor', () => {
           metric="recall"
           onSave={async (next) => {
             await save(next)
-            setSaved(next)
+            setSaved((current) => ({ ...current, ...next }))
           }}
         />
       )
@@ -105,7 +115,6 @@ describe('Analytics target editor', () => {
     await user.type(screen.getByLabelText('Target Recall (%)'), '80{Enter}')
     expect(save).toHaveBeenCalledExactlyOnceWith({
       targetRecall: 0.8,
-      targetReviewSuccess: 0.9,
     })
     await waitFor(() =>
       expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument(),
@@ -116,27 +125,74 @@ describe('Analytics target editor', () => {
   })
 
   it.each([
-    [0, 0],
-    [0, 100],
-    [100, 100],
-  ])('saves valid boundary goals %i/%i', async (recall, success) => {
+    { metric: 'recall', initial: targets, value: 0 },
+    {
+      metric: 'recall',
+      initial: { targetRecall: 0.9, targetReviewSuccess: 1 },
+      value: 100,
+    },
+    {
+      metric: 'reviewSuccess',
+      initial: { targetRecall: 0, targetReviewSuccess: 0.9 },
+      value: 0,
+    },
+    { metric: 'reviewSuccess', initial: targets, value: 100 },
+  ] as const)(
+    'saves only $metric at $value%',
+    async ({ metric, initial, value }) => {
+      const user = userEvent.setup()
+      const save = vi.fn().mockResolvedValue(undefined)
+      render(
+        <AnalyticsTargetEditor
+          targets={initial}
+          metric={metric}
+          onSave={save}
+        />,
+      )
+      const label =
+        metric === 'recall' ? 'Target Recall' : 'Target Review Success'
+      await user.click(screen.getByRole('button', { name: `${label} 90%` }))
+      fireEvent.change(screen.getByLabelText(`${label} (%)`), {
+        target: { value: String(value) },
+      })
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+      expect(save).toHaveBeenCalledExactlyOnceWith({
+        [metric === 'recall' ? 'targetRecall' : 'targetReviewSuccess']:
+          value / 100,
+      })
+    },
+  )
+
+  it('keeps the active draft while a refreshed counterpart updates the hint and validation', async () => {
     const user = userEvent.setup()
     const save = vi.fn().mockResolvedValue(undefined)
-    render(
+    const { rerender } = render(
       <AnalyticsTargetEditor targets={targets} metric="recall" onSave={save} />,
     )
     await user.click(screen.getByRole('button', { name: 'Target Recall 90%' }))
     fireEvent.change(screen.getByLabelText('Target Recall (%)'), {
-      target: { value: String(recall) },
+      target: { value: '85' },
     })
-    fireEvent.change(screen.getByLabelText('Target Review Success (%)'), {
-      target: { value: String(success) },
-    })
+    rerender(
+      <AnalyticsTargetEditor
+        targets={{ targetRecall: 0.8, targetReviewSuccess: 0.8 }}
+        metric="recall"
+        onSave={save}
+      />,
+    )
+    expect(screen.getByLabelText('Target Recall (%)')).toHaveValue(85)
+    expect(screen.getByText(/Up to Review Success 80%/)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    rerender(
+      <AnalyticsTargetEditor
+        targets={{ targetRecall: 0.8, targetReviewSuccess: 0.9 }}
+        metric="recall"
+        onSave={save}
+      />,
+    )
+    expect(screen.getByLabelText('Target Recall (%)')).toHaveValue(85)
     await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(save).toHaveBeenCalledExactlyOnceWith({
-      targetRecall: recall / 100,
-      targetReviewSuccess: success / 100,
-    })
+    expect(save).toHaveBeenCalledExactlyOnceWith({ targetRecall: 0.85 })
   })
 
   it.each(['Escape', 'Cancel'])(

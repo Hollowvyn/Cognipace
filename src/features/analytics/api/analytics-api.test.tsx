@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { sendMessage } from '@/extension/messaging'
-import { defaultUserSettings } from '@/features/settings'
+import { defaultUserSettings, type AnalyticsTargets } from '@/features/settings'
 import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 import type { SerializedAnalyticsSummary } from './analytics-contracts'
@@ -95,74 +95,78 @@ describe('analytics runtime API', () => {
     expect(sendMessage).toHaveBeenCalledTimes(3)
   })
 
-  it('applies the successful saved target pair and fitted scales to every cached summary', async () => {
-    const { queryClient, wrapper } = createQueryTestHarness()
-    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
-    const summaries = ([14, 30, 90] as const).map((range) => {
-      const summary = summaryWithMeasuredRows(range)
-      queryClient.setQueryData(
-        analyticsQueryKeys.summary(range, 'UTC'),
-        summary,
-      )
-      return summary
-    })
-    const unrelated = { stable: true }
-    queryClient.setQueryData(['problems'], unrelated)
-    const savedSettings = {
-      ...defaultUserSettings,
-      analytics: { targetRecall: 0, targetReviewSuccess: 1 },
-    }
-    vi.mocked(sendMessage).mockResolvedValueOnce(savedSettings)
-    const { result } = renderHook(() => useUpdateAnalyticsTargets(), {
-      wrapper,
-    })
-
-    let returned: unknown
-    await act(async () => {
-      returned = await result.current.mutateAsync({
-        targetRecall: 0.4,
-        targetReviewSuccess: 0.7,
+  it.each(['targetRecall', 'targetReviewSuccess'] as const)(
+    'saves only %s and applies the returned full pair and scales to every cached summary',
+    async (field) => {
+      const { queryClient, wrapper } = createQueryTestHarness()
+      const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+      const summaries = ([14, 30, 90] as const).map((range) => {
+        const summary = summaryWithMeasuredRows(range)
+        queryClient.setQueryData(
+          analyticsQueryKeys.summary(range, 'UTC'),
+          summary,
+        )
+        return summary
       })
-    })
+      const unrelated = { stable: true }
+      queryClient.setQueryData(['problems'], unrelated)
+      const savedSettings = {
+        ...defaultUserSettings,
+        analytics: { targetRecall: 0, targetReviewSuccess: 1 },
+      }
+      vi.mocked(sendMessage).mockResolvedValueOnce(savedSettings)
+      const { result } = renderHook(() => useUpdateAnalyticsTargets(), {
+        wrapper,
+      })
 
-    expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
-      surface: 'dashboard',
-      patch: { analytics: { targetRecall: 0.4, targetReviewSuccess: 0.7 } },
-    })
-    expect(returned).toEqual(savedSettings)
-    for (const before of summaries) {
-      const cached = queryClient.getQueryData<SerializedAnalyticsSummary>(
-        analyticsQueryKeys.summary(before.range, 'UTC'),
-      )!
-      expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(0)
-      expect(cached.views.practiceRhythm.targetReviewSuccess).toBe(1)
-      expect(cached.views.observedRecallVsFsrs.scale.domain[0]).toBe(0)
-      expect(cached.views.practiceRhythm.percentageScale.domain[1]).toBe(1)
-      expect(cached.views.observedRecallVsFsrs.scale).not.toEqual(
-        before.views.observedRecallVsFsrs.scale,
-      )
-      expect(cached.views.practiceRhythm.percentageScale).not.toEqual(
-        before.views.practiceRhythm.percentageScale,
-      )
-      expect(cached.views.observedRecallVsFsrs.rows).toEqual(
-        before.views.observedRecallVsFsrs.rows,
-      )
-      expect(cached.views.practiceRhythm.rows).toEqual(
-        before.views.practiceRhythm.rows,
-      )
-      expect(cached.views.practiceRhythm.countScale).toEqual(
-        before.views.practiceRhythm.countScale,
-      )
-      expect(cached.views.retentionMap).toEqual(before.views.retentionMap)
-      expect(cached.targetRetention).toBe(before.targetRetention)
-      expect(cached.totalReviews).toBe(before.totalReviews)
-      expect(cached.timeFrame).toEqual(before.timeFrame)
-    }
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: analyticsQueryKeys.all,
-    })
-    expect(queryClient.getQueryData(['problems'])).toEqual(unrelated)
-  })
+      const patch: Partial<AnalyticsTargets> =
+        field === 'targetRecall'
+          ? { targetRecall: 0.4 }
+          : { targetReviewSuccess: 0.7 }
+      let returned: unknown
+      await act(async () => {
+        returned = await result.current.mutateAsync(patch)
+      })
+
+      expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+        surface: 'dashboard',
+        patch: { analytics: patch },
+      })
+      expect(returned).toEqual(savedSettings)
+      for (const before of summaries) {
+        const cached = queryClient.getQueryData<SerializedAnalyticsSummary>(
+          analyticsQueryKeys.summary(before.range, 'UTC'),
+        )!
+        expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(0)
+        expect(cached.views.practiceRhythm.targetReviewSuccess).toBe(1)
+        expect(cached.views.observedRecallVsFsrs.scale.domain[0]).toBe(0)
+        expect(cached.views.practiceRhythm.percentageScale.domain[1]).toBe(1)
+        expect(cached.views.observedRecallVsFsrs.scale).not.toEqual(
+          before.views.observedRecallVsFsrs.scale,
+        )
+        expect(cached.views.practiceRhythm.percentageScale).not.toEqual(
+          before.views.practiceRhythm.percentageScale,
+        )
+        expect(cached.views.observedRecallVsFsrs.rows).toEqual(
+          before.views.observedRecallVsFsrs.rows,
+        )
+        expect(cached.views.practiceRhythm.rows).toEqual(
+          before.views.practiceRhythm.rows,
+        )
+        expect(cached.views.practiceRhythm.countScale).toEqual(
+          before.views.practiceRhythm.countScale,
+        )
+        expect(cached.views.retentionMap).toEqual(before.views.retentionMap)
+        expect(cached.targetRetention).toBe(before.targetRetention)
+        expect(cached.totalReviews).toBe(before.totalReviews)
+        expect(cached.timeFrame).toEqual(before.timeFrame)
+      }
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: analyticsQueryKeys.all,
+      })
+      expect(queryClient.getQueryData(['problems'])).toEqual(unrelated)
+    },
+  )
 
   it('keeps cached chart targets and scales unchanged after a failed save', async () => {
     const { queryClient, wrapper } = createQueryTestHarness()

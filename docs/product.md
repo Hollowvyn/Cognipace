@@ -298,13 +298,16 @@ Recall: this intentionally stricter aspiration never constrains measured
 rates. For the same review population, measured Review Success cannot exceed
 measured Recall, but these charts can use different eligible populations.
 
-Each relevant chart has a small native target button above its plot. Either
-opens the same inline editor with both labeled percentage inputs, rating
-combination hints, Save, and Cancel. The selected chart's input receives focus;
-Enter saves and Escape cancels and returns focus. Invalid values or an invalid
-pair cannot save, and the editor never adjusts the other goal automatically.
-Saving persists the pair atomically, shows a pending state, and prevents
-duplicate submissions. Success updates both references from the saved result;
+Each relevant chart has a small native target button above its plot. It opens
+a compact inline editor with one percentage input for that chart, Save, Cancel,
+and a short rating-combination and counterpart-limit hint. The input receives
+focus; Enter saves and Escape cancels and returns focus. Invalid values or an
+invalid pair cannot save, and the editor never adjusts the other goal
+automatically. A refreshed counterpart updates the hint and validation without
+replacing the active draft. Saving sends only the edited goal; Settings merges
+and validates the final pair atomically, preserving the latest other goal.
+Saving shows a pending state and prevents duplicate submissions. Success
+updates both references from the saved result;
 failure keeps the prior goals and the open draft with a useful error. Cancel
 changes no saved values. Controls remain available with empty or sparse data,
 and reopening, reloading, or changing range preserves saved goals.

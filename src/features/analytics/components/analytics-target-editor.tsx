@@ -13,7 +13,7 @@ type TargetMetric = 'recall' | 'reviewSuccess'
 interface AnalyticsTargetEditorProps {
   targets: AnalyticsTargets
   metric: TargetMetric
-  onSave: (targets: AnalyticsTargets) => Promise<unknown>
+  onSave: (patch: Partial<AnalyticsTargets>) => Promise<unknown>
 }
 
 const inputClassName =
@@ -27,23 +27,26 @@ export function AnalyticsTargetEditor({
   onSave,
 }: AnalyticsTargetEditorProps) {
   const id = useId()
+  const key = metric === 'recall' ? 'targetRecall' : 'targetReviewSuccess'
+  const label = metric === 'recall' ? 'Target Recall' : 'Target Review Success'
+  const value = targets[key]
+  const hint =
+    metric === 'recall'
+      ? `Hard + Good + Easy · Up to Review Success ${formatPercent(targets.targetReviewSuccess)}.`
+      : `Good + Easy · At least Recall ${formatPercent(targets.targetRecall)}.`
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const recallRef = useRef<HTMLInputElement>(null)
-  const successRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const savingRef = useRef(false)
   const restoreFocusRef = useRef(false)
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState(() => percentageDraft(targets))
+  const [draft, setDraft] = useState(() => percentageText(value))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const validation = validateDraft(draft)
+  const validation = validateDraft(draft, targets, key)
   const error = validation.error ?? saveError
-  const label = metric === 'recall' ? 'Target Recall' : 'Target Review Success'
-  const value =
-    metric === 'recall' ? targets.targetRecall : targets.targetReviewSuccess
 
   useEffect(() => {
-    if (open) (metric === 'recall' ? recallRef : successRef).current?.focus()
+    if (open) inputRef.current?.focus()
     else if (restoreFocusRef.current) {
       restoreFocusRef.current = false
       triggerRef.current?.focus()
@@ -58,12 +61,12 @@ export function AnalyticsTargetEditor({
   }
 
   async function save() {
-    if (savingRef.current || !validation.targets) return
+    if (savingRef.current || !validation.patch) return
     savingRef.current = true
     setSaving(true)
     setSaveError(null)
     try {
-      await onSave(validation.targets)
+      await onSave(validation.patch)
       restoreFocusRef.current = true
       setOpen(false)
     } catch (error) {
@@ -86,7 +89,7 @@ export function AnalyticsTargetEditor({
         onClick={() => {
           if (open) close()
           else {
-            setDraft(percentageDraft(targets))
+            setDraft(percentageText(value))
             setSaveError(null)
             setOpen(true)
           }
@@ -106,8 +109,8 @@ export function AnalyticsTargetEditor({
       </button>
       {open ? (
         <form
-          aria-label="Chart targets"
-          className="grid w-full max-w-sm min-w-0 gap-3 rounded-[var(--cp-control-radius)] border border-border bg-muted/30 p-3 text-left"
+          aria-label={`${label} editor`}
+          className="grid w-full max-w-72 min-w-0 gap-2 rounded-[var(--cp-control-radius)] border border-border bg-muted/30 p-2 text-left"
           id={`${id}-editor`}
           noValidate
           onKeyDown={(event) => {
@@ -122,68 +125,37 @@ export function AnalyticsTargetEditor({
             void save()
           }}
         >
-          <div className="grid min-w-0 grid-cols-2 gap-3">
-            {(
-              [
-                [
-                  'targetRecall',
-                  'Target Recall (%)',
-                  'Hard + Good + Easy',
-                  recallRef,
-                ],
-                [
-                  'targetReviewSuccess',
-                  'Target Review Success (%)',
-                  'Good + Easy',
-                  successRef,
-                ],
-              ] as const
-            ).map(([key, fieldLabel, hint, ref]) => (
-              <div className="grid min-w-0 content-start gap-1.5" key={key}>
-                <label
-                  className="min-h-8 text-xs font-semibold text-foreground"
-                  htmlFor={`${id}-${key}`}
-                >
-                  {fieldLabel}
-                </label>
-                <input
-                  aria-describedby={`${id}-${key}-hint${error ? ` ${id}-error` : ''}`}
-                  aria-invalid={Boolean(validation.error)}
-                  autoComplete="off"
-                  className={inputClassName}
-                  disabled={saving}
-                  id={`${id}-${key}`}
-                  inputMode="numeric"
-                  max={100}
-                  min={0}
-                  onChange={(event) => {
-                    setDraft({ ...draft, [key]: event.target.value })
-                    setSaveError(null)
-                  }}
-                  ref={ref}
-                  step={1}
-                  type="number"
-                  value={draft[key]}
-                />
-                <span
-                  className="text-[11px] leading-relaxed text-muted-foreground"
-                  id={`${id}-${key}-hint`}
-                >
-                  {hint}
-                </span>
-              </div>
-            ))}
-          </div>
-          {error ? (
-            <p
-              className="m-0 text-xs text-[color:var(--cp-tone-danger-fg)]"
-              id={`${id}-error`}
-              role="alert"
-            >
-              {error}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap justify-end gap-2">
+          <label className="sr-only" htmlFor={`${id}-value`}>
+            {label} (%)
+          </label>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-1">
+              <input
+                aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`}
+                aria-invalid={Boolean(validation.error)}
+                autoComplete="off"
+                className={inputClassName}
+                disabled={saving}
+                id={`${id}-value`}
+                inputMode="numeric"
+                max={100}
+                min={0}
+                onChange={(event) => {
+                  setDraft(event.target.value)
+                  setSaveError(null)
+                }}
+                ref={inputRef}
+                step={1}
+                type="number"
+                value={draft}
+              />
+              <span
+                aria-hidden="true"
+                className="text-xs text-muted-foreground"
+              >
+                %
+              </span>
+            </div>
             <button
               className={`${buttonClassName} bg-card text-foreground hover:bg-muted`}
               disabled={saving}
@@ -200,45 +172,51 @@ export function AnalyticsTargetEditor({
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
+          <p
+            className="m-0 text-[11px] leading-relaxed text-muted-foreground"
+            id={`${id}-hint`}
+          >
+            {hint}
+          </p>
+          {error ? (
+            <p
+              className="m-0 text-xs text-[color:var(--cp-tone-danger-fg)]"
+              id={`${id}-error`}
+              role="alert"
+            >
+              {error}
+            </p>
+          ) : null}
         </form>
       ) : null}
     </div>
   )
 }
 
-function percentageDraft(targets: AnalyticsTargets) {
-  return {
-    targetRecall: String(Number((targets.targetRecall * 100).toFixed(8))),
-    targetReviewSuccess: String(
-      Number((targets.targetReviewSuccess * 100).toFixed(8)),
-    ),
-  }
+function percentageText(value: number) {
+  return String(Number((value * 100).toFixed(8)))
 }
 
-function validateDraft(draft: ReturnType<typeof percentageDraft>): {
-  targets: AnalyticsTargets | null
-  error: string | null
-} {
-  const values = Object.values(draft)
+function validateDraft(
+  draft: string,
+  targets: AnalyticsTargets,
+  key: keyof AnalyticsTargets,
+): { patch: Partial<AnalyticsTargets> | null; error: string | null } {
+  const value = Number(draft)
   if (
-    values.some(
-      (text) =>
-        text.trim() === '' ||
-        !Number.isInteger(Number(text)) ||
-        Number(text) < 0 ||
-        Number(text) > 100,
-    )
+    draft.trim() === '' ||
+    !Number.isInteger(value) ||
+    value < 0 ||
+    value > 100
   ) {
-    return { targets: null, error: 'Use whole percentages from 0 to 100.' }
+    return { patch: null, error: 'Use whole percentages from 0 to 100.' }
   }
-  const result = analyticsTargetsSchema.safeParse({
-    targetRecall: Number(draft.targetRecall) / 100,
-    targetReviewSuccess: Number(draft.targetReviewSuccess) / 100,
-  })
+  const patch = { [key]: value / 100 }
+  const result = analyticsTargetsSchema.safeParse({ ...targets, ...patch })
   return result.success
-    ? { targets: result.data, error: null }
+    ? { patch, error: null }
     : {
-        targets: null,
-        error: result.error.issues[0]?.message ?? 'Check your targets.',
+        patch: null,
+        error: result.error.issues[0]?.message ?? 'Check your target.',
       }
 }

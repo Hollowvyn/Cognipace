@@ -304,7 +304,11 @@ The owners in that flow are:
   deep merge and validated patches preserve unrelated preferences and save
   the pair atomically. Analytics' target mutation reuses `useUpdateSettings`,
   `settings.updateSettings`, the Settings repository, and existing query
-  invalidation. Successful saved results update cached chart goals and their
+  invalidation. Each graph sends only its edited target property; the Settings
+  transaction merges against the latest stored counterpart before validating
+  the pair. UI validates against current props without discarding an active
+  draft when the counterpart refreshes. Successful saved results update cached
+  chart goals and their
   percentage scales; failed saves leave those caches unchanged. No new runtime
   method, table, migration, Chrome permission, or Settings page section is
   needed. Settings Save preserves the pair; Reset Defaults restores 0.9/0.9.

@@ -134,4 +134,7 @@ packaging changes were implemented at that checkpoint. The subsequent
 implementation validation is recorded in the handoff; human extension smoke
 proof remains pending.
 
-Compact-editor refinement implementation is tracked in the [follow-up plan](../plans/2026-10-02-analytics-compact-target-editors.md). The original paired-editor proof remains archived in its handoff and Git history.
+Compact-editor refinement is implemented with proof in the
+[follow-up handoff](../handoffs/2026-10-02-analytics-compact-target-editors.md)
+and tracked in the [follow-up plan](../plans/2026-10-02-analytics-compact-target-editors.md).
+The original paired-editor proof remains archived in its handoff and Git history.

@@ -810,17 +810,22 @@ proof.
       and Review Success rates/counts, and Retention Map values before editing
       goals so the later comparisons use the same practice data.
 - [ ] **Save and cancel:** open Target Recall, confirm its input receives focus,
-      and verify both labels and the Hard + Good + Easy / Good + Easy hints.
-      Save Recall 80% and Success 85%; both captions and references must update
-      from the saved pair. Open Target Review Success and confirm its input
-      receives focus. Change both drafts, then Cancel or Escape; the prior
-      pair remains and focus returns to the trigger. Reopen and submit a valid
-      pair with Enter. Repeat with pointer, keyboard, and touch where available.
+      and verify exactly one input with the Hard + Good + Easy hint and current
+      Success limit. Save Recall 80%; Success remains 90%. Open Target Review
+      Success, verify its single focused input and Good + Easy / Recall-limit
+      hint, then save 85%; Recall remains 80%. Both references use the saved
+      result. Change each draft, then Cancel or Escape; the prior pair remains
+      and focus returns to the trigger. Reopen and submit with Enter. Repeat
+      with pointer, keyboard, and touch where available.
 - [ ] **Invalid drafts:** test an empty input, a fractional percentage, -1,
       101, and Recall 95% with Success 90%. Saving must be blocked without
-      changing either goal or silently adjusting the other input. The invalid
+      changing either goal or silently adjusting the other goal. The invalid
       pair says “Review Success target must be at least your Recall target.”
-      Equality, 0%, and 100% are valid when the pair satisfies the rule.
+      Equality, 0%, and 100% are valid when the pair satisfies the rule. Raise
+      Success before raising Recall beyond it; lower Recall before lowering
+      Success below it. With a draft open, change the counterpart from another
+      tab; the input draft stays while its hint and validation refresh. Save
+      must preserve the latest other goal, or reject an invalid merged pair.
 - [ ] **Pending and failure:** use a controlled delayed and rejected
       `settings.updateSettings` mutation in a disposable local test build and
       record how it was induced. Confirm Saving and duplicate-submit prevention.

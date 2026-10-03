@@ -200,13 +200,16 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   **Target Recall 90%** or **Target Review Success 90%** button above the relevant
   plot with the target color and a subtle dashed-line key. Replace the generic
   Recall caption without duplicating it or adding a permanent bottom row.
-  Either button opens the same compact inline panel with both labeled inputs
-  for whole percentages (0–100 in one-point steps), rating-combination hints, Save,
-  and Cancel. Focus the target for the chart that opened it; Enter saves and
-  Escape cancels and returns focus. Keep the panel collapsed by default and
+  Each button opens a small inline panel with one labeled percentage input
+  for that chart (0–100 in one-point steps), a percent suffix, Save and Cancel
+  in one row. Below it, show a short rating-combination and counterpart-limit
+  hint. Focus its single input; Enter saves and Escape cancels and returns focus.
+  Keep the panel collapsed by default and
   reachable in Chart/Table, empty, sparse, narrow, light, and dark states.
   Explain **Review Success target must be at least your Recall target** for an
-  invalid pair; never silently change the other input. This is an intentionally
+  invalid pair; never silently change the other goal. Save only the edited goal
+  and retain the draft when refreshed settings change its counterpart limit.
+  This is an intentionally
   stricter aspiration, not a rule for measured rates. Show Saving, prevent
   duplicate submission, and keep failed drafts open with a useful error while
   retaining the prior saved references. Cancel leaves both goals unchanged.
