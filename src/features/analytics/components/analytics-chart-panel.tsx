@@ -7,6 +7,7 @@ import { cn } from '@/utils/cn'
 export interface AnalyticsChartPanelProps {
   children?: ReactNode
   className?: string
+  compactBody?: boolean
   description: string
   emptyMessage?: ReactNode
   footer?: ReactNode
@@ -20,6 +21,7 @@ export interface AnalyticsChartPanelProps {
 export function AnalyticsChartPanel({
   children,
   className,
+  compactBody = false,
   description,
   emptyMessage,
   footer,
@@ -70,7 +72,8 @@ export function AnalyticsChartPanel({
 
       <div
         className={cn(
-          'min-h-[16rem] min-w-0',
+          'min-w-0',
+          !compactBody && 'min-h-[16rem]',
           hasEmptyState && 'grid place-items-center',
         )}
       >

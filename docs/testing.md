@@ -879,18 +879,30 @@ exact pending case.
 17. Confirm Recent Overdue Backlog still has a watch zone at five problems:
     values at or below five use healthy green, values above five use attention
     yellow, and its tooltip reports threshold status. Unknown/reconstructable
-    history must not be made up.
+    history must not be made up. Confirm straight connections, dots for zero and
+    isolated known dates, null gaps, unclipped boundary dots, and matching
+    pointer/tap/keyboard inspection with arrows, Home/End and Escape.
 18. Confirm Upcoming Review Load still shows its fixed next 14 calendar days,
-    including when the selected historical range is unready.
+    including when the selected historical range is unready. Check separate Due
+    and Overdue counts inside sufficiently large segments, tiny outside labels,
+    overdue-only Today, neighboring label collisions, and zero schedules. Inspect
+    and Table must retain exact counts, dates and report context.
 19. In Retention Map, hover and keyboard-focus a point to inspect the preview,
     pin its details, tab through dialog controls, press Escape, and dismiss by
     clicking outside. Its LeetCode action opens the matching canonical problem
     in a new tab.
 20. In Memory Signals by Problem, confirm exactly five rows per page when more
     than five exist, Previous/Next and the live row range update correctly, and
-    visible problem links open canonical LeetCode problems in new tabs. Topic
-    Performance and the current-state/workload panels retain their existing
-    treatment while the four historical cards change.
+    visible problem links open canonical LeetCode problems in new tabs. Confirm
+    compact inline reasons, long-title wrapping and severity order. Refresh data
+    while on a later page to check reset/clamping and top-25 versus total copy.
+21. For Topic Performance, include more than five qualifying topics, low-evidence
+    topics, long names, and rates at 0%, just below the goal, and 100%. Confirm
+    rising columns, stable ordering, the shared Review Success goal, unrounded
+    goal status, and all rows/full names in Table. Changing the goal from either
+    Topic or Practice Rhythm updates both while preserving outcomes. At 320px,
+    keyboard selection must reveal the active topic inside the bounded scroller;
+    neither the chart nor its editor may create document overflow.
 
 Expected: Analytics loads through the extension runtime without the failed-load
 state, reflects only local practice data, and tells a truthful chart story

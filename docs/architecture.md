@@ -360,8 +360,8 @@ The owners in that flow are:
   Strength from `memory-practice-views.tsx`, and the merged
   `practice-ratings-view.tsx`. `analytics-screen.tsx` places New Problem Success
   and Recall in a responsive `lg` pair, Practice in a full-width card, then
-  Memory and the unchanged Topic view in a responsive
-  pair. Later current-state/workload panels retain their existing treatment.
+  Memory and Topic Performance in a responsive
+  pair. Retention Map is followed by compact Memory Signals and the workload pair.
   The screen retains the Settings-owned Review Success editor and exposes
   distinct rating/count readiness warnings when they differ.
   Their feature-local `historical-chart.tsx`
@@ -425,6 +425,23 @@ The owners in that flow are:
   summary and evidence-gated prior comparison remain below the view. The chart
   explains association only: count-line crossings with a percentage target
   carry no percentage meaning.
+- Topic Performance retains all qualifying domain rows in its Zod-validated
+  view, preserving success/count/name ordering and bounded low-evidence details.
+  Its omitted-qualifying compatibility count is zero. The screen supplies the
+  existing Practice `targetReviewSuccess` and Settings-owned editor; no new
+  preference or message is introduced. Categorical columns have a fixed
+  percentage scale, bounded scrolling and synchronized full-topic inspection.
+- Memory Signals render supplied ranks, canonical titles and typed reasons as
+  compact inline rows. Reason wording is produced by the owning domain, not
+  parsed by the view. The panel opts into natural body height and a 36rem cap;
+  other panels retain their body-height default.
+- Workload views preserve their domain contracts. Backlog draws exact known
+  daily dots and straight threshold-aware connectors, with null dates breaking
+  runs. Upcoming labels original positive stack components without minimum bar
+  heights or duplicate totals. Workload inspection uses supplied dates/counts
+  and the report context for pointer, tap and keyboard. The reconstructed
+  backlog timestamp rule remains distinct from Upcoming's local-date overdue
+  classification.
 - `src/lib/leetcode/domain/problem-url.ts` owns canonical problem URLs; the
   retention details and fragile-knowledge rows use `createLeetCodeProblemUrl`
   rather than constructing links in chart components.

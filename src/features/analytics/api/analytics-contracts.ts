@@ -392,7 +392,7 @@ export const analyticsViewsSchema = z
       comparison: ratingsMixComparisonSchema,
     }),
     topicPerformance: z.object({
-      rows: z.array(topicPerformanceRowSchema).max(5),
+      rows: z.array(topicPerformanceRowSchema),
       strongerQualifyingTopics: countSchema,
       lowEvidenceTopics: z.array(lowEvidenceTopicRowSchema).max(5),
       additionalLowEvidenceTopics: countSchema,

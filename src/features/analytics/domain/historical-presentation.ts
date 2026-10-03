@@ -639,7 +639,7 @@ function buildTopicPerformance(
     )
 
   return {
-    rows: qualifying.slice(0, 5).map((entry) => ({
+    rows: qualifying.map((entry) => ({
       id: entry.normalizedTopic,
       topic: entry.topic,
       reviewSuccess: entry.reviewSuccess,
@@ -648,7 +648,7 @@ function buildTopicPerformance(
       distinctProblems: entry.distinctProblems,
       evidence: 'Measured',
     })),
-    strongerQualifyingTopics: Math.max(0, qualifying.length - 5),
+    strongerQualifyingTopics: 0,
     lowEvidenceTopics: lowEvidence.slice(0, 5).map((entry) => ({
       topic: entry.topic,
       validRatings: entry.validRatings,
