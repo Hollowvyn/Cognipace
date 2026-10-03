@@ -107,6 +107,7 @@ describe('AnalyticsScreen', () => {
   it.each([
     ['targetRecall', 'Recall', 'Recall vs FSRS Estimate', 80],
     ['targetReviewSuccess', 'Review Success', 'Practice Rhythm', 95],
+    ['targetReviewSuccess', 'Review Success', 'Topic Performance', 95],
     [
       'targetFirstAttemptSuccess',
       'First-attempt Success',
@@ -145,6 +146,19 @@ describe('AnalyticsScreen', () => {
           name: `${label} ${percent}%`,
         }),
       ).toBeVisible()
+      if (field === 'targetReviewSuccess') {
+        const other = screen.getByRole('region', {
+          name:
+            panel === 'Practice Rhythm'
+              ? 'Topic Performance'
+              : 'Practice Rhythm',
+        })
+        expect(
+          await within(other).findByRole('button', {
+            name: `${label} ${percent}%`,
+          }),
+        ).toBeVisible()
+      }
     },
   )
 

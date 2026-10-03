@@ -176,10 +176,8 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   Recall vs FSRS Estimate, Practice Rhythm with the merged rating composition,
   and Memory Strength. First outcomes and repeat Recall share a responsive `lg`
   pair and stack in that order below it, followed by a full-width Practice Rhythm card;
-  Memory Strength and the unchanged Topic Performance view share the next
-  responsive row. Retention Map,
-  Memory Signals, Recent Overdue Backlog, and Upcoming Review Load keep their
-  current treatment until a separate design iteration.
+  Memory Strength and Topic Performance share the next responsive row. Retention
+  Map follows, then a compact Memory Signals card and the responsive workload pair.
 - Keep the explicit 14-day daily, 30-day three-day, and 90-day weekly grouping
   and feature-supplied values. All four historical charts trim
   unsupported beginning and ending buckets only, using the same contiguous activity
@@ -307,3 +305,25 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   Memory/Topic pair before its axes, keys, and controls become crowded. Keep panel alignment
   usable when neighboring readiness messages differ, and check light and dark
   themes.
+
+## CogniPace Topic and Workload Chart Rules
+
+- Topic Performance uses rising columns for every qualifying topic, weakest to
+  strongest on one fixed 0–100% scale. Use a 96px minimum topic slot, wrapping
+  names and bounded plot scrolling when needed. Keep the shared Review Success
+  editor/caption outside scrolling, and scroll keyboard-selected topics into
+  view. Status uses unrounded rates; inspection and Table retain exact counts.
+  Keep target extremes, zero columns and 100% labels readable.
+- Memory Signals use rank and linked title with inline wrapping reasons below,
+  quiet separators, five rows per page and a natural-height card capped at 36rem.
+  Clearly label model-estimated recall and its FSRS target. Keep reason kinds and
+  severity intact, and retain long titles at 320px without a wide table.
+- Backlog uses straight daily connections with small measured dots and quiet
+  watch bands. Preserve zero/singleton dots, unknown gaps, original dates and
+  supplied scales; split connector status at five without adding a measured
+  crossing. Pointer, tap and keyboard share one inspector and selected marker.
+- Upcoming Due/Overdue segments carry their own exact positive counts. Use
+  contrasting text and hatch-safe backing where text fits; tiny segments get
+  outside labels associated with their bar. Deconflict neighboring labels and
+  plot edges without inflating bars, shrinking text or duplicating totals.
+  Keep zero-date slots, the fixed 14-day horizon and full inspection/Table data.

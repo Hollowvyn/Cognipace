@@ -109,7 +109,10 @@ function AnalyticsWorkloadStory({
         question="Is my overdue backlog staying at an acceptable level instead of accumulating?"
         title="Recent Overdue Backlog"
       >
-        <RecentOverdueBacklogView view={data.views.overdueBacklog} />
+        <RecentOverdueBacklogView
+          timeFrame={data.timeFrame}
+          view={data.views.overdueBacklog}
+        />
       </AnalyticsChartPanel>
       <AnalyticsChartPanel
         description="A fixed local-date schedule for active, non-suspended FSRS cards due today and over the next 13 days."
@@ -117,7 +120,10 @@ function AnalyticsWorkloadStory({
         question="What review work is currently scheduled for the next 14 days?"
         title="Upcoming Review Load"
       >
-        <UpcomingReviewLoadView view={data.views.upcomingReviewLoad} />
+        <UpcomingReviewLoadView
+          timeFrame={data.timeFrame}
+          view={data.views.upcomingReviewLoad}
+        />
       </AnalyticsChartPanel>
     </div>
   )
@@ -142,7 +148,9 @@ function AnalyticsCurrentStateStory({
         />
       </AnalyticsChartPanel>
       <AnalyticsChartPanel
-        description="Current problems that are below recall target, overdue, or have low target-crossing durability."
+        className="w-full max-w-[36rem]"
+        compactBody
+        description="Current problems with estimated recall below the FSRS target, an overdue review, or low target-crossing durability."
         id="memory-signals"
         question="Which current problems need attention, and exactly why were they flagged?"
         title="Memory Signals by Problem"
@@ -339,14 +347,22 @@ function AnalyticsHistoricalStory({
           />
         </PhaseTwoPanel>
         <PhaseTwoPanel
-          description="Topics ranked by sufficiently sampled Good + Easy Review Success in the selected period; this is not a mastery score."
+          description="All sufficiently practiced topics, ranked from lowest to highest Good + Easy Review Success in the selected period."
           id="topic-performance"
-          question="Which sufficiently practiced topics had lower Review Success?"
+          question="How does each practiced topic compare with your Review Success target?"
           readiness={data.historicalReadiness.topics}
           showReadiness={false}
           title="Topic Performance"
         >
           <TopicPerformanceView
+            targetEditor={
+              <AnalyticsTargetEditor
+                targets={targets}
+                metric="reviewSuccess"
+                onSave={updateTargets.mutateAsync}
+              />
+            }
+            targetReviewSuccess={data.views.practiceRhythm.targetReviewSuccess}
             selectedPeriod={`${data.range}-day selected period`}
             view={data.views.topicPerformance}
           />

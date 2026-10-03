@@ -640,7 +640,7 @@ describe('buildHistoricalAnalyticsViews', () => {
     })
   })
 
-  it('ranks only the five lowest qualifying normalized topics by Good + Easy Review Success', () => {
+  it('ranks qualifying normalized topics by Good + Easy Review Success', () => {
     const reviews = Array.from({ length: 10 }, (_, index) =>
       event({
         cardId: `graph-${index % 3}`,
@@ -688,14 +688,17 @@ describe('buildHistoricalAnalyticsViews', () => {
     })
   })
 
-  it('retains only five qualifying topics and counts stronger qualifiers separately', () => {
-    const reviews = Array.from({ length: 6 }, (_, topicIndex) =>
-      Array.from({ length: 10 }, (_, reviewIndex) =>
+  it('retains every qualifying topic in ascending order without an omitted population', () => {
+    const reviews = Array.from({ length: 7 }, (_, topicIndex) =>
+      Array.from({ length: topicIndex >= 5 ? 20 : 10 }, (_, reviewIndex) =>
         event({
           cardId: `topic-${topicIndex}-${reviewIndex % 3}`,
           id: `topic-${topicIndex}-${reviewIndex}`,
           problemSlug: `topic-${topicIndex}-${reviewIndex % 3}`,
-          rating: reviewIndex < topicIndex ? 'good' : 'again',
+          rating:
+            reviewIndex < Math.min(topicIndex, 4) * (topicIndex >= 5 ? 2 : 1)
+              ? 'good'
+              : 'again',
           topicLabels: [`Topic ${topicIndex}`],
         }),
       ),
@@ -703,15 +706,17 @@ describe('buildHistoricalAnalyticsViews', () => {
 
     const views = buildHistoricalAnalyticsViews(reviews, options)
 
-    expect(views.topicPerformance.rows).toHaveLength(5)
+    expect(views.topicPerformance.rows).toHaveLength(7)
     expect(views.topicPerformance.rows.map((row) => row.topic)).toEqual([
       'Topic 0',
       'Topic 1',
       'Topic 2',
       'Topic 3',
+      'Topic 5',
+      'Topic 6',
       'Topic 4',
     ])
-    expect(views.topicPerformance.strongerQualifyingTopics).toBe(1)
+    expect(views.topicPerformance.strongerQualifyingTopics).toBe(0)
   })
 })
 

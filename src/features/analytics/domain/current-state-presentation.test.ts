@@ -118,11 +118,17 @@ describe('current-state Analytics presentation', () => {
       'overdue',
       'durability',
     ])
+    expect(views.memorySignals.rows[0]?.reasons).toEqual([
+      {
+        kind: 'below-recall',
+        label: 'Estimated recall 70% · below FSRS target',
+      },
+    ])
     expect(views.memorySignals.rows[1]?.reasons).toEqual([
-      { kind: 'overdue', label: '2d overdue' },
+      { kind: 'overdue', label: 'Overdue · 2d' },
     ])
     expect(views.memorySignals.rows[2]?.reasons).toEqual([
-      { kind: 'low-durability', label: 'Low durability 3d' },
+      { kind: 'low-durability', label: 'Low durability · 3d' },
     ])
   })
 
@@ -163,7 +169,7 @@ describe('current-state Analytics presentation', () => {
     )
 
     expect(views.memorySignals.rows[0]?.reasons).toEqual([
-      { kind: 'overdue', label: '1d overdue' },
+      { kind: 'overdue', label: 'Overdue · 1d' },
     ])
   })
 })

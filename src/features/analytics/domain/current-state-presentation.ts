@@ -255,19 +255,19 @@ function buildMemorySignalCandidate(
   if (belowRecall) {
     reasons.push({
       kind: 'below-recall',
-      label: `Below recall ${formatPercent(input.retrievability)}`,
+      label: `Estimated recall ${formatPercent(input.retrievability)} · below FSRS target`,
     })
   }
   if (overdue) {
     reasons.push({
       kind: 'overdue',
-      label: `${overdueDays}d overdue`,
+      label: `Overdue · ${overdueDays}d`,
     })
   }
   if (lowDurability) {
     reasons.push({
       kind: 'low-durability',
-      label: `Low durability ${formatDays(input.targetDurationDays!)}`,
+      label: `Low durability · ${formatDays(input.targetDurationDays!)}`,
     })
   }
 

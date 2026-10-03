@@ -387,8 +387,8 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
 The four historical cards have these metric meanings and controls. New Problem
 Success and Recall vs FSRS Estimate share a responsive row, stacked in that
 order on narrow screens, followed by a full-width Practice Rhythm card. Memory Strength and
-the unchanged Topic Performance view share the next responsive row; later
-current-state and workload panels keep their existing treatment.
+Topic Performance share the next responsive row. Compact Memory Signals follow
+the Retention Map, then the two workload panels share a responsive row.
 
 - **New Problem Success** shows the first retained recorded assessment per
   problem across all cards and modes. Selection uses raw history ordered by
@@ -493,9 +493,25 @@ without a permanent extra detail row. Each Table shows seven rows per page and
 uses the same retained rows and supplied values as its chart. A metric without
 supported buckets shows its explicit empty state.
 
-Topic Performance, Retention Map, Memory Signals, Recent Overdue Backlog, and
-Upcoming Review Load retain their current treatments; their next visual
-iteration is deferred.
+Topic Performance shows every topic with at least 10 valid ratings across three
+reviewed problems as rising columns, from lowest to highest Good + Easy Review
+Success. Ties prefer more valid ratings, then normalized topic name. Its fixed
+0–100% axis includes the saved Target Review Success, shared with Practice Rhythm;
+the same compact editor updates both. Status compares unrounded rates, while
+inspection/Table show one-decimal percentages and exact counts. Crowded topics
+scroll within the plot; full names and every qualifying topic remain available.
+Topic counts overlap when reviews have several direct topics, so these are
+below-target signals rather than additive contributions to an overall rate.
+Current direct assignments apply to retained history, without ancestor rollups.
+
+Recent Overdue Backlog connects known daily snapshots with straight lines and
+small measured dots. Unknown days break the line; zero and isolated observations
+remain visible. Values through five are within its watch zone. Pointer, tap and
+keyboard inspection share the same date/count/status; a connector crossing five
+is not an additional observation. Upcoming Review Load retains its fixed 14-date
+schedule with separate exact Due and Overdue segment counts. Labels sit inside
+when they fit, with readable outside fallbacks for tiny segments. Zero segments
+stay zero-height and receive no label; Table and inspection retain their zeros.
 
 Historical readiness does not hide useful analytics. New Problem Success,
 Recall vs FSRS Estimate, Practice Rhythm, Memory Strength, and Recent Overdue Backlog keep
@@ -505,8 +521,13 @@ Memory Signals by Problem, and the fixed 14-day Upcoming Review Load remain
 available as current or forecast views. Retention Map compares each active
 problem's current FSRS retrievability with the configured target; its hover/focus
 preview can be pinned for details and provides a canonical LeetCode link.
-Memory Signals by Problem highlights current cards with risk signals and shows
-five rows per page with canonical LeetCode problem links.
+Memory Signals by Problem is a compact ranked list with canonical LeetCode
+problem links and wrapping reasons directly beneath each title, five rows per
+page. Reasons identify estimated recall below the FSRS retention target,
+calendar-date overdue reviews, or low total target-crossing durability. Its FSRS
+target is separate from the personal Recall goal; durability is not time until
+due. Severity, all flags and the returned-top-25 versus total distinction remain
+intact.
 
 Observed correctness is the persisted share of eligible assessments marked
 correct. It is not FSRS-predicted recall, retention, or a record of first-try

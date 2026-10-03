@@ -150,6 +150,42 @@ function withoutSummaryField(field: keyof SerializedAnalyticsSummary) {
   return summary
 }
 
+it('accepts all qualifying topics while keeping low-evidence diagnostics bounded', () => {
+  const row = {
+    id: 'topic',
+    topic: 'Topic',
+    reviewSuccess: 0,
+    goodEasy: 0,
+    validRatings: 10,
+    distinctProblems: 3,
+    evidence: 'Measured' as const,
+  }
+  const topicPerformance = {
+    ...validSummary.views.topicPerformance,
+    rows: Array.from({ length: 6 }, (_, index) => ({
+      ...row,
+      id: `topic-${index}`,
+    })),
+  }
+  expect(
+    analyticsSummarySchema.safeParse({
+      ...validSummary,
+      views: { ...validSummary.views, topicPerformance },
+    }).success,
+  ).toBe(true)
+  topicPerformance.lowEvidenceTopics = Array.from({ length: 6 }, () => ({
+    topic: 'Sparse',
+    validRatings: 1,
+    distinctProblems: 1,
+  }))
+  expect(
+    analyticsSummarySchema.safeParse({
+      ...validSummary,
+      views: { ...validSummary.views, topicPerformance },
+    }).success,
+  ).toBe(false)
+})
+
 describe('analyticsSummaryRequestSchema', () => {
   it('requires both first-attempt view and independent readiness', () => {
     expect(

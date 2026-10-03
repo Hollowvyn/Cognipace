@@ -83,7 +83,7 @@ export function MemorySignalsView({
         {view.totalQualifying === 1 ? '' : 's'}; showing the first{' '}
         {formatCount(view.rows.length)} by severity.
       </p>
-      <MemorySignalsTable rows={view.rows} />
+      <MemorySignalsList rows={view.rows} />
     </div>
   )
 }
@@ -741,7 +741,7 @@ function RetentionMapTable({
   )
 }
 
-function MemorySignalsTable({
+function MemorySignalsList({
   rows,
 }: {
   rows: AnalyticsViews['memorySignals']['rows']
@@ -751,61 +751,53 @@ function MemorySignalsTable({
     5,
   )
   return (
-    <div className="grid gap-3">
-      <div className="min-w-0 overflow-x-auto">
-        <table
-          aria-label={`Memory Signals rows ${start} through ${end} of ${rows.length}`}
-          className="w-full min-w-[36rem] border-collapse text-left text-sm"
-        >
-          <caption className="sr-only">
-            Memory Signals by Problem data table
-          </caption>
-          <thead>
-            <tr className="border-b border-border text-xs uppercase text-muted-foreground">
-              <th className="px-2 pb-2" scope="col">
-                Rank
-              </th>
-              <th className="px-2 pb-2" scope="col">
-                Problem
-              </th>
-              <th className="px-2 pb-2" scope="col">
-                Why it&apos;s here
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.map((row) => (
-              <tr className="border-b border-border align-top" key={row.slug}>
-                <td className="px-2 py-2 text-right tabular-nums">
-                  {row.rank}
-                </td>
-                <th className="px-2 py-2 font-medium" scope="row">
-                  <a
-                    className="text-primary underline-offset-4 hover:underline"
-                    href={createLeetCodeProblemUrl(row.slug)}
-                    rel="noopener noreferrer"
-                    target="_blank"
+    <div className="grid w-full max-w-[36rem] gap-3 [&>div]:flex-wrap">
+      <ol
+        aria-label={`Memory Signals rows ${start} through ${end} of ${rows.length}`}
+        className="m-0 grid list-none divide-y divide-border p-0 text-sm"
+        role="list"
+        start={start}
+      >
+        {visibleRows.map((row) => (
+          <li
+            className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-3 py-3"
+            key={row.slug}
+            value={row.rank}
+          >
+            <span className="text-center text-xs text-muted-foreground tabular-nums">
+              {row.rank}
+            </span>
+            <div className="min-w-0">
+              <a
+                className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [overflow-wrap:anywhere]"
+                href={createLeetCodeProblemUrl(row.slug)}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                {row.title}
+              </a>
+              <p className="m-0 mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs tabular-nums">
+                {row.reasons.map((reason) => (
+                  <span
+                    className="min-w-0 [overflow-wrap:anywhere]"
+                    key={reason.kind}
+                    style={{
+                      color:
+                        reason.kind === 'below-recall'
+                          ? 'var(--cp-analytics-risk)'
+                          : reason.kind === 'overdue'
+                            ? 'var(--cp-analytics-attention)'
+                            : 'var(--color-muted-foreground)',
+                    }}
                   >
-                    {row.title}
-                  </a>
-                </th>
-                <td className="px-2 py-2">
-                  <div className="grid max-w-md grid-cols-2 gap-1">
-                    {row.reasons.map((reason) => (
-                      <span
-                        className="rounded border border-border px-1.5 py-0.5 text-xs"
-                        key={reason.kind}
-                      >
-                        {reason.label}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                    {reason.label}
+                  </span>
+                ))}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
       <Pagination
         end={end}
         onNext={() => setPage((value) => Math.min(pageCount - 1, value + 1))}

@@ -139,45 +139,52 @@ describe('current-state analytics views', () => {
     expect(within(retentionTable).getByText('08/20/26')).toBeVisible()
   })
 
-  it('renders Memory Signals as only the required three-column diagnostic table', async () => {
+  it('pages ranked Memory Signals with canonical links and supplied reasons', async () => {
     const user = userEvent.setup()
-    render(
-      <MemorySignalsView
-        view={{
-          totalQualifying: 1,
-          rows: [
-            {
-              rank: 1,
-              slug: 'graph-traversal',
-              title: 'Graph Traversal',
-              reasons: [
-                { kind: 'below-recall', label: 'Below recall 70%' },
-                { kind: 'overdue', label: '1d overdue' },
-                { kind: 'low-durability', label: 'Low durability 3d' },
-              ],
-            },
-          ],
-        }}
-      />,
+    const rows: AnalyticsViews['memorySignals']['rows'] = Array.from(
+      { length: 25 },
+      (_, index) => ({
+        rank: index + 1,
+        slug: `problem-${index + 1}`,
+        title: `Problem ${index + 1}`,
+        reasons: [
+          {
+            kind: 'below-recall',
+            label: 'Estimated recall 70% · below FSRS target',
+          },
+          { kind: 'overdue', label: 'Overdue · 1d' },
+          { kind: 'low-durability', label: 'Low durability · 3d' },
+        ],
+      }),
     )
-
-    const table = screen.getByRole('table', { name: /Memory Signals rows/i })
+    const { rerender } = render(
+      <MemorySignalsView view={{ totalQualifying: 31, rows }} />,
+    )
+    const list = screen.getByRole('list', { name: /Memory Signals rows/i })
+    expect(list.tagName).toBe('OL')
+    expect(within(list).getAllByRole('link')).toHaveLength(5)
+    const link = within(list).getByRole('link', { name: 'Problem 1' })
+    expect(link).toHaveAttribute(
+      'href',
+      'https://leetcode.com/problems/problem-1/',
+    )
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(within(list).getAllByRole('listitem')[0]).toHaveTextContent(
+      /Estimated recall 70% · below FSRS target.*Overdue · 1d.*Low durability · 3d/,
+    )
     expect(
-      within(table)
-        .getAllByRole('columnheader')
-        .map((cell) => cell.textContent),
-    ).toEqual(['Rank', 'Problem', "Why it's here"])
-    expect(
-      within(table).getByRole('link', { name: 'Graph Traversal' }),
-    ).toHaveAttribute('target', '_blank')
-    expect(screen.queryByRole('tab', { name: 'Chart' })).not.toBeInTheDocument()
-    expect(screen.getByText('Below recall 70%')).toBeVisible()
-    expect(screen.getByText('Low durability 3d')).toBeVisible()
-    expect(
-      screen.getByText('Memory Signals by Problem data table'),
-    ).toBeInTheDocument()
+      screen.getByText(
+        '31 qualifying problems; showing the first 25 by severity.',
+      ),
+    ).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Next page' }))
-    expect(screen.getByRole('status')).toHaveTextContent('Showing 1–1 of 1')
+    expect(list).toHaveAttribute('start', '6')
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 6–10 of 25')
+    rerender(
+      <MemorySignalsView view={{ totalQualifying: 31, rows: [...rows] }} />,
+    )
+    expect(list).toHaveAttribute('start', '1')
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 1–5 of 25')
   })
 
   it('returns to page one when retained rows refresh', async () => {
