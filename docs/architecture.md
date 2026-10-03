@@ -262,7 +262,11 @@ creates a fresh migrated and seeded database.
 
 ### Analytics Read Models And Chart Story
 
-Analytics is a feature-owned, read-only calculation. The background Analytics
+Analytics calculations remain feature-owned and read-only. The only editable
+Analytics behavior is the small chart-goal preference pair owned by Settings.
+The chart-target implementation and automated/fixture validation are recorded
+in its handoff; human installed-extension smoke remains pending before review
+or merge. The background Analytics
 service reads the full review history once for a request, together with the
 current FSRS cards and supporting local state; chart components do not make
 per-chart database calls. Its data flow is:
@@ -291,6 +295,21 @@ The owners in that flow are:
   buckets after its first supported bucket.
 - `src/features/analytics/api/analytics-contracts.ts` validates the serialized
   read model with Zod before it crosses the extension runtime boundary.
+- Settings owns defaulted `analytics.targetRecall` and
+  `analytics.targetReviewSuccess` fractions in its existing JSON preferences,
+  both 0.9 by default. Full-pair validation requires finite values from 0
+  through 1 and Success greater than or equal to Recall; this is a goal rule,
+  never a rule for measured chart rates. Missing older fields use defaults;
+  malformed stored analytics falls back only to analytics defaults. Explicit
+  deep merge and validated patches preserve unrelated preferences and save
+  the pair atomically. Analytics' target mutation reuses `useUpdateSettings`,
+  `settings.updateSettings`, the Settings repository, and existing query
+  invalidation. Successful saved results update cached chart goals and their
+  percentage scales; failed saves leave those caches unchanged. No new runtime
+  method, table, migration, Chrome permission, or Settings page section is
+  needed. Settings Save preserves the pair; Reset Defaults restores 0.9/0.9.
+  The user explicitly approved inclusion in existing backup export/restore and
+  configured Gist settings payloads, without a new sync mechanism.
 - `src/features/analytics/components/charts/chart-definitions.ts` is the typed
   chart catalogue: title, question, data meaning, eligibility, aggregation,
   semantic series, and sparse-state copy. `LineSegments` in
@@ -322,8 +341,15 @@ The owners in that flow are:
   Exact original date ranges, report timezone, counts, and evidence stay in
   inspection and the shared seven-row `historical-table.tsx` alternative, which
   use the same retained rows as the chart.
-  Memory Strength alone uses the fitted duration-scale helper; the other
-  supplied value-axis domains remain unchanged. Scoped presentation styles live in
+  Memory Strength uses the fitted duration-scale helper. Recall's serialized
+  `targetRecall` and Practice's `targetReviewSuccess` also participate in their
+  percentage-scale fits, including goals at 0 or 1. Practice's reference uses
+  its right percentage axis, preserving its independent count scale. The
+  feature-owned native editor saves preferences above the plot; drawing
+  primitives do not persist data. Goal edits cannot change rows, dates, gaps,
+  observations, counts, trim rules, or FSRS scheduling/Retention Map outputs.
+  The current FSRS `targetRetention` remains intact outside the personal chart
+  references. Scoped presentation styles live in
   `src/styles/analytics.css`, enabled by the panel's `historical` option.
 - `src/lib/leetcode/domain/problem-url.ts` owns canonical problem URLs; the
   retention details and fragile-knowledge rows use `createLeetCodeProblemUrl`

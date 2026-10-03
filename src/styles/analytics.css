@@ -77,6 +77,11 @@
     .cp-analytics-history-pair [data-analytics-historical] > header {
       min-height: 110px;
     }
+
+    /* Match the collapsed Practice target row when the plots sit together. */
+    .cp-analytics-history-pair .cp-historical-memory {
+      padding-top: 2rem;
+    }
   }
 
   @container historical-panel (max-width: 430px) {

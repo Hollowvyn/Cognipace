@@ -10,6 +10,10 @@ import {
   normalizeTopicLabelList,
   normalizeTopicLookupKey,
 } from '@/features/problems/domain/topic-taxonomy'
+import {
+  defaultAnalyticsTargets,
+  type AnalyticsTargets,
+} from '@/features/settings/domain'
 
 import {
   buildAnalyticsBucketsFromTimeFrame,
@@ -55,6 +59,7 @@ export interface HistoricalPresentationOptions {
   fsrsOptions: NormalizedFsrsSchedulingOptions
   timeZone: string
   timeFrame: AnalyticsTimeFrame
+  analyticsTargets?: AnalyticsTargets
 }
 
 export interface HistoricalPresentationScale {
@@ -140,7 +145,7 @@ export interface HistoricalAnalyticsViews {
   observedRecallVsFsrs: {
     rows: ObservedRecallVsFsrsRow[]
     scale: HistoricalPresentationScale
-    targetRetention: number
+    targetRecall: number
   }
   memoryStrength: {
     rows: MemoryStrengthRow[]
@@ -150,6 +155,7 @@ export interface HistoricalAnalyticsViews {
     rows: PracticeRhythmRow[]
     countScale: HistoricalPresentationScale
     percentageScale: HistoricalPresentationScale
+    targetReviewSuccess: number
   }
   ratingsMix: {
     rows: RatingsMixRow[]
@@ -316,68 +322,98 @@ export function buildHistoricalAnalyticsViews(
     rhythmRows.map((row) => row.completedReviews),
   )
 
-  return {
-    observedRecallVsFsrs: {
-      rows: observedRows,
-      scale: percentageScale(
-        observedRows.flatMap((row) => [row.observedRecall, row.fsrsEstimate]),
-        [options.fsrsOptions.targetRetention],
-      ),
-      targetRetention: options.fsrsOptions.targetRetention,
-    },
-    memoryStrength: {
-      rows: memoryRows,
-      scale: toPresentationScale(durationScale),
-    },
-    practiceRhythm: {
-      rows: rhythmRows,
-      countScale: toPresentationScale(countScale),
-      percentageScale: percentageScale(
-        rhythmRows.map((row) => row.reviewSuccess),
-      ),
-    },
-    ratingsMix: {
-      rows: ratingsMixRows,
-      selectedHardAgain,
-      selectedValidRatings,
-      comparison: buildRatingsMixComparison(
-        events,
-        options,
+  return applyHistoricalChartTargets(
+    {
+      observedRecallVsFsrs: {
+        rows: observedRows,
+      },
+      memoryStrength: {
+        rows: memoryRows,
+        scale: toPresentationScale(durationScale),
+      },
+      practiceRhythm: {
+        rows: rhythmRows,
+        countScale: toPresentationScale(countScale),
+      },
+      ratingsMix: {
+        rows: ratingsMixRows,
         selectedHardAgain,
         selectedValidRatings,
+        comparison: buildRatingsMixComparison(
+          events,
+          options,
+          selectedHardAgain,
+          selectedValidRatings,
+        ),
+      },
+      topicPerformance,
+      retentionMap: {
+        rows: [],
+        totalEligible: 0,
+        statusCounts: { onTarget: 0, watch: 0, needsAttention: 0 },
+        recallScale: { domain: [0, 1] as const, ticks: [0, 1] },
+        durationScale: { domain: [1, 10] as const, ticks: [1, 10] },
+        targetRetention: options.fsrsOptions.targetRetention,
+      },
+      memorySignals: { rows: [], totalQualifying: 0 },
+      overdueBacklog: {
+        rows: [],
+        knownDays: 0,
+        withinWatchDays: 0,
+        aboveWatchDays: 0,
+        selectedDays: 0,
+        currentBacklog: null,
+        peak: null,
+        scale: { domain: [0, 5] as const, ticks: [0, 5] },
+      },
+      upcomingReviewLoad: {
+        rows: Array.from({ length: 14 }, (_, index) => ({
+          date: addAnalyticsCalendarDays(
+            options.timeFrame.buckets.at(-1)?.endKey ?? '1970-01-01',
+            index,
+          ),
+          dueCount: 0,
+          overdueCount: 0,
+          today: index === 0,
+        })),
+        scale: { domain: [0, 1] as const, ticks: [0, 1] },
+      },
+    },
+    options.analyticsTargets ?? defaultAnalyticsTargets,
+  )
+}
+
+type HistoricalChartTargetViews = {
+  observedRecallVsFsrs: Pick<
+    HistoricalAnalyticsViews['observedRecallVsFsrs'],
+    'rows'
+  >
+  practiceRhythm: Pick<HistoricalAnalyticsViews['practiceRhythm'], 'rows'>
+}
+
+export function applyHistoricalChartTargets<
+  T extends HistoricalChartTargetViews,
+>(views: T, targets: AnalyticsTargets) {
+  return {
+    ...views,
+    observedRecallVsFsrs: {
+      ...views.observedRecallVsFsrs,
+      targetRecall: targets.targetRecall,
+      scale: percentageScale(
+        views.observedRecallVsFsrs.rows.flatMap((row) => [
+          row.observedRecall,
+          row.fsrsEstimate,
+        ]),
+        [targets.targetRecall],
       ),
     },
-    topicPerformance,
-    retentionMap: {
-      rows: [],
-      totalEligible: 0,
-      statusCounts: { onTarget: 0, watch: 0, needsAttention: 0 },
-      recallScale: { domain: [0, 1], ticks: [0, 1] },
-      durationScale: { domain: [1, 10], ticks: [1, 10] },
-      targetRetention: options.fsrsOptions.targetRetention,
-    },
-    memorySignals: { rows: [], totalQualifying: 0 },
-    overdueBacklog: {
-      rows: [],
-      knownDays: 0,
-      withinWatchDays: 0,
-      aboveWatchDays: 0,
-      selectedDays: 0,
-      currentBacklog: null,
-      peak: null,
-      scale: { domain: [0, 5], ticks: [0, 5] },
-    },
-    upcomingReviewLoad: {
-      rows: Array.from({ length: 14 }, (_, index) => ({
-        date: addAnalyticsCalendarDays(
-          options.timeFrame.buckets.at(-1)?.endKey ?? '1970-01-01',
-          index,
-        ),
-        dueCount: 0,
-        overdueCount: 0,
-        today: index === 0,
-      })),
-      scale: { domain: [0, 1], ticks: [0, 1] },
+    practiceRhythm: {
+      ...views.practiceRhythm,
+      targetReviewSuccess: targets.targetReviewSuccess,
+      percentageScale: percentageScale(
+        views.practiceRhythm.rows.map((row) => row.reviewSuccess),
+        [targets.targetReviewSuccess],
+      ),
     },
   }
 }
@@ -684,7 +720,7 @@ function bucketRow(bucket: AnalyticsBucket, end: Date) {
 function percentageScale(
   values: readonly (number | null)[],
   references: readonly number[] = [],
-): HistoricalPresentationScale {
+): { domain: [number, number]; ticks: number[] } {
   const domain = buildAdaptivePercentageDomain(
     values.filter((value): value is number => value !== null),
     references,
@@ -693,7 +729,7 @@ function percentageScale(
     { length: Math.round((domain[1] - domain[0]) / 0.05) + 1 },
     (_, index) => Number((domain[0] + index * 0.05).toFixed(2)),
   )
-  return { domain, ticks }
+  return { domain: [domain[0], domain[1]], ticks }
 }
 
 function toPresentationScale(

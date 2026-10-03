@@ -8,6 +8,76 @@ import { defaultUserSettings } from '../domain'
 import { createSettingsRepository } from './settings-repository'
 
 describe('SettingsRepository', () => {
+  it('reads old settings with independent default analytics targets', async () => {
+    const handle = await createTestDb({ seed: false })
+    const oldSettings = {
+      ...defaultUserSettings,
+      review: { ...defaultUserSettings.review, targetRetention: 0.75 },
+    }
+    delete (oldSettings as Record<string, unknown>).analytics
+    await handle.db.insert(settingsKv).values({
+      key: 'user-settings',
+      value: JSON.stringify(oldSettings),
+      updatedAt: 1,
+    })
+
+    await expect(
+      createSettingsRepository(handle.db).getSettings(),
+    ).resolves.toEqual({
+      ...oldSettings,
+      analytics: { targetRecall: 0.9, targetReviewSuccess: 0.9 },
+    })
+  })
+
+  it('atomically persists both targets and reloads them without changing FSRS retention', async () => {
+    const handle = await createTestDb({ seed: false })
+    const repository = createSettingsRepository(handle.db)
+    const savedAt = new Date('2026-10-02T12:00:00.000Z')
+    await repository.updateSettings({ review: { targetRetention: 0.75 } })
+
+    const saved = await repository.updateSettings(
+      { analytics: { targetRecall: 0.95, targetReviewSuccess: 0.98 } },
+      savedAt,
+    )
+    const rows = await handle.db.select().from(settingsKv)
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.updatedAt).toBe(savedAt.getTime())
+    expect(JSON.parse(rows[0]!.value)).toEqual(saved)
+    expect(saved.analytics).toEqual({
+      targetRecall: 0.95,
+      targetReviewSuccess: 0.98,
+    })
+    expect(saved.review.targetRetention).toBe(0.75)
+    await expect(
+      createSettingsRepository(handle.db).getSettings(),
+    ).resolves.toEqual(saved)
+  })
+
+  it('rejects invalid merged targets without changing the saved record', async () => {
+    const handle = await createTestDb({ seed: false })
+    const repository = createSettingsRepository(handle.db)
+    const saved = await repository.updateSettings({
+      practice: { dailyGoal: 12 },
+      analytics: { targetRecall: 0.8, targetReviewSuccess: 0.95 },
+    })
+    const rowsBefore = await handle.db.select().from(settingsKv)
+
+    for (const analytics of [
+      { targetRecall: 0.96 },
+      { targetRecall: 0.96, targetReviewSuccess: 0.94 },
+      { targetReviewSuccess: 0.79 },
+    ]) {
+      await expect(
+        repository.updateSettings({ analytics, practice: { dailyGoal: 20 } }),
+      ).rejects.toThrow(
+        'Review Success target must be at least your Recall target.',
+      )
+      expect(await handle.db.select().from(settingsKv)).toEqual(rowsBefore)
+      await expect(repository.getSettings()).resolves.toEqual(saved)
+    }
+  })
+
   it('returns defaults when no settings row exists', async () => {
     const handle = await createTestDb({ seed: false })
 

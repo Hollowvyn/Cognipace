@@ -702,7 +702,7 @@ the fixture case.
    with “Not enough data for a trend yet.”
 7. In Observed Recall vs FSRS Estimate, confirm a solid observed line with
    circle markers, an opaque short-dashed estimate with diamonds, visibly longer
-   missing-evidence bridges, and a configured target caption above the data.
+   missing-evidence bridges, and the saved Target Recall button above the data.
    With at least two retained intervals, verify the first marker sits 12px from
    the plot's left axis at both wide and narrow widths. The domain starts at
    that interval's actual midpoint and still ends at the last interval's end;
@@ -739,7 +739,8 @@ the fixture case.
     show the explicit empty state.
 11. In Practice Rhythm, confirm muted completed-review bars and a mint Review
     Success line share one plot, with Reviews on the left and Review Success
-    (%) on the right. Tooltip and Table must report completed reviews and the
+    (%) on the right. The saved Target Review Success reference uses that right
+    percentage axis. Tooltip and Table must report completed reviews and the
     Good + Easy numerator/valid-rating denominator. A bucket with zero reviews
     and no measured success has zero volume and unavailable success; internal
     buckets remain in place. A measured 0% success remains 0% and must retain an
@@ -793,6 +794,73 @@ the fixture case.
 Expected: Analytics loads through the extension runtime without the failed-load
 state, reflects only local practice data, and tells a truthful chart story
 without filling missing evidence.
+
+#### Analytics Chart Targets
+
+The chart-target implementation has automated and component-fixture proof.
+These unchecked cases are required human installed-extension smoke before PR
+review or merge, using
+the rebuilt extension and disposable data from the flow above. Record the
+tested build and exact passed or pending cases; fixture images are separate
+proof.
+
+- [ ] **Independent defaults:** open Analytics with older settings missing the
+      goal fields and an FSRS target retention other than 90%. Both chart goals
+      must be 90%. Record FSRS retention, representative card due dates, Recall
+      and Review Success rates/counts, and Retention Map values before editing
+      goals so the later comparisons use the same practice data.
+- [ ] **Save and cancel:** open Target Recall, confirm its input receives focus,
+      and verify both labels and the Hard + Good + Easy / Good + Easy hints.
+      Save Recall 80% and Success 85%; both captions and references must update
+      from the saved pair. Open Target Review Success and confirm its input
+      receives focus. Change both drafts, then Cancel or Escape; the prior
+      pair remains and focus returns to the trigger. Reopen and submit a valid
+      pair with Enter. Repeat with pointer, keyboard, and touch where available.
+- [ ] **Invalid drafts:** test an empty input, a fractional percentage, -1,
+      101, and Recall 95% with Success 90%. Saving must be blocked without
+      changing either goal or silently adjusting the other input. The invalid
+      pair says “Review Success target must be at least your Recall target.”
+      Equality, 0%, and 100% are valid when the pair satisfies the rule.
+- [ ] **Pending and failure:** use a controlled delayed and rejected
+      `settings.updateSettings` mutation in a disposable local test build and
+      record how it was induced. Confirm Saving and duplicate-submit prevention.
+      A rejected save must keep the prior captions/references and the open
+      draft with a useful error; retry succeeds and Cancel still discards it.
+      If either condition cannot be induced, record that exact case as pending.
+- [ ] **Boundary references:** save 0%/0%, 0%/100%, and 100%/100%. Inspect both
+      named dashed references and accessible descriptions at 0% and 100%; each
+      percentage scale must contain its goal with usable boundary clearance.
+      Practice's goal uses the right percentage axis and leaves its left
+      review-count scale unchanged. Measured rates, counts, rows, dates,
+      internal gaps, and trimming must match the pre-edit data.
+- [ ] **Range and presentation:** retain a non-default pair while changing
+      14/30/90-day ranges, including switching to an uncached range while a save
+      is pending, toggling Recall series, switching Chart/Table, and
+      opening empty or sparse datasets. The controls remain reachable and the
+      saved pair remains fixed. Repeat closed, open, invalid, and boundary-goal
+      states at wide/narrow widths in light/dark themes; check focus, wrapping,
+      tap targets, axes, keys, and tooltip visibility without clipping.
+- [ ] **Reload and Settings:** save a non-default pair, reload the built
+      extension in `chrome://extensions`, and reopen Analytics. Captions,
+      references, and reopened drafts must use the saved values. Save an
+      unrelated preference in Settings and confirm the pair remains. Use
+      Reset Defaults and confirm both goals return to 90% with the other
+      preferences. Repeat after another tab edits the goals while Settings has
+      an unrelated dirty draft, and immediately after Settings Save while its
+      refresh is pending; no separate Settings section is added.
+- [ ] **Backup and configured sync:** export a full backup with a non-default
+      pair, restore it into a disposable profile, and confirm both saved goals.
+      Restore an older backup without these fields and confirm 90%/90% while
+      unrelated settings retain their stored values. When testing an already
+      configured Gist with disposable profiles, push/pull the pair through the
+      existing settings payload and verify it survives. Use the existing backup
+      and Gist confirmation flows; record unexercised sync as pending.
+- [ ] **FSRS isolation and proof:** compare the recorded retention setting,
+      card due dates, FSRS estimates, Retention Map, readiness, rates, and
+      practice outcomes after changing only chart goals. They must be
+      unchanged. Attach screenshots or a recording of the saved happy path,
+      invalid and failed-save edge paths, wide/narrow light/dark editors, and
+      0%/100% reference clearance before PR review or merge.
 
 The human engineer must record the tested build, datasets, ranges, widths,
 themes, and exact passed or pending cases, then attach screenshot or

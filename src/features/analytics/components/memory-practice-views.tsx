@@ -1,4 +1,5 @@
 import { usePlotArea, useXAxisScale, useYAxisScale } from 'recharts'
+import type { ReactNode } from 'react'
 
 import { ChartTable } from '@/components/ui/chart-table'
 
@@ -17,6 +18,7 @@ import {
   trimHistoricalEmptyEdges,
 } from './charts/historical-chart-model'
 import { HistoricalTable } from './charts/historical-table'
+import { HistoricalTargetLine } from './charts/historical-target-line'
 import { LineSegments } from './charts/line-segments'
 import {
   ChartTrendNote,
@@ -41,7 +43,7 @@ export function MemoryStrengthView({
   )
   const hasValues = rows.length > 0
   return (
-    <div className="cp-historical-view grid min-w-0 gap-2">
+    <div className="cp-historical-view cp-historical-memory grid min-w-0 gap-2">
       <ChartTable
         chart={
           hasValues ? (
@@ -141,9 +143,11 @@ export function MemoryStrengthView({
 export function PracticeRhythmView({
   view,
   timeFrame,
+  targetControl,
 }: {
   view: AnalyticsViews['practiceRhythm']
   timeFrame?: HistoricalChartTimeFrame | undefined
+  targetControl?: ReactNode
 }) {
   const rows = trimHistoricalEmptyEdges(
     view.rows,
@@ -155,6 +159,11 @@ export function PracticeRhythmView({
   const hasReviews = rows.length > 0
   return (
     <div className="cp-historical-view grid min-w-0 gap-2">
+      {targetControl ?? (
+        <p className="m-0 text-right text-xs text-muted-foreground">
+          Target Review Success {formatPercent(view.targetReviewSuccess)}
+        </p>
+      )}
       <ChartTable
         chart={
           hasReviews ? (
@@ -170,13 +179,17 @@ export function PracticeRhythmView({
                     color: 'var(--cp-analytics-observed)',
                   },
                 }}
-                description={`Completed reviews and Review Success on separate axes. Review count scale: ${view.countScale.domain.join('–')}; Review Success scale: ${formatPercent(view.percentageScale.domain[0])}–${formatPercent(view.percentageScale.domain[1])}. Review Success is Good + Easy divided by valid ratings. Association, not causation. Dashed lines cross periods with no eligible evidence. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
+                description={`Completed reviews and Review Success on separate axes. Review count scale: ${view.countScale.domain.join('–')}; Review Success scale: ${formatPercent(view.percentageScale.domain[0])}–${formatPercent(view.percentageScale.domain[1])}. Review Success is Good + Easy divided by valid ratings. Target Review Success: ${formatPercent(view.targetReviewSuccess)}. Association, not causation. Dashed lines cross periods with no eligible evidence. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
                 height={290}
                 name="Practice Rhythm chart"
                 rows={rows}
                 timeFrame={timeFrame}
                 tooltip={(row) => (
-                  <PracticeTooltip row={row} timeFrame={timeFrame} />
+                  <PracticeTooltip
+                    row={row}
+                    target={view.targetReviewSuccess}
+                    timeFrame={timeFrame}
+                  />
                 )}
                 yAxes={[
                   {
@@ -200,6 +213,11 @@ export function PracticeRhythmView({
                 {(rows, selected, visible) => (
                   <>
                     <PracticeVolumeColumns rows={rows} />
+                    <HistoricalTargetLine
+                      testId="practice-success-target"
+                      value={view.targetReviewSuccess}
+                      yAxisId="success"
+                    />
                     <LineSegments
                       activeIndex={
                         visible && selected ? rows.indexOf(selected) : null
@@ -460,9 +478,11 @@ function MemoryTooltip({
 function PracticeTooltip({
   row,
   timeFrame,
+  target,
 }: {
   row: PracticeRow
   timeFrame?: HistoricalChartTimeFrame | undefined
+  target: number
 }) {
   return (
     <TooltipBox
@@ -471,6 +491,7 @@ function PracticeTooltip({
       values={[
         `Completed reviews: ${formatCount(row.completedReviews)}`,
         `Review Success: ${isFiniteValue(row.reviewSuccess) ? formatPercent(row.reviewSuccess) : 'Unavailable'}`,
+        `Target Review Success: ${formatPercent(target)}`,
         `Good + Easy: ${formatCount(row.goodEasy)} of ${formatCount(row.validRatings)} valid ratings`,
         `Evidence: ${evidenceText(row.evidence)}`,
       ]}

@@ -73,6 +73,73 @@ function event(
 }
 
 describe('buildHistoricalAnalyticsViews', () => {
+  it('defaults personal chart targets independently of FSRS target retention', () => {
+    const views = buildHistoricalAnalyticsViews([], {
+      ...options,
+      fsrsOptions: normalizeFsrsSchedulingOptions({ targetRetention: 0.8 }),
+    })
+
+    expect(views.observedRecallVsFsrs.targetRecall).toBe(0.9)
+    expect(views.practiceRhythm.targetReviewSuccess).toBe(0.9)
+    expect(views.retentionMap.targetRetention).toBe(0.8)
+    expect(views.observedRecallVsFsrs).not.toHaveProperty('targetRetention')
+  })
+
+  it.each([0, 1])('fits both personal percentage targets at %s', (target) => {
+    const views = buildHistoricalAnalyticsViews([event()], {
+      ...options,
+      analyticsTargets: {
+        targetRecall: target,
+        targetReviewSuccess: target,
+      },
+    })
+
+    expect(views.observedRecallVsFsrs.targetRecall).toBe(target)
+    expect(views.practiceRhythm.targetReviewSuccess).toBe(target)
+    for (const scale of [
+      views.observedRecallVsFsrs.scale,
+      views.practiceRhythm.percentageScale,
+    ]) {
+      expect(scale.domain[0]).toBeLessThanOrEqual(target)
+      expect(scale.domain[1]).toBeGreaterThanOrEqual(target)
+      expect(scale.ticks).toContain(target)
+    }
+  })
+
+  it('preserves observations and unrelated views when personal targets change', () => {
+    const reviews = [
+      event(),
+      event({ id: 'again', rating: 'again' }),
+      event({ id: 'hard', rating: 'hard' }),
+    ]
+    const before = buildHistoricalAnalyticsViews(reviews, options)
+    const after = buildHistoricalAnalyticsViews(reviews, {
+      ...options,
+      analyticsTargets: { targetRecall: 0.1, targetReviewSuccess: 1 },
+    })
+
+    expect(after.observedRecallVsFsrs.targetRecall).toBe(0.1)
+    expect(after.practiceRhythm.targetReviewSuccess).toBe(1)
+    expect(after.observedRecallVsFsrs.rows).toEqual(
+      before.observedRecallVsFsrs.rows,
+    )
+    expect(after.practiceRhythm.rows).toEqual(before.practiceRhythm.rows)
+    expect(after.practiceRhythm.countScale).toEqual(
+      before.practiceRhythm.countScale,
+    )
+    for (const name of [
+      'memoryStrength',
+      'ratingsMix',
+      'topicPerformance',
+      'retentionMap',
+      'memorySignals',
+      'overdueBacklog',
+      'upcomingReviewLoad',
+    ] as const) {
+      expect(after[name]).toEqual(before[name])
+    }
+  })
+
   it('pairs rating-derived recalled outcomes with the FSRS estimate from the exact reviews', () => {
     const views = buildHistoricalAnalyticsViews(
       [

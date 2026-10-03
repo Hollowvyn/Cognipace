@@ -31,7 +31,7 @@ describe('Phase 2 historical analytics views', () => {
             },
           ],
           scale: { domain: [0.6, 1], ticks: [0.6, 0.8, 1] },
-          targetRetention: 0.9,
+          targetRecall: 0.9,
         }}
       />,
     )
@@ -86,7 +86,7 @@ describe('Phase 2 historical analytics views', () => {
             },
           ],
           scale: { domain: [0.6, 1], ticks: [0.6, 0.8, 1] },
-          targetRetention: 0.9,
+          targetRecall: 0.9,
         }}
       />,
     )
@@ -150,6 +150,7 @@ describe('Phase 2 historical analytics views', () => {
             },
           ],
           countScale: { domain: [0, 5], ticks: [0, 5] },
+          targetReviewSuccess: 0.9,
           percentageScale: { domain: [0.6, 1], ticks: [0.6, 1] },
         }}
       />,

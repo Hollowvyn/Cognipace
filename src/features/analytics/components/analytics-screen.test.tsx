@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { sendMessage } from '@/extension/messaging'
+import { defaultUserSettings } from '@/features/settings/domain'
 import type {
   ReadinessFailure,
   SerializedAnalyticsSummary,
@@ -119,13 +120,14 @@ function baseAnalyticsSummary(): SerializedAnalyticsSummary {
       observedRecallVsFsrs: {
         rows: [],
         scale: { domain: [0, 1], ticks: [0, 1] },
-        targetRetention: 0.9,
+        targetRecall: 0.9,
       },
       memoryStrength: {
         rows: [],
         scale: { domain: [0, 2], ticks: [0, 1, 2] },
       },
       practiceRhythm: {
+        targetReviewSuccess: 0.9,
         rows: [],
         countScale: { domain: [0, 1], ticks: [0, 1] },
         percentageScale: { domain: [0, 1], ticks: [0, 1] },
@@ -264,6 +266,61 @@ describe('AnalyticsScreen', () => {
     vi.clearAllMocks()
   })
 
+  it('edits saved goals in empty charts and keeps the controls available in Table view', async () => {
+    const user = userEvent.setup()
+    const summary = baseAnalyticsSummary()
+    const analytics = { targetRecall: 0.8, targetReviewSuccess: 0.9 }
+    const savedSummary = {
+      ...summary,
+      views: {
+        ...summary.views,
+        observedRecallVsFsrs: {
+          ...summary.views.observedRecallVsFsrs,
+          targetRecall: analytics.targetRecall,
+        },
+      },
+    }
+    vi.mocked(sendMessage)
+      .mockResolvedValue(savedSummary)
+      .mockResolvedValueOnce(summary)
+      .mockResolvedValueOnce({ ...defaultUserSettings, analytics })
+
+    renderAnalyticsScreen()
+    const recall = await screen.findByRole('region', {
+      name: 'Observed Recall vs FSRS Estimate',
+    })
+    const practice = screen.getByRole('region', { name: 'Practice Rhythm' })
+    await user.click(
+      within(recall).getByRole('button', { name: 'Target Recall 90%' }),
+    )
+    await user.clear(screen.getByLabelText('Target Recall (%)'))
+    await user.type(screen.getByLabelText('Target Recall (%)'), '80')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+      surface: 'dashboard',
+      patch: { analytics },
+    })
+    expect(
+      await within(recall).findByRole('button', { name: 'Target Recall 80%' }),
+    ).toBeVisible()
+    await user.click(within(recall).getByRole('tab', { name: 'Table' }))
+    expect(
+      within(recall).getByRole('button', { name: 'Target Recall 80%' }),
+    ).toBeVisible()
+    await user.click(
+      within(practice).getByRole('button', {
+        name: 'Target Review Success 90%',
+      }),
+    )
+    expect(screen.getByLabelText('Target Recall (%)')).toHaveValue(80)
+    await user.clear(screen.getByLabelText('Target Review Success (%)'))
+    await user.type(screen.getByLabelText('Target Review Success (%)'), '70')
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Review Success target must be at least your Recall target',
+    )
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
   it('renders loading state while analytics data is pending', () => {
     vi.mocked(sendMessage).mockReturnValueOnce(new Promise(() => {}))
 
@@ -398,13 +455,14 @@ describe('AnalyticsScreen', () => {
               },
             ],
             scale: { domain: [0.6, 1], ticks: [0.6, 0.8, 1] },
-            targetRetention: 0.9,
+            targetRecall: 0.9,
           },
           memoryStrength: {
             rows: [],
             scale: { domain: [0, 2], ticks: [0, 1, 2] },
           },
           practiceRhythm: {
+            targetReviewSuccess: 0.9,
             rows: [],
             countScale: { domain: [0, 1], ticks: [0, 1] },
             percentageScale: { domain: [0, 1], ticks: [0, 1] },

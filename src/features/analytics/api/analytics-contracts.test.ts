@@ -95,7 +95,7 @@ const validSummary: SerializedAnalyticsSummary = {
     observedRecallVsFsrs: {
       rows: [],
       scale: { domain: [0, 1], ticks: [0, 1] },
-      targetRetention: 0.9,
+      targetRecall: 0.9,
     },
     memoryStrength: {
       rows: [],
@@ -105,6 +105,7 @@ const validSummary: SerializedAnalyticsSummary = {
       rows: [],
       countScale: { domain: [0, 1], ticks: [0, 1] },
       percentageScale: { domain: [0, 1], ticks: [0, 1] },
+      targetReviewSuccess: 0.9,
     },
     ratingsMix: {
       rows: [],
@@ -257,6 +258,72 @@ describe('analyticsSummaryRequestSchema', () => {
 })
 
 describe('analyticsSummarySchema', () => {
+  it('serializes the personal chart targets separately from scheduling retention', () => {
+    const summary = {
+      ...validSummary,
+      targetRetention: 0.8,
+      views: {
+        ...validSummary.views,
+        observedRecallVsFsrs: {
+          ...validSummary.views.observedRecallVsFsrs,
+          targetRecall: 0.75,
+        },
+        practiceRhythm: {
+          ...validSummary.views.practiceRhythm,
+          targetReviewSuccess: 0.95,
+        },
+      },
+    }
+
+    expect(analyticsSummarySchema.parse(summary)).toMatchObject({
+      targetRetention: 0.8,
+      views: {
+        observedRecallVsFsrs: { targetRecall: 0.75 },
+        practiceRhythm: { targetReviewSuccess: 0.95 },
+      },
+    })
+  })
+
+  it.each([-0.01, 1.01, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid personal chart fraction %s',
+    (target) => {
+      for (const view of ['observedRecallVsFsrs', 'practiceRhythm'] as const) {
+        const targetField =
+          view === 'observedRecallVsFsrs'
+            ? 'targetRecall'
+            : 'targetReviewSuccess'
+        expect(
+          analyticsSummarySchema.safeParse({
+            ...validSummary,
+            views: {
+              ...validSummary.views,
+              [view]: { ...validSummary.views[view], [targetField]: target },
+            },
+          }).success,
+        ).toBe(false)
+      }
+    },
+  )
+
+  it('rejects personal Review Success targets below Recall targets', () => {
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...validSummary,
+        views: {
+          ...validSummary.views,
+          observedRecallVsFsrs: {
+            ...validSummary.views.observedRecallVsFsrs,
+            targetRecall: 0.95,
+          },
+          practiceRhythm: {
+            ...validSummary.views.practiceRhythm,
+            targetReviewSuccess: 0.9,
+          },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
   it('requires the Phase 2 historical view presentation models', () => {
     expect(analyticsSummarySchema.safeParse(validSummary).success).toBe(true)
     expect(

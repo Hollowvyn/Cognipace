@@ -12,6 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-02-analytics-chart-targets-design.md`](./specs/2026-10-02-analytics-chart-targets-design.md): approved independent saved Recall/Review Success goals, compact graph editors, Settings/backup/configured sync ownership, and unchanged FSRS behavior; implemented with automated/fixture proof; human extension smoke remains pending.
 - [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): approved historical-chart decisions, with the first four implemented and later panels deferred.
 - [`specs/2026-10-02-analytics-recall-approved-design.md`](./specs/2026-10-02-analytics-recall-approved-design.md): exact approved Recall source, screenshots, and checksums.
 - [`specs/2026-10-02-analytics-memory-practice-approved-design.md`](./specs/2026-10-02-analytics-memory-practice-approved-design.md): exact approved fitted Memory Strength and mixed Practice Rhythm snapshots.
@@ -50,6 +51,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-02-analytics-chart-targets.md`](./plans/2026-10-02-analytics-chart-targets.md): approved phase-sized implementation plan for the saved pair, target-aware models/cache, compact editors, validation, and required human extension smoke; execution complete with human extension smoke pending.
 - [`plans/2026-10-02-analytics-historical-charts.md`](./plans/2026-10-02-analytics-historical-charts.md): completed implementation plan for the first four historical charts, inspection, tables, scoped layout, and validation.
 
 - [`plans/2026-10-02-track-editor-phase-1.md`](./plans/2026-10-02-track-editor-phase-1.md): full-width groups and questions, accessible Change menu, and external progress form fields.
@@ -94,6 +96,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-02-analytics-chart-targets.md`](./handoffs/2026-10-02-analytics-chart-targets.md): saved graph goals, pair validation, cache/reset race fixes, automated checks and production-component proof; human installed-extension smoke remains pending.
 
 - [`handoffs/2026-10-02-analytics-historical-charts.md`](./handoffs/2026-10-02-analytics-historical-charts.md): implemented charts, automated validation, component screenshots, and pending human extension smoke.
 

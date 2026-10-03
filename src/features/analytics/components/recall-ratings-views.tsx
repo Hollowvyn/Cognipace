@@ -19,6 +19,7 @@ import {
   trimHistoricalEmptyEdges,
 } from './charts/historical-chart-model'
 import { HistoricalTable } from './charts/historical-table'
+import { HistoricalTargetLine } from './charts/historical-target-line'
 import { LineSegments } from './charts/line-segments'
 
 type RecallRow = AnalyticsViews['observedRecallVsFsrs']['rows'][number]
@@ -54,9 +55,11 @@ const ratings = [
 export function ObservedRecallVsFsrsView({
   view,
   timeFrame,
+  targetControl,
 }: {
   view: AnalyticsViews['observedRecallVsFsrs']
   timeFrame?: HistoricalChartTimeFrame | undefined
+  targetControl?: ReactNode
 }) {
   const [series, setSeries] = useState({ observed: true, estimate: true })
   const rows = trimHistoricalEmptyEdges(
@@ -75,10 +78,15 @@ export function ObservedRecallVsFsrsView({
     ]
       .filter(Boolean)
       .join('; ') || 'Both data series are hidden'
-  const description = `${visibleDescription}. ${series.observed || series.estimate ? 'Long-dash bridges span missing buckets without adding observations. ' : ''}Paired review outcomes and reconstructed FSRS estimates. Scale: ${percent(view.scale.domain[0])}–${percent(view.scale.domain[1])}. Configured target: ${percent(view.targetRetention)}. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`
+  const description = `${visibleDescription}. ${series.observed || series.estimate ? 'Long-dash bridges span missing buckets without adding observations. ' : ''}Paired review outcomes and reconstructed FSRS estimates. Scale: ${percent(view.scale.domain[0])}–${percent(view.scale.domain[1])}. Target Recall: ${percent(view.targetRecall)}. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`
 
   return (
     <div className="cp-historical-view cp-historical-recall grid min-w-0 gap-2">
+      {targetControl ?? (
+        <p className="m-0 text-right text-xs text-muted-foreground">
+          Target Recall {percent(view.targetRecall)}
+        </p>
+      )}
       <ChartTable
         chart={
           hasValues ? (
@@ -106,7 +114,7 @@ export function ObservedRecallVsFsrsView({
                   <RecallTooltip
                     row={row}
                     series={series}
-                    target={view.targetRetention}
+                    target={view.targetRecall}
                     timeFrame={timeFrame}
                   />
                 )}
@@ -121,7 +129,10 @@ export function ObservedRecallVsFsrsView({
               >
                 {(rows, selected) => (
                   <>
-                    <RecallTarget value={view.targetRetention} />
+                    <HistoricalTargetLine
+                      testId="recall-target"
+                      value={view.targetRecall}
+                    />
                     {series.estimate ? (
                       <LineSegments
                         activeIndex={rows.findIndex(
@@ -262,45 +273,6 @@ export function ObservedRecallVsFsrsView({
   )
 }
 
-function RecallTarget({ value }: { value: number }) {
-  const plot = usePlotArea()
-  const yScale = useYAxisScale()
-  if (!plot || !yScale) return null
-  const y = yScale(value)
-  if (y === undefined) return null
-  return (
-    <g aria-hidden="true" data-testid="recall-target">
-      <line
-        stroke="var(--cp-analytics-target)"
-        strokeDasharray="5 5"
-        strokeOpacity={0.8}
-        x1={plot.x}
-        x2={plot.x + plot.width}
-        y1={y}
-        y2={y}
-      />
-      <line
-        stroke="var(--cp-analytics-target)"
-        strokeDasharray="5 5"
-        strokeOpacity={0.65}
-        x1={plot.x + plot.width - 105}
-        x2={plot.x + plot.width - 86}
-        y1={plot.y - 18}
-        y2={plot.y - 18}
-      />
-      <text
-        fill="var(--color-muted-foreground)"
-        fontSize={12}
-        textAnchor="end"
-        x={plot.x + plot.width}
-        y={plot.y - 14}
-      >
-        Target {percent(value)}
-      </text>
-    </g>
-  )
-}
-
 function SeriesSwitch({
   label,
   pressed,
@@ -382,7 +354,7 @@ function RecallTooltip({
         ...(series.observed && series.estimate
           ? [['Observed − estimate', difference(row.difference)] as const]
           : []),
-        ['Configured target', percent(target)],
+        ['Target Recall', percent(target)],
         ['Provenance', 'Reconstructed'],
         ['Evidence', evidenceText(row.evidence)],
       ]}

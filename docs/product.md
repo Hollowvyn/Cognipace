@@ -284,8 +284,38 @@ navigation and never reveals stored secret values.
 
 Analytics owns the local dashboard route for review health, historical recall
 and practice patterns, current memory state, workload, and weak-area
-inspection. It is read-only and derived from local practice state; it does not
-introduce hosted reporting or account behavior.
+inspection. Its calculations remain read-only and derived from local practice
+state. The narrowly editable chart goals are Settings-owned preferences; they
+do not introduce hosted reporting or account behavior.
+
+The chart-target behavior below is implemented. Automated and production-component
+fixture validation are recorded in the chart-target handoff; required human
+installed-extension smoke remains pending before review or merge.
+Target Recall and Target Review Success are independent saved goals, both
+defaulting to 90%, regardless of FSRS target retention. Each accepts whole
+percentages from 0 through 100. Target Review Success must be at least Target
+Recall: this intentionally stricter aspiration never constrains measured
+rates. For the same review population, measured Review Success cannot exceed
+measured Recall, but these charts can use different eligible populations.
+
+Each relevant chart has a small native target button above its plot. Either
+opens the same inline editor with both labeled percentage inputs, rating
+combination hints, Save, and Cancel. The selected chart's input receives focus;
+Enter saves and Escape cancels and returns focus. Invalid values or an invalid
+pair cannot save, and the editor never adjusts the other goal automatically.
+Saving persists the pair atomically, shows a pending state, and prevents
+duplicate submissions. Success updates both references from the saved result;
+failure keeps the prior goals and the open draft with a useful error. Cancel
+changes no saved values. Controls remain available with empty or sparse data,
+and reopening, reloading, or changing range preserves saved goals.
+
+Settings Save preserves the pair; Reset Defaults restores 90%/90%. Older
+settings or backups with no goals use those defaults. A malformed analytics
+subsection falls back only to its defaults, preserving unrelated preferences.
+The user-approved pair travels through existing full backups and optional
+configured Gist sync as normal settings. It changes neither FSRS scheduling,
+cards, due dates, reconstruction, Retention Map, readiness, nor practice
+outcomes.
 
 Historical Analytics uses adaptive presentation buckets and evidence gates:
 
@@ -316,13 +346,16 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
   buckets, a gap that is too long, or too many gaps. Readiness is guidance for
   confidence, not a reason to hide an otherwise available chart.
 
-The first four historical panels have these implemented meanings and controls:
+The first four historical panels have these metric meanings and controls:
 
 - **Observed Recall vs FSRS Estimate** pairs valid rating-derived recalled
   outcomes (Hard, Good, or Easy) with reconstructed FSRS retrievability
   immediately before the same reviews. Observed recall uses a solid line and
   circle markers; the FSRS estimate uses short dashes and diamond markers.
-  Longer dashes bridge missing evidence. The configured target remains visible.
+  Longer dashes bridge missing evidence. The dashed Target Recall reference
+  uses the saved personal goal, with an explicit editable caption, tooltip, and
+  accessible description. Its percentage scale includes that goal even at 0%
+  or 100%.
   Each series can be toggled independently; its curve, markers, and tooltip
   rate hide together, and the signed observed-minus-estimate difference appears
   only when both series are visible. That difference comes from the supplied
@@ -349,7 +382,10 @@ The first four historical panels have these implemented meanings and controls:
 - **Practice Rhythm** places completed-review bars and a Review Success line in
   one plot with independent axes: Reviews on the left and Review Success (%)
   on the right. Review Success is Good + Easy divided by valid ratings; tooltip
-  and Table retain that numerator and denominator. The relationship is
+  and Table retain that numerator and denominator. Its dashed Target Review
+  Success reference uses the right percentage axis and a scale that includes
+  the saved goal even at 0% or 100%; goal edits do not change the review-count
+  scale, observations, rows, dates, gaps, or trimming. The relationship is
   association, not causation. A bucket supports the retained activity window
   when it has completed reviews, valid ratings, or a known finite success rate,
   including 0%. Internal zero-volume buckets remain available.

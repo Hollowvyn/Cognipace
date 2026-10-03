@@ -61,6 +61,45 @@ const percentageScale: AnalyticsViews['practiceRhythm']['percentageScale'] = {
 }
 
 describe('approved Memory Strength and Practice Rhythm views', () => {
+  it.each([0, 1])(
+    'draws a %i success goal on the right percentage axis',
+    (targetReviewSuccess) => {
+      render(
+        <PracticeRhythmView
+          view={{
+            rows: [practiceRow()],
+            countScale,
+            percentageScale: { domain: [0, 1], ticks: [0, 0.5, 1] },
+            targetReviewSuccess,
+          }}
+        />,
+      )
+      expect(
+        screen.getByText(`Target Review Success ${targetReviewSuccess * 100}%`),
+      ).toBeVisible()
+      const line = screen
+        .getByTestId('practice-success-target')
+        .querySelector('line')!
+      const y = Number(line.getAttribute('y1'))
+      const plotLines = screen
+        .getByTestId('historical-chart-grid')
+        .querySelectorAll('line')
+      const gridYs = Array.from(plotLines, (line) =>
+        Number(line.getAttribute('y1')),
+      )
+      expect(y).toBeCloseTo(
+        targetReviewSuccess === 1 ? Math.min(...gridYs) : Math.max(...gridYs),
+      )
+      fireEvent.keyDown(
+        screen.getByRole('button', { name: 'Inspect Practice Rhythm chart' }),
+        { key: 'Home' },
+      )
+      expect(screen.getByRole('tooltip')).toHaveTextContent(
+        `Target Review Success: ${targetReviewSuccess * 100}%`,
+      )
+    },
+  )
+
   it('draws discrete quartile stems and caps only for supported eligible cohorts, below the median', () => {
     const rows = [
       memoryRow(),
@@ -321,7 +360,7 @@ describe('approved Memory Strength and Practice Rhythm views', () => {
     const { container } = render(
       <PracticeRhythmView
         timeFrame={timeFrame}
-        view={{ rows, countScale, percentageScale }}
+        view={{ targetReviewSuccess: 0.9, rows, countScale, percentageScale }}
       />,
     )
     expect(container.querySelectorAll('[data-chart]')).toHaveLength(1)
@@ -405,7 +444,7 @@ describe('approved Memory Strength and Practice Rhythm views', () => {
     render(
       <PracticeRhythmView
         timeFrame={timeFrame}
-        view={{ rows, countScale, percentageScale }}
+        view={{ targetReviewSuccess: 0.9, rows, countScale, percentageScale }}
       />,
     )
     const control = screen.getByRole('button', {
@@ -470,6 +509,7 @@ describe('approved Memory Strength and Practice Rhythm views', () => {
             }),
           ],
           countScale,
+          targetReviewSuccess: 0.9,
           percentageScale,
         }}
       />,
@@ -555,7 +595,7 @@ describe('empty edge trimming boundaries', () => {
     render(
       <PracticeRhythmView
         timeFrame={timeFrame}
-        view={{ rows, countScale, percentageScale }}
+        view={{ targetReviewSuccess: 0.9, rows, countScale, percentageScale }}
       />,
     )
     expect(
@@ -766,7 +806,7 @@ it('retains zero-volume Practice boundaries with known rating evidence or measur
   render(
     <PracticeRhythmView
       timeFrame={timeFrame}
-      view={{ rows, countScale, percentageScale }}
+      view={{ targetReviewSuccess: 0.9, rows, countScale, percentageScale }}
     />,
   )
   const inspect = screen.getByRole('button', {

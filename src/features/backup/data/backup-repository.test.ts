@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { setAiProviderSecret } from '@/features/genai/server/genai-settings-service'
 import { defaultUserSettings } from '@/features/settings/domain'
+import { createSettingsRepository } from '@/features/settings/data/settings-repository'
 import {
   companies,
   fsrsCards,
@@ -41,6 +42,54 @@ const settingsValue = JSON.stringify({
 })
 
 describe('backup repository', () => {
+  it('round-trips saved analytics targets through the existing Settings backup row', async () => {
+    const source = await createTestDb({ now, seed: false })
+    const target = await createTestDb({ now, seed: false })
+    const saved = await createSettingsRepository(source.db).updateSettings(
+      {
+        analytics: { targetRecall: 0.8, targetReviewSuccess: 0.95 },
+        review: { targetRetention: 0.75 },
+      },
+      now,
+    )
+    const backupData = await createBackupRepository(source.db).readBackupData()
+
+    expect(JSON.parse(backupData.settings[0]!.value)).toMatchObject({
+      analytics: { targetRecall: 0.8, targetReviewSuccess: 0.95 },
+    })
+    await clearAndRestoreBackupData(target.db, backupData, now)
+
+    await expect(
+      createSettingsRepository(target.db).getSettings(),
+    ).resolves.toEqual(saved)
+  })
+
+  it('restores an old settings backup with independent default chart targets', async () => {
+    const source = await createTestDb({ now, seed: false })
+    const target = await createTestDb({ now, seed: false })
+    const oldSettings = {
+      ...defaultUserSettings,
+      practice: { ...defaultUserSettings.practice, dailyGoal: 12 },
+      review: { ...defaultUserSettings.review, targetRetention: 0.75 },
+    }
+    delete (oldSettings as Record<string, unknown>).analytics
+    await source.db.insert(settingsKv).values({
+      key: 'user-settings',
+      value: JSON.stringify(oldSettings),
+      updatedAt: timestamp,
+    })
+    const backupData = await createBackupRepository(source.db).readBackupData()
+
+    await clearAndRestoreBackupData(target.db, backupData, now)
+
+    await expect(
+      createSettingsRepository(target.db).getSettings(),
+    ).resolves.toEqual({
+      ...oldSettings,
+      analytics: { targetRecall: 0.9, targetReviewSuccess: 0.9 },
+    })
+  })
+
   it('exports all durable local data categories after inserting custom state', async () => {
     const { db } = await createTestDb({ now })
     await insertCustomState(db)

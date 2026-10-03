@@ -191,8 +191,25 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   in inspection. Reducing tick density must not reduce observations.
 - Keep axis quantities and units explicit, horizontal grid lines quiet, and
   top/bottom clearance sufficient for boundary markers and low whiskers. Retain
-  supplied serialized value-axis domains and independent scales; only Memory Strength's
-  duration fit changes in this iteration.
+  supplied serialized value-axis domains and independent scales. Memory Strength
+  uses its duration fit; the approved personal-goal work also fits Recall and
+  Practice's percentage scales around their saved targets, including 0% and
+  100%, while preserving Practice's review-count scale.
+- The chart-target editor is implemented and has automated/fixture proof;
+  human installed-extension smoke remains pending before review or merge. Place a small native
+  **Target Recall 90%** or **Target Review Success 90%** button above the relevant
+  plot with the target color and a subtle dashed-line key. Replace the generic
+  Recall caption without duplicating it or adding a permanent bottom row.
+  Either button opens the same compact inline panel with both labeled inputs
+  for whole percentages (0–100 in one-point steps), rating-combination hints, Save,
+  and Cancel. Focus the target for the chart that opened it; Enter saves and
+  Escape cancels and returns focus. Keep the panel collapsed by default and
+  reachable in Chart/Table, empty, sparse, narrow, light, and dark states.
+  Explain **Review Success target must be at least your Recall target** for an
+  invalid pair; never silently change the other input. This is an intentionally
+  stricter aspiration, not a rule for measured rates. Show Saving, prevent
+  duplicate submission, and keep failed drafts open with a useful error while
+  retaining the prior saved references. Cancel leaves both goals unchanged.
 - Inspection starts with the tooltip hidden. Pointer movement and taps select
   the nearest retained original bucket. A native focusable button covering the
   plot exposes the same values through focus, Left/Right arrows, Home/End, and
@@ -202,7 +219,9 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   permanent bottom detail row.
 - Recall uses a solid observed line with circles and an opaque FSRS estimate
   with short `4 4` dashes and diamonds. Missing-evidence bridges use visibly
-  longer `9 7` dashes. Place the configured target caption above the data.
+  longer `9 7` dashes. Its dashed reference uses saved Target Recall, independent
+  of FSRS retention, and names that goal in inspection and its accessible
+  description. Keep the editable target caption above the data.
   Compact native series switches hide the relevant curve, markers, and tooltip
   rate together. Show the signed difference only when both series are visible,
   preserve shared sample counts, and keep the accessible description aligned
@@ -227,8 +246,11 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   applies only to whiskers.
 - Practice Rhythm uses muted review-volume columns and a clear mint Review
   Success line in one mixed plot. Label Reviews on the left and Review Success
-  (%) on the right. Measured success receives markers; unknown success receives
-  only a dashed bridge between measured neighbors. Keep the visible
+  (%) on the right. Its matching dashed Target Review Success reference uses
+  the right percentage axis, with an explicit target name in inspection and
+  its accessible description. Editing either goal must preserve observations,
+  dates, rows, gaps, counts, and trim rules. Measured success receives markers;
+  unknown success receives only a dashed bridge between measured neighbors. Keep the visible
   association-only explanation. Completed reviews, valid ratings, or a known
   finite success rate support the activity window. Measured 0% success remains
   supported, while internal zero-volume gaps remain in place.

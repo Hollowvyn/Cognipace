@@ -1,4 +1,5 @@
 import { isReviewRating } from '@/lib/fsrs'
+import { defaultAnalyticsTargets } from '@/features/settings/domain'
 
 import type { AnalyticsReadiness } from './analytics-readiness'
 import type { HistoricalAnalyticsViews } from './historical-presentation'
@@ -153,7 +154,7 @@ function emptyHistoricalViews(
     observedRecallVsFsrs: {
       rows: [],
       scale: { domain: [0, 1], ticks: [0, 1] },
-      targetRetention,
+      targetRecall: defaultAnalyticsTargets.targetRecall,
     },
     memoryStrength: {
       rows: [],
@@ -163,6 +164,7 @@ function emptyHistoricalViews(
       rows: [],
       countScale: { domain: [0, 1], ticks: [0, 1] },
       percentageScale: { domain: [0, 1], ticks: [0, 1] },
+      targetReviewSuccess: defaultAnalyticsTargets.targetReviewSuccess,
     },
     ratingsMix: {
       rows: [],

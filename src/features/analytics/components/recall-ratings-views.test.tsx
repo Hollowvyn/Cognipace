@@ -42,7 +42,7 @@ function recallView(rows: RecallRow[]): AnalyticsViews['observedRecallVsFsrs'] {
   return {
     rows,
     scale: { domain: [0.2, 1], ticks: [0.2, 0.4, 0.6, 0.8, 1] },
-    targetRetention: 0.87,
+    targetRecall: 0.87,
   }
 }
 
@@ -115,6 +115,18 @@ beforeEach(() => {
 })
 
 describe('Recall approved historical presentation', () => {
+  it('names its personal recall goal explicitly above the plot and in inspection', () => {
+    render(<ObservedRecallVsFsrsView view={recallView([recallRow(0)])} />)
+    expect(screen.getByText('Target Recall 87%')).toBeVisible()
+    fireEvent.keyDown(
+      screen.getByRole('button', {
+        name: 'Inspect Observed Recall vs FSRS Estimate chart',
+      }),
+      { key: 'Home' },
+    )
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Target Recall87%')
+  })
+
   it('starts the first Recall point 12px from the left axis while keeping its full interval and stable switches', async () => {
     const user = userEvent.setup()
     render(
@@ -193,7 +205,7 @@ describe('Recall approved historical presentation', () => {
       screen.queryByTestId('fsrs-estimate-marker-1'),
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
-    expect(screen.getByText('Target 87%')).toBeInTheDocument()
+    expect(screen.getByText('Target Recall 87%')).toBeInTheDocument()
   })
 
   it('keeps exact serialized precision, counts, context, and cohort in keyboard inspection', () => {
@@ -271,9 +283,7 @@ describe('Recall approved historical presentation', () => {
     expect(
       Number(circle.getAttribute('cy')) - Number(guide.getAttribute('y1')),
     ).toBeGreaterThanOrEqual(8)
-    expect(
-      Number(screen.getByText('Target 87%').getAttribute('y')),
-    ).toBeLessThan(Number(guide.getAttribute('y1')))
+    expect(screen.getByText('Target Recall 87%').closest('svg')).toBeNull()
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     fireEvent.focus(
       screen.getByRole('button', {

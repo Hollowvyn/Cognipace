@@ -101,7 +101,7 @@ export function createSerializedAnalyticsSummary(
       observedRecallVsFsrs: {
         rows: [],
         scale: { domain: [0, 1], ticks: [0, 1] },
-        targetRetention: 0.9,
+        targetRecall: 0.9,
       },
       memoryStrength: {
         rows: [],
@@ -111,6 +111,7 @@ export function createSerializedAnalyticsSummary(
         rows: [],
         countScale: { domain: [0, 1], ticks: [0, 1] },
         percentageScale: { domain: [0, 1], ticks: [0, 1] },
+        targetReviewSuccess: 0.9,
       },
       ratingsMix: {
         rows: [],

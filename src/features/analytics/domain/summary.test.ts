@@ -179,6 +179,34 @@ describe('buildObservedRatingQuality', () => {
 })
 
 describe('buildAnalyticsSummary', () => {
+  it('includes independent 90-percent personal targets when historical views are omitted', () => {
+    const result = buildAnalyticsSummary({
+      generatedAt: now,
+      timeFrame: buildAnalyticsTimeFrame({
+        asOf: now,
+        requestedDays: 30,
+        timeZone: 'UTC',
+      }),
+      reviewDays: 0,
+      totalReviews: 0,
+      currentStreak: 0,
+      observedRatingQuality: {
+        value: null,
+        label: '—',
+        sampleSize: 0,
+        lowSample: true,
+      },
+      range: 30,
+      targetRetention: 0.8,
+      historicalReadiness: createHistoricalReadiness(30),
+    })
+
+    expect(result.views.observedRecallVsFsrs.targetRecall).toBe(0.9)
+    expect(result.views.practiceRhythm.targetReviewSuccess).toBe(0.9)
+    expect(result.targetRetention).toBe(0.8)
+    expect(result.views.retentionMap.targetRetention).toBe(0.8)
+  })
+
   it('assembles all fields into the summary shape', () => {
     const generatedAt = new Date(2026, 0, 15, 12, 0, 0)
     const retention: ObservedRatingQualityResult = {

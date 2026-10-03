@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { analyticsTargetsSchema } from '@/features/settings/domain'
 
 export const analyticsRangeSchema = z.union([
   z.literal(14),
@@ -283,7 +284,7 @@ export const analyticsViewsSchema = z
     observedRecallVsFsrs: z.object({
       rows: z.array(observedRecallVsFsrsRowSchema),
       scale: analyticsScaleSchema,
-      targetRetention: percentageSchema,
+      targetRecall: percentageSchema,
     }),
     memoryStrength: z.object({
       rows: z.array(memoryStrengthRowSchema),
@@ -293,6 +294,7 @@ export const analyticsViewsSchema = z
       rows: z.array(practiceRhythmRowSchema),
       countScale: analyticsScaleSchema,
       percentageScale: analyticsScaleSchema,
+      targetReviewSuccess: percentageSchema,
     }),
     ratingsMix: z.object({
       rows: z.array(ratingsMixRowSchema),
@@ -334,6 +336,22 @@ export const analyticsViewsSchema = z
     }),
   })
   .superRefine((views, context) => {
+    const targets = analyticsTargetsSchema.safeParse({
+      targetRecall: views.observedRecallVsFsrs.targetRecall,
+      targetReviewSuccess: views.practiceRhythm.targetReviewSuccess,
+    })
+    if (!targets.success) {
+      for (const issue of targets.error.issues) {
+        context.addIssue({
+          ...issue,
+          path:
+            issue.path[0] === 'targetRecall'
+              ? ['observedRecallVsFsrs', 'targetRecall']
+              : ['practiceRhythm', 'targetReviewSuccess'],
+        })
+      }
+    }
+
     const { rows } = views.upcomingReviewLoad
     if (!rows[0]?.today || rows.filter((row) => row.today).length !== 1) {
       context.addIssue({

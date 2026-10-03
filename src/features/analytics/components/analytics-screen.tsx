@@ -4,7 +4,10 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { InlineStatus } from '@/components/ui/inline-status'
 import { Surface } from '@/components/ui/surface'
-import { useAnalyticsSummary } from '../api/analytics-api'
+import {
+  useAnalyticsSummary,
+  useUpdateAnalyticsTargets,
+} from '../api/analytics-api'
 import type {
   AnalyticsRange,
   SerializedAnalyticsSummary,
@@ -12,6 +15,7 @@ import type {
 import { AnalyticsChartPanel } from './analytics-chart-panel'
 import { AnalyticsMetricRow } from './analytics-metric-row'
 import { AnalyticsReadinessState } from './analytics-readiness-state'
+import { AnalyticsTargetEditor } from './analytics-target-editor'
 import {
   MemoryStrengthView,
   ObservedRecallVsFsrsView,
@@ -203,6 +207,11 @@ function AnalyticsHistoricalStory({
 }: {
   data: SerializedAnalyticsSummary
 }) {
+  const updateTargets = useUpdateAnalyticsTargets()
+  const targets = {
+    targetRecall: data.views.observedRecallVsFsrs.targetRecall,
+    targetReviewSuccess: data.views.practiceRhythm.targetReviewSuccess,
+  }
   return (
     <div className="cp-analytics-history grid min-w-0 gap-4">
       <PhaseTwoPanel
@@ -214,6 +223,13 @@ function AnalyticsHistoricalStory({
         title="Observed Recall vs FSRS Estimate"
       >
         <ObservedRecallVsFsrsView
+          targetControl={
+            <AnalyticsTargetEditor
+              targets={targets}
+              metric="recall"
+              onSave={updateTargets.mutateAsync}
+            />
+          }
           timeFrame={data.timeFrame}
           view={data.views.observedRecallVsFsrs}
         />
@@ -242,6 +258,13 @@ function AnalyticsHistoricalStory({
           title="Practice Rhythm"
         >
           <PracticeRhythmView
+            targetControl={
+              <AnalyticsTargetEditor
+                targets={targets}
+                metric="reviewSuccess"
+                onSave={updateTargets.mutateAsync}
+              />
+            }
             timeFrame={data.timeFrame}
             view={data.views.practiceRhythm}
           />

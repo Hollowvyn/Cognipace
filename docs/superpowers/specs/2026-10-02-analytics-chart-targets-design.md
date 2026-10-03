@@ -1,6 +1,8 @@
 # Analytics Chart Targets
 
-Status: approved by the user on 2026-10-02; implementation pending.
+Status: approved by the user on 2026-10-02; implemented with automated and
+component-fixture proof. Human installed-extension smoke remains pending before
+PR review or merge. See the [implementation handoff](../handoffs/2026-10-02-analytics-chart-targets.md).
 
 ## Purpose
 
@@ -107,8 +109,9 @@ merge; keep the PR draft while that is pending.
 
 ## Design Review Record
 
-Read-only review found no substantive contradictions or ownership/compatibility
-issues. Application source and persisted data remain unchanged.
+At proposal time, read-only review found no substantive contradictions or
+ownership/compatibility issues. That docs-only checkpoint changed no application
+source or persisted data.
 
 Passed for this proposed design:
 
@@ -122,5 +125,6 @@ Skipped `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, and
 `rtk npm run format` for this docs-only proposal; explicit formatting checks
 cover this historically excluded Markdown path. Skipped `rtk npm run db:check`,
 `rtk npm run db:generate`, and `rtk npm run zip` because no database, schema, or
-packaging changes have been implemented. Implementation validation and human
-smoke proof remain future phase work, not completed proof for these targets.
+packaging changes were implemented at that checkpoint. The subsequent
+implementation validation is recorded in the handoff; human extension smoke
+proof remains pending.
