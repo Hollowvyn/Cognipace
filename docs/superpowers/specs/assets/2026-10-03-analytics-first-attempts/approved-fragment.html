@@ -1,0 +1,287 @@
+<div id="cp-outcomes-preview" aria-label="First recorded outcomes and repeat recall designs">
+  <div class="cp-context"><span>Illustrative data · 30 days · 3-day buckets</span><span>09/04/26–10/03/26</span></div>
+  <div class="viz-carousel viz-dotted-background" aria-label="Two-graph analytics designs">
+    <section data-variant="Two outcome rates" aria-label="First outcomes with stronger-rated outcomes, alongside repeat recall"><div class="cp-pair"></div></section>
+    <section data-variant="Success only" aria-label="One first-outcome curve, alongside repeat recall" hidden><div class="cp-pair"></div></section>
+  </div>
+  <div class="cp-tooltip" role="tooltip" hidden></div>
+  <div class="cp-announcement" role="status" aria-live="polite"></div>
+</div>
+<style>
+  #cp-outcomes-preview {
+    --cp-surface:light-dark(#ffffff,#1c2320); --cp-text:light-dark(#25352d,#e0e7e2);
+    --cp-muted:light-dark(#53655b,#b7c4bb); --cp-border:light-dark(#d9e3dc,#3c4941);
+    --cp-grid:light-dark(#e4ebe6,#34413a); --cp-subtle:light-dark(#f6f8f6,#161d19);
+    --cp-success:light-dark(#287847,#8bdda6); --cp-strong:light-dark(#276e91,#96cbe3);
+    --cp-estimate:light-dark(#607e68,#a7cdb3); --cp-target:light-dark(#866719,#d7ba65);
+    --cp-active:light-dark(#cce5d4,#a1cfb3); --cp-active-text:light-dark(#1a432b,#163c28);
+    --cp-warning:light-dark(#89560d,#e7c989);
+    position:relative; color:var(--cp-text); font:14px/1.5 "Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  #cp-outcomes-preview * { box-sizing:border-box; }
+  #cp-outcomes-preview [hidden] { display:none!important; }
+  #cp-outcomes-preview .cp-announcement { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  #cp-outcomes-preview .cp-context { display:flex; flex-wrap:wrap; gap:4px 16px; justify-content:space-between; margin-bottom:12px; color:var(--cp-muted); font-size:12px; }
+  #cp-outcomes-preview section[data-variant] { min-height:590px; }
+  #cp-outcomes-preview .cp-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+  #cp-outcomes-preview .cp-panel { min-width:0; border:1px solid var(--cp-border); border-radius:8px; padding:18px; background:var(--cp-surface); color:var(--cp-text); }
+  #cp-outcomes-preview h3,#cp-outcomes-preview p { margin:0; }
+  #cp-outcomes-preview h3 { font-size:16px; font-weight:500; }
+  #cp-outcomes-preview .cp-heading { min-height:112px; }
+  #cp-outcomes-preview .cp-question { margin-top:4px; font-size:13px; }
+  #cp-outcomes-preview .cp-description { margin-top:6px; font-size:12px; color:var(--cp-muted); }
+  #cp-outcomes-preview .cp-plot-controls { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; min-height:40px; margin-bottom:8px; }
+  #cp-outcomes-preview .cp-sample { color:var(--cp-muted); font-size:12px; font-variant-numeric:tabular-nums; }
+  #cp-outcomes-preview .cp-tabs { display:flex; gap:4px; margin-left:auto; }
+  #cp-outcomes-preview button,#cp-outcomes-preview input { font:inherit; }
+  #cp-outcomes-preview button { color:var(--cp-text); background:transparent; border:1px solid var(--cp-border); border-radius:5px; padding:6px 10px; font-size:12px; }
+  #cp-outcomes-preview button:disabled { opacity:.5; }
+  #cp-outcomes-preview .cp-tabs button[aria-pressed="true"] { background:var(--cp-active); color:var(--cp-active-text); border-color:var(--cp-active); }
+  #cp-outcomes-preview .cp-target { border:0; padding:4px 0; display:inline-flex; align-items:center; gap:7px; color:var(--cp-muted); }
+  #cp-outcomes-preview .cp-target i { width:18px; border-top:1px dashed var(--cp-target); }
+  #cp-outcomes-preview .cp-target-row { display:flex; justify-content:flex-end; align-items:flex-start; min-height:30px; margin-bottom:5px; }
+  #cp-outcomes-preview .cp-first-rate { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--cp-muted); }
+  #cp-outcomes-preview .cp-period-value { font-size:20px; font-weight:500; color:var(--cp-text); font-variant-numeric:tabular-nums; }
+  #cp-outcomes-preview .cp-target-editor { border:1px solid var(--cp-border); border-radius:6px; background:var(--cp-subtle); padding:8px; display:flex; align-items:center; gap:6px; margin-bottom:10px; }
+  #cp-outcomes-preview .cp-target-editor input { min-width:0; width:76px; flex:1; padding:6px 8px; font-size:16px; background:var(--cp-surface); color:var(--cp-text); border:1px solid var(--cp-border); border-radius:5px; }
+  #cp-outcomes-preview .cp-target-editor button { padding:7px; }
+  #cp-outcomes-preview .cp-target-editor .cp-save { background:var(--cp-active); color:var(--cp-active-text); }
+  #cp-outcomes-preview .cp-plot { width:100%; position:relative; min-width:0; }
+  #cp-outcomes-preview .cp-plot svg { display:block; width:100%; }
+  #cp-outcomes-preview .cp-plot svg text { fill:var(--cp-muted); font-family:inherit; font-size:12px; font-weight:400; }
+  #cp-outcomes-preview .cp-plot svg .axis-title { fill:var(--cp-text); }
+  #cp-outcomes-preview .cp-inspect { position:absolute; z-index:1; background:transparent; border:0; border-radius:0; padding:0; }
+  #cp-outcomes-preview .cp-legend { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:8px; align-items:center; }
+  #cp-outcomes-preview .cp-series { display:inline-flex; align-items:center; gap:6px; border:0; border-radius:0; padding:2px 0; color:var(--cp-muted); }
+  #cp-outcomes-preview .cp-series[aria-pressed="false"] { opacity:.55; text-decoration:line-through; }
+  #cp-outcomes-preview .cp-key { width:20px; height:0; display:inline-block; border-top:2px solid var(--cp-success); position:relative; }
+  #cp-outcomes-preview .cp-key::after { content:""; position:absolute; width:6px; height:6px; border:1px solid var(--cp-success); background:var(--cp-surface); border-radius:50%; left:7px; top:-4px; }
+  #cp-outcomes-preview .cp-key.cp-strong { border-color:var(--cp-strong); }
+  #cp-outcomes-preview .cp-key.cp-strong::after { border-color:var(--cp-strong); border-radius:0; transform:rotate(45deg); }
+  #cp-outcomes-preview .cp-key.cp-estimate { border-color:var(--cp-estimate); border-top-style:dashed; }
+  #cp-outcomes-preview .cp-key.cp-estimate::after { border-color:var(--cp-estimate); border-radius:0; transform:rotate(45deg); }
+  #cp-outcomes-preview .cp-empty { min-height:288px; display:grid; place-items:center; text-align:center; color:var(--cp-muted); font-size:13px; padding:20px; }
+  #cp-outcomes-preview .cp-trend { margin-top:8px; font-size:12px; color:var(--cp-warning); }
+  #cp-outcomes-preview .cp-method { margin-top:12px; color:var(--cp-muted); font-size:12px; }
+  #cp-outcomes-preview .cp-method summary { color:var(--cp-muted); }
+  #cp-outcomes-preview .cp-method p { margin-top:7px; }
+  #cp-outcomes-preview .cp-table-scroll { min-width:0; overflow-x:auto; margin-top:10px; }
+  #cp-outcomes-preview table { width:100%; border-collapse:collapse; font-size:12px; }
+  #cp-outcomes-preview table caption { text-align:left; margin-bottom:8px; color:var(--cp-muted); }
+  #cp-outcomes-preview th,#cp-outcomes-preview td { padding:8px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--cp-border); font-variant-numeric:tabular-nums; }
+  #cp-outcomes-preview th { font-weight:500; }
+  #cp-outcomes-preview th:first-child { text-align:left; }
+  #cp-outcomes-preview .cp-pagination { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; margin-top:12px; color:var(--cp-muted); font-size:12px; }
+  #cp-outcomes-preview .cp-tooltip { position:absolute; z-index:5; width:290px; max-width:calc(100% - 12px); background:var(--cp-surface); color:var(--cp-text); padding:12px; border:1px solid var(--cp-border); border-radius:6px; box-shadow:0 4px 16px color-mix(in srgb,var(--cp-border) 30%,transparent); pointer-events:none; font-size:12px; }
+  #cp-outcomes-preview .cp-tooltip strong { font-weight:500; }
+  #cp-outcomes-preview .cp-tooltip dl { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 10px; margin:8px 0 0; }
+  #cp-outcomes-preview .cp-tooltip dt { color:var(--cp-muted); }
+  #cp-outcomes-preview .cp-tooltip dd { margin:0; text-align:right; font-variant-numeric:tabular-nums; }
+  #cp-outcomes-preview .cp-tooltip small { display:block; font-size:11px; color:var(--cp-muted); margin-top:8px; }
+  @media(max-width:760px) {
+    #cp-outcomes-preview .cp-pair { grid-template-columns:minmax(0,1fr); }
+    #cp-outcomes-preview section[data-variant] { min-height:1120px; }
+    #cp-outcomes-preview .cp-heading { min-height:0; margin-bottom:14px; }
+  }
+  @media(max-width:430px) {
+    #cp-outcomes-preview .cp-panel { padding:13px; }
+    #cp-outcomes-preview .cp-plot-controls { align-items:flex-start; }
+    #cp-outcomes-preview .cp-sample { flex:1 1 100%; }
+    #cp-outcomes-preview section[data-variant] { min-height:1160px; }
+    #cp-outcomes-preview .cp-context { font-size:11px; }
+  }
+  @media(pointer:coarse) {
+    #cp-outcomes-preview button { min-height:44px; }
+    #cp-outcomes-preview .cp-target-editor input { min-height:44px; }
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script>
+(() => {
+  const root = document.getElementById('cp-outcomes-preview');
+  const tip = root.querySelector('.cp-tooltip');
+  const base = [
+    {ratings:[4,4,2,0],n:12,k:8,p:.76},
+    {ratings:[3,4,3,0],n:15,k:11,p:.79},
+    {ratings:[0,0,0,0],excluded:1,n:0,k:0,p:null},
+    {ratings:[2,3,5,0],n:9,k:7,p:.80},
+    {ratings:[3,2,5,0],n:10,k:8,p:.83},
+    {ratings:[2,2,6,0],n:16,k:13,p:.84},
+    {ratings:[0,0,0,0],n:8,k:7,p:.87},
+    {ratings:[2,4,4,0],n:0,k:0,p:null},
+    {ratings:[2,2,6,0],n:15,k:13,p:.88},
+    {ratings:[2,0,8,0],n:10,k:9,p:.90}
+  ].map((row,index) => ({...row, index, start:Date.UTC(2026,8,4+index*3),end:Date.UTC(2026,8,7+index*3),x:Date.UTC(2026,8,4+index*3)+1.5*86400000,partial:index===9}));
+  const knownExamples = ['Mixed practice','Sparse history','Only first attempts','Only repeat reviews'];
+  const initial = window.openai?.widgetState;
+  const preview = { example:knownExamples.includes(initial?.modelContent?.example)?initial.modelContent.example:'Mixed practice', target:Number.isInteger(initial?.privateContent?.target)&&initial.privateContent.target>=0&&initial.privateContent.target<=100?initial.privateContent.target:90 };
+  const panels = [];
+  const pct = value => value===null?'Unavailable':`${Number((value*100).toFixed(1))}%`;
+  const roundPct = value => value===null?'—':`${Math.round(value*100)}%`;
+  const date = timestamp => { const d=new Date(timestamp); const core=`${String(d.getUTCMonth()+1).padStart(2,'0')}/${String(d.getUTCDate()).padStart(2,'0')}`; return d.getUTCFullYear()===2026?core:`${core}/${String(d.getUTCFullYear()).slice(-2)}`; };
+  const interval = row => `${date(row.start)}–${date(row.end-86400000)}`;
+  const fullDate = value => new Date(value).toISOString().slice(0,10);
+  function rowsFor(type) {
+    let rows = base.map(row=>({...row,ratings:[...row.ratings]}));
+    rows.forEach(row=>{
+      if(preview.example==='Only first attempts') { row.n=0; row.k=0; row.p=null; }
+      if(preview.example==='Only repeat reviews') { row.ratings=[0,0,0,0]; row.excluded=0; }
+      if(preview.example==='Sparse history' && ![2,5,8].includes(row.index)) { row.ratings=[0,0,0,0]; row.n=0; row.k=0; row.p=null; row.excluded=0; }
+      if(preview.example==='Sparse history' && row.index===2) { row.ratings=[2,0,0,0]; row.n=2; row.k=0; row.p=.68; }
+      if(preview.example==='Sparse history' && row.index===5) { row.ratings=[1,1,0,0]; row.n=3; row.k=2; row.p=.75; }
+      if(preview.example==='Sparse history' && row.index===8) { row.ratings=[0,1,1,0]; row.n=3; row.k=3; row.p=.82; }
+      row.firstN=row.ratings.reduce((a,b)=>a+b,0);
+      row.difficulty=[Math.floor(row.firstN*.2),Math.floor(row.firstN*.6),row.firstN-Math.floor(row.firstN*.2)-Math.floor(row.firstN*.6)];
+      row.successN=row.firstN-row.ratings[0];
+      row.strongN=row.ratings[2]+row.ratings[3];
+      row.success=row.firstN?row.successN/row.firstN:null;
+      row.strong=row.firstN?row.strongN/row.firstN:null;
+      row.observed=row.n?row.k/row.n:null;
+    });
+    const support = row=>type==='new'?row.firstN>0:row.n>0;
+    const first=rows.findIndex(support);
+    if(first<0) return [];
+    let last=rows.length-1; while(last>first&&!support(rows[last])) last--;
+    return rows.slice(first,last+1);
+  }
+  function persist() {
+    if(!window.openai?.setWidgetState) return;
+    window.openai.setWidgetState({modelContent:{design:'Separate first outcomes and repeat recall',example:preview.example,outcomeQualityAvailable:true},privateContent:{target:preview.target,panels:panels.map(p=>({id:p.id,mode:p.mode,visible:p.visible,page:p.page}))}}).catch(()=>{});
+  }
+  const chartMarkup = (type,quality) => `
+    <header class="cp-heading">
+      <h3>${type==='new'?'New Problem Success':'Recall vs FSRS Estimate'}</h3>
+      <p class="cp-question">${type==='new'?'How are your first recorded outcomes changing?':'How well are you recalling problems on later reviews?'}</p>
+      <p class="cp-description">${type==='new'?'First recorded assessment per problem. Success = Hard + Good + Easy.':'Repeat assessments only. Both curves use the same paired reviews.'}</p>
+    </header>
+    <div class="cp-plot-controls"><span class="cp-sample"></span><div class="cp-tabs" role="group" aria-label="${type==='new'?'First outcomes':'Repeat recall'} display"><button type="button" class="cursor-interaction" data-view="chart" aria-pressed="true">Chart</button><button type="button" class="cursor-interaction" data-view="table" aria-pressed="false">Table</button></div></div>
+    <div class="cp-target-row">${type==='new'?'<div class="cp-first-rate"><span class="cp-period-value"></span><span>successful</span></div>':'<button type="button" class="cp-target cursor-interaction" aria-expanded="false"><i aria-hidden="true"></i><span>Target Recall 90%</span><span aria-hidden="true">▾</span></button>'}</div>
+    ${type==='review'?'<form class="cp-target-editor" aria-label="Preview Target Recall editor" hidden><input type="number" min="0" max="100" step="1" value="90" aria-label="Preview Target Recall (%)"><span>%</span><button type="button" class="cp-cancel cursor-interaction">Cancel</button><button type="submit" class="cp-save cursor-interaction">Save</button></form>':''}
+    <div class="cp-chart"><div class="cp-plot"></div><div class="cp-legend" aria-label="${type==='new'?'First outcome':'Recall'} series"></div><p class="cp-trend" hidden>Low sample: inspect the counts before reading a trend.</p></div>
+    <div class="cp-table" hidden><div class="cp-table-scroll"><table><caption>${type==='new'?'First recorded outcomes':'Paired repeat reviews'} · exact illustrative values</caption><thead></thead><tbody></tbody></table></div><div class="cp-pagination"><span></span><button type="button" class="cursor-interaction" data-page="prev">Previous</button><button type="button" class="cursor-interaction" data-page="next">Next</button></div></div>
+    <details class="cp-method"><summary class="cursor-interaction">Calculation details</summary><p>${type==='new'?'Earliest recorded assessment per problem across retained history, then filtered by date. Again stays a failure even after later success. Earlier attempts, retries and assistance are unknown.':'Initial card reviews are excluded from both curves. They still build the memory state used for later reviews. True zero estimates on repeat reviews remain valid.'}</p>${type==='new'&&quality?'<p>The distance between the two rates is the Hard share. Good + Easy describes stronger ratings, not proof of unassisted solving.</p>':''}<p>Long dashed bridges connect measured points across unavailable intervals; they do not estimate missing outcomes.</p></details>`;
+  root.querySelectorAll('[data-variant]').forEach((variant,vi)=>{
+    for(const type of ['new','review']) {
+      const article=document.createElement('article'); article.className='cp-panel'; article.setAttribute('aria-label',`${type==='new'?'New problem':'Repeat recall'} ${vi===0?'two-rate':'focused'} design`);
+      article.innerHTML=chartMarkup(type,vi===0); variant.querySelector('.cp-pair').appendChild(article);
+      const id=`${vi}-${type}`;
+      const saved=initial?.privateContent?.panels?.find(p=>p.id===id);
+      const panel={id,article,type,quality:vi===0,rows:[],mode:saved?.mode==='table'?'table':'chart',page:saved?.page||0,visible:{primary:saved?.visible?.primary!==false,secondary:saved?.visible?.secondary!==false},selection:null,pinned:false,drawn:false};
+      const spec=type==='new'?[{key:'primary',field:'success',name:'Hard + Good + Easy',color:'var(--cp-success)',marker:'circle'},...(vi===0?[{key:'secondary',field:'strong',name:'Good + Easy',color:'var(--cp-strong)',marker:'diamond'}]:[])]:[{key:'primary',field:'observed',name:'Observed recall',color:'var(--cp-success)',marker:'circle'},{key:'secondary',field:'p',name:'FSRS estimate',color:'var(--cp-estimate)',marker:'diamond',dash:'4 4'}];
+      panel.spec=spec;
+      spec.forEach(s=>{ const b=document.createElement('button'); b.type='button'; b.className='cp-series cursor-interaction'; b.dataset.series=s.key; b.innerHTML=`<i class="cp-key ${s.field==='strong'?'cp-strong':s.field==='p'?'cp-estimate':''}" aria-hidden="true"></i>${s.name}`; b.addEventListener('click',()=>{panel.visible[s.key]=!panel.visible[s.key]; hideTip(); draw(panel,true); persist();}); article.querySelector('.cp-legend').appendChild(b); });
+      article.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{panel.mode=button.dataset.view; panel.selection=null; hideTip(); draw(panel,true); persist();}));
+      article.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>{panel.page=Math.max(0,Math.min(Math.ceil(panel.rows.length/7)-1,panel.page+(button.dataset.page==='next'?1:-1))); table(panel); persist();}));
+      if(type==='review') {
+        const button=article.querySelector('.cp-target'),form=article.querySelector('form'),input=form.querySelector('input');
+        const cancel=()=>{form.hidden=true;button.setAttribute('aria-expanded','false');button.focus();};
+        button.addEventListener('click',()=>{form.hidden=!form.hidden;button.setAttribute('aria-expanded',String(!form.hidden));input.value=preview.target;if(!form.hidden)input.focus();hideTip();});
+        form.querySelector('.cp-cancel').addEventListener('click',cancel);
+        form.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();cancel();}});
+        form.addEventListener('submit',e=>{e.preventDefault(); const value=Number(input.value); if(!input.value||!Number.isInteger(value)||value<0||value>100){input.reportValidity();return;} preview.target=value;cancel();panels.filter(p=>p.type==='review').forEach(p=>draw(p,true));persist();});
+      }
+      panels.push(panel);
+      new ResizeObserver(()=>{if(article.getBoundingClientRect().width>0)draw(panel,false);}).observe(article.querySelector('.cp-plot'));
+    }
+  });
+  function hideTip() { tip.hidden=true; panels.forEach(p=>{p.selection=null;p.pinned=false;const guide=p.article.querySelector('.cp-guide');if(guide)guide.setAttribute('visibility','hidden');p.article.querySelectorAll('.cp-selected-marker').forEach(m=>m.setAttribute('visibility','hidden'));}); }
+  function table(panel) {
+    const headers=panel.type==='new'?['Period','Rated first records','Successful','Success rate','Good + Easy','G + E rate','Again','Hard','Good','Easy','Excluded first ratings']:['Period','Paired repeats','Recalled','Observed','FSRS estimate','Difference','Target Recall'];
+    panel.article.querySelector('thead').innerHTML=`<tr>${headers.map(h=>`<th scope="col">${h}</th>`).join('')}</tr>`;
+    panel.article.querySelector('tbody').innerHTML=panel.rows.slice(panel.page*7,panel.page*7+7).map(row=>{
+      const cells=panel.type==='new'?[row.firstN,row.successN,pct(row.success),row.strongN,pct(row.strong),...row.ratings,row.excluded||0]:[row.n,row.k,pct(row.observed),pct(row.p),row.n?`${Number(((row.observed-row.p)*100).toFixed(1))} pp`:'Unavailable',`${preview.target}%`];
+      return `<tr><th scope="row">${interval(row)}${row.partial?' (in progress)':''}</th>${cells.map(c=>`<td>${c}</td>`).join('')}</tr>`;
+    }).join('');
+    const pages=Math.max(1,Math.ceil(panel.rows.length/7));
+    const pager=panel.article.querySelector('.cp-pagination');pager.hidden=panel.rows.length<=7;pager.querySelector('span').textContent=`Page ${panel.page+1} of ${pages}`;pager.querySelector('[data-page="prev"]').disabled=panel.page===0;pager.querySelector('[data-page="next"]').disabled=panel.page>=pages-1;
+  }
+  function draw(panel,animate) {
+    panel.rows=rowsFor(panel.type);panel.page=Math.min(panel.page,Math.max(0,Math.ceil(panel.rows.length/7)-1));
+    const totals=panel.rows.reduce((t,r)=>({n:t.n+(panel.type==='new'?r.firstN:r.n),k:t.k+(panel.type==='new'?r.successN:r.k)}),{n:0,k:0});
+    panel.article.querySelector('.cp-sample').textContent=panel.type==='new'?`${totals.n} rated first records`:`${totals.n} paired repeat reviews`;
+    if(panel.type==='new') panel.article.querySelector('.cp-period-value').textContent=roundPct(totals.n?totals.k/totals.n:null);
+    else panel.article.querySelector('.cp-target span').textContent=`Target Recall ${preview.target}%`;
+    panel.article.querySelector('.cp-chart').hidden=panel.mode!=='chart';panel.article.querySelector('.cp-table').hidden=panel.mode!=='table';
+    panel.article.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===panel.mode)));
+    panel.article.querySelectorAll('[data-series]').forEach(b=>b.setAttribute('aria-pressed',String(panel.visible[b.dataset.series])));
+    panel.article.querySelector('.cp-trend').hidden=!(totals.n>0&&totals.n<24);
+    table(panel);
+    if(panel.mode!=='chart') return;
+    const plot=panel.article.querySelector('.cp-plot'),width=plot.getBoundingClientRect().width;
+    if(width<100) return;
+    if(!panel.rows.length) { plot.innerHTML=`<p class="cp-empty">${panel.type==='new'?'No first recorded attempts in this period.':'No eligible repeat reviews in this period.'}</p>`;panel.drawn=false;return; }
+    if(!plot.querySelector('svg')) {
+      plot.innerHTML=`<svg role="img" aria-label="${panel.type==='new'?'First recorded outcome rates':'Repeat recall compared with FSRS'}"><title>${panel.type==='new'?'First recorded outcomes':'Repeat recall vs FSRS'}</title><desc></desc><g class="cp-grid-lines"></g><g class="cp-axes"></g><g class="cp-paths"></g><g class="cp-points"></g><g class="cp-target-line"></g><g class="cp-hover"><line class="cp-guide" visibility="hidden"/></g></svg><button class="cp-inspect cursor-interaction" type="button" aria-label="Inspect ${panel.type==='new'?'first recorded outcomes':'repeat recall'}"></button>`;
+      const hit=plot.querySelector('button');
+      hit.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'&&!panel.pinned){const r=plot.getBoundingClientRect();const x=panel.x.invert(e.clientX-r.left);inspect(panel,d3.bisector(d=>d.x).center(panel.rows,x));}});
+      hit.addEventListener('pointerleave',()=>{if(!panel.pinned)hideTip();});
+      hit.addEventListener('click',e=>{const r=plot.getBoundingClientRect();const x=panel.x.invert(e.clientX-r.left);panel.pinned=true;inspect(panel,d3.bisector(d=>d.x).center(panel.rows,x));});
+      hit.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End','Escape','Enter',' '].includes(e.key))return;e.preventDefault();if(e.key==='Escape'){hideTip();return;} let index=panel.selection??0;if(e.key==='Home')index=0;else if(e.key==='End')index=panel.rows.length-1;else if(e.key==='ArrowRight')index=Math.min(panel.rows.length-1,index+1);else if(e.key==='ArrowLeft')index=Math.max(0,index-1);panel.pinned=true;inspect(panel,index);});
+    }
+    const height=290,margin={top:31,right:12,bottom:61,left:49};
+    const x=d3.scaleLinear().domain([panel.rows.length>1?panel.rows[0].x:panel.rows[0].start,panel.rows.at(-1).end]).range([margin.left+12,width-margin.right-5]);
+    const fields=panel.type==='new'?['success','strong']:['observed','p'];
+    const values=panel.rows.flatMap(r=>fields.map(f=>r[f]).filter(v=>v!==null));if(panel.type==='review')values.push(preview.target/100);
+    const extent=d3.extent(values),span=Math.max(.2,extent[1]-extent[0]);
+    const y=d3.scaleLinear().domain([Math.max(0,extent[0]-span*.1),Math.min(1,extent[1]+span*.1)]).nice(4).range([height-margin.bottom-6,margin.top+6]);
+    panel.x=x;panel.y=y;panel.width=width;panel.margin=margin;panel.height=height;
+    const svg=d3.select(plot.querySelector('svg')).attr('viewBox',`0 0 ${width} ${height}`).attr('height',height);
+    svg.select('desc').text(`${totals.n} ${panel.type==='new'?'rated first records':'paired repeat reviews'}. Full interval counts are available through the inspection button or Table. No markers are invented in gaps. ${panel.type==='review'?`Initial card reviews excluded. Target Recall ${preview.target}%.`: 'Earliest retained assessment per problem; prior attempts and assistance unknown.'}`);
+    const ticks=y.ticks(width<350?3:4);
+    svg.select('.cp-grid-lines').selectAll('line').data(ticks).join('line').attr('x1',margin.left).attr('x2',width-margin.right).attr('y1',y).attr('y2',y).attr('stroke','var(--cp-grid)').attr('stroke-width',1);
+    const labels=svg.select('.cp-axes');
+    labels.selectAll('.cp-y-tick').data(ticks).join('text').attr('class','cp-y-tick').attr('x',margin.left-8).attr('y',v=>y(v)+4).attr('text-anchor','end').text(v=>`${Math.round(v*100)}%`);
+    const tickCount=width<350?2:4;
+    const dates=[panel.rows[0].x,...d3.range(1,tickCount-1).map(i=>panel.rows[0].x+(panel.rows.at(-1).end-panel.rows[0].x)*i/(tickCount-1)),panel.rows.at(-1).end-86400000];
+    labels.selectAll('.cp-x-tick').data(dates).join('text').attr('class','cp-x-tick').attr('x',x).attr('y',height-margin.bottom+18).attr('text-anchor',(_,i)=>i===0?'start':i===dates.length-1?'end':'middle').text(date);
+    labels.selectAll('.cp-axis-x').data([1]).join('text').attr('class','axis-title cp-axis-x').attr('data-axis','x').attr('x',(margin.left+width-margin.right)/2).attr('y',height-11).attr('text-anchor','middle').text('Local date · 3-day buckets');
+    labels.selectAll('.cp-axis-y').data([1]).join('text').attr('class','axis-title cp-axis-y').attr('data-axis','y').attr('x',margin.left).attr('y',15).text(panel.type==='new'?'First-outcome rate (%)':'Recall (%)');
+    const connections=[];const points=[];
+    panel.spec.filter(s=>panel.visible[s.key]).forEach(s=>{
+      let previous=null;
+      panel.rows.forEach((row,index)=>{if(row[s.field]===null)return;const current={key:`${s.key}-${index}`,x:row.x,value:row[s.field],s,index};points.push(current);if(previous)connections.push({key:`${s.key}-${previous.index}-${index}`,from:previous,to:current,s,bridge:index>previous.index+1});previous=current;});
+    });
+    const duration=animate&&panel.drawn&&!matchMedia('(prefers-reduced-motion: reduce)').matches?220:0;
+    const paths=svg.select('.cp-paths').selectAll('path').data(connections,d=>d.key).join(enter=>enter.append('path').attr('fill','none'),update=>update,exit=>exit.remove()).attr('stroke',d=>d.s.color).attr('stroke-width',d=>d.s.field==='strong'?1.7:2).attr('stroke-dasharray',d=>d.bridge?'8 6':d.s.dash||null);
+    paths.transition().duration(duration).attr('d',d=>`M${x(d.from.x)},${y(d.from.value)}L${x(d.to.x)},${y(d.to.value)}`);
+    const marks=svg.select('.cp-points').selectAll('path').data(points,d=>d.key).join('path').attr('d',d=>d.s.marker==='diamond'?'M0,-4L4,0L0,4L-4,0Z':d3.symbol().type(d3.symbolCircle).size(36)()).attr('fill','var(--cp-surface)').attr('stroke',d=>d.s.color).attr('stroke-width',1.8);
+    marks.transition().duration(duration).attr('transform',d=>`translate(${x(d.x)},${y(d.value)})`);
+    svg.select('.cp-target-line').selectAll('line').data(panel.type==='review'?[preview.target/100]:[]).join('line').attr('x1',margin.left).attr('x2',width-margin.right).attr('y1',y).attr('y2',y).attr('stroke','var(--cp-target)').attr('stroke-width',1).attr('stroke-dasharray','5 5');
+    const hit=plot.querySelector('button');hit.style.left=`${margin.left}px`;hit.style.top=`${margin.top}px`;hit.style.width=`${Math.max(1,width-margin.left-margin.right)}px`;hit.style.height=`${height-margin.top-margin.bottom}px`;
+    panel.drawn=true;
+    if(panel.selection!==null)inspect(panel,panel.selection);
+  }
+  function inspect(panel,index) {
+    const row=panel.rows[index];if(!row)return;panel.selection=index;
+    const items=[];
+    if(panel.type==='new') {
+      if(panel.visible.primary)items.push(['Hard + Good + Easy',row.firstN?`${row.successN} / ${row.firstN} · ${pct(row.success)}`:'Unavailable']);
+      if(!panel.quality||panel.visible.secondary)items.push(['Good + Easy',row.firstN?`${row.strongN} / ${row.firstN} · ${pct(row.strong)}`:'Unavailable']);
+      items.push(['Rated first records',row.firstN],['Again',row.ratings[0]],['Hard',row.ratings[1]],['Good',row.ratings[2]],['Easy',row.ratings[3]],['Excluded first ratings',row.excluded||0]);
+      if(row.firstN)items.push(['Question difficulty',`${row.difficulty[0]} Easy · ${row.difficulty[1]} Medium · ${row.difficulty[2]} Hard`]);
+    } else {
+      if(panel.visible.primary)items.push(['Observed recall',pct(row.observed)]);
+      if(panel.visible.secondary)items.push(['FSRS estimate',pct(row.p)]);
+      if(panel.visible.primary&&panel.visible.secondary)items.push(['Observed − estimate',row.n?`${Number(((row.observed-row.p)*100).toFixed(1))} pp`:'Unavailable']);
+      items.push(['Recalled',`${row.k} / ${row.n} paired repeats`],['Target Recall',`${preview.target}%`]);
+    }
+    const meaning=panel.type==='new'?(row.firstN?'Earliest retained assessment per problem.':row.excluded?'First outcome unavailable: invalid recorded rating.':'No rated first records in this interval.'):(row.n?'FSRS reconstructed immediately before these same repeat reviews.':'No eligible repeat reviews; initial card reviews do not enter this comparison.');
+    tip.innerHTML=`<strong>${interval(row)} · ${panel.type==='new'?'First outcomes':'Repeat recall'}</strong><dl>${items.map(([label,value])=>`<dt>${label}</dt><dd>${value}</dd>`).join('')}</dl><small>${meaning}</small><small>${fullDate(row.start)}–${fullDate(row.end-86400000)} · ${row.partial?'In progress':'Complete interval'} · As of Oct 3, 2026, 2:44 AM (America/New_York)</small>`;
+    if(panel.pinned)root.querySelector('.cp-announcement').textContent=`${interval(row)}. ${items.map(([label,value])=>`${label}: ${value}`).join('. ')}. ${meaning}`;
+    tip.hidden=false;
+    const rootRect=root.getBoundingClientRect(),plot=panel.article.querySelector('.cp-plot'),pr=plot.getBoundingClientRect();
+    const left=Math.max(6,Math.min(rootRect.width-tip.offsetWidth-6,pr.left-rootRect.left+panel.x(row.x)+10));
+    const top=Math.max(8,Math.min(root.clientHeight-tip.offsetHeight-8,pr.top-rootRect.top+37));tip.style.left=`${left}px`;tip.style.top=`${top}px`;
+    const svg=d3.select(plot.querySelector('svg'));svg.select('.cp-guide').attr('x1',panel.x(row.x)).attr('x2',panel.x(row.x)).attr('y1',panel.margin.top).attr('y2',panel.height-panel.margin.bottom).attr('stroke','var(--cp-border)').attr('stroke-width',1).attr('visibility','visible');
+    const markers=panel.spec.filter(s=>panel.visible[s.key]&&row[s.field]!==null);
+    svg.select('.cp-hover').selectAll('path').data(markers,s=>s.key).join('path').attr('class','cp-selected-marker').attr('d',s=>s.marker==='diamond'?'M0,-5L5,0L0,5L-5,0Z':d3.symbol().type(d3.symbolCircle).size(64)()).attr('transform',s=>`translate(${panel.x(row.x)},${panel.y(row[s.field])})`).attr('fill','var(--cp-surface)').attr('stroke',s=>s.color).attr('stroke-width',2).attr('visibility','visible');
+  }
+  panels.forEach(p=>draw(p,false));
+  root.addEventListener('pointerdown',event=>{if(!event.target.closest('.cp-inspect'))hideTip();});
+  window.addEventListener('openai:set_globals',event=>{const saved=event.detail?.globals?.widgetState;if(!saved)return;const name=saved.modelContent?.example;if(knownExamples.includes(name))preview.example=name;const target=saved.privateContent?.target;if(Number.isInteger(target)&&target>=0&&target<=100)preview.target=target;hideTip();panels.forEach(p=>draw(p,false));});
+  if(globalThis.Tweak) {
+    const tweak=new Tweak({container:root,onChange:()=>{hideTip();panels.forEach(p=>{p.page=0;draw(p,true);});persist();}});
+    tweak.addSelect(preview,'example',{label:'Evidence example',options:knownExamples});
+  }
+})();
+</script>

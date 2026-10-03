@@ -12,6 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): approved two-rate first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall, with the selected preview preserved verbatim; production implementation pending.
 - [`specs/2026-10-03-analytics-practice-ratings-merge-design.md`](./specs/2026-10-03-analytics-practice-ratings-merge-design.md): approved merged Practice Rhythm chart with exact stacked shares, independent completed-review line, saved Success target, interval union, and three-card historical layout; earlier exact design snapshots remain historical context.
 - [`specs/2026-10-02-analytics-chart-targets-design.md`](./specs/2026-10-02-analytics-chart-targets-design.md): approved independent saved Recall/Review Success goals, compact graph editors, Settings/backup/configured sync ownership, and unchanged FSRS behavior; implemented with automated/fixture proof; human extension smoke remains pending.
 - [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): earlier four-chart historical treatment and exact design snapshots, retained as implementation history; the approved merged Practice Rhythm design owns the current three-card historical layout and later panels remain deferred.
@@ -52,6 +53,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md`](./plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md): phased cohort/API, Settings goals, and graph implementation plan for the approved first-attempt/repeat split; written-spec review and execution pending.
 - [`plans/2026-10-03-analytics-practice-ratings-merge.md`](./plans/2026-10-03-analytics-practice-ratings-merge.md): approved phase-sized plan for the pure interval join, merged chart, dashboard composition, automated validation, production-component proof, and required human installed-extension smoke.
 - [`plans/2026-10-02-analytics-compact-target-editors.md`](./plans/2026-10-02-analytics-compact-target-editors.md): user-directed refinement to one small input per graph, independent partial saves, current counterpart constraints, and refreshed production-component proof.
 - [`plans/2026-10-02-analytics-chart-targets.md`](./plans/2026-10-02-analytics-chart-targets.md): approved phase-sized implementation plan for the saved pair, target-aware models/cache, compact editors, validation, and required human extension smoke; execution complete with human extension smoke pending.
