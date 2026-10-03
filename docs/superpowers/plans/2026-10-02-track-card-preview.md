@@ -79,25 +79,47 @@ expect(sendMessage).not.toHaveBeenCalledWith(
       live-extension screenshot/recording smoke remains required before
       review/merge.
 
-## Execution Record
+## Completed Refinements
 
-Current main (including PR #180) was merged into the existing task branch.
-The docs/testing.md conflict was resolved by keeping both smoke sections.
+The user approved an enclosing card outline, exclusive track expansion, and
+removal of visible Preview labels and track-row chevrons. The collection heading
+and its separate chevron remain expansion controls. Typography uses the existing
+bold sans-serif family. Active tracks keep green markers; expanded inactive
+tracks and keyboard focus use neutral outlines. The current design is in
+[the approved spec](../specs/2026-10-02-all-tracks-library-design.md).
 
-The initial focused run failed in the expected seven cases: the disabled
-no-active-track toggle and absent preview controls. Implementation passed all
-101 focused Tracks/dashboard route tests. The full check passed 187 files and
-1,958 tests. Lint, build, formatting, and diff checks passed. Independent
-read-only review reported no actionable findings. Existing JSDOM scrollTo
-notices and the non-blocking build chunk-size warning remain.
+An intermediate phase incorrectly removed the collection chevron. That phase
+is superseded: the user's request applied only to track-row chevrons. The final
+correction restored the collection button and retained its heading control.
 
-Commands run with Node 24.20.0/npm 11.19.0 using this wrapper:
+## Consolidated Verification Record
+
+Current main, including PR #180, was merged into the task branch. The
+`docs/testing.md` conflict was resolved by retaining both smoke sections.
+
+The initial seven focused regressions failed before implementation. Exclusive
+expansion and removal of visible Preview text also failed before their fixes.
+The incorrect collection-button removal initially left one stale route
+assertion; its correction was tested again while the required Hide all tracks
+button was absent, then passed after restoration.
+
+Before review cleanup, the final focused run passed 103 Tracks/route tests;
+`npm run check` passed database consistency, typecheck, lint, and 1,960 tests
+across 187 files. Build, formatting, and diff checks passed. Existing JSDOM
+scrollTo notices and the non-blocking build chunk-size warning remain.
+Independent static review found no actionable issue; its duplicate test run
+was blocked by sandbox EPERM on `.vite-temp`. Successful execution proof came
+from the main agent's runs.
+
+### Exact Command Ledger
+
+These are the distinct commands actually run across the completed phases.
+Repeated invocations are listed once. npm/npx commands used Node 24.20.0/npm
+11.19.0 through the explicit PATH wrapper below; the final correction's focused
+suite, lint/check/build, five-file formatting check, and diff check passed.
 
 ```sh
 rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin <npm-or-npx-command>
-```
-
-```sh
 npm run test -- src/features/tracks/components/tracks-screen.test.tsx
 npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
 npm run lint
@@ -107,290 +129,89 @@ npx prettier --write src/features/tracks/components/other-tracks-accordion.tsx s
 npx prettier --write --ignore-path /dev/null docs/product.md docs/architecture.md docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/track-card-preview.tsx src/features/tracks/components/tracks-screen.test.tsx docs/product.md docs/architecture.md docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 rtk git diff --check
-```
-
-Skipped npm run zip because release packaging is unchanged. Skipped
-npm run db:generate because this follow-up changes no schema; npm run check
-includes db:check against the already merged migration. Human installed-extension
-smoke and new preview screenshot/recording proof remain pending, including
-actual card hit targets, narrow wrapping, and keyboard focus. No additional
-browser automation was performed; the development extension is provided for
-the user's requested hands-on testing. See docs/testing.md > Track Card Preview.
-
-Release impact remains an additive feat(tracks) UI change. Roll back by
-reverting the collection/import and preview feature commits while retaining
-main's existing migration and editor changes.
-
-## Installed-Extension Visual Follow-Up
-
-The user's supplied screenshot shows an open NeetCode 150 card. They requested
-that the expanded groups visibly belong to that track and that the redundant
-Preview label disappear. Their latest refinement asks for a clear enclosing
-outline without an extra caption, and only one open track at a time. This is a
-scoped adjustment to the approved card-click interaction.
-
-- [x] Extend preview interaction coverage for no visible Preview text, content
-      contained in its owning article, exclusive track expansion, and closing
-      the preview when All tracks collapses. Confirm the exclusive-expansion
-      test fails before implementation. Preserve keyboard and action coverage.
-- [x] In other-tracks-accordion.tsx, enclose the open summary and content within
-      a clear continuous rounded outline/background, give the open summary a
-      tonal fill, and remove the visible Preview text and extra owning-track
-      caption. Lift the open track ID into the collection so opening another
-      track closes the current one. Retain the native toggle and chevron.
-- [x] Update docs/product.md and the smoke guidance in docs/testing.md. Run focused tests, npm run lint,
-      npm run check, npm run build, touched-file Prettier, and git diff --check.
-- [x] Publish the scoped change to existing draft PR #183. Add the supplied
-      screenshot as human installed-extension evidence of the earlier preview
-      state; final framing proof remains pending another human screenshot.
-      Continue the dev build into the user's installed WebstormProjects folder.
-
-### Follow-Up Verification Record
-
-The exclusive-expansion test failed before implementation because both track
-previews remained in the document. The earlier no-visible-Preview regression
-also failed before the label was removed. The final focused run passed 103
-tests across two files; `npm run check` passed 1,960 tests across 187 files,
-database consistency, typecheck, and lint. Production build passed with the
-existing non-blocking chunk-size warning. Independent static review found no
-actionable issue; the reviewer's duplicate test attempt was blocked by sandbox
-EPERM on `.vite-temp`, so execution evidence comes from the successful main
-agent runs.
-
-Commands executed from the feature worktree through `rtk proxy`, using the
-project's Node v24.20.0 PATH:
-
-```sh
 npm run test -- src/features/tracks/components/tracks-screen.test.tsx -t 'lazily previews'
 npm run test -- src/features/tracks/components/tracks-screen.test.tsx -t 'opens only one track preview'
-npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
-npm run lint
-npm run check
-npm run build
 npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 npx prettier --write --ignore-path /dev/null docs/product.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/product.md docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
-rtk git diff --check
 npm run dev -- --config /private/tmp/cognipace-tracks-installed-dev.config.ts --port 3000
-```
-
-The temporary dev configuration keeps feature source in the managed worktree
-and writes development output into
-`/Users/tobiolutimehin/WebstormProjects/cognipace-v2/dist/chrome-mv3-dev`, the
-folder Chrome loads. Localhost source verification confirmed the single-track
-state, enclosing outline, and absent extra caption. The original checkout's
-source remains clean.
-
-Skipped `npm run zip` because release packaging is unchanged. Skipped
-`npm run db:generate` because no schema changed; `npm run check` includes the
-database consistency check. Human installed-extension happy-path and edge-case
-smoke remains pending for this latest refinement. Browser automation cannot
-claim extension URLs under its URL policy; source and automated tests are not
-live visual proof. The supplied human screenshot is preserved byte-for-byte at
-`docs/superpowers/evidence/2026-10-02-all-tracks/installed-preview-before-framing.png`
-and is labeled as the installed preview before this framing/accordion change.
-Keep the PR draft until final human smoke and updated visual proof are attached.
-
-## Collection Heading Typography Follow-Up
-
-The user approved matching All tracks to the dashboard's bold sans-serif
-headings. Replace only the generic serif family and semibold weight, keeping
-the larger collection title, icon, count, and container hierarchy.
-
-- [x] Use the existing `font-sans` token and `font-bold` in
-      `src/features/tracks/components/other-tracks-accordion.tsx`, retaining
-      `text-2xl`. Update the design spec and docs/testing.md to record this
-      approved choice and its visual smoke check.
-- [x] Run the existing focused Tracks/route tests, required lint/check/build,
-      touched-file Prettier, and diff check. No new tests that assert CSS classes
-      are needed for this presentation-only adjustment.
-- [x] Update draft PR #183 and verify the running dev server serves the new
-      heading in the user's installed extension folder. Final human visual
-      proof remains pending.
-
-### Typography Verification Record
-
-Existing focused coverage passed 103 tests across two files. `npm run lint`
-passed; `npm run check` passed database consistency, typecheck, lint, and 1,960
-tests across 187 files. `npm run build` passed with the existing non-blocking
-chunk-size warning. Prettier and diff checks passed. Localhost verification
-confirmed `font-sans text-2xl font-bold`, removal of `font-serif`, and the
-installed dev dashboard's connection to port 3000. This is source verification;
-the final installed-extension visual check is still pending.
-
-Commands executed through `rtk proxy` with the project's Node v24.20.0 PATH:
-
-```sh
-npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
-npm run lint
-npm run check
-npm run build
 npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
-rtk git diff --check
-```
-
-Skipped `npm run zip` because packaging is unchanged. Skipped
-`npm run db:generate` because no schema changed; database consistency passed
-inside `npm run check`. No new tests were added for this reversible font-class
-adjustment. Existing behavior coverage and the human visual smoke checklist
-remain the relevant checks. The already running dev server serves the updated
-heading; browser automation remains unable to claim extension URLs.
-
-## Collection Collapse Button Removal (Superseded)
-
-This phase implemented an incorrect interpretation of the user's screenshot.
-The user intended removal of the track-row chevrons, while the collection
-chevron remains required. The correction below supersedes this phase.
-
-The user requested removal of the standalone All tracks chevron icon button.
-Keep the heading as the accessible click/Enter/Space expansion control. Track
-card chevrons and create/import actions retain their existing behavior.
-
-- [x] Update existing collection tests to use the heading and verify the
-      redundant control is absent. Run the focused heading regression before
-      removing the button, then preserve existing collection/preview coverage.
-      Update the import route's existing expansion assertion in
-      src/app/dashboard/routes.test.tsx to reference the remaining heading.
-- [x] Remove the collection IconButton and unused imports in
-      other-tracks-accordion.tsx. Update the design spec and smoke guidance.
-- [x] Run focused Tracks/route tests, lint/check/build, touched-file Prettier,
-      and diff check. Publish to draft PR #183 and confirm the running dev
-      extension serves the update. Human visual proof remains pending.
-
-### Collapse Button Removal Verification
-
-The existing heading test first failed because the redundant collapse button
-was still present. After removal, the first focused two-file run passed 102
-tests and failed one import-route assertion that still referenced the removed
-button. Updating that assertion to use the heading produced 103 passing tests.
-`npm run lint` passed; `npm run check` passed database consistency, typecheck,
-lint, and 1,960 tests across 187 files. `npm run build` passed with the existing
-non-blocking chunk-size warning. Prettier and diff checks passed.
-
-Exact commands executed through `rtk proxy` with Node v24.20.0:
-
-```sh
 npm run test -- src/features/tracks/components/tracks-screen.test.tsx -t 'toggles all tracks when the collection heading is clicked'
-npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
-npm run lint
-npm run check
-npm run build
-npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
-rtk git diff --check
-```
-
-Skipped `npm run zip` because packaging is unchanged. Skipped
-`npm run db:generate` because no schema changed; database consistency passed
-inside `npm run check`. Localhost source verification confirmed the redundant
-control is gone and the heading toggle remains, served to the user's installed
-dev folder on port 3000. Final human installed-extension visual and smoke proof
-remains pending; extension URL automation is still unavailable under the
-browser policy. Existing tests cover the remaining heading's click/Enter/Space
-behavior, automatic reopen after adding a track, and preview reset on collapse.
-
-## Active And Expanded Track Styling
-
-The user's latest installed-extension screenshot shows that inactive expanded
-and active tracks both use green outlines and thicker leading accents. Reserve
-those active markers for the active track. Give an expanded inactive track a
-clear neutral outline of uniform thickness around its summary and groups,
-with a subtle surface tint. Use a neutral card-toggle focus ring to distinguish
-keyboard focus from activation. Preserve the single-open preview interaction.
-
-- [x] Simplify the article's state classes in other-tracks-accordion.tsx so
-      active styling takes priority whether open or closed, while inactive
-      expansion uses neutral styling. Change the card-toggle focus ring to
-      neutral. Update the design spec and manual visual smoke guidance.
-- [x] Run existing focused Tracks/route coverage, lint/check/build, touched-file
-      Prettier, and diff check. Avoid new tests that mirror CSS classes for this
-      presentation adjustment.
-- [x] Publish to draft PR #183 and verify the running dev source. Preserve the
-      supplied screenshot as evidence before the state-style distinction.
-      Final human installed-extension visual confirmation remains pending.
-
-### Active/Expanded Styling Verification
-
-Existing focused coverage passed 103 tests across two files. `npm run lint`
-passed; `npm run check` passed database consistency, typecheck, lint, and 1,960
-tests across 187 files. `npm run build` passed with the existing non-blocking
-chunk-size warning. Prettier and diff checks passed. Localhost source
-verification confirmed the neutral inactive preview outline, active green
-leading accent/tint, and neutral focus ring. No new CSS-class tests were added.
-
-Exact commands executed through `rtk proxy` with Node v24.20.0:
-
-```sh
-npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
-npm run lint
-npm run check
-npm run build
-npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
-npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
-rtk git diff --check
-```
-
-Skipped `npm run zip` because packaging is unchanged. Skipped
-`npm run db:generate` because no schema changed; database consistency passed
-inside `npm run check`. The supplied installed-extension screenshot is
-preserved byte-for-byte at
-`docs/superpowers/evidence/2026-10-02-all-tracks/installed-preview-before-state-distinction.png`.
-It shows the contained preview before this state-style change. Final human
-visual proof remains pending for inactive expansion, active expansion, and
-keyboard focus in light/dark themes and narrow layouts. The dev server serves
-the update on port 3000 to the user's loaded folder; extension URL automation
-remains unavailable under the browser policy.
-
-## Chevron Scope Correction
-
-The user clarified that the All tracks chevron is important and must remain.
-Restore that icon button beside the collection actions, sharing the heading's
-expansion state and reset behavior. Remove only the individual track row
-chevrons; rows remain clickable and keyboard-accessible. Preserve the neutral
-preview outlines, active green markers, and single-open track behavior.
-
-- [x] Adjust existing collection tests to exercise both heading and chevron,
-      including synchronized expansion states and keyboard reopening without
-      an active track. Confirm the regression fails before restoring the icon.
-- [x] Restore the collection IconButton/ChevronUp import and rendering in
-      other-tracks-accordion.tsx; remove the row's decorative ChevronDown.
-      Correct the current design spec and human smoke guidance.
-- [x] Run focused Tracks/route tests, lint/check/build, touched-file Prettier,
-      and diff check. Update draft PR #183 around the correct final behavior
-      and verify the running dev source. Human visual proof remains pending.
-
-### Chevron Correction Verification
-
-The existing heading regression first failed because the All tracks chevron's
-accessible Hide all tracks button was absent. After correction, focused
-coverage passed 103 tests across two files. `npm run lint` passed;
-`npm run check` passed database consistency, typecheck, lint, and 1,960 tests
-across 187 files. `npm run build` passed with the existing non-blocking chunk-size
-warning. Prettier and diff checks passed. Source verification on localhost
-confirmed the collection toggle is restored, row chevrons are absent, and row
-click handling remains, served to the user's installed dev folder on port 3000.
-
-Exact commands executed through `rtk proxy` with Node v24.20.0:
-
-```sh
-npm run test -- src/features/tracks/components/tracks-screen.test.tsx -t 'toggles all tracks when the collection heading is clicked'
-npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx
-npm run lint
-npm run check
-npm run build
-npx prettier --write --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
 npx prettier --check --ignore-path /dev/null src/features/tracks/components/other-tracks-accordion.tsx src/features/tracks/components/tracks-screen.test.tsx docs/testing.md docs/superpowers/specs/2026-10-02-all-tracks-library-design.md docs/superpowers/plans/2026-10-02-track-card-preview.md
+```
+
+### Installed Development Build And Evidence
+
+The temporary configuration at
+`/private/tmp/cognipace-tracks-installed-dev.config.ts` keeps source in the
+managed PR worktree and writes output into
+`/Users/tobiolutimehin/WebstormProjects/cognipace-v2/dist/chrome-mv3-dev`, the
+folder Chrome loads. The original checkout's source remains clean. Localhost
+source checks confirmed the current collection chevron, absent row chevrons,
+single-track expansion, enclosing outlines, and corrected typography/styles.
+They are source checks, not live installed-extension visual proof.
+
+The user's supplied installed-extension screenshots are preserved byte-for-byte:
+
+- [Before enclosing-outline/single-open refinement](../evidence/2026-10-02-all-tracks/installed-preview-before-framing.png).
+- [Before active/expanded style distinction](../evidence/2026-10-02-all-tracks/installed-preview-before-state-distinction.png).
+
+Both images precede the final style and chevron corrections. Human happy-path
+and edge-case installed-extension smoke and final screenshots/recording remain
+pending. Browser automation cannot claim extension URLs under its policy.
+Keep PR #183 draft; follow `docs/testing.md > Track Card Preview` and
+`All Tracks Collection And Import` for the complete manual flows.
+
+### Skips And Recovery
+
+Skipped `npm run zip` because release packaging is unchanged. Skipped
+`npm run db:generate` because no schema changed; `npm run check` includes
+`db:check` against merged main. No CSS-class-only tests were added for the
+presentation refinements; existing behavior tests and human visual smoke apply.
+
+Release impact remains an additive `feat(tracks)` UI change. Roll back by
+reverting the scoped feature commits while retaining main's migration/editor
+changes. Review cleanup preserves behavior and persistence compatibility.
+
+## Review Cleanup
+
+The user approved implementing the seven Ponytail review reductions.
+
+- [x] Share the active/no-active collection rendering without changing behavior.
+- [x] Merge overlapping collapse coverage and share repeated preview/file mocks.
+- [x] Reuse preview defaults while retaining one addition and empty preview items.
+- [x] Replace superseded instructions and repetitive logs with one honest record.
+- [x] Run focused Tracks/import/route tests, lint/check/build, touched-file
+      Prettier, and diff checks; update draft PR #183 with actual results.
+
+Final installed-extension smoke and screenshots remain required before merge.
+
+### Cleanup Verification
+
+All seven reviewed reductions were applied. The overlap in heading-toggle
+coverage was merged into the broader collection test, preserving the chevron
+state assertions and separate no-active-track keyboard coverage. One test case
+was consolidated; no behavior or smoke scenario was removed.
+
+Focused regression coverage passed 119 tests across three files. `npm run lint`
+and `npm run check` passed; the full suite passed 1,959 tests across 187 files.
+`npm run build` passed with the existing non-blocking chunk warning. Touched-file
+formatting and diff checks passed. Exact cleanup commands:
+
+```sh
+npm run test -- src/features/tracks/components/tracks-screen.test.tsx src/features/imports/components/import-content-panel.test.tsx src/app/dashboard/routes.test.tsx
+npm run lint
+npm run check
+npm run build
+npx prettier --write --ignore-path /dev/null src/features/tracks/components/tracks-screen.tsx src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx docs/superpowers/plans/2026-10-02-track-card-preview.md
+npx prettier --check --ignore-path /dev/null src/features/tracks/components/tracks-screen.tsx src/features/tracks/components/tracks-screen.test.tsx src/app/dashboard/routes.test.tsx docs/superpowers/plans/2026-10-02-track-card-preview.md
 rtk git diff --check
 ```
 
-Skipped `npm run zip` because packaging is unchanged. Skipped
-`npm run db:generate` because no schema changed; database consistency passed
-inside `npm run check`. Human installed-extension visual/smoke proof remains
-pending for the restored collection chevron and row chevron removal. The
-earlier supplied screenshots precede this correction. Browser automation still
-cannot claim extension URLs under its policy; source verification and tests
-are not a substitute for that proof. Keep the PR draft.
+The same Node/PATH wrapper and skipped zip/schema-generation reasons above
+apply. Final human installed-extension smoke and visual proof remain pending.

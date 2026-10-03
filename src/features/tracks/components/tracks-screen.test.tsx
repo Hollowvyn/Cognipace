@@ -641,10 +641,16 @@ describe('TracksScreen', () => {
     })
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(
+      screen.getByRole('button', { name: 'Hide all tracks' }),
+    ).toHaveAttribute('aria-expanded', 'true')
+    expect(
       document.getElementById(toggle.getAttribute('aria-controls') ?? ''),
     ).toContainElement(otherRow)
     await user.click(toggle)
     expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Show all tracks' }),
+    ).toHaveAttribute('aria-expanded', 'false')
     await user.click(screen.getByRole('button', { name: 'All tracks' }))
     expect(screen.getByText('Grind 75')).toBeVisible()
   })
@@ -690,32 +696,6 @@ describe('TracksScreen', () => {
     )
   })
 
-  it('toggles all tracks when the collection heading is clicked', async () => {
-    const user = userEvent.setup()
-    vi.mocked(sendMessage).mockResolvedValueOnce(twoGroupWorkspace)
-    renderTracksScreen()
-
-    expect(await screen.findByText('All tracks')).toBeVisible()
-    expect(
-      screen.getByRole('button', { name: 'Hide all tracks' }),
-    ).toHaveAttribute('aria-expanded', 'true')
-    await user.click(screen.getByRole('button', { name: 'All tracks' }))
-    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Show all tracks' }),
-    ).toHaveAttribute('aria-expanded', 'false')
-
-    await user.click(screen.getByText('All tracks'))
-
-    expect(screen.getByText('Grind 75')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'All tracks' })).toBeVisible()
-
-    await user.click(screen.getByText('All tracks'))
-
-    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'All tracks' })).toBeVisible()
-  })
-
   it('does not toggle all tracks when New Track is clicked', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce(twoGroupWorkspace)
@@ -758,13 +738,7 @@ describe('TracksScreen', () => {
 
   it('lazily previews ordered groups, questions, and topics without activating a track', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) => {
-      if (method === 'tracks.getWorkspace')
-        return Promise.resolve(twoGroupWorkspace)
-      if (method === 'tracks.getTrackForEdit')
-        return Promise.resolve(trackPreview)
-      return Promise.resolve(null)
-    })
+    mockWorkspaceAndTrackPreview()
     renderTracksScreen()
     const toggle = await screen.findByRole('button', {
       name: 'Preview Grind 75',
@@ -825,13 +799,7 @@ describe('TracksScreen', () => {
 
   it('opens only one track preview at a time without activating it', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) => {
-      if (method === 'tracks.getWorkspace')
-        return Promise.resolve(twoGroupWorkspace)
-      if (method === 'tracks.getTrackForEdit')
-        return Promise.resolve(trackPreview)
-      return Promise.resolve(null)
-    })
+    mockWorkspaceAndTrackPreview()
     renderTracksScreen()
     const grindToggle = await screen.findByRole('button', {
       name: 'Preview Grind 75',
@@ -868,13 +836,7 @@ describe('TracksScreen', () => {
 
   it('closes a track preview when the collection collapses', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) => {
-      if (method === 'tracks.getWorkspace')
-        return Promise.resolve(twoGroupWorkspace)
-      if (method === 'tracks.getTrackForEdit')
-        return Promise.resolve(trackPreview)
-      return Promise.resolve(null)
-    })
+    mockWorkspaceAndTrackPreview()
     renderTracksScreen()
     await user.click(
       await screen.findByRole('button', { name: 'Preview Grind 75' }),
@@ -897,13 +859,7 @@ describe('TracksScreen', () => {
 
   it('keeps every catalog action usable without toggling an open preview', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) => {
-      if (method === 'tracks.getWorkspace')
-        return Promise.resolve(twoGroupWorkspace)
-      if (method === 'tracks.getTrackForEdit')
-        return Promise.resolve(trackPreview)
-      return Promise.resolve(null)
-    })
+    mockWorkspaceAndTrackPreview()
     renderTracksScreen()
     await user.click(
       await screen.findByRole('button', { name: 'Preview Grind 75' }),
@@ -1514,6 +1470,16 @@ describe('TracksScreen', () => {
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
   })
 })
+
+function mockWorkspaceAndTrackPreview() {
+  vi.mocked(sendMessage).mockImplementation((method) => {
+    if (method === 'tracks.getWorkspace')
+      return Promise.resolve(twoGroupWorkspace)
+    if (method === 'tracks.getTrackForEdit')
+      return Promise.resolve(trackPreview)
+    return Promise.resolve(null)
+  })
+}
 
 function renderTracksScreen() {
   const { wrapper } = createQueryTestHarness()

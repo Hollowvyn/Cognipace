@@ -42,6 +42,14 @@ let analyticsSummary = createSerializedAnalyticsSummary()
 const analyticsTimeZone =
   Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 
+function createTrackImportFile(text = validTwoQuestionTrackFileText) {
+  const file = new File([text], 'my-track.json', { type: 'application/json' })
+  Object.defineProperty(file, 'text', {
+    value: () => Promise.resolve(text),
+  })
+  return file
+}
+
 function renderDashboard(initialEntry = '/') {
   const router = createDashboardRouter({
     history: createMemoryHistory({ initialEntries: [initialEntry] }),
@@ -604,12 +612,7 @@ describe('dashboard routes', () => {
       const dialog = await screen.findByRole('dialog', {
         name: 'Import tracks',
       })
-      const file = new File([validTwoQuestionTrackFileText], 'my-track.json', {
-        type: 'application/json',
-      })
-      Object.defineProperty(file, 'text', {
-        value: () => Promise.resolve(validTwoQuestionTrackFileText),
-      })
+      const file = createTrackImportFile()
       await user.upload(
         within(dialog).getByLabelText('Choose track JSON file'),
         file,
@@ -667,12 +670,7 @@ describe('dashboard routes', () => {
     })
     const { user, router } = renderDashboard('/tracks/import')
     const dialog = await screen.findByRole('dialog', { name: 'Import tracks' })
-    const file = new File([validTwoQuestionTrackFileText], 'my-track.json', {
-      type: 'application/json',
-    })
-    Object.defineProperty(file, 'text', {
-      value: () => Promise.resolve(validTwoQuestionTrackFileText),
-    })
+    const file = createTrackImportFile()
     await user.upload(
       within(dialog).getByLabelText('Choose track JSON file'),
       file,
@@ -735,12 +733,7 @@ describe('dashboard routes', () => {
     })
     const { user } = renderDashboard('/tracks/import')
     const dialog = await screen.findByRole('dialog', { name: 'Import tracks' })
-    const file = new File([validTwoQuestionTrackFileText], 'my-track.json', {
-      type: 'application/json',
-    })
-    Object.defineProperty(file, 'text', {
-      value: () => Promise.resolve(validTwoQuestionTrackFileText),
-    })
+    const file = createTrackImportFile()
     await user.upload(
       within(dialog).getByLabelText('Choose track JSON file'),
       file,
@@ -765,20 +758,9 @@ describe('dashboard routes', () => {
   it('guards modal dismissal during apply and save retry, then returns to Tracks', async () => {
     const original = vi.mocked(sendMessage).getMockImplementation()!
     const preview = {
-      status: 'ready' as const,
-      fingerprint: 'a'.repeat(64),
-      additions: {
-        tracks: 1,
-        groups: 0,
-        memberships: 0,
-        problems: 0,
-        companies: 0,
-        topics: 0,
-        problemTopics: 0,
-        problemCompanies: 0,
-      },
+      ...readyPreview,
+      additions: { ...readyPreview.additions, tracks: 1, problems: 0 },
       items: [],
-      diagnostics: [],
     }
     let finishApply!: (response: {
       status: 'persistence-error'
@@ -803,12 +785,7 @@ describe('dashboard routes', () => {
     const { user, router } = renderDashboard('/tracks/import')
     const dialog = await screen.findByRole('dialog', { name: 'Import tracks' })
     const fileText = '{"format":"cognipace-content","version":1,"tracks":[]}'
-    const file = new File([fileText], 'my-track.json', {
-      type: 'application/json',
-    })
-    Object.defineProperty(file, 'text', {
-      value: () => Promise.resolve(fileText),
-    })
+    const file = createTrackImportFile(fileText)
     await user.upload(
       within(dialog).getByLabelText('Choose track JSON file'),
       file,

@@ -80,36 +80,24 @@ function TracksWorkspaceView({
     )
   }
 
-  if (!workspace.activeTrack) {
-    return (
-      <TracksFrame>
-        <NoActiveTrackState />
-        <OtherTracksAccordion
-          importTrackAction={importTrackAction}
-          activeTrackId={null}
-          generatedAt={workspace.generatedAt}
-          newTrackAction={newTrackAction}
-          renderEditTrackAction={renderEditTrackAction}
-          tracks={workspace.tracks}
-        />
-      </TracksFrame>
-    )
-  }
-
   return (
     <TracksFrame>
-      <ActiveTrackWorkspace
-        activeTrack={workspace.activeTrack}
-        dueCount={workspace.dueCount}
-        generatedAt={workspace.generatedAt}
-        groups={workspace.activeTrackGroups}
-        renderEditProblemAction={renderEditProblemAction}
-        renderEditTrackAction={renderEditTrackAction}
-        rows={workspace.activeTrackRows}
-      />
+      {workspace.activeTrack ? (
+        <ActiveTrackWorkspace
+          activeTrack={workspace.activeTrack}
+          dueCount={workspace.dueCount}
+          generatedAt={workspace.generatedAt}
+          groups={workspace.activeTrackGroups}
+          renderEditProblemAction={renderEditProblemAction}
+          renderEditTrackAction={renderEditTrackAction}
+          rows={workspace.activeTrackRows}
+        />
+      ) : (
+        <NoActiveTrackState />
+      )}
       <OtherTracksAccordion
         importTrackAction={importTrackAction}
-        activeTrackId={workspace.activeTrack.track.id}
+        activeTrackId={workspace.activeTrack?.track.id ?? null}
         generatedAt={workspace.generatedAt}
         newTrackAction={newTrackAction}
         renderEditTrackAction={renderEditTrackAction}
