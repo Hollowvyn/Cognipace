@@ -56,52 +56,6 @@ describe('useSettingsDraft', () => {
     expect(result.current.hasChanges).toBe(false)
   })
 
-  it('preserves both first-attempt goals on Settings Save after an external refresh', async () => {
-    let storedSettings = defaultUserSettings
-    vi.mocked(sendMessage).mockImplementation((method, payload) => {
-      if (method === 'settings.getSettings')
-        return Promise.resolve(storedSettings)
-      if (method === 'settings.updateSettings') {
-        const { patch } = settingsUpdateRequestSchema.parse(payload)
-        storedSettings = mergeUserSettings(storedSettings, patch)
-        return Promise.resolve(storedSettings)
-      }
-      return Promise.reject(new Error(`Unexpected method ${method}`))
-    })
-    const { queryClient, wrapper } = createQueryTestHarness()
-    const { result } = renderHook(() => useSettingsDraft(), { wrapper })
-    await waitFor(() =>
-      expect(result.current.draft).toEqual(defaultUserSettings),
-    )
-    act(() => {
-      result.current.actions.setNumberInput('dailyGoal', '9')
-    })
-    storedSettings = {
-      ...storedSettings,
-      analytics: {
-        ...storedSettings.analytics,
-        targetFirstAttemptSuccess: 0.29,
-        targetFirstAttemptGoodEasy: 1,
-      },
-    }
-    act(() => {
-      queryClient.setQueryData(queryKeys.settings.all, storedSettings)
-    })
-    await act(async () => {
-      await result.current.actions.save()
-    })
-
-    expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
-      surface: 'dashboard',
-      patch: { practice: { dailyGoal: 9 } },
-    })
-    expect(result.current.draft).toEqual(storedSettings)
-    expect(result.current.draft?.analytics).toMatchObject({
-      targetFirstAttemptSuccess: 0.29,
-      targetFirstAttemptGoodEasy: 1,
-    })
-  })
-
   it('resets a successful local Save while its Settings refetch is still pending', async () => {
     let storedSettings = defaultUserSettings
     let readCount = 0
@@ -172,6 +126,8 @@ describe('useSettingsDraft', () => {
         ...defaultUserSettings.analytics,
         targetRecall: 0.8,
         targetReviewSuccess: 0.9,
+        targetFirstAttemptSuccess: 0.29,
+        targetFirstAttemptGoodEasy: 1,
       },
       expectedDailyGoal: 9,
     },
@@ -217,6 +173,8 @@ describe('useSettingsDraft', () => {
           ...defaultUserSettings.analytics,
           targetRecall: 0.8,
           targetReviewSuccess: 0.9,
+          targetFirstAttemptSuccess: 0.29,
+          targetFirstAttemptGoodEasy: 1,
         },
       }
       act(() => {
@@ -242,6 +200,7 @@ describe('useSettingsDraft', () => {
         patch: expectedPatch,
       })
       expect(storedSettings.analytics).toEqual(expectedTargets)
+      expect(result.current.controller.draft).toEqual(storedSettings)
       expect(result.current.controller.draft?.analytics).toEqual(
         expectedTargets,
       )

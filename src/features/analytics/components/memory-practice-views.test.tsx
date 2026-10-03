@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { AnalyticsViews } from '../api/analytics-contracts'
 import { buildAdaptiveDurationScale } from '../domain/analytics-scales'
-import { MemoryStrengthView, PracticeRhythmView } from './memory-practice-views'
+import { MemoryStrengthView } from './memory-practice-views'
 
 const timeFrame = {
   asOf: '2026-10-02T06:44:00.000Z',
@@ -13,7 +13,6 @@ const timeFrame = {
 }
 
 type MemoryRow = AnalyticsViews['memoryStrength']['rows'][number]
-type PracticeRow = AnalyticsViews['practiceRhythm']['rows'][number]
 
 function memoryRow(overrides: Partial<MemoryRow> = {}): MemoryRow {
   return {
@@ -32,74 +31,12 @@ function memoryRow(overrides: Partial<MemoryRow> = {}): MemoryRow {
   }
 }
 
-function practiceRow(overrides: Partial<PracticeRow> = {}): PracticeRow {
-  return {
-    id: 'supported',
-    bucketStart: '2026-09-03',
-    bucketEnd: '2026-09-05',
-    isPartial: false,
-    completedReviews: 8,
-    goodEasy: 6,
-    validRatings: 8,
-    reviewSuccess: 0.75,
-    evidence: 'measured',
-    ...overrides,
-  }
-}
-
 const memoryScale: AnalyticsViews['memoryStrength']['scale'] = {
   domain: [0, 50],
   ticks: [0, 10, 20, 30, 40, 50],
 }
-const countScale: AnalyticsViews['practiceRhythm']['countScale'] = {
-  domain: [0, 20],
-  ticks: [0, 5, 10, 15, 20],
-}
-const percentageScale: AnalyticsViews['practiceRhythm']['percentageScale'] = {
-  domain: [0.6, 0.9],
-  ticks: [0.6, 0.7, 0.8, 0.9],
-}
 
-describe('approved Memory Strength and Practice Rhythm views', () => {
-  it.each([0, 1])(
-    'draws a %i success goal on the right percentage axis',
-    (targetReviewSuccess) => {
-      render(
-        <PracticeRhythmView
-          view={{
-            rows: [practiceRow()],
-            countScale,
-            percentageScale: { domain: [0, 1], ticks: [0, 0.5, 1] },
-            targetReviewSuccess,
-          }}
-        />,
-      )
-      expect(
-        screen.getByText(`Target Review Success ${targetReviewSuccess * 100}%`),
-      ).toBeVisible()
-      const line = screen
-        .getByTestId('practice-success-target')
-        .querySelector('line')!
-      const y = Number(line.getAttribute('y1'))
-      const plotLines = screen
-        .getByTestId('historical-chart-grid')
-        .querySelectorAll('line')
-      const gridYs = Array.from(plotLines, (line) =>
-        Number(line.getAttribute('y1')),
-      )
-      expect(y).toBeCloseTo(
-        targetReviewSuccess === 1 ? Math.min(...gridYs) : Math.max(...gridYs),
-      )
-      fireEvent.keyDown(
-        screen.getByRole('button', { name: 'Inspect Practice Rhythm chart' }),
-        { key: 'Home' },
-      )
-      expect(screen.getByRole('tooltip')).toHaveTextContent(
-        `Target Review Success: ${targetReviewSuccess * 100}%`,
-      )
-    },
-  )
-
+describe('approved Memory Strength view', () => {
   it('draws discrete quartile stems and caps only for supported eligible cohorts, below the median', () => {
     const rows = [
       memoryRow(),
@@ -334,198 +271,6 @@ describe('approved Memory Strength and Practice Rhythm views', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
-  it('shows one mixed Practice plot with muted columns behind measured success and independent axes', () => {
-    const rows = [
-      practiceRow(),
-      practiceRow({
-        id: 'zero',
-        bucketStart: '2026-09-06',
-        bucketEnd: '2026-09-08',
-        completedReviews: 0,
-        goodEasy: 0,
-        validRatings: 0,
-        reviewSuccess: null,
-        evidence: 'not-measured',
-      }),
-      practiceRow({
-        id: 'last',
-        bucketStart: '2026-09-09',
-        bucketEnd: '2026-09-11',
-        completedReviews: 12,
-        goodEasy: 10,
-        validRatings: 12,
-        reviewSuccess: 10 / 12,
-      }),
-    ]
-    const { container } = render(
-      <PracticeRhythmView
-        timeFrame={timeFrame}
-        view={{ targetReviewSuccess: 0.9, rows, countScale, percentageScale }}
-      />,
-    )
-    expect(container.querySelectorAll('[data-chart]')).toHaveLength(1)
-    expect(screen.getByText('Reviews')).toBeVisible()
-    expect(screen.getByText('Review Success (%)')).toBeVisible()
-    expect(within(container).getByText('60%')).toBeVisible()
-    expect(within(container).getByText('90%')).toBeVisible()
-    expect(within(container).queryByText('0%')).not.toBeInTheDocument()
-    expect(screen.getByTestId('practice-volume-zero')).toHaveAttribute(
-      'data-completed-reviews',
-      '0',
-    )
-    expect(screen.getByTestId('practice-volume-zero')).toHaveAttribute(
-      'height',
-      '0',
-    )
-    expect(
-      screen.queryByTestId('practice-success-marker-1'),
-    ).not.toBeInTheDocument()
-    expect(screen.getByTestId('practice-success-bridge-0-2')).toHaveAttribute(
-      'stroke-dasharray',
-      '7 5',
-    )
-    const columns = screen.getByTestId('practice-volume-columns')
-    const markers = screen.getByTestId('practice-success-markers')
-    expect(
-      columns.compareDocumentPosition(markers) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-    expect(
-      screen.getByRole('list', { name: 'Practice Rhythm series' }),
-    ).toHaveTextContent('Review volume (left)Review Success (right)')
-    expect(
-      screen
-        .getByText('Association, not causation.')
-        .compareDocumentPosition(screen.getByRole('list')) &
-        Node.DOCUMENT_POSITION_PRECEDING,
-    ).toBeTruthy()
-    expect(container.querySelector('[data-chart]')).toHaveStyle({
-      height: '290px',
-    })
-    const ticks = screen
-      .getByTestId('historical-chart-grid')
-      .querySelectorAll('line')
-    const bottom = Number(ticks[0]!.getAttribute('y1'))
-    const top = Number(ticks[ticks.length - 1]!.getAttribute('y1'))
-    const success = screen
-      .getByTestId('practice-success-marker-0')
-      .querySelector('circle')!
-    const volume = screen.getByTestId('practice-volume-supported')
-    // The 75% observation is halfway along its 60–90% domain. Eight reviews
-    // occupy 40% of the independent 0–20 review-count domain.
-    expect(
-      (bottom - Number(success.getAttribute('cy'))) / (bottom - top),
-    ).toBeCloseTo(0.5)
-    expect(Number(volume.getAttribute('height')) / (bottom - top)).toBeCloseTo(
-      0.4,
-    )
-  })
-
-  it('preserves exact Practice cohort values and inspects zero volume separately from unavailable success', async () => {
-    const user = userEvent.setup()
-    const rows = [
-      practiceRow(),
-      practiceRow({
-        id: 'empty',
-        bucketStart: '2026-09-06',
-        bucketEnd: '2026-09-08',
-        completedReviews: 0,
-        goodEasy: 0,
-        validRatings: 0,
-        reviewSuccess: null,
-        evidence: 'not-measured',
-      }),
-      practiceRow({
-        id: 'later',
-        bucketStart: '2026-09-09',
-        bucketEnd: '2026-09-11',
-      }),
-    ]
-    render(
-      <PracticeRhythmView
-        timeFrame={timeFrame}
-        view={{ targetReviewSuccess: 0.9, rows, countScale, percentageScale }}
-      />,
-    )
-    const control = screen.getByRole('button', {
-      name: 'Inspect Practice Rhythm chart',
-    })
-    fireEvent.focus(control)
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Good + Easy: 6 of 8 valid ratings',
-    )
-    fireEvent.keyDown(control, { key: 'ArrowRight' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('09/06–09/08')
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Completed reviews: 0',
-    )
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Review Success: Unavailable',
-    )
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Good + Easy: 0 of 0 valid ratings',
-    )
-    await user.click(screen.getByRole('tab', { name: 'Table' }))
-    expect(
-      within(
-        screen.getByRole('rowheader', { name: '09/03–09/05' }).closest('tr')!,
-      )
-        .getAllByRole('cell')
-        .map((cell) => cell.textContent),
-    ).toEqual([
-      '8',
-      '6 of 8',
-      '75%',
-      'Measured',
-      '3-day summaries · Complete interval',
-    ])
-    expect(
-      within(
-        screen.getByRole('rowheader', { name: '09/06–09/08' }).closest('tr')!,
-      )
-        .getAllByRole('cell')
-        .map((cell) => cell.textContent),
-    ).toEqual([
-      '0',
-      '0 of 0',
-      '—',
-      'Not measured',
-      '3-day summaries · Complete interval',
-    ])
-  })
-
-  it('reports an empty Practice history without a fabricated line or inspection target', () => {
-    render(
-      <PracticeRhythmView
-        timeFrame={timeFrame}
-        view={{
-          rows: [
-            practiceRow({
-              completedReviews: 0,
-              goodEasy: 0,
-              validRatings: 0,
-              reviewSuccess: null,
-              evidence: 'not-measured',
-            }),
-          ],
-          countScale,
-          targetReviewSuccess: 0.9,
-          percentageScale,
-        }}
-      />,
-    )
-    expect(
-      screen.getByText('No valid review ratings are available in this period.'),
-    ).toBeVisible()
-    expect(screen.getByText('Association, not causation.')).toBeVisible()
-    expect(
-      screen.queryByRole('button', { name: 'Inspect Practice Rhythm chart' }),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.queryByTestId('practice-success-marker-0'),
-    ).not.toBeInTheDocument()
-  })
-
   it('keeps seven-row paging and reports empty and single-point histories truthfully', async () => {
     const user = userEvent.setup()
     const rows = Array.from({ length: 8 }, (_, index) =>
@@ -571,63 +316,6 @@ describe('approved Memory Strength and Practice Rhythm views', () => {
 })
 
 describe('empty edge trimming boundaries', () => {
-  it('trims Practice ends but keeps zero success, middle gaps, and reviews without ratings', async () => {
-    const user = userEvent.setup()
-    const rows = Array.from({ length: 5 }, (_, index) =>
-      practiceRow({
-        id: `period-${index}`,
-        bucketStart: `2026-09-${String(3 + index * 3).padStart(2, '0')}`,
-        bucketEnd: `2026-09-${String(5 + index * 3).padStart(2, '0')}`,
-        completedReviews: 0,
-        goodEasy: 0,
-        validRatings: 0,
-        reviewSuccess: null,
-        evidence: 'measured',
-      }),
-    )
-    rows[1] = {
-      ...rows[1]!,
-      completedReviews: 4,
-      validRatings: 4,
-      reviewSuccess: 0,
-    }
-    rows[3] = { ...rows[3]!, completedReviews: 2 }
-    render(
-      <PracticeRhythmView
-        timeFrame={timeFrame}
-        view={{ targetReviewSuccess: 0.9, rows, countScale, percentageScale }}
-      />,
-    )
-    expect(
-      screen.queryByTestId('practice-volume-period-0'),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.queryByTestId('practice-volume-period-4'),
-    ).not.toBeInTheDocument()
-    expect(screen.getByTestId('practice-volume-period-2')).toBeInTheDocument()
-    const inspect = screen.getByRole('button', {
-      name: 'Inspect Practice Rhythm chart',
-    })
-    fireEvent.keyDown(inspect, { key: 'Home' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('09/06–09/08')
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Review Success: 0%')
-    fireEvent.keyDown(inspect, { key: 'ArrowRight' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('09/09–09/11')
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Completed reviews: 0',
-    )
-    fireEvent.keyDown(inspect, { key: 'End' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('09/12–09/14')
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Completed reviews: 2',
-    )
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Review Success: Unavailable',
-    )
-    await user.click(screen.getByRole('tab', { name: 'Table' }))
-    expect(screen.getAllByRole('rowheader')).toHaveLength(3)
-  })
-
   it('trims Memory to finite medians, preserving its internal gaps, fitted scale, and source rows', async () => {
     const user = userEvent.setup()
     const rows = Array.from({ length: 5 }, (_, index) =>
@@ -773,51 +461,4 @@ describe('empty edge trimming boundaries', () => {
     await user.click(screen.getByRole('tab', { name: 'Table' }))
     expect(screen.queryByRole('rowheader')).not.toBeInTheDocument()
   })
-})
-
-it('retains zero-volume Practice boundaries with known rating evidence or measured zero success', () => {
-  const rows = [
-    practiceRow({
-      id: 'rating-only',
-      completedReviews: 0,
-      goodEasy: 0,
-      validRatings: 2,
-      reviewSuccess: null,
-    }),
-    practiceRow({
-      id: 'known-zero',
-      bucketStart: '2026-09-06',
-      bucketEnd: '2026-09-08',
-      completedReviews: 0,
-      goodEasy: 0,
-      validRatings: 0,
-      reviewSuccess: 0,
-    }),
-    practiceRow({
-      id: 'empty-end',
-      bucketStart: '2026-09-09',
-      bucketEnd: '2026-09-11',
-      completedReviews: 0,
-      goodEasy: 0,
-      validRatings: 0,
-      reviewSuccess: null,
-    }),
-  ]
-  render(
-    <PracticeRhythmView
-      timeFrame={timeFrame}
-      view={{ targetReviewSuccess: 0.9, rows, countScale, percentageScale }}
-    />,
-  )
-  const inspect = screen.getByRole('button', {
-    name: 'Inspect Practice Rhythm chart',
-  })
-  fireEvent.keyDown(inspect, { key: 'Home' })
-  expect(screen.getByRole('tooltip')).toHaveTextContent('09/03–09/05')
-  fireEvent.keyDown(inspect, { key: 'End' })
-  expect(screen.getByRole('tooltip')).toHaveTextContent('09/06–09/08')
-  expect(screen.getByRole('tooltip')).toHaveTextContent('Review Success: 0%')
-  expect(
-    screen.queryByTestId('practice-volume-empty-end'),
-  ).not.toBeInTheDocument()
 })

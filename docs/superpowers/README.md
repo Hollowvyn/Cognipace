@@ -53,6 +53,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-03-analytics-cleanup.md`](./plans/2026-10-03-analytics-cleanup.md): approved deletion pass for superseded renderers and their tests, unused chart metadata, summary fallback, and duplicate cache/Settings test setup; exact approved visual artifacts remain preserved.
 - [`plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md`](./plans/2026-10-03-analytics-first-attempts-and-repeat-recall.md): phased cohort/API, Settings goals, and graph implementation plan for the approved first-attempt/repeat split; executed with independent specification/code-quality review and preserved production-component proof; human installed-extension smoke remains pending.
 - [`plans/2026-10-03-analytics-practice-ratings-merge.md`](./plans/2026-10-03-analytics-practice-ratings-merge.md): approved phase-sized plan for the pure interval join, merged chart, dashboard composition, automated validation, production-component proof, and required human installed-extension smoke.
 - [`plans/2026-10-02-analytics-compact-target-editors.md`](./plans/2026-10-02-analytics-compact-target-editors.md): user-directed refinement to one small input per graph, independent partial saves, current counterpart constraints, and refreshed production-component proof.

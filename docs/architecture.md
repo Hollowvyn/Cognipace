@@ -335,9 +335,8 @@ The owners in that flow are:
   Reset Defaults restores all four targets. The new serialized first-outcome
   schema validates rating/count/numerator/rate/evidence coherence and totals
   against the full untrimmed rows before runtime transport.
-- `src/features/analytics/components/charts/chart-definitions.ts` is the typed
-  chart catalogue: title, question, data meaning, eligibility, aggregation,
-  semantic series, and sparse-state copy. `LineSegments` in
+- Historical view components own their chart descriptions and semantic series.
+  `LineSegments` in
   `src/features/analytics/components/charts/line-segments.tsx` renders measured
   runs and dashed next-valid-point bridges without interpolating data.
 - The four historical cards use New Problem Success from

@@ -1,5 +1,4 @@
 import { usePlotArea, useXAxisScale, useYAxisScale } from 'recharts'
-import type { ReactNode } from 'react'
 
 import { ChartTable } from '@/components/ui/chart-table'
 
@@ -18,18 +17,10 @@ import {
   trimHistoricalEmptyEdges,
 } from './charts/historical-chart-model'
 import { HistoricalTable } from './charts/historical-table'
-import { HistoricalTargetLine } from './charts/historical-target-line'
 import { LineSegments } from './charts/line-segments'
-import {
-  ChartTrendNote,
-  formatCount,
-  formatDays,
-  formatPercent,
-} from './charts/chart-shared'
+import { ChartTrendNote, formatCount, formatDays } from './charts/chart-shared'
 
 type MemoryRow = AnalyticsViews['memoryStrength']['rows'][number]
-type PracticeRow = AnalyticsViews['practiceRhythm']['rows'][number]
-type HistoricalRow = MemoryRow | PracticeRow
 
 export function MemoryStrengthView({
   view,
@@ -140,149 +131,6 @@ export function MemoryStrengthView({
   )
 }
 
-export function PracticeRhythmView({
-  view,
-  timeFrame,
-  targetControl,
-}: {
-  view: AnalyticsViews['practiceRhythm']
-  timeFrame?: HistoricalChartTimeFrame | undefined
-  targetControl?: ReactNode
-}) {
-  const rows = trimHistoricalEmptyEdges(
-    view.rows,
-    (row) =>
-      row.completedReviews > 0 ||
-      row.validRatings > 0 ||
-      isFiniteValue(row.reviewSuccess),
-  )
-  const hasReviews = rows.length > 0
-  return (
-    <div className="cp-historical-view grid min-w-0 gap-2">
-      {targetControl ?? (
-        <p className="m-0 text-right text-xs text-muted-foreground">
-          Target Review Success {formatPercent(view.targetReviewSuccess)}
-        </p>
-      )}
-      <ChartTable
-        chart={
-          hasReviews ? (
-            <div className="grid min-w-0 gap-2">
-              <HistoricalChart
-                config={{
-                  completedReviews: {
-                    label: 'Completed reviews',
-                    color: 'var(--cp-analytics-practice-volume)',
-                  },
-                  reviewSuccess: {
-                    label: 'Review Success',
-                    color: 'var(--cp-analytics-observed)',
-                  },
-                }}
-                description={`Completed reviews and Review Success on separate axes. Review count scale: ${view.countScale.domain.join('–')}; Review Success scale: ${formatPercent(view.percentageScale.domain[0])}–${formatPercent(view.percentageScale.domain[1])}. Review Success is Good + Easy divided by valid ratings. Target Review Success: ${formatPercent(view.targetReviewSuccess)}. Association, not causation. Dashed lines cross periods with no eligible evidence. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
-                height={290}
-                name="Practice Rhythm chart"
-                rows={rows}
-                timeFrame={timeFrame}
-                tooltip={(row) => (
-                  <PracticeTooltip
-                    row={row}
-                    target={view.targetReviewSuccess}
-                    timeFrame={timeFrame}
-                  />
-                )}
-                yAxes={[
-                  {
-                    id: 'count',
-                    label: 'Reviews',
-                    scale: view.countScale,
-                    format: formatCount,
-                    padding: { top: 6, bottom: 10 },
-                  },
-                  {
-                    id: 'success',
-                    label: 'Review Success (%)',
-                    scale: view.percentageScale,
-                    format: formatPercent,
-                    orientation: 'right',
-                    width: 50,
-                    padding: { top: 6, bottom: 10 },
-                  },
-                ]}
-              >
-                {(rows, selected, visible) => (
-                  <>
-                    <PracticeVolumeColumns rows={rows} />
-                    <HistoricalTargetLine
-                      testId="practice-success-target"
-                      value={view.targetReviewSuccess}
-                      yAxisId="success"
-                    />
-                    <LineSegments
-                      activeIndex={
-                        visible && selected ? rows.indexOf(selected) : null
-                      }
-                      bridgeDasharray="7 5"
-                      data={rows}
-                      dataKey="reviewSuccess"
-                      markerFill="var(--cp-analytics-observed)"
-                      markerShape="circle"
-                      seriesKey="Review Success"
-                      showMeasuredDots
-                      stroke="var(--cp-analytics-observed)"
-                      strokeWidth={2}
-                      testId="practice-success"
-                      type="linear"
-                      yAxisId="success"
-                    />
-                  </>
-                )}
-              </HistoricalChart>
-              <PracticeLegend />
-              <ChartTrendNote
-                pointCount={
-                  rows.filter((row) => isFiniteValue(row.reviewSuccess)).length
-                }
-              />
-            </div>
-          ) : (
-            <Empty message="No valid review ratings are available in this period." />
-          )
-        }
-        table={
-          <div className="grid min-w-0 gap-2">
-            <HistoricalTable
-              caption="Practice Rhythm exact values"
-              cells={(row) => [
-                bucketText(row, timeFrame),
-                row.completedReviews,
-                `${row.goodEasy} of ${row.validRatings}`,
-                formatPercent(row.reviewSuccess),
-                evidenceText(row.evidence),
-                historicalIntervalContext(row, timeFrame),
-              ]}
-              headers={[
-                'Bucket',
-                'Completed reviews',
-                'Good + Easy',
-                'Review Success',
-                'Evidence',
-                'Period context',
-              ]}
-              resetKey={rows.map((row) => row.id).join('|')}
-              rows={rows}
-            />
-            <ReportContext timeFrame={timeFrame} />
-          </div>
-        }
-      />
-      <p className="m-0 text-xs text-muted-foreground">
-        Association, not causation.
-      </p>
-    </div>
-  )
-}
-
 function MemoryWhiskers({
   rows,
 }: {
@@ -332,53 +180,6 @@ function MemoryWhiskers({
   )
 }
 
-function PracticeVolumeColumns({
-  rows,
-}: {
-  rows: readonly PositionedHistoricalRow<PracticeRow>[]
-}) {
-  const plot = usePlotArea()
-  const xScale = useXAxisScale()
-  const yScale = useYAxisScale('count')
-  if (!plot || !xScale || !yScale) return null
-  const baseline = yScale(0)
-  if (baseline === undefined) return null
-  return (
-    <g
-      aria-hidden="true"
-      data-testid="practice-volume-columns"
-      fill="var(--cp-analytics-practice-volume)"
-    >
-      {rows.map((row) => {
-        const x = xScale(row.x)
-        const y = yScale(row.completedReviews)
-        const start = xScale(row.startX)
-        const end = xScale(row.endX)
-        if (
-          x === undefined ||
-          y === undefined ||
-          start === undefined ||
-          end === undefined
-        )
-          return null
-        const width = Math.min(30, Math.abs(end - start) * 0.62)
-        return (
-          <rect
-            data-completed-reviews={row.completedReviews}
-            data-testid={`practice-volume-${row.id}`}
-            height={Math.max(0, baseline - y)}
-            key={row.id}
-            rx={2}
-            width={width}
-            x={x - width / 2}
-            y={y}
-          />
-        )
-      })}
-    </g>
-  )
-}
-
 function MemoryLegend() {
   return (
     <div
@@ -400,29 +201,6 @@ function MemoryLegend() {
           />
         </svg>
         Middle 50%
-      </span>
-    </div>
-  )
-}
-
-function PracticeLegend() {
-  return (
-    <div
-      aria-label="Practice Rhythm series"
-      className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
-      role="list"
-    >
-      <span className="inline-flex items-center gap-1.5" role="listitem">
-        <span
-          aria-hidden="true"
-          className="h-2.5 w-3 rounded-sm"
-          style={{ background: 'var(--cp-analytics-practice-volume)' }}
-        />
-        Review volume (left)
-      </span>
-      <span className="inline-flex items-center gap-1.5" role="listitem">
-        <LineKey color="var(--cp-analytics-observed)" />
-        Review Success (right)
       </span>
     </div>
   )
@@ -475,36 +253,12 @@ function MemoryTooltip({
   )
 }
 
-function PracticeTooltip({
-  row,
-  timeFrame,
-  target,
-}: {
-  row: PracticeRow
-  timeFrame?: HistoricalChartTimeFrame | undefined
-  target: number
-}) {
-  return (
-    <TooltipBox
-      row={row}
-      timeFrame={timeFrame}
-      values={[
-        `Completed reviews: ${formatCount(row.completedReviews)}`,
-        `Review Success: ${isFiniteValue(row.reviewSuccess) ? formatPercent(row.reviewSuccess) : 'Unavailable'}`,
-        `Target Review Success: ${formatPercent(target)}`,
-        `Good + Easy: ${formatCount(row.goodEasy)} of ${formatCount(row.validRatings)} valid ratings`,
-        `Evidence: ${evidenceText(row.evidence)}`,
-      ]}
-    />
-  )
-}
-
 function TooltipBox({
   row,
   timeFrame,
   values,
 }: {
-  row: HistoricalRow
+  row: MemoryRow
   timeFrame?: HistoricalChartTimeFrame | undefined
   values: readonly string[]
 }) {
@@ -555,7 +309,7 @@ function availableDays(value: number | null) {
   return isFiniteValue(value) ? formatDays(value) : 'Unavailable'
 }
 
-function bucketText(row: HistoricalRow, timeFrame?: HistoricalChartTimeFrame) {
+function bucketText(row: MemoryRow, timeFrame?: HistoricalChartTimeFrame) {
   const range = timeFrame
     ? formatHistoricalBucket(row, timeFrame)
     : row.bucketStart === row.bucketEnd
@@ -564,7 +318,7 @@ function bucketText(row: HistoricalRow, timeFrame?: HistoricalChartTimeFrame) {
   return `${range}${row.isPartial ? ' (in progress)' : ''}`
 }
 
-function evidenceText(value: HistoricalRow['evidence']) {
+function evidenceText(value: MemoryRow['evidence']) {
   return value === 'measured' ? 'Measured' : 'Not measured'
 }
 

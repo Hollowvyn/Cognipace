@@ -5,8 +5,6 @@ import { describe, expect, it } from 'vitest'
 import {
   MemoryStrengthView,
   ObservedRecallVsFsrsView,
-  PracticeRhythmView,
-  RatingsMixView,
   TopicPerformanceView,
 } from './historical-views'
 
@@ -129,109 +127,6 @@ describe('Phase 2 historical analytics views', () => {
     expect(
       screen.queryByTestId('memory-strength-iqr-band'),
     ).not.toBeInTheDocument()
-  })
-
-  it('keeps the association warning visible and formats table buckets as MM/DD/YY', async () => {
-    const user = userEvent.setup()
-    render(
-      <PracticeRhythmView
-        view={{
-          rows: [
-            {
-              id: '2026-08-01',
-              bucketStart: '2026-08-01',
-              bucketEnd: '2026-08-01',
-              isPartial: false,
-              completedReviews: 4,
-              goodEasy: 3,
-              validRatings: 4,
-              reviewSuccess: 0.75,
-              evidence: 'measured',
-            },
-          ],
-          countScale: { domain: [0, 5], ticks: [0, 5] },
-          targetReviewSuccess: 0.9,
-          percentageScale: { domain: [0.6, 1], ticks: [0.6, 1] },
-        }}
-      />,
-    )
-
-    expect(screen.getByText('Association, not causation.')).toBeVisible()
-    await user.click(screen.getByRole('tab', { name: 'Table' }))
-    expect(screen.getByRole('rowheader', { name: '08/01/26' })).toBeVisible()
-  })
-
-  it('keeps Ratings Mix chart and table values on the same feature-owned rows', async () => {
-    const user = userEvent.setup()
-    render(
-      <RatingsMixView
-        view={{
-          rows: [
-            {
-              id: '2026-08-01',
-              bucketStart: '2026-08-01',
-              bucketEnd: '2026-08-01',
-              isPartial: true,
-              again: 1,
-              hard: 0,
-              good: 2,
-              easy: 1,
-              againShare: 0.25,
-              hardShare: 0,
-              goodShare: 0.5,
-              easyShare: 0.25,
-              validRatings: 4,
-              challengingReviews: 1,
-              evidence: 'measured',
-            },
-          ],
-          selectedHardAgain: 250,
-          selectedValidRatings: 1000,
-          comparison: {
-            direction: 'down',
-            difference: -0.3,
-            previousHardAgainShare: 0.5,
-            previousValidRatings: 1000,
-          },
-        }}
-      />,
-    )
-
-    const ratingsChartContainer = screen.getByRole('img', {
-      name: 'Ratings Mix chart',
-    })
-    expect(ratingsChartContainer).toHaveAttribute(
-      'aria-roledescription',
-      '100% stacked column chart',
-    )
-    const ratingsChart = screen.getByRole('button', {
-      name: 'Inspect Ratings Mix chart',
-    })
-    expect(ratingsChart).not.toHaveAttribute('tabindex', '-1')
-    expect(ratingsChart.closest('svg')).toBeNull()
-    const ratingsLegend = screen.getByRole('list', {
-      name: 'Ratings Mix categories',
-    })
-    expect(ratingsLegend).toHaveTextContent('AgainHardGoodEasyNo valid ratings')
-    expect(ratingsChartContainer).not.toContainElement(ratingsLegend)
-    expect(
-      screen.getByText(
-        /This period's rating mix is based on 1,000 valid ratings/,
-      ),
-    ).toBeVisible()
-    expect(
-      screen.getByText(
-        'Hard + Again is down 30 pp from the equivalent prior period (50%; 1,000 valid ratings).',
-      ),
-    ).toBeVisible()
-    await user.click(screen.getByRole('tab', { name: 'Table' }))
-    expect(
-      screen.getByRole('rowheader', { name: '08/01 (in progress)' }),
-    ).toBeVisible()
-    expect(
-      screen.getByRole('columnheader', { name: 'Challenging reviews' }),
-    ).toBeVisible()
-    expect(screen.getByText('2 (50%)')).toBeVisible()
   })
 
   it('renders Topic Performance as an unpaginated five-row-or-fewer ranking', async () => {

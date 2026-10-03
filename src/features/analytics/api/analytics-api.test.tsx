@@ -99,8 +99,13 @@ describe('analytics runtime API', () => {
     expect(sendMessage).toHaveBeenCalledTimes(3)
   })
 
-  it.each(['targetRecall', 'targetReviewSuccess'] as const)(
-    'saves only %s and applies the returned full pair and scales to every cached summary',
+  it.each([
+    'targetRecall',
+    'targetReviewSuccess',
+    'targetFirstAttemptSuccess',
+    'targetFirstAttemptGoodEasy',
+  ] as const)(
+    'saves only %s and applies returned goals and scales across cached ranges without changing evidence',
     async (field) => {
       const { queryClient, wrapper } = createQueryTestHarness()
       const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
@@ -114,12 +119,21 @@ describe('analytics runtime API', () => {
       })
       const unrelated = { stable: true }
       queryClient.setQueryData(['problems'], unrelated)
+      const firstAttempt =
+        field === 'targetFirstAttemptSuccess' ||
+        field === 'targetFirstAttemptGoodEasy'
       const savedSettings = {
         ...defaultUserSettings,
         analytics: {
           ...defaultUserSettings.analytics,
-          targetRecall: 0,
-          targetReviewSuccess: 1,
+          ...(firstAttempt
+            ? { targetFirstAttemptSuccess: 0, targetFirstAttemptGoodEasy: 1 }
+            : {
+                targetRecall: 0,
+                targetReviewSuccess: 1,
+                targetFirstAttemptSuccess: 0.4,
+                targetFirstAttemptGoodEasy: 0.4,
+              }),
         },
       }
       vi.mocked(sendMessage).mockResolvedValueOnce(savedSettings)
@@ -127,10 +141,9 @@ describe('analytics runtime API', () => {
         wrapper,
       })
 
-      const patch: Partial<AnalyticsTargets> =
-        field === 'targetRecall'
-          ? { targetRecall: 0.4 }
-          : { targetReviewSuccess: 0.7 }
+      const patch: Partial<AnalyticsTargets> = {
+        [field]: firstAttempt ? 0.29 : field === 'targetRecall' ? 0.4 : 0.7,
+      }
       let returned: unknown
       await act(async () => {
         returned = await result.current.mutateAsync(patch)
@@ -145,15 +158,41 @@ describe('analytics runtime API', () => {
         const cached = queryClient.getQueryData<SerializedAnalyticsSummary>(
           analyticsQueryKeys.summary(before.range, 'UTC'),
         )!
-        expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(0)
-        expect(cached.views.practiceRhythm.targetReviewSuccess).toBe(1)
-        expect(cached.views.observedRecallVsFsrs.scale.domain[0]).toBe(0)
-        expect(cached.views.practiceRhythm.percentageScale.domain[1]).toBe(1)
-        expect(cached.views.observedRecallVsFsrs.scale).not.toEqual(
-          before.views.observedRecallVsFsrs.scale,
+        expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(
+          savedSettings.analytics.targetRecall,
         )
-        expect(cached.views.practiceRhythm.percentageScale).not.toEqual(
-          before.views.practiceRhythm.percentageScale,
+        expect(cached.views.practiceRhythm.targetReviewSuccess).toBe(
+          savedSettings.analytics.targetReviewSuccess,
+        )
+        expect(
+          cached.views.firstAttemptOutcomes.targetFirstAttemptSuccess,
+        ).toBe(savedSettings.analytics.targetFirstAttemptSuccess)
+        expect(
+          cached.views.firstAttemptOutcomes.targetFirstAttemptGoodEasy,
+        ).toBe(savedSettings.analytics.targetFirstAttemptGoodEasy)
+        if (firstAttempt) {
+          expect(cached.views.firstAttemptOutcomes.scale.domain).toEqual([0, 1])
+          expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(
+            before.views.observedRecallVsFsrs.targetRecall,
+          )
+          expect(cached.views.practiceRhythm.targetReviewSuccess).toBe(
+            before.views.practiceRhythm.targetReviewSuccess,
+          )
+        } else {
+          expect(cached.views.observedRecallVsFsrs.scale.domain[0]).toBe(0)
+          expect(cached.views.practiceRhythm.percentageScale.domain[1]).toBe(1)
+          expect(cached.views.observedRecallVsFsrs.scale).not.toEqual(
+            before.views.observedRecallVsFsrs.scale,
+          )
+          expect(cached.views.practiceRhythm.percentageScale).not.toEqual(
+            before.views.practiceRhythm.percentageScale,
+          )
+        }
+        expect(cached.views.firstAttemptOutcomes.rows).toEqual(
+          before.views.firstAttemptOutcomes.rows,
+        )
+        expect(cached.views.firstAttemptOutcomes.totals).toEqual(
+          before.views.firstAttemptOutcomes.totals,
         )
         expect(cached.views.observedRecallVsFsrs.rows).toEqual(
           before.views.observedRecallVsFsrs.rows,
@@ -165,6 +204,7 @@ describe('analytics runtime API', () => {
           before.views.practiceRhythm.countScale,
         )
         expect(cached.views.retentionMap).toEqual(before.views.retentionMap)
+        expect(cached.historicalReadiness).toEqual(before.historicalReadiness)
         expect(cached.targetRetention).toBe(before.targetRetention)
         expect(cached.totalReviews).toBe(before.totalReviews)
         expect(cached.timeFrame).toEqual(before.timeFrame)
@@ -197,99 +237,6 @@ describe('analytics runtime API', () => {
 
     expect(queryClient.getQueryData(key)).toEqual(before)
   })
-
-  it.each(['targetFirstAttemptSuccess', 'targetFirstAttemptGoodEasy'] as const)(
-    'saves only %s and refreshes first-attempt references across cached ranges without changing evidence',
-    async (field) => {
-      const { queryClient, wrapper } = createQueryTestHarness()
-      const summaries = ([14, 30, 90] as const).map((range) => {
-        const summary = summaryWithMeasuredRows(range)
-        const outcomes = {
-          again: 1,
-          hard: 0,
-          good: 1,
-          easy: 0,
-          recordedFirstAttempts: 2,
-          excludedInvalidRatings: 0,
-          validFirstAttempts: 2,
-          hardGoodEasy: 1,
-          goodEasy: 1,
-          firstAttemptSuccess: 0.5,
-          firstAttemptGoodEasy: 0.5,
-          evidence: 'measured' as const,
-        }
-        summary.views.firstAttemptOutcomes = {
-          rows: [
-            {
-              ...outcomes,
-              id: 'first',
-              bucketStart: '2026-05-01',
-              bucketEnd: '2026-05-03',
-              isPartial: false,
-            },
-          ],
-          totals: outcomes,
-          scale: { domain: [0.4, 0.6], ticks: [0.4, 0.5, 0.6] },
-          targetFirstAttemptSuccess: 0.4,
-          targetFirstAttemptGoodEasy: 0.4,
-        }
-        queryClient.setQueryData(
-          analyticsQueryKeys.summary(range, 'UTC'),
-          summary,
-        )
-        return summary
-      })
-      const savedSettings = {
-        ...defaultUserSettings,
-        analytics: {
-          ...defaultUserSettings.analytics,
-          targetFirstAttemptSuccess: 0,
-          targetFirstAttemptGoodEasy: 1,
-        },
-      }
-      vi.mocked(sendMessage).mockResolvedValueOnce(savedSettings)
-      const { result } = renderHook(() => useUpdateAnalyticsTargets(), {
-        wrapper,
-      })
-      const patch = { [field]: 0.29 }
-
-      await act(async () => {
-        await result.current.mutateAsync(patch)
-      })
-
-      expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
-        surface: 'dashboard',
-        patch: { analytics: patch },
-      })
-      for (const before of summaries) {
-        const cached = queryClient.getQueryData<SerializedAnalyticsSummary>(
-          analyticsQueryKeys.summary(before.range, 'UTC'),
-        )!
-        expect(
-          cached.views.firstAttemptOutcomes.targetFirstAttemptSuccess,
-        ).toBe(0)
-        expect(
-          cached.views.firstAttemptOutcomes.targetFirstAttemptGoodEasy,
-        ).toBe(1)
-        expect(cached.views.firstAttemptOutcomes.scale.domain).toEqual([0, 1])
-        expect(cached.views.firstAttemptOutcomes.rows).toEqual(
-          before.views.firstAttemptOutcomes.rows,
-        )
-        expect(cached.views.firstAttemptOutcomes.totals).toEqual(
-          before.views.firstAttemptOutcomes.totals,
-        )
-        expect(cached.historicalReadiness).toEqual(before.historicalReadiness)
-        expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(
-          before.views.observedRecallVsFsrs.targetRecall,
-        )
-        expect(cached.views.practiceRhythm.targetReviewSuccess).toBe(
-          before.views.practiceRhythm.targetReviewSuccess,
-        )
-        expect(cached.targetRetention).toBe(before.targetRetention)
-        expect(cached.timeFrame).toEqual(before.timeFrame)
-      }
-    },
-  )
 
   it('uses the correct analytics summary query key', () => {
     expect(analyticsQueryKeys.summary(14, 'America/New_York')).toEqual([
@@ -344,6 +291,35 @@ function summaryWithMeasuredRows(
 ): SerializedAnalyticsSummary {
   const summary = createSerializedAnalyticsSummary({ range })
   summary.timeFrame.requestedDays = range
+  const outcomes = {
+    again: 1,
+    hard: 0,
+    good: 1,
+    easy: 0,
+    recordedFirstAttempts: 2,
+    excludedInvalidRatings: 0,
+    validFirstAttempts: 2,
+    hardGoodEasy: 1,
+    goodEasy: 1,
+    firstAttemptSuccess: 0.5,
+    firstAttemptGoodEasy: 0.5,
+    evidence: 'measured' as const,
+  }
+  summary.views.firstAttemptOutcomes = {
+    rows: [
+      {
+        ...outcomes,
+        id: 'first',
+        bucketStart: '2026-05-01',
+        bucketEnd: '2026-05-03',
+        isPartial: false,
+      },
+    ],
+    totals: outcomes,
+    scale: { domain: [0.4, 0.6], ticks: [0.4, 0.5, 0.6] },
+    targetFirstAttemptSuccess: 0.4,
+    targetFirstAttemptGoodEasy: 0.4,
+  }
   summary.views.observedRecallVsFsrs.rows = [
     {
       id: 'observed',

@@ -2,8 +2,6 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { LineChart, Tooltip, XAxis, YAxis } from 'recharts'
 import { describe, expect, it } from 'vitest'
 
-import { analyticsChartDefinitions } from './chart-definitions'
-import { AnalyticsChartLegendItem } from './chart-shared'
 import { LineSegments } from './line-segments'
 
 function TooltipProbe({
@@ -34,30 +32,24 @@ const bridgeData = [
   { bucket: 'Aug 03', value: 0.84 },
 ] as const
 
+const observedSeries = {
+  key: 'observedCorrectness',
+  color: 'var(--cp-analytics-observed)',
+} as const
+
 function AnalyticsLineChart({ defaultIndex }: { defaultIndex: number }) {
   return (
-    <div>
-      <LineChart data={bridgeData} height={240} width={480}>
-        <XAxis allowDuplicatedCategory={false} dataKey="bucket" />
-        <YAxis domain={[0, 1]} />
-        <Tooltip
-          active
-          content={<TooltipProbe />}
-          defaultIndex={defaultIndex}
-        />
-        <LineSegments
-          data={bridgeData}
-          dataKey="value"
-          seriesKey="observedCorrectness"
-          stroke="var(--cp-analytics-observed)"
-        />
-      </LineChart>
-      <div aria-label="Chart legend" role="list">
-        <AnalyticsChartLegendItem
-          item={analyticsChartDefinitions.practiceRhythm.series[1]}
-        />
-      </div>
-    </div>
+    <LineChart data={bridgeData} height={240} width={480}>
+      <XAxis allowDuplicatedCategory={false} dataKey="bucket" />
+      <YAxis domain={[0, 1]} />
+      <Tooltip active content={<TooltipProbe />} defaultIndex={defaultIndex} />
+      <LineSegments
+        data={bridgeData}
+        dataKey="value"
+        seriesKey={observedSeries.key}
+        stroke={observedSeries.color}
+      />
+    </LineChart>
   )
 }
 
@@ -218,7 +210,6 @@ describe('LineSegments in a Recharts line chart', () => {
 
     expect(bridge).toHaveAttribute('stroke-dasharray', '5 5')
     expect(document.querySelectorAll('circle')).toHaveLength(0)
-    expect(screen.getAllByText('Observed correctness')).toHaveLength(1)
     const xAxisTicks = Array.from(
       document.querySelectorAll('tspan'),
       (tick) => tick.textContent,

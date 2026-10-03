@@ -5,11 +5,8 @@ import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import type { AnalyticsViews } from '../api/analytics-contracts'
 import { formatCount, formatPercent } from './charts/chart-shared'
 
-export {
-  ObservedRecallVsFsrsView,
-  RatingsMixView,
-} from './recall-ratings-views'
-export { MemoryStrengthView, PracticeRhythmView } from './memory-practice-views'
+export { ObservedRecallVsFsrsView } from './recall-ratings-views'
+export { MemoryStrengthView } from './memory-practice-views'
 export { PracticeRatingsView } from './practice-ratings-view'
 export { NewProblemSuccessView } from './new-problem-success-view'
 
