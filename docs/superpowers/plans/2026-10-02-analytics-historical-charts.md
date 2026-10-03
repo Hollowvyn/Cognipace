@@ -164,3 +164,31 @@ This is a focused presentation adjustment on draft PR #184.
 - [x] Save a Conventional Commit, push the existing PR branch, and update draft
       PR #184's description and proof. Keep human smoke pending before review
       or merge.
+
+## Follow-Up: Trim Memory Strength Empty Edges (Approved 2026-10-02)
+
+The user approved the stated finite-median edge rule; see the master design's
+Memory Strength follow-up. Continue on draft PR #184's existing branch.
+
+- [ ] Update `memory-practice-views.test.tsx` to require trimmed Memory Home/End
+      and Table endpoints, retained internal unavailable inspection, finite
+      zero/sub-day and small-cohort medians, singleton/all-empty handling,
+      immutable source rows, and unchanged fitted scale/whiskers. Move the
+      prior trailing-unavailable inspection fixture into an internal gap.
+- [ ] Reuse `trimHistoricalEmptyEdges` in `MemoryStrengthView`, with finite
+      `medianStrengthDays` as support. Use the slice for Chart/Table, inspection
+      reset keys, and trend counts; preserve the supplied duration scale.
+- [ ] Update current authority docs and approved-spec follow-up notes to remove
+      the Memory exception. Retain prior handoff/plan records as history and
+      append the latest validation and manual smoke checklist.
+- [ ] Capture actual production Memory with empty prefixes/suffixes and an
+      internal unavailable bucket; verify Home/End and Chart/Table parity in
+      wide dark and narrow light layouts. Save new ordinary viewport captures.
+- [ ] Run focused component/model/screen tests, then `rtk npm run lint`,
+      `rtk npm run check`, `rtk npm run build`, `rtk npm run format`, explicit
+      touched-Markdown Prettier checks, and `rtk proxy git diff --check`. Record
+      exact commands/skips and pending human installed-extension smoke.
+- [ ] Review the focused diff, commit, push, and update draft PR #184 and proof.
+
+Done when all four historical charts trim only empty edges, Memory's fitted
+scale and whiskers remain unchanged, and automated/fixture proof is recorded.

@@ -488,3 +488,20 @@ move dates. Empty/all-empty input remains an explicit empty state, and a single
 supported interval remains visible with single-point guidance. Original row
 objects, grouping, serialized scales, selected-period totals/comparisons,
 readiness, report dates, and runtime/persisted data remain unchanged.
+
+## Approved Follow-Up: Memory Strength Empty Edges
+
+The user subsequently approved applying the same edge treatment to Memory
+Strength. This supersedes only the previous exception that kept Memory's full
+supplied window. Start at the first finite median stability estimate and end
+at the last; keep every internal unavailable bucket. A finite zero or sub-day
+median remains supported. A known median needs no quartiles or four-review
+cohort to support the window; that cohort requirement applies only to whiskers.
+
+Reuse `trimHistoricalEmptyEdges` in `MemoryStrengthView`. Chart, Table,
+inspection, reset keys, and trend counts use the same surviving rows. Keep the
+fitted serialized duration scale, median line, discrete whisker eligibility,
+exact row values and dates, report context, and service response unchanged.
+Wholly unsupported history keeps the existing explicit empty state, and a
+single supported median keeps its actual interval and single-point guidance.
+Do not modify the frozen approved preview assets or the later panels.
