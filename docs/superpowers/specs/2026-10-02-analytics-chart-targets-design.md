@@ -1,6 +1,6 @@
 # Analytics Chart Targets
 
-Status: proposed for user review; not implemented.
+Status: approved by the user on 2026-10-02; implementation pending.
 
 ## Purpose
 
