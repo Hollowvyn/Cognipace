@@ -17,68 +17,52 @@ const timeFrame = {
   requestedDays: 30,
 }
 
-describe('empty historical edges', () => {
-  it('trims only the empty prefix and suffix, preserving zero and internal gaps without mutation', () => {
-    const original = Object.freeze([
-      { ...row('2026-09-03', '2026-09-05'), value: null },
-      { ...row('2026-09-06', '2026-09-08'), value: 0 },
-      { ...row('2026-09-09', '2026-09-11'), value: null },
-      { ...row('2026-09-12', '2026-09-14'), value: 0.75 },
-      { ...row('2026-09-15', '2026-09-17'), value: null },
-      { ...row('2026-09-18', '2026-09-20'), value: null },
-    ])
+function row(start: string, end = start, value: number | null = null) {
+  return { id: start, bucketStart: start, bucketEnd: end, value }
+}
+
+function day(dayOfMonth: number) {
+  return new Date(Date.UTC(2026, 8, dayOfMonth)).toISOString().slice(0, 10)
+}
+
+const intervals = [
+  row('2026-09-02', '2026-09-06'),
+  row('2026-09-07', '2026-09-13'),
+  row('2026-09-14', '2026-09-15'),
+]
+
+describe('historical calendar model', () => {
+  it('trims empty edges without losing zero, internal gaps, source identity, or singleton intervals', () => {
+    const original = Object.freeze(
+      [null, 0, null, 0.75, null, null].map((value, index) =>
+        row(day(3 + index * 3), day(5 + index * 3), value),
+      ),
+    )
+    original.forEach(Object.freeze)
     const visible = trimHistoricalEmptyEdges(
       original,
       (point) => point.value !== null,
     )
     expect(visible).toEqual(original.slice(1, 4))
     visible.forEach((point, index) => expect(point).toBe(original[index + 1]))
-    expect(original).toHaveLength(6)
-    const model = buildHistoricalChartModel(visible, timeFrame)
-    expect(model.domain).toEqual([
-      historicalDayOrdinal('2026-09-06'),
-      historicalDayOrdinal('2026-09-15'),
-    ])
-  })
-
-  it('returns an empty slice for empty or entirely unsupported history', () => {
-    expect(trimHistoricalEmptyEdges([], () => true)).toEqual([])
-    const original = [row('2026-09-03'), row('2026-09-04')]
-    expect(trimHistoricalEmptyEdges(original, () => false)).toEqual([])
-    expect(original).toHaveLength(2)
-  })
-
-  it('preserves the actual interval for one measured bucket and leaves supported edges intact', () => {
-    const original = [
-      { ...row('2026-09-01'), value: null },
-      { ...row('2026-09-02', '2026-09-06'), value: 0 },
-      { ...row('2026-09-07'), value: null },
-    ]
-    const visible = trimHistoricalEmptyEdges(
-      original,
+    const single = trimHistoricalEmptyEdges(
+      original.slice(0, 3),
       (point) => point.value !== null,
     )
-    expect(visible).toEqual([original[1]])
-    expect(buildHistoricalChartModel(visible).domain).toEqual([
-      historicalDayOrdinal('2026-09-02'),
-      historicalDayOrdinal('2026-09-07'),
+    expect(single).toEqual([original[1]])
+    expect(buildHistoricalChartModel(single).domain).toEqual([
+      historicalDayOrdinal('2026-09-06'),
+      historicalDayOrdinal('2026-09-09'),
     ])
     expect(trimHistoricalEmptyEdges(original, () => true)).toEqual(original)
+    expect(trimHistoricalEmptyEdges(original, () => false)).toEqual([])
+    expect(trimHistoricalEmptyEdges([], () => true)).toEqual([])
   })
-})
 
-function row(start: string, end = start) {
-  return { id: start, bucketStart: start, bucketEnd: end, value: null }
-}
-
-describe('historical calendar chart model', () => {
   it.each([1, 2, 3, 7])(
-    'can start at the first midpoint for a %i-day interval without moving points or calendar ticks',
+    'starts at the first %i-day midpoint without moving rows or calendar ticks',
     (intervalDays) => {
-      const original = [
-        row('2026-09-01', `2026-09-${String(intervalDays).padStart(2, '0')}`),
-        row('2026-09-08', '2026-09-14'),
-      ]
+      const original = [row(day(1), day(intervalDays)), row(day(8), day(14))]
       const full = buildHistoricalChartModel(original, timeFrame, 640)
       const fitted = buildHistoricalChartModel(original, timeFrame, 640, true)
       expect(fitted.domain).toEqual([full.rows[0]!.x, full.domain[1]])
@@ -90,68 +74,60 @@ describe('historical calendar chart model', () => {
         expect(tick % 1).toBe(0.5)
       }
       expect(fitted.formatTick(fitted.ticks[0]!)).toBe(
-        formatHistoricalDate(
-          `2026-09-${String(1 + Math.floor(intervalDays / 2)).padStart(2, '0')}`,
-          timeFrame,
-        ),
+        formatHistoricalDate(day(1 + Math.floor(intervalDays / 2)), timeFrame),
       )
-      expect(original[0]).not.toHaveProperty('x')
     },
   )
 
-  it('keeps the actual singleton interval and empty fallback when starting at the first point is requested', () => {
-    for (const original of [[], [row('2026-09-09', '2026-09-11')]]) {
-      expect(buildHistoricalChartModel(original, timeFrame, 210, true)).toEqual(
-        expect.objectContaining({
-          domain: buildHistoricalChartModel(original, timeFrame, 210).domain,
-          ticks: buildHistoricalChartModel(original, timeFrame, 210).ticks,
-          rows: buildHistoricalChartModel(original, timeFrame, 210).rows,
-        }),
-      )
+  it('retains empty and singleton domains when starting at the first point is requested', () => {
+    for (const original of [[], [row(day(9), day(11))], [row('2026-10-02')]]) {
+      const full = buildHistoricalChartModel(original, timeFrame, 210)
+      expect(
+        buildHistoricalChartModel(original, timeFrame, 210, true),
+      ).toMatchObject({
+        domain: full.domain,
+        ticks: full.ticks,
+        rows: full.rows,
+      })
+      if (!original.length) expect(full.domain).toEqual([0, 1])
+      else {
+        expect(full.domain).toEqual([
+          historicalDayOrdinal(original[0]!.bucketStart),
+          historicalDayOrdinal(original[0]!.bucketEnd) + 1,
+        ])
+        expect(full.ticks).toContain(full.rows[0]!.x)
+      }
     }
+    expect(formatHistoricalBucket(row('2026-10-02'), timeFrame)).toBe('10/02')
   })
 
-  it('distinguishes a complete shortened edge from an in-progress interval', () => {
-    const weekly = { ...timeFrame, requestedDays: 90 }
+  it('keeps shortened and in-progress interval context, actual widths and midpoint placement', () => {
     expect(
-      historicalIntervalContext(
-        { ...row('2026-09-02', '2026-09-06'), isPartial: false },
-        weekly,
+      intervals.map((bucket, index) =>
+        historicalIntervalContext(
+          { ...bucket, isPartial: index === 2 },
+          { ...timeFrame, requestedDays: 90 },
+        ),
       ),
-    ).toBe('Weekly summaries · 5-day shortened interval · Complete interval')
-    expect(
+    ).toEqual([
+      'Weekly summaries · 5-day shortened interval · Complete interval',
+      'Weekly summaries · Complete interval',
+      'Weekly summaries · In progress',
+    ])
+    expect([
       historicalIntervalContext(
-        { ...row('2026-09-07', '2026-09-13'), isPartial: false },
-        weekly,
-      ),
-    ).toBe('Weekly summaries · Complete interval')
-    expect(
-      historicalIntervalContext(
-        { ...row('2026-09-14', '2026-09-15'), isPartial: true },
-        weekly,
-      ),
-    ).toBe('Weekly summaries · In progress')
-    expect(
-      historicalIntervalContext(
-        { ...row('2026-09-01', '2026-09-02'), isPartial: false },
+        { ...row(day(1), day(2)), isPartial: false },
         timeFrame,
       ),
-    ).toBe('3-day summaries · 2-day shortened interval · Complete interval')
-    expect(
       historicalIntervalContext(
-        { ...row('2026-09-01'), isPartial: false },
+        { ...row(day(1)), isPartial: false },
         { ...timeFrame, requestedDays: 14 },
       ),
-    ).toBe('Daily summaries · Complete interval')
-  })
-
-  it('anchors aggregates at midpoints and preserves shortened edge widths and fields', () => {
-    const original = [
-      row('2026-09-02', '2026-09-06'),
-      row('2026-09-07', '2026-09-13'),
-      row('2026-09-14', '2026-09-15'),
-    ]
-    const model = buildHistoricalChartModel(original, timeFrame)
+    ]).toEqual([
+      '3-day summaries · 2-day shortened interval · Complete interval',
+      'Daily summaries · Complete interval',
+    ])
+    const model = buildHistoricalChartModel(intervals, timeFrame)
     expect(model.domain).toEqual([
       historicalDayOrdinal('2026-09-02'),
       historicalDayOrdinal('2026-09-16'),
@@ -161,89 +137,59 @@ describe('historical calendar chart model', () => {
     ])
     expect(model.rows[0]!.x).toBe(historicalDayOrdinal('2026-09-02') + 2.5)
     expect(model.rows[2]!.x).toBe(historicalDayOrdinal('2026-09-15'))
-    expect(model.rows[0]).toMatchObject(original[0]!)
-    expect(original[0]).not.toHaveProperty('x')
+    expect(model.rows[0]).toMatchObject(intervals[0]!)
+    expect(intervals[0]).not.toHaveProperty('x')
   })
 
-  it('keeps equal calendar-day spacing across daylight-saving changes', () => {
+  it('uses calendar-day spacing across DST and selects nearest unknown rows with edge clamping', () => {
     const model = buildHistoricalChartModel(
       [row('2026-03-07'), row('2026-03-08'), row('2026-03-09')],
       timeFrame,
     )
     expect(model.rows[1]!.x - model.rows[0]!.x).toBe(1)
     expect(model.rows[2]!.x - model.rows[1]!.x).toBe(1)
+    expect(nearestHistoricalRowIndex(model.rows, model.rows[1]!.x)).toBe(1)
+    expect(nearestHistoricalRowIndex(model.rows, -Infinity)).toBe(0)
+    expect(nearestHistoricalRowIndex(model.rows, model.rows[2]!.x + 10)).toBe(2)
   })
 
-  it('derives the current year from the report instant in the report timezone', () => {
+  it('derives MM/DD year labels from the report instant in the report timezone', () => {
     const frame = { ...timeFrame, asOf: '2026-01-01T01:00:00.000Z' }
     expect(formatHistoricalDate('2025-12-31', frame)).toBe('12/31')
     expect(formatHistoricalDate('2026-01-01', frame)).toBe('01/01/26')
     expect(formatHistoricalBucket(row('2025-12-30', '2026-01-01'), frame)).toBe(
       '12/30/25–01/01/26',
     )
-    expect(
-      formatHistoricalBucket(row('2026-09-09', '2026-09-11'), timeFrame),
-    ).toBe('09/09–09/11')
+    expect(formatHistoricalBucket(row(day(9), day(11)), timeFrame)).toBe(
+      '09/09–09/11',
+    )
   })
 
-  it('keeps a one-bucket interval domain and a daily bucket single date', () => {
-    const model = buildHistoricalChartModel([row('2026-10-02')], timeFrame)
-    expect(model.domain[1] - model.domain[0]).toBe(1)
-    expect(model.ticks).toEqual([model.rows[0]!.x])
-    expect(formatHistoricalBucket(model.rows[0]!, timeFrame)).toBe('10/02')
-  })
-
-  it('uses weekly calendar ticks at wide widths and fewer labels at narrow widths without removing rows', () => {
-    const rows = Array.from({ length: 10 }, (_, index) => {
-      const start = new Date(Date.UTC(2026, 8, 3 + index * 3))
-        .toISOString()
-        .slice(0, 10)
-      const end = new Date(Date.UTC(2026, 8, 5 + index * 3))
-        .toISOString()
-        .slice(0, 10)
-      return row(start, end)
-    })
-    const wide = buildHistoricalChartModel(rows, timeFrame, 640)
-    const narrow = buildHistoricalChartModel(rows, timeFrame, 210)
-    expect(wide.ticks.map(wide.formatTick)).toEqual([
-      '09/03',
-      '09/10',
-      '09/17',
-      '09/24',
-      '10/02',
-    ])
-    expect(narrow.ticks.map(narrow.formatTick)).toEqual([
-      '09/03',
-      '09/17',
-      '10/02',
-    ])
-    expect(narrow.rows).toHaveLength(rows.length)
-  })
-
-  it('selects the nearest original row including unknown rows and clamps at either end', () => {
-    const model = buildHistoricalChartModel([
-      row('2026-09-01'),
-      row('2026-09-02'),
-      row('2026-09-03'),
-    ])
-    expect(nearestHistoricalRowIndex(model.rows, model.rows[1]!.x)).toBe(1)
-    expect(nearestHistoricalRowIndex(model.rows, -Infinity)).toBe(0)
-    expect(nearestHistoricalRowIndex(model.rows, model.rows[2]!.x + 10)).toBe(2)
-  })
-
-  it('reserves the full label spacing before the final date on very narrow surviving ranges', () => {
-    const model = buildHistoricalChartModel(
-      [row('2026-09-09', '2026-09-11'), row('2026-09-30', '2026-10-02')],
+  it('thins calendar labels for narrow plots without removing rows or crowding the last date', () => {
+    const rows = Array.from({ length: 10 }, (_, index) =>
+      row(day(3 + index * 3), day(5 + index * 3)),
+    )
+    for (const [width, labels] of [
+      [640, ['09/03', '09/10', '09/17', '09/24', '10/02']],
+      [210, ['09/03', '09/17', '10/02']],
+    ] as const) {
+      const model = buildHistoricalChartModel(rows, timeFrame, width)
+      expect(model.ticks.map(model.formatTick)).toEqual(labels)
+      expect(model.rows).toHaveLength(rows.length)
+    }
+    const surviving = buildHistoricalChartModel(
+      [row(day(9), day(11)), row('2026-09-30', '2026-10-02')],
       timeFrame,
       156,
     )
-    expect(model.ticks.map(model.formatTick)).toEqual(['09/09', '10/02'])
-    expect(model.rows).toHaveLength(2)
-  })
-
-  it('thins only supplied Y ticks while retaining their endpoints', () => {
-    const ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-    expect(sparseHistoricalYTicks(ticks, 5)).toEqual([0, 2, 4, 6, 8])
+    expect(surviving.ticks.map(surviving.formatTick)).toEqual([
+      '09/09',
+      '10/02',
+    ])
+    expect(surviving.rows).toHaveLength(2)
+    expect(sparseHistoricalYTicks([0, 1, 2, 3, 4, 5, 6, 7, 8], 5)).toEqual([
+      0, 2, 4, 6, 8,
+    ])
     expect(sparseHistoricalYTicks([0, 0.5, 1])).toEqual([0, 0.5, 1])
   })
 })

@@ -26,7 +26,7 @@ import { analyticsSummarySchema } from '../api/analytics-contracts'
 import { getAnalyticsSummary } from './analytics-service'
 
 describe('getAnalyticsSummary dashboard views', () => {
-  it('makes first-attempt readiness independent from an initial-only Recall cohort', async () => {
+  it('makes first-attempt readiness independent from an initial-only Recall cohort and reads persisted goals without changing cards or evidence', async () => {
     const handle = await createTestDb({ seed: false })
     const now = new Date('2026-08-14T12:00:00Z')
     for (let index = 0; index < 14; index += 1) {
@@ -42,6 +42,7 @@ describe('getAnalyticsSummary dashboard views', () => {
         difficulty: 4,
       })
     }
+    await updateSettings(handle.db, { review: { targetRetention: 0.85 } })
     const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
     expect(summary.historicalReadiness).toMatchObject({
       firstAttemptOutcomes: { ready: true, assessments: 14, activeBuckets: 14 },
@@ -49,51 +50,14 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
     expect(summary.recallQuality).toEqual([])
     expect(summary.predictedRecall.sampleSize).toBe(0)
-    expect(summary.views).toMatchObject({
-      firstAttemptOutcomes: {
-        totals: {
-          validFirstAttempts: 14,
-          hardGoodEasy: 14,
-          goodEasy: 0,
-          firstAttemptSuccess: 1,
-          firstAttemptGoodEasy: 0,
-        },
-      },
+    expect(summary.views.firstAttemptOutcomes.totals).toMatchObject({
+      validFirstAttempts: 14,
+      hardGoodEasy: 14,
+      goodEasy: 0,
+      firstAttemptSuccess: 1,
+      firstAttemptGoodEasy: 0,
     })
-  })
-  it('reads saved personal targets without changing cards, historical observations, or retention diagnostics', async () => {
-    const handle = await createTestDb({ seed: false })
-    const now = new Date('2026-01-31T12:00:00.000Z')
-    await insertAnalyticsProblem(
-      handle.db,
-      'personal-goals',
-      'Personal Goals',
-      [],
-    )
-    await insertAnalyticsHistory(handle.db, 'personal-goals', {
-      id: 'personal-goals-card:default',
-      dates: [
-        new Date('2026-01-25T12:00:00.000Z'),
-        new Date('2026-01-27T12:00:00.000Z'),
-      ],
-      ratings: ['good', 'hard'],
-      correct: [true, true],
-      dueAt: new Date('2026-02-03T12:00:00.000Z'),
-      stability: 4,
-      difficulty: 4,
-    })
-    await updateSettings(handle.db, { review: { targetRetention: 0.85 } })
     const cardsBefore = await handle.db.select().from(fsrsCards)
-    const before = await getAnalyticsSummary(handle.db, { range: 14, now })
-
-    expect(before.views.observedRecallVsFsrs.targetRecall).toBe(0.9)
-    expect(before.views.practiceRhythm.targetReviewSuccess).toBe(0.9)
-    expect(before.views.firstAttemptOutcomes.targetFirstAttemptSuccess).toBe(
-      0.9,
-    )
-    expect(before.views.firstAttemptOutcomes.targetFirstAttemptGoodEasy).toBe(
-      0.9,
-    )
 
     await updateSettings(handle.db, {
       analytics: {
@@ -105,34 +69,23 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
     const after = await getAnalyticsSummary(handle.db, { range: 14, now })
 
-    expect(after.views.observedRecallVsFsrs.targetRecall).toBe(0)
-    expect(after.views.practiceRhythm.targetReviewSuccess).toBe(1)
-    expect(after.views.firstAttemptOutcomes.targetFirstAttemptSuccess).toBe(0)
-    expect(after.views.firstAttemptOutcomes.targetFirstAttemptGoodEasy).toBe(1)
-    expect(after.views.firstAttemptOutcomes.scale.domain).toEqual([0, 1])
-    expect(after.views.firstAttemptOutcomes.rows).toEqual(
-      before.views.firstAttemptOutcomes.rows,
-    )
-    expect(after.views.firstAttemptOutcomes.totals).toEqual(
-      before.views.firstAttemptOutcomes.totals,
-    )
-    expect(after.views.observedRecallVsFsrs.scale.domain[0]).toBe(0)
-    expect(after.views.practiceRhythm.percentageScale.domain[1]).toBe(1)
+    expect(after.views).toMatchObject({
+      retentionMap: summary.views.retentionMap,
+      observedRecallVsFsrs: { targetRecall: 0 },
+      practiceRhythm: {
+        ...summary.views.practiceRhythm,
+        targetReviewSuccess: 1,
+        percentageScale: { domain: [0, 1] },
+      },
+      firstAttemptOutcomes: {
+        ...summary.views.firstAttemptOutcomes,
+        targetFirstAttemptSuccess: 0,
+        targetFirstAttemptGoodEasy: 1,
+        scale: { domain: [0, 1] },
+      },
+    })
     expect(after.targetRetention).toBe(0.85)
-    expect(after.recallQuality).toEqual(before.recallQuality)
-    expect(after.practiceRhythm).toEqual(before.practiceRhythm)
-    expect(after.historicalReadiness).toEqual(before.historicalReadiness)
-    expect(after.views.observedRecallVsFsrs.rows).toEqual(
-      before.views.observedRecallVsFsrs.rows,
-    )
-    expect(after.views.practiceRhythm.rows).toEqual(
-      before.views.practiceRhythm.rows,
-    )
-    expect(after.views.practiceRhythm.countScale).toEqual(
-      before.views.practiceRhythm.countScale,
-    )
-    expect(after.views.retentionMap).toEqual(before.views.retentionMap)
-    expect(after.views.memorySignals).toEqual(before.views.memorySignals)
+    expect(after.views.observedRecallVsFsrs.scale.domain[0]).toBe(0)
     expect(await handle.db.select().from(fsrsCards)).toEqual(cardsBefore)
   })
 

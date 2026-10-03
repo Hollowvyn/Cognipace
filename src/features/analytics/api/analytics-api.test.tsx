@@ -122,20 +122,13 @@ describe('analytics runtime API', () => {
       const firstAttempt =
         field === 'targetFirstAttemptSuccess' ||
         field === 'targetFirstAttemptGoodEasy'
-      const savedSettings = {
-        ...defaultUserSettings,
-        analytics: {
-          ...defaultUserSettings.analytics,
-          ...(firstAttempt
-            ? { targetFirstAttemptSuccess: 0, targetFirstAttemptGoodEasy: 1 }
-            : {
-                targetRecall: 0,
-                targetReviewSuccess: 1,
-                targetFirstAttemptSuccess: 0.4,
-                targetFirstAttemptGoodEasy: 0.4,
-              }),
-        },
+      const goals = {
+        targetRecall: firstAttempt ? 0.9 : 0,
+        targetReviewSuccess: firstAttempt ? 0.9 : 1,
+        targetFirstAttemptSuccess: firstAttempt ? 0 : 0.4,
+        targetFirstAttemptGoodEasy: firstAttempt ? 1 : 0.4,
       }
+      const savedSettings = { ...defaultUserSettings, analytics: goals }
       vi.mocked(sendMessage).mockResolvedValueOnce(savedSettings)
       const { result } = renderHook(() => useUpdateAnalyticsTargets(), {
         wrapper,
@@ -158,18 +151,28 @@ describe('analytics runtime API', () => {
         const cached = queryClient.getQueryData<SerializedAnalyticsSummary>(
           analyticsQueryKeys.summary(before.range, 'UTC'),
         )!
-        expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(
-          savedSettings.analytics.targetRecall,
-        )
-        expect(cached.views.practiceRhythm.targetReviewSuccess).toBe(
-          savedSettings.analytics.targetReviewSuccess,
-        )
-        expect(
-          cached.views.firstAttemptOutcomes.targetFirstAttemptSuccess,
-        ).toBe(savedSettings.analytics.targetFirstAttemptSuccess)
-        expect(
-          cached.views.firstAttemptOutcomes.targetFirstAttemptGoodEasy,
-        ).toBe(savedSettings.analytics.targetFirstAttemptGoodEasy)
+        expect(cached).toEqual({
+          ...before,
+          views: {
+            ...before.views,
+            observedRecallVsFsrs: {
+              ...before.views.observedRecallVsFsrs,
+              targetRecall: goals.targetRecall,
+              scale: cached.views.observedRecallVsFsrs.scale,
+            },
+            practiceRhythm: {
+              ...before.views.practiceRhythm,
+              targetReviewSuccess: goals.targetReviewSuccess,
+              percentageScale: cached.views.practiceRhythm.percentageScale,
+            },
+            firstAttemptOutcomes: {
+              ...before.views.firstAttemptOutcomes,
+              targetFirstAttemptSuccess: goals.targetFirstAttemptSuccess,
+              targetFirstAttemptGoodEasy: goals.targetFirstAttemptGoodEasy,
+              scale: cached.views.firstAttemptOutcomes.scale,
+            },
+          },
+        })
         if (firstAttempt) {
           expect(cached.views.firstAttemptOutcomes.scale.domain).toEqual([0, 1])
           expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(
@@ -188,26 +191,6 @@ describe('analytics runtime API', () => {
             before.views.practiceRhythm.percentageScale,
           )
         }
-        expect(cached.views.firstAttemptOutcomes.rows).toEqual(
-          before.views.firstAttemptOutcomes.rows,
-        )
-        expect(cached.views.firstAttemptOutcomes.totals).toEqual(
-          before.views.firstAttemptOutcomes.totals,
-        )
-        expect(cached.views.observedRecallVsFsrs.rows).toEqual(
-          before.views.observedRecallVsFsrs.rows,
-        )
-        expect(cached.views.practiceRhythm.rows).toEqual(
-          before.views.practiceRhythm.rows,
-        )
-        expect(cached.views.practiceRhythm.countScale).toEqual(
-          before.views.practiceRhythm.countScale,
-        )
-        expect(cached.views.retentionMap).toEqual(before.views.retentionMap)
-        expect(cached.historicalReadiness).toEqual(before.historicalReadiness)
-        expect(cached.targetRetention).toBe(before.targetRetention)
-        expect(cached.totalReviews).toBe(before.totalReviews)
-        expect(cached.timeFrame).toEqual(before.timeFrame)
       }
       expect(invalidateQueries).toHaveBeenCalledWith({
         queryKey: analyticsQueryKeys.all,

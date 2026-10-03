@@ -1,3 +1,0 @@
-.fixture-shell{display:grid;grid-template-columns:220px minmax(0,1fr)}.fixture-sidebar{padding:24px;border-right:1px solid var(--color-border)}.fixture-content{min-width:0;padding:28px}.fixture-content>.cp-analytics-history{max-width:80rem;margin:auto}@media(max-width:760px){.fixture-shell{grid-template-columns:minmax(0,1fr)}.fixture-sidebar{display:none}.fixture-content{padding:12px}}
-@import '/Users/tobiolutimehin/.codex/worktrees/837d/cognipace-v2/src/app/styles.css';
-@source '/Users/tobiolutimehin/.codex/worktrees/837d/cognipace-v2/src';

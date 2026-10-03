@@ -56,9 +56,7 @@ const emptyPractice = (day: number) =>
 const emptyRatings = (day: number) =>
   ratings(day, {
     again: 0,
-    hard: 0,
     good: 0,
-    easy: 0,
     validRatings: 0,
     challengingReviews: 0,
     againShare: null,

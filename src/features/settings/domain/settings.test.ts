@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import * as settingsDomain from './settings'
 import {
+  analyticsTargetsSchema,
   createUserSettingsPatch,
+  defaultAnalyticsTargets,
   defaultUserSettings,
   deriveNextThemeMode,
   hasUserSettingsChanges,
@@ -12,95 +13,75 @@ import {
   userSettingsSchema,
 } from './settings'
 
-describe('first-attempt target settings', () => {
-  const legacyTargets = { targetRecall: 0.825, targetReviewSuccess: 0.955 }
-  const firstAttemptDefaults = {
-    targetFirstAttemptSuccess: 0.9,
-    targetFirstAttemptGoodEasy: 0.9,
-  }
+describe('analytics target settings', () => {
+  const fields = Object.keys(
+    defaultAnalyticsTargets,
+  ) as (keyof typeof defaultAnalyticsTargets)[]
   const firstAttemptFields = [
     'targetFirstAttemptSuccess',
     'targetFirstAttemptGoodEasy',
   ] as const
-
-  it('defaults old two-key preferences without changing saved decimal targets', () => {
-    const saved = { ...defaultUserSettings, analytics: legacyTargets }
-
-    expect(userSettingsSchema.parse(saved).analytics).toEqual({
+  const legacyTargets = { targetRecall: 0.825, targetReviewSuccess: 0.955 }
+  const saved = {
+    ...defaultUserSettings,
+    analytics: {
       ...legacyTargets,
-      ...firstAttemptDefaults,
+      targetFirstAttemptSuccess: 0.29,
+      targetFirstAttemptGoodEasy: 0.8,
+    },
+    practice: { ...defaultUserSettings.practice, dailyGoal: 12 },
+    review: { ...defaultUserSettings.review, targetRetention: 0.75 },
+  }
+
+  it('defaults all four goals independently of FSRS retention', () => {
+    expect(defaultAnalyticsTargets).toEqual({
+      targetRecall: 0.9,
+      targetReviewSuccess: 0.9,
+      targetFirstAttemptSuccess: 0.9,
+      targetFirstAttemptGoodEasy: 0.9,
     })
-    expect(parseStoredUserSettings(saved).analytics).toEqual({
-      ...legacyTargets,
-      ...firstAttemptDefaults,
+    const oldSettings = { ...saved }
+    delete (oldSettings as Record<string, unknown>).analytics
+    expect(userSettingsSchema.parse(oldSettings)).toEqual({
+      ...oldSettings,
+      analytics: defaultAnalyticsTargets,
+    })
+    expect(
+      parseStoredUserSettings({ review: { targetRetention: 0.75 } }),
+    ).toMatchObject({
+      analytics: defaultAnalyticsTargets,
+      review: { targetRetention: 0.75 },
     })
   })
 
-  it.each(firstAttemptFields)(
-    'defaults an independently missing %s',
-    (field) => {
-      const analytics: Record<string, number> = {
-        ...legacyTargets,
-        targetFirstAttemptSuccess: 0.29,
-        targetFirstAttemptGoodEasy: 0.8,
+  it.each([
+    legacyTargets,
+    { ...legacyTargets, targetFirstAttemptSuccess: 0.29 },
+    { ...legacyTargets, targetFirstAttemptGoodEasy: 0.8 },
+    saved.analytics,
+  ])(
+    'fills only missing new goals and preserves old decimal goals: %j',
+    (analytics) => {
+      const settings = { ...saved, analytics }
+      const expected = {
+        ...settings,
+        analytics: { ...defaultAnalyticsTargets, ...analytics },
       }
-      delete analytics[field]
-
-      expect(
-        userSettingsSchema.parse({ ...defaultUserSettings, analytics })
-          .analytics,
-      ).toEqual({ ...analytics, [field]: 0.9 })
+      expect(userSettingsSchema.parse(settings)).toEqual(expected)
+      expect(parseStoredUserSettings(settings)).toEqual(expected)
     },
   )
 
   it.each(firstAttemptFields)(
-    'recovers malformed stored %s independently',
-    (field) => {
-      for (const value of [null, '90', -0.01, 1.01, 0.295, NaN, Infinity]) {
-        const analytics = {
-          ...legacyTargets,
-          targetFirstAttemptSuccess: 0.29,
-          targetFirstAttemptGoodEasy: 0.8,
-          [field]: value,
-        }
-
-        expect(
-          parseStoredUserSettings({
-            ...defaultUserSettings,
-            practice: { ...defaultUserSettings.practice, dailyGoal: 12 },
-            analytics,
-          }),
-        ).toMatchObject({
-          analytics: { ...analytics, [field]: 0.9 },
-          practice: { dailyGoal: 12 },
-        })
-      }
-    },
-  )
-
-  it.each(firstAttemptFields)(
-    'accepts whole-percent %s including 29%, 0%, and 100%',
+    'validates whole-percent %s and recovers only its malformed stored value',
     (field) => {
       for (const value of [0, 0.29, 1]) {
-        const analytics = {
-          ...legacyTargets,
-          ...firstAttemptDefaults,
-          [field]: value,
-        }
-        expect(
-          userSettingsSchema.parse({ ...defaultUserSettings, analytics })
-            .analytics,
-        ).toEqual(analytics)
+        const analytics = { ...saved.analytics, [field]: value }
+        expect(analyticsTargetsSchema.parse(analytics)).toEqual(analytics)
         expect(
           userSettingsPatchSchema.parse({ analytics: { [field]: value } }),
         ).toEqual({ analytics: { [field]: value } })
       }
-    },
-  )
-
-  it.each(firstAttemptFields)(
-    'strictly rejects malformed or decimal-grid %s',
-    (field) => {
       for (const value of [
         null,
         '90',
@@ -111,14 +92,31 @@ describe('first-attempt target settings', () => {
         Infinity,
         -Infinity,
       ]) {
+        const settings = {
+          ...saved,
+          analytics: { ...saved.analytics, [field]: value },
+        }
+        expect(userSettingsSchema.safeParse(settings).success).toBe(false)
+        expect(
+          userSettingsPatchSchema.safeParse({ analytics: { [field]: value } })
+            .success,
+        ).toBe(false)
+        expect(parseStoredUserSettings(settings)).toEqual({
+          ...saved,
+          analytics: { ...saved.analytics, [field]: 0.9 },
+        })
+      }
+    },
+  )
+
+  it.each(['targetRecall', 'targetReviewSuccess'] as const)(
+    'rejects invalid %s fractions in full settings and patches',
+    (field) => {
+      for (const value of [null, '90', -0.01, 1.01, NaN, Infinity, -Infinity]) {
         expect(
           userSettingsSchema.safeParse({
-            ...defaultUserSettings,
-            analytics: {
-              ...legacyTargets,
-              ...firstAttemptDefaults,
-              [field]: value,
-            },
+            ...saved,
+            analytics: { ...saved.analytics, [field]: value },
           }).success,
         ).toBe(false)
         expect(
@@ -128,96 +126,6 @@ describe('first-attempt target settings', () => {
       }
     },
   )
-
-  it('allows either new goal ordering independently of the legacy pair', () => {
-    for (const [targetFirstAttemptSuccess, targetFirstAttemptGoodEasy] of [
-      [0, 1],
-      [1, 0],
-    ]) {
-      const analytics = {
-        ...legacyTargets,
-        targetFirstAttemptSuccess,
-        targetFirstAttemptGoodEasy,
-      }
-      expect(
-        userSettingsSchema.parse({ ...defaultUserSettings, analytics })
-          .analytics,
-      ).toEqual(analytics)
-    }
-  })
-
-  it.each(firstAttemptFields)(
-    'creates and merges only the edited %s',
-    (field) => {
-      const saved = {
-        ...defaultUserSettings,
-        analytics: { ...legacyTargets, ...firstAttemptDefaults },
-      }
-      const draft = {
-        ...saved,
-        analytics: { ...saved.analytics, [field]: 0.29 },
-      }
-      const patch = createUserSettingsPatch(saved, draft)
-
-      expect(patch).toEqual({ analytics: { [field]: 0.29 } })
-      expect(
-        mergeUserSettings(saved, userSettingsPatchSchema.parse(patch)),
-      ).toEqual(draft)
-      expect(
-        hasUserSettingsChanges(defaultUserSettings, {
-          ...defaultUserSettings,
-          analytics: { ...defaultUserSettings.analytics, [field]: 0.29 },
-        }),
-      ).toBe(true)
-    },
-  )
-})
-
-describe('analytics target settings', () => {
-  it('exports independent default targets and a reusable pair schema', () => {
-    expect(settingsDomain.defaultAnalyticsTargets).toEqual({
-      targetRecall: 0.9,
-      targetReviewSuccess: 0.9,
-      targetFirstAttemptSuccess: 0.9,
-      targetFirstAttemptGoodEasy: 0.9,
-    })
-    expect(settingsDomain.analyticsTargetsSchema).toBeDefined()
-    expect(
-      settingsDomain.analyticsTargetsSchema.parse({
-        targetRecall: 0.8,
-        targetReviewSuccess: 0.95,
-      }),
-    ).toEqual({
-      ...defaultUserSettings.analytics,
-      targetRecall: 0.8,
-      targetReviewSuccess: 0.95,
-    })
-  })
-
-  it('defaults old full settings to 90/90 independently of FSRS retention', () => {
-    const oldSettings = {
-      ...defaultUserSettings,
-      review: { ...defaultUserSettings.review, targetRetention: 0.75 },
-    }
-    delete (oldSettings as Record<string, unknown>).analytics
-
-    expect(parseStoredUserSettings(oldSettings)).toEqual({
-      ...oldSettings,
-      analytics: defaultUserSettings.analytics,
-    })
-    expect(userSettingsSchema.parse(oldSettings).analytics).toEqual(
-      defaultUserSettings.analytics,
-    )
-  })
-
-  it('fills independent targets for old partial settings', () => {
-    expect(
-      parseStoredUserSettings({ review: { targetRetention: 0.75 } }),
-    ).toMatchObject({
-      analytics: { targetRecall: 0.9, targetReviewSuccess: 0.9 },
-      review: { targetRetention: 0.75 },
-    })
-  })
 
   it.each([
     null,
@@ -225,130 +133,60 @@ describe('analytics target settings', () => {
     {},
     { targetRecall: 0.8 },
     { targetRecall: -0.1, targetReviewSuccess: 0.95 },
-    { targetRecall: 0.8, targetReviewSuccess: Number.POSITIVE_INFINITY },
-    { targetRecall: Number.NaN, targetReviewSuccess: 0.95 },
+    { targetRecall: 0.8, targetReviewSuccess: Infinity },
+    { targetRecall: NaN, targetReviewSuccess: 0.95 },
     { targetRecall: 0.95, targetReviewSuccess: 0.9 },
     { targetRecall: 0.8, targetReviewSuccess: 0.95, unknown: true },
   ])(
-    'normalizes malformed stored analytics %j without dropping other sections',
+    'recovers malformed legacy analytics without dropping unrelated settings: %j',
     (analytics) => {
-      const saved = {
-        ...defaultUserSettings,
-        appearance: { themeMode: 'dark' as const },
-        practice: { ...defaultUserSettings.practice, dailyGoal: 12 },
-        review: { ...defaultUserSettings.review, targetRetention: 0.75 },
-        analytics,
-      }
-
-      expect(parseStoredUserSettings(saved)).toEqual({
+      expect(parseStoredUserSettings({ ...saved, analytics })).toEqual({
         ...saved,
-        analytics: defaultUserSettings.analytics,
+        analytics: defaultAnalyticsTargets,
       })
     },
   )
 
-  it('isolates malformed analytics in a partial stored record', () => {
-    expect(
-      parseStoredUserSettings({
-        analytics: { targetRecall: 0.95, targetReviewSuccess: 0.9 },
-        practice: { dailyGoal: 12, problemFilters: { skipPremium: true } },
-      }),
-    ).toMatchObject({
-      analytics: { targetRecall: 0.9, targetReviewSuccess: 0.9 },
-      practice: { dailyGoal: 12, problemFilters: { skipPremium: true } },
-    })
-  })
-
-  it('preserves a valid stored target pair', () => {
-    const saved = {
-      ...defaultUserSettings,
-      analytics: {
-        ...defaultUserSettings.analytics,
-        targetRecall: 0.8,
-        targetReviewSuccess: 0.95,
-      },
-    }
-
-    expect(parseStoredUserSettings(saved)).toEqual(saved)
-  })
-
   it.each([
-    { targetRecall: 0, targetReviewSuccess: 0 },
-    { targetRecall: 0, targetReviewSuccess: 1 },
-    { targetRecall: 1, targetReviewSuccess: 1 },
-  ])('accepts inclusive target boundaries %j', (analytics) => {
-    expect(
-      userSettingsSchema.parse({ ...defaultUserSettings, analytics }).analytics,
-    ).toEqual({ ...defaultUserSettings.analytics, ...analytics })
-  })
-
-  it.each(['targetRecall', 'targetReviewSuccess'] as const)(
-    'rejects non-finite or out-of-range %s fractions',
-    (field) => {
-      for (const value of [-0.01, 1.01, Number.NaN, Infinity, -Infinity]) {
-        expect(
-          userSettingsSchema.safeParse({
-            ...defaultUserSettings,
-            analytics: {
-              targetRecall: 0.8,
-              targetReviewSuccess: 0.95,
-              [field]: value,
-            },
-          }).success,
-        ).toBe(false)
-        expect(
-          userSettingsPatchSchema.safeParse({ analytics: { [field]: value } })
-            .success,
-        ).toBe(false)
-      }
+    {
+      targetRecall: 0,
+      targetReviewSuccess: 0,
+      targetFirstAttemptSuccess: 0,
+      targetFirstAttemptGoodEasy: 1,
+    },
+    {
+      targetRecall: 0,
+      targetReviewSuccess: 1,
+      targetFirstAttemptSuccess: 1,
+      targetFirstAttemptGoodEasy: 0,
+    },
+    {
+      targetRecall: 1,
+      targetReviewSuccess: 1,
+      targetFirstAttemptSuccess: 0.29,
+      targetFirstAttemptGoodEasy: 0.8,
+    },
+  ])(
+    'accepts inclusive boundaries and independently ordered new goals: %j',
+    (analytics) => {
+      expect(analyticsTargetsSchema.parse(analytics)).toEqual(analytics)
     },
   )
 
-  it('reports the shared goal ordering rule on Review Success', () => {
+  it('validates the merged legacy pair and reports its ordering error on Review Success', () => {
+    const invalid = { targetRecall: 0.95, targetReviewSuccess: 0.9 }
     const parsed = userSettingsSchema.safeParse({
-      ...defaultUserSettings,
-      analytics: { targetRecall: 0.95, targetReviewSuccess: 0.9 },
+      ...saved,
+      analytics: invalid,
     })
-
     expect(parsed.success).toBe(false)
-    if (!parsed.success) {
+    if (!parsed.success)
       expect(parsed.error.issues).toContainEqual(
         expect.objectContaining({
           path: ['analytics', 'targetReviewSuccess'],
           message: 'Review Success target must be at least your Recall target.',
         }),
       )
-    }
-  })
-
-  it('accepts optional patch scalars without injecting their defaults', () => {
-    expect(
-      userSettingsPatchSchema.parse({
-        analytics: { targetReviewSuccess: 0.95 },
-      }),
-    ).toEqual({ analytics: { targetReviewSuccess: 0.95 } })
-  })
-
-  it('deep-merges targets while preserving their sibling and FSRS setting', () => {
-    const saved = {
-      ...defaultUserSettings,
-      analytics: {
-        ...defaultUserSettings.analytics,
-        targetRecall: 0.8,
-        targetReviewSuccess: 0.96,
-      },
-    }
-
-    expect(
-      mergeUserSettings(saved, { analytics: { targetRecall: 0.85 } }),
-    ).toEqual({
-      ...saved,
-      analytics: { ...saved.analytics, targetRecall: 0.85 },
-    })
-    expect(mergeUserSettings(saved, { analytics: {} })).toEqual(saved)
-  })
-
-  it('validates the merged pair and accepts an atomic upward change', () => {
     expect(() =>
       mergeUserSettings(defaultUserSettings, {
         analytics: { targetRecall: 0.95 },
@@ -359,39 +197,19 @@ describe('analytics target settings', () => {
         analytics: { targetRecall: 0.95, targetReviewSuccess: 0.98 },
       }).analytics,
     ).toEqual({
-      ...defaultUserSettings.analytics,
+      ...defaultAnalyticsTargets,
       targetRecall: 0.95,
       targetReviewSuccess: 0.98,
     })
   })
 
-  it('creates only changed target fields in Settings patches', () => {
-    const saved = {
-      ...defaultUserSettings,
-      analytics: {
-        ...defaultUserSettings.analytics,
-        targetRecall: 0.8,
-        targetReviewSuccess: 0.95,
-      },
-    }
-
-    expect(
-      createUserSettingsPatch(saved, {
-        ...saved,
-        analytics: { ...saved.analytics, targetReviewSuccess: 0.98 },
-      }),
-    ).toEqual({ analytics: { targetReviewSuccess: 0.98 } })
-    expect(
-      createUserSettingsPatch(saved, {
-        ...saved,
-        analytics: {
-          ...saved.analytics,
-          targetRecall: 0.85,
-          targetReviewSuccess: 0.98,
-        },
-      }),
-    ).toEqual({ analytics: { targetRecall: 0.85, targetReviewSuccess: 0.98 } })
-    expect(createUserSettingsPatch(saved, saved)).toBeNull()
+  it.each(fields)('patches and merges only the edited %s', (field) => {
+    const draft = { ...saved, analytics: { ...saved.analytics, [field]: 0.85 } }
+    const patch = { analytics: { [field]: 0.85 } }
+    expect(createUserSettingsPatch(saved, draft)).toEqual(patch)
+    expect(userSettingsPatchSchema.parse(patch)).toEqual(patch)
+    expect(mergeUserSettings(saved, patch)).toEqual(draft)
+    expect(mergeUserSettings(saved, { analytics: {} })).toEqual(saved)
   })
 })
 

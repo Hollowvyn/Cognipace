@@ -33,12 +33,8 @@ function ratings(
   index: number,
   overrides: Partial<RatingsRow> = {},
 ): RatingsRow {
-  const p = practice(index)
   return {
-    id: p.id,
-    bucketStart: p.bucketStart,
-    bucketEnd: p.bucketEnd,
-    isPartial: false,
+    ...practice(index),
     again: 4,
     hard: 1,
     good: 3,
@@ -49,31 +45,16 @@ function ratings(
     easyShare: 0.2,
     validRatings: 10,
     challengingReviews: 5,
-    evidence: 'measured',
     ...overrides,
   }
 }
-const emptyRatings = (index: number) =>
-  ratings(index, {
-    again: 0,
-    hard: 0,
-    good: 0,
-    easy: 0,
-    againShare: null,
-    hardShare: null,
-    goodShare: null,
-    easyShare: null,
-    validRatings: 0,
-    challengingReviews: 0,
-    evidence: 'not-measured',
-  })
 function view(
   rows: PracticeRow[],
-  target = 0.9,
+  targetReviewSuccess = 0.9,
 ): AnalyticsViews['practiceRhythm'] {
   return {
     rows,
-    targetReviewSuccess: target,
+    targetReviewSuccess,
     countScale: { domain: [0, 20], ticks: [0, 5, 10, 15, 20] },
     percentageScale: { domain: [0.1, 0.9], ticks: [0.1, 0.3, 0.5, 0.7, 0.9] },
   }
@@ -91,26 +72,24 @@ function ratingsView(rows: RatingsRow[]): AnalyticsViews['ratingsMix'] {
     },
   }
 }
+const part = (id: string) => screen.getByTestId(`practice-${id}`)
+const tooltip = () => screen.getByRole('tooltip')
 const number = (node: Element, attribute: string) =>
   Number(node.getAttribute(attribute))
-const inspect = () =>
-  screen.getByRole('button', { name: 'Inspect Practice Rhythm chart' })
-const measureTextBox = vi.fn(function (this: SVGElement) {
-  return {
-    x: 0,
-    y: 0,
-    width: (this.textContent?.length ?? 0) * 7,
-    height: 12,
-  } as DOMRect
-})
+const inspect = (key = 'Home') =>
+  fireEvent.keyDown(
+    screen.getByRole('button', {
+      name: 'Inspect Practice Rhythm chart',
+    }),
+    { key },
+  )
+const measureTextBox = vi.fn()
 beforeEach(() => {
   measureTextBox.mockImplementation(function (this: SVGElement) {
     return {
-      x: 0,
-      y: 0,
       width: (this.textContent?.length ?? 0) * 7,
       height: 12,
-    } as DOMRect
+    }
   })
   Object.defineProperty(SVGElement.prototype, 'getBBox', {
     configurable: true,
@@ -119,267 +98,220 @@ beforeEach(() => {
 })
 
 describe('merged Practice Rhythm chart', () => {
-  it('uses supplied shares in Easy/Good/Hard/Again order on a fixed axis independently of count', () => {
-    const props = {
-      view: view([practice(0)]),
-      ratingsView: ratingsView([ratings(0)]),
-    }
-    const { rerender } = render(<PracticeRatingsView {...props} />)
-    const easy = screen.getByTestId('practice-ratings-easy-0')
-    const good = screen.getByTestId('practice-ratings-good-0')
-    const hard = screen.getByTestId('practice-ratings-hard-0')
-    const again = screen.getByTestId('practice-ratings-again-0')
-    const height = [easy, good, hard, again].reduce(
-      (sum, rect) => sum + number(rect, 'height'),
-      0,
-    )
-    expect(number(easy, 'height') / height).toBeCloseTo(0.2)
-    expect(number(good, 'height') / height).toBeCloseTo(0.3)
-    expect(number(hard, 'height') / height).toBeCloseTo(0.1)
-    expect(number(again, 'height') / height).toBeCloseTo(0.4)
-    expect(number(good, 'y') + number(good, 'height')).toBeCloseTo(
-      number(easy, 'y'),
-    )
-    expect(number(again, 'y') + number(again, 'height')).toBeCloseTo(
-      number(hard, 'y'),
-    )
-    const circle = screen.getByTestId('practice-reviews-marker-0')
-    const bottom = number(easy, 'y') + number(easy, 'height')
-    expect((bottom - number(circle, 'cy')) / height).toBeCloseTo(0.5)
-    expect(circle).toHaveAttribute('r', '3')
-    const originalY = number(easy, 'y')
-    rerender(
+  it('stacks exact Easy/Good/Hard/Again shares on the fixed percent axis with an independent right count scale and boundary targets', () => {
+    const r = [ratings(0), ratings(1)]
+    const { rerender } = render(
       <PracticeRatingsView
-        {...props}
-        view={view([practice(0, { completedReviews: 0 })])}
+        view={view([practice(0), practice(1)])}
+        ratingsView={ratingsView(r)}
       />,
     )
-    expect(number(screen.getByTestId('practice-ratings-easy-0'), 'y')).toBe(
-      originalY,
+    const rects = ['easy', 'good', 'hard', 'again'].map((key) =>
+      part(`ratings-${key}-0`),
     )
+    const height = rects.reduce((sum, rect) => sum + number(rect, 'height'), 0)
+    const bottom = number(rects[0]!, 'y') + number(rects[0]!, 'height')
+    rects.forEach((rect, index) => {
+      expect(number(rect, 'height') / height).toBeCloseTo(
+        [0.2, 0.3, 0.1, 0.4][index]!,
+      )
+      if (index > 0)
+        expect(number(rect, 'y') + number(rect, 'height')).toBeCloseTo(
+          number(rects[index - 1]!, 'y'),
+        )
+    })
     expect(
-      number(screen.getByTestId('practice-reviews-marker-0'), 'cy'),
-    ).toBeCloseTo(bottom)
+      (bottom - number(part('reviews-marker-0'), 'cy')) / height,
+    ).toBeCloseTo(0.5)
+    expect(part('reviews-marker-0')).toHaveAttribute('r', '3')
+    inspect()
+    expect(part('reviews-marker-0')).toHaveAttribute('r', '4')
+    expect(part('reviews-solid-0-1')).toHaveAttribute('stroke-width', '1.5')
+    expect(
+      screen.getByRole('img', { name: 'Practice Rhythm chart' }),
+    ).toHaveAccessibleDescription(
+      expect.stringContaining('right count axis: 0–20'),
+    )
     expect(screen.getByText('100%')).toBeVisible()
     expect(
       screen.queryByTestId('practice-success-markers'),
     ).not.toBeInTheDocument()
-  })
-
-  it.each([0, 1])(
-    'keeps target %s visible on the percentage axis',
-    (target) => {
-      render(
+    const originalY = number(rects[0]!, 'y')
+    for (const target of [0, 1]) {
+      rerender(
         <PracticeRatingsView
-          view={view([practice(0)], target)}
-          ratingsView={ratingsView([ratings(0)])}
+          view={view(
+            [practice(0, { completedReviews: 0 }), practice(1)],
+            target,
+          )}
+          ratingsView={ratingsView(r)}
         />,
       )
-      const rect = screen.getByTestId(
-        target === 0 ? 'practice-ratings-easy-0' : 'practice-ratings-again-0',
-      )
-      const targetLine = screen
-        .getByTestId('practice-success-target')
-        .querySelector('line')!
-      expect(number(targetLine, 'y1')).toBeCloseTo(
-        number(rect, 'y') + (target === 0 ? number(rect, 'height') : 0),
-      )
+      expect(number(part('ratings-easy-0'), 'y')).toBe(originalY)
+      expect(number(part('reviews-marker-0'), 'cy')).toBeCloseTo(bottom)
+      expect(
+        number(part('success-target').querySelector('line')!, 'y1'),
+      ).toBeCloseTo(target === 0 ? bottom : bottom - height)
       expect(
         screen.getByText(`Target Review Success ${target * 100}%`),
       ).toBeVisible()
-    },
-  )
-
-  it('distinguishes known zero, count-only and missing count in gaps and inspection', () => {
-    render(
-      <PracticeRatingsView
-        view={view([
-          practice(0, { completedReviews: 0 }),
-          practice(1, { validRatings: 0, goodEasy: 0, reviewSuccess: null }),
-          practice(3),
-        ])}
-        ratingsView={ratingsView([
-          ratings(0),
-          emptyRatings(1),
-          ratings(2),
-          ratings(3),
-        ])}
-        timeFrame={timeFrame}
-      />,
-    )
-    expect(screen.getByTestId('practice-reviews-marker-0')).toBeVisible()
-    expect(screen.getByTestId('practice-ratings-empty-1')).toBeVisible()
-    expect(
-      screen.queryByTestId('practice-reviews-marker-2'),
-    ).not.toBeInTheDocument()
-    expect(screen.getByTestId('practice-reviews-bridge-1-3')).toHaveAttribute(
-      'stroke-dasharray',
-      '7 5',
-    )
-    fireEvent.keyDown(inspect(), { key: 'Home' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Completed reviews0')
-    fireEvent.keyDown(inspect(), { key: 'ArrowRight' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'No valid ratings · composition unavailable',
-    )
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Completed reviews10')
-    fireEvent.keyDown(inspect(), { key: 'ArrowRight' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Completed reviewsUnavailable',
-    )
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Practice evidenceUnavailable',
-    )
+    }
   })
 
-  it('does not claim zero ratings when a positive practice cohort lacks its composition counterpart', () => {
+  it('distinguishes zero and unavailable composition and keeps precise Table data after count hiding', async () => {
+    const user = userEvent.setup()
     render(
       <PracticeRatingsView
-        view={view([practice(0, { validRatings: 8, goodEasy: 6 })])}
-        ratingsView={ratingsView([])}
+        timeFrame={timeFrame}
+        view={view([
+          practice(0, {
+            completedReviews: 0,
+            isPartial: true,
+            evidence: 'not-measured',
+          }),
+          practice(1, { validRatings: 8, goodEasy: 6 }),
+          practice(2, { validRatings: 0, goodEasy: 0, reviewSuccess: null }),
+        ])}
+        ratingsView={ratingsView([
+          ratings(0, { easy: 1, easyShare: 1 / 6 }),
+          ratings(2, {
+            again: 0,
+            hard: 0,
+            good: 0,
+            easy: 0,
+            againShare: null,
+            hardShare: null,
+            goodShare: null,
+            easyShare: null,
+            validRatings: 0,
+            challengingReviews: 0,
+            evidence: 'not-measured',
+          }),
+        ])}
       />,
     )
-    expect(screen.getByTestId('practice-ratings-empty-0')).toHaveAttribute(
+    expect(part('reviews-marker-0')).toBeVisible()
+    expect(part('ratings-empty-2')).toHaveAttribute(
+      'fill',
+      expect.stringMatching(/^url\(#/),
+    )
+    inspect()
+    for (const text of [
+      'Completed reviews0',
+      'Easy1 (16.7%)',
+      'Good + Easy2 of 9',
+      'Review Success13%',
+      'Practice evidenceNot measured',
+      'Ratings evidenceMeasured',
+      'America/New_York',
+      'In progress',
+    ])
+      expect(tooltip()).toHaveTextContent(text)
+    inspect('ArrowRight')
+    expect(part('ratings-empty-1')).toHaveAttribute(
       'aria-label',
       expect.stringContaining('Rating composition unavailable'),
     )
-    fireEvent.keyDown(inspect(), { key: 'Home' })
-    const tooltip = screen.getByRole('tooltip')
-    expect(tooltip).toHaveTextContent('Rating composition unavailable')
-    expect(tooltip).not.toHaveTextContent('No valid ratings')
-    expect(tooltip).toHaveTextContent('Completed reviews10')
-    expect(tooltip).toHaveTextContent('Good + Easy6 of 8')
-  })
-
-  it('preserves precise ratings, supplied success, both evidence states and full cross-year context', () => {
-    const p = practice(0, {
-      bucketStart: '2025-12-30',
-      bucketEnd: '2026-01-01',
-      isPartial: true,
-      evidence: 'not-measured',
-    })
-    const r = ratings(0, {
-      bucketStart: p.bucketStart,
-      bucketEnd: p.bucketEnd,
-      easy: 1,
-      easyShare: 1 / 6,
-    })
-    render(
-      <PracticeRatingsView
-        view={view([p])}
-        ratingsView={ratingsView([r])}
-        timeFrame={timeFrame}
-      />,
+    expect(tooltip()).not.toHaveTextContent('No valid ratings')
+    expect(tooltip()).toHaveTextContent('Good + Easy6 of 8')
+    inspect('End')
+    expect(tooltip()).toHaveTextContent(
+      'No valid ratings · composition unavailable',
     )
-    fireEvent.keyDown(inspect(), { key: 'Home' })
-    const tooltip = screen.getByRole('tooltip')
-    expect(tooltip).toHaveTextContent('12/30/25–01/01/26')
-    expect(tooltip).toHaveTextContent('Easy1 (16.7%)')
-    expect(tooltip).toHaveTextContent('Good + Easy2 of 9')
-    expect(tooltip).toHaveTextContent('Review Success13%')
-    expect(tooltip).toHaveTextContent('Practice evidenceNot measured')
-    expect(tooltip).toHaveTextContent('Ratings evidenceMeasured')
-    expect(tooltip).toHaveTextContent('2025-12-30–2026-01-01')
-    expect(tooltip).toHaveTextContent('In progress')
-    expect(tooltip).toHaveTextContent('America/New_York')
-    fireEvent.keyDown(inspect(), { key: 'Escape' })
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
-    fireEvent.keyDown(inspect(), { key: ' ' })
-    expect(screen.getByRole('tooltip')).toBeVisible()
-  })
-
-  it('toggles count presentation together without changing dates, targets, inspection or Table values', async () => {
-    const user = userEvent.setup()
-    const props = {
-      view: view([practice(0), practice(1)]),
-      ratingsView: ratingsView([ratings(0), ratings(1)]),
-    }
-    const { container } = render(<PracticeRatingsView {...props} />)
-    fireEvent.keyDown(inspect(), { key: 'End' })
-    const rowTitle = within(screen.getByRole('tooltip')).getByText(
-      /09\/04–09\/06/,
-    ).textContent
-    const dates = Array.from(
-      container.querySelectorAll('.recharts-xAxis text'),
-    ).map((node) => node.textContent)
-    const goalY = screen
-      .getByTestId('practice-success-target')
-      .querySelector('line')!
-      .getAttribute('y1')
+    expect(tooltip()).toHaveTextContent('Completed reviews10')
     const toggle = screen.getByRole('button', { name: 'Reviews' })
-    expect(toggle).toHaveAttribute('aria-pressed', 'true')
     toggle.focus()
     await user.keyboard('{Enter}')
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
-    expect(
-      screen.getByRole('img', { name: 'Practice Rhythm chart' }),
-    ).toHaveAttribute('aria-roledescription', 'Stacked rating shares')
     expect(
       screen.queryByTestId('practice-reviews-line'),
     ).not.toBeInTheDocument()
     expect(
       screen.queryByText('Reviews', { selector: 'svg text' }),
     ).not.toBeInTheDocument()
-    expect(
-      Array.from(container.querySelectorAll('desc')).some((node) =>
-        node.textContent?.includes('Review volume is hidden'),
-      ),
-    ).toBe(true)
-    expect(
-      screen.getByTestId('practice-success-target').querySelector('line'),
-    ).toHaveAttribute('y1', goalY)
-    fireEvent.keyDown(inspect(), { key: 'End' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent(rowTitle)
-    expect(screen.getByRole('tooltip')).not.toHaveTextContent(
-      'Completed reviews',
+    const chart = screen.getByRole('img', { name: 'Practice Rhythm chart' })
+    expect(chart).toHaveAttribute(
+      'aria-roledescription',
+      'Stacked rating shares',
+    )
+    expect(chart).toHaveAccessibleDescription(
+      expect.stringContaining('Review volume is hidden'),
+    )
+    inspect()
+    expect(tooltip()).not.toHaveTextContent('Completed reviews')
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    const table = within(
+      screen.getByRole('table', { name: 'Practice Rhythm exact values' }),
     )
     expect(
-      Array.from(container.querySelectorAll('.recharts-xAxis text')).map(
-        (node) => node.textContent,
-      ),
-    ).toEqual(dates)
-    await user.click(screen.getByRole('tab', { name: 'Table' }))
-    const table = screen.getByRole('table', {
-      name: 'Practice Rhythm exact values',
-    })
-    expect(
-      within(table).getByRole('columnheader', { name: 'Completed reviews' }),
+      table.getByRole('columnheader', { name: 'Completed reviews' }),
     ).toBeVisible()
-    expect(within(table).getAllByRole('rowheader')).toHaveLength(2)
     expect(
-      within(table)
+      table
         .getAllByRole('row')
         .slice(1)
         .map((row) => row.children[1]?.textContent),
-    ).toEqual(['10', '10'])
+    ).toEqual(['0', '10', '10'])
+    expect(table.getAllByRole('row')[1]).toHaveTextContent('1 (16.7%)')
   })
 
-  it('uses seven-row pagination and resets page and inspection when the interval window changes', async () => {
+  it('keeps zero shares at zero and 12px labels clear of target, count bridges and oversized measured text without changing geometry', async () => {
     const user = userEvent.setup()
-    const p = Array.from({ length: 9 }, (_, index) => practice(index))
-    const r = Array.from({ length: 9 }, (_, index) => ratings(index))
-    const props = { view: view(p), ratingsView: ratingsView(r) }
+    const props = {
+      view: view(
+        [
+          practice(0, { completedReviews: 0 }),
+          practice(2, { completedReviews: 4 }),
+        ],
+        0.35,
+      ),
+      ratingsView: ratingsView([
+        ratings(0, { hard: 0, hardShare: 0, againShare: 0.5 }),
+        ratings(1),
+        ratings(2),
+      ]),
+    }
     const { rerender } = render(<PracticeRatingsView {...props} />)
-    fireEvent.keyDown(inspect(), { key: 'End' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('09/25–09/27')
-    await user.click(screen.getByRole('tab', { name: 'Table' }))
-    expect(screen.getAllByRole('rowheader')).toHaveLength(7)
-    await user.click(screen.getByRole('button', { name: 'Next' }))
-    expect(screen.getAllByRole('rowheader')).toHaveLength(2)
+    expect(part('ratings-hard-0')).toHaveAttribute('height', '0')
+    expect(
+      screen.queryByTestId('practice-ratings-hard-label-0'),
+    ).not.toBeInTheDocument()
+    expect(part('reviews-bridge-0-2')).toHaveAttribute(
+      'stroke-dasharray',
+      '7 5',
+    )
+    expect(
+      screen.queryByTestId('practice-reviews-marker-1'),
+    ).not.toBeInTheDocument()
+    inspect('End')
+    inspect('ArrowLeft')
+    expect(tooltip()).toHaveTextContent('Completed reviewsUnavailable')
+    const easy = part('ratings-easy-label-1')
+    expect(easy).toHaveAttribute('font-size', '12')
+    expect(easy).not.toBeVisible()
+    expect(part('ratings-good-label-1')).not.toBeVisible()
+    const height = part('ratings-easy-1').getAttribute('height')
+    await user.click(screen.getByRole('button', { name: 'Reviews' }))
+    expect(part('ratings-easy-label-1')).toBeVisible()
+    expect(part('ratings-good-label-1')).not.toBeVisible()
+    expect(part('ratings-easy-1')).toHaveAttribute('height', height)
+    measureTextBox.mockReturnValue({
+      width: 50,
+      height: 12,
+    })
     rerender(
       <PracticeRatingsView
-        view={view(p.slice(0, 8))}
-        ratingsView={ratingsView(r.slice(0, 8))}
+        view={view([practice(0)])}
+        ratingsView={ratingsView([ratings(0)])}
       />,
     )
-    expect(screen.getByText('Page 1 of 2')).toBeVisible()
-    await user.click(screen.getByRole('tab', { name: 'Chart' }))
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
-    fireEvent.keyDown(inspect(), { key: 'Home' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('09/01–09/03')
+    expect(part('ratings-easy-label-0')).not.toBeVisible()
+    expect(part('ratings-easy-label-0')).toHaveAttribute('font-size', '12')
+    inspect()
+    expect(tooltip()).toHaveTextContent('Easy2 (20%)')
   })
 
-  it('keeps the goal editor available above empty Chart and Table with supplied totals and eligible comparison', async () => {
+  it('keeps the goal editor and supplied summary available in empty Chart and Table', async () => {
     const user = userEvent.setup()
     render(
       <PracticeRatingsView
@@ -388,7 +320,6 @@ describe('merged Practice Rhythm chart', () => {
         targetControl={<button type="button">Change goal</button>}
       />,
     )
-    expect(screen.getByRole('button', { name: 'Change goal' })).toBeVisible()
     expect(
       screen.getByText(
         'No completed reviews or valid ratings are available in this period.',
@@ -399,99 +330,10 @@ describe('merged Practice Rhythm chart', () => {
     ).not.toBeInTheDocument()
     expect(screen.getByText(/12 of 37/)).toBeVisible()
     expect(screen.getByText(/up 15 pp/)).toBeVisible()
-    await user.click(screen.getByRole('tab', { name: 'Table' }))
-    expect(screen.getByRole('button', { name: 'Change goal' })).toBeVisible()
-    expect(screen.queryByRole('rowheader')).not.toBeInTheDocument()
-  })
-
-  it('keeps a zero category at zero height and omits labels that cannot fit at 12px', () => {
-    render(
-      <PracticeRatingsView
-        view={view([practice(0)])}
-        ratingsView={ratingsView([
-          ratings(0, {
-            hard: 0,
-            hardShare: 0,
-            againShare: 0.5,
-          }),
-        ])}
-      />,
-    )
-    expect(screen.getByTestId('practice-ratings-hard-0')).toHaveAttribute(
-      'height',
-      '0',
-    )
-    expect(
-      screen.queryByTestId('practice-ratings-hard-label-0'),
-    ).not.toBeInTheDocument()
-    expect(screen.getByTestId('practice-ratings-easy-label-0')).toHaveAttribute(
-      'font-size',
-      '12',
-    )
-    expect(screen.getByTestId('practice-ratings-easy-label-0')).toBeVisible()
-  })
-
-  it('hides labels colliding with target and interpolated count segments without moving shares', async () => {
-    const user = userEvent.setup()
-    render(
-      <PracticeRatingsView
-        view={view(
-          [
-            practice(0, { completedReviews: 0 }),
-            practice(2, { completedReviews: 4 }),
-          ],
-          0.35,
-        )}
-        ratingsView={ratingsView([ratings(0), ratings(1), ratings(2)])}
-      />,
-    )
-    // Easy label is centered at 10%; the count bridge crosses it at the
-    // missing middle count. Neither endpoint marker is near that text.
-    expect(
-      screen.getByTestId('practice-ratings-easy-label-1'),
-    ).not.toBeVisible()
-    expect(
-      screen.getByTestId('practice-ratings-good-label-1'),
-    ).not.toBeVisible()
-    const height = screen
-      .getByTestId('practice-ratings-easy-1')
-      .getAttribute('height')
-    await user.click(screen.getByRole('button', { name: 'Reviews' }))
-    expect(screen.getByTestId('practice-ratings-easy-label-1')).toBeVisible()
-    expect(
-      screen.getByTestId('practice-ratings-good-label-1'),
-    ).not.toBeVisible()
-    expect(screen.getByTestId('practice-ratings-easy-1')).toHaveAttribute(
-      'height',
-      height,
-    )
-  })
-
-  it('hides measured text when the measured box exceeds its segment and keeps precise data available', () => {
-    measureTextBox.mockReturnValue({
-      x: 0,
-      y: 0,
-      width: 50,
-      height: 12,
-    } as DOMRect)
-    render(
-      <PracticeRatingsView
-        view={view([practice(0)])}
-        ratingsView={ratingsView([ratings(0)])}
-      />,
-    )
-    expect(
-      screen.getByTestId('practice-ratings-easy-label-0'),
-    ).not.toBeVisible()
-    expect(screen.getByTestId('practice-ratings-easy-label-0')).toHaveAttribute(
-      'font-size',
-      '12',
-    )
-    fireEvent.keyDown(inspect(), { key: 'Home' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Easy2 (20%)')
-    expect(screen.getByTestId('practice-reviews-marker-0')).toHaveAttribute(
-      'r',
-      '4',
-    )
+    for (const tab of ['Chart', 'Table']) {
+      await user.click(screen.getByRole('tab', { name: tab }))
+      expect(screen.getByRole('button', { name: 'Change goal' })).toBeVisible()
+      expect(screen.queryByRole('rowheader')).not.toBeInTheDocument()
+    }
   })
 })

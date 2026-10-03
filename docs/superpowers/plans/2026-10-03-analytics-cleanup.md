@@ -111,3 +111,94 @@ smoke remain pending for the parent feature; the PR remains draft.
 Independent specification and code-quality reviews are clear. The code/test
 cleanup removes 2,924 net lines: 1,969 production lines and 955 test lines.
 The compact plan records the approved scope and validation separately.
+
+## Phase 2: User-Approved Test Budget
+
+The user requested aggressive ponytail pruning with a maximum 1:1 ratio of
+added test/fixture lines to added production source lines across the whole PR.
+Starting at `04e9d20`, the original PR base has 5,898 source test/fixture
+additions, another 512 archived browser proof fixture lines, and 3,948
+production additions. Do not pad production, move test code out of the
+count, change formatter rules, or delete essential contracts to satisfy it.
+
+- [x] Reduce component suites to graph-specific rendering/inspection smoke
+      and genuinely different edge behavior. Test shared pointer, keyboard,
+      calendar, scale, trimming, and pagination mechanics at their owner.
+- [x] Consolidate goal-editor interactions into one four-metric matrix;
+      preserve dependent-pair rules, independent goals, refreshed drafts,
+      failure/pending state, and focus restoration.
+- [x] Collapse repeated Settings/domain/repository/backup setup and validation
+      matrices. Keep strict trust-boundary rejection, atomic persistence,
+      missing-field compatibility, Reset/refresh races, and backup round trip.
+- [x] Reduce screen/API/chart-frame setup duplication. Keep selected-range
+      readiness, real cached-save assertions, empty/error states, and accessible
+      inspection. Keep cohort chronology, replay, zero/null, and exact interval
+      join checks in their existing domain owners.
+- [x] Measure the whole PR against its original base, counting every added
+      test and fixture line, and require tests/fixtures <= production additions.
+- [x] Obtain independent coverage/code-quality review; run focused tests,
+      `npm run lint`, `npm run check`, `npm run build`, and `npm run format`.
+- [x] Push to the same PR with the actual ratio and validation; preserve
+      exact visual archives and the pending human installed-extension smoke.
+
+Execution owns tests/fixtures and their records. Retire the 512 lines of
+duplicate one-off browser illustration harnesses. The historical/Practice
+imports or target shape no longer match production; the latest harness
+contains no executable regression assertions. Historical handoffs link their
+exact source at `04e9d20`; do not move these copies elsewhere on the branch.
+Production, every screenshot, and canonical approved design assets must match
+`04e9d20` byte for byte. A passing suite is supplemented by review of
+which assertions survive each removed test, rather than treating a lower test
+count as evidence by itself.
+
+## Phase 2 Validation Record
+
+The whole PR against `a20e8c6782f43c78eebdc5e99a46b806e0e21618` now has
+**3,948 added test/fixture lines and 3,948 added production lines: exactly 1:1**.
+Count all source tests, `src/testing`, and archived browser fixture code;
+canonical approved designs, screenshots/manifests, and validation ledgers are
+historical records. No test code was relocated or production padded.
+
+This pass removes **2,803 net test/fixture lines** (2,291 executable test lines
+and 512 one-off illustration harness lines). Added test/fixture lines drop
+from 6,410 to 3,948, a reduction of 2,462. Production is byte-identical to
+`04e9d20`; independent Git-blob review also verified all 76 protected assets.
+The historical harness sources remain recoverable through pinned handoff links.
+
+Independent coverage and quality reviews are clear. They caught two removed
+contracts, both restored at their retained owner: touch leave keeps inspection
+open, and Recall's first circle stays 12px from the plot's left edge. Domain
+owners retain cohort chronology, weighted numerators/denominators, invalid-first
+exclusions, FSRS pairing, null versus zero, and goal-independent evidence.
+Settings/backup owners retain strict rejection, compatibility, atomic writes,
+no-data-loss restore, and refresh/save/reset races. The API matrix asserts the
+whole cached summary except the explicitly updated goals/scales; screen target
+saves are verified while refetch remains pending.
+
+Passed final integration commands:
+
+- `rtk proxy npm run test -- src/features/analytics/components src/features/analytics/api/analytics-api.test.tsx src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/domain/review-cohorts.test.ts src/features/analytics/server/analytics-service.test.ts src/features/settings/domain/settings.test.ts src/features/settings/data/settings-repository.test.ts src/features/settings/hooks/use-settings-draft.test.tsx src/features/backup/api/backup-contracts.test.ts src/features/backup/data/backup-repository.test.ts`: 26 files / 340 tests.
+- `rtk proxy npm run test -- src/features/analytics/components/recall-ratings-views.test.tsx src/features/analytics/components/practice-ratings-model.test.ts src/features/analytics/components/new-problem-success-view.test.tsx`: 3 files / 10 tests after the final Recall assertion and redundant zero-default removal.
+- `rtk proxy npm run test -- src/features/analytics/server/analytics-service.test.ts`: 30 tests after the final persisted-goal/evidence comparison.
+- `rtk proxy npm run lint`: passed; also included in the final `check`.
+- `rtk proxy npm run check`: database check, WXT/TypeScript, lint, and 195 files / 2,083 tests passed after all review fixes.
+- `rtk proxy npm run build`: passed, existing nonfatal chunk-size warning only. The final edits affect tests only; production remained byte-identical.
+- `rtk proxy npm run format`: passed.
+- `rtk proxy npx prettier --check --ignore-path /dev/null docs/superpowers/plans/2026-10-03-analytics-cleanup.md docs/superpowers/handoffs/2026-10-02-analytics-historical-charts.md docs/superpowers/handoffs/2026-10-03-analytics-practice-ratings-merge.md docs/superpowers/handoffs/2026-10-03-analytics-first-attempts-and-repeat-recall.md`: passed.
+- `rtk proxy git diff --check`: passed.
+
+Corrected initial consolidation failures: editor trigger matching and an async
+callback without an await; the whole-percentage check initially used the view
+schema rather than the stricter summary boundary; tap inspection intentionally
+moves focus, so hover/Escape preservation is checked before tapping; the merged
+initial-only service fixture fits Recall to 0–25%, so it now asserts the target
+boundary rather than incorrectly requiring 0–100%. Scoped lint also caught
+unused/destructuring and unnecessary-cast issues. Final focused and full runs
+passed; existing jsdom `scrollTo` notices are nonfatal.
+
+Skipped commands remain `rtk proxy npm run db:generate` (no SQL/schema change),
+standalone `rtk proxy npm run db:check` (included in `check`), and
+`rtk proxy npm run zip` (packaging outside scope). Human installed-extension
+happy-path/edge-case and configured disposable Gist smoke remain pending for
+the parent feature. This behavior-neutral pruning does not replace that proof;
+PR readiness was not changed by this maintenance pass.

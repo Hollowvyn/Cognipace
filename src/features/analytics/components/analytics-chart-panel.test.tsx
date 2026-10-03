@@ -7,6 +7,8 @@ describe('AnalyticsChartPanel', () => {
   it('connects the panel title and description and renders an empty state', () => {
     render(
       <AnalyticsChartPanel
+        historical
+        question="How did they compare?"
         description="Observed correctness across the selected period."
         emptyMessage="Not enough review history yet."
         id="recall-quality"
@@ -16,9 +18,10 @@ describe('AnalyticsChartPanel', () => {
 
     const panel = screen.getByRole('region', { name: 'Recall quality' })
 
+    expect(panel).toHaveAttribute('data-analytics-historical', '')
     expect(panel).toHaveAttribute(
       'aria-describedby',
-      'recall-quality-description',
+      'recall-quality-question recall-quality-description',
     )
     expect(
       within(panel).getByText(
@@ -42,6 +45,9 @@ describe('AnalyticsChartPanel', () => {
       </AnalyticsChartPanel>,
     )
 
+    expect(
+      screen.getByRole('region', { name: 'Predicted recall' }),
+    ).not.toHaveAttribute('data-analytics-historical')
     expect(screen.getByTestId('chart-body')).toBeVisible()
     expect(
       screen.getByText('Predicted recall is an estimate, not a guarantee.'),
@@ -49,39 +55,5 @@ describe('AnalyticsChartPanel', () => {
     expect(
       screen.getByRole('region', { name: 'Predicted recall' }),
     ).toHaveAttribute('aria-describedby', 'predicted-recall-description')
-  })
-
-  it('opts only historical panels into their compact frame while retaining descriptions', () => {
-    render(
-      <>
-        <AnalyticsChartPanel
-          historical
-          description="The same paired reviews."
-          id="historical"
-          question="How did they compare?"
-          title="Recall"
-        >
-          <div>Historical plot</div>
-        </AnalyticsChartPanel>
-        <AnalyticsChartPanel
-          description="Existing topic ranking."
-          id="later"
-          title="Topics"
-        />
-      </>,
-    )
-
-    const historical = screen.getByRole('region', { name: 'Recall' })
-    expect(historical).toHaveAttribute('data-analytics-historical', '')
-    expect(historical).toHaveAttribute(
-      'aria-describedby',
-      'historical-question historical-description',
-    )
-    expect(
-      within(historical).getByText('The same paired reviews.'),
-    ).toBeVisible()
-    expect(screen.getByRole('region', { name: 'Topics' })).not.toHaveAttribute(
-      'data-analytics-historical',
-    )
   })
 })

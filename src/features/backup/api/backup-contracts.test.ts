@@ -192,46 +192,39 @@ function createValidBackupFixture() {
 }
 
 describe('backup contracts', () => {
-  it('accepts older two-key chart preferences with compatible decimal goals', () => {
+  it.each([
+    { targetRecall: 0.825, targetReviewSuccess: 0.955 },
+    {
+      ...defaultUserSettings.analytics,
+      targetFirstAttemptSuccess: 0.29,
+      targetFirstAttemptGoodEasy: 1,
+    },
+  ])('preserves old and current chart preference JSON: %j', (analytics) => {
     const fixture = createValidBackupFixture()
     fixture.data.settings[0]!.value = JSON.stringify({
       ...defaultUserSettings,
-      analytics: { targetRecall: 0.825, targetReviewSuccess: 0.955 },
+      analytics,
     })
-
-    expect(() => parseBackupFileForCurrentApp(fixture)).not.toThrow()
-  })
-
-  it('accepts independently ordered first-attempt goals in the existing backup row', () => {
-    const fixture = createValidBackupFixture()
-    fixture.data.settings[0]!.value = JSON.stringify({
-      ...defaultUserSettings,
-      analytics: {
-        ...defaultUserSettings.analytics,
-        targetFirstAttemptSuccess: 0.29,
-        targetFirstAttemptGoodEasy: 1,
-      },
-    })
-
     expect(parseBackupFileForCurrentApp(fixture).data.settings).toEqual(
       fixture.data.settings,
     )
   })
 
-  it.each(['targetFirstAttemptSuccess', 'targetFirstAttemptGoodEasy'] as const)(
-    'strictly rejects malformed imported %s rather than applying local recovery',
-    (field) => {
-      for (const value of [null, '90', -0.01, 1.01, 0.295]) {
-        const fixture = createValidBackupFixture()
-        fixture.data.settings[0]!.value = JSON.stringify({
-          ...defaultUserSettings,
-          analytics: { ...defaultUserSettings.analytics, [field]: value },
-        })
-
-        expect(() => parseBackupFileForCurrentApp(fixture)).toThrow(
-          'settings value must contain current UserSettings JSON',
-        )
-      }
+  it.each([
+    { targetFirstAttemptSuccess: 0.295 },
+    { targetFirstAttemptGoodEasy: null },
+    { targetRecall: 0.95, targetReviewSuccess: 0.9 },
+  ])(
+    'rejects invalid imported targets instead of applying local recovery: %j',
+    (patch) => {
+      const fixture = createValidBackupFixture()
+      fixture.data.settings[0]!.value = JSON.stringify({
+        ...defaultUserSettings,
+        analytics: { ...defaultUserSettings.analytics, ...patch },
+      })
+      expect(() => parseBackupFileForCurrentApp(fixture)).toThrow(
+        'settings value must contain current UserSettings JSON',
+      )
     },
   )
 

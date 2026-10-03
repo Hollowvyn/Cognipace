@@ -142,12 +142,15 @@ browser tab/server were closed and the viewport override reset. Hidden Chart/
 Table transitions emitted nonfatal Recharts zero-size notices; the isolated
 fixture config also emitted a nonfatal Vite native-config compatibility warning.
 
-Reproducible fixture source is saved beside the screenshots as
-`production-fixture.tsx.txt`, `production-fixture.css.txt`,
-`production-fixture-vite.config.ts.txt`, and `production-fixture-index.html.txt`.
+Superseded temporary fixture source is retained at its saved commit as
+[production-fixture.tsx.txt](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-03-analytics-practice-ratings-merge/production-fixture.tsx.txt), [production-fixture.css.txt](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-03-analytics-practice-ratings-merge/production-fixture.css.txt),
+[production-fixture-vite.config.ts.txt](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-03-analytics-practice-ratings-merge/production-fixture-vite.config.ts.txt), and [production-fixture-index.html.txt](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-03-analytics-practice-ratings-merge/production-fixture-index.html.txt).
 Restore their original extensions into an isolated temporary directory, adjust
 the absolute workspace imports/source paths, and use the repo's installed Vite
 runtime. The source never writes installed-extension data.
+Restore those sources with that revision, whose targets and components match
+the captures. Current code uses the four-goal model; the approved design
+archive and every screenshot remain on this branch.
 
 ## Skipped validation and human smoke
 

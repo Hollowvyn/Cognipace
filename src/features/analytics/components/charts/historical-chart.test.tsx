@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { usePlotArea, useXAxisScale, useYAxisScale } from 'recharts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { HistoricalChart } from './historical-chart'
+import { HistoricalChart, type HistoricalYAxis } from './historical-chart'
 import type { PositionedHistoricalRow } from './historical-chart-model'
 
 const rows = [
@@ -52,16 +52,30 @@ function Marks({
   )
 }
 
+const recallAxis: HistoricalYAxis = {
+  label: 'Recall (%)',
+  scale: { domain: [0, 1], ticks: [0, 0.5, 1] },
+  format: (value) => `${value * 100}%`,
+}
+
+function bounds(width = 640, left = 0) {
+  return new DOMRect(left, 0, width, 288)
+}
+
+function inspect() {
+  return screen.getByRole('button', {
+    name: 'Inspect Example historical chart',
+  })
+}
+
 function Fixture({
   data = rows,
   initialIndex = 0,
   inspectionResetKey = '',
-  dualAxes = false,
 }: {
   data?: typeof rows
   initialIndex?: number
   inspectionResetKey?: string
-  dualAxes?: boolean
 }) {
   return (
     <HistoricalChart
@@ -77,25 +91,13 @@ function Fixture({
         </p>
       )}
       yAxes={[
+        recallAxis,
         {
-          label: 'Recall (%)',
-          scale: { domain: [0, 1], ticks: [0, 0.5, 1] },
-          format: (value) => `${value * 100}%`,
+          ...recallAxis,
+          id: 'success',
+          label: 'Review Success (%)',
+          orientation: 'right',
         },
-        ...(dualAxes
-          ? [
-              {
-                id: 'success',
-                label: 'Review Success (%)',
-                scale: {
-                  domain: [0, 1] as [number, number],
-                  ticks: [0, 0.5, 1],
-                },
-                format: (value: number) => `${value * 100}%`,
-                orientation: 'right' as const,
-              },
-            ]
-          : []),
       ]}
     >
       {(data, selected, visible) => (
@@ -106,23 +108,23 @@ function Fixture({
 }
 
 beforeEach(() => {
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-    left: 0,
-    top: 0,
-    width: 640,
-    height: 288,
-    x: 0,
-    y: 0,
-    right: 640,
-    bottom: 288,
-    toJSON() {},
-  })
-  vi.stubGlobal('PointerEvent', MouseEvent)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    bounds(),
+  )
+  vi.stubGlobal(
+    'PointerEvent',
+    class extends MouseEvent {
+      pointerType: string
+      constructor(type: string, init: PointerEventInit = {}) {
+        super(type, init)
+        this.pointerType = init.pointerType ?? 'mouse'
+      }
+    },
+  )
   vi.stubGlobal(
     'ResizeObserver',
     class {
       observe() {}
-      unobserve() {}
       disconnect() {}
     },
   )
@@ -134,7 +136,7 @@ afterEach(() => {
 })
 
 describe('HistoricalChart inspection', () => {
-  it('starts hidden and reserves render clearance for supplied domain boundary values', async () => {
+  it('starts hidden with boundary clearance, then inspects every original row with keyboard clamping and Escape', async () => {
     render(<Fixture initialIndex={1} />)
     const marks = await screen.findByTestId('marks')
     expect(marks).toHaveAttribute('data-selected', 'unknown')
@@ -158,17 +160,13 @@ describe('HistoricalChart inspection', () => {
     expect(chart).toHaveAccessibleDescription(
       'Measured values with unknown periods.',
     )
-    expect(chart).not.toContainElement(
-      screen.getByRole('button', { name: 'Inspect Example historical chart' }),
-    )
-  })
-
-  it('inspects every original row with focus and arrows, clamps at edges, and hides on Escape', async () => {
-    render(<Fixture />)
-    const control = await screen.findByRole('button', {
-      name: 'Inspect Example historical chart',
-    })
+    const control = inspect()
+    expect(chart).not.toContainElement(control)
     fireEvent.focus(control)
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'unknown: Not measured',
+    )
+    fireEvent.keyDown(control, { key: 'Home' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('first: 0')
     expect(screen.getByRole('tooltip').parentElement).toHaveAttribute(
       'aria-live',
@@ -180,7 +178,6 @@ describe('HistoricalChart inspection', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent(
       'unknown: Not measured',
     )
-    expect(screen.queryByTestId('measured-unknown')).not.toBeInTheDocument()
     fireEvent.keyDown(control, { key: 'End' })
     fireEvent.keyDown(control, { key: 'ArrowRight' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('last: 1')
@@ -192,38 +189,7 @@ describe('HistoricalChart inspection', () => {
     )
   })
 
-  it('chooses the nearest bucket from actual hover and tap coordinates across the full plot', async () => {
-    render(<Fixture />)
-    const control = await screen.findByRole('button', {
-      name: 'Inspect Example historical chart',
-    })
-    const width = Number.parseFloat(control.style.width)
-    vi.spyOn(control, 'getBoundingClientRect').mockReturnValue({
-      left: 100,
-      top: 0,
-      width,
-      height: 200,
-      x: 100,
-      y: 0,
-      right: 100 + width,
-      bottom: 200,
-      toJSON() {},
-    })
-    fireEvent.pointerMove(control, { clientX: 100 + width / 2 })
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'unknown: Not measured',
-    )
-    expect(screen.getByRole('tooltip').parentElement).toHaveAttribute(
-      'aria-live',
-      'off',
-    )
-    fireEvent.pointerDown(control, { clientX: 100 + width - 2 })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('last: 1')
-    fireEvent.pointerDown(control, { clientX: 101 })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('first: 0')
-  })
-
-  it('dismisses a hover tooltip with Escape while keyboard focus remains elsewhere', async () => {
+  it('chooses the nearest bucket from actual hover and tap coordinates across the plot, then dismisses with Escape while focus stays elsewhere', () => {
     render(
       <>
         <button type="button">Elsewhere</button>
@@ -232,30 +198,37 @@ describe('HistoricalChart inspection', () => {
     )
     const elsewhere = screen.getByRole('button', { name: 'Elsewhere' })
     elsewhere.focus()
-    const control = await screen.findByRole('button', {
-      name: 'Inspect Example historical chart',
-    })
-    fireEvent.pointerMove(control, { clientX: 320 })
-    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+    const control = inspect()
+    const width = Number.parseFloat(control.style.width)
+    vi.spyOn(control, 'getBoundingClientRect').mockReturnValue(
+      bounds(width, 100),
+    )
+    fireEvent.pointerMove(control, { clientX: 100 + width / 2 })
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'unknown: Not measured',
+    )
+    expect(screen.getByRole('tooltip').parentElement).toHaveAttribute(
+      'aria-live',
+      'off',
+    )
     expect(document.activeElement).toBe(elsewhere)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     expect(document.activeElement).toBe(elsewhere)
+    fireEvent.pointerDown(control, { clientX: 100 + width - 2 })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('last: 1')
+    fireEvent.pointerDown(control, { clientX: 101, pointerType: 'touch' })
+    fireEvent.pointerLeave(control, { pointerType: 'touch' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('first: 0')
+    fireEvent.pointerLeave(control, { pointerType: 'mouse' })
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
-  it('stacks measured dual-axis headers on a narrow plot', async () => {
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      left: 0,
-      top: 0,
-      width: 260,
-      height: 288,
-      x: 0,
-      y: 0,
-      right: 260,
-      bottom: 288,
-      toJSON() {},
-    })
-    render(<Fixture dualAxes />)
+  it('stacks dual-axis headers and contains inspection details in a narrow chart host', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      bounds(180),
+    )
+    render(<Fixture />)
     await screen.findByTestId('marks')
     const left = screen.getByText('Recall (%)')
     const right = screen.getByText('Review Success (%)')
@@ -263,24 +236,7 @@ describe('HistoricalChart inspection', () => {
       Number(right.getAttribute('y')) - Number(left.getAttribute('y')),
     ).toBe(14)
     expect(screen.getAllByText('Local date · 3-day summaries')).toHaveLength(1)
-  })
-
-  it('keeps a tooltip within the chart host when a narrow plot is under 160px', async () => {
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      left: 0,
-      top: 0,
-      width: 180,
-      height: 288,
-      x: 0,
-      y: 0,
-      right: 180,
-      bottom: 288,
-      toJSON() {},
-    })
-    render(<Fixture />)
-    const control = await screen.findByRole('button', {
-      name: 'Inspect Example historical chart',
-    })
+    const control = inspect()
     expect(Number.parseFloat(control.style.width)).toBeLessThan(160)
     fireEvent.focus(control)
     const tooltip = screen.getByRole('tooltip').parentElement!
@@ -291,11 +247,11 @@ describe('HistoricalChart inspection', () => {
     ).toBeLessThanOrEqual(172)
   })
 
-  it('hides details when series visibility changes while preserving the selected period', async () => {
-    const { rerender } = render(<Fixture inspectionResetKey="both" />)
-    const control = await screen.findByRole('button', {
-      name: 'Inspect Example historical chart',
-    })
+  it('hides details when series visibility changes while preserving selection, then resets and clamps when rows change', () => {
+    const { rerender } = render(
+      <Fixture inspectionResetKey="both" initialIndex={2} />,
+    )
+    const control = inspect()
     fireEvent.keyDown(control, { key: 'End' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('last: 1')
     rerender(<Fixture inspectionResetKey="observed" />)
@@ -303,19 +259,8 @@ describe('HistoricalChart inspection', () => {
     expect(screen.getByTestId('marks')).toHaveAttribute('data-selected', 'last')
     fireEvent.keyDown(control, { key: 'ArrowRight' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('last: 1')
-  })
-
-  it('resets inspection when the row set changes and clamps the requested initial row', async () => {
-    const { rerender } = render(<Fixture initialIndex={2} />)
-    const control = await screen.findByRole('button', {
-      name: 'Inspect Example historical chart',
-    })
-    fireEvent.focus(control)
-    expect(screen.getByRole('tooltip')).toHaveTextContent('last: 1')
     rerender(<Fixture data={[rows[0]!]} initialIndex={2} />)
-    await waitFor(() =>
-      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument(),
-    )
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     expect(screen.getByTestId('marks')).toHaveAttribute(
       'data-selected',
       'first',

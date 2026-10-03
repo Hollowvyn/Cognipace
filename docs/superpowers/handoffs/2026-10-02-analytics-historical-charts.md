@@ -128,10 +128,14 @@ fixtures. It did not load the installed extension runtime or live database,
 and it made no application data writes. The temporary server is stopped after
 capture. Fixture source is saved as text beside the screenshots for recovery:
 
-- [Fixture entry](assets/2026-10-02-analytics-historical-charts/fixture-main.tsx.txt)
-- [Vite config](assets/2026-10-02-analytics-historical-charts/fixture-vite.config.ts.txt)
-- [Proof CSS](assets/2026-10-02-analytics-historical-charts/fixture-proof.css.txt)
-- [HTML entry](assets/2026-10-02-analytics-historical-charts/fixture-index.html.txt)
+The superseded temporary harness sources are linked at their saved commit;
+restore them with that revision to reproduce the original captures. The
+approved design archives and all screenshots remain on this branch.
+
+- [Fixture entry](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-02-analytics-historical-charts/fixture-main.tsx.txt)
+- [Vite config](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-02-analytics-historical-charts/fixture-vite.config.ts.txt)
+- [Proof CSS](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-02-analytics-historical-charts/fixture-proof.css.txt)
+- [HTML entry](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-02-analytics-historical-charts/fixture-index.html.txt)
 
 Server command used:
 
@@ -272,7 +276,7 @@ chart sizing change was needed.
 - [Wide trimmed charts, dark](assets/2026-10-02-analytics-historical-charts/edge-trim-dark.jpg)
 - [Lower trimmed charts, dark](assets/2026-10-02-analytics-historical-charts/edge-trim-lower-dark.jpg)
 - [Narrow trimmed Ratings, light](assets/2026-10-02-analytics-historical-charts/edge-trim-narrow-light.jpg)
-- [Follow-up fixture entry](assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt)
+- [Follow-up fixture entry](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt)
 
 Skipped: `rtk npm run zip` because packaging/release behavior is unchanged;
 `rtk npm run db:generate` because no schema changed (`db:check` passed).
@@ -328,7 +332,7 @@ rtk proxy git diff --check
 ```
 
 Browser proof reused the actual production components and the archived
-[empty-edge fixture entry](assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt).
+[empty-edge fixture entry](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt).
 With ten supplied intervals, Memory now displays **09/09–09/26** instead of
 **09/03–10/02**, retaining the internal **09/15–09/17** unavailable period.
 Home/End selected the exact first/last supported intervals, arrow inspection
@@ -408,7 +412,7 @@ rtk proxy git diff --check
 ```
 
 Browser proof reused the actual production components, styles, and unchanged
-[empty-edge fixture entry](assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt).
+[empty-edge fixture entry](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt).
 At 1440px dark and 320px light, the Recall SVG matched its 1122px and 270px
 hosts respectively; the first circle's center was exactly 12px from the left
 grid boundary in both. Sparse labels were 09/10, 09/17, and 09/26. Home showed

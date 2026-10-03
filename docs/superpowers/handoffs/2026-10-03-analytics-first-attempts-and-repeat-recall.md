@@ -148,11 +148,12 @@ Preserved proof:
 The temporary browser tab/server were closed and viewport override reset.
 Hidden Chart/Table transition emitted one nonfatal Recharts zero-size warning;
 no console errors were recorded. Earlier screenshots taken during hot reload
-were replaced with stable final captures. Reproducible fixture source lives
-beside the screenshots as `index.html.txt`, `proof.tsx.txt`, `proof.css.txt`, and
-`server.mjs.txt`. Restore their extensions under `.superpowers/analytics-first-proof`
-and use the installed repo runtime. Close/remove that temporary fixture before
-lint, whose project scan does not honor Git's ignore rules.
+were replaced with stable final captures. The duplicate one-off illustration harness is retained at its saved commit as
+[index.html.txt](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-03-analytics-first-attempts-and-repeat-recall/index.html.txt), [proof.tsx.txt](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-03-analytics-first-attempts-and-repeat-recall/proof.tsx.txt), [proof.css.txt](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-03-analytics-first-attempts-and-repeat-recall/proof.css.txt), [server.mjs.txt](https://github.com/Hollowvyn/Cognipace/blob/04e9d20c66decaf8b73d10d8cad48eddbcb51c6a/docs/superpowers/handoffs/assets/2026-10-03-analytics-first-attempts-and-repeat-recall/server.mjs.txt).
+Restore these sources with that revision under `.superpowers/analytics-first-proof`
+to reproduce the captures. The exact approved design archive and every screenshot
+remain on this branch. Close/remove the temporary fixture before lint, whose
+project scan does not honor Git's ignore rules.
 
 ## Skips, human smoke, and release impact
 
