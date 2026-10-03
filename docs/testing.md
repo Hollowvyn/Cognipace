@@ -654,14 +654,22 @@ and required before review or merge:
 
 Run this flow against the locally built extension, with separate disposable
 ready-history and sparse-history datasets. Ready history must contain enough
-eligible samples to show all four historical charts and supported Memory
+eligible samples to show all three historical cards and supported Memory
 Strength quartiles. Sparse history must include empty beginning and ending
 buckets, internal missing buckets, measured 0% rates, one measured point, no
-valid ratings in a period, and mixed metric readiness. Include a
+valid ratings in a period, count-only intervals, known zero counts, and mixed
+practice/rating readiness. Include a
 current partial bucket and a cross-year report date when preparing the test
 data. If a cross-year report date cannot be exercised in the local extension at
 test time, record that exact smoke case as pending; fixture proof covers only
 the fixture case.
+
+The merged Practice Rhythm flow, including happy-path and edge-case realtime
+smoke, remains required and pending before PR review or merge. The human engineer
+must use the installed rebuilt extension and attach screenshots or a recording;
+production-component fixture images are separate proof. Record any interval-union
+or cross-year edge that cannot be exercised in the installed extension as an
+exact pending case.
 
 1. Run `npm run build`, load `dist/chrome-mv3` in Chrome, and click CogniPace's
    reload button in `chrome://extensions` after the build. Reopen the dashboard
@@ -678,12 +686,12 @@ the fixture case.
    MM/DD in the report's as-of year and /YY for another year; a cross-year
    tooltip interval shows both years. The current partial interval is marked
    in progress, with no future observations.
-   All four historical charts must remove only empty beginning and ending
+   All three historical charts must remove only unsupported beginning and ending
    buckets from Chart, Table, and inspection while retaining all internal gaps.
    Recall's window starts/ends with either known rate; Memory's starts/ends with
    a finite median, including zero or sub-day values; Practice's starts/ends
-   with completed reviews, valid ratings, or a finite success rate including
-   0%; Ratings starts/ends with valid ratings. Confirm the selected range,
+   with positive completed reviews, positive valid-rating counts in either
+   source view, or a finite supplied success rate including 0%. Confirm the selected range,
    period totals, readiness, serialized scales, and report time remain
    unchanged.
 4. In each chart, move the pointer across the plot and tap near its left,
@@ -710,8 +718,8 @@ the fixture case.
    09/09–09/11 interval starts the domain at 09/10, while its tooltip and Table
    still show 09/09–09/11. Inspect a first point at 0% or 100% and confirm its
    ordinary and active circle/diamond remain fully visible. A singleton keeps
-   its original interval domain and centered marker. Memory Strength, Practice
-   Rhythm, and Ratings Mix retain their existing X domains and padding.
+   its original interval domain and centered marker. Memory Strength and Practice
+   Rhythm retain their interval-boundary X domains and padding.
    Compare tooltip and Table recalled/paired counts, rate values, signed
    observed-minus-estimate difference, evidence, and reconstruction provenance.
    The difference must reflect the supplied value rather than subtraction of
@@ -737,39 +745,56 @@ the fixture case.
     unavailable buckets remain inspectable. A single finite median retains its
     original interval and single-point guidance; wholly unavailable medians
     show the explicit empty state.
-11. In Practice Rhythm, confirm muted completed-review bars and a mint Review
-    Success line share one plot, with Reviews on the left and Review Success
-    (%) on the right. The saved Target Review Success reference uses that right
-    percentage axis. Tooltip and Table must report completed reviews and the
-    Good + Easy numerator/valid-rating denominator. A bucket with zero reviews
-    and no measured success has zero volume and unavailable success; internal
-    buckets remain in place. A measured 0% success remains 0% and must retain an
-    edge bucket, as must positive completed-review or valid-rating counts.
-    The visible copy explains association rather than causation.
-12. In Ratings Mix, confirm empty beginning and ending slots are absent in both
-    Chart and Table, while every internal slot without valid ratings remains.
-    Those internal slots use a full-height neutral gray diagonal hatch and
-    report unavailable composition.
-    A populated bucket's zero-count category stays zero-height; only Again,
-    Hard, Good, and Easy appear as categories.
-13. Compare Ratings tooltip/Table counts and precise shares with the exact
-    stacked geometry. Centered whole-percentage labels stay at readable 12px
-    type when they fit and disappear when a segment is too narrow or short.
-    Rounded labels may total 99% or 101% without altering shares. Confirm the
-    selected-period Hard + Again summary, eligible prior-period comparison,
-    and wholly empty-period state are truthful.
-14. Switch each of the four panels between Chart and Table. When more than
+11. Confirm one full-width Practice Rhythm card combines exact supplied shares
+    in bottom-to-top Easy, Good, Hard, Again order with a thin, straight neutral
+    completed-review line and measured markers. The left axis is fixed at
+    0–100% and labeled Rating share (%); the supplied independent right axis is
+    labeled Reviews. The Good + Easy upper boundary expresses Review Success,
+    with no separate success curve. The saved Target Review Success reference
+    uses the left percentage axis; its compact editor remains above the plot in
+    empty, sparse, Chart, and Table states. Test goals at 0% and 100% and confirm
+    they do not change rating geometry, count scale, rows, or dates. Completed
+    reviews must remain independently supplied rather than derived from valid
+    ratings. The visible copy explains association rather than causation, and
+    that a count-line crossing with the target has no percentage meaning.
+12. Inspect the merged interval union, including count-only and rating-only
+    intervals where supplied. Rows must match by ID plus exact start/end dates,
+    preserving an absent counterpart as unavailable rather than borrowing a
+    neighboring row or substituting zero. Chart, inspection, and Table trim only
+    unsupported outer intervals; positive completed-review or valid-rating
+    counts and finite supplied success including 0% retain an edge. Known zero
+    counts remain measured observations in the retained window, while missing
+    counts have no measured marker. Every internal gap remains inspectable.
+    Unavailable composition uses full-height neutral gray diagonal hatching; a
+    populated bucket's zero category stays zero-height. Only Easy, Good, Hard,
+    and Again are rating categories.
+13. Compare the shared tooltip and Table with exact stacked geometry. Both must
+    retain completed reviews, each rating count and precise share, Good + Easy
+    numerator/valid-rating denominator, supplied success, target, each metric's
+    evidence, full interval, timezone/as-of, and complete/in-progress context.
+    Centered whole-percent labels stay at 12px only when they fit without count
+    line or target collisions; rounded totals of 99% or 101% must not alter
+    shares. Toggle Reviews with pointer and keyboard: the count line, markers,
+    right axis, and tooltip count hide/show together, and accessible copy follows
+    that state. Dates, retained rows, target, Table counts, and category geometry
+    remain fixed. Confirm distinct practice/rating readiness warnings, the
+    selected-period Hard + Again summary, evidence-gated prior-period comparison,
+    and wholly unsupported-period empty state remain truthful.
+14. Switch each of the three historical panels between Chart and Table. When more than
     seven rows exist, confirm seven rows per page, Previous/Next boundary
     states, and page reset after a range change. Inspect full interval,
     complete/in-progress state, grouping, report time, and evidence context
     across both views. Confirm Chart and Table use the same retained activity
     window, and wholly unsupported periods show their explicit empty state.
+    Practice's Table retains all supplied counts/shares and unavailable states
+    when Reviews is hidden in Chart; its target control remains reachable.
     Change range while a tooltip is visible to check that selection resets or
     clamps to the new rows without stale values.
-15. Repeat ready and sparse paths at wide and narrow dashboard widths in both
+15. Repeat ready and sparse paths at wide and 320px dashboard widths in both
     light and dark themes. Check axis/key contrast, sparse ticks, control
     reachability, tap coordinates, keyboard focus, table scrolling, and
-    Memory/Practice stacking. Include neighboring panels with different
+    the full-width Recall/Practice order, and Memory/Topic stacking. There must
+    be no horizontal document overflow. Include neighboring panels with different
     readiness messages; plots and controls must retain usable alignment without
     overlap or clipped labels.
 16. Reload the built extension again and reopen Analytics. Confirm the local
@@ -789,7 +814,7 @@ the fixture case.
     than five exist, Previous/Next and the live row range update correctly, and
     visible problem links open canonical LeetCode problems in new tabs. Topic
     Performance and the current-state/workload panels retain their existing
-    treatment while the four historical charts change.
+    treatment while the three historical cards change.
 
 Expected: Analytics loads through the extension runtime without the failed-load
 state, reflects only local practice data, and tells a truthful chart story
@@ -835,12 +860,12 @@ proof.
 - [ ] **Boundary references:** save 0%/0%, 0%/100%, and 100%/100%. Inspect both
       named dashed references and accessible descriptions at 0% and 100%; each
       percentage scale must contain its goal with usable boundary clearance.
-      Practice's goal uses the right percentage axis and leaves its left
-      review-count scale unchanged. Measured rates, counts, rows, dates,
+      Practice's goal uses the fixed left rating-share axis and leaves rating
+      geometry and its supplied right review-count scale unchanged. Measured rates, counts, rows, dates,
       internal gaps, and trimming must match the pre-edit data.
 - [ ] **Range and presentation:** retain a non-default pair while changing
       14/30/90-day ranges, including switching to an uncached range while a save
-      is pending, toggling Recall series, switching Chart/Table, and
+      is pending, toggling Recall series and Practice's Reviews, switching Chart/Table, and
       opening empty or sparse datasets. The controls remain reachable and the
       saved pair remains fixed. Repeat closed, open, invalid, and boundary-goal
       states at wide/narrow widths in light/dark themes; check focus, wrapping,

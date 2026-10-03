@@ -1,0 +1,20 @@
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
+export default defineConfig({
+  root: "/private/tmp/cognipace-merged-chart-proof",
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": "/Users/tobiolutimehin/.codex/worktrees/837d/cognipace-v2/src",
+    },
+  },
+  server: {
+    fs: {
+      allow: [
+        "/private/tmp/cognipace-merged-chart-proof",
+        "/Users/tobiolutimehin/.codex/worktrees/837d/cognipace-v2",
+      ],
+    },
+  },
+});

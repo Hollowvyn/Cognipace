@@ -523,24 +523,107 @@ describe('AnalyticsScreen', () => {
         name: 'Observed Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
-    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(7)
-    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(7)
-    expect(screen.getByRole('region', { name: 'Ratings Mix' })).toBeVisible()
+    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(6)
+    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(6)
+    expect(
+      screen.queryByRole('region', { name: 'Ratings Mix' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('renders Ratings Mix and Topic Performance with their semantic Chart and Table alternatives', async () => {
+  it('merges ratings into one Practice Rhythm card and retains Topic Performance', async () => {
     vi.mocked(sendMessage).mockResolvedValueOnce(readyAnalyticsSummary())
 
     renderAnalyticsScreen()
 
     expect(
-      await screen.findByRole('region', { name: 'Ratings Mix' }),
+      await screen.findByRole('region', { name: 'Practice Rhythm' }),
     ).toBeVisible()
     expect(
       screen.getByRole('region', { name: 'Topic Performance' }),
     ).toBeVisible()
-    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(7)
-    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(7)
+    expect(
+      screen.queryByRole('region', { name: 'Ratings Mix' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(6)
+    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(6)
+  })
+
+  it('keeps independent rating readiness and the target in the merged card', async () => {
+    const summary = readyAnalyticsSummary()
+    summary.historicalReadiness.ratingsMix = {
+      ...summary.historicalReadiness.ratingsMix,
+      ready: false,
+      assessments: 12,
+      minimumAssessments: 24,
+      failingReasons: ['insufficient-assessments'],
+    }
+    vi.mocked(sendMessage).mockResolvedValueOnce(summary)
+
+    renderAnalyticsScreen()
+
+    const practice = await screen.findByRole('region', {
+      name: 'Practice Rhythm',
+    })
+    expect(
+      within(practice).getByRole('button', {
+        name: 'Target Review Success 90%',
+      }),
+    ).toBeVisible()
+    expect(
+      within(practice).getByRole('status', {
+        name: 'Rating composition readiness',
+      }),
+    ).toHaveTextContent('12 more assessments needed.')
+    expect(
+      screen.queryByRole('region', { name: 'Ratings Mix' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('visibly identifies differing Practice and rating composition readiness warnings', async () => {
+    const summary = readyAnalyticsSummary()
+    summary.historicalReadiness.practiceRhythm = {
+      ...summary.historicalReadiness.practiceRhythm,
+      ready: false,
+      assessments: 12,
+      minimumAssessments: 24,
+      failingReasons: ['insufficient-assessments'],
+    }
+    summary.historicalReadiness.ratingsMix = {
+      ...summary.historicalReadiness.ratingsMix,
+      ready: false,
+      assessments: 0,
+      failingReasons: ['no-evidence'],
+    }
+    vi.mocked(sendMessage).mockResolvedValueOnce(summary)
+
+    renderAnalyticsScreen()
+
+    const practice = await screen.findByRole('region', {
+      name: 'Practice Rhythm',
+    })
+    const practiceLabel = within(practice).getByText('Practice Rhythm evidence')
+    const ratingsLabel = within(practice).getByText(
+      'Rating composition evidence',
+    )
+    expect(practiceLabel).toBeVisible()
+    expect(ratingsLabel).toBeVisible()
+    expect(
+      within(practiceLabel.parentElement!).getByRole('status', {
+        name: 'Practice Rhythm readiness',
+      }),
+    ).toHaveTextContent('12 more assessments needed.')
+    expect(
+      within(ratingsLabel.parentElement!).getByRole('status', {
+        name: 'Rating composition readiness',
+      }),
+    ).toHaveTextContent(
+      'Complete your first eligible review to begin this view.',
+    )
+    expect(
+      within(practice).getByRole('button', {
+        name: 'Target Review Success 90%',
+      }),
+    ).toBeVisible()
   })
 
   it('uses Topic Performance qualifying evidence instead of legacy correctness readiness', async () => {
@@ -801,8 +884,8 @@ describe('AnalyticsScreen', () => {
     ).toBeVisible()
     const chartRegionNames = [
       'Observed Recall vs FSRS Estimate',
-      'Memory Strength',
       'Practice Rhythm',
+      'Memory Strength',
     ]
     const regionOrder = screen.getAllByRole('region').map((region) => {
       const labelledBy = region.getAttribute('aria-labelledby')
@@ -820,7 +903,7 @@ describe('AnalyticsScreen', () => {
     })
     expect(
       within(practiceRhythm).getByText(
-        /Completed review volume and the Good \+ Easy share/,
+        /Rating shares and completed review volume/,
       ),
     ).toBeVisible()
     expect(screen.queryByText(/practice days \/ week/i)).not.toBeInTheDocument()

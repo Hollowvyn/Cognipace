@@ -288,9 +288,10 @@ inspection. Its calculations remain read-only and derived from local practice
 state. The narrowly editable chart goals are Settings-owned preferences; they
 do not introduce hosted reporting or account behavior.
 
-The chart-target behavior below is implemented. Automated and production-component
-fixture validation are recorded in the chart-target handoff; required human
-installed-extension smoke remains pending before review or merge.
+The chart-target and merged Practice Rhythm behaviors below are implemented.
+Automated and production-component fixture validation are recorded in their
+handoffs; required human installed-extension happy-path and edge-case smoke
+with screenshot or recording proof remains pending before review or merge.
 Target Recall and Target Review Success are independent saved goals, both
 defaulting to 90%, regardless of FSRS target retention. Each accepts whole
 percentages from 0 through 100. Target Review Success must be at least Target
@@ -325,7 +326,7 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
 - The implemented range choices are 14 days with daily buckets, 30 days with
   three-day buckets, and 90 days with weekly buckets. The selection is always
   explicit and never silently changes to a shorter period.
-- All four historical panels trim only empty beginning and ending buckets from
+- All three historical panels trim only unsupported beginning and ending buckets from
   their presentation. Chart, Table, and inspection share the contiguous
   first-supported through last-supported
   slice, preserving every internal gap and each retained bucket's exact dates
@@ -336,9 +337,11 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
   When the selected range is not ready, the page explains the relevant evidence
   shortfall and can offer the richest shorter ready range as an explicit link;
   available charts remain visible.
-- Practice Rhythm distinguishes zero completed review volume from unavailable
-  Review Success. A bucket without valid ratings has no measured success rate;
-  its completed-review count remains the supplied count.
+- Practice Rhythm joins intervals supplied by the existing practice and rating
+  views by ID plus exact start/end dates. A missing counterpart stays
+  unavailable. A known zero completed-review count is an observation. Composition
+  and success retain their supplied availability; completed-review counts remain
+  independently supplied.
 - A dashed line bridge means two measured values are separated by a missing-
   evidence gap. It is a visual connection only, never an interpolated data
   value. Historical line charts connect each measured point to the next valid
@@ -349,7 +352,10 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
   buckets, a gap that is too long, or too many gaps. Readiness is guidance for
   confidence, not a reason to hide an otherwise available chart.
 
-The first four historical panels have these metric meanings and controls:
+The three historical cards have these metric meanings and controls. Recall
+comes first, followed by a full-width Practice Rhythm card. Memory Strength and
+the unchanged Topic Performance view share the next responsive row; later
+current-state and workload panels keep their existing treatment.
 
 - **Observed Recall vs FSRS Estimate** pairs valid rating-derived recalled
   outcomes (Hard, Good, or Easy) with reconstructed FSRS retrievability
@@ -382,31 +388,43 @@ The first four historical panels have these metric meanings and controls:
   reconstruction provenance. A finite median supports the retained activity
   window, including zero and sub-day values, without requiring quartiles or
   four eligible reviews. The four-review requirement applies only to whiskers.
-- **Practice Rhythm** places completed-review bars and a Review Success line in
-  one plot with independent axes: Reviews on the left and Review Success (%)
-  on the right. Review Success is Good + Easy divided by valid ratings; tooltip
-  and Table retain that numerator and denominator. Its dashed Target Review
-  Success reference uses the right percentage axis and a scale that includes
-  the saved goal even at 0% or 100%; goal edits do not change the review-count
-  scale, observations, rows, dates, gaps, or trimming. The relationship is
-  association, not causation. A bucket supports the retained activity window
-  when it has completed reviews, valid ratings, or a known finite success rate,
-  including 0%. Internal zero-volume buckets remain available.
-- **Ratings Mix** stacks the exact Again, Hard, Good, and Easy fractions for
-  each retained bucket. The activity window starts and ends with valid ratings.
-  An internal slot without valid ratings has a full-height neutral gray diagonal
-  hatch and unavailable composition; it is not a fifth rating.
-  A zero-count category in a populated bucket stays zero-height. Whole-percent
-  labels appear only when they fit; rounded labels can total 99% or 101% without
-  changing the exact segment geometry. Counts and more precise shares remain
-  available in tooltip and Table. The selected-period Hard + Again summary and
-  evidence-gated prior-period comparison remain available, and a wholly empty
-  selected period shows the explicit empty state.
+- **Practice Rhythm** combines exact rating composition and completed-review
+  volume in one plot. It stacks supplied shares bottom to top as Easy, Good,
+  Hard, Again on the fixed 0–100% left axis, labeled Rating share (%). The upper
+  boundary of Good + Easy expresses Review Success; there is no additional
+  success curve. Completed reviews use a thin neutral line and small measured
+  markers on the independent supplied right axis, labeled Reviews. Count zero
+  remains known, unavailable counts remain unavailable, and completed counts
+  are never derived from valid-rating counts. The saved Target Review Success
+  reference uses the left percentage axis and remains visible at 0% or 100%.
+  Its existing compact editor stays above the plot, including Chart/Table and
+  empty or sparse states. Goal edits do not change shares, review-count scale,
+  observations, rows, dates, gaps, or trimming.
+  The activity window spans the first through last union interval with positive
+  completed reviews, positive valid-rating counts in either source view, or a
+  finite supplied success rate including 0%. Every internal interval remains.
+  An internal interval without available rating composition has a full-height
+  neutral gray diagonal hatch; a zero category in a populated bucket stays
+  zero-height. Whole-percent labels appear at readable 12px only when they fit
+  without colliding with the count line or target; rounded labels can total 99%
+  or 101% without changing exact geometry.
+  Shared inspection and the seven-row Table retain completed reviews, each
+  rating count and precise share, Good + Easy numerator/valid-rating denominator,
+  supplied success, target, each metric's evidence, full interval, timezone/as-of,
+  and complete/in-progress context. A native Reviews switch hides the count
+  line, markers, right axis, and tooltip count together, preserving rows, dates,
+  target, and all Table values. Accessible copy reflects visible series.
+  The selected-period Hard + Again summary and evidence-gated prior-period
+  comparison remain below the shared view. Distinct rating and count readiness
+  warnings remain visible when they differ, without hiding supported data. The
+  visible explanation describes association rather than causation; a count-line
+  crossing with the percentage target has no percentage meaning. A wholly
+  unsupported selected period shows the explicit empty state.
 
-These four panels use sparse calendar-date axis labels without dropping retained
+These three panels use sparse calendar-date axis labels without dropping retained
 chart rows. Bucket marks sit at the midpoint of their actual local-date interval,
-including shortened edge intervals. Memory Strength, Practice Rhythm, and
-Ratings Mix keep their existing interval-boundary X domains and padding.
+including shortened edge intervals. Memory Strength and Practice Rhythm keep
+their interval-boundary X domains and padding.
 Labels use MM/DD in the report's as-of
 year and MM/DD/YY for other years; cross-year tooltip intervals show both years.
 Pointer or tap position selects the nearest retained original bucket. A native

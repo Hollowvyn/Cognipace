@@ -57,6 +57,12 @@
     --cp-analytics-predicted: light-dark(#698475, #a2bdab);
   }
 
+  .cp-historical-practice-ratings {
+    --cp-analytics-hard: light-dark(#d5bb77, #ccb777);
+    --cp-analytics-again: light-dark(#d6a5a1, #cba5a2);
+    --cp-analytics-review-line: light-dark(#495b50, #e0e9e2);
+  }
+
   @container historical-panel (min-width: 430px) {
     [data-analytics-historical] > header > :not(:last-child) {
       padding-right: 116px;

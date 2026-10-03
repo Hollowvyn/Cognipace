@@ -20,26 +20,25 @@ React Testing Library, scoped analytics CSS.
 and `.test.ts`; create `practice-ratings-view.tsx` and `.test.tsx` in that same
 directory. Modify `src/styles/analytics.css` only for scoped merged colors.
 
-- [ ] Write join regression tests before implementation. Supply reordered
+- [x] Write join regression tests before implementation. Supply reordered
       arrays, absent counterparts, equal IDs with different boundaries,
       count-only edges, measured zero success, internal empty rows, and entirely
       empty history. Freeze inputs and assert original rows are retained.
-- [ ] Run `rtk npm run test -- src/features/analytics/components/practice-ratings-model.test.ts`
+- [x] Run `rtk npm run test -- src/features/analytics/components/practice-ratings-model.test.ts`
       and observe RED. Implement a typed interval union sorted by date with a
       contiguous supported slice. The key is
       `JSON.stringify([row.id, row.bucketStart, row.bucketEnd])`.
       A merged row exposes `practice`, `ratings`, and nullable
-      `completedReviews`, retaining original objects. Support is
-      `(practice?.completedReviews ?? 0) > 0 || (practice?.validRatings ?? 0) > 0 ||
-    (ratings?.validRatings ?? 0) > 0 || (practice?.reviewSuccess !== null &&
-    practice?.reviewSuccess !== undefined && Number.isFinite(practice.reviewSuccess))`.
-- [ ] Write component tests before rendering code. Assert percentage/count
+      `completedReviews`, retaining original objects. Support is positive
+      completed reviews, positive valid-rating counts in either source, or a
+      supplied finite Practice success rate including zero.
+- [x] Write component tests before rendering code. Assert percentage/count
       coordinates are independent, Easy/Good/Hard/Again bottom-to-top exact
       shares, hatching and zero category geometry, target 0/1 on left axis,
       unavailable composition with known zero count, visibility parity without
       date/window changes, full interval/evidence and supplied success in
       keyboard inspection, seven-row pagination, and empty target availability.
-- [ ] Run `rtk npm run test -- src/features/analytics/components/practice-ratings-view.test.tsx`
+- [x] Run `rtk npm run test -- src/features/analytics/components/practice-ratings-view.test.tsx`
       and observe RED. Implement this public interface:
 
       ```tsx
@@ -61,7 +60,7 @@ directory. Modify `src/styles/analytics.css` only for scoped merged colors.
       labels measured for fit and skip overlaps with target/count crossings.
       Use one shared tooltip and Table slice. Keep prior-period summary honest.
 
-- [ ] Run both new suites and existing historical suites. Format touched source.
+- [x] Run both new suites and existing historical suites. Format touched source.
       Specification review must precede quality review; fix actionable findings.
 
 ## Task 2: Compose one dashboard card
@@ -69,18 +68,18 @@ directory. Modify `src/styles/analytics.css` only for scoped merged colors.
 **Files:** Modify `src/features/analytics/components/analytics-screen.tsx`,
 `analytics-screen.test.tsx`, and `historical-views.tsx`.
 
-- [ ] Add a failing screen regression: one Practice Rhythm region contains
+- [x] Add a failing screen regression: one Practice Rhythm region contains
       the target and merged chart, and no separate Ratings Mix region exists.
       Include rating readiness differing from practice readiness.
-- [ ] Run `rtk npm run test -- src/features/analytics/components/analytics-screen.test.tsx`
+- [x] Run `rtk npm run test -- src/features/analytics/components/analytics-screen.test.tsx`
       and observe the intended failures.
-- [ ] Export/import `PracticeRatingsView`, pass `view={data.views.practiceRhythm}`
+- [x] Export/import `PracticeRatingsView`, pass `view={data.views.practiceRhythm}`
       and `ratingsView={data.views.ratingsMix}`, retaining the existing
       `AnalyticsTargetEditor metric="reviewSuccess"` and callback. Place Recall
       and Practice as full-width cards, then Memory/Topic in a responsive pair.
       Keep the Topic component and later panels unchanged. Expose differing
       rating readiness with the existing `AnalyticsReadinessState compact`.
-- [ ] Update only obsolete screen expectations; run screen, target-editor,
+- [x] Update only obsolete screen expectations; run screen, target-editor,
       model, and merged-view tests. Review specification and then quality.
 
 ## Task 3: Validation, proof, docs, and existing PR
@@ -90,21 +89,21 @@ directory. Modify `src/styles/analytics.css` only for scoped merged colors.
 `docs/superpowers/handoffs/2026-10-03-analytics-practice-ratings-merge.md` and proof
 assets under `docs/superpowers/handoffs/assets/2026-10-03-analytics-practice-ratings-merge/`.
 
-- [ ] Amend current authority to the three-card historical composition and
+- [x] Amend current authority to the three-card historical composition and
       merged plot, fixed percent scale, separate count scale, preserved goals,
       readiness and comparison, interval union, and human smoke checklist.
-- [ ] Render actual production components in an isolated Vite fixture using
+- [x] Render actual production components in an isolated Vite fixture using
       ready, sparse, zero, count-only, partial/cross-year and empty rows. Capture
       desktop light/dark, 320px light/dark, keyboard gap inspection, Table, and
       target editing. Inspect each screenshot; verify 320px no horizontal
       document overflow. Fixture saves must be clearly distinguished from
       Settings persistence and human extension smoke.
-- [ ] Run `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`,
+- [x] Run `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`,
       `rtk npm run format`, touched Markdown Prettier and `rtk proxy git diff --check`.
       Record exact commands/results. `rtk npm run db:generate` is skipped because
       no schema changes; `rtk npm run zip` is skipped because packaging is
       unchanged. Keep human realtime installed-extension smoke pending.
-- [ ] Complete final independent review and resolve findings. Commit with a
+- [x] Complete final independent review and resolve findings. Commit with a
       Conventional Commit title, push `codex/analytics-layout-polish`, and update
       draft PR #184 using the existing PR template and `--body-file`. Attach the
       existing PR to this task. Leave it draft until required human smoke proof.

@@ -12,11 +12,12 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-03-analytics-practice-ratings-merge-design.md`](./specs/2026-10-03-analytics-practice-ratings-merge-design.md): approved merged Practice Rhythm chart with exact stacked shares, independent completed-review line, saved Success target, interval union, and three-card historical layout; earlier exact design snapshots remain historical context.
 - [`specs/2026-10-02-analytics-chart-targets-design.md`](./specs/2026-10-02-analytics-chart-targets-design.md): approved independent saved Recall/Review Success goals, compact graph editors, Settings/backup/configured sync ownership, and unchanged FSRS behavior; implemented with automated/fixture proof; human extension smoke remains pending.
-- [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): approved historical-chart decisions, with the first four implemented and later panels deferred.
+- [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): earlier four-chart historical treatment and exact design snapshots, retained as implementation history; the approved merged Practice Rhythm design owns the current three-card historical layout and later panels remain deferred.
 - [`specs/2026-10-02-analytics-recall-approved-design.md`](./specs/2026-10-02-analytics-recall-approved-design.md): exact approved Recall source, screenshots, and checksums.
-- [`specs/2026-10-02-analytics-memory-practice-approved-design.md`](./specs/2026-10-02-analytics-memory-practice-approved-design.md): exact approved fitted Memory Strength and mixed Practice Rhythm snapshots.
-- [`specs/2026-10-02-analytics-ratings-mix-approved-design.md`](./specs/2026-10-02-analytics-ratings-mix-approved-design.md): exact approved Ratings Mix snapshot, missing-period hatch, and segment labels.
+- [`specs/2026-10-02-analytics-memory-practice-approved-design.md`](./specs/2026-10-02-analytics-memory-practice-approved-design.md): exact approved fitted Memory Strength and earlier Practice Rhythm snapshots, preserved as historical context.
+- [`specs/2026-10-02-analytics-ratings-mix-approved-design.md`](./specs/2026-10-02-analytics-ratings-mix-approved-design.md): exact earlier standalone Ratings Mix snapshot, missing-period hatch, and segment labels, preserved as historical context.
 
 - [`specs/2026-10-02-track-editor-external-progress-design.md`](./specs/2026-10-02-track-editor-external-progress-design.md): approved vertical Track editor, Change button menu, and opt-in continuous external progress, including preserving migrations and backup v5.
 - [`specs/2026-09-26-topics-foundation-library-filtering-design.md`](./specs/2026-09-26-topics-foundation-library-filtering-design.md): approved design for typed topic relationships, deterministic aliases, preserving upgrades, and Library filtering by descendants with Any/All matching.
@@ -51,6 +52,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-03-analytics-practice-ratings-merge.md`](./plans/2026-10-03-analytics-practice-ratings-merge.md): approved phase-sized plan for the pure interval join, merged chart, dashboard composition, automated validation, production-component proof, and required human installed-extension smoke.
 - [`plans/2026-10-02-analytics-compact-target-editors.md`](./plans/2026-10-02-analytics-compact-target-editors.md): user-directed refinement to one small input per graph, independent partial saves, current counterpart constraints, and refreshed production-component proof.
 - [`plans/2026-10-02-analytics-chart-targets.md`](./plans/2026-10-02-analytics-chart-targets.md): approved phase-sized implementation plan for the saved pair, target-aware models/cache, compact editors, validation, and required human extension smoke; execution complete with human extension smoke pending.
 - [`plans/2026-10-02-analytics-historical-charts.md`](./plans/2026-10-02-analytics-historical-charts.md): completed implementation plan for the first four historical charts, inspection, tables, scoped layout, and validation.
@@ -98,6 +100,7 @@ Use these files to understand why work was shaped a certain way. Before changing
 
 ## Handoffs
 
+- [`handoffs/2026-10-03-analytics-practice-ratings-merge.md`](./handoffs/2026-10-03-analytics-practice-ratings-merge.md): merged chart implementation, interval and visibility validation, production-component proof, and required human installed-extension happy-path and edge-case smoke pending before review or merge.
 - [`handoffs/2026-10-02-analytics-compact-target-editors.md`](./handoffs/2026-10-02-analytics-compact-target-editors.md): single-target compact controls, safe partial saves, review and validation results, and new fixture screenshots; human installed-extension smoke remains pending.
 - [`handoffs/2026-10-02-analytics-chart-targets.md`](./handoffs/2026-10-02-analytics-chart-targets.md): saved graph goals, pair validation, cache/reset race fixes, automated checks and production-component proof; human installed-extension smoke remains pending.
 

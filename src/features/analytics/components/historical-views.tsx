@@ -10,6 +10,7 @@ export {
   RatingsMixView,
 } from './recall-ratings-views'
 export { MemoryStrengthView, PracticeRhythmView } from './memory-practice-views'
+export { PracticeRatingsView } from './practice-ratings-view'
 
 const chartDimension = { width: 640, height: 288 }
 

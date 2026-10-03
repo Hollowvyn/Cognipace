@@ -19,8 +19,7 @@ import { AnalyticsTargetEditor } from './analytics-target-editor'
 import {
   MemoryStrengthView,
   ObservedRecallVsFsrsView,
-  PracticeRhythmView,
-  RatingsMixView,
+  PracticeRatingsView,
   TopicPerformanceView,
 } from './historical-views'
 import { MemorySignalsView, RetentionMapView } from './current-state-views'
@@ -212,6 +211,11 @@ function AnalyticsHistoricalStory({
     targetRecall: data.views.observedRecallVsFsrs.targetRecall,
     targetReviewSuccess: data.views.practiceRhythm.targetReviewSuccess,
   }
+  const showRatingReadiness =
+    (!data.historicalReadiness.ratingsMix.ready ||
+      hasTrimmedLeadingHistory(data.historicalReadiness.ratingsMix)) &&
+    JSON.stringify(data.historicalReadiness.ratingsMix) !==
+      JSON.stringify(data.historicalReadiness.practiceRhythm)
   return (
     <div className="cp-analytics-history grid min-w-0 gap-4">
       <PhaseTwoPanel
@@ -235,7 +239,58 @@ function AnalyticsHistoricalStory({
         />
       </PhaseTwoPanel>
 
-      <div className="cp-analytics-history-pair grid min-w-0 gap-4">
+      <PhaseTwoPanel
+        historical
+        description="Rating shares and completed review volume move together by time bucket. Good + Easy shows Review Success; the relationship is association only."
+        id="practice-rhythm"
+        question="How did your review ratings change with practice?"
+        readiness={data.historicalReadiness.practiceRhythm}
+        showReadiness={false}
+        title="Practice Rhythm"
+      >
+        <PracticeRatingsView
+          ratingsView={data.views.ratingsMix}
+          targetControl={
+            <AnalyticsTargetEditor
+              targets={targets}
+              metric="reviewSuccess"
+              onSave={updateTargets.mutateAsync}
+            />
+          }
+          timeFrame={data.timeFrame}
+          view={data.views.practiceRhythm}
+        />
+        {showRatingReadiness ? (
+          <div className="mt-3 grid gap-1">
+            <p className="m-0 text-xs font-medium text-muted-foreground">
+              Rating composition evidence
+            </p>
+            <AnalyticsReadinessState
+              compact
+              readiness={data.historicalReadiness.ratingsMix}
+              recommendedRange={null}
+              title="Rating composition"
+            />
+          </div>
+        ) : null}
+        {!data.historicalReadiness.practiceRhythm.ready ? (
+          <div className="mt-3 grid gap-1">
+            {showRatingReadiness ? (
+              <p className="m-0 text-xs font-medium text-muted-foreground">
+                Practice Rhythm evidence
+              </p>
+            ) : null}
+            <AnalyticsReadinessState
+              compact
+              readiness={data.historicalReadiness.practiceRhythm}
+              recommendedRange={null}
+              title="Practice Rhythm"
+            />
+          </div>
+        ) : null}
+      </PhaseTwoPanel>
+
+      <div className="grid w-full min-w-0 max-w-[64rem] gap-4 lg:grid-cols-2">
         <PhaseTwoPanel
           historical
           description="FSRS's reconstructed post-review estimate of how long the memories reviewed in each bucket may remain retrievable."
@@ -247,42 +302,6 @@ function AnalyticsHistoricalStory({
           <MemoryStrengthView
             timeFrame={data.timeFrame}
             view={data.views.memoryStrength}
-          />
-        </PhaseTwoPanel>
-        <PhaseTwoPanel
-          historical
-          description="Completed review volume and the Good + Easy share move together by time bucket; the relationship is association only."
-          id="practice-rhythm"
-          question="When you practiced more or less, how did Review Success move?"
-          readiness={data.historicalReadiness.practiceRhythm}
-          title="Practice Rhythm"
-        >
-          <PracticeRhythmView
-            targetControl={
-              <AnalyticsTargetEditor
-                targets={targets}
-                metric="reviewSuccess"
-                onSave={updateTargets.mutateAsync}
-              />
-            }
-            timeFrame={data.timeFrame}
-            view={data.views.practiceRhythm}
-          />
-        </PhaseTwoPanel>
-      </div>
-
-      <div className="grid w-full min-w-0 max-w-[64rem] gap-4 lg:grid-cols-2">
-        <PhaseTwoPanel
-          historical
-          description="The changing share of valid Again, Hard, Good, and Easy review ratings across the selected period."
-          id="ratings-mix"
-          question="How is the balance of your review ratings changing?"
-          readiness={data.historicalReadiness.ratingsMix}
-          title="Ratings Mix"
-        >
-          <RatingsMixView
-            timeFrame={data.timeFrame}
-            view={data.views.ratingsMix}
           />
         </PhaseTwoPanel>
         <PhaseTwoPanel
