@@ -10,6 +10,7 @@ export interface AnalyticsChartPanelProps {
   description: string
   emptyMessage?: ReactNode
   footer?: ReactNode
+  historical?: boolean
   id: string
   question?: string | undefined
   title: string
@@ -22,6 +23,7 @@ export function AnalyticsChartPanel({
   description,
   emptyMessage,
   footer,
+  historical = false,
   id,
   question,
   title,
@@ -39,6 +41,7 @@ export function AnalyticsChartPanel({
       }
       aria-labelledby={titleId}
       className={cn('grid min-w-0 gap-4', className)}
+      data-analytics-historical={historical ? '' : undefined}
       id={id}
       role="region"
     >

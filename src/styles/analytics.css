@@ -1,0 +1,100 @@
+/* Scoped to the approved historical charts; later panels retain their tokens. */
+@layer utilities {
+  .cp-analytics-history {
+    container: analytics-history / inline-size;
+  }
+
+  [data-analytics-historical] {
+    position: relative;
+    container: historical-panel / inline-size;
+    --cp-copy-font-size: 0.75rem;
+    gap: 12px;
+    align-content: start;
+    grid-template-rows: auto 1fr;
+  }
+
+  [data-analytics-historical] > header h2 {
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  [data-analytics-historical] > header p {
+    line-height: 1.5;
+  }
+
+  [data-analytics-historical] [role='tab'] {
+    padding: 5px 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .cp-historical-view {
+    --cp-analytics-observed: light-dark(#34865a, #8fdfa9);
+    --cp-analytics-predicted: light-dark(#507c65, #b1d7be);
+    --cp-analytics-target: light-dark(#a87906, #ffd449);
+    --cp-analytics-practice-volume: color-mix(
+      in srgb,
+      var(--cp-analytics-predicted) 40%,
+      transparent
+    );
+    --cp-analytics-again: light-dark(#c06a65, #fbb0aa);
+    --cp-analytics-hard: light-dark(#a87906, #ffd449);
+    --cp-analytics-good: light-dark(#258e86, #5bdcc9);
+    --cp-analytics-easy: light-dark(#34865a, #8fdfa9);
+    --cp-analytics-healthy: var(--cp-analytics-observed);
+    --cp-analytics-rating-label: light-dark(#000000, #173c28);
+    --cp-analytics-empty: light-dark(#e2e7e3, #334038);
+    --cp-analytics-hatch: light-dark(#85958a, #778b7d);
+    min-width: 0;
+  }
+
+  .cp-historical-view > p {
+    font-size: 0.75rem;
+  }
+
+  .cp-historical-recall {
+    --cp-analytics-predicted: light-dark(#698475, #a2bdab);
+  }
+
+  @container historical-panel (min-width: 430px) {
+    [data-analytics-historical] > header > :not(:last-child) {
+      padding-right: 116px;
+    }
+
+    [data-analytics-historical] [role='tablist'] {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+  }
+
+  @container analytics-history (min-width: 1040px) {
+    .cp-analytics-history-pair {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cp-analytics-history-pair [data-analytics-historical] > header {
+      min-height: 110px;
+    }
+  }
+
+  @container historical-panel (max-width: 430px) {
+    [data-analytics-historical] [role='tablist'] {
+      justify-content: flex-end;
+    }
+  }
+
+  @container analytics-history (max-width: 430px) {
+    [data-analytics-historical] {
+      --cp-panel-padding: 12px;
+    }
+  }
+
+  @media (pointer: coarse) {
+    [data-analytics-historical] [role='tab'] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+}

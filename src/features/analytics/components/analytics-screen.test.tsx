@@ -676,14 +676,26 @@ describe('AnalyticsScreen', () => {
       failingReasons: ['insufficient-assessments'] as ReadinessFailure[],
     }
 
-    vi.mocked(sendMessage).mockResolvedValueOnce(
-      readyAnalyticsSummary({
-        historicalReadiness: {
-          ...historicalReadiness,
-          practiceRhythm,
-        },
-      }),
-    )
+    const summary = readyAnalyticsSummary({
+      historicalReadiness: {
+        ...historicalReadiness,
+        practiceRhythm,
+      },
+    })
+    summary.views.practiceRhythm.rows = [
+      {
+        id: '2026-01-12',
+        bucketStart: '2026-01-12',
+        bucketEnd: '2026-01-14',
+        isPartial: false,
+        completedReviews: 4,
+        goodEasy: 3,
+        validRatings: 4,
+        reviewSuccess: 0.75,
+        evidence: 'measured',
+      },
+    ]
+    vi.mocked(sendMessage).mockResolvedValueOnce(summary)
 
     renderAnalyticsScreen()
 
@@ -696,6 +708,15 @@ describe('AnalyticsScreen', () => {
     expect(
       screen.getByRole('region', { name: 'Practice Rhythm' }),
     ).toBeVisible()
+    const chart = screen.getByRole('button', {
+      name: 'Inspect Practice Rhythm chart',
+    })
+    const warning = screen.getByRole('status', {
+      name: 'Practice Rhythm readiness',
+    })
+    expect(
+      chart.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(
       screen.queryByRole('region', { name: 'Ratings mix' }),
     ).not.toBeInTheDocument()

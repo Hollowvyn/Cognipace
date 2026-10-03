@@ -66,7 +66,9 @@ export function AnalyticsScreen({
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--cp-surface-gap)]">
-      <AnalyticsMetricRow summary={data} />
+      <div className="w-full max-w-[64rem]">
+        <AnalyticsMetricRow summary={data} />
+      </div>
       <AnalyticsScopeMetadata data={data} />
       {!data.historicalReadiness.requested.ready ? (
         <AnalyticsReadinessState
@@ -96,7 +98,7 @@ function AnalyticsWorkloadStory({
   data: SerializedAnalyticsSummary
 }) {
   return (
-    <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+    <div className="grid w-full min-w-0 max-w-[64rem] gap-4 lg:grid-cols-2">
       <AnalyticsChartPanel
         description="Daily local overdue counts reconstructed from known persisted FSRS review intervals and current card state. Unknown days are deliberately not estimated."
         id="recent-overdue-backlog"
@@ -123,7 +125,7 @@ function AnalyticsCurrentStateStory({
   data: SerializedAnalyticsSummary
 }) {
   return (
-    <div className="grid min-w-0 gap-4">
+    <div className="grid w-full min-w-0 max-w-[64rem] gap-4">
       <AnalyticsChartPanel
         description="Current FSRS retrievability and total target-crossing duration for active reviewed problems. This is model-estimated memory health, not observed recall or a due queue."
         id="retention-map"
@@ -202,47 +204,63 @@ function AnalyticsHistoricalStory({
   data: SerializedAnalyticsSummary
 }) {
   return (
-    <div className="grid min-w-0 gap-4">
+    <div className="cp-analytics-history grid min-w-0 gap-4">
       <PhaseTwoPanel
+        historical
         description="Rating-derived recalled outcomes compared with reconstructed FSRS retrievability immediately before those exact reviews."
         id="observed-recall-vs-fsrs"
         question="How did recalled review outcomes compare with the FSRS estimate?"
         readiness={data.historicalReadiness.recallQuality}
         title="Observed Recall vs FSRS Estimate"
       >
-        <ObservedRecallVsFsrsView view={data.views.observedRecallVsFsrs} />
+        <ObservedRecallVsFsrsView
+          timeFrame={data.timeFrame}
+          view={data.views.observedRecallVsFsrs}
+        />
       </PhaseTwoPanel>
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+      <div className="cp-analytics-history-pair grid min-w-0 gap-4">
         <PhaseTwoPanel
+          historical
           description="FSRS's reconstructed post-review estimate of how long the memories reviewed in each bucket may remain retrievable."
           id="memory-strength"
           question="Are your reviewed memories staying strong for longer?"
           readiness={data.historicalReadiness.stability}
           title="Memory Strength"
         >
-          <MemoryStrengthView view={data.views.memoryStrength} />
+          <MemoryStrengthView
+            timeFrame={data.timeFrame}
+            view={data.views.memoryStrength}
+          />
         </PhaseTwoPanel>
         <PhaseTwoPanel
+          historical
           description="Completed review volume and the Good + Easy share move together by time bucket; the relationship is association only."
           id="practice-rhythm"
           question="When you practiced more or less, how did Review Success move?"
           readiness={data.historicalReadiness.practiceRhythm}
           title="Practice Rhythm"
         >
-          <PracticeRhythmView view={data.views.practiceRhythm} />
+          <PracticeRhythmView
+            timeFrame={data.timeFrame}
+            view={data.views.practiceRhythm}
+          />
         </PhaseTwoPanel>
       </div>
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+      <div className="grid w-full min-w-0 max-w-[64rem] gap-4 lg:grid-cols-2">
         <PhaseTwoPanel
+          historical
           description="The changing share of valid Again, Hard, Good, and Easy review ratings across the selected period."
           id="ratings-mix"
           question="How is the balance of your review ratings changing?"
           readiness={data.historicalReadiness.ratingsMix}
           title="Ratings Mix"
         >
-          <RatingsMixView view={data.views.ratingsMix} />
+          <RatingsMixView
+            timeFrame={data.timeFrame}
+            view={data.views.ratingsMix}
+          />
         </PhaseTwoPanel>
         <PhaseTwoPanel
           description="Topics ranked by sufficiently sampled Good + Easy Review Success in the selected period; this is not a mastery score."
@@ -264,6 +282,7 @@ function AnalyticsHistoricalStory({
 
 function PhaseTwoPanel({
   description,
+  historical = false,
   id,
   question,
   readiness,
@@ -272,6 +291,7 @@ function PhaseTwoPanel({
   children,
 }: {
   description: string
+  historical?: boolean
   id: string
   question: string
   readiness: SerializedAnalyticsSummary['historicalReadiness']['recallQuality']
@@ -281,12 +301,13 @@ function PhaseTwoPanel({
 }) {
   return (
     <AnalyticsChartPanel
+      historical={historical}
       description={description}
       id={id}
       question={question}
       title={title}
     >
-      {showReadiness && !readiness.ready ? (
+      {!historical && showReadiness && !readiness.ready ? (
         <AnalyticsReadinessState
           compact
           readiness={readiness}
@@ -295,6 +316,16 @@ function PhaseTwoPanel({
         />
       ) : null}
       {children}
+      {historical && showReadiness && !readiness.ready ? (
+        <div className="mt-3">
+          <AnalyticsReadinessState
+            compact
+            readiness={readiness}
+            recommendedRange={null}
+            title={title}
+          />
+        </div>
+      ) : null}
     </AnalyticsChartPanel>
   )
 }

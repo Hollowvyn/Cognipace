@@ -1,8 +1,10 @@
 # Approved Memory Strength And Practice Rhythm Designs
 
 Status: human-approved visual design, archived exactly on 2026-10-02.
-Application implementation is pending. Recall and the remaining Analytics
-refinements are being reviewed separately.
+The four historical charts are now implemented locally; see the
+[implementation handoff](../handoffs/2026-10-02-analytics-historical-charts.md)
+for checks and the pending human extension smoke. The original archive record
+below remains a design-only checkpoint.
 
 The user approved the displayed pair with: “Let's use fitted scale” and asked
 to save the exact designs. This is the durable checkpoint for that decision.

@@ -1,0 +1,116 @@
+<div id="cp-ratings-mix-direction" class="viz-dotted-background">
+  <main class="rm-page" aria-label="Ratings Mix preview">
+    <article class="rm-panel">
+      <header class="rm-header"><div><h3>Ratings Mix</h3><p>How is the balance of your review ratings changing?</p></div><div class="rm-switch" aria-label="Ratings Mix display"><button type="button" data-mode="chart" aria-pressed="true">Chart</button><button type="button" data-mode="table" aria-pressed="false">Table</button></div></header>
+      <p class="rm-description">The changing share of valid Again, Hard, Good, and Easy review ratings across the selected period.</p>
+      <div class="rm-chart-content">
+        <div class="rm-plot" aria-label="Inspect ratings buckets"></div>
+        <div class="rm-key" aria-label="Review ratings and unavailable buckets"><span><i class="rm-again"></i>Again</span><span><i class="rm-hard"></i>Hard</span><span><i class="rm-good"></i>Good</span><span><i class="rm-easy"></i>Easy</span><span class="rm-empty-key"><i></i>No valid ratings</span></div>
+      </div>
+      <div class="rm-table-content" hidden><table><caption>Illustrative review counts and shares by 3-day bucket</caption><thead><tr><th>Period</th><th>Valid ratings</th><th>Again</th><th>Hard</th><th>Good</th><th>Easy</th></tr></thead><tbody></tbody></table></div>
+      <p class="rm-summary">This period's rating mix is based on 39 valid ratings. Hard + Again: 18 of 39 (46%).</p>
+      <p class="rm-prior">Hard + Again is up 15 pp from the equivalent prior period (31%; 45 valid ratings).</p>
+      <details><summary>Calculation details</summary><p>The chart shows valid Again, Hard, Good and Easy rating shares by bucket. Colored segments use exact fractions; labels are rounded to whole percentages and may total 99% or 101%. Gray stripes mean no valid ratings and unavailable composition, rather than a rating share. The ten 3-day buckets spanning 09/03–10/02 and their counts are illustrative. The final 09/30–10/02 bucket is in progress as of 10/02, 2:44 AM.</p></details>
+    </article>
+  </main>
+</div>
+<style>
+  #cp-ratings-mix-direction { --rm-bg:light-dark(#f4f6f2,#101513); --rm-panel:light-dark(#ffffff,#1b211e); --rm-text:light-dark(#26382e,#e1e8e3); --rm-muted:light-dark(#59695e,#afbdb4); --rm-border:light-dark(#dce4dc,#3b4840); --rm-grid:light-dark(#e4eae3,#303d34); --rm-again:light-dark(#c06a65,#fbb0aa); --rm-hard:light-dark(#a87906,#ffd449); --rm-good:light-dark(#258e86,#5bdcc9); --rm-easy:light-dark(#34865a,#8fdfa9); --rm-label:light-dark(#000000,#173c28); --rm-empty:light-dark(#e2e7e3,#334038); --rm-hatch:light-dark(#85958a,#778b7d); --rm-active:light-dark(#d9ebde,#a0cdb2); --rm-active-text:light-dark(#214e33,#173c28); color:var(--rm-text); }
+  #cp-ratings-mix-direction * { box-sizing:border-box; }
+  #cp-ratings-mix-direction .rm-page { width:100%; padding:20px; background:var(--rm-bg); color:var(--rm-text); font-family:"Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:14px; line-height:1.5; }
+  #cp-ratings-mix-direction .rm-panel { background:var(--rm-panel); border:1px solid var(--rm-border); border-radius:7px; padding:20px; min-width:0; }
+  #cp-ratings-mix-direction h3,#cp-ratings-mix-direction p { margin:0; }
+  #cp-ratings-mix-direction h3 { font-size:16px; line-height:1.4; font-weight:500; }
+  #cp-ratings-mix-direction .rm-header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:12px; }
+  #cp-ratings-mix-direction .rm-header p { color:var(--rm-muted); font-size:12px; margin-top:4px; }
+  #cp-ratings-mix-direction .rm-description { color:var(--rm-muted); font-size:12px; margin-bottom:12px; }
+  #cp-ratings-mix-direction button { font:inherit; font-size:12px; color:var(--rm-muted); background:transparent; border:0; border-radius:3px; padding:5px 8px; }
+  #cp-ratings-mix-direction .rm-switch { flex-shrink:0; display:inline-flex; padding:2px; border:1px solid var(--rm-border); border-radius:5px; background:var(--rm-bg); }
+  #cp-ratings-mix-direction .rm-switch button[aria-pressed="true"] { color:var(--rm-active-text); background:var(--rm-active); font-weight:500; }
+  #cp-ratings-mix-direction .rm-plot { width:100%; height:310px; position:relative; }
+  #cp-ratings-mix-direction .rm-plot svg { display:block; width:100%; height:100%; overflow:visible; }
+  #cp-ratings-mix-direction .rm-plot svg text { fill:var(--rm-muted); font-family:inherit; font-size:12px; font-weight:400; }
+  #cp-ratings-mix-direction .rm-plot svg .rm-percent { fill:var(--rm-label); font-weight:500; }
+  #cp-ratings-mix-direction .rm-key { display:flex; gap:8px 16px; align-items:center; flex-wrap:wrap; padding:8px 0; color:var(--rm-muted); font-size:12px; }
+  #cp-ratings-mix-direction .rm-key span { display:inline-flex; align-items:center; gap:6px; }
+  #cp-ratings-mix-direction .rm-key i { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  #cp-ratings-mix-direction .rm-again { background:var(--rm-again); }
+  #cp-ratings-mix-direction .rm-hard { background:var(--rm-hard); }
+  #cp-ratings-mix-direction .rm-good { background:var(--rm-good); }
+  #cp-ratings-mix-direction .rm-easy { background:var(--rm-easy); }
+  #cp-ratings-mix-direction .rm-empty-key i { width:13px; height:12px; border-radius:0; background:repeating-linear-gradient(135deg,var(--rm-empty),var(--rm-empty) 4px,var(--rm-hatch) 4px,var(--rm-hatch) 5px); }
+  #cp-ratings-mix-direction .rm-summary,#cp-ratings-mix-direction .rm-prior { color:var(--rm-muted); font-size:12px; margin-top:8px; }
+  #cp-ratings-mix-direction details { color:var(--rm-muted); font-size:12px; border-top:1px solid var(--rm-border); padding-top:10px; margin-top:12px; }
+  #cp-ratings-mix-direction details p { margin-top:8px; }
+  #cp-ratings-mix-direction .rm-table-content { overflow-x:auto; min-width:0; }
+  #cp-ratings-mix-direction table { width:100%; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums; }
+  #cp-ratings-mix-direction caption { text-align:left; color:var(--rm-muted); padding-bottom:10px; }
+  #cp-ratings-mix-direction th { text-align:left; font-weight:500; }
+  #cp-ratings-mix-direction td,#cp-ratings-mix-direction th { padding:10px 8px; border-bottom:1px solid var(--rm-border); vertical-align:top; }
+  #cp-ratings-mix-direction td { text-align:right; }
+  #cp-ratings-mix-direction tbody th { font-weight:400; }
+  #cp-ratings-mix-direction thead th { color:var(--rm-muted); }
+  #cp-ratings-mix-direction .rm-hit { position:absolute; z-index:1; background:transparent; padding:0; border-radius:0; }
+  #cp-ratings-mix-direction .rm-tooltip { position:absolute; z-index:2; top:8px; right:8px; max-width:calc(100% - 16px); padding:10px 12px; border:1px solid var(--rm-border); border-radius:5px; background:var(--rm-panel); color:var(--rm-text); font-size:12px; line-height:1.5; pointer-events:none; box-shadow:0 4px 12px color-mix(in srgb,var(--rm-border) 35%,transparent); }
+  #cp-ratings-mix-direction .rm-tooltip strong { font-weight:500; }
+  #cp-ratings-mix-direction .rm-tooltip .rm-denominator { display:block; margin-top:5px; font-size:14px; font-variant-numeric:tabular-nums; }
+  #cp-ratings-mix-direction .rm-tooltip dl { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 18px; margin:7px 0 0; }
+  #cp-ratings-mix-direction .rm-tooltip dt { color:var(--rm-muted); }
+  #cp-ratings-mix-direction .rm-tooltip dd { margin:0; text-align:right; font-variant-numeric:tabular-nums; }
+  #cp-ratings-mix-direction .rm-tooltip small { display:block; color:var(--rm-muted); font-size:12px; margin-top:5px; }
+  #cp-ratings-mix-direction .rm-sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  #cp-ratings-mix-direction [hidden] { display:none !important; }
+  @media(max-width:430px) { #cp-ratings-mix-direction .rm-page { padding:12px; } #cp-ratings-mix-direction .rm-panel { padding:12px; } #cp-ratings-mix-direction .rm-header { flex-direction:column; gap:10px; } #cp-ratings-mix-direction .rm-switch { align-self:flex-end; } #cp-ratings-mix-direction .rm-plot { height:280px; } #cp-ratings-mix-direction .rm-key { gap:5px 12px; } }
+  @media(pointer:coarse) { #cp-ratings-mix-direction button { min-width:44px; min-height:44px; } }
+</style>
+<script>
+(() => {
+  const root=document.getElementById('cp-ratings-mix-direction'),host=root.querySelector('.rm-plot');
+  const names=['Again','Hard','Good','Easy'],colors=['var(--rm-again)','var(--rm-hard)','var(--rm-good)','var(--rm-easy)'];
+  const counts=[[0,0,0,0],[0,0,0,0],[1,0,1,4],[2,2,7,3],[0,0,0,0],[1,3,0,0],[0,1,1,0],[2,0,1,2],[0,0,0,0],[2,4,1,1]],denominators=[0,0,6,14,0,4,2,5,0,8];
+  const referenceYear=2026,ns='http://www.w3.org/2000/svg';
+  let selected=0,tooltipVisible=false;
+  function dayIso(day){return day<=27?`2026-09-${String(day+3).padStart(2,'0')}`:`2026-10-${String(day-27).padStart(2,'0')}`;}
+  function compactDate(iso,forceYear=false){const [year,month,day]=iso.split('-');return `${month}/${day}${forceYear||Number(year)!==referenceYear?`/${year.slice(-2)}`:''}`;}
+  function range(d){const cross=d.start.slice(0,4)!==d.end.slice(0,4);return d.start===d.end?compactDate(d.start):`${compactDate(d.start,cross)}–${compactDate(d.end,cross)}`;}
+  const buckets=counts.map((ratings,index)=>({start:dayIso(index*3),end:dayIso(index*3+2),ratings,n:denominators[index],partial:index===9}));
+  function share(d,index){return d.n===0?null:d.ratings[index]/d.n*100;}
+  function precise(value){return value===null?'Unavailable':`${Number.isInteger(value)?value:value.toFixed(1)}%`;}
+  function category(d,index){return `${d.ratings[index]} (${precise(share(d,index))})`;}
+  function el(tag,attrs={},content){const node=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([key,value])=>node.setAttribute(key,String(value)));if(content!==undefined)node.textContent=content;return node;}
+  function add(svg,tag,attrs={},content){const node=el(tag,attrs,content);svg.appendChild(node);return node;}
+  function text(svg,x,y,value,anchor='start',attrs={}){return add(svg,'text',{x,y,'text-anchor':anchor,...attrs},value);}
+  function line(svg,x1,y1,x2,y2,stroke,attrs={}){return add(svg,'line',{x1,y1,x2,y2,stroke,'stroke-width':1,...attrs});}
+  function description(index){const d=buckets[index];return {heading:`${range(d)} · 3-day summary`,denominator:`${d.n} valid ratings`,rows:names.map((name,i)=>[name,category(d,i)]),empty:d.n===0,context:`${d.partial?'In progress':'Complete interval'} · as of 10/02, 2:44 AM · illustrative counts`};}
+  const tbody=root.querySelector('tbody');buckets.forEach(d=>{const tr=document.createElement('tr');[`${range(d)}${d.partial?' (in progress)':''}${d.n===0?' · No valid ratings':''}`,d.n,...names.map((_,i)=>category(d,i))].forEach((value,index)=>{const cell=document.createElement(index===0?'th':'td');if(index===0)cell.scope='row';cell.textContent=value;tr.appendChild(cell);});tbody.appendChild(tr);});
+  root.querySelectorAll('button,summary').forEach(node=>node.classList.add('cursor-interaction'));
+  function draw(){
+    const width=host.getBoundingClientRect().width;if(width<=0)return;
+    const height=host.clientHeight,box={left:64,right:width-18,top:30,bottom:height-50};
+    const svg=el('svg',{viewBox:`0 0 ${width} ${height}`,role:'img','aria-label':'Ratings Mix: exact 100-percent stacks ordered Again, Hard, Good, Easy. Colored segments have percentage labels when they fit. Empty buckets have full-height gray stripes indicating No valid ratings and unavailable composition, not a rating share. Values are illustrative.'});
+    add(svg,'title',{},'Ratings Mix');
+    const defs=add(svg,'defs'),pattern=add(defs,'pattern',{id:'rm-no-valid-ratings-hatch',width:7,height:7,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'});add(pattern,'rect',{width:7,height:7,fill:'var(--rm-empty)'});line(pattern,0,0,0,7,'var(--rm-hatch)',{'stroke-width':1.5});
+    const xDay=day=>box.left+8+day/29*(box.right-box.left-16),x=index=>xDay(1+index*3),y=value=>box.bottom-value/100*(box.bottom-box.top);
+    const spacing=(box.right-box.left-16)/29*3,barWidth=Math.min(44,Math.max(12,spacing-5));
+    add(svg,'rect',{x:box.left,y:box.top,width:box.right-box.left,height:box.bottom-box.top,fill:'none','data-chart-frame':''});
+    [0,25,50,75,100].forEach(value=>{line(svg,box.left,y(value),box.right,y(value),'var(--rm-grid)');text(svg,box.left-12,y(value)+4,`${value}%`,'end');});
+    text(svg,box.left,14,'Rating share (%)','start',{'data-axis':'y','class':'axis-title'});
+    const ticks=width<440?[0,14,29]:[0,7,14,21,29];ticks.forEach((day,index)=>text(svg,xDay(day),box.bottom+23,compactDate(dayIso(day)),index===0?'start':index===ticks.length-1?'end':'middle'));
+    text(svg,(box.left+box.right)/2,box.bottom+45,'Local date','middle',{'data-axis':'x','class':'axis-title'});
+    const labels=[];
+    buckets.forEach((d,index)=>{
+      if(d.n===0){add(svg,'rect',{x:x(index)-barWidth/2,y:y(100),width:barWidth,height:y(0)-y(100),fill:'url(#rm-no-valid-ratings-hatch)','data-empty-bucket':index,'aria-label':`${range(d)}: No valid ratings, composition unavailable`});return;}
+      let total=0;d.ratings.forEach((count,categoryIndex)=>{if(count===0)return;const percent=share(d,categoryIndex),top=y(total+percent),bottom=y(total);add(svg,'rect',{x:x(index)-barWidth/2,y:top,width:barWidth,height:bottom-top,fill:colors[categoryIndex],'data-rating':names[categoryIndex]});const label=text(svg,x(index),(top+bottom)/2,`${Math.round(percent)}%`,'middle',{'dominant-baseline':'middle','class':'rm-percent','data-rating-label':names[categoryIndex]});labels.push({label,width:barWidth,height:bottom-top});total+=percent;});
+    });
+    const hit=document.createElement('button');hit.type='button';hit.className='rm-hit cursor-interaction';hit.setAttribute('data-chart-hit','');Object.assign(hit.style,{left:`${box.left}px`,top:`${box.top}px`,width:`${box.right-box.left}px`,height:`${box.bottom-box.top}px`});
+    const tooltip=document.createElement('div');tooltip.className='rm-tooltip';tooltip.id='rm-bucket-tooltip';tooltip.setAttribute('role','tooltip');hit.setAttribute('aria-describedby',tooltip.id);const live=document.createElement('span');live.className='rm-sr-only';live.setAttribute('aria-live','polite');
+    function inspect(index,announce=false){selected=index;const content=description(index);tooltip.replaceChildren();const heading=document.createElement('strong');heading.textContent=content.heading;tooltip.appendChild(heading);const denominator=document.createElement('strong');denominator.className='rm-denominator';denominator.textContent=content.denominator;tooltip.appendChild(denominator);if(content.empty){const empty=document.createElement('small');empty.textContent='No valid ratings · composition unavailable';tooltip.appendChild(empty);}const values=document.createElement('dl');content.rows.forEach(([name,value])=>{const label=document.createElement('dt');label.textContent=name;const result=document.createElement('dd');result.textContent=value;values.append(label,result);});tooltip.appendChild(values);const context=document.createElement('small');context.textContent=content.context;tooltip.appendChild(context);tooltip.hidden=!tooltipVisible;const right=x(index)>(box.left+box.right)/2;tooltip.style.left=right?'8px':'auto';tooltip.style.right=right?'auto':'8px';const spoken=`${content.heading}. ${content.denominator}. ${content.empty?'No valid ratings. Composition unavailable. ':''}${content.rows.map(([name,value])=>`${name}: ${value}`).join('. ')}. ${content.context}.`;hit.setAttribute('aria-label',`${spoken} Use Left and Right arrow keys to inspect adjacent buckets.`);if(announce)live.textContent=spoken;}
+    const show=()=>{tooltipVisible=true;inspect(selected);},hide=()=>{tooltipVisible=false;inspect(selected);};
+    function nearest(event){const px=event.clientX-host.getBoundingClientRect().left,day=(px-box.left-8)/(box.right-box.left-16)*29;return Math.max(0,Math.min(9,Math.round((day-1)/3)));}
+    hit.addEventListener('pointerenter',show);hit.addEventListener('pointermove',event=>inspect(nearest(event)));hit.addEventListener('pointerdown',event=>{tooltipVisible=true;inspect(nearest(event),true);});hit.addEventListener('pointerleave',()=>{if(!hit.matches(':focus'))hide();});hit.addEventListener('focus',show);hit.addEventListener('blur',hide);hit.addEventListener('click',event=>{tooltipVisible=true;inspect(event.detail>0?nearest(event):selected,true);});hit.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();tooltipVisible=true;inspect(Math.max(0,Math.min(9,selected+(event.key==='ArrowRight'?1:-1))),true);}if(event.key==='Escape')hide();});
+    host.replaceChildren(svg,hit,tooltip,live);labels.forEach(({label,width:availableWidth,height:availableHeight})=>{const bounds=label.getBBox();if(bounds.width+4>availableWidth||bounds.height+4>availableHeight)label.remove();});inspect(selected);
+  }
+  root.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{const chart=button.dataset.mode==='chart';root.querySelector('.rm-chart-content').hidden=!chart;root.querySelector('.rm-table-content').hidden=chart;root.querySelectorAll('[data-mode]').forEach(peer=>peer.setAttribute('aria-pressed',String(peer===button)));tooltipVisible=false;if(chart)draw();}));
+  new ResizeObserver(draw).observe(host);draw();
+})();
+</script>

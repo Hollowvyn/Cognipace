@@ -296,13 +296,26 @@ The owners in that flow are:
   semantic series, and sparse-state copy. `LineSegments` in
   `src/features/analytics/components/charts/line-segments.tsx` renders measured
   runs and dashed next-valid-point bridges without interpolating data.
+- The first four historical views are composed in `recall-ratings-views.tsx`
+  and `memory-practice-views.tsx`. Their feature-local `historical-chart.tsx`
+  frame uses the public Recharts plot and axis scales for numeric calendar
+  coordinates, supported markers, and one native inspection control.
+  `historical-chart-model.ts` positions immutable serialized rows at their
+  calendar midpoint and selects sparse ticks independently of observations.
+  Exact original date ranges, report timezone, counts, and evidence stay in
+  inspection and the shared seven-row `historical-table.tsx` alternative.
+  Memory Strength alone uses the fitted duration-scale helper; the other
+  supplied domains remain unchanged. Scoped presentation styles live in
+  `src/styles/analytics.css`, enabled by the panel's `historical` option.
 - `src/lib/leetcode/domain/problem-url.ts` owns canonical problem URLs; the
   retention details and fragile-knowledge rows use `createLeetCodeProblemUrl`
   rather than constructing links in chart components.
 
 The Analytics service applies the range policy, calculates readiness separately
-for each metric's eligibility rules, trims only unsupported leading history, and
-then builds its Zod-validated summary. Historical readiness is exposed as
+for each metric's eligibility rules, and builds its Zod-validated summary.
+Legacy summary series may trim unsupported leading history; the first four
+chart views render their supplied presentation rows, including Ratings Mix's
+leading empty slots. Historical readiness is exposed as
 confidence context; it does not suppress available Recall Quality, Practice
 Rhythm, Memory Strength, or Recent Overdue Backlog points. Current Retention
 Health, Fragile Knowledge, and the fixed 14-day Upcoming Review Load do not

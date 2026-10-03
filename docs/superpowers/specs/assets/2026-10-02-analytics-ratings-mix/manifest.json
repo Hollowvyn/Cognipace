@@ -1,0 +1,21 @@
+{
+  "status": "Approved Ratings Mix design snapshot",
+  "approved_on": "2026-10-02",
+  "approval_scope": "Implement approved four historical charts; Ratings Mix missing-period stripes and contrasting percentage labels.",
+  "fixture_policy": "Illustrative rating counts; no live user data.",
+  "source_policy": "Frozen byte-for-byte files. Do not format or overwrite.",
+  "files": {
+    "approved-fragment.html": {
+      "bytes": 17483,
+      "sha256": "25f86762d506c52330bb8a3a0d0d82b6f03458e856d24754e9203930335ff12c"
+    },
+    "approved-preview.jpg": {
+      "bytes": 54007,
+      "sha256": "f7f8fcdda08e2895169d8d9481a2cfc9aae1fe72ca9153cdd8df0b7a290ff804"
+    },
+    "approved-card-preview.jpg": {
+      "bytes": 48006,
+      "sha256": "f961e5a534750e93e4477c0a22972fb539b69113aa64854eefcf8566285a73f4"
+    }
+  }
+}

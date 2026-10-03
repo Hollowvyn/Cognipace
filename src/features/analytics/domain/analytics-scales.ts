@@ -2,7 +2,7 @@ export type AnalyticsDomain = readonly [number, number]
 
 const percentageStep = 0.05
 const durationMinimumWindow = 2
-const targetTickIntervals = 4
+const durationTargetTickIntervals = 5
 
 export interface AnalyticsScale {
   domain: AnalyticsDomain
@@ -69,15 +69,13 @@ export function buildAdaptiveDurationScale(
 
   const lo = Math.min(...visibleValues)
   const hi = Math.max(...visibleValues)
-  const window = Math.max((hi - lo) * 1.5, durationMinimumWindow)
-  const center = (lo + hi) / 2
-  let lower = center - window / 2
-  let upper = center + window / 2
-
-  if (lower < 0) {
-    upper -= lower
-    lower = 0
-  }
+  const span = hi - lo
+  const window = Math.max(span * 1.2, durationMinimumWindow)
+  const padding = (window - span) / 2
+  const lower = Math.max(0, lo - padding)
+  // Clamping does not move negative lower padding to the upper edge. The
+  // minimum window remains useful for a single or sub-day observation.
+  const upper = Math.max(hi + padding, lower + durationMinimumWindow)
 
   return buildNiceScale(lower, upper)
 }
@@ -136,7 +134,7 @@ function niceCeil(value: number): number {
 }
 
 function buildNiceScale(lower: number, upper: number): AnalyticsScale {
-  const step = selectNiceTickStep((upper - lower) / targetTickIntervals)
+  const step = selectNiceTickStep((upper - lower) / durationTargetTickIntervals)
   const domain: AnalyticsDomain = [
     roundDownToStep(lower, step),
     roundUpToStep(upper, step),

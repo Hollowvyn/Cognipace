@@ -50,4 +50,38 @@ describe('AnalyticsChartPanel', () => {
       screen.getByRole('region', { name: 'Predicted recall' }),
     ).toHaveAttribute('aria-describedby', 'predicted-recall-description')
   })
+
+  it('opts only historical panels into their compact frame while retaining descriptions', () => {
+    render(
+      <>
+        <AnalyticsChartPanel
+          historical
+          description="The same paired reviews."
+          id="historical"
+          question="How did they compare?"
+          title="Recall"
+        >
+          <div>Historical plot</div>
+        </AnalyticsChartPanel>
+        <AnalyticsChartPanel
+          description="Existing topic ranking."
+          id="later"
+          title="Topics"
+        />
+      </>,
+    )
+
+    const historical = screen.getByRole('region', { name: 'Recall' })
+    expect(historical).toHaveAttribute('data-analytics-historical', '')
+    expect(historical).toHaveAttribute(
+      'aria-describedby',
+      'historical-question historical-description',
+    )
+    expect(
+      within(historical).getByText('The same paired reviews.'),
+    ).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Topics' })).not.toHaveAttribute(
+      'data-analytics-historical',
+    )
+  })
 })

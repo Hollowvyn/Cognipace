@@ -14,7 +14,7 @@ export function AnalyticsPage() {
   const { range } = useSearch({ from: '/analytics' })
 
   return (
-    <DashboardPage className="mx-auto w-full max-w-[64rem]">
+    <DashboardPage className="mx-auto w-full max-w-[80rem]">
       <DashboardPageHeader
         actions={
           <>

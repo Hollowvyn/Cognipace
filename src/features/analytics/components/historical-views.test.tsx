@@ -36,11 +36,18 @@ describe('Phase 2 historical analytics views', () => {
       />,
     )
 
-    expect(screen.getByTestId('observed-recall-markers')).toBeVisible()
-    expect(screen.getByTestId('fsrs-estimate-markers')).toHaveAttribute(
-      'stroke-dasharray',
-      '6 3',
+    expect(
+      screen.getByRole('img', {
+        name: 'Observed Recall vs FSRS Estimate chart',
+      }),
+    ).toHaveAccessibleDescription(
+      /solid line with circles.*short dashes and diamonds/,
     )
+    expect(
+      screen.getByRole('button', {
+        name: 'Inspect Observed Recall vs FSRS Estimate chart',
+      }),
+    ).toBeVisible()
     expect(screen.getByRole('list')).toHaveTextContent('Observed recall')
     expect(screen.getByRole('list')).toHaveTextContent('FSRS estimate')
     expect(screen.getByRole('list').closest('svg')).toBeNull()
@@ -85,15 +92,13 @@ describe('Phase 2 historical analytics views', () => {
     )
 
     const xAxisLabels = Array.from(
-      document.querySelectorAll(
-        '.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-label text',
-      ),
+      document.querySelectorAll('.recharts-xAxis-tick-labels text'),
     ).map((node) => node.textContent)
 
-    expect(xAxisLabels).toEqual(['Aug 1–Aug 2', 'Aug 3–Aug 4'])
+    expect(xAxisLabels).toEqual(['08/01', '08/02', '08/03', '08/04'])
   })
 
-  it('renders the supported Memory Strength IQR as a restrained chart band', () => {
+  it('describes supported Memory Strength quartiles as whiskers', () => {
     render(
       <MemoryStrengthView
         view={{
@@ -117,8 +122,13 @@ describe('Phase 2 historical analytics views', () => {
       />,
     )
 
-    expect(screen.getByTestId('memory-strength-iqr-band')).toBeVisible()
-    expect(screen.getByTestId('memory-strength-markers')).toBeVisible()
+    expect(
+      screen.getByRole('img', { name: 'Memory Strength chart' }),
+    ).toHaveAccessibleDescription(/supported Q1–Q3 ranges/)
+    expect(screen.getByTestId('memory-strength-whiskers')).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('memory-strength-iqr-band'),
+    ).not.toBeInTheDocument()
   })
 
   it('keeps the association warning visible and formats table buckets as MM/DD/YY', async () => {
@@ -193,12 +203,15 @@ describe('Phase 2 historical analytics views', () => {
       'aria-roledescription',
       '100% stacked column chart',
     )
-    const ratingsChart = screen.getByTestId('ratings-mix-keyboard-chart')
-    expect(ratingsChart.closest('svg')).toHaveAttribute('tabindex', '0')
+    const ratingsChart = screen.getByRole('button', {
+      name: 'Inspect Ratings Mix chart',
+    })
+    expect(ratingsChart).not.toHaveAttribute('tabindex', '-1')
+    expect(ratingsChart.closest('svg')).toBeNull()
     const ratingsLegend = screen.getByRole('list', {
       name: 'Ratings Mix categories',
     })
-    expect(ratingsLegend).toHaveTextContent('AgainHardGoodEasy')
+    expect(ratingsLegend).toHaveTextContent('AgainHardGoodEasyNo valid ratings')
     expect(ratingsChartContainer).not.toContainElement(ratingsLegend)
     expect(
       screen.getByText(
@@ -212,7 +225,7 @@ describe('Phase 2 historical analytics views', () => {
     ).toBeVisible()
     await user.click(screen.getByRole('tab', { name: 'Table' }))
     expect(
-      screen.getByRole('rowheader', { name: '08/01/26 (in progress)' }),
+      screen.getByRole('rowheader', { name: '08/01 (in progress)' }),
     ).toBeVisible()
     expect(
       screen.getByRole('columnheader', { name: 'Challenging reviews' }),

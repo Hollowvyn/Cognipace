@@ -292,14 +292,16 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
 - The implemented range choices are 14 days with daily buckets, 30 days with
   three-day buckets, and 90 days with weekly buckets. The selection is always
   explicit and never silently changes to a shorter period.
-- For each metric, Analytics removes only unsupported leading buckets from its
-  presentation window. Internal and trailing gaps remain unknown; it does not
-  fill them with invented values. When the selected range is not ready, the
-  page explains the relevant evidence shortfall and can offer the richest
-  shorter ready range as a link; the available chart still remains visible.
-- Practice Rhythm keeps every bucket after the first supported practice bucket.
-  A bucket with no reviews is plotted as zero review volume, while correctness
-  remains unknown unless an eligible correctness assessment exists.
+- Charts use their feature-supplied row sets. Readiness's effective evidence
+  window describes usable history separately from those rows; it does not
+  authorize the chart to remove buckets or invent values. Ratings Mix retains
+  every supplied selected-period slot, including leading, internal, and
+  trailing slots without valid ratings. When the selected range is not ready,
+  the page explains the relevant evidence shortfall and can offer the richest
+  shorter ready range as an explicit link; available charts remain visible.
+- Practice Rhythm distinguishes zero completed review volume from unavailable
+  Review Success. A bucket without valid ratings has no measured success rate;
+  its completed-review count remains the supplied count.
 - A dashed line bridge means two measured values are separated by a missing-
   evidence gap. It is a visual connection only, never an interpolated data
   value. Historical line charts connect each measured point to the next valid
@@ -310,16 +312,65 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
   buckets, a gap that is too long, or too many gaps. Readiness is guidance for
   confidence, not a reason to hide an otherwise available chart.
 
-Historical readiness does not hide useful analytics. Recall Quality, Practice
-Rhythm, Memory Strength, and Recent Overdue Backlog keep showing available
-points when a historical selected range is unready; a one-point series says
-that it is not enough for a trend yet. Retention Health, Fragile Knowledge, and
-the fixed 14-day Upcoming Review Load remain available as current or forecast
-views. Retention Health compares each active problem's current FSRS
-retrievability with the configured target; its hover/focus preview can be
-pinned for details and provides a canonical LeetCode link. Fragile Knowledge
-highlights current cards with risk signals and shows five rows per page with
-canonical LeetCode problem links.
+The first four historical panels have these implemented meanings and controls:
+
+- **Observed Recall vs FSRS Estimate** pairs valid rating-derived recalled
+  outcomes (Hard, Good, or Easy) with reconstructed FSRS retrievability
+  immediately before the same reviews. Observed recall uses a solid line and
+  circle markers; the FSRS estimate uses short dashes and diamond markers.
+  Longer dashes bridge missing evidence. The configured target remains visible.
+  Each series can be toggled independently; its curve, markers, and tooltip
+  rate hide together, and the signed observed-minus-estimate difference appears
+  only when both series are visible. That difference comes from the supplied
+  exact value rather than subtracting rounded displayed percentages. Shared
+  recalled and paired-review counts remain available.
+- **Memory Strength** shows median reconstructed post-review FSRS stability in
+  days. Discrete Q1–Q3 whiskers show the middle 50% only when the bucket has at
+  least four eligible reviews and known quartiles. The duration scale fits all
+  finite median and quartile values with padding and a minimum two-day window;
+  it preserves the observed extrema rather than forcing a broad fixed scale.
+  Tooltip and Table retain eligible counts, median change, evidence, and
+  reconstruction provenance.
+- **Practice Rhythm** places completed-review bars and a Review Success line in
+  one plot with independent axes: Reviews on the left and Review Success (%)
+  on the right. Review Success is Good + Easy divided by valid ratings; tooltip
+  and Table retain that numerator and denominator. The relationship is
+  association, not causation.
+- **Ratings Mix** stacks the exact Again, Hard, Good, and Easy fractions for
+  each supplied bucket. A slot without valid ratings has a full-height neutral
+  gray diagonal hatch and unavailable composition; it is not a fifth rating.
+  A zero-count category in a populated bucket stays zero-height. Whole-percent
+  labels appear only when they fit; rounded labels can total 99% or 101% without
+  changing the exact segment geometry. Counts and more precise shares remain
+  available in tooltip and Table. The selected-period Hard + Again summary and
+  evidence-gated prior-period comparison remain available, and a wholly empty
+  selected period shows the explicit empty state.
+
+These four panels use sparse calendar-date axis labels without dropping chart
+rows. Bucket marks sit at the midpoint of their actual local-date interval,
+including shortened edge intervals. Labels use MM/DD in the report's as-of
+year and MM/DD/YY for other years; cross-year tooltip intervals show both years.
+Pointer or tap position selects the nearest original bucket. A native focusable
+inspection button provides the same tooltip through keyboard focus, Left/Right
+arrows, Home/End, and Enter/Space; Escape hides it. Inspection includes the full
+bucket range, grouping, complete or in-progress state, report time, and evidence
+without a permanent extra detail row. Each Table shows seven rows per page and
+uses the same supplied values as its chart.
+
+Topic Performance, Retention Map, Memory Signals, Recent Overdue Backlog, and
+Upcoming Review Load retain their current treatments; their next visual
+iteration is deferred.
+
+Historical readiness does not hide useful analytics. Observed Recall vs FSRS
+Estimate, Practice Rhythm, Memory Strength, and Recent Overdue Backlog keep
+showing available points when a historical selected range is unready; a
+one-point series says that it is not enough for a trend yet. Retention Map,
+Memory Signals by Problem, and the fixed 14-day Upcoming Review Load remain
+available as current or forecast views. Retention Map compares each active
+problem's current FSRS retrievability with the configured target; its hover/focus
+preview can be pinned for details and provides a canonical LeetCode link.
+Memory Signals by Problem highlights current cards with risk signals and shows
+five rows per page with canonical LeetCode problem links.
 
 Observed correctness is the persisted share of eligible assessments marked
 correct. It is not FSRS-predicted recall, retention, or a record of first-try

@@ -12,6 +12,11 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): approved historical-chart decisions, with the first four implemented and later panels deferred.
+- [`specs/2026-10-02-analytics-recall-approved-design.md`](./specs/2026-10-02-analytics-recall-approved-design.md): exact approved Recall source, screenshots, and checksums.
+- [`specs/2026-10-02-analytics-memory-practice-approved-design.md`](./specs/2026-10-02-analytics-memory-practice-approved-design.md): exact approved fitted Memory Strength and mixed Practice Rhythm snapshots.
+- [`specs/2026-10-02-analytics-ratings-mix-approved-design.md`](./specs/2026-10-02-analytics-ratings-mix-approved-design.md): exact approved Ratings Mix snapshot, missing-period hatch, and segment labels.
+
 - [`specs/2026-10-02-track-editor-external-progress-design.md`](./specs/2026-10-02-track-editor-external-progress-design.md): approved vertical Track editor, Change button menu, and opt-in continuous external progress, including preserving migrations and backup v5.
 - [`specs/2026-09-26-topics-foundation-library-filtering-design.md`](./specs/2026-09-26-topics-foundation-library-filtering-design.md): approved design for typed topic relationships, deterministic aliases, preserving upgrades, and Library filtering by descendants with Any/All matching.
 - [`specs/2026-09-26-non-destructive-content-import-design.md`](./specs/2026-09-26-non-destructive-content-import-design.md): approved design implemented in this branch for a versioned JSON content format, additive problem/track/company/topic imports, read-only previews, partial validation, and atomic database application; human browser proof remains pending before merge.
@@ -44,6 +49,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-02-analytics-historical-charts.md`](./plans/2026-10-02-analytics-historical-charts.md): completed implementation plan for the first four historical charts, inspection, tables, scoped layout, and validation.
 
 - [`plans/2026-10-02-track-editor-phase-1.md`](./plans/2026-10-02-track-editor-phase-1.md): full-width groups and questions, accessible Change menu, and external progress form fields.
 - [`plans/2026-10-02-track-editor-phase-2.md`](./plans/2026-10-02-track-editor-phase-2.md): appended migration, preserving v7/v8 upgrades, backup v5, and additive import compatibility.
@@ -87,6 +94,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-02-analytics-historical-charts.md`](./handoffs/2026-10-02-analytics-historical-charts.md): implemented charts, automated validation, component screenshots, and pending human extension smoke.
 
 - [`handoffs/2026-10-02-track-editor-external-progress.md`](./handoffs/2026-10-02-track-editor-external-progress.md): implementation, validation evidence, compatibility and rollback notes, and required human smoke proof.
 

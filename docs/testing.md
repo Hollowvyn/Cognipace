@@ -652,61 +652,125 @@ and required before review or merge:
 
 ### Dashboard Analytics
 
-1. Open the dashboard.
-2. Navigate to Analytics.
-3. Test 14, 30, and 90 days from the range control. Confirm their historical
-   bucket labels are respectively daily, three-day, and weekly; the selected
-   range stays selected unless you explicitly choose another one.
-4. With enough eligible local history, confirm the historical chart story
-   renders. If older leading buckets have no evidence, confirm the effective-
-   window copy explains the usable part of the selected range rather than
-   drawing a fabricated value from the range start.
-5. For a range or metric that is not ready, confirm the compact warning
-   identifies the evidence shortfall, reports its progress in buckets/
-   assessments where applicable, and offers a shorter ready range only as an
-   explicit link. The page must not silently switch ranges, and any available
-   chart points must remain visible.
-6. Check a line chart with missing-evidence gaps. It should use a dashed bridge
-   from one measured point to the next valid point; absent buckets remain
-   unknown and have no fabricated marker or tooltip value. A one-point chart
-   remains visible with “Not enough data for a trend yet.”
-7. In Practice Rhythm, confirm every bucket after the first supported practice
-   bucket remains in the chart. A week with no reviews has zero review volume,
-   while its correctness line remains unknown unless correctness evidence
-   exists.
-8. Confirm Recall Quality, Practice Rhythm, Ratings Mix, Where to Focus, and
-   Memory Strength communicate their defined data meanings. Practice Rhythm is
-   review volume plus observed correctness; it must not claim causation.
-9. Confirm Recent Overdue Backlog has a watch zone at five problems: values at
-   or below five render in the healthy green treatment, values above five use
-   the attention yellow treatment, and its tooltip reports the bucket's
-   threshold status. Unknown/reconstructable history must not be made up.
-10. Confirm Upcoming Review Load always shows its fixed next 14 calendar days,
+Run this flow against the locally built extension, with separate disposable
+ready-history and sparse-history datasets. Ready history must contain enough
+eligible samples to show all four historical charts and supported Memory
+Strength quartiles. Sparse history must include missing buckets, one measured
+point, no valid ratings in a period, and mixed metric readiness. Include a
+current partial bucket and a cross-year report date when preparing the test
+data. If a cross-year report date cannot be exercised in the local extension at
+test time, record that exact smoke case as pending; fixture proof covers only
+the fixture case.
+
+1. Run `npm run build`, load `dist/chrome-mv3` in Chrome, and click CogniPace's
+   reload button in `chrome://extensions` after the build. Reopen the dashboard
+   and navigate to Analytics so the smoke uses the rebuilt local extension and
+   its runtime, rather than a fixture page or an already-open stale dashboard.
+2. In both datasets, choose 14, 30, and 90 days. Confirm daily, three-day, and
+   weekly grouping respectively, and verify the selected range remains selected
+   until explicitly changed. Available charts remain visible under a readiness
+   warning; a suggested shorter ready range changes selection only when its
+   link is activated.
+3. Check the report's selected timezone and as-of context, sparse calendar-date
+   ticks, and full bucket intervals in inspection. Marks use each supplied
+   interval's midpoint, including shortened edge intervals. Tick labels use
+   MM/DD in the report's as-of year and /YY for another year; a cross-year
+   tooltip interval shows both years. The current partial interval is marked
+   in progress, with no future observations.
+4. In each chart, move the pointer across the plot and tap near its left,
+   middle, and right buckets. The nearest original bucket must be inspected,
+   including an empty bucket. Confirm no permanent bottom detail row is added
+   and the tooltip remains hidden before interaction.
+5. Tab to each chart's native inspection button. Check visible focus,
+   Left/Right arrows, Home/End, Enter/Space, and Escape. Keyboard inspection
+   exposes the same exact bucket values as pointer/tap inspection; Escape and
+   blur hide the tooltip. A quiet selected guide must not create a measured
+   marker or value for unknown evidence.
+6. Inspect the first and last measured values and extremes near axis bounds.
+   Circle/diamond markers and low whiskers must remain visible with sufficient
+   clearance. Missing-evidence bridges connect measured neighbors only; an
+   unknown bucket keeps its unavailable value. A single point remains visible
+   with “Not enough data for a trend yet.”
+7. In Observed Recall vs FSRS Estimate, confirm a solid observed line with
+   circle markers, an opaque short-dashed estimate with diamonds, visibly longer
+   missing-evidence bridges, and a configured target caption above the data.
+   Compare tooltip and Table recalled/paired counts, rate values, signed
+   observed-minus-estimate difference, evidence, and reconstruction provenance.
+   The difference must reflect the supplied value rather than subtraction of
+   rounded displayed rates.
+8. Toggle each Recall series with pointer and keyboard, then hide both. The
+   curve, markers, and tooltip rate hide together; the signed difference appears
+   only with both series visible. Shared sample counts and the target remain,
+   and the accessible description matches the visible series.
+9. In Memory Strength, inspect a bucket with at least four eligible reviews and
+   one with fewer than four. Only the supported bucket gets discrete Q1–Q3
+   whiskers; known medians remain available in both. Confirm the Median/Middle
+   50% key, reconstructed stability in days, eligible count, median change, and
+   unavailable quartiles agree between tooltip and Table.
+10. Check Memory Strength with sub-day, equal/single, and widely spread values.
+    Its fitted duration domain must contain every finite median/Q1/Q3 extremum,
+    leave an actual minimum two-day window, and keep low ranges and markers
+    readable. No connected shaded range may imply quartiles across an
+    unsupported bucket.
+11. In Practice Rhythm, confirm muted completed-review bars and a mint Review
+    Success line share one plot, with Reviews on the left and Review Success
+    (%) on the right. Tooltip and Table must report completed reviews and the
+    Good + Easy numerator/valid-rating denominator. A zero-review bucket has
+    zero volume and unavailable success; a measured 0% success remains 0%.
+    The visible copy explains association rather than causation.
+12. In Ratings Mix, confirm every supplied slot remains, including leading,
+    internal, and trailing slots with no valid ratings. Those slots use a
+    full-height neutral gray diagonal hatch and report unavailable composition.
+    A populated bucket's zero-count category stays zero-height; only Again,
+    Hard, Good, and Easy appear as categories.
+13. Compare Ratings tooltip/Table counts and precise shares with the exact
+    stacked geometry. Centered whole-percentage labels stay at readable 12px
+    type when they fit and disappear when a segment is too narrow or short.
+    Rounded labels may total 99% or 101% without altering shares. Confirm the
+    selected-period Hard + Again summary, eligible prior-period comparison,
+    and wholly empty-period state are truthful.
+14. Switch each of the four panels between Chart and Table. When more than
+    seven rows exist, confirm seven rows per page, Previous/Next boundary
+    states, and page reset after a range change. Inspect full interval,
+    complete/in-progress state, grouping, report time, and evidence context
+    across both views. Change range while a tooltip is visible to check that
+    selection resets or clamps to the new rows without stale values.
+15. Repeat ready and sparse paths at wide and narrow dashboard widths in both
+    light and dark themes. Check axis/key contrast, sparse ticks, control
+    reachability, tap coordinates, keyboard focus, table scrolling, and
+    Memory/Practice stacking. Include neighboring panels with different
+    readiness messages; plots and controls must retain usable alignment without
+    overlap or clipped labels.
+16. Reload the built extension again and reopen Analytics. Confirm the local
+    data and expected values remain available, and repeat a range change and
+    keyboard inspection through the extension runtime.
+17. Confirm Recent Overdue Backlog still has a watch zone at five problems:
+    values at or below five use healthy green, values above five use attention
+    yellow, and its tooltip reports threshold status. Unknown/reconstructable
+    history must not be made up.
+18. Confirm Upcoming Review Load still shows its fixed next 14 calendar days,
     including when the selected historical range is unready.
-11. In Retention Health, hover and keyboard-focus a point to inspect the
-    preview, pin its details, tab through the dialog controls, press Escape,
-    and dismiss it by clicking outside. Confirm its LeetCode action opens the
-    matching canonical problem in a new tab.
-12. In Fragile Knowledge, confirm exactly five rows appear per page when there
-    are more than five rows, Previous/Next and the live row range update
-    correctly, and every visible problem link opens its canonical LeetCode
-    problem in a new tab.
-13. Exercise sparse and unknown history: verify readiness context rather than
-    invented trends, while Recall Quality, Practice Rhythm, Memory Strength,
-    Recent Overdue Backlog, Retention Health, Fragile Knowledge, and Upcoming
-    Review Load remain usable. Repeat the happy path and sparse path at a narrow dashboard
-    width; charts, range controls, dialogs, table scrolling, and keyboard focus
-    must remain usable.
+19. In Retention Map, hover and keyboard-focus a point to inspect the preview,
+    pin its details, tab through dialog controls, press Escape, and dismiss by
+    clicking outside. Its LeetCode action opens the matching canonical problem
+    in a new tab.
+20. In Memory Signals by Problem, confirm exactly five rows per page when more
+    than five exist, Previous/Next and the live row range update correctly, and
+    visible problem links open canonical LeetCode problems in new tabs. Topic
+    Performance and the current-state/workload panels retain their existing
+    treatment while the four historical charts change.
 
 Expected: Analytics loads through the extension runtime without the failed-load
 state, reflects only local practice data, and tells a truthful chart story
 without filling missing evidence.
 
-For this dashboard behavior change, the human engineer must attach screenshot
-or screen-recording proof of both the ready-history happy path and the sparse or
-unready edge path before PR review or merge. This is required by
-`docs/agent-governance.md`; automated checks do not replace real-time extension
-smoke testing.
+The human engineer must record the tested build, datasets, ranges, widths,
+themes, and exact passed or pending cases, then attach screenshot or
+screen-recording proof of the ready-history happy path and sparse/unready edge
+path before PR review or merge. This is required by
+`docs/agent-governance.md`. Automated checks and agent-rendered fixture
+screenshots do not replace human real-time extension smoke or establish that
+this checklist has passed.
 
 ### LeetCode Overlay
 

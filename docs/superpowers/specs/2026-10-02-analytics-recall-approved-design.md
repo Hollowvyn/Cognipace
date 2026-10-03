@@ -1,7 +1,10 @@
 # Approved Observed Recall And FSRS Estimate Design
 
 Status: human-approved visual design, archived exactly on 2026-10-02.
-Application implementation is pending. The user approved the final refined
+The four historical charts are now implemented locally; see the
+[implementation handoff](../handoffs/2026-10-02-analytics-historical-charts.md)
+for checks and the pending human extension smoke. The original archive record
+below remains a design-only checkpoint. The user approved the final refined
 Recall preview with: “we have what we need”. This checkpoint follows removal of
 the redundant bottom selected-detail row; Ratings Mix is the next design review.
 

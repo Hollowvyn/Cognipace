@@ -6,6 +6,10 @@ plot are human-approved and saved in the
 Recall's tooltip-only refinement is also human-approved and saved in its
 [exact approved checkpoint](2026-10-02-analytics-recall-approved-design.md).
 Ratings Mix's striped empty slots and percentage labels are also approved.
+Its [exact approved checkpoint](2026-10-02-analytics-ratings-mix-approved-design.md)
+preserves the source and screenshots. All four are now implemented locally;
+the [handoff](../handoffs/2026-10-02-analytics-historical-charts.md) records
+validation and pending human extension smoke.
 On 2026-10-02 the user authorized implementing these four historical charts
 first and explicitly deferred the other panels to a later iteration. The
 focused execution plan is
