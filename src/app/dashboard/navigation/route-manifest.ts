@@ -31,6 +31,7 @@ export const dashboardPaths = {
   settings: '/settings',
   devSmoke: '/dev/smoke',
   trackNew: '/tracks/new',
+  trackImport: '/tracks/import',
   trackEdit: '/tracks/$trackId/edit',
   trackProblemEdit: '/tracks/problems/$problemSlug/edit',
   libraryTrackNew: '/library/tracks/new',
@@ -142,6 +143,16 @@ export const dashboardHiddenRouteMeta = {
 >
 
 export const dashboardModalRouteMeta = {
+  trackImport: {
+    closeTo: dashboardPaths.tracks,
+    description: 'Add a study path from a JSON file.',
+    relativePath: 'import',
+    staticData: {
+      presentation: 'modal',
+      section: 'tracks',
+      title: 'Import tracks',
+    },
+  },
   trackNew: {
     closeTo: dashboardPaths.tracks,
     description: 'Create a custom track from existing Library problems.',

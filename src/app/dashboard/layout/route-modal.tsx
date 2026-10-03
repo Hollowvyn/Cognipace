@@ -27,6 +27,7 @@ export function RouteModal({
   closeLabel = 'Close',
   closeTo,
   description,
+  dismissDisabled = false,
   eyebrow,
   showCloseButton = true,
   variant = 'default',
@@ -36,6 +37,7 @@ export function RouteModal({
   closeLabel?: string
   closeTo: DashboardModalClosePath
   description?: string | undefined
+  dismissDisabled?: boolean
   eyebrow?: ReactNode
   showCloseButton?: boolean
   title: string
@@ -48,8 +50,9 @@ export function RouteModal({
   const isFormVariant = variant === 'form'
 
   const closeModal = useCallback(() => {
+    if (dismissDisabled) return
     void navigate({ to: closeTo, replace: true })
-  }, [closeTo, navigate])
+  }, [closeTo, dismissDisabled, navigate])
 
   useEffect(() => {
     function replaceModalRouteBeforeUnload() {
@@ -178,11 +181,17 @@ export function RouteModal({
               </h2>
             </div>
             {showCloseButton ? (
-              <Button asChild size="sm" variant="outline">
-                <Link replace to={closeTo}>
+              dismissDisabled ? (
+                <Button disabled size="sm" variant="outline">
                   {closeLabel}
-                </Link>
-              </Button>
+                </Button>
+              ) : (
+                <Button asChild size="sm" variant="outline">
+                  <Link replace to={closeTo}>
+                    {closeLabel}
+                  </Link>
+                </Button>
+              )
             ) : null}
           </div>
           {description ? (

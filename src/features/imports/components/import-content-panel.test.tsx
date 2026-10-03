@@ -29,7 +29,59 @@ const fileText =
 
 describe('ImportContentPanel', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
+  })
+
+  it('offers a focused track template and file picker in the modal variant', () => {
+    const { wrapper } = createQueryTestHarness()
+    render(<ImportContentPanel variant="tracks" />, { wrapper })
+
+    const template = screen.getByRole('link', {
+      name: 'Download track template',
+    })
+    expect(template).toHaveAttribute('download', 'track-only.json')
+    expect(template).toHaveAttribute(
+      'href',
+      'chrome-extension://test/import/examples/track-only.json',
+    )
+    expect(screen.getByLabelText('Choose track JSON file')).toBeVisible()
+    expect(
+      screen.queryByRole('link', { name: 'Companies' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Import content' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('reports when modal dismissal must wait for persistence and retry', async () => {
+    const user = userEvent.setup()
+    const preview = createPreview({ additions: { tracks: 1 } })
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(preview)
+      .mockResolvedValueOnce({ status: 'persistence-error', preview })
+      .mockResolvedValueOnce({ status: 'saved' })
+    const onDismissAvailabilityChange = vi.fn()
+    const { wrapper } = createQueryTestHarness()
+    render(
+      <ImportContentPanel
+        variant="tracks"
+        onDismissAvailabilityChange={onDismissAvailabilityChange}
+      />,
+      { wrapper },
+    )
+
+    expect(onDismissAvailabilityChange).toHaveBeenLastCalledWith(true)
+    await user.upload(
+      screen.getByLabelText('Choose track JSON file'),
+      createFile(),
+    )
+    expect(await status()).toHaveTextContent('Review the additions below')
+    await user.click(screen.getByRole('button', { name: 'Import 1 addition' }))
+    expect(await status()).toHaveTextContent('Retry saving before closing')
+    expect(onDismissAvailabilityChange).toHaveBeenLastCalledWith(false)
+    await user.click(screen.getByRole('button', { name: 'Retry saving' }))
+    expect(await status()).toHaveTextContent('Content imported and saved.')
+    expect(onDismissAvailabilityChange).toHaveBeenLastCalledWith(true)
   })
 
   it('previews first, then explicitly imports and hides apply after save', async () => {

@@ -545,6 +545,81 @@ group and problem order without being reordered by due state. In Study Plan mode
 incomplete problem nor clears an earlier completion. Free Practice does not write
 active-track progress.
 
+#### All Tracks Collection And Import
+
+Human realtime happy-path and edge-case smoke with screenshots or a recording
+is required before review or merge:
+
+1. Open Tracks with multiple tracks. Confirm All tracks starts expanded, its
+   count includes the active track, and the active row has a strong outline,
+   tinted background, and filled Active badge. Confirm the collection heading
+   uses the dashboard's bold sans-serif family while retaining its larger size.
+   Check each row's title,
+   description, completed/total count, and progress bar. Select an inactive
+   track with Set active and confirm both the collection and workspace update.
+2. Collapse and reopen the collection with its heading and the separate
+   chevron button beside New Track and Import tracks. Confirm both controls'
+   expansion states stay in sync. Then use
+   New Track and Import tracks. Confirm the actions do not collapse the
+   collection. Check the narrow layout, long titles, zero progress, and a
+   completed track. With no active track, confirm the collection starts expanded
+   and can still collapse/reopen using the heading, chevron, Enter, and Space;
+   with no tracks, confirm both create and import are available.
+3. Open Import tracks, download the template, author a disposable track, and
+   choose that file. Inspect its groups and additions in the preview before
+   applying. Confirm the new track appears in All tracks, the count updates,
+   and the previously active track stays active. With no active track, confirm
+   importing does not activate one. Cancel a preview using Close, Escape, and
+   the backdrop, and confirm no content was added.
+4. Try malformed JSON and a file with invalid rows. Confirm diagnostics remain
+   readable and valid additions can be previewed. Reimport identical content
+   and confirm no duplicate additions. Change relevant local content after a
+   preview and confirm a stale preview requires another explicit apply.
+   Use the keyboard to retry a failed preview and dismiss a preview; confirm
+   focus stays in the modal and dismissal returns focus to the file chooser.
+5. With a controlled pending apply or browser-storage save failure in a
+   disposable profile, confirm Close, Escape, and backdrop cannot dismiss the
+   dialog until the write/save completes. Retry a failed save and confirm it
+   saves the committed changes without duplicating the import. Confirm Settings
+   > Data Management retains the full content importer and template set.
+   > Check Tab and Escape during pending apply/retry and after each result; the
+   > status keeps focus during writes, a save failure focuses Retry saving, and a
+   > saved import focuses the result without exposing background navigation.
+
+#### Track Card Preview
+
+Human installed-extension happy-path and edge-case smoke with screenshot or
+recording proof is required before PR review or merge:
+
+1. Click a track card's title, description, progress, and spare summary space.
+   Confirm its inline preview toggles; Enter and Space on the focused card
+   do the same and keep focus. Opening an inactive track must not activate it,
+   change the active group, or change progress. Collapse/reopen All tracks with
+   and without an active track; the count and create/import actions remain,
+   and the preview stays closed when the collection reopens. Open another
+   track and confirm the previous track closes, with focus on the new toggle.
+2. Inspect a populated preview. Confirm the card summary and expanded groups
+   share one clear rounded outline and background, with groups constrained
+   inside their owning track. An expanded inactive track has a neutral outline
+   of uniform thickness; the active track keeps its green outline, thicker
+   leading accent, tinted background, and Active badge whether open or closed.
+   Tab between card toggles and confirm the neutral focus ring is visible at
+   desktop and narrow widths in light and dark themes. Each track summary has
+   no expansion chevron, visible Preview label, or extra owning-track caption;
+   clicking the summary still toggles its preview. Confirm ordered group headers and question
+   order match Edit Track, the first group starts open, each group can collapse,
+   and complete titles, difficulty, and topic labels wrap at narrow widths.
+   A long curriculum scrolls inside the compact preview. Inspect empty groups
+   and a track with unavailable question metadata; stored slugs remain visible.
+3. Use Set active, Clear Active, Edit, Reset Progress, and Delete from the card.
+   They must retain their existing behavior without toggling the preview. Cancel
+   reset/delete and verify the preview and focus remain usable. Edit and save a
+   group's questions, then reopen the preview and verify fresh content.
+4. With controlled slow or failed preview reads, close while loading, check
+   the error and Retry preview, then retry. Focus returns to the card toggle
+   before the temporary retry button disappears. Opening a preview performs
+   only the existing read and never a track mutation.
+
 #### Vertical Track Editor And External Progress
 
 Human realtime happy-path and edge-case smoke with screenshots or a recording

@@ -1,4 +1,8 @@
+import { Download } from 'lucide-react'
+import { useId } from 'react'
 import { browser } from 'wxt/browser'
+
+import { Button } from '@/components/ui/button'
 
 const exampleFiles = [
   { label: 'Minimal questions', filename: 'minimal-problems.json' },
@@ -11,12 +15,47 @@ const exampleFiles = [
 
 const schemaPath = '/import/cognipace-content-v1.schema.json'
 
-export function ImportTemplates() {
+export function ImportTemplates({
+  variant = 'content',
+}: {
+  variant?: 'content' | 'tracks'
+}) {
+  const titleId = useId()
+  if (variant === 'tracks') {
+    return (
+      <section
+        aria-labelledby={titleId}
+        className="grid gap-3 rounded-[var(--cp-control-radius)] border border-border bg-muted/30 p-4"
+      >
+        <h3
+          className="m-0 text-[length:var(--cp-copy-font-size)] font-bold"
+          id={titleId}
+        >
+          1. Start with a template
+        </h3>
+        <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
+          Download the example, then add your track name, ordered groups, and
+          LeetCode problem slugs or URLs.
+        </p>
+        <div>
+          <Button asChild size="sm" variant="outline">
+            <a
+              download="track-only.json"
+              href={browser.runtime.getURL('/import/examples/track-only.json')}
+            >
+              <Download aria-hidden="true" />
+              Download track template
+            </a>
+          </Button>
+        </div>
+      </section>
+    )
+  }
   return (
-    <section aria-labelledby="import-template-title" className="grid gap-2">
+    <section aria-labelledby={titleId} className="grid gap-2">
       <h3
         className="m-0 text-[length:var(--cp-copy-font-size)] font-semibold"
-        id="import-template-title"
+        id={titleId}
       >
         Start with a template
       </h3>

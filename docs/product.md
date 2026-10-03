@@ -107,7 +107,19 @@ Current behavior:
 - Library manages problem rows, filters, details, create/edit modals, and problem
   practice actions.
 - Tracks manages active track workspace, groups, ordered problems, progress,
-  create/edit, activation, deletion, and reset progress.
+  create/edit, activation, deletion, and reset progress. Its All tracks
+  collection starts expanded and can be collapsed with or without an active
+  track. It shows every available track, emphasizes the active track, and
+  offers explicit activation, New Track, and a compact Import tracks action.
+  Clicking a track card's summary opens a compact read-only preview of its
+  ordered groups, questions, and topics inside the same outlined card. Only one
+  track preview can be open at a time; collapsing All tracks closes it.
+  Groups can be collapsed individually;
+  the card's management actions stay available. Previewing does not activate
+  the track or change the active group.
+  Import tracks opens a template-first dialog with a downloadable track JSON
+  example, file selection, preview, diagnostics, and explicit apply. Imported
+  tracks are not automatically activated.
 - Settings manages persisted user preferences through a dirty-state form workflow.
 - Data Management in Settings exports full local backups, validates and restores
   full backups, imports versioned content files, configures optional GitHub Gist

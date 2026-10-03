@@ -8,6 +8,27 @@ import {
   dashboardPaths,
 } from '@/app/dashboard/navigation/route-manifest'
 import { LibrarySelectionTrackForm, TrackForm } from '@/features/tracks'
+import { ImportContentPanel } from '@/features/imports'
+
+export function ImportTracksModalPage() {
+  const [canDismiss, setCanDismiss] = useState(true)
+  return (
+    <RouteModal
+      closeTo={dashboardModalRouteMeta.trackImport.closeTo}
+      description={dashboardModalRouteMeta.trackImport.description}
+      dismissDisabled={!canDismiss}
+      title="Import tracks"
+      variant="form"
+    >
+      <div className="pb-[var(--cp-panel-padding)]">
+        <ImportContentPanel
+          onDismissAvailabilityChange={setCanDismiss}
+          variant="tracks"
+        />
+      </div>
+    </RouteModal>
+  )
+}
 
 export function NewTrackModalPage() {
   const closeToTracks = useCloseToTracks()

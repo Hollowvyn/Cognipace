@@ -16,6 +16,7 @@ import type { SerializedProblem } from '@/features/problems'
 import {
   createSerializedTrack,
   createSerializedTrackGroup,
+  createTrackForEditResponse,
   createTrackProblemRow,
   createTrackWorkspaceResponse,
 } from '@/testing/track-fixtures'
@@ -111,11 +112,7 @@ describe('TracksScreen', () => {
     expect(
       within(allTracksActions).getByRole('link', { name: 'New Track' }),
     ).toHaveAttribute('href', '#/tracks/new')
-    expect(
-      within(allTracksActions).getByRole('button', {
-        name: 'All tracks shown',
-      }),
-    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toBeEnabled()
   })
 
   it('renders the active workspace title, summaries, metrics, groups, and active rows', async () => {
@@ -123,9 +120,9 @@ describe('TracksScreen', () => {
     renderTracksScreen()
 
     expect(
-      await screen.findByRole('heading', { name: 'LeetCode 75' }),
+      await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 }),
     ).toBeVisible()
-    expect(screen.getByText('Core interview practice.')).toBeVisible()
+    expect(screen.getAllByText('Core interview practice.')[0]).toBeVisible()
     const progressSummary = screen.getByLabelText('Track progress summary')
     expect(within(progressSummary).getByText('Progress')).toBeVisible()
     expect(within(progressSummary).getByText('1 of 3')).toBeVisible()
@@ -219,18 +216,14 @@ describe('TracksScreen', () => {
     renderTracksScreen()
 
     expect(
-      await screen.findByRole('heading', { name: 'LeetCode 75' }),
+      await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 }),
     ).toBeVisible()
     const allTracksActions = screen.getByLabelText('All tracks actions')
 
     expect(
       within(allTracksActions).getByRole('link', { name: 'New Track' }),
     ).toHaveAttribute('href', '#/tracks/new')
-    expect(
-      within(allTracksActions).getByRole('button', {
-        name: 'Show all tracks',
-      }),
-    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toBeVisible()
   })
 
   it('formats target summary and catalog metadata without local timezone drift', async () => {
@@ -273,10 +266,6 @@ describe('TracksScreen', () => {
     expect(targetSummary).toHaveAttribute('data-cp-tone', 'success')
     expect(screen.queryByText('Due Jun 15, 2026')).not.toBeInTheDocument()
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Show all tracks' }),
-    )
-
     expect(screen.getAllByText('Target Jun 15 · 14 days left')).toHaveLength(1)
   })
 
@@ -315,7 +304,6 @@ describe('TracksScreen', () => {
   })
 
   it('marks overdue track targets without making the row an error state', async () => {
-    const user = userEvent.setup()
     const activeTrack = twoGroupWorkspace.activeTrack
 
     if (!activeTrack) {
@@ -347,8 +335,6 @@ describe('TracksScreen', () => {
     expect(targetSummary).toHaveAttribute('data-cp-tone', 'danger')
     expect(within(targetSummary).getByText('Overdue')).toBeVisible()
     expect(within(targetSummary).getByText('11 days late')).toBeVisible()
-
-    await user.click(screen.getByRole('button', { name: 'Show all tracks' }))
 
     const overdueMetadata = screen.getAllByText(
       'Target May 21 · Overdue · 11 days late',
@@ -619,36 +605,57 @@ describe('TracksScreen', () => {
     })
   })
 
-  it('keeps all tracks collapsed by default and marks the active row when expanded', async () => {
+  it('shows the complete collection by default and can collapse it', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce(twoGroupWorkspace)
     renderTracksScreen()
 
-    const allTracksButton = await screen.findByRole('button', {
-      name: 'Show all tracks',
+    const collection = await screen.findByRole('region', { name: 'All tracks' })
+    expect(
+      within(collection).getByRole('heading', { name: 'All tracks' }),
+    ).toBeVisible()
+    expect(within(collection).getByText('2 tracks')).toBeVisible()
+    expect(
+      within(collection).getByText('Your complete study collection'),
+    ).toBeVisible()
+    const activeRow = within(collection).getByRole('article', {
+      name: 'LeetCode 75',
     })
-    expect(screen.getByText('All tracks')).toBeVisible()
-    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
-
-    await user.click(allTracksButton)
-
+    expect(within(activeRow).getByText('Active')).toBeVisible()
+    expect(
+      within(activeRow).getByRole('link', { name: 'Edit Track' }),
+    ).toHaveAttribute('href', '#/tracks/leetcode-75/edit')
+    const otherRow = within(collection).getByRole('article', {
+      name: 'Grind 75',
+    })
+    expect(
+      within(otherRow).getByRole('button', { name: 'Set Grind 75 active' }),
+    ).toHaveTextContent('Set active')
+    expect(
+      within(otherRow).getByRole('progressbar', {
+        name: 'Grind 75 completion',
+      }),
+    ).toHaveAttribute('aria-valuenow', '13')
+    const toggle = within(collection).getByRole('button', {
+      name: 'All tracks',
+    })
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(
       screen.getByRole('button', { name: 'Hide all tracks' }),
-    ).toBeVisible()
-    const activeRowActions = screen.getByLabelText(
-      'LeetCode 75 catalog actions',
-    )
-    expect(screen.getByText('Active')).toBeVisible()
+    ).toHaveAttribute('aria-expanded', 'true')
     expect(
-      within(activeRowActions).getByRole('button', { name: 'Clear Active' }),
-    ).toBeVisible()
+      document.getElementById(toggle.getAttribute('aria-controls') ?? ''),
+    ).toContainElement(otherRow)
+    await user.click(toggle)
+    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
     expect(
-      within(activeRowActions).getByRole('link', { name: 'Edit Track' }),
-    ).toHaveAttribute('href', '#/tracks/leetcode-75/edit')
+      screen.getByRole('button', { name: 'Show all tracks' }),
+    ).toHaveAttribute('aria-expanded', 'false')
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
     expect(screen.getByText('Grind 75')).toBeVisible()
   })
 
-  it('opens all tracks when a track is added after the catalog mounts', () => {
+  it('reopens a collapsed collection when a track is added', async () => {
     const activeTrackRow = twoGroupWorkspace.tracks.find(
       (row) => row.track.id === 'leetcode-75',
     )
@@ -672,41 +679,21 @@ describe('TracksScreen', () => {
     }
 
     const { rerender } = renderOtherTracksAccordion(initialTracks)
+    await userEvent.click(screen.getByRole('button', { name: 'All tracks' }))
 
     expect(screen.queryByText('Fresh Track')).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Show all tracks' }),
-    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
 
     rerender(createOtherTracksAccordionElement([...initialTracks, addedTrack]))
 
     expect(screen.getByText('Fresh Track')).toBeVisible()
-    expect(
-      screen.getByRole('button', { name: 'Hide all tracks' }),
-    ).toBeVisible()
-  })
-
-  it('toggles all tracks when the accordion header row is clicked', async () => {
-    const user = userEvent.setup()
-    vi.mocked(sendMessage).mockResolvedValueOnce(twoGroupWorkspace)
-    renderTracksScreen()
-
-    expect(await screen.findByText('All tracks')).toBeVisible()
-    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
-
-    await user.click(screen.getByText('All tracks'))
-
-    expect(screen.getByText('Grind 75')).toBeVisible()
-    expect(
-      screen.getByRole('button', { name: 'Hide all tracks' }),
-    ).toBeVisible()
-
-    await user.click(screen.getByText('All tracks'))
-
-    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Show all tracks' }),
-    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
   })
 
   it('does not toggle all tracks when New Track is clicked', async () => {
@@ -720,13 +707,11 @@ describe('TracksScreen', () => {
       within(allTracksActions).getByRole('link', { name: 'New Track' }),
     )
 
-    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Show all tracks' }),
-    ).toBeVisible()
+    expect(screen.getByText('Grind 75')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toBeVisible()
   })
 
-  it('keeps the forced-open all tracks row from collapsing when there is no active track', async () => {
+  it('allows heading and chevron collapse without an active track and keyboard reopening', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce({
       ...twoGroupWorkspace,
@@ -741,18 +726,255 @@ describe('TracksScreen', () => {
 
     await user.click(screen.getByText('All tracks'))
 
+    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'All tracks' })).toHaveFocus()
+    await user.keyboard('{Enter}')
     expect(screen.getByText('Grind 75')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Hide all tracks' }))
+    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
+    await user.keyboard(' ')
+    expect(screen.getByText('Grind 75')).toBeVisible()
+  })
+
+  it('lazily previews ordered groups, questions, and topics without activating a track', async () => {
+    const user = userEvent.setup()
+    mockWorkspaceAndTrackPreview()
+    renderTracksScreen()
+    const toggle = await screen.findByRole('button', {
+      name: 'Preview Grind 75',
+    })
+    const card = screen.getByRole('article', { name: 'Grind 75' })
+    expect(within(card).queryByText('Preview')).not.toBeInTheDocument()
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'tracks.getTrackForEdit',
+      expect.anything(),
+    )
+    await user.click(toggle)
+    expect(toggle).toHaveFocus()
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const preview = screen.getByRole('region', { name: 'Grind 75 preview' })
+    expect(within(card).getByRole('region', { name: 'Grind 75 preview' })).toBe(
+      preview,
+    )
     expect(
-      screen.getByRole('button', { name: 'All tracks shown' }),
-    ).toBeDisabled()
+      document.getElementById(toggle.getAttribute('aria-controls') ?? ''),
+    ).toBe(preview)
+    expect(await within(preview).findByText('Arrays and Hashing')).toBeVisible()
+    expect(within(preview).getByText('Dynamic Programming')).toBeVisible()
+    const arrays = within(preview).getByLabelText('Arrays and Hashing group')
+    expect(
+      within(arrays)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      expect.stringContaining('Binary Search'),
+      expect.stringContaining('Two Sum'),
+    ])
+    expect(within(arrays).getByText('Array')).toBeVisible()
+    expect(within(arrays).getByText('Hash Table')).toBeVisible()
+    const dp = within(preview).getByLabelText('Dynamic Programming group')
+    expect(dp).not.toHaveAttribute('open')
+    await user.click(within(dp).getByText('Dynamic Programming'))
+    expect(within(dp).getByText('Maximum Subarray')).toBeVisible()
+    expect(sendMessage).toHaveBeenCalledWith('tracks.getTrackForEdit', {
+      surface: 'dashboard',
+      trackId: 'grind-75',
+    })
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'tracks.setActiveTrack',
+      expect.anything(),
+    )
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'tracks.setActiveGroup',
+      expect.anything(),
+    )
+    toggle.focus()
+    await user.keyboard(' ')
+    expect(
+      screen.queryByRole('region', { name: 'Grind 75 preview' }),
+    ).not.toBeInTheDocument()
+    expect(toggle).toHaveFocus()
+  })
+
+  it('opens only one track preview at a time without activating it', async () => {
+    const user = userEvent.setup()
+    mockWorkspaceAndTrackPreview()
+    renderTracksScreen()
+    const grindToggle = await screen.findByRole('button', {
+      name: 'Preview Grind 75',
+    })
+    const leetcodeToggle = screen.getByRole('button', {
+      name: 'Preview LeetCode 75',
+    })
+
+    await user.click(grindToggle)
+    expect(
+      screen.getByRole('region', { name: 'Grind 75 preview' }),
+    ).toBeVisible()
+    await user.click(leetcodeToggle)
+    expect(
+      screen.queryByRole('region', { name: 'Grind 75 preview' }),
+    ).not.toBeInTheDocument()
+    expect(grindToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(leetcodeToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(leetcodeToggle).toHaveFocus()
+    expect(
+      screen.getByRole('region', { name: 'LeetCode 75 preview' }),
+    ).toBeVisible()
+
+    await user.keyboard(' ')
+    expect(leetcodeToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(
+      screen.queryByRole('region', { name: 'LeetCode 75 preview' }),
+    ).not.toBeInTheDocument()
+    expect(leetcodeToggle).toHaveFocus()
+    for (const method of ['tracks.setActiveTrack', 'tracks.setActiveGroup']) {
+      expect(sendMessage).not.toHaveBeenCalledWith(method, expect.anything())
+    }
+  })
+
+  it('closes a track preview when the collection collapses', async () => {
+    const user = userEvent.setup()
+    mockWorkspaceAndTrackPreview()
+    renderTracksScreen()
+    await user.click(
+      await screen.findByRole('button', { name: 'Preview Grind 75' }),
+    )
+    expect(
+      screen.getByRole('region', { name: 'Grind 75 preview' }),
+    ).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
+    expect(
+      screen.queryByRole('region', { name: 'Grind 75 preview' }),
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
+    expect(
+      screen.getByRole('button', { name: 'Preview Grind 75' }),
+    ).toHaveAttribute('aria-expanded', 'false')
+    expect(
+      screen.queryByRole('region', { name: 'Grind 75 preview' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps every catalog action usable without toggling an open preview', async () => {
+    const user = userEvent.setup()
+    mockWorkspaceAndTrackPreview()
+    renderTracksScreen()
+    await user.click(
+      await screen.findByRole('button', { name: 'Preview Grind 75' }),
+    )
+    const preview = screen.getByRole('region', { name: 'Grind 75 preview' })
+    await within(preview).findByText('Arrays and Hashing')
+    const actions = screen.getByLabelText('Grind 75 catalog actions')
+    await user.click(
+      within(actions).getByRole('button', { name: 'Set Grind 75 active' }),
+    )
+    expect(sendMessage).toHaveBeenCalledWith('tracks.setActiveTrack', {
+      surface: 'dashboard',
+      trackId: 'grind-75',
+    })
+    await user.click(within(actions).getByRole('link', { name: 'Edit Track' }))
+    for (const name of ['Reset Progress', 'Delete Track']) {
+      await user.click(within(actions).getByRole('button', { name }))
+      const dialog = screen.getByRole('dialog')
+      expect(preview).toBeInTheDocument()
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+      expect(preview).toBeVisible()
+    }
+    expect(
+      screen.getByRole('button', { name: 'Preview Grind 75' }),
+    ).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('shows preview read failures and retries without writing', async () => {
+    const user = userEvent.setup()
+    let previewReads = 0
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'tracks.getWorkspace')
+        return Promise.resolve(twoGroupWorkspace)
+      if (method === 'tracks.getTrackForEdit') {
+        previewReads += 1
+        return previewReads === 1
+          ? Promise.reject(new Error('offline'))
+          : Promise.resolve(trackPreview)
+      }
+      return Promise.resolve(null)
+    })
+    renderTracksScreen()
+    await user.click(
+      await screen.findByRole('button', { name: 'Preview Grind 75' }),
+    )
+    const preview = screen.getByRole('region', { name: 'Grind 75 preview' })
+    expect(await within(preview).findByRole('alert')).toHaveTextContent(
+      'Failed to load track preview.',
+    )
+    await user.click(
+      within(preview).getByRole('button', { name: 'Retry preview' }),
+    )
+    expect(await within(preview).findByText('Arrays and Hashing')).toBeVisible()
+    expect(previewReads).toBe(2)
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'tracks.updateTrack',
+      expect.anything(),
+    )
+  })
+
+  it('allows a loading preview to close without affecting collection controls', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'tracks.getWorkspace')
+        return Promise.resolve(twoGroupWorkspace)
+      return new Promise(() => undefined)
+    })
+    renderTracksScreen()
+    const toggle = await screen.findByRole('button', {
+      name: 'Preview Grind 75',
+    })
+    await user.click(toggle)
+    expect(screen.getByText('Loading track preview…')).toBeVisible()
+    await user.click(toggle)
+    expect(screen.queryByText('Loading track preview…')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'All tracks' }))
+    expect(screen.queryByText('Grind 75')).not.toBeInTheDocument()
+  })
+
+  it('previews empty groups and falls back to stored slugs for unavailable question metadata', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'tracks.getWorkspace')
+        return Promise.resolve(twoGroupWorkspace)
+      return Promise.resolve(
+        createTrackForEditResponse({
+          groups: [
+            { title: 'Empty group', position: 1, problemSlugs: [] },
+            {
+              title: 'References',
+              position: 2,
+              problemSlugs: ['missing-question'],
+            },
+          ],
+          problemRows: [],
+        }),
+      )
+    })
+    renderTracksScreen()
+    await user.click(
+      await screen.findByRole('button', { name: 'Preview Grind 75' }),
+    )
+    const preview = screen.getByRole('region', { name: 'Grind 75 preview' })
+    expect(
+      await within(preview).findByText('No problems in this group.'),
+    ).toBeVisible()
+    await user.click(within(preview).getByText('References'))
+    expect(within(preview).getByText('missing-question')).toBeVisible()
   })
 
   it('keeps all tracks actions available when expanded', async () => {
-    const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce(twoGroupWorkspace)
     renderTracksScreen()
 
-    await user.click(await screen.findByText('All tracks'))
+    await screen.findByText('All tracks')
     const activeRowActions = screen.getByLabelText(
       'LeetCode 75 catalog actions',
     )
@@ -769,7 +991,7 @@ describe('TracksScreen', () => {
       }),
     ).not.toBeInTheDocument()
     expect(screen.getByText('Grind 75')).toBeVisible()
-    expect(screen.getByText('10 of 75')).toBeVisible()
+    expect(screen.getByText('10 of 75 completed')).toBeVisible()
     expect(screen.getByLabelText('Grind 75 progress: 10 of 75')).toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Set Grind 75 active' }),
@@ -791,9 +1013,7 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Show all tracks' }),
-    )
+    await screen.findByRole('button', { name: 'All tracks' })
     await user.click(
       screen.getByRole('button', { name: 'Set Grind 75 active' }),
     )
@@ -819,10 +1039,10 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
-    const clearActiveButton = screen.getByRole('button', {
-      name: 'Clear Active',
-    })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
+    const clearActiveButton = within(
+      screen.getByLabelText('LeetCode 75 track actions'),
+    ).getByRole('button', { name: 'Clear Active' })
     const activeHeaderActions = screen.getByLabelText(
       'LeetCode 75 track actions',
     )
@@ -858,9 +1078,7 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Show all tracks' }),
-    )
+    await screen.findByRole('button', { name: 'All tracks' })
 
     const actions = screen.getByLabelText('Grind 75 catalog actions')
 
@@ -913,9 +1131,14 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
 
-    await user.click(screen.getByRole('button', { name: 'Reset Progress' }))
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Reset Progress' },
+      ),
+    )
     const resetDialog = screen.getByRole('dialog', {
       name: 'Reset track progress?',
     })
@@ -928,7 +1151,12 @@ describe('TracksScreen', () => {
       trackId: 'leetcode-75',
     })
 
-    await user.click(screen.getByRole('button', { name: 'Delete Track' }))
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Delete Track' },
+      ),
+    )
     const deleteDialog = screen.getByRole('dialog', { name: 'Delete track?' })
     expect(deleteDialog).toBeVisible()
     await user.click(
@@ -960,9 +1188,14 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
 
-    await user.click(screen.getByRole('button', { name: 'Reset Progress' }))
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Reset Progress' },
+      ),
+    )
     const resetDialog = screen.getByRole('dialog', {
       name: 'Reset track progress?',
     })
@@ -976,7 +1209,12 @@ describe('TracksScreen', () => {
       within(resetDialog).getByRole('button', { name: 'Cancel' }),
     )
 
-    await user.click(screen.getByRole('button', { name: 'Delete Track' }))
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Delete Track' },
+      ),
+    )
     const deleteDialog = screen.getByRole('dialog', { name: 'Delete track?' })
     await user.click(
       within(deleteDialog).getByRole('button', { name: 'Delete Track' }),
@@ -998,8 +1236,10 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
-    const resetButton = screen.getByRole('button', { name: 'Reset Progress' })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
+    const resetButton = within(
+      screen.getByLabelText('LeetCode 75 track actions'),
+    ).getByRole('button', { name: 'Reset Progress' })
 
     await user.click(resetButton)
     const resetDialog = screen.getByRole('dialog', {
@@ -1042,8 +1282,10 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
-    const resetButton = screen.getByRole('button', { name: 'Reset Progress' })
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
+    const resetButton = within(
+      screen.getByLabelText('LeetCode 75 track actions'),
+    ).getByRole('button', { name: 'Reset Progress' })
 
     await user.click(resetButton)
 
@@ -1077,8 +1319,13 @@ describe('TracksScreen', () => {
 
     renderTracksScreen()
 
-    await screen.findByRole('heading', { name: 'LeetCode 75' })
-    await user.click(screen.getByRole('button', { name: 'Reset Progress' }))
+    await screen.findByRole('heading', { name: 'LeetCode 75', level: 2 })
+    await user.click(
+      within(screen.getByLabelText('LeetCode 75 track actions')).getByRole(
+        'button',
+        { name: 'Reset Progress' },
+      ),
+    )
 
     const resetDialog = screen.getByRole('dialog', {
       name: 'Reset track progress?',
@@ -1224,6 +1471,16 @@ describe('TracksScreen', () => {
   })
 })
 
+function mockWorkspaceAndTrackPreview() {
+  vi.mocked(sendMessage).mockImplementation((method) => {
+    if (method === 'tracks.getWorkspace')
+      return Promise.resolve(twoGroupWorkspace)
+    if (method === 'tracks.getTrackForEdit')
+      return Promise.resolve(trackPreview)
+    return Promise.resolve(null)
+  })
+}
+
 function renderTracksScreen() {
   const { wrapper } = createQueryTestHarness()
 
@@ -1259,6 +1516,48 @@ function renderTracksScreen() {
     { wrapper },
   )
 }
+
+const trackPreview = createTrackForEditResponse({
+  groups: [
+    {
+      title: 'Dynamic Programming',
+      position: 2,
+      problemSlugs: ['maximum-subarray'],
+    },
+    {
+      title: 'Arrays and Hashing',
+      position: 1,
+      problemSlugs: ['binary-search', 'two-sum'],
+    },
+  ],
+  problemRows: [
+    createTrackProblemRow({
+      problem: {
+        ...createTrackProblemRow().problem,
+        slug: 'two-sum',
+        title: 'Two Sum',
+      },
+      topics: [
+        { id: 'array', label: 'Array', parentTopics: [] },
+        { id: 'hash-table', label: 'Hash Table', parentTopics: [] },
+      ],
+    }),
+    createTrackProblemRow({
+      problem: {
+        ...createTrackProblemRow().problem,
+        slug: 'binary-search',
+        title: 'Binary Search',
+      },
+    }),
+    createTrackProblemRow({
+      problem: {
+        ...createTrackProblemRow().problem,
+        slug: 'maximum-subarray',
+        title: 'Maximum Subarray',
+      },
+    }),
+  ],
+})
 
 function renderOtherTracksAccordion(
   tracks: React.ComponentProps<typeof OtherTracksAccordion>['tracks'],

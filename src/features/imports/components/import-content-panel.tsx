@@ -1,4 +1,4 @@
-import { useId, useRef, type ChangeEvent } from 'react'
+import { useEffect, useId, useRef, type ChangeEvent } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { InlineStatus } from '@/components/ui/inline-status'
@@ -9,9 +9,20 @@ import { useContentImport } from '../hooks/use-content-import'
 import { ImportPreviewView } from './import-preview'
 import { ImportTemplates } from './import-templates'
 
-export function ImportContentPanel() {
+export function ImportContentPanel({
+  variant = 'content',
+  onDismissAvailabilityChange,
+}: {
+  variant?: 'content' | 'tracks'
+  onDismissAvailabilityChange?: (isAllowed: boolean) => void
+}) {
   const titleId = useId()
+  const inputId = useId()
+  const isTrackImport = variant === 'tracks'
   const inputRef = useRef<HTMLInputElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
+  const retryRef = useRef<HTMLButtonElement>(null)
+  const wasWritingRef = useRef(false)
   const { state, selectFile, clear, apply, retryPersistence, previewAgain } =
     useContentImport()
   const isWriting = state.step === 'applying' || state.step === 'retrying'
@@ -24,6 +35,22 @@ export function ImportContentPanel() {
     preview?.status === 'ready'
   const additionCount = preview ? sumAdditionCounts(preview.additions) : 0
   const status = getStatus(state)
+  const canDismiss = !isWriting && !isPersistencePending
+
+  useEffect(() => {
+    onDismissAvailabilityChange?.(canDismiss)
+  }, [canDismiss, onDismissAvailabilityChange])
+
+  useEffect(() => {
+    const wasWriting = wasWritingRef.current
+    wasWritingRef.current = isWriting
+    if (!isTrackImport || !wasWriting || isWriting) return
+
+    const nextFocus = isPersistencePending
+      ? retryRef.current
+      : resultRef.current
+    nextFocus?.focus()
+  }, [isPersistencePending, isTrackImport, isWriting])
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget
@@ -36,39 +63,60 @@ export function ImportContentPanel() {
     })()
   }
 
+  function focusResult() {
+    if (isTrackImport) resultRef.current?.focus()
+  }
+
   return (
     <Surface
       aria-busy={isBusy || undefined}
-      aria-labelledby={titleId}
+      aria-label={isTrackImport ? 'Import tracks' : undefined}
+      aria-labelledby={isTrackImport ? undefined : titleId}
       className="grid gap-3"
+      variant={isTrackImport ? 'flat' : 'panel'}
     >
-      <header className="grid gap-1">
-        <h2
-          className="m-0 text-[length:var(--cp-title-font-size)] font-bold leading-tight"
-          id={titleId}
-        >
-          Import content
-        </h2>
-        <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
-          Add questions, tracks, companies, and topics while keeping your
-          existing data and progress.
-        </p>
-      </header>
+      {isTrackImport ? null : (
+        <header className="grid gap-1">
+          <h2
+            className="m-0 text-[length:var(--cp-title-font-size)] font-bold leading-tight"
+            id={titleId}
+          >
+            Import content
+          </h2>
+          <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
+            Add questions, tracks, companies, and topics while keeping your
+            existing data and progress.
+          </p>
+        </header>
+      )}
 
-      <ImportTemplates />
+      <ImportTemplates variant={variant} />
 
       <div className="grid gap-1.5">
+        {isTrackImport ? (
+          <h3 className="m-0 text-[length:var(--cp-copy-font-size)] font-bold">
+            2. Choose your track file
+          </h3>
+        ) : null}
         <label
           className="text-[length:var(--cp-copy-font-size)] font-semibold"
-          htmlFor="content-import-file"
+          htmlFor={inputId}
         >
-          Choose content JSON file
+          {isTrackImport
+            ? 'Choose track JSON file'
+            : 'Choose content JSON file'}
         </label>
+        {isTrackImport ? (
+          <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
+            Preview the additions and any errors before importing. Existing
+            tracks and progress are preserved.
+          </p>
+        ) : null}
         <input
           accept=".json,application/json"
           className="min-w-0 rounded-[var(--cp-control-radius)] border border-border bg-background px-3 py-2 text-[length:var(--cp-copy-font-size)] file:mr-3 file:rounded-[var(--cp-control-radius)] file:border-0 file:bg-primary file:px-3 file:py-2 file:font-semibold file:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           disabled={isWriting || isPersistencePending}
-          id="content-import-file"
+          id={inputId}
           onChange={handleFileChange}
           ref={inputRef}
           type="file"
@@ -86,7 +134,14 @@ export function ImportContentPanel() {
       {status ? (
         <InlineStatus
           aria-label="Content import status"
+          className={
+            isTrackImport
+              ? 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+              : undefined
+          }
+          ref={resultRef}
           role="status"
+          tabIndex={isTrackImport ? 0 : undefined}
           tone={status.tone}
         >
           {status.message}
@@ -95,14 +150,25 @@ export function ImportContentPanel() {
 
       <div className="flex flex-wrap items-center gap-2">
         {isReady ? (
-          <Button disabled={isWriting} onClick={() => void apply()} size="sm">
+          <Button
+            disabled={isWriting}
+            onClick={() => {
+              focusResult()
+              void apply()
+            }}
+            size="sm"
+          >
             {`Import ${additionCount} ${additionCount === 1 ? 'addition' : 'additions'}`}
           </Button>
         ) : null}
         {state.step === 'persistence-error' ? (
           <Button
             disabled={isWriting}
-            onClick={() => void retryPersistence()}
+            onClick={() => {
+              focusResult()
+              void retryPersistence()
+            }}
+            ref={retryRef}
             size="sm"
           >
             Retry saving
@@ -111,7 +177,10 @@ export function ImportContentPanel() {
         {state.step === 'error' && state.fileText !== null ? (
           <Button
             disabled={isWriting}
-            onClick={() => void previewAgain()}
+            onClick={() => {
+              focusResult()
+              void previewAgain()
+            }}
             size="sm"
             variant="outline"
           >
@@ -123,7 +192,10 @@ export function ImportContentPanel() {
             disabled={isWriting || isPersistencePending}
             onClick={() => {
               clear()
-              if (inputRef.current) inputRef.current.value = ''
+              if (inputRef.current) {
+                inputRef.current.value = ''
+                if (isTrackImport) inputRef.current.focus()
+              }
             }}
             size="sm"
             variant="outline"

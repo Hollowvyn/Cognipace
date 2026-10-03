@@ -1,5 +1,5 @@
 import { Link, Outlet } from '@tanstack/react-router'
-import { Pencil, Plus } from 'lucide-react'
+import { Pencil, Plus, Upload } from 'lucide-react'
 
 import {
   DashboardPage,
@@ -28,6 +28,18 @@ export function TracksPage() {
       </DashboardPageHeader>
       <DashboardPageBody>
         <TracksScreen
+          importTrackAction={
+            <IconButton
+              asChild
+              label="Import tracks"
+              tooltip="Import tracks"
+              variant="outline"
+            >
+              <Link to={dashboardPaths.trackImport}>
+                <Upload aria-hidden="true" />
+              </Link>
+            </IconButton>
+          }
           newTrackAction={
             <Button asChild size="sm">
               <Link to={dashboardPaths.trackNew}>

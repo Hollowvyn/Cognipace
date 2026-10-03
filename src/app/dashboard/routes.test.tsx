@@ -1,9 +1,13 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryHistory } from '@tanstack/react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { sendMessage } from '@/extension/messaging'
+import {
+  readyPreview,
+  validTwoQuestionTrackFileText,
+} from '@/features/imports/testing/import-fixtures'
 import { defaultUserSettings } from '@/features/settings/domain'
 import type { SyncActionResult } from '@/features/sync'
 import { createLibrarySelectionTrackDraft } from '@/features/tracks'
@@ -37,6 +41,14 @@ vi.mock('@/extension/messaging', () => ({
 let analyticsSummary = createSerializedAnalyticsSummary()
 const analyticsTimeZone =
   Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+
+function createTrackImportFile(text = validTwoQuestionTrackFileText) {
+  const file = new File([text], 'my-track.json', { type: 'application/json' })
+  Object.defineProperty(file, 'text', {
+    value: () => Promise.resolve(text),
+  })
+  return file
+}
 
 function renderDashboard(initialEntry = '/') {
   const router = createDashboardRouter({
@@ -177,7 +189,9 @@ describe('dashboard routes', () => {
     renderDashboard(path)
 
     expect(await screen.findByRole('heading', { name: heading })).toBeVisible()
-    expect(await screen.findByText(new RegExp(expectedCopy, 'i'))).toBeVisible()
+    expect(
+      (await screen.findAllByText(new RegExp(expectedCopy, 'i')))[0],
+    ).toBeVisible()
   })
 
   it('navigates from Settings to Overview through the brand link', async () => {
@@ -515,6 +529,7 @@ describe('dashboard routes', () => {
 
   it.each([
     ['/tracks/new', 'Tracks', /New Track/i, null],
+    ['/tracks/import', 'Tracks', /Import tracks/i, null],
     ['/tracks/leetcode-75/edit', 'Tracks', /Edit/i, null],
     ['/tracks/problems/two-sum/edit', 'Tracks', /Edit/i, null],
     ['/library/tracks/new?draft=missing-draft', 'Library', /New Track/i, null],
@@ -535,6 +550,310 @@ describe('dashboard routes', () => {
       }
     },
   )
+
+  it('opens template-first track import from the collection without collapsing it', async () => {
+    const { user, router } = renderDashboard('/tracks')
+    const collection = await screen.findByRole('region', { name: 'All tracks' })
+    await user.click(
+      within(collection).getByRole('link', { name: 'Import tracks' }),
+    )
+
+    const dialog = await screen.findByRole('dialog', { name: 'Import tracks' })
+    expect(
+      within(dialog).getByRole('link', { name: 'Download track template' }),
+    ).toHaveAttribute('download', 'track-only.json')
+    expect(
+      within(dialog).getByLabelText('Choose track JSON file'),
+    ).toBeVisible()
+    expect(
+      within(collection).getByRole('button', { name: 'All tracks' }),
+    ).toHaveAttribute('aria-expanded', 'true')
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tracks'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'imports.apply',
+      expect.anything(),
+    )
+  })
+
+  it('keeps import reachable when no tracks exist', async () => {
+    const original = vi.mocked(sendMessage).getMockImplementation()!
+    vi.mocked(sendMessage).mockImplementation((method, request) =>
+      method === 'tracks.getWorkspace'
+        ? Promise.resolve(
+            createTrackWorkspaceResponse({
+              tracks: [],
+              activeTrack: null,
+              activeTrackGroups: [],
+              activeTrackRows: [],
+            }),
+          )
+        : original(method, request),
+    )
+    const { user } = renderDashboard('/tracks')
+    await screen.findByText('No tracks yet.')
+    await user.click(screen.getByRole('link', { name: 'Import tracks' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'Import tracks' }),
+    ).toBeVisible()
+  })
+
+  it.each(['Close', 'Escape', 'backdrop'])(
+    'cancels a track file preview with %s without applying it',
+    async (dismissal) => {
+      const original = vi.mocked(sendMessage).getMockImplementation()!
+      vi.mocked(sendMessage).mockImplementation((method, request) =>
+        method === 'imports.preview'
+          ? Promise.resolve(readyPreview)
+          : original(method, request),
+      )
+      const { user, router } = renderDashboard('/tracks/import')
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Import tracks',
+      })
+      const file = createTrackImportFile()
+      await user.upload(
+        within(dialog).getByLabelText('Choose track JSON file'),
+        file,
+      )
+      await within(dialog).findByRole('button', { name: 'Import 1 addition' })
+      if (dismissal === 'Close') {
+        await user.click(within(dialog).getByRole('link', { name: 'Close' }))
+      } else if (dismissal === 'Escape') {
+        await user.keyboard('{Escape}')
+      } else {
+        await user.click(dialog.parentElement as HTMLElement)
+      }
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe('/tracks'),
+      )
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(sendMessage).not.toHaveBeenCalledWith(
+        'imports.apply',
+        expect.anything(),
+      )
+    },
+  )
+
+  it('retains keyboard focus and refreshes the collection after a track import is saved', async () => {
+    const original = vi.mocked(sendMessage).getMockImplementation()!
+    const preview = {
+      ...readyPreview,
+      additions: { ...readyPreview.additions, tracks: 1 },
+    }
+    let imported = false
+    vi.mocked(sendMessage).mockImplementation((method, request) => {
+      if (method === 'imports.preview') return Promise.resolve(preview)
+      if (method === 'imports.apply') {
+        imported = true
+        return Promise.resolve({ status: 'saved', preview })
+      }
+      if (method === 'tracks.getWorkspace' && imported) {
+        const workspace = createTrackWorkspaceResponse()
+        return Promise.resolve({
+          ...workspace,
+          tracks: [
+            ...workspace.tracks,
+            {
+              track: createSerializedTrack({
+                id: 'imported-interview-track',
+                slug: 'imported-interview-track',
+                title: 'Imported Interview Track',
+              }),
+              progress: { completedCount: 0, totalCount: 2, percent: 0 },
+            },
+          ],
+        })
+      }
+      return original(method, request)
+    })
+    const { user, router } = renderDashboard('/tracks/import')
+    const dialog = await screen.findByRole('dialog', { name: 'Import tracks' })
+    const file = createTrackImportFile()
+    await user.upload(
+      within(dialog).getByLabelText('Choose track JSON file'),
+      file,
+    )
+    const apply = await within(dialog).findByRole('button', {
+      name: 'Import 2 additions',
+    })
+    apply.focus()
+    await user.keyboard('{Enter}')
+    const status = await within(dialog).findByRole('status', {
+      name: 'Content import status',
+    })
+    await waitFor(() =>
+      expect(status).toHaveTextContent('Content imported and saved.'),
+    )
+    expect(status).toHaveFocus()
+    await user.tab()
+    expect(
+      within(dialog).getByRole('button', { name: 'Dismiss import' }),
+    ).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(
+      within(dialog).getByLabelText('Choose track JSON file'),
+    ).toHaveFocus()
+    await user.tab()
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tracks'))
+    const collection = screen.getByRole('region', { name: 'All tracks' })
+    expect(
+      await within(collection).findByRole('article', {
+        name: 'Imported Interview Track',
+      }),
+    ).toBeVisible()
+    expect(within(collection).getByText('2 tracks')).toBeVisible()
+    expect(
+      within(collection).getByRole('article', { name: 'LeetCode 75' }),
+    ).toHaveTextContent('Active')
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'tracks.setActiveTrack',
+      expect.anything(),
+    )
+  })
+
+  it('keeps keyboard focus inside the dialog while retrying a failed preview', async () => {
+    const original = vi.mocked(sendMessage).getMockImplementation()!
+    let previewCalls = 0
+    let finishPreview!: (response: typeof readyPreview) => void
+    const previewing = new Promise<typeof readyPreview>((resolve) => {
+      finishPreview = resolve
+    })
+    vi.mocked(sendMessage).mockImplementation((method, request) => {
+      if (method === 'imports.preview') {
+        previewCalls++
+        return previewCalls === 1
+          ? Promise.reject(new Error('Preview failed'))
+          : previewing
+      }
+      return original(method, request)
+    })
+    const { user } = renderDashboard('/tracks/import')
+    const dialog = await screen.findByRole('dialog', { name: 'Import tracks' })
+    const file = createTrackImportFile()
+    await user.upload(
+      within(dialog).getByLabelText('Choose track JSON file'),
+      file,
+    )
+    await user.click(
+      await within(dialog).findByRole('button', { name: 'Preview file again' }),
+    )
+    expect(
+      within(dialog).getByRole('status', { name: 'Content import status' }),
+    ).toHaveFocus()
+    await user.tab()
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
+    await act(async () => {
+      finishPreview(readyPreview)
+      await previewing
+    })
+    expect(
+      await within(dialog).findByRole('button', { name: 'Import 1 addition' }),
+    ).toBeVisible()
+  })
+
+  it('guards modal dismissal during apply and save retry, then returns to Tracks', async () => {
+    const original = vi.mocked(sendMessage).getMockImplementation()!
+    const preview = {
+      ...readyPreview,
+      additions: { ...readyPreview.additions, tracks: 1, problems: 0 },
+      items: [],
+    }
+    let finishApply!: (response: {
+      status: 'persistence-error'
+      preview: typeof preview
+    }) => void
+    const applying = new Promise<{
+      status: 'persistence-error'
+      preview: typeof preview
+    }>((resolve) => {
+      finishApply = resolve
+    })
+    let finishRetry!: (response: { status: 'saved' }) => void
+    const retrying = new Promise<{ status: 'saved' }>((resolve) => {
+      finishRetry = resolve
+    })
+    vi.mocked(sendMessage).mockImplementation((method, request) => {
+      if (method === 'imports.preview') return Promise.resolve(preview)
+      if (method === 'imports.apply') return applying
+      if (method === 'imports.retryPersistence') return retrying
+      return original(method, request)
+    })
+    const { user, router } = renderDashboard('/tracks/import')
+    const dialog = await screen.findByRole('dialog', { name: 'Import tracks' })
+    const fileText = '{"format":"cognipace-content","version":1,"tracks":[]}'
+    const file = createTrackImportFile(fileText)
+    await user.upload(
+      within(dialog).getByLabelText('Choose track JSON file'),
+      file,
+    )
+    await user.click(
+      await within(dialog).findByRole('button', { name: 'Import 1 addition' }),
+    )
+    const close = await within(dialog).findByRole('button', { name: 'Close' })
+    expect(close).toBeDisabled()
+    expect(
+      within(dialog).getByRole('status', { name: 'Content import status' }),
+    ).toHaveFocus()
+    await user.tab()
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
+    await user.keyboard('{Escape}')
+    await user.click(dialog.parentElement as HTMLElement)
+    expect(router.state.location.pathname).toBe('/tracks/import')
+    await act(async () => {
+      finishApply({ status: 'persistence-error', preview })
+      await applying
+    })
+    expect(
+      await within(dialog).findByRole('button', { name: 'Retry saving' }),
+    ).toBeVisible()
+    expect(
+      within(dialog).getByRole('button', { name: 'Retry saving' }),
+    ).toHaveFocus()
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeDisabled()
+    await user.keyboard('{Escape}')
+    expect(router.state.location.pathname).toBe('/tracks/import')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Retry saving' }),
+    )
+    expect(
+      within(dialog).getByRole('status', { name: 'Content import status' }),
+    ).toHaveFocus()
+    await user.tab()
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeDisabled()
+    await user.keyboard('{Escape}')
+    await user.click(dialog.parentElement as HTMLElement)
+    expect(router.state.location.pathname).toBe('/tracks/import')
+    await act(async () => {
+      finishRetry({ status: 'saved' })
+      await retrying
+    })
+    expect(
+      await within(dialog).findByRole('status', {
+        name: 'Content import status',
+      }),
+    ).toHaveTextContent('Content imported and saved.')
+    expect(
+      within(dialog).getByRole('status', { name: 'Content import status' }),
+    ).toHaveFocus()
+    await user.tab()
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tracks'))
+    expect(sendMessage).toHaveBeenCalledWith('imports.apply', {
+      surface: 'dashboard',
+      fileText,
+      fingerprint: preview.fingerprint,
+    })
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'tracks.setActiveTrack',
+      expect.anything(),
+    )
+  })
 
   it('/tracks/new renders the track form over Tracks and loads options', async () => {
     const { user } = renderDashboard('/tracks/new')
@@ -916,7 +1235,7 @@ describe('dashboard routes', () => {
     expect(router.state.location.pathname).toBe('/library')
   })
 
-  it('does not define deferred destructive or data-management routes', () => {
+  it('does not define deferred destructive or backup routes', () => {
     const router = createDashboardRouter({
       history: createMemoryHistory({ initialEntries: ['/'] }),
     })
@@ -927,7 +1246,7 @@ describe('dashboard routes', () => {
 
     expect(routePaths).not.toEqual(
       expect.arrayContaining([
-        expect.stringMatching(/delete|reset|backup|import|data-management/i),
+        expect.stringMatching(/delete|reset|backup|data-management/i),
       ]),
     )
   })
