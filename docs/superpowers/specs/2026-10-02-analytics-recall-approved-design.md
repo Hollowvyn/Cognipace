@@ -1,5 +1,11 @@
 # Approved Observed Recall And FSRS Estimate Design
 
+Follow-up: the user's later empty-edge trimming request supersedes the original
+full-window treatment for Recall, Practice Rhythm, and Ratings Mix. Memory
+Strength keeps its original window. See the
+[approved adjustment](2026-10-02-analytics-layout-polish-design.md#approved-follow-up-empty-edge-trimming).
+The exact frozen artifacts below remain unchanged design history.
+
 Status: human-approved visual design, archived exactly on 2026-10-02.
 The four historical charts are now implemented locally; see the
 [implementation handoff](../handoffs/2026-10-02-analytics-historical-charts.md)

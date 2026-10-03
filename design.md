@@ -177,8 +177,13 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   Memory Signals, Recent Overdue Backlog, and Upcoming Review Load keep their
   current treatment until a separate design iteration.
 - Keep the explicit 14-day daily, 30-day three-day, and 90-day weekly grouping
-  and feature-supplied row sets. Readiness copy describes usable evidence;
-  presentation does not remove supplied buckets or fabricate observations.
+  and feature-supplied values. Recall, Practice Rhythm, and Ratings Mix trim
+  empty beginning and ending buckets only, using the same contiguous activity
+  window for Chart, Table, and inspection. Preserve every internal gap and each
+  retained interval's dates. Memory Strength retains its supplied rows.
+  Readiness does not control trimming. Keep the selected range, period totals,
+  readiness, supplied scales, and report time unchanged; do not fabricate
+  observations.
 - Use a numeric local-calendar axis with marks at each interval's midpoint,
   including shortened edge buckets. Show sparse date ticks at readable calendar
   intervals rather than labeling every bucket. Dates use MM/DD in the report's
@@ -189,8 +194,8 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   supplied serialized domains and independent scales; only Memory Strength's
   duration fit changes in this iteration.
 - Inspection starts with the tooltip hidden. Pointer movement and taps select
-  the nearest original bucket. A native focusable button covering the plot
-  exposes the same values through focus, Left/Right arrows, Home/End, and
+  the nearest retained original bucket. A native focusable button covering the
+  plot exposes the same values through focus, Left/Right arrows, Home/End, and
   Enter/Space, with Escape to hide details. Use a quiet vertical selection guide
   and highlight measured values only. Keep full range, grouping, report time,
   evidence, and complete/in-progress context in the tooltip; do not add a
@@ -201,7 +206,8 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   Compact native series switches hide the relevant curve, markers, and tooltip
   rate together. Show the signed difference only when both series are visible,
   preserve shared sample counts, and keep the accessible description aligned
-  with both, one, or neither series visible.
+  with both, one, or neither series visible. Either known rate, including 0%,
+  supports the activity window; toggling series must not reshape that window.
 - Memory Strength uses a clear median line and discrete Q1–Q3 whiskers with a
   compact Median/Middle 50% key. Render whiskers only with at least four eligible
   reviews and known quartiles. Fit all finite median/Q1/Q3 extrema by choosing
@@ -213,18 +219,22 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   Success line in one mixed plot. Label Reviews on the left and Review Success
   (%) on the right. Measured success receives markers; unknown success receives
   only a dashed bridge between measured neighbors. Keep the visible
-  association-only explanation.
-- Ratings Mix retains all supplied slots, including leading empty ones. Keep
-  exact Again/Hard/Good/Easy fractions as segment geometry. Empty composition is
-  a full-height neutral gray diagonal hatch, while a true zero category in a
-  populated slot stays zero-height. Keep the four rating categories distinct
-  from the neutral missing-composition key. Center contrasting whole-percentage labels at 12px when both their
-  width and height fit; omit labels that do not fit without shrinking the type
-  or changing shares. More precise shares and counts stay in tooltip and Table;
+  association-only explanation. Completed reviews, valid ratings, or a known
+  finite success rate support the activity window. Measured 0% success remains
+  supported, while internal zero-volume gaps remain in place.
+- Ratings Mix starts and ends with a slot containing valid ratings and keeps
+  all internal slots. Keep exact Again/Hard/Good/Easy fractions as segment
+  geometry. Empty internal composition is a full-height neutral gray diagonal
+  hatch, while a true zero category in a populated slot stays zero-height. Keep
+  the four rating categories distinct
+  from the neutral missing-composition key. Center contrasting whole-percentage
+  labels at 12px when both their width and height fit; omit labels that do not
+  fit without shrinking the type or changing shares. More precise shares and
+  counts stay in tooltip and Table;
   rounded labels may total 99% or 101%.
 - Keep Chart/Table switching and seven-row table pagination. Preserve exact
-  feature-owned values, unavailable states, and current-interval context across
-  both views. At narrow widths, reduce ticks and stack the Memory/Practice pair
-  before its axes, keys, and controls become crowded. Keep panel alignment
+  retained rows, feature-owned values, unavailable states, and current-interval
+  context across both views. At narrow widths, reduce ticks and stack the
+  Memory/Practice pair before its axes, keys, and controls become crowded. Keep panel alignment
   usable when neighboring readiness messages differ, and check light and dark
   themes.

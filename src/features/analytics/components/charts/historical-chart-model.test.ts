@@ -8,6 +8,7 @@ import {
   historicalIntervalContext,
   nearestHistoricalRowIndex,
   sparseHistoricalYTicks,
+  trimHistoricalEmptyEdges,
 } from './historical-chart-model'
 
 const timeFrame = {
@@ -15,6 +16,56 @@ const timeFrame = {
   timeZone: 'America/New_York',
   requestedDays: 30,
 }
+
+describe('empty historical edges', () => {
+  it('trims only the empty prefix and suffix, preserving zero and internal gaps without mutation', () => {
+    const original = Object.freeze([
+      { ...row('2026-09-03', '2026-09-05'), value: null },
+      { ...row('2026-09-06', '2026-09-08'), value: 0 },
+      { ...row('2026-09-09', '2026-09-11'), value: null },
+      { ...row('2026-09-12', '2026-09-14'), value: 0.75 },
+      { ...row('2026-09-15', '2026-09-17'), value: null },
+      { ...row('2026-09-18', '2026-09-20'), value: null },
+    ])
+    const visible = trimHistoricalEmptyEdges(
+      original,
+      (point) => point.value !== null,
+    )
+    expect(visible).toEqual(original.slice(1, 4))
+    visible.forEach((point, index) => expect(point).toBe(original[index + 1]))
+    expect(original).toHaveLength(6)
+    const model = buildHistoricalChartModel(visible, timeFrame)
+    expect(model.domain).toEqual([
+      historicalDayOrdinal('2026-09-06'),
+      historicalDayOrdinal('2026-09-15'),
+    ])
+  })
+
+  it('returns an empty slice for empty or entirely unsupported history', () => {
+    expect(trimHistoricalEmptyEdges([], () => true)).toEqual([])
+    const original = [row('2026-09-03'), row('2026-09-04')]
+    expect(trimHistoricalEmptyEdges(original, () => false)).toEqual([])
+    expect(original).toHaveLength(2)
+  })
+
+  it('preserves the actual interval for one measured bucket and leaves supported edges intact', () => {
+    const original = [
+      { ...row('2026-09-01'), value: null },
+      { ...row('2026-09-02', '2026-09-06'), value: 0 },
+      { ...row('2026-09-07'), value: null },
+    ]
+    const visible = trimHistoricalEmptyEdges(
+      original,
+      (point) => point.value !== null,
+    )
+    expect(visible).toEqual([original[1]])
+    expect(buildHistoricalChartModel(visible).domain).toEqual([
+      historicalDayOrdinal('2026-09-02'),
+      historicalDayOrdinal('2026-09-07'),
+    ])
+    expect(trimHistoricalEmptyEdges(original, () => true)).toEqual(original)
+  })
+})
 
 function row(start: string, end = start) {
   return { id: start, bucketStart: start, bucketEnd: end, value: null }

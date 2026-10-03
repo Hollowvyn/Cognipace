@@ -1,0 +1,59 @@
+import { useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import './proof.css'
+import { SurfaceRoot } from '@/components/ui/surface'
+import { AnalyticsChartPanel } from '@/features/analytics/components/analytics-chart-panel'
+import { AnalyticsReadinessState } from '@/features/analytics/components/analytics-readiness-state'
+import { ObservedRecallVsFsrsView, MemoryStrengthView, PracticeRhythmView, RatingsMixView } from '@/features/analytics/components/historical-views'
+import type { AnalyticsViews } from '@/features/analytics/api/analytics-contracts'
+import { buildAdaptiveDurationScale } from '@/features/analytics/domain/analytics-scales'
+
+// Isolated render proof of production components; illustrative approved cohorts.
+const timeFrame = { asOf:'2026-10-02T06:44:00.000Z', timeZone:'America/New_York', requestedDays:30 }
+const intervals = ['09-09','09-12','09-15','09-18','09-21','09-24','09-27','09-30'].map((date, i) => ({id:`2026-${date}`,bucketStart:`2026-${date}`,bucketEnd:`2026-${['09-11','09-14','09-17','09-20','09-23','09-26','09-29','10-02'][i]}`,isPartial:i===7}))
+const counts = [6,14,0,4,2,5,0,8]
+const recall: AnalyticsViews['observedRecallVsFsrs'] = {
+  rows:intervals.map((b,i)=> {const r=[5,12,0,3,2,3,0,6][i]; const observed=counts[i]?r/counts[i]:null; const estimate=[.9,.85,null,.47,.75,.69,null,.76][i]; return {...b,recalledCount:r,pairedReviews:counts[i],observedRecall:observed,fsrsEstimate:estimate,difference:observed!==null&&estimate!==null?observed-estimate:null,provenance:'reconstructed',evidence:counts[i]?'measured':'not-measured'} }),
+  scale:{domain:[.2,1],ticks:[.2,.4,.6,.8,1]},targetRetention:.87
+}
+const median = [3,20,null,1,16,3,null,12], q1=[1,2,null,.5,7,1,null,5], q3=[12,44,null,3,24,8,null,19]
+const memory: AnalyticsViews['memoryStrength'] = {
+  rows:intervals.map((b,i)=>({...b,medianStrengthDays:median[i],q1:counts[i]>=4?q1[i]:null,q3:counts[i]>=4?q3[i]:null,eligibleReviews:counts[i],medianChangeDays:i>0&&median[i]!==null&&median[i-1]!==null?median[i]!-median[i-1]!:null,provenance:'reconstructed',evidence:counts[i]?'measured':'not-measured'})),
+  scale:buildAdaptiveDurationScale([.5,44])
+}
+const practice: AnalyticsViews['practiceRhythm'] = {
+  rows:intervals.map((b,i)=>{const success=[5,10,0,0,1,3,0,2][i];return {...b,completedReviews:counts[i],goodEasy:success,validRatings:counts[i],reviewSuccess:counts[i]?success/counts[i]:null,evidence:counts[i]?'measured':'not-measured'}}),
+  countScale:{domain:[0,20],ticks:[0,5,10,15,20]},percentageScale:{domain:[0,1],ticks:[0,.25,.5,.75,1]}
+}
+const ratingCounts=[[0,0,0,0],[0,0,0,0],[1,0,1,4],[2,2,7,3],[0,0,0,0],[1,3,0,0],[0,1,1,0],[2,0,1,2],[0,0,0,0],[2,4,1,1]]
+const ratings: AnalyticsViews['ratingsMix'] = {
+ rows:[{id:'2026-09-03',bucketStart:'2026-09-03',bucketEnd:'2026-09-05',isPartial:false},{id:'2026-09-06',bucketStart:'2026-09-06',bucketEnd:'2026-09-08',isPartial:false},...intervals].map((b,i)=>{const [again,hard,good,easy]=ratingCounts[i];const total=again+hard+good+easy;return {...b,again,hard,good,easy,againShare:total?again/total:null,hardShare:total?hard/total:null,goodShare:total?good/total:null,easyShare:total?easy/total:null,validRatings:total,challengingReviews:again+hard,evidence:total?'measured':'not-measured'}}),
+ selectedHardAgain:18,selectedValidRatings:39,comparison:{direction:'up',difference:.15,previousHardAgainShare:.31,previousValidRatings:45}
+}
+function App(){
+ const [theme,setTheme]=useState<'dark'|'light'>('dark');const [state,setState]=useState('edges')
+ const selectRows=<T,>(rows:T[])=>state==='empty'?[]:state==='sparse'?rows.slice(3,5):state==='single'?rows.slice(0,1):rows
+ const ratingRows=state==='edges'?ratings.rows.map((row,i)=>i===ratings.rows.length-1?{...row,again:0,hard:0,good:0,easy:0,againShare:null,hardShare:null,goodShare:null,easyShare:null,validRatings:0,challengingReviews:0,evidence:'not-measured' as const}:row):state==='single'?ratings.rows.slice(2,3):selectRows(ratings.rows)
+ const displayRatings={...ratings,rows:ratingRows,selectedValidRatings:ratingRows.reduce((n,row)=>n+row.validRatings,0),selectedHardAgain:ratingRows.reduce((n,row)=>n+row.challengingReviews,0),comparison:state==='ready'||state==='mixed'?ratings.comparison:{direction:null,difference:null,previousHardAgainShare:null,previousValidRatings:0}}
+ const emptyPeriods=ratings.rows.slice(0,2).map(({id,bucketStart,bucketEnd,isPartial})=>({id,bucketStart,bucketEnd,isPartial}))
+ const emptyRecall={recalledCount:0,pairedReviews:0,observedRecall:null,fsrsEstimate:null,difference:null,provenance:'reconstructed' as const,evidence:'not-measured' as const}
+ const emptyPractice={completedReviews:0,goodEasy:0,validRatings:0,reviewSuccess:null,evidence:'measured' as const}
+ const emptyMemory={medianStrengthDays:null,q1:null,q3:null,eligibleReviews:0,medianChangeDays:null,provenance:'reconstructed' as const,evidence:'not-measured' as const}
+ const displayRecall={...recall,rows:state==='edges'?[...emptyPeriods.map(b=>({...b,...emptyRecall})),...recall.rows.map((row,i)=>i===recall.rows.length-1?{...row,...emptyRecall}:row)]:selectRows(recall.rows)}
+ const displayPractice={...practice,rows:state==='edges'?[...emptyPeriods.map(b=>({...b,...emptyPractice})),...practice.rows.map((row,i)=>i===practice.rows.length-1?{...row,...emptyPractice}:row)]:selectRows(practice.rows)}
+ const memoryRows=state==='edges'?[...emptyPeriods.map(b=>({...b,...emptyMemory})),...memory.rows.map((row,i)=>i===memory.rows.length-1?{...row,...emptyMemory}:row)]:selectRows(memory.rows)
+ const displayMemory={...memory,rows:memoryRows,scale:buildAdaptiveDurationScale(memoryRows.flatMap(row=>[row.medianStrengthDays,row.q1,row.q3].filter((n):n is number=>n!==null)))}
+ const chartProps={historical:true}
+ return <SurfaceRoot surface="dashboard" theme={theme} className="min-h-screen">
+  <nav aria-label="Fixture controls" className="flex flex-wrap gap-3 border-b border-border p-3 text-sm"><span>Production chart proof</span><button onClick={()=>setTheme(theme==='dark'?'light':'dark')}>Switch to {theme==='dark'?'light':'dark'}</button><select aria-label="Fixture state" value={state} onChange={e=>setState(e.target.value)}><option value="edges">Empty edges</option><option value="ready">Ready</option><option value="sparse">Sparse</option><option value="single">Single</option><option value="mixed">Mixed readiness</option><option value="empty">Empty</option></select></nav>
+  <div className="fixture-shell"><aside className="fixture-sidebar"><b>CogniPace</b><p>Analytics</p></aside><div className="fixture-content"><div className="cp-analytics-history grid gap-4">
+   <AnalyticsChartPanel {...chartProps} id="recall" title="Observed Recall vs FSRS Estimate" question="How did recalled review outcomes compare with the FSRS estimate?" description="Rating-derived recalled outcomes compared with reconstructed FSRS retrievability immediately before those exact reviews."><ObservedRecallVsFsrsView view={displayRecall} timeFrame={timeFrame}/></AnalyticsChartPanel>
+   <div className="cp-analytics-history-pair grid min-w-0 gap-4">
+    <AnalyticsChartPanel {...chartProps} id="memory" title="Memory Strength" question="Are your reviewed memories staying strong for longer?" description="FSRS’s reconstructed post-review estimate of how long the memories reviewed in each bucket may remain retrievable."><MemoryStrengthView view={displayMemory} timeFrame={timeFrame}/></AnalyticsChartPanel>
+    <AnalyticsChartPanel {...chartProps} id="practice" title="Practice Rhythm" question="When you practiced more or less, how did Review Success move?" description="Completed review volume and the Good + Easy share move together by time bucket; the relationship is association only."><PracticeRhythmView view={displayPractice} timeFrame={timeFrame}/>{state==='mixed'?<div className="mt-3"><AnalyticsReadinessState compact title="Practice Rhythm" recommendedRange={null} readiness={{ready:false,requestedDays:30,bucketDays:3,requestedBuckets:10,effectiveBuckets:8,effectiveStart:'2026-09-09',assessments:12,minimumAssessments:24,activeBuckets:6,minimumActiveBuckets:6,longestGap:1,maximumGap:2,gapRuns:2,maximumGapRuns:2,failingReasons:['insufficient-assessments']}}/></div>:null}</AnalyticsChartPanel>
+   </div>
+   <div className="grid w-full max-w-[64rem] gap-4 lg:grid-cols-2"><AnalyticsChartPanel {...chartProps} id="ratings" title="Ratings Mix" question="How is the balance of your review ratings changing?" description="The changing share of valid Again, Hard, Good, and Easy review ratings across the selected period."><RatingsMixView view={displayRatings} timeFrame={timeFrame}/></AnalyticsChartPanel><div/></div>
+  </div></div></div>
+ </SurfaceRoot>
+}
+createRoot(document.getElementById('root')!).render(<App/>);

@@ -1,10 +1,16 @@
 # Analytics Historical Charts Handoff
 
-Status: implemented and saved locally on `codex/analytics-layout-polish`.
+PR: [#184](https://github.com/Hollowvyn/Cognipace/pull/184) (draft).
+
+Current status: implemented, with empty-edge trimming added in the follow-up
+below. Human installed-extension smoke remains pending before review or merge.
+
+Original implementation checkpoint: saved locally on `codex/analytics-layout-polish`.
 The user approved the chart previews and explicitly requested implementation
 of the first four charts before the remaining panels. The phase plan was saved
 in `8f73d27` before source implementation, after incorporating `origin/main`
-at `a20e8c6`. No PR, push, merge, or release publication was requested.
+at `a20e8c6`. That checkpoint preceded the later request to create draft PR #184.
+No merge or release publication was requested.
 
 ## Details
 
@@ -201,3 +207,70 @@ smoke above. There is no persisted-shape change or new permission. A scoped
 revert of the implementation commit restores the previous presentation without
 a database migration or data recovery. Keep the frozen approved design archives
 as the source for any later visual correction.
+
+## Follow-Up: Empty Edge Trimming
+
+The user explicitly requested empty beginning and ending periods be trimmed
+from Recall, Practice Rhythm, and Ratings Mix while preserving middle gaps.
+The approved design/plan addendum was committed before source changes. This
+supersedes the original full-window display policy; exact approved snapshot
+assets and the original screenshots remain unchanged historical records.
+
+`trimHistoricalEmptyEdges` returns an immutable contiguous first-supported to
+last-supported slice. Recall retains either known rate; Practice retains
+review volume, valid ratings, or a finite success rate; Ratings retains valid
+ratings. Measured 0% is supported. Chart, Table, inspection, and reset keys use
+that same slice. Internal unavailable periods keep their bridges, zero-volume
+slots, or gray hatching. Recall series toggles cannot move dates. Memory
+Strength's rows, original service data, selected-period totals/comparisons,
+readiness, serialized Y scales, grouping, and report context are unchanged.
+Empty/all-empty inputs keep explicit empty states; one supported interval keeps
+its real calendar bounds and single-point guidance. Recall's trend count now
+uses known visible rates, including an FSRS-only singleton.
+
+Passed after the last source edit: **5 focused files / 59 tests**, independent
+lint, full check **191 files / 1,994 tests**, and production build. Formatting
+and diff whitespace checks passed. The initial test run had **7 expected
+failures / 28 passes** before trimming was implemented. Independent review
+found two partial-cohort cases (FSRS-only trend count and zero-volume known
+Practice evidence); both were fixed and covered, with no remaining substantive
+findings. Existing jsdom scroll notices and build chunk warnings remain nonfatal.
+
+Exact follow-up validation commands:
+
+```sh
+rtk npm run test -- src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/recall-ratings-views.test.tsx src/features/analytics/components/memory-practice-views.test.tsx
+rtk npm run test -- src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/recall-ratings-views.test.tsx src/features/analytics/components/memory-practice-views.test.tsx src/features/analytics/components/historical-views.test.tsx src/features/analytics/components/analytics-screen.test.tsx
+rtk npm run lint
+rtk npm run check
+rtk npm run build
+rtk npm run format
+rtk proxy npx prettier --write docs/product.md docs/architecture.md docs/testing.md design.md
+rtk proxy npx prettier --check docs/product.md docs/architecture.md docs/testing.md design.md
+rtk proxy npx prettier --ignore-path /dev/null --write docs/superpowers/plans/2026-10-02-analytics-historical-charts.md docs/superpowers/specs/2026-10-02-analytics-layout-polish-design.md docs/superpowers/specs/2026-10-02-analytics-memory-practice-approved-design.md docs/superpowers/specs/2026-10-02-analytics-recall-approved-design.md docs/superpowers/specs/2026-10-02-analytics-ratings-mix-approved-design.md docs/superpowers/handoffs/2026-10-02-analytics-historical-charts.md
+rtk proxy npx prettier --ignore-path /dev/null --check docs/superpowers/plans/2026-10-02-analytics-historical-charts.md docs/superpowers/specs/2026-10-02-analytics-layout-polish-design.md docs/superpowers/specs/2026-10-02-analytics-memory-practice-approved-design.md docs/superpowers/specs/2026-10-02-analytics-recall-approved-design.md docs/superpowers/specs/2026-10-02-analytics-ratings-mix-approved-design.md docs/superpowers/handoffs/2026-10-02-analytics-historical-charts.md
+rtk proxy git diff --check
+```
+
+Agent browser proof used the actual production components with ten supplied
+intervals, including empty prefixes, an internal gap, and empty suffixes.
+Recall, Practice, and Ratings displayed **09/09–09/26**; Memory retained
+**09/03–10/02**. Recall Home/End selected the first/last measured intervals;
+arrow navigation still inspected **09/15–09/17** as unavailable. Practice End
+reported the final retained cohort; Memory Home still inspected its supplied
+empty beginning. Ratings Table contained the same six retained intervals.
+The 320px light-theme check had no page overflow and preserved the middle gray
+stripe. Screenshots were saved after responsive layout settled.
+
+- [Wide trimmed charts, dark](assets/2026-10-02-analytics-historical-charts/edge-trim-dark.jpg)
+- [Narrow trimmed Ratings, light](assets/2026-10-02-analytics-historical-charts/edge-trim-narrow-light.jpg)
+- [Follow-up fixture entry](assets/2026-10-02-analytics-historical-charts/fixture-edge-main.tsx.txt)
+
+Skipped: `rtk npm run zip` because packaging/release behavior is unchanged;
+`rtk npm run db:generate` because no schema changed (`db:check` passed).
+Human installed-extension ready-history happy path and sparse-history edge
+cases remain pending before review or merge. The updated Dashboard Analytics
+checklist in [docs/testing.md](../../testing.md) explicitly covers empty edges,
+retained middle gaps, 0%/partial cohorts, Chart/Table windows, and untrimmed
+Memory Strength. This is a patch presentation change; reverting the follow-up
+implementation restores the previous window without data migration or recovery.

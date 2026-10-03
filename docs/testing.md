@@ -655,8 +655,9 @@ and required before review or merge:
 Run this flow against the locally built extension, with separate disposable
 ready-history and sparse-history datasets. Ready history must contain enough
 eligible samples to show all four historical charts and supported Memory
-Strength quartiles. Sparse history must include missing buckets, one measured
-point, no valid ratings in a period, and mixed metric readiness. Include a
+Strength quartiles. Sparse history must include empty beginning and ending
+buckets, internal missing buckets, measured 0% rates, one measured point, no
+valid ratings in a period, and mixed metric readiness. Include a
 current partial bucket and a cross-year report date when preparing the test
 data. If a cross-year report date cannot be exercised in the local extension at
 test time, record that exact smoke case as pending; fixture proof covers only
@@ -677,10 +678,17 @@ the fixture case.
    MM/DD in the report's as-of year and /YY for another year; a cross-year
    tooltip interval shows both years. The current partial interval is marked
    in progress, with no future observations.
+   Recall, Practice Rhythm, and Ratings Mix must remove only empty beginning
+   and ending buckets from Chart, Table, and inspection while retaining all
+   internal gaps. Recall's window starts/ends with either known rate; Practice's
+   starts/ends with completed reviews, valid ratings, or a finite success rate
+   including 0%; Ratings starts/ends with valid ratings. Confirm the selected
+   range, period totals, readiness, serialized scales, and report time remain
+   unchanged. Memory Strength must keep its supplied row set.
 4. In each chart, move the pointer across the plot and tap near its left,
-   middle, and right buckets. The nearest original bucket must be inspected,
-   including an empty bucket. Confirm no permanent bottom detail row is added
-   and the tooltip remains hidden before interaction.
+   middle, and right buckets. The nearest retained original bucket must be
+   inspected, including an internal empty bucket. Confirm no permanent bottom
+   detail row is added and the tooltip remains hidden before interaction.
 5. Tab to each chart's native inspection button. Check visible focus,
    Left/Right arrows, Home/End, Enter/Space, and Escape. Keyboard inspection
    exposes the same exact bucket values as pointer/tap inspection; Escape and
@@ -701,7 +709,9 @@ the fixture case.
 8. Toggle each Recall series with pointer and keyboard, then hide both. The
    curve, markers, and tooltip rate hide together; the signed difference appears
    only with both series visible. Shared sample counts and the target remain,
-   and the accessible description matches the visible series.
+   and the accessible description matches the visible series. The retained
+   window and its dates must remain fixed while toggling, even when an edge
+   bucket has only one known rate. A measured 0% edge remains supported.
 9. In Memory Strength, inspect a bucket with at least four eligible reviews and
    one with fewer than four. Only the supported bucket gets discrete Q1–Q3
    whiskers; known medians remain available in both. Confirm the Median/Middle
@@ -711,16 +721,19 @@ the fixture case.
     Its fitted duration domain must contain every finite median/Q1/Q3 extremum,
     leave an actual minimum two-day window, and keep low ranges and markers
     readable. No connected shaded range may imply quartiles across an
-    unsupported bucket.
+    unsupported bucket. Empty edges in Memory Strength remain as supplied.
 11. In Practice Rhythm, confirm muted completed-review bars and a mint Review
     Success line share one plot, with Reviews on the left and Review Success
     (%) on the right. Tooltip and Table must report completed reviews and the
-    Good + Easy numerator/valid-rating denominator. A zero-review bucket has
-    zero volume and unavailable success; a measured 0% success remains 0%.
+    Good + Easy numerator/valid-rating denominator. A bucket with zero reviews
+    and no measured success has zero volume and unavailable success; internal
+    buckets remain in place. A measured 0% success remains 0% and must retain an
+    edge bucket, as must positive completed-review or valid-rating counts.
     The visible copy explains association rather than causation.
-12. In Ratings Mix, confirm every supplied slot remains, including leading,
-    internal, and trailing slots with no valid ratings. Those slots use a
-    full-height neutral gray diagonal hatch and report unavailable composition.
+12. In Ratings Mix, confirm empty beginning and ending slots are absent in both
+    Chart and Table, while every internal slot without valid ratings remains.
+    Those internal slots use a full-height neutral gray diagonal hatch and
+    report unavailable composition.
     A populated bucket's zero-count category stays zero-height; only Again,
     Hard, Good, and Easy appear as categories.
 13. Compare Ratings tooltip/Table counts and precise shares with the exact
@@ -733,8 +746,10 @@ the fixture case.
     seven rows exist, confirm seven rows per page, Previous/Next boundary
     states, and page reset after a range change. Inspect full interval,
     complete/in-progress state, grouping, report time, and evidence context
-    across both views. Change range while a tooltip is visible to check that
-    selection resets or clamps to the new rows without stale values.
+    across both views. Confirm Chart and Table use the same retained activity
+    window, and wholly unsupported periods show their explicit empty state.
+    Change range while a tooltip is visible to check that selection resets or
+    clamps to the new rows without stale values.
 15. Repeat ready and sparse paths at wide and narrow dashboard widths in both
     light and dark themes. Check axis/key contrast, sparse ticks, control
     reachability, tap coordinates, keyboard focus, table scrolling, and

@@ -292,13 +292,18 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
 - The implemented range choices are 14 days with daily buckets, 30 days with
   three-day buckets, and 90 days with weekly buckets. The selection is always
   explicit and never silently changes to a shorter period.
-- Charts use their feature-supplied row sets. Readiness's effective evidence
-  window describes usable history separately from those rows; it does not
-  authorize the chart to remove buckets or invent values. Ratings Mix retains
-  every supplied selected-period slot, including leading, internal, and
-  trailing slots without valid ratings. When the selected range is not ready,
-  the page explains the relevant evidence shortfall and can offer the richest
-  shorter ready range as an explicit link; available charts remain visible.
+- Observed Recall vs FSRS Estimate, Practice Rhythm, and Ratings Mix trim only
+  empty beginning and ending buckets from their presentation. Chart, Table,
+  and inspection share the contiguous first-supported through last-supported
+  slice, preserving every internal gap and each retained bucket's exact dates
+  and values. Memory Strength retains its supplied rows. Trimming does not
+  change the selected range, service data, selected-period totals, readiness,
+  supplied scales, or report time.
+- Readiness's effective evidence window describes usable history separately
+  from those rows; it does not control trimming or authorize invented values.
+  When the selected range is not ready, the page explains the relevant evidence
+  shortfall and can offer the richest shorter ready range as an explicit link;
+  available charts remain visible.
 - Practice Rhythm distinguishes zero completed review volume from unavailable
   Review Success. A bucket without valid ratings has no measured success rate;
   its completed-review count remains the supplied count.
@@ -323,7 +328,9 @@ The first four historical panels have these implemented meanings and controls:
   rate hide together, and the signed observed-minus-estimate difference appears
   only when both series are visible. That difference comes from the supplied
   exact value rather than subtracting rounded displayed percentages. Shared
-  recalled and paired-review counts remain available.
+  recalled and paired-review counts remain available. A bucket with either a
+  known observed recall or FSRS estimate supports the retained activity window,
+  including a measured 0% rate. Series toggles do not change that window.
 - **Memory Strength** shows median reconstructed post-review FSRS stability in
   days. Discrete Q1–Q3 whiskers show the middle 50% only when the bucket has at
   least four eligible reviews and known quartiles. The duration scale fits all
@@ -335,10 +342,13 @@ The first four historical panels have these implemented meanings and controls:
   one plot with independent axes: Reviews on the left and Review Success (%)
   on the right. Review Success is Good + Easy divided by valid ratings; tooltip
   and Table retain that numerator and denominator. The relationship is
-  association, not causation.
+  association, not causation. A bucket supports the retained activity window
+  when it has completed reviews, valid ratings, or a known finite success rate,
+  including 0%. Internal zero-volume buckets remain available.
 - **Ratings Mix** stacks the exact Again, Hard, Good, and Easy fractions for
-  each supplied bucket. A slot without valid ratings has a full-height neutral
-  gray diagonal hatch and unavailable composition; it is not a fifth rating.
+  each retained bucket. The activity window starts and ends with valid ratings.
+  An internal slot without valid ratings has a full-height neutral gray diagonal
+  hatch and unavailable composition; it is not a fifth rating.
   A zero-count category in a populated bucket stays zero-height. Whole-percent
   labels appear only when they fit; rounded labels can total 99% or 101% without
   changing the exact segment geometry. Counts and more precise shares remain
@@ -346,16 +356,17 @@ The first four historical panels have these implemented meanings and controls:
   evidence-gated prior-period comparison remain available, and a wholly empty
   selected period shows the explicit empty state.
 
-These four panels use sparse calendar-date axis labels without dropping chart
-rows. Bucket marks sit at the midpoint of their actual local-date interval,
+These four panels use sparse calendar-date axis labels without dropping retained
+chart rows. Bucket marks sit at the midpoint of their actual local-date interval,
 including shortened edge intervals. Labels use MM/DD in the report's as-of
 year and MM/DD/YY for other years; cross-year tooltip intervals show both years.
-Pointer or tap position selects the nearest original bucket. A native focusable
-inspection button provides the same tooltip through keyboard focus, Left/Right
-arrows, Home/End, and Enter/Space; Escape hides it. Inspection includes the full
-bucket range, grouping, complete or in-progress state, report time, and evidence
+Pointer or tap position selects the nearest retained original bucket. A native
+focusable inspection button provides the same tooltip through keyboard focus,
+Left/Right arrows, Home/End, and Enter/Space; Escape hides it. Inspection includes
+the full bucket range, grouping, complete or in-progress state, report time, and evidence
 without a permanent extra detail row. Each Table shows seven rows per page and
-uses the same supplied values as its chart.
+uses the same retained rows and supplied values as its chart. A metric without
+supported buckets shows its explicit empty state.
 
 Topic Performance, Retention Map, Memory Signals, Recent Overdue Backlog, and
 Upcoming Review Load retain their current treatments; their next visual

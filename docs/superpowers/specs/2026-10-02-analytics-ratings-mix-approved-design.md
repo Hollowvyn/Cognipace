@@ -1,5 +1,11 @@
 # Approved Ratings Mix Design
 
+Follow-up: the user's later empty-edge trimming request supersedes the original
+full-window treatment for Recall, Practice Rhythm, and Ratings Mix. Memory
+Strength keeps its original window. See the
+[approved adjustment](2026-10-02-analytics-layout-polish-design.md#approved-follow-up-empty-edge-trimming).
+The exact frozen artifacts below remain unchanged design history.
+
 Status: implemented locally with the four historical charts on 2026-10-02.
 Automated checks and component proof passed; human installed-extension smoke
 remains pending before PR review or merge. The user requested full-height gray striped bars for empty periods

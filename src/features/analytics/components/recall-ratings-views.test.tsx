@@ -328,7 +328,7 @@ describe('Recall approved historical presentation', () => {
 })
 
 describe('Ratings Mix approved historical presentation', () => {
-  it('retains leading/internal empty slots as full-height neutral hatch and zero shares as zero height', () => {
+  it('trims leading/trailing empty slots and retains internal hatching and exact zero shares', () => {
     render(
       <RatingsMixView
         view={ratingsView([
@@ -336,21 +336,24 @@ describe('Ratings Mix approved historical presentation', () => {
           ratingsRow(1),
           emptyRatingsRow(2),
           ratingsRow(3),
+          emptyRatingsRow(4),
         ])}
       />,
     )
-    const empty = screen.getByTestId('ratings-empty-0')
+    const empty = screen.getByTestId('ratings-empty-1')
+    expect(screen.queryByTestId('ratings-empty-0')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ratings-empty-3')).not.toBeInTheDocument()
     expect(empty).toHaveAttribute('fill', expect.stringMatching(/^url\(#/))
-    expect(screen.getByTestId('ratings-empty-2')).toBeInTheDocument()
+    expect(screen.queryByTestId('ratings-empty-2')).not.toBeInTheDocument()
     expect(Number(empty.getAttribute('height'))).toBeGreaterThan(200)
-    const again = screen.getByTestId('ratings-again-1')
-    const easy = screen.getByTestId('ratings-easy-1')
+    const again = screen.getByTestId('ratings-again-0')
+    const easy = screen.getByTestId('ratings-easy-0')
     expect(
       Number(easy.getAttribute('height')) /
         Number(again.getAttribute('height')),
     ).toBeCloseTo(4)
-    expect(screen.getByTestId('ratings-hard-1')).toHaveAttribute('height', '0')
-    expect(screen.queryByTestId('ratings-hard-label-1')).not.toBeInTheDocument()
+    expect(screen.getByTestId('ratings-hard-0')).toHaveAttribute('height', '0')
+    expect(screen.queryByTestId('ratings-hard-label-0')).not.toBeInTheDocument()
     expect(
       screen.queryByText('100%', { selector: '[data-rating-label]' }),
     ).not.toBeInTheDocument()
@@ -456,8 +459,9 @@ describe('Ratings Mix approved historical presentation', () => {
       <RatingsMixView
         timeFrame={timeFrame}
         view={ratingsView([
-          emptyRatingsRow(0),
-          ratingsRow(1, { isPartial: true }),
+          ratingsRow(0),
+          emptyRatingsRow(1),
+          ratingsRow(2, { isPartial: true }),
         ])}
       />,
     )
@@ -465,6 +469,7 @@ describe('Ratings Mix approved historical presentation', () => {
       name: 'Inspect Ratings Mix chart',
     })
     fireEvent.focus(inspect)
+    fireEvent.keyDown(inspect, { key: 'ArrowRight' })
     expect(screen.getByRole('tooltip')).toHaveTextContent(
       'No valid ratings · composition unavailable',
     )
@@ -476,14 +481,14 @@ describe('Ratings Mix approved historical presentation', () => {
       '31%; 45 valid ratings',
     )
     await user.click(screen.getByRole('tab', { name: 'Table' }))
-    expect(screen.getAllByRole('rowheader')).toHaveLength(2)
+    expect(screen.getAllByRole('rowheader')).toHaveLength(3)
     expect(
       screen.getByRole('rowheader', {
-        name: /09\/03–09\/05.*No valid ratings/,
+        name: /09\/06–09\/08.*No valid ratings/,
       }),
     ).toBeVisible()
     expect(
-      within(screen.getByRole('table')).getByText('4 (66.7%)'),
+      within(screen.getByRole('table')).getAllByText('4 (66.7%)')[0]!,
     ).toBeVisible()
   })
 
@@ -513,4 +518,111 @@ describe('Ratings Mix approved historical presentation', () => {
       screen.queryByText(/equivalent prior period/),
     ).not.toBeInTheDocument()
   })
+})
+
+describe('historical visible window', () => {
+  it('trims Recall ends, preserves measured zero and middle inspection, and keeps dates stable when a series hides', async () => {
+    const user = userEvent.setup()
+    const empty = (index: number) =>
+      recallRow(index, {
+        observedRecall: null,
+        fsrsEstimate: null,
+        difference: null,
+        pairedReviews: 0,
+        recalledCount: 0,
+        evidence: 'not-measured',
+      })
+    render(
+      <ObservedRecallVsFsrsView
+        timeFrame={timeFrame}
+        view={recallView([
+          empty(0),
+          recallRow(1, { observedRecall: 0, recalledCount: 0 }),
+          empty(2),
+          recallRow(3),
+          empty(4),
+        ])}
+      />,
+    )
+    const inspect = screen.getByRole('button', {
+      name: 'Inspect Observed Recall vs FSRS Estimate chart',
+    })
+    fireEvent.keyDown(inspect, { key: 'Home' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/12–09/14')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('0%')
+    fireEvent.keyDown(inspect, { key: 'ArrowRight' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/15–09/17')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'No usable paired evidence',
+    )
+    fireEvent.keyDown(inspect, { key: 'End' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/18–09/20')
+    await user.click(screen.getByRole('button', { name: 'Observed recall' }))
+    fireEvent.keyDown(inspect, { key: 'Home' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/12–09/14')
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(screen.getAllByRole('rowheader')).toHaveLength(3)
+    expect(
+      screen.queryByRole('rowheader', { name: '09/09–09/11' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('rowheader', { name: '09/21–09/23' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('trims Ratings ends in both views while retaining middle gaps and period totals', async () => {
+    const user = userEvent.setup()
+    render(
+      <RatingsMixView
+        timeFrame={timeFrame}
+        view={ratingsView([
+          emptyRatingsRow(0),
+          ratingsRow(1),
+          emptyRatingsRow(2),
+          ratingsRow(3),
+          emptyRatingsRow(4),
+        ])}
+      />,
+    )
+    const inspect = screen.getByRole('button', {
+      name: 'Inspect Ratings Mix chart',
+    })
+    fireEvent.keyDown(inspect, { key: 'Home' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/06–09/08')
+    fireEvent.keyDown(inspect, { key: 'ArrowRight' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'No valid ratings · composition unavailable',
+    )
+    fireEvent.keyDown(inspect, { key: 'End' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/12–09/14')
+    expect(screen.getByText(/based on 39 valid ratings/)).toHaveTextContent(
+      '18 of 39',
+    )
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(screen.getAllByRole('rowheader')).toHaveLength(3)
+    expect(
+      screen.queryByRole('rowheader', { name: /09\/03–09\/05/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('rowheader', { name: /09\/15–09\/17/ }),
+    ).not.toBeInTheDocument()
+  })
+})
+
+it('retains a lone FSRS-only Recall period with single-point guidance', () => {
+  render(
+    <ObservedRecallVsFsrsView
+      view={recallView([
+        recallRow(0, {
+          observedRecall: null,
+          recalledCount: 0,
+          difference: null,
+        }),
+      ])}
+    />,
+  )
+  expect(screen.getByTestId('fsrs-estimate-marker-0')).toBeInTheDocument()
+  expect(
+    screen.getByText('Not enough data for a trend yet.'),
+  ).toBeInTheDocument()
 })

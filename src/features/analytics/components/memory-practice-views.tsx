@@ -14,6 +14,7 @@ import {
   historicalGroupingLabel,
   historicalIntervalContext,
   historicalReportContext,
+  trimHistoricalEmptyEdges,
 } from './charts/historical-chart-model'
 import { HistoricalTable } from './charts/historical-table'
 import { LineSegments } from './charts/line-segments'
@@ -144,7 +145,14 @@ export function PracticeRhythmView({
   view: AnalyticsViews['practiceRhythm']
   timeFrame?: HistoricalChartTimeFrame | undefined
 }) {
-  const hasReviews = view.rows.some((row) => row.completedReviews > 0)
+  const rows = trimHistoricalEmptyEdges(
+    view.rows,
+    (row) =>
+      row.completedReviews > 0 ||
+      row.validRatings > 0 ||
+      isFiniteValue(row.reviewSuccess),
+  )
+  const hasReviews = rows.length > 0
   return (
     <div className="cp-historical-view grid min-w-0 gap-2">
       <ChartTable
@@ -165,7 +173,7 @@ export function PracticeRhythmView({
                 description={`Completed reviews and Review Success on separate axes. Review count scale: ${view.countScale.domain.join('–')}; Review Success scale: ${formatPercent(view.percentageScale.domain[0])}–${formatPercent(view.percentageScale.domain[1])}. Review Success is Good + Easy divided by valid ratings. Association, not causation. Dashed lines cross periods with no eligible evidence. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
                 height={290}
                 name="Practice Rhythm chart"
-                rows={view.rows}
+                rows={rows}
                 timeFrame={timeFrame}
                 tooltip={(row) => (
                   <PracticeTooltip row={row} timeFrame={timeFrame} />
@@ -215,8 +223,7 @@ export function PracticeRhythmView({
               <PracticeLegend />
               <ChartTrendNote
                 pointCount={
-                  view.rows.filter((row) => isFiniteValue(row.reviewSuccess))
-                    .length
+                  rows.filter((row) => isFiniteValue(row.reviewSuccess)).length
                 }
               />
             </div>
@@ -244,8 +251,8 @@ export function PracticeRhythmView({
                 'Evidence',
                 'Period context',
               ]}
-              resetKey={view.rows.map((row) => row.id).join('|')}
-              rows={view.rows}
+              resetKey={rows.map((row) => row.id).join('|')}
+              rows={rows}
             />
             <ReportContext timeFrame={timeFrame} />
           </div>

@@ -99,6 +99,18 @@ function dateKeyFromOrdinal(ordinal: number): string {
     .slice(0, 10)
 }
 
+/** Keep the activity window intact, including every empty interval inside it. */
+export function trimHistoricalEmptyEdges<Row>(
+  rows: readonly Row[],
+  hasData: (row: Row) => boolean,
+): Row[] {
+  const first = rows.findIndex(hasData)
+  if (first === -1) return []
+  let last = rows.length - 1
+  while (last > first && !hasData(rows[last]!)) last -= 1
+  return rows.slice(first, last + 1)
+}
+
 export function buildHistoricalChartModel<Row extends HistoricalChartRow>(
   rows: readonly Row[],
   timeFrame?: HistoricalChartTimeFrame,

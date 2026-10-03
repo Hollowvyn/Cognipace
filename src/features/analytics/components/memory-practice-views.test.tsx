@@ -391,6 +391,11 @@ describe('approved Memory Strength and Practice Rhythm views', () => {
         reviewSuccess: null,
         evidence: 'not-measured',
       }),
+      practiceRow({
+        id: 'later',
+        bucketStart: '2026-09-09',
+        bucketEnd: '2026-09-11',
+      }),
     ]
     render(
       <PracticeRhythmView
@@ -518,4 +523,149 @@ describe('approved Memory Strength and Practice Rhythm views', () => {
       screen.queryByRole('button', { name: 'Inspect Memory Strength chart' }),
     ).not.toBeInTheDocument()
   })
+})
+
+describe('empty edge trimming boundaries', () => {
+  it('trims Practice ends but keeps zero success, middle gaps, and reviews without ratings', async () => {
+    const user = userEvent.setup()
+    const rows = Array.from({ length: 5 }, (_, index) =>
+      practiceRow({
+        id: `period-${index}`,
+        bucketStart: `2026-09-${String(3 + index * 3).padStart(2, '0')}`,
+        bucketEnd: `2026-09-${String(5 + index * 3).padStart(2, '0')}`,
+        completedReviews: 0,
+        goodEasy: 0,
+        validRatings: 0,
+        reviewSuccess: null,
+        evidence: 'measured',
+      }),
+    )
+    rows[1] = {
+      ...rows[1]!,
+      completedReviews: 4,
+      validRatings: 4,
+      reviewSuccess: 0,
+    }
+    rows[3] = { ...rows[3]!, completedReviews: 2 }
+    render(
+      <PracticeRhythmView
+        timeFrame={timeFrame}
+        view={{ rows, countScale, percentageScale }}
+      />,
+    )
+    expect(
+      screen.queryByTestId('practice-volume-period-0'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('practice-volume-period-4'),
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId('practice-volume-period-2')).toBeInTheDocument()
+    const inspect = screen.getByRole('button', {
+      name: 'Inspect Practice Rhythm chart',
+    })
+    fireEvent.keyDown(inspect, { key: 'Home' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/06–09/08')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Review Success: 0%')
+    fireEvent.keyDown(inspect, { key: 'ArrowRight' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/09–09/11')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Completed reviews: 0',
+    )
+    fireEvent.keyDown(inspect, { key: 'End' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/12–09/14')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Completed reviews: 2',
+    )
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Review Success: Unavailable',
+    )
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(screen.getAllByRole('rowheader')).toHaveLength(3)
+  })
+
+  it('leaves Memory Strength edge rows available for inspection', () => {
+    const rows = [
+      memoryRow({
+        id: 'empty-first',
+        medianStrengthDays: null,
+        q1: null,
+        q3: null,
+        eligibleReviews: 0,
+      }),
+      memoryRow({
+        id: 'measured',
+        bucketStart: '2026-09-06',
+        bucketEnd: '2026-09-08',
+      }),
+      memoryRow({
+        id: 'empty-last',
+        bucketStart: '2026-09-09',
+        bucketEnd: '2026-09-11',
+        medianStrengthDays: null,
+        q1: null,
+        q3: null,
+        eligibleReviews: 0,
+      }),
+    ]
+    render(
+      <MemoryStrengthView
+        timeFrame={timeFrame}
+        view={{ rows, scale: memoryScale }}
+      />,
+    )
+    const inspect = screen.getByRole('button', {
+      name: 'Inspect Memory Strength chart',
+    })
+    fireEvent.keyDown(inspect, { key: 'Home' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/03–09/05')
+    fireEvent.keyDown(inspect, { key: 'End' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('09/09–09/11')
+  })
+})
+
+it('retains zero-volume Practice boundaries with known rating evidence or measured zero success', () => {
+  const rows = [
+    practiceRow({
+      id: 'rating-only',
+      completedReviews: 0,
+      goodEasy: 0,
+      validRatings: 2,
+      reviewSuccess: null,
+    }),
+    practiceRow({
+      id: 'known-zero',
+      bucketStart: '2026-09-06',
+      bucketEnd: '2026-09-08',
+      completedReviews: 0,
+      goodEasy: 0,
+      validRatings: 0,
+      reviewSuccess: 0,
+    }),
+    practiceRow({
+      id: 'empty-end',
+      bucketStart: '2026-09-09',
+      bucketEnd: '2026-09-11',
+      completedReviews: 0,
+      goodEasy: 0,
+      validRatings: 0,
+      reviewSuccess: null,
+    }),
+  ]
+  render(
+    <PracticeRhythmView
+      timeFrame={timeFrame}
+      view={{ rows, countScale, percentageScale }}
+    />,
+  )
+  const inspect = screen.getByRole('button', {
+    name: 'Inspect Practice Rhythm chart',
+  })
+  fireEvent.keyDown(inspect, { key: 'Home' })
+  expect(screen.getByRole('tooltip')).toHaveTextContent('09/03–09/05')
+  fireEvent.keyDown(inspect, { key: 'End' })
+  expect(screen.getByRole('tooltip')).toHaveTextContent('09/06–09/08')
+  expect(screen.getByRole('tooltip')).toHaveTextContent('Review Success: 0%')
+  expect(
+    screen.queryByTestId('practice-volume-empty-end'),
+  ).not.toBeInTheDocument()
 })

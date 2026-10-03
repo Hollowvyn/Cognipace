@@ -16,6 +16,7 @@ import {
   historicalGroupingLabel,
   historicalIntervalContext,
   historicalReportContext,
+  trimHistoricalEmptyEdges,
 } from './charts/historical-chart-model'
 import { HistoricalTable } from './charts/historical-table'
 import { LineSegments } from './charts/line-segments'
@@ -58,7 +59,11 @@ export function ObservedRecallVsFsrsView({
   timeFrame?: HistoricalChartTimeFrame | undefined
 }) {
   const [series, setSeries] = useState({ observed: true, estimate: true })
-  const hasValues = view.rows.some((row) => row.observedRecall !== null)
+  const rows = trimHistoricalEmptyEdges(
+    view.rows,
+    (row) => row.observedRecall !== null || row.fsrsEstimate !== null,
+  )
+  const hasValues = rows.length > 0
   const visibleDescription =
     [
       series.observed
@@ -91,10 +96,10 @@ export function ObservedRecallVsFsrsView({
                 }}
                 description={description}
                 height={310}
-                initialIndex={Math.max(0, Math.floor(view.rows.length / 2) - 1)}
+                initialIndex={Math.max(0, Math.floor(rows.length / 2) - 1)}
                 inspectionResetKey={`${series.observed}:${series.estimate}`}
                 name="Observed Recall vs FSRS Estimate chart"
-                rows={view.rows}
+                rows={rows}
                 timeFrame={timeFrame}
                 tooltip={(row) => (
                   <RecallTooltip
@@ -210,10 +215,11 @@ export function ObservedRecallVsFsrsView({
               </div>
               <ChartTrendNote
                 pointCount={
-                  series.observed || series.estimate
-                    ? view.rows.filter((row) => row.observedRecall !== null)
-                        .length
-                    : 0
+                  rows.filter(
+                    (row) =>
+                      (series.observed && row.observedRecall !== null) ||
+                      (series.estimate && row.fsrsEstimate !== null),
+                  ).length
                 }
               />
             </div>
@@ -246,8 +252,8 @@ export function ObservedRecallVsFsrsView({
               'Evidence',
               'Period context',
             ]}
-            resetKey={view.rows.map((row) => row.id).join('|')}
-            rows={view.rows}
+            resetKey={rows.map((row) => row.id).join('|')}
+            rows={rows}
           />
         }
       />
@@ -396,7 +402,11 @@ export function RatingsMixView({
   view: AnalyticsViews['ratingsMix']
   timeFrame?: HistoricalChartTimeFrame | undefined
 }) {
-  const hasRatings = view.rows.some((row) => row.validRatings > 0)
+  const rows = trimHistoricalEmptyEdges(
+    view.rows,
+    (row) => row.validRatings > 0,
+  )
+  const hasRatings = rows.length > 0
   const challengingShare =
     view.selectedValidRatings === 0
       ? null
@@ -418,7 +428,7 @@ export function RatingsMixView({
                 description={`Again, Hard, Good, and Easy exact shares for valid ratings in each selected-period bucket. Scale: 0%–100%. ${formatCount(view.selectedValidRatings)} valid ratings in the selected period. Full-height gray stripes mean no valid ratings and unavailable composition. Colored labels are rounded whole percentages when they fit. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
                 height={310}
                 name="Ratings Mix chart"
-                rows={view.rows}
+                rows={rows}
                 timeFrame={timeFrame}
                 tooltip={(row) => (
                   <RatingsTooltip row={row} timeFrame={timeFrame} />
@@ -436,9 +446,7 @@ export function RatingsMixView({
               </HistoricalChart>
               <RatingsLegend />
               <ChartTrendNote
-                pointCount={
-                  view.rows.filter((row) => row.validRatings > 0).length
-                }
+                pointCount={rows.filter((row) => row.validRatings > 0).length}
               />
             </div>
           ) : (
@@ -472,8 +480,8 @@ export function RatingsMixView({
               'Evidence',
               'Period context',
             ]}
-            resetKey={view.rows.map((row) => row.id).join('|')}
-            rows={view.rows}
+            resetKey={rows.map((row) => row.id).join('|')}
+            rows={rows}
           />
         }
       />
