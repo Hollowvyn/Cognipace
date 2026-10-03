@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.0](https://github.com/Hollowvyn/Cognipace/compare/v2.0.1...v2.1.0) (2026-10-03)
+
+
+### Features
+
+* **analytics:** refine charts and separate first outcomes ([#184](https://github.com/Hollowvyn/Cognipace/issues/184)) ([7cccd2d](https://github.com/Hollowvyn/Cognipace/commit/7cccd2d7b63d8d01e226227ca9e62247e3c165e1))
+
+
+### Bug Fixes
+
+* **tracks:** derive current chapter from next question ([#185](https://github.com/Hollowvyn/Cognipace/issues/185)) ([d0b3337](https://github.com/Hollowvyn/Cognipace/commit/d0b3337f3d2c3219196d36ec982a13db4d230563))
+
 ## [2.0.1](https://github.com/Hollowvyn/Cognipace/compare/v2.0.0...v2.0.1) (2026-10-02)
 
 
