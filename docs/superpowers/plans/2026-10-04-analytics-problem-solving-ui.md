@@ -218,6 +218,5 @@ Full check passed database checks, typecheck, lint and **206 test files / 2,607
 tests**. One provider evaluation file / six tests remain skipped by the suite.
 Build retains the existing chunk-size warning. The browser interaction command
 above was not repeated because the conflict resolution changes only the planning
-index. Human installed-extension smoke and visual proof remain pending; the PR
-stays draft. Packaging and database generation remain skipped for the reasons
-recorded above.
+index. Human installed-extension smoke and visual proof remain pending. Packaging and
+database generation remain skipped for the reasons recorded above.
