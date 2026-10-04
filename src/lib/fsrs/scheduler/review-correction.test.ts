@@ -408,7 +408,7 @@ it.each(['latest only', 'missing middle'])(
     const first = history[0]
     const latest = history.at(-1)
     if (!first || !latest) throw new Error('Missing fixture entries.')
-    const sparse: FsrsLegacyReviewEntry[] = new Array(history.length)
+    const sparse = new Array<FsrsLegacyReviewEntry>(history.length)
     sparse[history.length - 1] = latest
     if (shape === 'missing middle') sparse[0] = first
     const before = JSON.stringify({ card, history: sparse })
