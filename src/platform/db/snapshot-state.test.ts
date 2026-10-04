@@ -3,6 +3,7 @@ import {
   preserveRecovery,
   readSnapshotState,
   RECOVERY_KEY,
+  FSRS_RECOVERY_KEY,
   TRACK_RECOVERY_KEY,
 } from './snapshot-state'
 import { FINGERPRINT_KEY, SNAPSHOT_KEY } from './snapshot'
@@ -229,4 +230,79 @@ describe('preserveRecovery', () => {
 
     await expect(preserveRecovery(storage, raw, now)).rejects.toBe(failure)
   })
+})
+
+describe('FSRS baseline recovery', () => {
+  const now = new Date('2026-10-03T16:00:00.000Z')
+  const raw = {
+    [SNAPSHOT_KEY]: 'exact through-0009 original',
+    [FINGERPRINT_KEY]: '1144ce07',
+  }
+
+  it('stores a third original without touching either earlier recovery', async () => {
+    const earlier = {
+      [RECOVERY_KEY]: {
+        version: 1,
+        raw: { [SNAPSHOT_KEY]: 'v7' },
+        savedAt: now.toISOString(),
+      },
+      [TRACK_RECOVERY_KEY]: {
+        version: 1,
+        raw: { [SNAPSHOT_KEY]: 'v8' },
+        savedAt: now.toISOString(),
+      },
+    }
+    const values: Record<string, unknown> = { ...earlier }
+    const storage = {
+      get: vi.fn().mockResolvedValue(values),
+      set: vi.fn((next: Record<string, unknown>) => {
+        Object.assign(values, next)
+        return Promise.resolve()
+      }),
+    }
+
+    await preserveRecovery(storage, raw, now, FSRS_RECOVERY_KEY)
+    expect(values[RECOVERY_KEY]).toEqual(earlier[RECOVERY_KEY])
+    expect(values[TRACK_RECOVERY_KEY]).toEqual(earlier[TRACK_RECOVERY_KEY])
+    const original = values[FSRS_RECOVERY_KEY]
+    expect(original).toEqual({ version: 1, raw, savedAt: now.toISOString() })
+
+    await preserveRecovery(
+      storage,
+      raw,
+      new Date(now.getTime() + 1000),
+      FSRS_RECOVERY_KEY,
+    )
+    expect(values[FSRS_RECOVERY_KEY]).toEqual(original)
+    expect(storage.set).toHaveBeenCalledOnce()
+
+    await expect(
+      preserveRecovery(
+        storage,
+        { ...raw, [SNAPSHOT_KEY]: 'another original' },
+        now,
+        FSRS_RECOVERY_KEY,
+      ),
+    ).rejects.toThrow(
+      'An earlier database recovery record must be exported before another upgrade.',
+    )
+    expect(values[FSRS_RECOVERY_KEY]).toEqual(original)
+    expect(storage.set).toHaveBeenCalledOnce()
+  })
+
+  it.each([undefined, null, { version: 2, raw, savedAt: 'invalid' }])(
+    'rejects a present malformed FSRS recovery (%s)',
+    async (existing) => {
+      const storage = {
+        get: vi.fn().mockResolvedValue({ [FSRS_RECOVERY_KEY]: existing }),
+        set: vi.fn(),
+      }
+      await expect(
+        preserveRecovery(storage, raw, now, FSRS_RECOVERY_KEY),
+      ).rejects.toThrow(
+        'An earlier database recovery record must be exported before another upgrade.',
+      )
+      expect(storage.set).not.toHaveBeenCalled()
+    },
+  )
 })

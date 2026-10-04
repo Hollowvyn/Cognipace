@@ -12,6 +12,7 @@ import {
 } from './snapshot'
 import {
   selectSnapshotBaselineSql,
+  legacyFsrsMigrationFingerprint,
   legacyTrackMigrationFingerprint,
   selectUpgradeSql,
   validateSnapshotSchema,
@@ -21,6 +22,7 @@ import {
   preserveRecovery,
   readSnapshotState,
   type SnapshotStorage,
+  FSRS_RECOVERY_KEY,
   TRACK_RECOVERY_KEY,
 } from './snapshot-state'
 
@@ -82,9 +84,11 @@ async function openAppDb(options: AppDbOptions, generation: number) {
         storage,
         raw,
         new Date(),
-        raw[FINGERPRINT_KEY] === legacyTrackMigrationFingerprint
-          ? TRACK_RECOVERY_KEY
-          : undefined,
+        raw[FINGERPRINT_KEY] === legacyFsrsMigrationFingerprint
+          ? FSRS_RECOVERY_KEY
+          : raw[FINGERPRINT_KEY] === legacyTrackMigrationFingerprint
+            ? TRACK_RECOVERY_KEY
+            : undefined,
       ),
     fresh: async () => {
       const freshHandle = await createDb({

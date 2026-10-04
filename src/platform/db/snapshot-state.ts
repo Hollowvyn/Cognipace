@@ -53,6 +53,12 @@ export async function readSnapshotState(
 
 export const RECOVERY_KEY = 'cognipace_db_recovery_topics_v1'
 export const TRACK_RECOVERY_KEY = 'cognipace_db_recovery_tracks_v1'
+export const FSRS_RECOVERY_KEY = 'cognipace_db_recovery_fsrs_v1'
+
+type SnapshotRecoveryKey =
+  | typeof RECOVERY_KEY
+  | typeof TRACK_RECOVERY_KEY
+  | typeof FSRS_RECOVERY_KEY
 
 const recoveryRecordSchema = z.strictObject({
   version: z.literal(1),
@@ -86,7 +92,7 @@ export async function preserveRecovery(
   storage: SnapshotStorage,
   raw: Record<string, unknown>,
   now: Date,
-  recoveryKey: typeof RECOVERY_KEY | typeof TRACK_RECOVERY_KEY = RECOVERY_KEY,
+  recoveryKey: SnapshotRecoveryKey = RECOVERY_KEY,
 ) {
   const existingValues = await storage.get([recoveryKey])
   if (Object.hasOwn(existingValues, recoveryKey)) {

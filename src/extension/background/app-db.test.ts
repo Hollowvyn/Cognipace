@@ -34,6 +34,7 @@ vi.mock('@/features/problems/data/topic-reconciliation', () => ({
 }))
 
 import { getBackgroundDb } from './app-db'
+import { legacyFsrsMigrationFingerprint } from '@/platform/db/snapshot-upgrade'
 import {
   seedTopicAliases,
   seedTopicRelations,
@@ -91,5 +92,18 @@ describe('background app database bridge', () => {
 
     await expect(getBackgroundDb()).rejects.toBe(failure)
     expect(appDbMocks.reconcileTopicTaxonomy).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not rerun historical taxonomy conversion for the through-0009 source', async () => {
+    appDbMocks.getAppDb.mockImplementation(async ({ beforePublish }) => {
+      await beforePublish(handle, {
+        kind: 'upgrade',
+        fromFingerprint: legacyFsrsMigrationFingerprint,
+      })
+      return handle
+    })
+
+    await expect(getBackgroundDb()).resolves.toBe(handle)
+    expect(appDbMocks.reconcileTopicTaxonomy).not.toHaveBeenCalled()
   })
 })

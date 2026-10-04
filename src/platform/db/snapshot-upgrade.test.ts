@@ -6,6 +6,7 @@ import {
   assertDatabaseIntegrity,
   legacyTopicMigrationFingerprint,
   legacyTopicMigrationSql,
+  selectSnapshotBaselineSql,
   selectUpgradeSql,
   validateSnapshotSchema,
 } from '@/platform/db/snapshot-upgrade'
@@ -19,6 +20,11 @@ import {
   frozenV8MigrationEntries,
   frozenV8MigrationSql,
 } from '@/testing/fixtures/tracks-external-progress-legacy-migrations'
+import {
+  expectedV9MigrationFingerprint,
+  frozenV9MigrationEntries,
+  frozenV9MigrationSql,
+} from '@/testing/fixtures/fsrs-remediation-legacy-migrations'
 
 const handles: Awaited<ReturnType<typeof createDb>>[] = []
 
@@ -193,5 +199,57 @@ describe('supported topic snapshot upgrade', () => {
         returnValue: 'resultRows',
       }),
     ).toEqual([['retained']])
+  })
+})
+
+describe('shipped FSRS snapshot baseline', () => {
+  it('pins all ten shipped files and selects only appended SQL', () => {
+    const suffix = 'CREATE TABLE fsrs_upgrade_probe (id TEXT PRIMARY KEY);'
+    const entries = [
+      ...frozenV9MigrationEntries,
+      { path: './migrations/0010_fsrs_upgrade_probe.sql', sql: suffix },
+    ]
+
+    expect(frozenV9MigrationEntries).toHaveLength(10)
+    expect(frozenV9MigrationEntries.at(-1)?.path).toBe(
+      './migrations/0009_mushy_beyonder.sql',
+    )
+    expect(migrationEntries.slice(0, 10)).toEqual(frozenV9MigrationEntries)
+    expect(computeFingerprint(frozenV9MigrationSql)).toBe('1144ce07')
+    expect(selectSnapshotBaselineSql(expectedV9MigrationFingerprint)).toBe(
+      frozenV9MigrationSql,
+    )
+    expect(selectUpgradeSql(expectedV9MigrationFingerprint, entries)).toBe(
+      suffix,
+    )
+    expect(
+      selectUpgradeSql(
+        expectedV9MigrationFingerprint,
+        frozenV9MigrationEntries,
+      ),
+    ).toBe('')
+  })
+
+  it('rejects changed, reordered and missing shipped prefixes', () => {
+    const changed = frozenV9MigrationEntries.map((entry, index) =>
+      index === 9 ? { ...entry, sql: `${entry.sql}\n-- changed` } : entry,
+    )
+    const reordered = [
+      frozenV9MigrationEntries[1],
+      frozenV9MigrationEntries[0],
+      ...frozenV9MigrationEntries.slice(2),
+    ]
+    for (const entries of [
+      changed,
+      reordered,
+      frozenV9MigrationEntries.slice(0, 9),
+    ]) {
+      expect(() =>
+        selectUpgradeSql(expectedV9MigrationFingerprint, entries),
+      ).toThrow('The supported migration prefix has changed.')
+    }
+    expect(() => selectSnapshotBaselineSql('deadbeef')).toThrow(
+      'This database version requires recovery; its original data was retained.',
+    )
   })
 })

@@ -66,7 +66,8 @@ notification-specific count.
 When both snapshot keys are absent, startup creates and seeds a fresh database.
 A partial pair, malformed value, or unknown or unsupported fingerprint fails
 startup and retains the original available values for recovery. Automatic
-upgrades accept only the exact v7/v8 migration prefixes allowlisted in
+upgrades accept only the exact through-0007, through-0008, and through-0009
+migration prefixes allowlisted in
 [`snapshot-upgrade.ts`](../src/platform/db/snapshot-upgrade.ts),
 documented in [Database And Persistence](architecture.md#database-and-persistence).
 Automatic downgrade is unsupported. The Library may still offer Retry for
@@ -77,8 +78,8 @@ To make a local recovery copy:
 
 1. Open `chrome://extensions`, find CogniPace, and select its service worker
    console from the Inspect views.
-2. In that console, run the following expression. It reads only the four
-   database recovery keys and copies their JSON values to the clipboard:
+2. In that console, run the following expression. It reads only the five
+   database snapshot/recovery keys and copies their JSON values to the clipboard:
 
    ```js
    copy(
@@ -88,6 +89,7 @@ To make a local recovery copy:
          'cognipace_db_snapshot_fingerprint_v1',
          'cognipace_db_recovery_topics_v1',
          'cognipace_db_recovery_tracks_v1',
+         'cognipace_db_recovery_fsrs_v1',
        ]),
      ),
    )
@@ -97,6 +99,26 @@ To make a local recovery copy:
    `chrome.storage.local.get(null)` or export all extension storage: it can
    include secrets and unrelated private settings. Do not paste the recovery
    JSON, snapshot bytes, or topic values into an issue or other shared report.
+
+The through-0009 upgrade suite in
+[`fsrs-preservation.integration.test.ts`](../src/platform/db/fsrs-preservation.integration.test.ts)
+compares every original column in a populated source, 75% retention, distinct
+daily and streak progress, staged-publication failure, retry, and reopen while
+checking both older recovery slots. Its appended table is test-only and does
+not prove preservation for a later real FSRS metadata migration.
+
+Before PR review or merge, a human must load this phase's built extension in a
+disposable profile with current history, opaque card IDs, suspension, track
+completion, an active session, and non-default settings. Compare history, raw due
+dates, Daily Goal and streaks, track credit, and Settings before and after
+reload; capture screenshots or a recording without private recovery contents.
+Confirm an ordinary review save persists across reload. Run older supported
+upgrade and recovery smoke when affected, and capture unsupported or corrupt
+failure proof without discarding the original bytes. A future actual metadata
+migration requires human through-0009 upgrade, failure, and retry proof. This
+phase adds no schema; its upgrade trigger is synthetic-test-only. Opaque-ID
+subsequent-save behavior remains for phases C/D; Phase A proves load
+preservation only.
 
 Startup diagnostics should report a safe, actionable error without logging raw
 snapshot bytes, topics, tokens, or settings. When the original snapshot pair is
