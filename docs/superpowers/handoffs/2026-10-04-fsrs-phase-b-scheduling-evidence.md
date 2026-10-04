@@ -157,7 +157,8 @@ index; authorized escalated staging/commits succeeded.
 
 ## Final automated validation
 
-Final source commit: `120c2b0e`. The fresh compatibility selection passed **272
+Initial validated source commit: `120c2b0e`; the later ponytail cleanup is recorded
+below. The fresh compatibility selection passed **272
 tests across 15 suites**. Fresh `rtk npm run lint` passed, and `rtk npm run check`
 passed database checks, WXT/TypeScript, lint and **2,682 tests across 208 suites**.
 Six tests in one existing opt-in live-provider evaluation suite were skipped
@@ -195,6 +196,35 @@ Not run / remaining validation:
   required before PR review or merge. Checklist below.
 - C/D integration, E daily activation, G packaged scaling and H live optimizer
   evaluation: outside B; no such readiness is claimed.
+
+## Follow-up ponytail cleanup
+
+The user approved both remaining review findings. Projections now pass the
+existing options directly to scheduling, whose adapter selects only scheduler
+fields. The redundant seven-field copy/helper is removed. The native card test
+oracle compares one named-field object instead of parallel lists, retaining all
+ten values and Date comparisons. Net source/test reduction: **26 lines**.
+
+The focused selection passed **74 tests across three suites** before and after
+the cleanup. Fresh lint, full check, build and formatting passed. Full check
+again passed **2,682 tests across 208 suites**, with the same six opt-in provider
+tests skipped. The rebuilt unpacked extension remains ready for human smoke:
+
+```sh
+rtk npm run test -- src/lib/fsrs/domain/scheduler-profile.test.ts src/lib/fsrs/scheduler/review-scheduler.test.ts src/lib/fsrs/scheduler/review-correction.test.ts
+rtk npx prettier --write src/lib/fsrs/scheduler/review-scheduler.ts src/lib/fsrs/scheduler/review-correction.test.ts
+rtk npx prettier --ignore-path /dev/null --write docs/superpowers/handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md
+rtk npx prettier --ignore-path /dev/null --check src/lib/fsrs/scheduler/review-scheduler.ts src/lib/fsrs/scheduler/review-correction.test.ts docs/superpowers/handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md
+rtk npm run lint
+rtk npm run check
+rtk npm run build
+rtk npm run format
+rtk git diff --check
+rtk git diff --cached --check
+```
+
+Skipped commands and human proof remain as listed above; there is no additional
+schema, dependency, runtime or UI change.
 
 ## Human compatibility smoke
 

@@ -548,29 +548,18 @@ function expectNativeProfile(
 }
 
 function expectNativeCard(actual: FsrsCardSnapshot, expected: Card) {
-  expect([
-    actual.dueAt.toISOString(),
-    actual.stability,
-    actual.difficulty,
-    actual.elapsedDays,
-    actual.scheduledDays,
-    actual.learningSteps,
-    actual.reps,
-    actual.lapses,
-    actual.state,
-    actual.lastReviewAt?.toISOString() ?? null,
-  ]).toEqual([
-    expected.due.toISOString(),
-    expected.stability,
-    expected.difficulty,
-    expected.elapsed_days,
-    expected.scheduled_days,
-    expected.learning_steps,
-    expected.reps,
-    expected.lapses,
-    State[expected.state].toLowerCase(),
-    expected.last_review?.toISOString() ?? null,
-  ])
+  expect(actual).toEqual({
+    dueAt: expected.due,
+    stability: expected.stability,
+    difficulty: expected.difficulty,
+    elapsedDays: expected.elapsed_days,
+    scheduledDays: expected.scheduled_days,
+    learningSteps: expected.learning_steps,
+    reps: expected.reps,
+    lapses: expected.lapses,
+    state: State[expected.state].toLowerCase(),
+    lastReviewAt: expected.last_review ?? null,
+  })
 }
 
 function expectNativeLog(actual: FsrsReviewLogSnapshot, expected: ReviewLog) {

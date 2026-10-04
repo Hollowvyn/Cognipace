@@ -211,7 +211,6 @@ export function projectReviewSchedule(
   } = options
   const horizonDays = normalizeProjectionHorizonDays(rawHorizonDays)
   const maxReviews = normalizeProjectionMaxReviews(rawMaxReviews)
-  const schedulingOptions = readSchedulingOptions(options)
   const horizonAt = new Date(startAt.getTime() + horizonDays * dayMs)
   const projections: FsrsProjectedReview[] = []
   let currentCard = card
@@ -226,7 +225,7 @@ export function projectReviewSchedule(
       currentCard,
       assumedRating,
       reviewAt,
-      schedulingOptions,
+      options,
     )
     projections.push(projected)
 
@@ -239,20 +238,6 @@ export function projectReviewSchedule(
   }
 
   return projections
-}
-
-function readSchedulingOptions(
-  options: FsrsReviewScheduleProjectionOptions,
-): FsrsSchedulingOptions {
-  return {
-    targetRetention: options.targetRetention,
-    maximumInterval: options.maximumInterval,
-    weights: options.weights,
-    enableFuzz: options.enableFuzz,
-    enableShortTerm: options.enableShortTerm,
-    learningSteps: options.learningSteps,
-    relearningSteps: options.relearningSteps,
-  }
 }
 
 function normalizeProjectionHorizonDays(value: number): number {
