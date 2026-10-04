@@ -10,6 +10,7 @@ import {
 } from '../domain/review-log-snapshot'
 import type { FsrsSchedulerProfile } from '../domain/scheduler-profile'
 import type { ReviewRating } from '../domain/review-rating'
+import { isCanonicalIsoDateString } from '../domain/snapshot-validation'
 import {
   rollbackCardReview,
   scheduleCardReviewWithProfile,
@@ -32,20 +33,14 @@ export function correctReviewFromEvidence(
   context: FsrsReviewContext,
   replacementRating: ReviewRating,
 ): FsrsScheduledReview & { readonly context: FsrsReviewContext } {
-  const reviewedAt = new Date(context.reviewedAt)
-
-  if (
-    typeof context.reviewedAt !== 'string' ||
-    !Number.isFinite(reviewedAt.getTime()) ||
-    reviewedAt.toISOString() !== context.reviewedAt
-  ) {
+  if (!isCanonicalIsoDateString(context.reviewedAt)) {
     throw new Error('Invalid FSRS review context time.')
   }
 
   return scheduleReviewWithProfile(
     parseFsrsCardSnapshot(context.preCard),
     replacementRating,
-    reviewedAt,
+    new Date(context.reviewedAt),
     context.profile,
   )
 }
