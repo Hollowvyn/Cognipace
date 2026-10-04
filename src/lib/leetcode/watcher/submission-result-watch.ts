@@ -182,6 +182,9 @@ export function createLeetCodeSubmissionResultWatch(options: {
     }
 
     if (apiResponse?.result) {
+      if (submissionResultWatch) {
+        submissionResultWatch.submissionId ??= apiResponse.result.submissionId
+      }
       emitSubmissionResult(apiResponse.result)
       completeSubmissionResultWatch(submissionResultWatch)
       return
@@ -237,6 +240,7 @@ export function createLeetCodeSubmissionResultWatch(options: {
         location: submissionResultWatch.location,
         click: submissionResultWatch.click,
         attemptId: submissionResultWatch.attempt.attemptId,
+        submissionId: submissionResultWatch.submissionId ?? undefined,
         submittedCodeSnapshot:
           submissionResultWatch.attempt.submittedCodeSnapshot,
         auth: readLeetCodeRemoteAuthFromDocument(options.documentRef),
@@ -263,8 +267,7 @@ export function createLeetCodeSubmissionResultWatch(options: {
     submissionResultWatch: ActiveSubmissionResultWatch,
     debug: LeetCodeSubmissionPollingDebug,
   ) {
-    submissionResultWatch.submissionId =
-      debug.submissionId ?? submissionResultWatch.submissionId
+    submissionResultWatch.submissionId ??= debug.submissionId
     submissionResultWatch.checkState =
       debug.checkState ?? submissionResultWatch.checkState
     submissionResultWatch.statusText =

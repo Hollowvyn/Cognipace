@@ -89,6 +89,98 @@ describe('readLeetCodeSubmissionResultFromApi', () => {
     ])
   })
 
+  it('reads only a pinned submission even when a newer unrelated ID exists', async () => {
+    const { result, fetcher } = await readSubmissionApiResult({
+      fixture: {
+        ...leetcodeAcceptedSubmissionApiFixture,
+        submissionListPayload: {
+          submission_list: [
+            { id: '9999999999', timestamp: 6, status_display: 'Accepted' },
+          ],
+        },
+      },
+      submissionId: '1234567890',
+      now: 7000,
+    })
+    expect(result?.submissionId).toBe('1234567890')
+    expect(
+      fetcher.mock.calls.map(([input]) => readLeetCodeFixtureRequestUrl(input)),
+    ).toEqual([
+      expect.stringContaining('/submissions/detail/1234567890/check/'),
+      'https://leetcode.com/graphql',
+    ])
+  })
+
+  it.each(['', 'bad-id'])(
+    'refuses invalid pinned ID %j without discovering a replacement',
+    async (submissionId) => {
+      const { result, fetcher } = await readSubmissionApiResult({
+        fixture: leetcodeAcceptedSubmissionApiFixture,
+        submissionId,
+        now: 7000,
+      })
+      expect(result).toBeNull()
+      expect(fetcher).not.toHaveBeenCalled()
+    },
+  )
+
+  it('retries incomplete details for the same pinned submission', async () => {
+    const fixture: LeetCodeSubmissionApiFixture = {
+      ...leetcodeAcceptedSubmissionApiFixture,
+      graphQlPayload: null,
+    }
+    const fetcher = createLeetCodeSubmissionApiFixtureFetcher(fixture)
+    const request = {
+      location,
+      click,
+      submittedCodeSnapshot,
+      submissionId: '1234567890',
+      fetch: fetcher,
+    }
+    const first = await readLeetCodeSubmissionResultFromApi(request)
+    expect(first?.resultCodeSnapshot.completeness).toBe('partial')
+    fixture.graphQlPayload = leetcodeAcceptedSubmissionApiFixture.graphQlPayload
+    const second = await readLeetCodeSubmissionResultFromApi(request)
+    expect(second?.resultCodeSnapshot).toMatchObject({
+      source: 'api',
+      completeness: 'complete',
+    })
+    expect(fetcher).toHaveBeenCalledTimes(4)
+  })
+
+  it.each([
+    { name: 'pre-click', entries: [{ id: '1234567890', timestamp: 4 }] },
+    { name: 'after-window', entries: [{ id: '1234567890', timestamp: 11 }] },
+    {
+      name: 'ambiguous-window',
+      entries: [
+        { id: '1234567890', timestamp: 5 },
+        { id: '9999999999', timestamp: 6 },
+      ],
+    },
+    { name: 'invalid-ID', entries: [{ id: 'bad-id', timestamp: 5 }] },
+    {
+      name: 'internal-error',
+      entries: [
+        { id: '1234567890', timestamp: 5, status_display: 'Internal Error' },
+      ],
+    },
+  ])(
+    'refuses $name initial discovery instead of selecting another submission',
+    async ({ entries }) => {
+      const { result, fetcher, debugEvents } = await readSubmissionApiResult({
+        fixture: {
+          ...leetcodeAcceptedSubmissionApiFixture,
+          submissionListPayload: { submission_list: entries },
+        },
+        now: 7000,
+      })
+      expect(result).toBeNull()
+      expect(fetcher).toHaveBeenCalledTimes(1)
+      expect(debugEvents.at(-1)?.phase).toBe('submission-not-found')
+    },
+  )
+
   it('preserves exact full details code whitespace', async () => {
     const code = '  class Solution:\n    pass\n\n'
     const { result } = await readSubmissionApiResult({
@@ -128,6 +220,7 @@ describe('readLeetCodeSubmissionResultFromApi', () => {
   ])('rejects nonmatching details provenance: %j', async (details) => {
     const { result, debugEvents } = await readSubmissionApiResult({
       fixture: fixtureWithDetails(details),
+      submissionId: '1234567890',
       now: 7000,
     })
     expect(result?.resultCodeSnapshot).toMatchObject({
@@ -278,6 +371,7 @@ describe('readLeetCodeSubmissionResultFromApi', () => {
 
 async function readSubmissionApiResult(options: {
   fixture: LeetCodeSubmissionApiFixture
+  submissionId?: string | undefined
   click?: LeetCodeSubmissionClick | undefined
   now: number
 }) {
@@ -285,6 +379,7 @@ async function readSubmissionApiResult(options: {
   const fetcher = createLeetCodeSubmissionApiFixtureFetcher(options.fixture)
   const result = await readLeetCodeSubmissionResultFromApi({
     location,
+    submissionId: options.submissionId,
     click: options.click ?? click,
     submittedCodeSnapshot,
     fetch: fetcher,

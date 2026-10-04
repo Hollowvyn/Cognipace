@@ -108,6 +108,13 @@ export async function readLeetCodeSubmissionResultFromApi(options: {
   now?: (() => number) | undefined
   onDebug?: ((debug: LeetCodeSubmissionPollingDebug) => void) | undefined
 }): Promise<LeetCodeSubmissionResult | null> {
+  if (
+    options.submissionId !== undefined &&
+    !/^\d+$/.test(options.submissionId)
+  ) {
+    return null
+  }
+
   const fetchLeetCode = options.fetch ?? globalThis.fetch?.bind(globalThis)
 
   if (!fetchLeetCode) {
@@ -121,11 +128,20 @@ export async function readLeetCodeSubmissionResultFromApi(options: {
     statusText: null,
   })
 
-  const submissionListEntry = await findSubmissionListEntryForClick({
-    location: options.location,
-    click: options.click,
-    fetch: fetchLeetCode,
-  })
+  const submissionListEntry: SubmissionListEntry | null = options.submissionId
+    ? {
+        id: options.submissionId,
+        timestamp: null,
+        statusText: null,
+        runtime: null,
+        memory: null,
+        language: null,
+      }
+    : await findSubmissionListEntryForClick({
+        location: options.location,
+        click: options.click,
+        fetch: fetchLeetCode,
+      })
 
   if (!submissionListEntry) {
     emitSubmissionPollingDebug(options, {
@@ -307,14 +323,19 @@ async function findSubmissionListEntryForClick(options: {
   const submissions = readSubmissionListEntries(payload)
   const clickedAtSeconds = Math.floor(options.click.clickedAt / 1000)
 
-  return (
-    submissions.find(
-      (submission) =>
-        submission.timestamp !== null &&
-        submission.timestamp >= clickedAtSeconds - 5 &&
-        submission.statusText !== 'Internal Error',
-    ) ?? null
+  // Timestamp association is best effort: same-second clicks and clock skew
+  // cannot establish network-confirmed identity. Refuse ambiguous candidates.
+  const eligibleSubmissions = submissions.filter(
+    (submission) =>
+      submission.timestamp !== null &&
+      submission.timestamp >= clickedAtSeconds &&
+      submission.timestamp <= clickedAtSeconds + 5 &&
+      submission.statusText !== 'Internal Error',
   )
+
+  return eligibleSubmissions.length === 1
+    ? (eligibleSubmissions[0] ?? null)
+    : null
 }
 
 async function readSubmissionCheckPayload(options: {

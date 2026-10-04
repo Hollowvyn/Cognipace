@@ -46,7 +46,7 @@ export const leetcodeAcceptedSubmissionApiFixture: LeetCodeSubmissionApiFixture 
       submission_list: [
         {
           id: 1234567890,
-          timestamp: 4,
+          timestamp: 5,
           status_display: 'Accepted',
           runtime: '4 ms',
           memory: '20.62 MB',

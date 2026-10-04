@@ -38,7 +38,8 @@ const submissionAttemptResultCache = new Map<
 export async function readLeetCodeProblemMetadataInBackground(
   request: LeetCodeProblemRemoteRequest,
 ) {
-  const cachedResult = metadataCache.get(request.location.slug)
+  const cacheKey = createProblemCacheKey(request)
+  const cachedResult = metadataCache.get(cacheKey)
 
   if (cachedResult) {
     return cachedResult
@@ -47,7 +48,7 @@ export async function readLeetCodeProblemMetadataInBackground(
   const result = serializeLeetCodeMetadataResult(
     await leetCodeRemoteClient.readProblemMetadata(request),
   )
-  metadataCache.set(request.location.slug, result)
+  metadataCache.set(cacheKey, result)
 
   return result
 }
@@ -55,16 +56,25 @@ export async function readLeetCodeProblemMetadataInBackground(
 export async function readLeetCodeProblemContentInBackground(
   request: LeetCodeProblemRemoteRequest,
 ) {
-  const cachedResult = contentCache.get(request.location.slug)
+  const cacheKey = createProblemCacheKey(request)
+  const cachedResult = contentCache.get(cacheKey)
 
-  if (cachedResult) {
+  if (
+    !request.refresh &&
+    cachedResult &&
+    isCompleteProblemContent(cachedResult)
+  ) {
     return cachedResult
   }
 
   const result = serializeLeetCodeProblemContentResult(
     await leetCodeRemoteClient.readProblemContent(request),
   )
-  contentCache.set(request.location.slug, result)
+  if (isCompleteProblemContent(result)) {
+    contentCache.set(cacheKey, result)
+  } else {
+    contentCache.delete(cacheKey)
+  }
 
   return result
 }
@@ -73,31 +83,82 @@ export async function readLeetCodeSubmissionResultInBackground(
   request: LeetCodeSubmissionResultRemoteRequest,
 ) {
   const attemptCacheKey = createSubmissionAttemptCacheKey(request)
-  const cachedAttemptResponse =
-    submissionAttemptResultCache.get(attemptCacheKey)
 
-  if (cachedAttemptResponse) {
-    return cachedAttemptResponse
+  if (!request.refresh) {
+    if (request.submissionId) {
+      const cachedResponse = submissionResultCache.get(
+        createSubmissionIdCacheKey(request.location.host, request.submissionId),
+      )
+
+      if (
+        cachedResponse &&
+        isCompleteMatchingSubmission(cachedResponse, request)
+      ) {
+        submissionAttemptResultCache.set(attemptCacheKey, cachedResponse)
+        return cachedResponse
+      }
+    }
+
+    const cachedAttemptResponse =
+      submissionAttemptResultCache.get(attemptCacheKey)
+
+    if (
+      cachedAttemptResponse &&
+      isCompleteMatchingSubmission(cachedAttemptResponse, request)
+    ) {
+      return cachedAttemptResponse
+    }
   }
 
   const response = leetcodeSubmissionResultRemoteResponseSchema.parse(
     await leetCodeRemoteClient.readSubmissionResult(request),
   )
+
   const submissionId = response.result?.submissionId
 
-  if (submissionId) {
-    const cachedResponse = submissionResultCache.get(submissionId)
-
-    if (cachedResponse) {
-      submissionAttemptResultCache.set(attemptCacheKey, cachedResponse)
-      return cachedResponse
-    }
-
-    submissionResultCache.set(submissionId, response)
+  if (submissionId && isCompleteMatchingSubmission(response, request)) {
+    submissionResultCache.set(
+      createSubmissionIdCacheKey(request.location.host, submissionId),
+      response,
+    )
     submissionAttemptResultCache.set(attemptCacheKey, response)
   }
 
   return response
+}
+
+function createProblemCacheKey(request: LeetCodeProblemRemoteRequest) {
+  return JSON.stringify([request.location.host, request.location.slug])
+}
+
+function isCompleteProblemContent(
+  result: SerializedLeetCodeProblemContentResult,
+) {
+  return (
+    result.ok &&
+    result.content.completeness === 'complete' &&
+    Boolean(result.content.statement.trim())
+  )
+}
+
+function createSubmissionIdCacheKey(host: string, submissionId: string) {
+  return JSON.stringify([host, submissionId])
+}
+
+function isCompleteMatchingSubmission(
+  response: LeetCodeSubmissionResultRemoteResponse,
+  request: LeetCodeSubmissionResultRemoteRequest,
+) {
+  const result = response.result
+  return Boolean(
+    result?.submissionId &&
+    (!request.submissionId || result.submissionId === request.submissionId) &&
+    result.location.host === request.location.host &&
+    result.location.slug === request.location.slug &&
+    result.resultCodeSnapshot.completeness === 'complete' &&
+    result.resultCodeSnapshot.code?.trim() &&
+    result.resultCodeSnapshot.language?.trim(),
+  )
 }
 
 function serializeLeetCodeMetadataResult(
@@ -116,7 +177,11 @@ function serializeLeetCodeMetadataResult(
 function createSubmissionAttemptCacheKey(
   request: LeetCodeSubmissionResultRemoteRequest,
 ) {
-  return `${request.location.slug}:${request.click.clickedAt}`
+  return JSON.stringify([
+    request.location.host,
+    request.location.slug,
+    request.attemptId,
+  ])
 }
 
 function serializeLeetCodeProblemContentResult(

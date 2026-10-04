@@ -163,6 +163,8 @@ const backgroundMocks = vi.hoisted(() => {
     readSyncMetadata: vi.fn(),
     writeSyncMetadata: vi.fn(),
     recommendLeetCodeAssessmentInBackground: vi.fn(),
+    readLeetCodeProblemContentInBackground: vi.fn(),
+    readLeetCodeSubmissionResultInBackground: vi.fn(),
     alarmScheduler,
     syncAutoSync,
     syncService: {
@@ -319,6 +321,14 @@ vi.mock('@/platform/db', () => ({
 
 vi.mock('./app-db', () => ({
   getBackgroundDb: backgroundMocks.getAppDb,
+}))
+
+vi.mock('@/features/leetcode-capture/server/leetcode-capture-service', () => ({
+  readLeetCodeProblemMetadataInBackground: vi.fn(),
+  readLeetCodeProblemContentInBackground:
+    backgroundMocks.readLeetCodeProblemContentInBackground,
+  readLeetCodeSubmissionResultInBackground:
+    backgroundMocks.readLeetCodeSubmissionResultInBackground,
 }))
 
 vi.mock(
@@ -2233,6 +2243,48 @@ describe('background handler registration', () => {
       source: 'dashboard',
       tags: ['practice'],
     })
+  })
+
+  it('forwards pinned identity and refresh through the authorized capture handlers', async () => {
+    registerBackgroundHandlers()
+    const location = {
+      slug: 'two-sum',
+      host: 'leetcode.com',
+      url: 'https://leetcode.com/problems/two-sum/',
+    }
+    const contentRequest = {
+      surface: 'content-script',
+      location,
+      refresh: true,
+    }
+    const submissionRequest = {
+      ...contentRequest,
+      attemptId: 'attempt-pinned',
+      submissionId: '1234567890',
+      click: { location, clickedAt: 5000, buttonText: 'Submit' },
+      submittedCodeSnapshot: {
+        code: 'fragment',
+        language: 'Python3',
+        source: 'monaco',
+        completeness: 'partial',
+        capturedAt: 5000,
+      },
+    }
+    const sender = { tab: { id: 1 }, url: location.url }
+    await backgroundMocks.handlers.get('leetcode.readProblemContent')!({
+      data: contentRequest,
+      sender,
+    })
+    await backgroundMocks.handlers.get('leetcode.readSubmissionResult')!({
+      data: submissionRequest,
+      sender,
+    })
+    expect(
+      backgroundMocks.readLeetCodeProblemContentInBackground,
+    ).toHaveBeenCalledWith(contentRequest)
+    expect(
+      backgroundMocks.readLeetCodeSubmissionResultInBackground,
+    ).toHaveBeenCalledWith(submissionRequest)
   })
 
   describe('genai.recommendLeetCodeAssessment', () => {
