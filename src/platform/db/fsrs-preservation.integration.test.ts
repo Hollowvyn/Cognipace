@@ -20,6 +20,7 @@ import { buildPracticeProgressSummary } from '@/features/practice/domain/practic
 // This platform integration test verifies the owning settings repository reads preserved values.
 // eslint-disable-next-line no-restricted-imports
 import { createSettingsRepository } from '@/features/settings/data/settings-repository'
+import { getBackgroundDb } from '@/extension/background/app-db'
 import { expectedV9MigrationFingerprint } from '@/testing/fixtures/fsrs-remediation-legacy-migrations'
 import {
   makeFsrsPreservationSnapshot,
@@ -127,6 +128,17 @@ function progress(attempts: ReturnType<typeof readProgressAttempts>) {
 }
 
 describe('populated FSRS snapshot preservation', () => {
+  it('keeps all original rows through the production background bridge', async () => {
+    const { fixture } = await installPopulatedStorage()
+    const handle = await getBackgroundDb()
+    handles.push(handle)
+
+    expect(readPreservationRows(handle)).toEqual(fixture.rows)
+    expect(await createSettingsRepository(handle.db).getSettings()).toEqual(
+      fixture.settings,
+    )
+  })
+
   it('preserves every populated table and consumer reads across staged upgrade, flush, and matching reopen', async () => {
     const { fixture, storage, earlier, original } =
       await installPopulatedStorage()
