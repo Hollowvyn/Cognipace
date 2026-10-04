@@ -13,7 +13,11 @@ import {
   type ReviewLog,
 } from 'ts-fsrs'
 
-import type { FsrsCardSnapshot, FsrsCardState } from '../domain/card-snapshot'
+import {
+  assertValidFsrsCardSnapshot,
+  type FsrsCardSnapshot,
+  type FsrsCardState,
+} from '../domain/card-snapshot'
 import {
   normalizeFsrsSchedulingOptions,
   type FsrsSchedulingOptions,
@@ -167,7 +171,7 @@ export function calculateCardTargetRetentionDuration(
     return null
   }
 
-  validateCardSnapshot(card)
+  assertValidFsrsCardSnapshot(card)
   const scheduler = createScheduler(options)
   let lowerDays = 0
   let upperDays = 1
@@ -248,7 +252,7 @@ const maximumTargetDurationDays = 365_000
 const targetDurationIterations = 48
 
 function toTsFsrsCard(snapshot: FsrsCardSnapshot): CardInput {
-  validateCardSnapshot(snapshot)
+  assertValidFsrsCardSnapshot(snapshot)
 
   const card: CardInput = {
     due: snapshot.dueAt,
@@ -267,51 +271,6 @@ function toTsFsrsCard(snapshot: FsrsCardSnapshot): CardInput {
   }
 
   return card
-}
-
-function validateCardSnapshot(snapshot: FsrsCardSnapshot): void {
-  assertValidDate(snapshot.dueAt, 'dueAt')
-  assertFiniteNonNegativeNumber(snapshot.stability, 'stability')
-  assertFiniteNonNegativeNumber(snapshot.difficulty, 'difficulty')
-  assertNonNegativeInteger(snapshot.elapsedDays, 'elapsedDays')
-  assertNonNegativeInteger(snapshot.scheduledDays, 'scheduledDays')
-  assertNonNegativeInteger(snapshot.learningSteps, 'learningSteps')
-  assertNonNegativeInteger(snapshot.reps, 'reps')
-  assertNonNegativeInteger(snapshot.lapses, 'lapses')
-
-  if (snapshot.lastReviewAt !== null) {
-    assertValidDate(snapshot.lastReviewAt, 'lastReviewAt')
-  }
-
-  if (snapshot.state !== 'new' && !snapshot.lastReviewAt) {
-    throw new Error(
-      `Invalid FSRS card snapshot: "${snapshot.state}" cards require lastReviewAt.`,
-    )
-  }
-}
-
-function assertValidDate(value: Date, fieldName: string): void {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
-    throw new Error(
-      `Invalid FSRS card snapshot: "${fieldName}" must be a valid Date.`,
-    )
-  }
-}
-
-function assertFiniteNonNegativeNumber(value: number, fieldName: string): void {
-  if (!Number.isFinite(value) || value < 0) {
-    throw new Error(
-      `Invalid FSRS card snapshot: "${fieldName}" must be a finite non-negative number.`,
-    )
-  }
-}
-
-function assertNonNegativeInteger(value: number, fieldName: string): void {
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error(
-      `Invalid FSRS card snapshot: "${fieldName}" must be a non-negative integer.`,
-    )
-  }
 }
 
 function fromTsFsrsCard(card: Card): FsrsCardSnapshot {

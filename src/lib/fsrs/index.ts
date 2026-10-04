@@ -4,10 +4,15 @@ export {
   isFsrsCardKind,
   isFsrsCardState,
   parseFsrsCardKind,
+  parseFsrsCardSnapshot,
   parseFsrsCardState,
+  parseSerializedFsrsCardSnapshot,
+  serializeFsrsCardSnapshot,
+  toSerializableFsrsCardSnapshot,
   type FsrsCardKind,
   type FsrsCardSnapshot,
   type FsrsCardState,
+  type FsrsSerializedCardSnapshot,
 } from './domain/card-snapshot'
 export {
   isReviewRating,

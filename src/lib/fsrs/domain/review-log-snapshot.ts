@@ -1,5 +1,11 @@
 import { isFsrsCardState, type FsrsCardState } from './card-snapshot'
 import { isReviewRating, type ReviewRating } from './review-rating'
+import {
+  isCanonicalIsoDateString,
+  isNonNegativeInteger,
+  isNonNegativeNumber,
+  isRecord,
+} from './snapshot-validation'
 
 /** Serializable ts-fsrs review log snapshot stored for future rollback. */
 export interface FsrsReviewLogSnapshot {
@@ -30,14 +36,14 @@ export function isFsrsReviewLogSnapshot(
     isReviewRating(value.rating) &&
     typeof value.state === 'string' &&
     isFsrsCardState(value.state) &&
-    isIsoDateString(value.dueAt) &&
-    Number.isFinite(value.stability) &&
-    Number.isFinite(value.difficulty) &&
-    Number.isFinite(value.elapsedDays) &&
-    Number.isFinite(value.lastElapsedDays) &&
-    Number.isFinite(value.scheduledDays) &&
-    Number.isFinite(value.learningSteps) &&
-    isIsoDateString(value.reviewedAt)
+    isCanonicalIsoDateString(value.dueAt) &&
+    isNonNegativeNumber(value.stability) &&
+    isNonNegativeNumber(value.difficulty) &&
+    isNonNegativeInteger(value.elapsedDays) &&
+    isNonNegativeInteger(value.lastElapsedDays) &&
+    isNonNegativeInteger(value.scheduledDays) &&
+    isNonNegativeInteger(value.learningSteps) &&
+    isCanonicalIsoDateString(value.reviewedAt)
   )
 }
 
@@ -45,18 +51,29 @@ export function isFsrsReviewLogSnapshot(
 export function parseFsrsReviewLogSnapshot(
   value: unknown,
 ): FsrsReviewLogSnapshot {
-  if (isFsrsReviewLogSnapshot(value)) {
-    return value
+  if (!isFsrsReviewLogSnapshot(value)) {
+    throw new Error('Invalid FSRS review log snapshot.')
   }
 
-  throw new Error('Invalid FSRS review log snapshot.')
+  return Object.freeze({
+    rating: value.rating,
+    state: value.state,
+    dueAt: value.dueAt,
+    stability: value.stability,
+    difficulty: value.difficulty,
+    elapsedDays: value.elapsedDays,
+    lastElapsedDays: value.lastElapsedDays,
+    scheduledDays: value.scheduledDays,
+    learningSteps: value.learningSteps,
+    reviewedAt: value.reviewedAt,
+  })
 }
 
 /** Serializes an FSRS review log snapshot for persistence. */
 export function serializeFsrsReviewLogSnapshot(
   log: FsrsReviewLogSnapshot,
 ): string {
-  return JSON.stringify(log)
+  return JSON.stringify(parseFsrsReviewLogSnapshot(log))
 }
 
 /** Parses a serialized FSRS review log snapshot from persistence. */
@@ -64,18 +81,4 @@ export function parseSerializedFsrsReviewLogSnapshot(
   value: string,
 ): FsrsReviewLogSnapshot {
   return parseFsrsReviewLogSnapshot(JSON.parse(value))
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function isIsoDateString(value: unknown): value is string {
-  if (typeof value !== 'string') {
-    return false
-  }
-
-  const parsed = new Date(value)
-
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value
 }

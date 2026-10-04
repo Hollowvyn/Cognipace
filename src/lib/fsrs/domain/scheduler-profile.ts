@@ -1,4 +1,5 @@
 import { isFsrsStepUnit, type FsrsStepUnit } from './scheduling-options'
+import { isRecord } from './snapshot-validation'
 
 export interface FsrsEffectiveParameters {
   readonly targetRetention: number
@@ -21,11 +22,8 @@ export interface FsrsSchedulerProfile {
 
 /** Structural decoding only; the adapter checks exact native reconstruction. */
 export function readFsrsSchedulerProfile(value: unknown): FsrsSchedulerProfile {
-  const record = (input: unknown): input is Record<string, unknown> =>
-    typeof input === 'object' && input !== null && !Array.isArray(input)
-
   if (
-    !record(value) ||
+    !isRecord(value) ||
     Reflect.ownKeys(value).length !== 5 ||
     ![
       'schemaVersion',
@@ -38,7 +36,7 @@ export function readFsrsSchedulerProfile(value: unknown): FsrsSchedulerProfile {
     value.libraryVersion !== '5.4.0' ||
     value.modelVersion !== 'FSRS-6.0' ||
     (value.source !== 'default' && value.source !== 'custom') ||
-    !record(value.parameters)
+    !isRecord(value.parameters)
   ) {
     throw new Error('Invalid or unsupported FSRS scheduler profile.')
   }

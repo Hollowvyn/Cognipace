@@ -20,10 +20,12 @@ describe('FSRS public API facade', () => {
         'isReviewRating',
         'normalizeFsrsSchedulingOptions',
         'parseFsrsCardKind',
+        'parseFsrsCardSnapshot',
         'parseFsrsReviewLogSnapshot',
         'parseFsrsCardState',
         'parseFsrsSchedulerProfile',
         'parseSerializedFsrsReviewLogSnapshot',
+        'parseSerializedFsrsCardSnapshot',
         'parseSerializedFsrsSchedulerProfile',
         'parseFsrsStepUnit',
         'parseReviewRating',
@@ -34,7 +36,9 @@ describe('FSRS public API facade', () => {
         'reviewRatings',
         'scheduleReview',
         'serializeFsrsReviewLogSnapshot',
+        'serializeFsrsCardSnapshot',
         'serializeFsrsSchedulerProfile',
+        'toSerializableFsrsCardSnapshot',
       ].sort(),
     )
   })
@@ -49,5 +53,10 @@ describe('FSRS public API facade', () => {
     expect('assertExactFsrsSchedulerProfile' in fsrs).toBe(false)
     expect('scheduleCardReviewWithProfile' in fsrs).toBe(false)
     expect('readFsrsSchedulerProfile' in fsrs).toBe(false)
+    expect('assertValidFsrsCardSnapshot' in fsrs).toBe(false)
+    expect('isCanonicalIsoDateString' in fsrs).toBe(false)
+    expect('isNonNegativeInteger' in fsrs).toBe(false)
+    expect('isNonNegativeNumber' in fsrs).toBe(false)
+    expect('isRecord' in fsrs).toBe(false)
   })
 })
