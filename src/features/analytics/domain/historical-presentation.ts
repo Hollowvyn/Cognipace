@@ -166,28 +166,6 @@ export interface ObservedRecallVsFsrsRow {
   evidence: 'measured' | 'not-measured'
 }
 
-export interface FirstAttemptOutcomeTotals {
-  again: number
-  hard: number
-  good: number
-  easy: number
-  recordedFirstAttempts: number
-  excludedInvalidRatings: number
-  validFirstAttempts: number
-  hardGoodEasy: number
-  goodEasy: number
-  firstAttemptSuccess: number | null
-  firstAttemptGoodEasy: number | null
-  evidence: 'measured' | 'not-measured'
-}
-
-export interface FirstAttemptOutcomeRow extends FirstAttemptOutcomeTotals {
-  id: string
-  bucketStart: string
-  bucketEnd: string
-  isPartial: boolean
-}
-
 export interface MemoryStrengthRow {
   id: string
   bucketStart: string
@@ -250,13 +228,6 @@ export interface LowEvidenceTopicRow {
 
 export interface HistoricalAnalyticsViews {
   problemSolving: ProblemSolvingView
-  firstAttemptOutcomes: {
-    rows: FirstAttemptOutcomeRow[]
-    totals: FirstAttemptOutcomeTotals
-    scale: HistoricalPresentationScale
-    targetFirstAttemptSuccess: number
-    targetFirstAttemptGoodEasy: number
-  }
   observedRecallVsFsrs: {
     rows: ObservedRecallVsFsrsRow[]
     scale: HistoricalPresentationScale
@@ -302,18 +273,6 @@ export function buildHistoricalAnalyticsViews(
   options: HistoricalPresentationOptions,
 ): HistoricalAnalyticsViews {
   const pairedByEvent = buildRepeatReviewPairs(events, options)
-  const selectedFirstAttempts = selectFirstRecordedAttempts(events).filter(
-    (event) =>
-      event.reviewedAt >= options.start && event.reviewedAt <= options.end,
-  )
-  const firstAttemptRows = options.buckets.map((bucket) => ({
-    ...bucketRow(bucket, options.end),
-    ...aggregateFirstAttemptOutcomes(
-      selectedFirstAttempts.filter((event) =>
-        inBucket(event.reviewedAt, bucket),
-      ),
-    ),
-  }))
   const stabilityByEvent = buildStabilityObservations(events, options)
   const observedRows = options.buckets.map((bucket) => {
     const pairs = pairedByEvent.filter((pair) =>
@@ -451,10 +410,6 @@ export function buildHistoricalAnalyticsViews(
 
   return applyHistoricalChartTargets(
     {
-      firstAttemptOutcomes: {
-        rows: firstAttemptRows,
-        totals: aggregateFirstAttemptOutcomes(selectedFirstAttempts),
-      },
       problemSolving: buildProblemSolvingView(events, options),
       observedRecallVsFsrs: {
         rows: observedRows,
@@ -517,10 +472,6 @@ export function buildHistoricalAnalyticsViews(
 
 type HistoricalChartTargetViews = {
   problemSolving: ProblemSolvingView
-  firstAttemptOutcomes: Pick<
-    HistoricalAnalyticsViews['firstAttemptOutcomes'],
-    'rows' | 'totals'
-  >
   observedRecallVsFsrs: Pick<
     HistoricalAnalyticsViews['observedRecallVsFsrs'],
     'rows'
@@ -555,18 +506,6 @@ export function applyHistoricalChartTargets<
           ),
         },
       },
-    },
-    firstAttemptOutcomes: {
-      ...views.firstAttemptOutcomes,
-      targetFirstAttemptSuccess: targets.targetFirstAttemptSuccess,
-      targetFirstAttemptGoodEasy: targets.targetFirstAttemptGoodEasy,
-      scale: percentageScale(
-        views.firstAttemptOutcomes.rows.flatMap((row) => [
-          row.firstAttemptSuccess,
-          row.firstAttemptGoodEasy,
-        ]),
-        [targets.targetFirstAttemptSuccess, targets.targetFirstAttemptGoodEasy],
-      ),
     },
     observedRecallVsFsrs: {
       ...views.observedRecallVsFsrs,
@@ -775,27 +714,6 @@ function uniqueNormalizedTopics(labels: readonly string[]) {
       topics.set(normalizedTopic, { topic, normalizedTopic })
   }
   return [...topics.values()]
-}
-
-export function aggregateFirstAttemptOutcomes(
-  events: readonly HistoricalAnalyticsReviewEvent[],
-): FirstAttemptOutcomeTotals {
-  const outcomes = aggregateRatingOutcomes(events)
-  const {
-    recordedAssessments,
-    validRatings,
-    successRate,
-    goodEasyRate,
-    ...counts
-  } = outcomes
-  return {
-    ...counts,
-    recordedFirstAttempts: recordedAssessments,
-    validFirstAttempts: validRatings,
-    firstAttemptSuccess: successRate,
-    firstAttemptGoodEasy: goodEasyRate,
-    evidence: validRatings === 0 ? 'not-measured' : 'measured',
-  }
 }
 
 function aggregateRatingOutcomes(

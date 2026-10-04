@@ -134,3 +134,67 @@ Three unchanged production-component screenshots were copied into
 `docs/superpowers/handoffs/assets/2026-10-04-analytics-problem-solving/` for
 GitHub-visible proof: desktop dark Trend, Compare, and 320px light. These are
 illustrative fixtures and do not claim human installed-extension smoke.
+
+## Approved Review Cleanup
+
+The user approved the eight ponytail-review findings on PR #195. Apply them in
+two focused passes without changing the approved product behavior:
+
+1. Remove the superseded first-attempt presentation model and runtime schemas;
+   use Problem Solving targets and derive first-attempt readiness from its
+   per-difficulty valid counts. Migrate unique boundary, weighted-denominator,
+   correction and chronology regressions; consolidate obsolete fixtures and
+   cache expectations. Run the focused domain, contract, service and API tests.
+2. Share target metadata and local chart props, and use Recharts Symbols for
+   Compare markers. Run component and target-editor tests, production-component
+   browser checks, `npm run check`, `npm run build`, `npm run format`, and
+   `git diff --check`. Record actual line savings and update the existing PR.
+
+Done when both passes preserve the chart interactions and runtime invariants,
+required automated checks pass, and validation evidence records the remaining
+human installed-extension smoke requirement.
+
+### Cleanup Validation
+
+All eight findings were applied. Source shrank by **435 lines net**: 248
+production and 187 test/fixture lines. Against the PR merge base `92ba67d5`,
+added tests/fixtures are **767 lines / 2,179 production lines (0.35:1)**.
+The legacy presentation model is gone; its readiness contract remains, derived
+from the canonical cohort. Boundary rates, invalid outer buckets, weighted
+denominators, corrected/deleted/restored first records, saved goals and unchanged
+cache evidence remain covered.
+
+The seven-file baseline passed 168 tests. Post-cleanup domain/contract/service/API
+tests passed 117 tests, and component/screen/target-editor tests passed 40.
+The first full check found a widened goal-metric type; returning the shared
+metadata selection as a const object fixed it. Final `npm run check` passed
+**197 files / 2,207 tests**, database checks, typecheck and lint. Build and format
+passed; the build retains its existing chunk-size warning.
+
+Exact validation commands (pinned Node/npm, all final runs passed):
+
+```sh
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npx vitest run src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/server/analytics-service.test.ts src/features/analytics/api/analytics-api.test.tsx src/features/analytics/components/new-problem-success-view.test.tsx src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/components/analytics-target-editor.test.tsx
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npx vitest run src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/server/analytics-service.test.ts src/features/analytics/api/analytics-api.test.tsx
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npx vitest run src/features/analytics/components/new-problem-success-view.test.tsx src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/components/analytics-target-editor.test.tsx
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npm run check
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npm run build
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npm run format
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npx prettier --check --ignore-path /dev/null docs/architecture.md docs/superpowers/plans/2026-10-04-analytics-problem-solving-ui.md
+rtk proxy git diff --check
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH node /private/tmp/cognipace-solving-proof/interactions.cjs
+```
+
+Browser plugin not available; regular Playwright checked the production-component
+harness at `http://127.0.0.1:5178/?theme=dark`. The sandbox initially prevented
+Chrome from launching; the same script passed with approved sandbox escalation.
+All nine existing interaction groups passed with zero console errors, meaningful
+content, correct page identity and no framework overlay. Dark/light 1280/390/320
+layouts have no document overflow. Visual inspection confirmed the Compare
+markers and whiskers; its committed screenshot was refreshed.
+
+No required automated validation was skipped. `npm ci` was not repeated because
+dependencies are unchanged since the successful clean install; `npm run zip`
+and `npm run db:generate` remain skipped because packaging and schema are
+unchanged. Human installed-extension happy-path and edge-case smoke with visual
+proof remains pending; PR #195 stays draft.

@@ -87,6 +87,16 @@ export function NewProblemSuccessView({
   )
   const goal = problemGoal(view, cohort, measure)
   const resetKey = `${cohort}:${mode}:${measure}:${units}:${timing}:${shown.map(({ key }) => key).join(':')}`
+  const chartOptions = {
+    view,
+    cohort,
+    measure,
+    units,
+    timing,
+    goal: goal.value,
+    timeFrame,
+    resetKey,
+  }
   const totals = selected.totals
   const trendRows = rows.flatMap((row) =>
     shown.map((difficulty) => ({
@@ -218,27 +228,10 @@ export function NewProblemSuccessView({
                   kind="outcome"
                   rows={rows}
                   shown={shown}
-                  view={view}
-                  cohort={cohort}
-                  measure={measure}
-                  units={units}
-                  timing={timing}
-                  goal={goal.value}
-                  timeFrame={timeFrame}
-                  resetKey={resetKey}
+                  {...chartOptions}
                 />
               ) : (
-                <ComparisonChart
-                  kind="outcome"
-                  view={view}
-                  cohort={cohort}
-                  measure={measure}
-                  units={units}
-                  timing={timing}
-                  goal={goal.value}
-                  timeFrame={timeFrame}
-                  resetKey={resetKey}
-                />
+                <ComparisonChart kind="outcome" {...chartOptions} />
               )
             }
             table={
@@ -343,27 +336,10 @@ export function NewProblemSuccessView({
                   kind="time"
                   rows={rows}
                   shown={shown}
-                  view={view}
-                  cohort={cohort}
-                  measure={measure}
-                  units={units}
-                  timing={timing}
-                  goal={goal.value}
-                  timeFrame={timeFrame}
-                  resetKey={resetKey}
+                  {...chartOptions}
                 />
               ) : (
-                <ComparisonChart
-                  kind="time"
-                  view={view}
-                  cohort={cohort}
-                  measure={measure}
-                  units={units}
-                  timing={timing}
-                  goal={goal.value}
-                  timeFrame={timeFrame}
-                  resetKey={resetKey}
-                />
+                <ComparisonChart kind="time" {...chartOptions} />
               )
             }
             table={

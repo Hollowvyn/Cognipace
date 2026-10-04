@@ -322,6 +322,8 @@ The owners in that flow are:
   numerators/denominators; time uses existing quantiles with four-observation
   quartile support. Future events are excluded at as-of. Current catalog
   difficulty and time allowances are not attempt-time policy snapshots.
+  Problem Solving supersedes the first-attempt presentation model; independent
+  first-attempt readiness sums valid counts across all four difficulty groups.
 - `src/features/analytics/domain/chart-buckets.ts` and
   `src/features/analytics/domain/chart-data.ts` aggregate each metric only from
   eligible evidence, preserve unknown buckets as `null`, and classify solid or

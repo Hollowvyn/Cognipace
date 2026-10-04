@@ -198,8 +198,12 @@ export async function getAnalyticsSummary(
   })
   const firstAttemptReadiness = calculateAnalyticsReadiness({
     requestedDays: range,
-    evidenceCounts: historicalViews.firstAttemptOutcomes.rows.map(
-      (row) => row.validFirstAttempts,
+    evidenceCounts: historicalViews.problemSolving.cohorts.newProblems.rows.map(
+      (row) =>
+        Object.values(row.difficulties).reduce(
+          (sum, stats) => sum + stats.validRatings,
+          0,
+        ),
     ),
     bucketKeys: buckets.map((bucket) => bucket.key),
   })

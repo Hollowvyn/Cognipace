@@ -1,4 +1,5 @@
 import type { AnalyticsViews } from '../api/analytics-contracts'
+import { targetMetrics } from './analytics-target-metrics'
 
 export type ProblemView = AnalyticsViews['problemSolving']
 export type ProblemCohort = keyof ProblemView['cohorts']
@@ -56,31 +57,16 @@ export function problemGoal(
   cohort: ProblemCohort,
   measure: OutcomeMeasure,
 ) {
-  const goal =
+  const metric =
     cohort === 'newProblems'
       ? measure === 'successRate'
-        ? ({
-            metric: 'firstAttemptSuccess',
-            key: 'targetFirstAttemptSuccess',
-            label: 'Target First-attempt Success',
-          } as const)
-        : ({
-            metric: 'firstAttemptGoodEasy',
-            key: 'targetFirstAttemptGoodEasy',
-            label: 'Target Good + Easy',
-          } as const)
+        ? 'firstAttemptSuccess'
+        : 'firstAttemptGoodEasy'
       : measure === 'successRate'
-        ? ({
-            metric: 'recall',
-            key: 'targetRecall',
-            label: 'Target Recall',
-          } as const)
-        : ({
-            metric: 'reviewSuccess',
-            key: 'targetReviewSuccess',
-            label: 'Target Review Success',
-          } as const)
-  return { ...goal, value: view.targets[goal.key] }
+        ? 'recall'
+        : 'reviewSuccess'
+  const { key, label } = targetMetrics[metric]
+  return { metric, key, label, value: view.targets[key] } as const
 }
 export function timeValue(
   seconds: number | null,

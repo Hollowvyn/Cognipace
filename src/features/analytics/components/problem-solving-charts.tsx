@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ComposedChart,
+  Symbols,
   XAxis,
   YAxis,
   usePlotArea,
@@ -684,7 +685,16 @@ function CompareMarks({
                           <line x1={x - 10} x2={x + 10} y1={highY} y2={highY} />
                         </g>
                       ) : null}
-                      <Marker x={x} y={y} shape={shape} color={color} />
+                      <Symbols
+                        cx={x}
+                        cy={y}
+                        type={shape}
+                        size={10}
+                        sizeType="diameter"
+                        fill="var(--color-card)"
+                        stroke={color}
+                        strokeWidth={shape === 'circle' ? 2.5 : 2}
+                      />
                     </>
                   )}
                   {selectedIndex === index ? (
@@ -782,39 +792,6 @@ function CompareMarks({
           )
         : null}
     </>
-  )
-}
-function Marker({
-  x,
-  y,
-  shape,
-  color,
-}: {
-  x: number
-  y: number
-  shape: 'circle' | 'diamond' | 'triangle'
-  color: string
-}) {
-  return shape === 'circle' ? (
-    <circle
-      cx={x}
-      cy={y}
-      r={5}
-      fill="var(--color-card)"
-      stroke={color}
-      strokeWidth={2.5}
-    />
-  ) : (
-    <path
-      d={
-        shape === 'diamond'
-          ? `M${x},${y - 5}L${x + 5},${y}L${x},${y + 5}L${x - 5},${y}Z`
-          : `M${x},${y - 5}L${x + 5},${y + 5}L${x - 5},${y + 5}Z`
-      }
-      fill="var(--color-card)"
-      stroke={color}
-      strokeWidth={2}
-    />
   )
 }
 function ProblemStats({

@@ -233,6 +233,12 @@ describe('buildHistoricalAnalyticsViews', () => {
     const model = buildHistoricalAnalyticsViews(
       [
         event({
+          id: 'invalid-outer',
+          problemSlug: 'invalid-outer',
+          rating: 'invalid',
+          reviewedAt: new Date(localOptions.buckets[0]!.start.getTime() + 1000),
+        }),
+        event({
           id: 'prior',
           problemSlug: 'prior',
           problemDifficulty: 'hard',
@@ -248,6 +254,7 @@ describe('buildHistoricalAnalyticsViews', () => {
           id: 'current',
           problemSlug: 'current',
           problemDifficulty: 'hard',
+          rating: 'again',
           reviewedAt: new Date('2026-03-08T04:30:00Z'),
         }),
         event({
@@ -276,85 +283,41 @@ describe('buildHistoricalAnalyticsViews', () => {
       goodEasyRate: 0,
     })
     expect(model.cohorts.newProblems.totals).toMatchObject({
-      assessmentDays: 2,
-      distinctProblems: 2,
-      recordedAssessments: 2,
+      assessmentDays: 3,
+      distinctProblems: 3,
+      recordedAssessments: 3,
+      excludedInvalidRatings: 1,
     })
     expect(model.cohorts.followupPractice.totals).toMatchObject({
       assessmentDays: 1,
       distinctProblems: 1,
       recordedAssessments: 1,
     })
-    expect(model.cohorts.newProblems.rows.at(-1)?.isPartial).toBe(true)
+    const { rows } = model.cohorts.newProblems
+    expect(rows[0]!.difficulties.unknown).toMatchObject({
+      excludedInvalidRatings: 1,
+      validRatings: 0,
+      successRate: null,
+      goodEasyRate: null,
+    })
+    for (const [index, date, rate, isPartial] of [
+      [-2, '2026-03-07', 0, false],
+      [-1, '2026-03-08', 1, true],
+    ] as const) {
+      expect(rows.at(index)).toMatchObject({
+        bucketStart: date,
+        bucketEnd: date,
+        isPartial,
+        difficulties: {
+          hard: { validRatings: 1, successRate: rate, goodEasyRate: rate },
+        },
+      })
+    }
   })
 
-  it('retains invalid-only outer bucket exclusions and uses local-calendar partial intervals', () => {
-    const asOf = new Date('2026-03-08T07:30:00Z')
-    const localOptions = optionsForComparison(asOf, 'America/New_York')
-    const firstBucket = localOptions.buckets[0]!
-    const firstOutcomes = buildHistoricalAnalyticsViews(
-      [
-        event({
-          id: 'invalid-first',
-          problemSlug: 'invalid',
-          rating: 'invalid',
-          reviewedAt: new Date(firstBucket.start.getTime() + 1000),
-        }),
-        event({
-          id: 'local-before-midnight',
-          problemSlug: 'before',
-          rating: 'again',
-          reviewedAt: new Date('2026-03-08T04:30:00Z'),
-        }),
-        event({
-          id: 'local-partial',
-          problemSlug: 'partial',
-          rating: 'good',
-          reviewedAt: asOf,
-        }),
-        event({
-          id: 'future',
-          problemSlug: 'future',
-          rating: 'easy',
-          reviewedAt: new Date(asOf.getTime() + 1000),
-        }),
-      ],
-      localOptions,
-    ).firstAttemptOutcomes
-    expect(firstOutcomes.rows[0]).toMatchObject({
-      excludedInvalidRatings: 1,
-      validFirstAttempts: 0,
-      firstAttemptSuccess: null,
-      firstAttemptGoodEasy: null,
-      evidence: 'not-measured',
-    })
-    expect(firstOutcomes.rows.at(-2)).toMatchObject({
-      bucketStart: '2026-03-07',
-      bucketEnd: '2026-03-07',
-      validFirstAttempts: 1,
-      firstAttemptSuccess: 0,
-      firstAttemptGoodEasy: 0,
-      isPartial: false,
-    })
-    expect(firstOutcomes.rows.at(-1)).toMatchObject({
-      bucketStart: '2026-03-08',
-      bucketEnd: '2026-03-08',
-      validFirstAttempts: 1,
-      firstAttemptSuccess: 1,
-      firstAttemptGoodEasy: 1,
-      isPartial: true,
-    })
-    expect(firstOutcomes.totals).toMatchObject({
-      recordedFirstAttempts: 3,
-      excludedInvalidRatings: 1,
-      validFirstAttempts: 2,
-      firstAttemptSuccess: 0.5,
-      firstAttemptGoodEasy: 0.5,
-    })
-  })
   it('selects raw first records before rating and report filters and weights the valid denominators across buckets', () => {
     const secondDay = new Date('2026-08-02T12:00:00Z')
-    const firstOutcomes = buildHistoricalAnalyticsViews(
+    const views = buildHistoricalAnalyticsViews(
       [
         ...['again', 'invalid', 'hard', 'good', 'good'].map((rating, index) =>
           event({
@@ -380,42 +343,33 @@ describe('buildHistoricalAnalyticsViews', () => {
         }),
       ],
       options,
-    ).firstAttemptOutcomes
-    expect(firstOutcomes.rows).toMatchObject([
+    ).problemSolving
+    const firstOutcomes = views.cohorts.newProblems
+    expect(problemSolvingViewSchema.safeParse(views).success).toBe(true)
+    expect(
+      firstOutcomes.rows.map((row) => row.difficulties.unknown),
+    ).toMatchObject([
       {
-        recordedFirstAttempts: 2,
+        recordedAssessments: 2,
         excludedInvalidRatings: 1,
-        validFirstAttempts: 1,
-        again: 1,
-        hardGoodEasy: 0,
-        goodEasy: 0,
-        firstAttemptSuccess: 0,
-        firstAttemptGoodEasy: 0,
-        evidence: 'measured',
+        validRatings: 1,
+        successRate: 0,
+        goodEasyRate: 0,
       },
       {
-        recordedFirstAttempts: 3,
+        recordedAssessments: 3,
         excludedInvalidRatings: 0,
-        validFirstAttempts: 3,
-        hardGoodEasy: 3,
-        goodEasy: 2,
-        firstAttemptSuccess: 1,
-        firstAttemptGoodEasy: 2 / 3,
-        evidence: 'measured',
+        validRatings: 3,
+        successRate: 1,
+        goodEasyRate: 2 / 3,
       },
     ])
     expect(firstOutcomes.totals).toMatchObject({
-      again: 1,
-      hard: 1,
-      good: 2,
-      easy: 0,
-      recordedFirstAttempts: 5,
+      recordedAssessments: 5,
       excludedInvalidRatings: 1,
-      validFirstAttempts: 4,
-      hardGoodEasy: 3,
-      goodEasy: 2,
-      firstAttemptSuccess: 0.75,
-      firstAttemptGoodEasy: 0.5,
+      validRatings: 4,
+      successRate: 0.75,
+      goodEasyRate: 0.5,
     })
   })
 
@@ -432,11 +386,11 @@ describe('buildHistoricalAnalyticsViews', () => {
       [[later, first], 0, 0],
     ] as const) {
       expect(
-        buildHistoricalAnalyticsViews(history, options).firstAttemptOutcomes
-          .totals,
+        buildHistoricalAnalyticsViews(history, options).problemSolving.cohorts
+          .newProblems.totals,
       ).toMatchObject({
-        firstAttemptSuccess: success,
-        firstAttemptGoodEasy: goodEasy,
+        successRate: success,
+        goodEasyRate: goodEasy,
       })
     }
   })
@@ -535,14 +489,7 @@ describe('buildHistoricalAnalyticsViews', () => {
         targetReviewSuccess: 1,
         percentageScale: after.practiceRhythm.percentageScale,
       },
-      firstAttemptOutcomes: {
-        ...before.firstAttemptOutcomes,
-        targetFirstAttemptSuccess: 0,
-        targetFirstAttemptGoodEasy: 1,
-        scale: after.firstAttemptOutcomes.scale,
-      },
     })
-    expect(after.firstAttemptOutcomes.scale.domain).toEqual([0, 1])
     expect(after.problemSolving.targets).toEqual({
       targetRecall: 0.1,
       targetReviewSuccess: 1,

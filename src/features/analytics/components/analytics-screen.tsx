@@ -216,14 +216,7 @@ function AnalyticsHistoricalStory({
   data: SerializedAnalyticsSummary
 }) {
   const updateTargets = useUpdateAnalyticsTargets()
-  const targets = {
-    targetRecall: data.views.observedRecallVsFsrs.targetRecall,
-    targetReviewSuccess: data.views.practiceRhythm.targetReviewSuccess,
-    targetFirstAttemptSuccess:
-      data.views.firstAttemptOutcomes.targetFirstAttemptSuccess,
-    targetFirstAttemptGoodEasy:
-      data.views.firstAttemptOutcomes.targetFirstAttemptGoodEasy,
-  }
+  const targets = data.views.problemSolving.targets
   const showRatingReadiness =
     (!data.historicalReadiness.ratingsMix.ready ||
       hasTrimmedLeadingHistory(data.historicalReadiness.ratingsMix)) &&
