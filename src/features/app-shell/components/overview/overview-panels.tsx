@@ -95,7 +95,7 @@ export function OverviewMetrics({
   metrics: readonly DashboardOverviewMetricView[]
 }) {
   return (
-    <div className="grid min-w-0 gap-3 sm:grid-cols-3">
+    <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {metrics.map((metric) => (
         <Surface
           aria-label={`${metric.label} metric`}

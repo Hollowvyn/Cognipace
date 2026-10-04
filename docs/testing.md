@@ -209,6 +209,33 @@ Use one of these entry points:
 - Or open `chrome://extensions`, find CogniPace, open Details, copy the
   extension ID, and open `chrome-extension://<extension-id>/dashboard.html`.
 
+### Overview Daily Time
+
+1. Rebuild and reload the extension, then open Overview. Confirm the metric row
+   shows Reviews Due, Completed Today, Streak, and Time Today in that order.
+2. Happy path: save a timed assessment today from the LeetCode overlay, then
+   return to Overview. Confirm Time Today includes its saved elapsed time.
+   Save another timed assessment for the same problem, including a failed
+   attempt. Confirm both durations count while Completed Today counts that
+   problem once. Capture a screenshot or recording.
+3. Edge path: save an untimed assessment. Confirm it adds no time. With no timed
+   assessments today, confirm `0m`; with a positive total below a minute,
+   confirm `<1m`. Confirm minute/hour examples such as `35m` and `1h 25m`.
+4. Correct a timed assessment's rating and use Update. Confirm its time is
+   counted once. If its saved duration changes, confirm the total reflects the
+   replacement. Reset that problem's practice and confirm only its retained
+   effort is removed from the total.
+5. Check local date rollover by reopening/refetching Overview after midnight.
+   Confirm yesterday's assessments are excluded and an overnight timed session
+   counts on its saved assessment date. Capture edge-case proof.
+6. Check wide and narrow windows in both themes. Confirm four cards fit in the
+   desktop row, wrap to two on intermediate widths, and stack on small screens
+   without clipped values or horizontal overflow.
+
+Human installed-extension happy-path and edge-case smoke with screenshot or
+recording proof remains required before PR review or merge. Component fixture
+screenshots and automated tests do not replace this real-time proof.
+
 ### Popup
 
 1. Click the CogniPace extension icon.
@@ -1199,7 +1226,8 @@ refresh across surfaces.
 
 ## Current Incomplete Surfaces
 
-- Overview is a reserved dashboard route for a future guided-practice home.
+- Overview is implemented as a guided-practice home; use the daily-time flow
+  above to validate its recorded effort metric.
 
 Do not report these as broken unless they stop rendering or navigation fails.
 

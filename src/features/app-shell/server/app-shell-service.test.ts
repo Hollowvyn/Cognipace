@@ -296,6 +296,49 @@ describe('app-shell service', () => {
     expect(payload.metrics).toContainEqual({ label: 'Streak', value: '1 day' })
   })
 
+  it("serializes recorded time from today's assessments into Overview", async () => {
+    const handle = await createTestDb()
+    const repository = createPracticeRepository(handle.db)
+    const now = new Date(2026, 0, 1, 10)
+
+    for (const attempt of [
+      {
+        problemSlug: 'two-sum',
+        rating: 'again' as const,
+        elapsedSeconds: 900,
+        reviewedAt: new Date(2026, 0, 1, 8),
+      },
+      {
+        problemSlug: 'two-sum',
+        rating: 'good' as const,
+        elapsedSeconds: 1200,
+        reviewedAt: new Date(2026, 0, 1, 9),
+      },
+      {
+        problemSlug: 'valid-parentheses',
+        rating: 'good' as const,
+        elapsedSeconds: null,
+        reviewedAt: new Date(2026, 0, 1, 9, 30),
+      },
+      {
+        problemSlug: 'reverse-linked-list',
+        rating: 'good' as const,
+        elapsedSeconds: 3600,
+        reviewedAt: new Date(2025, 11, 31, 20),
+      },
+    ]) {
+      await repository.saveReviewResult(attempt)
+    }
+
+    const payload = await getDashboardPayload(handle, now.toISOString())
+
+    expect(payload.overview.practiceProgress).toMatchObject({
+      recordedSecondsToday: 2100,
+      completedToday: 2,
+    })
+    expect(payload.overview.practiceProgress).toEqual(payload.practiceProgress)
+  })
+
   it('composes overlay payload with current problem practice details', async () => {
     const handle = await createTestDb()
     await handle.db.insert(problemPractice).values({

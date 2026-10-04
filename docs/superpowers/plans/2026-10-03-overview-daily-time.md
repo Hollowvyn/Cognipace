@@ -17,12 +17,12 @@ Files: `src/features/practice/domain/practice-progress.ts`, its adjacent test,
 `src/features/practice/data/practice-repository.ts`, and
 `src/features/practice/server/practice-progress-service.test.ts`.
 
-- [ ] Add failing domain tests for repeated timed submissions on today's local
+- [x] Add failing domain tests for repeated timed submissions on today's local
       date, absent/invalid times, previous/next dates, and disabled daily goals.
       Assert `recordedSecondsToday` independently of `completedToday`.
-- [ ] Run `rtk proxy npm run test -- src/features/practice/domain/practice-progress.test.ts`
+- [x] Run `rtk proxy npm run test -- src/features/practice/domain/practice-progress.test.ts`
       and confirm failure because the total is absent.
-- [ ] Extend `PracticeProgressAttempt` with
+- [x] Extend `PracticeProgressAttempt` with
       `elapsedSeconds?: number | null | undefined` and the summary with
       `recordedSecondsToday: number`. Select and map `elapsedSeconds` in the
       existing repository query. Add the following calculation to the summary:
@@ -43,10 +43,10 @@ const recordedSecondsToday = attempts.reduce((total, attempt) => {
 }, 0)
 ```
 
-- [ ] Add service tests proving that repeated and failed saved assessments
+- [x] Add service tests proving that repeated and failed saved assessments
       contribute, untimed assessments do not, corrections replace time, and a
       reset removes only the affected problem's retained effort.
-- [ ] Run
+- [x] Run
       `rtk proxy npm run test -- src/features/practice/domain/practice-progress.test.ts src/features/practice/server/practice-progress-service.test.ts`.
 
 ## Task 2: Overview Contract And Presentation
@@ -59,13 +59,13 @@ Files: `src/features/app-shell/api/app-shell-contracts.ts`,
 `src/testing/app-shell-fixtures.ts`, and existing literal practice-progress
 fixtures/fallbacks identified by `rtk proxy rg -n 'todayDateKey:' src`.
 
-- [ ] Add failing Overview tests for the fourth card and formatting for 0, 45,
+- [x] Add failing Overview tests for the fourth card and formatting for 0, 45,
       60, 3599, 3600, and 5100 seconds. Add a real database app-shell test
       proving the serialized dashboard payload contains today's timed total.
-- [ ] Run
+- [x] Run
       `rtk proxy npm run test -- src/features/app-shell/domain/dashboard-overview.test.ts src/features/app-shell/components/overview-screen.test.tsx src/features/app-shell/server/app-shell-service.test.ts`
       and confirm the new card/field is missing.
-- [ ] Extend the shared progress schema with
+- [x] Extend the shared progress schema with
       `recordedSecondsToday: z.number().int().min(0)`, and set 0 in existing
       fallback/literal fixtures. Add this metric after Streak:
 
@@ -89,27 +89,27 @@ function formatRecordedTime(seconds: number) {
 }
 ```
 
-- [ ] Set the metric grid to `grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4`.
-- [ ] Rerun the focused Overview tests; inspect the diff for unrelated edits.
+- [x] Set the metric grid to `grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4`.
+- [x] Rerun the focused Overview tests; inspect the diff for unrelated edits.
 
 ## Task 3: Documentation, Review, And Proof
 
 Files: `docs/product.md`, `docs/testing.md`, `docs/superpowers/README.md`, and
 `docs/superpowers/handoffs/2026-10-03-overview-daily-time.md`.
 
-- [ ] Replace stale Overview-placeholder descriptions with the current home
+- [x] Replace stale Overview-placeholder descriptions with the current home
       behavior and documented Time Today counting semantics.
-- [ ] Add a human smoke checklist for timed/untimed, repeated/failed,
+- [x] Add a human smoke checklist for timed/untimed, repeated/failed,
       corrected/reset assessments, local date rollover, and responsive layout.
-- [ ] Render the production Overview metric component with fixture data at
+- [x] Render the production Overview metric component with fixture data at
       desktop and narrow widths; inspect and save screenshots.
-- [ ] Review against the approved design, then review code quality and fix any
+- [x] Review against the approved design, then review code quality and fix any
       findings. Do not create a PR before required human smoke proof.
-- [ ] Run `rtk proxy npm run lint`, `rtk proxy npm run check`,
+- [x] Run `rtk proxy npm run lint`, `rtk proxy npm run check`,
       `rtk proxy npm run build`, and
-      `rtk proxy npx prettier --check <all touched source/Markdown files>`.
+      the exact touched-file Prettier check recorded in the handoff.
       All commands must exit 0; report exact skipped commands with reasons.
-- [ ] Record exact validation and pending human proof in the handoff. Commit
+- [x] Record exact validation and pending human proof in the handoff. Commit
       the final change with `feat(overview): show daily recorded practice time`.
 
 Done when the fourth card displays the sum through the existing serialized read

@@ -7,6 +7,7 @@ export function createDashboardAppShellData(
   const queueItem = createAppShellQueueItem()
   const practiceProgress = {
     completedToday: 1,
+    recordedSecondsToday: 0,
     dailyGoal: 4,
     currentStreak: 0,
     goalMetToday: false,
