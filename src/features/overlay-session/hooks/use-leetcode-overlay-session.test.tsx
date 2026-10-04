@@ -8,10 +8,17 @@ import {
   openDashboardViaRuntime,
 } from '@/features/app-shell'
 import {
+  analyzeLeetCodeSubmissionViaRuntime,
+  cancelLeetCodeAnalysisViaRuntime,
   recommendLeetCodeAssessmentViaRuntime,
   type RecommendLeetCodeAssessmentRequest,
 } from '@/features/leetcode-review-assistant'
-import { makeValidRecommendation } from '@/features/leetcode-review-assistant/testing'
+import { makeCompleteCapture } from '@/features/leetcode-capture/testing/code-analysis-capture-fixtures'
+import { analysisIdentity } from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
+import {
+  makeValidAnalysis,
+  makeValidRecommendation,
+} from '@/features/leetcode-review-assistant/testing'
 import {
   overrideLastReviewResultViaRuntime,
   saveReviewResultViaRuntime,
@@ -78,8 +85,14 @@ vi.mock('@/lib/leetcode', async (importOriginal) => {
   }
 })
 
-vi.mock('@/features/leetcode-capture', () => ({
-  createLeetCodeCaptureRemoteClient: vi.fn(() => ({})),
+const remote = vi.hoisted(() => ({
+  readProblemMetadata: vi.fn(),
+  readProblemContent: vi.fn(),
+  readSubmissionResult: vi.fn(),
+}))
+vi.mock('@/features/leetcode-capture', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/leetcode-capture')>()),
+  createLeetCodeCaptureRemoteClient: vi.fn(() => remote),
 }))
 
 vi.mock('@/features/problems', () => ({
@@ -95,6 +108,8 @@ vi.mock('@/features/leetcode-review-assistant', async (importOriginal) => {
   return {
     ...actual,
     recommendLeetCodeAssessmentViaRuntime: vi.fn(),
+    analyzeLeetCodeSubmissionViaRuntime: vi.fn(),
+    cancelLeetCodeAnalysisViaRuntime: vi.fn(),
   }
 })
 
@@ -204,6 +219,31 @@ describe('useLeetCodeOverlaySession', () => {
       message: 'AI assessment is not configured.',
       submissionFingerprint: 'fallback',
     })
+    remote.readProblemContent.mockReset().mockResolvedValue({
+      ok: true,
+      content: makeCompleteCapture().problemContent,
+    })
+    remote.readSubmissionResult.mockReset().mockResolvedValue({
+      result: makeCompleteCapture().submissionResult,
+      debugEvents: [],
+    })
+    vi.mocked(analyzeLeetCodeSubmissionViaRuntime)
+      .mockReset()
+      .mockImplementation((request) =>
+        Promise.resolve({
+          status: 'ready',
+          ...analysisIdentity(request),
+          report: makeValidAnalysis({ summary: AI_PROBE_SUMMARY }),
+          providerMetadata: {
+            provider: 'openai',
+            model: 'fixture',
+            durationMs: 10,
+          },
+        }),
+      )
+    vi.mocked(cancelLeetCodeAnalysisViaRuntime)
+      .mockReset()
+      .mockResolvedValue({ requestId: 'ignored', cancelled: true })
     vi.mocked(sendMessage).mockResolvedValue({
       status: 'unavailable',
       message: 'AI assessment is not configured (test default).',
@@ -649,58 +689,117 @@ describe('useLeetCodeOverlaySession', () => {
     },
   )
 
-  it('clears the AI recommendation when the overlay restart action runs', async () => {
-    setSendMessageRecommendationReady()
+  it('runs one scored report for a full matching attempt without preselecting a rating', async () => {
+    const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
+      aiAssessmentAvailable: true,
+    })
+    act(() => result.current.actions.selectRating('easy'))
+    emitCompleteAnalysisSubmission()
+    await waitFor(() => expect(result.current.aiAnalysis.status).toBe('ready'))
+    const request = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
+      .calls[0]![0]
+    const capture = makeCompleteCapture()
+    expect(request).toMatchObject({
+      attemptId: capture.submissionAttempt.attemptId,
+      submissionId: capture.submissionResult.submissionId,
+      problemSlug: 'two-sum',
+      submission: { code: capture.submissionResult.resultCodeSnapshot.code },
+      problem: { followUps: capture.problemContent.followUps },
+    })
+    expect(result.current.overlay.selectedRating).toBe('easy')
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(recommendLeetCodeAssessmentViaRuntime).not.toHaveBeenCalled()
+    for (const action of ['expand', 'collapse', 'dock', 'restore'] as const) {
+      act(() => result.current.actions[action]())
+      await flushEffects()
+      expect(result.current.aiAnalysis.status).toBe('ready')
+    }
+    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledOnce()
+  })
+
+  it('exposes Retry for the same pinned attempt with a new request identity', async () => {
+    const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
+      aiAssessmentAvailable: true,
+    })
+    emitCompleteAnalysisSubmission()
+    await waitFor(() => expect(result.current.aiAnalysis.status).toBe('ready'))
+    const first = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
+      .calls[0]![0]
+    act(() => result.current.retryAiAnalysis())
+    await waitFor(() =>
+      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(2),
+    )
+    await waitFor(() => expect(result.current.aiAnalysis.status).toBe('ready'))
+    const second = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
+      .calls[1]![0]
+    expect(second.requestId).not.toBe(first.requestId)
+    expect(second.attemptId).toBe(first.attemptId)
+    expect(second.submissionId).toBe(first.submissionId)
+    expect(remote.readProblemContent).toHaveBeenCalledOnce()
+  })
+
+  it('keeps disabled analysis separate from provider availability', async () => {
+    const { result } = await renderReadySession({
+      aiAssessmentEnabled: false,
+      aiAssessmentAvailable: true,
+    })
+    emitCompleteAnalysisSubmission()
+    await flushEffects()
+    expect(result.current.aiAnalysis.status).toBe('disabled')
+    expect(analyzeLeetCodeSubmissionViaRuntime).not.toHaveBeenCalled()
+  })
+
+  it('clears the AI analysis when the overlay restart action runs', async () => {
     const { result } = await renderReadySession({
       aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
       autoDetectSolved: true,
     })
 
-    emitSubmissionResult()
+    emitCompleteAnalysisSubmission()
 
     await waitFor(() => {
-      expect(result.current.aiRecommendation.status).toBe('ready')
+      expect(result.current.aiAnalysis.status).toBe('ready')
     })
 
     act(() => {
       result.current.actions.restartLocalSession()
     })
 
-    expect(result.current.aiRecommendation.status).toBe('idle')
+    expect(result.current.aiAnalysis.status).toBe('idle')
   })
 
-  it('clears the AI recommendation when the LeetCode page changes', async () => {
-    setSendMessageRecommendationReady()
+  it('clears the AI analysis when the LeetCode page changes', async () => {
     const { result } = await renderReadySession({
       aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
       autoDetectSolved: true,
     })
 
-    emitSubmissionResult()
+    emitCompleteAnalysisSubmission()
 
     await waitFor(() => {
-      expect(result.current.aiRecommendation.status).toBe('ready')
+      expect(result.current.aiAnalysis.status).toBe('ready')
     })
 
     emitNextPage()
 
-    expect(result.current.aiRecommendation.status).toBe('idle')
+    expect(result.current.aiAnalysis.status).toBe('disabled')
   })
 
   it('excludes AI-authored text from the save review payload', async () => {
-    setSendMessageRecommendationReady()
     const { result } = await renderReadySession({
       aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
       autoDetectSolved: true,
     })
 
-    emitSubmissionResult()
+    emitCompleteAnalysisSubmission()
 
     await waitFor(() => {
-      expect(result.current.aiRecommendation.status).toBe('ready')
+      expect(result.current.aiAnalysis.status).toBe('ready')
     })
 
     await waitFor(() => {
@@ -908,6 +1007,25 @@ function emitSubmissionResult(result = createSubmissionResult()) {
     >
 
     leetcodeMockState.onEvent?.(event)
+  })
+}
+
+function emitCompleteAnalysisSubmission() {
+  const capture = makeCompleteCapture()
+  act(() => {
+    leetcodeMockState.onEvent?.({
+      type: 'problem-content-updated',
+      location: capture.location,
+      content: capture.problemContent,
+    })
+    leetcodeMockState.onEvent?.({
+      type: 'submission-started',
+      attempt: capture.submissionAttempt,
+    })
+    leetcodeMockState.onEvent?.({
+      type: 'submission-result-updated',
+      result: capture.submissionResult,
+    })
   })
 }
 

@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { makeValidAnalysis } from '@/features/leetcode-review-assistant/testing'
+
 import { initialOverlaySessionState } from '../../../domain'
 import { ExpandedOverlay } from './expanded-overlay'
 
@@ -140,36 +142,49 @@ describe('ExpandedOverlay', () => {
     expect(screen.getByRole('button', { name: 'Update' })).toBeDisabled()
   })
 
-  it('renders the AI recommendation section when state is non-idle', () => {
+  it('renders scored analysis independently of selected rating, locks, and mutation state', async () => {
+    const user = userEvent.setup()
+    const onRetryAiAnalysis = vi.fn()
+    const onSettings = vi.fn()
+    const onSelectRating = vi.fn()
     renderExpanded({
+      commands: { onRetryAiAnalysis, onSettings, onSelectRating },
       view: {
-        aiRecommendation: {
+        aiAnalysis: {
           status: 'ready',
-          fingerprint: 'fp-smoke',
-          recommendation: {
-            recommendedRating: 'good',
-            confidence: 'medium',
-            summary: 'Solved cleanly.',
-            primaryReason: 'Solved cleanly.',
-            evidence: [],
-            complexity: { time: 'O(n)', space: 'O(n)', confidence: 'medium' },
-            improvementPoints: [],
-            edgeCaseNotes: [],
-            shouldUpdateRating: false,
-            promptVersion: 'leetcode-assessment-v1',
-          },
-          providerMetadata: {
-            provider: 'openai',
-            model: 'gpt-test',
-            durationMs: 100,
-          },
+          requestId: 'request-1',
+          report: makeValidAnalysis(),
+        },
+        overlay: { ...createFailedSubmittedOverlay(), reviewStatus: 'saving' },
+      },
+    })
+    expect(
+      screen.getByRole('region', { name: 'AI assessment' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Approach 3/5')).toBeInTheDocument()
+    await user.click(screen.getByText('Approach', { selector: 'summary' }))
+    expect(onSelectRating).not.toHaveBeenCalled()
+  })
+
+  it('passes analysis recovery actions through the expanded panel', async () => {
+    const user = userEvent.setup()
+    const onRetryAiAnalysis = vi.fn()
+    const onSettings = vi.fn()
+    renderExpanded({
+      commands: { onRetryAiAnalysis, onSettings },
+      view: {
+        aiAnalysis: {
+          status: 'unavailable',
+          message: 'Configure AI assessment.',
+          canRetry: true,
+          showSettings: true,
         },
       },
     })
-
-    expect(
-      screen.getByRole('region', { name: 'AI recommendation' }),
-    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(onRetryAiAnalysis).toHaveBeenCalledOnce()
+    expect(onSettings).toHaveBeenCalledOnce()
   })
 
   it('keeps Help without structured-log controls', () => {
@@ -209,6 +224,7 @@ function createProps(
       onPauseTimer: vi.fn(),
       onResetTimer: vi.fn(),
       onRestart: vi.fn(),
+      onRetryAiAnalysis: vi.fn(),
       onSelectRating: vi.fn(),
       onSettings: vi.fn(),
       onStartTimer: vi.fn(),
@@ -218,7 +234,7 @@ function createProps(
     },
     themeMode: 'system',
     view: {
-      aiRecommendation: { status: 'idle' },
+      aiAnalysis: { status: 'idle' },
       context: createOverlayContext(),
       elapsedSeconds: 0,
       helpSearchQuery: 'Two Sum',
