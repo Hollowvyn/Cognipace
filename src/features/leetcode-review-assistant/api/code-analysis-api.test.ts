@@ -15,23 +15,26 @@ import {
 } from './code-analysis-api'
 import { analysisIdentity } from './code-analysis-contracts'
 
+const readyResponse = {
+  status: 'ready' as const,
+  ...analysisIdentity(makeAnalysisRequest()),
+  report: makeValidAnalysis(),
+  providerMetadata: {
+    provider: 'gemini' as const,
+    model: 'fixture-model',
+    durationMs: 1,
+  },
+}
+
 beforeEach(() => sendMessageMock.mockReset())
 
 describe('code analysis direct runtime API', () => {
   it('sends one direct analysis request and parses the report envelope', async () => {
     const request = makeAnalysisRequest()
-    const response = {
-      status: 'ready' as const,
-      ...analysisIdentity(request),
-      report: makeValidAnalysis(),
-      providerMetadata: {
-        provider: 'gemini' as const,
-        model: 'fixture-model',
-        durationMs: 1,
-      },
-    }
-    sendMessageMock.mockResolvedValue(response)
-    expect(await analyzeLeetCodeSubmissionViaRuntime(request)).toEqual(response)
+    sendMessageMock.mockResolvedValue(readyResponse)
+    expect(await analyzeLeetCodeSubmissionViaRuntime(request)).toEqual(
+      readyResponse,
+    )
     expect(sendMessageMock).toHaveBeenCalledExactlyOnceWith(
       'genai.analyzeLeetCodeSubmission',
       request,
@@ -41,14 +44,7 @@ describe('code analysis direct runtime API', () => {
   it('rejects unchecked provider output and response extras', async () => {
     const request = makeAnalysisRequest()
     sendMessageMock.mockResolvedValue({
-      status: 'ready',
-      ...analysisIdentity(request),
-      report: makeValidAnalysis(),
-      providerMetadata: {
-        provider: 'gemini',
-        model: 'fixture-model',
-        durationMs: 1,
-      },
+      ...readyResponse,
       apiKey: 'fixture-secret',
     })
     await expect(analyzeLeetCodeSubmissionViaRuntime(request)).rejects.toThrow()
@@ -59,14 +55,9 @@ describe('code analysis direct runtime API', () => {
       surface: 'content-script' as const,
       requestId: 'request-1',
     }
-    sendMessageMock.mockResolvedValue({
-      requestId: request.requestId,
-      cancelled: true,
-    })
-    expect(await cancelLeetCodeAnalysisViaRuntime(request)).toEqual({
-      requestId: 'request-1',
-      cancelled: true,
-    })
+    const response = { requestId: request.requestId, cancelled: true }
+    sendMessageMock.mockResolvedValue(response)
+    expect(await cancelLeetCodeAnalysisViaRuntime(request)).toEqual(response)
     expect(sendMessageMock).toHaveBeenCalledExactlyOnceWith(
       'genai.cancelLeetCodeAnalysis',
       request,

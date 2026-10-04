@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createLeetCodeReviewContext,
@@ -53,29 +53,33 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-function prepare(
-  capture: LeetCodeCaptureState,
-  remote = makeRemote(),
-  refresh = false,
-) {
-  return prepareLeetCodeAnalysisContext(
-    capture,
-    remote,
-    new AbortController().signal,
-    refresh,
-  )
-}
-
 describe('prepareLeetCodeAnalysisContext', () => {
+  let capture: ReturnType<typeof makeCompleteCapture>
+  let complete: ReturnType<typeof makeCompleteCapture>
+  let remote: ReturnType<typeof makeRemote>
+  let contentRead: ReturnType<typeof makeRemote>['readProblemContent']
+  let resultRead: ReturnType<typeof makeRemote>['readSubmissionResult']
+  beforeEach(() => {
+    capture = makeCompleteCapture()
+    complete = makeCompleteCapture()
+    remote = makeRemote()
+    contentRead = remote.readProblemContent
+    resultRead = remote.readSubmissionResult
+  })
+  function prepare(
+    input: LeetCodeCaptureState = capture,
+    refresh = false,
+    signal = new AbortController().signal,
+  ) {
+    return prepareLeetCodeAnalysisContext(input, remote, signal, refresh)
+  }
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
   it('returns complete matching input without transport or changing full source', async () => {
-    const capture = makeCompleteCapture()
-    const remote = makeRemote()
-    const prepared = await prepare(capture, remote)
+    const prepared = await prepare(capture)
 
     expect(prepared).toEqual({
       status: 'ready',
@@ -84,8 +88,8 @@ describe('prepareLeetCodeAnalysisContext', () => {
       attemptId: 'fixture-attempt-1',
       capture,
     })
-    expect(remote.readProblemContent).not.toHaveBeenCalled()
-    expect(remote.readSubmissionResult).not.toHaveBeenCalled()
+    expect(contentRead).not.toHaveBeenCalled()
+    expect(resultRead).not.toHaveBeenCalled()
     expect(remote.readProblemMetadata).not.toHaveBeenCalled()
     if (prepared.status === 'ready') {
       expect(prepared.context.submittedCode?.code).toBe(
@@ -95,20 +99,18 @@ describe('prepareLeetCodeAnalysisContext', () => {
   })
 
   it('explicitly refreshes both reads once in parallel with the same pinned attempt', async () => {
-    const capture = makeCompleteCapture()
-    const remote = makeRemote()
     const content = deferred<LeetCodeProblemContentResult>()
     const result = deferred<LeetCodeSubmissionResultRemoteResponse>()
-    remote.readProblemContent.mockReturnValue(content.promise)
-    remote.readSubmissionResult.mockReturnValue(result.promise)
-    const pending = prepare(capture, remote, true)
+    contentRead.mockReturnValue(content.promise)
+    resultRead.mockReturnValue(result.promise)
+    const pending = prepare(capture, true)
     await Promise.resolve()
 
-    expect(remote.readProblemContent).toHaveBeenCalledExactlyOnceWith({
+    expect(contentRead).toHaveBeenCalledExactlyOnceWith({
       location: capture.submissionAttempt.location,
       refresh: true,
     })
-    expect(remote.readSubmissionResult).toHaveBeenCalledExactlyOnceWith({
+    expect(resultRead).toHaveBeenCalledExactlyOnceWith({
       location: capture.submissionAttempt.location,
       attemptId: 'fixture-attempt-1',
       submissionId: '1234567890',
@@ -128,15 +130,13 @@ describe('prepareLeetCodeAnalysisContext', () => {
 
   it('finishes unavailable at 15 seconds even when a pinned result never settles', async () => {
     vi.useFakeTimers()
-    const complete = makeCompleteCapture()
     const capture: LeetCodeCaptureState = {
       ...complete,
       submissionResult: null,
       submissionPollingDebug: makeDebug('1234567890'),
     }
-    const remote = makeRemote()
-    remote.readSubmissionResult.mockReturnValue(new Promise(() => {}))
-    const pending = prepare(capture, remote)
+    resultRead.mockReturnValue(new Promise(() => {}))
+    const pending = prepare(capture)
     let settled = false
     void pending.then(() => {
       settled = true
@@ -150,7 +150,7 @@ describe('prepareLeetCodeAnalysisContext', () => {
       message: unavailableMessage,
       capture: { submissionPollingDebug: { submissionId: '1234567890' } },
     })
-    expect(remote.readSubmissionResult).toHaveBeenCalledWith(
+    expect(resultRead).toHaveBeenCalledWith(
       expect.objectContaining({ submissionId: '1234567890', refresh: true }),
     )
     expect(vi.getTimerCount()).toBe(0)
@@ -159,21 +159,16 @@ describe('prepareLeetCodeAnalysisContext', () => {
   it.each(['partial', 'missing'] as const)(
     'does not promote %s result code or the attempt fragment',
     async (completeness) => {
-      const full = makeCompleteCapture()
-      const remote = makeRemote()
       const result = {
-        ...full.submissionResult,
+        ...complete.submissionResult,
         resultCodeSnapshot: {
-          ...full.submissionResult.resultCodeSnapshot,
+          ...complete.submissionResult.resultCodeSnapshot,
           completeness,
           code: completeness === 'missing' ? null : 'return [0, 1]',
         },
       }
-      remote.readSubmissionResult.mockResolvedValue({ result, debugEvents: [] })
-      const prepared = await prepare(
-        { ...full, submissionResult: result },
-        remote,
-      )
+      resultRead.mockResolvedValue({ result, debugEvents: [] })
+      const prepared = await prepare({ ...complete, submissionResult: result })
       expect(prepared.status).toBe('unavailable')
       expect(
         prepared.capture.submissionResult?.resultCodeSnapshot.completeness,
@@ -184,12 +179,10 @@ describe('prepareLeetCodeAnalysisContext', () => {
   it.each(['partial', 'missing'] as const)(
     'does not accept %s content',
     async (completeness) => {
-      const capture = makeCompleteCapture()
       const content = { ...capture.problemContent, completeness }
-      const remote = makeRemote()
-      remote.readProblemContent.mockResolvedValue({ ok: true, content })
+      contentRead.mockResolvedValue({ ok: true, content })
       expect(
-        (await prepare({ ...capture, problemContent: content }, remote)).status,
+        (await prepare({ ...capture, problemContent: content })).status,
       ).toBe('unavailable')
     },
   )
@@ -197,33 +190,17 @@ describe('prepareLeetCodeAnalysisContext', () => {
   it.each(['code', 'language', 'statement'] as const)(
     'requires nonblank %s even with complete provenance',
     async (field) => {
-      const capture = makeCompleteCapture()
-      const incomplete: LeetCodeCaptureState = {
-        ...capture,
-        problemContent: {
-          ...capture.problemContent,
-          statement:
-            field === 'statement' ? '   ' : capture.problemContent.statement,
-        },
-        submissionResult: {
-          ...capture.submissionResult,
-          resultCodeSnapshot: {
-            ...capture.submissionResult.resultCodeSnapshot,
-            ...(field === 'code' ? { code: '   ' } : {}),
-            ...(field === 'language' ? { language: '   ' } : {}),
-          },
-        },
-      }
-      const remote = makeRemote()
-      remote.readProblemContent.mockResolvedValue({
+      if (field === 'statement') capture.problemContent.statement = '   '
+      else capture.submissionResult.resultCodeSnapshot[field] = '   '
+      contentRead.mockResolvedValue({
         ok: true,
-        content: incomplete.problemContent!,
+        content: capture.problemContent,
       })
-      remote.readSubmissionResult.mockResolvedValue({
-        result: incomplete.submissionResult,
+      resultRead.mockResolvedValue({
+        result: capture.submissionResult,
         debugEvents: [],
       })
-      expect((await prepare(incomplete, remote)).status).toBe('unavailable')
+      expect((await prepare(capture)).status).toBe('unavailable')
     },
   )
 
@@ -239,8 +216,6 @@ describe('prepareLeetCodeAnalysisContext', () => {
   ])(
     'preserves %s terminal diagnostics and exact full code on same-ID refresh',
     async (status) => {
-      const capture = makeCompleteCapture()
-      const remote = makeRemote()
       const result = {
         ...capture.submissionResult,
         status,
@@ -250,8 +225,8 @@ describe('prepareLeetCodeAnalysisContext', () => {
         runtimeError: 'Original runtime diagnostic',
         failingTestcase: '[2, 7], 9',
       }
-      remote.readSubmissionResult.mockResolvedValue({ result, debugEvents: [] })
-      const prepared = await prepare(capture, remote, true)
+      resultRead.mockResolvedValue({ result, debugEvents: [] })
+      const prepared = await prepare(capture, true)
       expect(prepared.status).toBe('ready')
       if (prepared.status === 'ready') {
         expect(prepared.context.submissionResult).toEqual(result)
@@ -273,39 +248,22 @@ describe('prepareLeetCodeAnalysisContext', () => {
     async (field) => {
       for (const mismatch of [{ host: 'leetcode.cn' }, { slug: 'three-sum' }]) {
         const capture: LeetCodeCaptureState = makeCompleteCapture()
-        if (field === 'location') {
-          capture.location = { ...capture.location!, ...mismatch }
-        } else {
-          const value = capture[field]!
-          const changedLocation = { ...value.location, ...mismatch }
-          if (field === 'submissionAttempt') {
-            capture.submissionAttempt = {
-              ...capture.submissionAttempt!,
-              location: changedLocation,
-            }
-          } else if (field === 'submissionResult') {
-            capture.submissionResult = {
-              ...capture.submissionResult!,
-              location: changedLocation,
-            }
-          } else if (field === 'metadata') {
-            capture.metadata = {
-              ...capture.metadata!,
-              location: changedLocation,
-            }
-          } else {
-            capture.problemContent = {
-              ...capture.problemContent!,
-              location: changedLocation,
-            }
-          }
+        const value = capture[field]!
+        const changedLocation = {
+          ...(field === 'location'
+            ? capture.location!
+            : capture[field]!.location),
+          ...mismatch,
         }
-        const remote = makeRemote()
-        expect((await prepare(capture, remote, true)).status).toBe(
-          'unavailable',
-        )
-        expect(remote.readProblemContent).not.toHaveBeenCalled()
-        expect(remote.readSubmissionResult).not.toHaveBeenCalled()
+        Object.assign(capture, {
+          [field]:
+            field === 'location'
+              ? changedLocation
+              : { ...value, location: changedLocation },
+        })
+        expect((await prepare(capture, true)).status).toBe('unavailable')
+        expect(contentRead).not.toHaveBeenCalled()
+        expect(resultRead).not.toHaveBeenCalled()
       }
     },
   )
@@ -314,10 +272,8 @@ describe('prepareLeetCodeAnalysisContext', () => {
     'rejects refreshed %s from another host or slug',
     async (field) => {
       for (const mismatch of [{ host: 'leetcode.cn' }, { slug: 'three-sum' }]) {
-        const capture = makeCompleteCapture()
-        const remote = makeRemote()
         if (field === 'content') {
-          remote.readProblemContent.mockResolvedValue({
+          contentRead.mockResolvedValue({
             ok: true,
             content: {
               ...capture.problemContent,
@@ -325,7 +281,7 @@ describe('prepareLeetCodeAnalysisContext', () => {
             },
           })
         } else {
-          remote.readSubmissionResult.mockResolvedValue({
+          resultRead.mockResolvedValue({
             result: {
               ...capture.submissionResult,
               location: { ...capture.location, ...mismatch },
@@ -333,7 +289,7 @@ describe('prepareLeetCodeAnalysisContext', () => {
             debugEvents: [makeDebug('999')],
           })
         }
-        const prepared = await prepare(capture, remote, true)
+        const prepared = await prepare(capture, true)
         expect(prepared.status).toBe('unavailable')
         expect(prepared.capture.submissionResult?.submissionId).toBe(
           '1234567890',
@@ -343,13 +299,11 @@ describe('prepareLeetCodeAnalysisContext', () => {
   )
 
   it('rejects a mismatched context location derived from mutable metadata', async () => {
-    const capture = makeCompleteCapture()
-    const remote = makeRemote()
-    remote.readProblemContent.mockImplementation(() => {
+    contentRead.mockImplementation(() => {
       capture.metadata.location = { ...capture.location, slug: 'three-sum' }
       return Promise.resolve({ ok: true, content: capture.problemContent })
     })
-    expect((await prepare(capture, remote, true)).status).toBe('unavailable')
+    expect((await prepare(capture, true)).status).toBe('unavailable')
   })
 
   it.each(['attempt', 'metadata', 'location'] as const)(
@@ -359,32 +313,27 @@ describe('prepareLeetCodeAnalysisContext', () => {
       if (field === 'attempt') capture.submissionAttempt = null
       if (field === 'metadata') capture.metadata = null
       if (field === 'location') capture.location = null
-      const remote = makeRemote()
-      expect((await prepare(capture, remote, true)).status).toBe('unavailable')
-      expect(remote.readProblemContent).not.toHaveBeenCalled()
-      expect(remote.readSubmissionResult).not.toHaveBeenCalled()
+      expect((await prepare(capture, true)).status).toBe('unavailable')
+      expect(contentRead).not.toHaveBeenCalled()
+      expect(resultRead).not.toHaveBeenCalled()
     },
   )
 
   it('does not transport a blank attempt ID', async () => {
-    const capture = makeCompleteCapture()
     capture.submissionAttempt.attemptId = '   '
-    const remote = makeRemote()
-    expect((await prepare(capture, remote, true)).status).toBe('unavailable')
-    expect(remote.readSubmissionResult).not.toHaveBeenCalled()
+    expect((await prepare(capture, true)).status).toBe('unavailable')
+    expect(resultRead).not.toHaveBeenCalled()
   })
 
   it('cannot replace an existing pin with another returned submission ID', async () => {
-    const capture = makeCompleteCapture()
-    const remote = makeRemote()
-    remote.readSubmissionResult.mockResolvedValue({
+    resultRead.mockResolvedValue({
       result: { ...capture.submissionResult, submissionId: '999' },
       debugEvents: [makeDebug('999')],
     })
-    const prepared = await prepare(capture, remote, true)
+    const prepared = await prepare(capture, true)
     expect(prepared.status).toBe('unavailable')
     expect(prepared.capture.submissionResult?.submissionId).toBe('1234567890')
-    expect(remote.readSubmissionResult).toHaveBeenCalledWith(
+    expect(resultRead).toHaveBeenCalledWith(
       expect.objectContaining({ submissionId: '1234567890' }),
     )
   })
@@ -392,19 +341,15 @@ describe('prepareLeetCodeAnalysisContext', () => {
   it.each([null, '', 'bad-id'])(
     'retains the existing result pin when refresh returns invalid ID %s',
     async (submissionId) => {
-      const capture = makeCompleteCapture()
-      const remote = makeRemote()
-      remote.readSubmissionResult.mockResolvedValueOnce({
+      resultRead.mockResolvedValueOnce({
         result: { ...capture.submissionResult, submissionId },
         debugEvents: [],
       })
-      const prepared = await prepare(capture, remote, true)
+      const prepared = await prepare(capture, true)
       expect(prepared.status).toBe('unavailable')
       expect(prepared.capture.submissionResult?.submissionId).toBe('1234567890')
-      expect((await prepare(prepared.capture, remote, true)).status).toBe(
-        'ready',
-      )
-      expect(remote.readSubmissionResult).toHaveBeenLastCalledWith(
+      expect((await prepare(prepared.capture, true)).status).toBe('ready')
+      expect(resultRead).toHaveBeenLastCalledWith(
         expect.objectContaining({ submissionId: '1234567890' }),
       )
     },
@@ -415,110 +360,80 @@ describe('prepareLeetCodeAnalysisContext', () => {
       ...makeCompleteCapture(),
       submissionPollingDebug: makeDebug('999'),
     }
-    const remote = makeRemote()
-    expect((await prepare(capture, remote, true)).status).toBe('ready')
-    expect(remote.readSubmissionResult).toHaveBeenCalledWith(
+    expect((await prepare(capture, true)).status).toBe('ready')
+    expect(resultRead).toHaveBeenCalledWith(
       expect.objectContaining({ submissionId: '1234567890' }),
     )
   })
 
-  it('retains the first fresh discovery when terminal result conflicts, then retries the discovered ID', async () => {
-    const complete = makeCompleteCapture()
-    const capture: LeetCodeCaptureState = {
-      ...complete,
-      submissionResult: null,
-    }
-    const original = structuredClone(capture)
-    const remote = makeRemote()
-    remote.readSubmissionResult.mockResolvedValueOnce({
-      result: { ...complete.submissionResult, submissionId: '999' },
-      debugEvents: [
-        makeDebug(null),
-        makeDebug('bad-id'),
-        makeDebug('1234567890'),
-      ],
-    })
-    const prepared = await prepare(capture, remote)
-    expect(prepared).toMatchObject({
-      status: 'unavailable',
-      capture: { submissionPollingDebug: { submissionId: '1234567890' } },
-    })
-    expect(prepared.capture.submissionResult).toBeNull()
-    expect(prepared.capture.problemContent).toBeNull()
-    expect(capture).toEqual(original)
-    remote.readSubmissionResult.mockImplementation((request) =>
-      Promise.resolve({
+  it.each(['conflicting-result', 'missing-result'] as const)(
+    'retains the first valid discovery with %s and retries that pin rather than latest',
+    async (kind) => {
+      const pendingCapture: LeetCodeCaptureState = {
+        ...complete,
+        submissionResult: null,
+        problemContent:
+          kind === 'missing-result' ? null : complete.problemContent,
+      }
+      const original = structuredClone(pendingCapture)
+      if (kind === 'missing-result')
+        contentRead.mockResolvedValueOnce({
+          ok: false,
+          error: new Error('Missing'),
+        })
+      resultRead.mockResolvedValueOnce({
         result:
-          request.submissionId === '1234567890'
-            ? complete.submissionResult
-            : { ...complete.submissionResult, submissionId: '999' },
-        debugEvents: [],
-      }),
-    )
-    const retry = await prepare(prepared.capture, remote, true)
-    expect(retry).toMatchObject({ status: 'ready', submissionId: '1234567890' })
-    expect(remote.readSubmissionResult).toHaveBeenLastCalledWith(
-      expect.objectContaining({ submissionId: '1234567890', refresh: true }),
-    )
-  })
-
-  it('retains the first valid discovery with no result and retries that pin rather than latest', async () => {
-    const complete = makeCompleteCapture()
-    const capture: LeetCodeCaptureState = {
-      ...complete,
-      submissionResult: null,
-      problemContent: null,
-    }
-    const remote = makeRemote()
-    remote.readProblemContent.mockResolvedValueOnce({
-      ok: false,
-      error: new Error('Missing'),
-    })
-    remote.readSubmissionResult.mockResolvedValueOnce({
-      result: null,
-      debugEvents: [
-        makeDebug(null),
-        makeDebug('bad-id'),
-        makeDebug('1234567890'),
-        makeDebug('999'),
-      ],
-    })
-    const first = await prepare(capture, remote)
-    expect(first).toMatchObject({
-      status: 'unavailable',
-      capture: { submissionPollingDebug: { submissionId: '1234567890' } },
-    })
-    remote.readSubmissionResult.mockImplementation((request) =>
-      Promise.resolve({
-        result:
-          request.submissionId === '1234567890'
-            ? complete.submissionResult
-            : { ...complete.submissionResult, submissionId: '999' },
-        debugEvents: [],
-      }),
-    )
-    expect((await prepare(first.capture, remote, true)).status).toBe('ready')
-    expect(remote.readSubmissionResult).toHaveBeenLastCalledWith(
-      expect.objectContaining({ submissionId: '1234567890' }),
-    )
-  })
+          kind === 'conflicting-result'
+            ? { ...complete.submissionResult, submissionId: '999' }
+            : null,
+        debugEvents: [
+          makeDebug(null),
+          makeDebug('bad-id'),
+          makeDebug('1234567890'),
+          makeDebug('999'),
+        ],
+      })
+      const first = await prepare(pendingCapture)
+      expect(first).toMatchObject({
+        status: 'unavailable',
+        capture: { submissionPollingDebug: { submissionId: '1234567890' } },
+      })
+      expect(first.capture.submissionResult).toBeNull()
+      expect(first.capture.problemContent).toBeNull()
+      expect(pendingCapture).toEqual(original)
+      resultRead.mockImplementation((request) =>
+        Promise.resolve({
+          result:
+            request.submissionId === '1234567890'
+              ? complete.submissionResult
+              : { ...complete.submissionResult, submissionId: '999' },
+          debugEvents: [],
+        }),
+      )
+      expect(await prepare(first.capture, true)).toMatchObject({
+        status: 'ready',
+        submissionId: '1234567890',
+      })
+      expect(resultRead).toHaveBeenLastCalledWith(
+        expect.objectContaining({ submissionId: '1234567890', refresh: true }),
+      )
+    },
+  )
 
   it('retains a discovered pin when content hangs, then ignores late resolution', async () => {
     vi.useFakeTimers()
-    const complete = makeCompleteCapture()
     const capture: LeetCodeCaptureState = {
       ...complete,
       submissionResult: null,
       problemContent: null,
     }
-    const remote = makeRemote()
     const content = deferred<LeetCodeProblemContentResult>()
-    remote.readProblemContent.mockReturnValueOnce(content.promise)
-    remote.readSubmissionResult.mockResolvedValueOnce({
+    contentRead.mockReturnValueOnce(content.promise)
+    resultRead.mockResolvedValueOnce({
       result: null,
       debugEvents: [makeDebug('1234567890')],
     })
-    const pending = prepare(capture, remote)
+    const pending = prepare(capture)
     await vi.advanceTimersByTimeAsync(15000)
     const first = await pending
     const beforeLateResolution = structuredClone(first.capture)
@@ -530,24 +445,19 @@ describe('prepareLeetCodeAnalysisContext', () => {
     content.resolve({ ok: true, content: complete.problemContent })
     await Promise.resolve()
     expect(first.capture).toEqual(beforeLateResolution)
-    expect((await prepare(first.capture, remote, true)).status).toBe('ready')
-    expect(remote.readSubmissionResult).toHaveBeenLastCalledWith(
+    expect((await prepare(first.capture, true)).status).toBe('ready')
+    expect(resultRead).toHaveBeenLastCalledWith(
       expect.objectContaining({ submissionId: '1234567890' }),
     )
     expect(vi.getTimerCount()).toBe(0)
   })
 
   it('retains a newly returned result pin when content is unavailable', async () => {
-    const complete = makeCompleteCapture()
-    const remote = makeRemote()
-    remote.readProblemContent.mockResolvedValue({
+    contentRead.mockResolvedValue({
       ok: false,
       error: new Error('Missing'),
     })
-    const prepared = await prepare(
-      { ...complete, submissionResult: null },
-      remote,
-    )
+    const prepared = await prepare({ ...complete, submissionResult: null })
     expect(prepared).toMatchObject({
       status: 'unavailable',
       capture: { submissionResult: { submissionId: '1234567890' } },
@@ -557,13 +467,10 @@ describe('prepareLeetCodeAnalysisContext', () => {
   it.each(['content', 'result'] as const)(
     'never returns old complete context after %s transport failure',
     async (field) => {
-      const capture = makeCompleteCapture()
-      const remote = makeRemote()
       if (field === 'content')
-        remote.readProblemContent.mockRejectedValue(new Error('Offline'))
-      if (field === 'result')
-        remote.readSubmissionResult.mockRejectedValue(new Error('Offline'))
-      expect(await prepare(capture, remote, true)).toMatchObject({
+        contentRead.mockRejectedValue(new Error('Offline'))
+      if (field === 'result') resultRead.mockRejectedValue(new Error('Offline'))
+      expect(await prepare(capture, true)).toMatchObject({
         status: 'unavailable',
         message: unavailableMessage,
       })
@@ -571,25 +478,21 @@ describe('prepareLeetCodeAnalysisContext', () => {
   )
 
   it('cannot reuse an old result with fresh content on the next default call after result refresh fails', async () => {
-    const capture = makeCompleteCapture()
-    const remote = makeRemote()
-    remote.readSubmissionResult.mockRejectedValueOnce(new Error('Offline'))
-    const first = await prepare(capture, remote, true)
+    resultRead.mockRejectedValueOnce(new Error('Offline'))
+    const first = await prepare(capture, true)
     expect(first.status).toBe('unavailable')
     expect(first.capture.submissionResult).toEqual(capture.submissionResult)
     expect(first.capture.problemContent).toBeNull()
-    const callsBefore = remote.readSubmissionResult.mock.calls.length
-    expect((await prepare(first.capture, remote)).status).toBe('ready')
-    expect(remote.readSubmissionResult).toHaveBeenCalledTimes(callsBefore + 1)
+    const callsBefore = resultRead.mock.calls.length
+    expect((await prepare(first.capture)).status).toBe('ready')
+    expect(resultRead).toHaveBeenCalledTimes(callsBefore + 1)
   })
 
   it('waits for a discovered pin even if the other transport already rejected', async () => {
-    const complete = makeCompleteCapture()
-    const remote = makeRemote()
     const result = deferred<LeetCodeSubmissionResultRemoteResponse>()
-    remote.readProblemContent.mockRejectedValue(new Error('Offline'))
-    remote.readSubmissionResult.mockReturnValue(result.promise)
-    const pending = prepare({ ...complete, submissionResult: null }, remote)
+    contentRead.mockRejectedValue(new Error('Offline'))
+    resultRead.mockReturnValue(result.promise)
+    const pending = prepare({ ...complete, submissionResult: null })
     await Promise.resolve()
     result.resolve({ result: null, debugEvents: [makeDebug('1234567890')] })
     expect(await pending).toMatchObject({
@@ -600,18 +503,11 @@ describe('prepareLeetCodeAnalysisContext', () => {
 
   it('cleans listeners and timers when parent abort rejects hanging reads', async () => {
     vi.useFakeTimers()
-    const capture = makeCompleteCapture()
-    const remote = makeRemote()
     const parent = new AbortController()
     const add = vi.spyOn(parent.signal, 'addEventListener')
     const remove = vi.spyOn(parent.signal, 'removeEventListener')
-    remote.readSubmissionResult.mockReturnValue(new Promise(() => {}))
-    const pending = prepareLeetCodeAnalysisContext(
-      capture,
-      remote,
-      parent.signal,
-      true,
-    )
+    resultRead.mockReturnValue(new Promise(() => {}))
+    const pending = prepare(capture, true, parent.signal)
     const rejection = expect(pending).rejects.toThrow('Navigated away')
     parent.abort(new Error('Navigated away'))
     await rejection
@@ -622,30 +518,19 @@ describe('prepareLeetCodeAnalysisContext', () => {
   it('rejects an already aborted signal before returning ready or starting transport', async () => {
     const parent = new AbortController()
     parent.abort(new Error('Already gone'))
-    const remote = makeRemote()
-    await expect(
-      prepareLeetCodeAnalysisContext(
-        makeCompleteCapture(),
-        remote,
-        parent.signal,
-      ),
-    ).rejects.toThrow('Already gone')
-    expect(remote.readSubmissionResult).not.toHaveBeenCalled()
+    await expect(prepare(capture, false, parent.signal)).rejects.toThrow(
+      'Already gone',
+    )
+    expect(resultRead).not.toHaveBeenCalled()
   })
 
   it('cleans listeners and timers on success and leaves caller capture unchanged', async () => {
     vi.useFakeTimers()
-    const capture = makeCompleteCapture()
     const original = structuredClone(capture)
     const parent = new AbortController()
     const add = vi.spyOn(parent.signal, 'addEventListener')
     const remove = vi.spyOn(parent.signal, 'removeEventListener')
-    const prepared = await prepareLeetCodeAnalysisContext(
-      capture,
-      makeRemote(),
-      parent.signal,
-      true,
-    )
+    const prepared = await prepare(capture, true, parent.signal)
     expect(prepared.status).toBe('ready')
     expect(capture).toEqual(original)
     expect(remove).toHaveBeenCalledWith('abort', add.mock.calls[0]?.[1])

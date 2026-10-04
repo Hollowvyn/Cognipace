@@ -87,26 +87,20 @@ describe('cache invalidation broadcaster', () => {
   })
 
   it('broadcasts typed cache invalidation events to extension pages and LeetCode tabs', async () => {
+    const input = {
+      problemSlug: 'two-sum',
+      reason: 'practice-updated',
+      source: 'content-script',
+      tags: ['practice', 'queue', 'app-shell'],
+    } as const
     const event = await broadcastCacheInvalidation({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'content-script',
-      tags: ['practice', 'queue', 'app-shell'],
+      ...input,
+      tags: [...input.tags],
     })
-
-    expect(event).toMatchObject({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'content-script',
-      tags: ['practice', 'queue', 'app-shell'],
-    })
-
+    expect(event).toMatchObject(input)
     expect(messagingMocks.sendMessage).toHaveBeenCalledWith(
       'cache.invalidate',
-      expect.objectContaining({
-        reason: 'practice-updated',
-        tags: ['practice', 'queue', 'app-shell'],
-      }),
+      expect.objectContaining(input),
     )
     expect(browserMocks.tabsQuery).toHaveBeenCalledWith({
       url: [
@@ -114,22 +108,12 @@ describe('cache invalidation broadcaster', () => {
         'https://www.leetcode.com/problems/*',
       ],
     })
-    expect(messagingMocks.sendMessage).toHaveBeenCalledWith(
-      'cache.invalidate',
-      expect.objectContaining({
-        reason: 'practice-updated',
-        tags: ['practice', 'queue', 'app-shell'],
-      }),
-      10,
-    )
-    expect(messagingMocks.sendMessage).toHaveBeenCalledWith(
-      'cache.invalidate',
-      expect.objectContaining({
-        reason: 'practice-updated',
-        tags: ['practice', 'queue', 'app-shell'],
-      }),
-      20,
-    )
+    for (const tabId of [10, 20])
+      expect(messagingMocks.sendMessage).toHaveBeenCalledWith(
+        'cache.invalidate',
+        expect.objectContaining(input),
+        tabId,
+      )
   })
 
   it('does not fail the source mutation when no surface can receive the event', async () => {

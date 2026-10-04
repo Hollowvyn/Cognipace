@@ -19,6 +19,9 @@ vi.mock('@/features/genai/server/genai-settings-service', () => ({
 }))
 vi.mock('./code-analysis-service', () => ({ analyzeCode: vi.fn() }))
 
+const loadConfig = vi.mocked(loadActiveProviderConfigSnapshot)
+const analyzeMock = vi.mocked(analyzeCode)
+
 const privateKey = 'fake-private-key'
 const rawBody = 'raw-provider-exception-body'
 const config = {
@@ -47,6 +50,9 @@ function deferred<T>() {
   })
   return { promise, resolve }
 }
+const runAnalysis = (signal = new AbortController().signal) =>
+  analyzeLeetCodeSubmissionInBackground(request, loadDb, signal)
+
 function expectSafe(result: unknown) {
   expect(
     analyzeLeetCodeSubmissionResponseSchema.safeParse(result).success,
@@ -66,8 +72,8 @@ beforeEach(() => {
   vi.useFakeTimers()
   vi.resetAllMocks()
   loadDb.mockResolvedValue(db)
-  vi.mocked(loadActiveProviderConfigSnapshot).mockResolvedValue(snapshot)
-  vi.mocked(analyzeCode).mockResolvedValue(success())
+  loadConfig.mockResolvedValue(snapshot)
+  analyzeMock.mockResolvedValue(success())
 })
 afterEach(() => {
   vi.useRealTimers()
@@ -75,11 +81,7 @@ afterEach(() => {
 
 describe('trusted background submission analysis', () => {
   it('returns a ready report with five identity fields and one sole analysis call', async () => {
-    const result = await analyzeLeetCodeSubmissionInBackground(
-      request,
-      loadDb,
-      new AbortController().signal,
-    )
+    const result = await runAnalysis()
     expect(result).toEqual({
       status: 'ready',
       ...analysisIdentity(request),
@@ -87,8 +89,8 @@ describe('trusted background submission analysis', () => {
       providerMetadata: metadata,
     })
     expectSafe(result)
-    expect(analyzeCode).toHaveBeenCalledTimes(1)
-    expect(loadActiveProviderConfigSnapshot).toHaveBeenCalledTimes(2)
+    expect(analyzeMock).toHaveBeenCalledTimes(1)
+    expect(loadConfig).toHaveBeenCalledTimes(2)
     expect(vi.getTimerCount()).toBe(0)
   })
 
@@ -97,31 +99,23 @@ describe('trusted background submission analysis', () => {
       vi.setSystemTime(Date.now() + 2_000)
       return Promise.resolve(db)
     })
-    vi.mocked(loadActiveProviderConfigSnapshot).mockImplementation(() => {
+    loadConfig.mockImplementation(() => {
       vi.setSystemTime(Date.now() + 3_000)
       return Promise.resolve(snapshot)
     })
-    await analyzeLeetCodeSubmissionInBackground(
-      request,
-      loadDb,
-      new AbortController().signal,
-    )
-    expect(analyzeCode).toHaveBeenCalledWith(
+    await runAnalysis()
+    expect(analyzeMock).toHaveBeenCalledWith(
       request,
       config,
       expect.any(AbortSignal),
       25_000,
     )
-    expect(analyzeCode).toHaveBeenCalledTimes(1)
+    expect(analyzeMock).toHaveBeenCalledTimes(1)
   })
 
   it('returns actionable unavailable feedback without generation for missing configuration', async () => {
-    vi.mocked(loadActiveProviderConfigSnapshot).mockResolvedValue(null)
-    const result = await analyzeLeetCodeSubmissionInBackground(
-      request,
-      loadDb,
-      new AbortController().signal,
-    )
+    loadConfig.mockResolvedValue(null)
+    const result = await runAnalysis()
     expect(result).toMatchObject({
       status: 'unavailable',
       reason: 'configuration',
@@ -129,23 +123,19 @@ describe('trusted background submission analysis', () => {
     if (result.status === 'unavailable')
       expect(result.message).toMatch(/enable.*settings/i)
     expectSafe(result)
-    expect(analyzeCode).not.toHaveBeenCalled()
+    expect(analyzeMock).not.toHaveBeenCalled()
   })
 
   it.each(aiErrorCodes)(
     'returns the controlled SDK %s failure',
     async (code) => {
-      vi.mocked(analyzeCode).mockResolvedValue({
+      analyzeMock.mockResolvedValue({
         status: 'error',
         code,
         message: 'Controlled SDK feedback.',
         providerMetadata: metadata,
       })
-      const result = await analyzeLeetCodeSubmissionInBackground(
-        request,
-        loadDb,
-        new AbortController().signal,
-      )
+      const result = await runAnalysis()
       expect(result).toMatchObject({
         status: 'error',
         code,
@@ -171,14 +161,8 @@ describe('trusted background submission analysis', () => {
                     : { ...config, apiKey: 'replacement-key' },
               identity: `changed-${kind}`,
             }
-      vi.mocked(loadActiveProviderConfigSnapshot)
-        .mockResolvedValueOnce(snapshot)
-        .mockResolvedValueOnce(current)
-      const result = await analyzeLeetCodeSubmissionInBackground(
-        request,
-        loadDb,
-        new AbortController().signal,
-      )
+      loadConfig.mockResolvedValueOnce(snapshot).mockResolvedValueOnce(current)
+      const result = await runAnalysis()
       expect(result).toMatchObject({
         status: 'error',
         code: 'stale-configuration',
@@ -190,22 +174,17 @@ describe('trusted background submission analysis', () => {
   )
 
   it('rejects a stale configuration even when generation returns a controlled failure', async () => {
-    vi.mocked(analyzeCode).mockResolvedValue({
+    analyzeMock.mockResolvedValue({
       status: 'error',
       code: 'auth',
       message: 'Controlled SDK feedback.',
       providerMetadata: metadata,
     })
-    vi.mocked(loadActiveProviderConfigSnapshot)
-      .mockResolvedValueOnce(snapshot)
-      .mockResolvedValueOnce(null)
-    expect(
-      await analyzeLeetCodeSubmissionInBackground(
-        request,
-        loadDb,
-        new AbortController().signal,
-      ),
-    ).toMatchObject({ status: 'error', code: 'stale-configuration' })
+    loadConfig.mockResolvedValueOnce(snapshot).mockResolvedValueOnce(null)
+    expect(await runAnalysis()).toMatchObject({
+      status: 'error',
+      code: 'stale-configuration',
+    })
   })
 
   it.each(['database', 'key', 'generation', 'recheck'] as const)(
@@ -213,19 +192,11 @@ describe('trusted background submission analysis', () => {
     async (stage) => {
       const error = new Error(`${privateKey} ${rawBody}`)
       if (stage === 'database') loadDb.mockRejectedValue(error)
-      if (stage === 'key')
-        vi.mocked(loadActiveProviderConfigSnapshot).mockRejectedValue(error)
-      if (stage === 'generation')
-        vi.mocked(analyzeCode).mockRejectedValue(error)
+      if (stage === 'key') loadConfig.mockRejectedValue(error)
+      if (stage === 'generation') analyzeMock.mockRejectedValue(error)
       if (stage === 'recheck')
-        vi.mocked(loadActiveProviderConfigSnapshot)
-          .mockResolvedValueOnce(snapshot)
-          .mockRejectedValueOnce(error)
-      const result = await analyzeLeetCodeSubmissionInBackground(
-        request,
-        loadDb,
-        new AbortController().signal,
-      )
+        loadConfig.mockResolvedValueOnce(snapshot).mockRejectedValueOnce(error)
+      const result = await runAnalysis()
       expect(result).toMatchObject({
         status: 'error',
         code: 'unknown',
@@ -235,75 +206,35 @@ describe('trusted background submission analysis', () => {
     },
   )
 
-  it.each(['database', 'key', 'generation', 'recheck'] as const)(
-    'bounds an unresolved %s stage, aborts, and ignores late completion',
-    async (stage) => {
+  it.each([
+    ['timeout', 'database'],
+    ['timeout', 'key'],
+    ['timeout', 'generation'],
+    ['timeout', 'recheck'],
+    ['cancelled', 'database'],
+    ['cancelled', 'key'],
+    ['cancelled', 'generation'],
+    ['cancelled', 'recheck'],
+  ] as const)(
+    '%s while awaiting %s aborts and ignores late completion',
+    async (code, stage) => {
       const stalled = deferred<never>()
       if (stage === 'database') loadDb.mockReturnValue(stalled.promise)
-      if (stage === 'key')
-        vi.mocked(loadActiveProviderConfigSnapshot).mockReturnValue(
-          stalled.promise,
-        )
-      if (stage === 'generation')
-        vi.mocked(analyzeCode).mockReturnValue(stalled.promise)
+      if (stage === 'key') loadConfig.mockReturnValue(stalled.promise)
+      if (stage === 'generation') analyzeMock.mockReturnValue(stalled.promise)
       if (stage === 'recheck')
-        vi.mocked(loadActiveProviderConfigSnapshot)
-          .mockResolvedValueOnce(snapshot)
-          .mockReturnValueOnce(stalled.promise)
-      const pending = analyzeLeetCodeSubmissionInBackground(
-        request,
-        loadDb,
-        new AbortController().signal,
-      )
-      await vi.advanceTimersByTimeAsync(30_000)
-      const result = await pending
-      expect(result).toMatchObject({ status: 'error', code: 'timeout' })
-      expectSafe(result)
-      expect(vi.getTimerCount()).toBe(0)
-      const callCount = vi.mocked(loadActiveProviderConfigSnapshot).mock.calls
-        .length
-      stalled.resolve(
-        (stage === 'database'
-          ? db
-          : stage === 'generation'
-            ? success()
-            : snapshot) as never,
-      )
-      await vi.advanceTimersByTimeAsync(0)
-      expect(loadActiveProviderConfigSnapshot).toHaveBeenCalledTimes(callCount)
-      if (stage === 'generation' || stage === 'recheck')
-        expect(vi.mocked(analyzeCode).mock.calls[0]?.[2].aborted).toBe(true)
-      else expect(analyzeCode).not.toHaveBeenCalled()
-    },
-  )
-
-  it.each(['database', 'key', 'generation', 'recheck'] as const)(
-    'cancels an unresolved %s stage immediately',
-    async (stage) => {
-      const stalled = deferred<never>()
-      if (stage === 'database') loadDb.mockReturnValue(stalled.promise)
-      if (stage === 'key')
-        vi.mocked(loadActiveProviderConfigSnapshot).mockReturnValue(
-          stalled.promise,
-        )
-      if (stage === 'generation')
-        vi.mocked(analyzeCode).mockReturnValue(stalled.promise)
-      if (stage === 'recheck')
-        vi.mocked(loadActiveProviderConfigSnapshot)
+        loadConfig
           .mockResolvedValueOnce(snapshot)
           .mockReturnValueOnce(stalled.promise)
       const controller = new AbortController()
-      const pending = analyzeLeetCodeSubmissionInBackground(
-        request,
-        loadDb,
-        controller.signal,
-      )
-      await vi.advanceTimersByTimeAsync(0)
-      controller.abort()
+      const pending = runAnalysis(controller.signal)
+      await vi.advanceTimersByTimeAsync(code === 'timeout' ? 30_000 : 0)
+      if (code === 'cancelled') controller.abort()
       const result = await pending
-      expect(result).toMatchObject({ status: 'error', code: 'cancelled' })
+      expect(result).toMatchObject({ status: 'error', code })
       expectSafe(result)
       expect(vi.getTimerCount()).toBe(0)
+      const callCount = loadConfig.mock.calls.length
       stalled.resolve(
         (stage === 'database'
           ? db
@@ -312,19 +243,17 @@ describe('trusted background submission analysis', () => {
             : snapshot) as never,
       )
       await vi.advanceTimersByTimeAsync(0)
-      if (stage === 'database' || stage === 'key')
-        expect(analyzeCode).not.toHaveBeenCalled()
+      expect(loadConfig).toHaveBeenCalledTimes(callCount)
+      if (stage === 'generation' || stage === 'recheck')
+        expect(analyzeMock.mock.calls[0]?.[2].aborted).toBe(true)
+      else expect(analyzeMock).not.toHaveBeenCalled()
     },
   )
 
   it('never starts database work for an already cancelled request', async () => {
     const controller = new AbortController()
     controller.abort()
-    const result = await analyzeLeetCodeSubmissionInBackground(
-      request,
-      loadDb,
-      controller.signal,
-    )
+    const result = await runAnalysis(controller.signal)
     expect(result).toMatchObject({ status: 'error', code: 'cancelled' })
     expectSafe(result)
     expect(loadDb).not.toHaveBeenCalled()

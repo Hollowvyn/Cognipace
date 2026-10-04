@@ -564,86 +564,49 @@ async function getOverlayPayload(
 }
 
 describe('AI assessment exposure', () => {
-  it('overlay payload reports aiAssessmentAvailable=false when settings disabled', async () => {
-    const handle = await createTestDb({ seed: false })
-    const payload = await getOverlayPayload(handle)
-    expect(payload.overlay.aiAssessmentAvailable).toBe(false)
-    expect(payload.overlay.aiAssessmentEnabled).toBe(false)
-  })
-
-  it('overlay payload reports aiAssessmentAvailable=false when enabled but key missing', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'openai', model: 'gpt-test' },
-    })
-    // no setAiProviderSecret call
-    const payload = await getOverlayPayload(handle)
-    expect(payload.overlay.aiAssessmentAvailable).toBe(false)
-    expect(payload.overlay.aiAssessmentEnabled).toBe(true)
-  })
-
-  it('overlay payload reports aiAssessmentAvailable=true when fully configured', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'openai', model: 'gpt-test' },
-    })
-    await setAiProviderSecret('openai', {
-      apiKey: 'sk-must-not-leak',
-    })
-    const payload = await getOverlayPayload(handle)
-    expect(payload.overlay.aiAssessmentAvailable).toBe(true)
-    expect(payload.overlay.aiAssessmentEnabled).toBe(true)
-  })
-
-  it('overlay payload never contains apiKey or the literal key string', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'openai', model: 'gpt-test' },
-    })
-    await setAiProviderSecret('openai', {
-      apiKey: 'sk-must-not-leak',
-    })
-    const payload = await getOverlayPayload(handle)
-    const serialized = JSON.stringify(payload)
-    expect(serialized).not.toContain('apiKey')
-    expect(serialized).not.toContain('sk-must-not-leak')
-  })
-
-  it('popup payload exposes safe aiAssessment fields but no apiKey', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'anthropic', model: 'claude-x' },
-    })
-    await setAiProviderSecret('anthropic', {
-      apiKey: 'sk-ant-must-not-leak',
-    })
-    const payload = await getPopupPayload(handle)
-    expect(payload.settings.aiAssessment).toEqual({
-      enabled: true,
-      provider: 'anthropic',
-      model: 'claude-x',
-    })
-    const serialized = JSON.stringify(payload)
-    expect(serialized).not.toContain('apiKey')
-    expect(serialized).not.toContain('sk-ant-must-not-leak')
-  })
-
-  it('dashboard payload exposes safe aiAssessment fields but no apiKey', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'gemini', model: 'gemini-x' },
-    })
-    await setAiProviderSecret('gemini', {
-      apiKey: 'g-must-not-leak',
-    })
-    const payload = await getDashboardPayload(handle)
-    expect(payload.settings.aiAssessment).toEqual({
-      enabled: true,
-      provider: 'gemini',
-      model: 'gemini-x',
-    })
-    const serialized = JSON.stringify(payload)
-    expect(serialized).not.toContain('apiKey')
-    expect(serialized).not.toContain('g-must-not-leak')
-  })
+  it.each([
+    [false, false],
+    [true, false],
+    [true, true],
+  ] as const)(
+    'overlay enablement=%s with key=%s preserves safe availability',
+    async (enabled, hasKey) => {
+      const handle = await createTestDb({ seed: false })
+      if (enabled)
+        await updateSettings(handle.db, {
+          aiAssessment: { enabled, provider: 'openai', model: 'gpt-test' },
+        })
+      if (hasKey)
+        await setAiProviderSecret('openai', { apiKey: 'sk-must-not-leak' })
+      const payload = await getOverlayPayload(handle)
+      expect(payload.overlay.aiAssessmentEnabled).toBe(enabled)
+      expect(payload.overlay.aiAssessmentAvailable).toBe(enabled && hasKey)
+      expect(JSON.stringify(payload)).not.toContain('apiKey')
+      expect(JSON.stringify(payload)).not.toContain('sk-must-not-leak')
+    },
+  )
+  it.each([
+    ['popup', 'anthropic', 'claude-x', 'sk-ant-must-not-leak'],
+    ['dashboard', 'gemini', 'gemini-x', 'g-must-not-leak'],
+  ] as const)(
+    '%s exposes safe %s settings without credentials',
+    async (surface, provider, model, apiKey) => {
+      const handle = await createTestDb({ seed: false })
+      await updateSettings(handle.db, {
+        aiAssessment: { enabled: true, provider, model },
+      })
+      await setAiProviderSecret(provider, { apiKey })
+      const payload =
+        surface === 'popup'
+          ? await getPopupPayload(handle)
+          : await getDashboardPayload(handle)
+      expect(payload.settings.aiAssessment).toEqual({
+        enabled: true,
+        provider,
+        model,
+      })
+      expect(JSON.stringify(payload)).not.toContain('apiKey')
+      expect(JSON.stringify(payload)).not.toContain(apiKey)
+    },
+  )
 })

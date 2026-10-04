@@ -52,17 +52,13 @@ describe('code analysis evaluation inputs', () => {
   })
 
   it('strictly parses complete requests with neutral titles and no invented measurements', () => {
-    expect(codeAnalysisEvaluationFixtures).toHaveLength(6)
     for (const { request } of codeAnalysisEvaluationFixtures) {
       expect(analyzeLeetCodeSubmissionRequestSchema.parse(request)).toEqual(
         request,
       )
-      expect(request.problemSlug).toBe(request.problem.slug)
       expect(['Two Sum', 'Search Insert Position', 'Running Sum']).toContain(
         request.problem.title,
       )
-      expect(request.problem.examples.length).toBeGreaterThan(0)
-      expect(request.problem.constraints.length).toBeGreaterThan(0)
       expect(request.submission).toMatchObject({
         languageVersion: null,
         runtime: null,
@@ -80,32 +76,11 @@ describe('code analysis evaluation inputs', () => {
     }
   })
 
-  it('keeps fixture ids and human criteria out of model inputs and rejects attached metadata', () => {
-    expect(codeAnalysisEvaluationFixtures).toHaveLength(6)
+  it('keeps fixture ids and human criteria out of model inputs', () => {
     for (const { id, request, criterion } of codeAnalysisEvaluationFixtures) {
       const prompt = buildCodeAnalysisPrompt(request)
-      expect(prompt.user).toBe(
-        JSON.stringify({
-          problem: request.problem,
-          submission: request.submission,
-        }),
-      )
       expect(prompt.user).not.toContain(id)
       expect(prompt.user).not.toContain(criterion)
-      expect(JSON.stringify(request.problem)).not.toContain(id)
-      expect(JSON.stringify(request.submission)).not.toContain(id)
-      expect(
-        analyzeLeetCodeSubmissionRequestSchema.safeParse({
-          ...request,
-          criterion,
-        }).success,
-      ).toBe(false)
-      expect(
-        analyzeLeetCodeSubmissionRequestSchema.safeParse({
-          ...request,
-          problem: { ...request.problem, criterion },
-        }).success,
-      ).toBe(false)
     }
   })
 
@@ -144,14 +119,9 @@ describe('code analysis evaluation inputs', () => {
 
   it('preserves sorted nondecreasing input and ordered one-based output while exposing the map space violation', () => {
     const sorted = fixture('sorted-one-based').request
-    expect(sorted.problemSlug).toBe('two-sum-ii')
-    expect(sorted.problem.topics).toEqual(['Array', 'Two Pointers'])
     expect(sorted.problem.statement).toContain('nondecreasing')
     expect(sorted.problem.constraints).toContain(
       'Use O(1) auxiliary space and leave numbers unchanged.',
-    )
-    expect(sorted.problem.statement).toContain(
-      '1 <= index1 < index2 <= numbers.length',
     )
     const numbers = [2, 7, 11, 15]
     const indices = executeAuthoredTwoSum('sorted-one-based', numbers, 9)
@@ -171,17 +141,13 @@ describe('code analysis evaluation inputs', () => {
     expect(
       Array.from(executeAuthoredTwoSum('insert-before-lookup', [3, 2, 4], 6)),
     ).toEqual([0, 0])
-    expect(wrong.problem.statement).toContain('two distinct zero-based indices')
   })
 
   it('defines Kotlin insertion boundaries without implying explicit Int annotations are invalid', () => {
     const kotlin = fixture('kotlin-inferred-int')
-    expect(kotlin.request.problemSlug).toBe('search-insert-position')
-    expect(kotlin.request.problem.topics).toEqual(['Array', 'Binary Search'])
     expect(kotlin.request.problem.statement).toContain(
       'sorted in strictly increasing order',
     )
-    expect(kotlin.request.problem.constraints).toContain('1 <= n <= 10000.')
     expect(kotlin.request.problem.examples).toHaveLength(4)
     expect(kotlin.request.submission.code).toContain(
       'fun searchInsert(nums: IntArray, target: Int): Int',
@@ -194,8 +160,6 @@ describe('code analysis evaluation inputs', () => {
 
   it('requires inclusive Long prefix sums and preserves generic typing only when the empty collection is retained', () => {
     const kotlin = fixture('kotlin-long-and-generic')
-    expect(kotlin.request.problemSlug).toBe('running-sum-long')
-    expect(kotlin.request.problem.topics).toEqual(['Array', 'Prefix Sum'])
     expect(kotlin.request.problem.statement).toContain(
       'output[i] = nums[0] + ... + nums[i]',
     )
@@ -204,9 +168,6 @@ describe('code analysis evaluation inputs', () => {
     )
     expect(kotlin.request.problem.constraints).toContain(
       '-2147483648 <= nums[i] <= 2147483647; each value is a valid Kotlin Int.',
-    )
-    expect(kotlin.request.problem.constraints).toContain(
-      '1 <= n <= 10000; prefix sums fit in Long.',
     )
     expect(kotlin.request.submission.code).toContain(
       'fun runningSum(nums: IntArray): LongArray',

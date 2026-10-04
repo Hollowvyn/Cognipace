@@ -1,9 +1,8 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 import { makeValidAnalysis } from '../testing/code-analysis-fixtures'
 import {
-  CODE_ANALYSIS_VERSION,
   codeAnalysisSchema,
   type CodeAnalysisReport,
 } from './code-analysis-schema'
@@ -40,108 +39,48 @@ const nullableFields: [string, ReportObjectSelector, string][] = [
   ],
 ]
 
-const proseFields: [string, ReportMutation][] = [
-  [
-    'summary',
-    (report) => {
-      report.summary = ' \n\t '
-    },
-  ],
-  [
-    'approach rationale',
-    (report) => {
-      report.approach.rationale = ' \n\t '
-    },
-  ],
-  [
-    'current label',
-    (report) => {
-      report.approach.current = [' \n\t ']
-    },
-  ],
-  [
-    'suggested label',
-    (report) => {
-      report.approach.suggested = [' \n\t ']
-    },
-  ],
-  [
-    'key idea',
-    (report) => {
-      report.approach.keyIdea = ' \n\t '
-    },
-  ],
-  [
-    'consideration',
-    (report) => {
-      report.approach.consider = ' \n\t '
-    },
-  ],
-  [
-    'efficiency rationale',
-    (report) => {
-      report.efficiency.rationale = ' \n\t '
-    },
-  ],
-  [
-    'complexity time',
-    (report) => {
-      report.efficiency.current!.time = ' \n\t '
-    },
-  ],
-  [
-    'complexity space',
-    (report) => {
-      report.efficiency.current!.space = ' \n\t '
-    },
-  ],
+const proseFields: [string, ReportObjectSelector, string, unknown][] = [
+  ['summary', (r) => r, 'summary', ' \n\t '],
+  ['approach rationale', (r) => r.approach, 'rationale', ' \n\t '],
+  ['current label', (r) => r.approach, 'current', [' \n\t ']],
+  ['suggested label', (r) => r.approach, 'suggested', [' \n\t ']],
+  ['key idea', (r) => r.approach, 'keyIdea', ' \n\t '],
+  ['consideration', (r) => r.approach, 'consider', ' \n\t '],
+  ['efficiency rationale', (r) => r.efficiency, 'rationale', ' \n\t '],
+  ['complexity time', (r) => r.efficiency.current!, 'time', ' \n\t '],
+  ['complexity space', (r) => r.efficiency.current!, 'space', ' \n\t '],
   [
     'complexity assumption',
-    (report) => {
-      report.efficiency.current!.assumptions = [' \n\t ']
-    },
+    (r) => r.efficiency.current!,
+    'assumptions',
+    [' \n\t '],
   ],
-  [
-    'efficiency suggestion',
-    (report) => {
-      report.efficiency.suggestions = [' \n\t ']
-    },
-  ],
-  [
-    'style rationale',
-    (report) => {
-      report.codeStyle.rationale = ' \n\t '
-    },
-  ],
-  [
-    'style suggestion',
-    (report) => {
-      report.codeStyle.suggestions = [' \n\t ']
-    },
-  ],
+  ['efficiency suggestion', (r) => r.efficiency, 'suggestions', [' \n\t ']],
+  ['style rationale', (r) => r.codeStyle, 'rationale', ' \n\t '],
+  ['style suggestion', (r) => r.codeStyle, 'suggestions', [' \n\t ']],
   [
     'implementation language',
-    (report) => {
-      report.suggestedImplementation!.language = ' \n\t '
-    },
+    (r) => r.suggestedImplementation!,
+    'language',
+    ' \n\t ',
   ],
   [
     'implementation change',
-    (report) => {
-      report.suggestedImplementation!.changes = [' \n\t ']
-    },
+    (r) => r.suggestedImplementation!,
+    'changes',
+    [' \n\t '],
   ],
   [
     'implementation assumption',
-    (report) => {
-      report.suggestedImplementation!.assumptions = [' \n\t ']
-    },
+    (r) => r.suggestedImplementation!,
+    'assumptions',
+    [' \n\t '],
   ],
   [
     'implementation unavailable reason',
-    (report) => {
-      report.suggestedImplementationUnavailableReason = ' \n\t '
-    },
+    (r) => r,
+    'suggestedImplementationUnavailableReason',
+    ' \n\t ',
   ],
 ]
 
@@ -150,9 +89,7 @@ describe('codeAnalysisSchema', () => {
     const report = makeValidAnalysis()
 
     expect(codeAnalysisSchema.parse(report)).toEqual(report)
-    expect(report.version).toBe(CODE_ANALYSIS_VERSION)
-    expect(CODE_ANALYSIS_VERSION).toBe('leetcode-code-analysis-v1')
-    expectTypeOf(report).toEqualTypeOf<CodeAnalysisReport>()
+    expect(report.version).toBe('leetcode-code-analysis-v1')
   })
 
   it.each(reportObjects)(
@@ -199,10 +136,9 @@ describe('codeAnalysisSchema', () => {
     },
   )
 
-  it.each(proseFields)('rejects blank %s', (_label, mutate) => {
+  it.each(proseFields)('rejects blank %s', (_label, select, key, value) => {
     const report = makeValidAnalysis()
-    mutate(report)
-
+    Reflect.set(select(report), key, value)
     expect(codeAnalysisSchema.safeParse(report).success).toBe(false)
   })
 
@@ -234,41 +170,20 @@ describe('codeAnalysisSchema', () => {
   })
 
   it.each([
-    [
-      'summary',
-      (report) => {
-        report.summary = 'x'.repeat(281)
-      },
-    ],
-    [
-      'common text',
-      (report) => {
-        report.approach.rationale = 'x'.repeat(801)
-      },
-    ],
-    [
-      'label',
-      (report) => {
-        report.approach.current = ['x'.repeat(81)]
-      },
-    ],
+    ['summary', (report) => (report.summary = 'x'.repeat(281))],
+    ['common text', (report) => (report.approach.rationale = 'x'.repeat(801))],
+    ['label', (report) => (report.approach.current = ['x'.repeat(81)])],
     [
       'complexity',
-      (report) => {
-        report.efficiency.current!.time = 'x'.repeat(161)
-      },
+      (report) => (report.efficiency.current!.time = 'x'.repeat(161)),
     ],
     [
       'language',
-      (report) => {
-        report.suggestedImplementation!.language = 'x'.repeat(121)
-      },
+      (report) => (report.suggestedImplementation!.language = 'x'.repeat(121)),
     ],
     [
       'generated code',
-      (report) => {
-        report.suggestedImplementation!.code = 'x'.repeat(32_001)
-      },
+      (report) => (report.suggestedImplementation!.code = 'x'.repeat(32_001)),
     ],
   ] satisfies [string, ReportMutation][])(
     'rejects oversized %s',

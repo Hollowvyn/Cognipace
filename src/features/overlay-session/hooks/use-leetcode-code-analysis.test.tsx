@@ -16,6 +16,8 @@ import { makeValidAnalysis } from '@/features/leetcode-review-assistant/testing/
 import {
   createLeetCodeReviewContext,
   type LeetCodeCaptureState,
+  type LeetCodeProblemContent,
+  type LeetCodeSubmissionResult,
   type LeetCodeSubmissionStatus,
 } from '@/lib/leetcode'
 import { invalidateTaggedQueries } from '@/platform/query/cache-invalidation'
@@ -44,6 +46,9 @@ vi.mock('@/features/leetcode-review-assistant', async (importOriginal) => ({
   analyzeLeetCodeSubmissionViaRuntime: vi.fn(),
   cancelLeetCodeAnalysisViaRuntime: vi.fn(),
 }))
+
+const analyze = vi.mocked(analyzeLeetCodeSubmissionViaRuntime)
+const cancelAnalysis = vi.mocked(cancelLeetCodeAnalysisViaRuntime)
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -78,10 +83,10 @@ function prepare(
 let harness: ReturnType<typeof createQueryTestHarness>
 beforeEach(() => {
   harness = createQueryTestHarness()
-  vi.mocked(analyzeLeetCodeSubmissionViaRuntime)
+  analyze
     .mockReset()
     .mockImplementation((request) => Promise.resolve(ready(request)))
-  vi.mocked(cancelLeetCodeAnalysisViaRuntime)
+  cancelAnalysis
     .mockReset()
     .mockResolvedValue({ requestId: 'ignored', cancelled: true })
   remote.readProblemMetadata.mockReset()
@@ -120,17 +125,10 @@ function mount(overrides: Partial<UseLeetCodeCodeAnalysisOptions> = {}) {
   return { ...hook, options, observed }
 }
 function nextAttempt(capture: LeetCodeCaptureState) {
-  return {
-    ...capture,
-    submissionAttempt: {
-      ...capture.submissionAttempt!,
-      attemptId: 'fixture-attempt-2',
-    },
-    submissionResult: {
-      ...capture.submissionResult!,
-      submissionId: '2222222222',
-    },
-  }
+  const next = structuredClone(capture)
+  next.submissionAttempt!.attemptId = 'fixture-attempt-2'
+  next.submissionResult!.submissionId = '2222222222'
+  return next
 }
 async function settle() {
   await act(async () => {
@@ -141,30 +139,21 @@ async function settle() {
 
 describe('buildCodeAnalysisRequest', () => {
   it('preserves complete code, exact context, follow-ups, names and nullable version', () => {
-    const baseline = makeCompleteCapture()
-    const capture = {
-      ...baseline,
-      problemContent: {
-        ...baseline.problemContent,
-        examples: [
-          {
-            label: 'Example 1',
-            input: null,
-            output: null,
-            explanation: null,
-            rawText: '  exact example\noutput=[0,1]  ',
-          },
-        ],
-        followUps: ['  full follow-up\nKeep extra detail.  '],
+    const capture = makeCompleteCapture()
+    const content: LeetCodeProblemContent = capture.problemContent
+    content.examples = [
+      {
+        label: 'Example 1',
+        input: null,
+        output: null,
+        explanation: null,
+        rawText: '  exact example\noutput=[0,1]  ',
       },
-      submissionResult: {
-        ...baseline.submissionResult,
-        resultCodeSnapshot: {
-          ...baseline.submissionResult.resultCodeSnapshot,
-          code: 'x'.repeat(32000),
-        },
-      },
-    }
+    ]
+    capture.problemContent.followUps = [
+      '  full follow-up\nKeep extra detail.  ',
+    ]
+    capture.submissionResult.resultCodeSnapshot.code = 'x'.repeat(32000)
     const request = buildCodeAnalysisRequest(prepare(capture), 'request-2', 3)!
     expect(request).toMatchObject({
       requestId: 'request-2',
@@ -209,15 +198,10 @@ describe('buildCodeAnalysisRequest', () => {
     expect(buildCodeAnalysisRequest(prepare(capture), 'request', 0)).toBeNull()
   })
   it('omits oversized optional diagnostics explicitly and preserves all eight nullable fields', () => {
-    const baseline = makeCompleteCapture()
-    const capture = {
-      ...baseline,
-      submissionResult: {
-        ...baseline.submissionResult,
-        errorMessage: 'x'.repeat(2001),
-        failingTestcase: 'x'.repeat(2000),
-      },
-    }
+    const capture = makeCompleteCapture()
+    const source: LeetCodeSubmissionResult = capture.submissionResult
+    source.errorMessage = 'x'.repeat(2001)
+    source.failingTestcase = 'x'.repeat(2000)
     const submission = buildCodeAnalysisRequest(
       prepare(capture),
       'request',
@@ -253,7 +237,7 @@ describe('useLeetCodeCodeAnalysis', () => {
       },
     })
     await settle()
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1)
+    expect(analyze).toHaveBeenCalledOnce()
     expect(harness.queryClient.getQueryCache().getAll()).toHaveLength(0)
     expect(harness.queryClient.getMutationCache().getAll()).toHaveLength(0)
     expect(remote.readSubmissionResult).not.toHaveBeenCalled()
@@ -268,23 +252,15 @@ describe('useLeetCodeCodeAnalysis', () => {
     'output-limit-exceeded',
     'unknown',
   ])('preserves terminal status %s', async (status) => {
-    const baseline = makeCompleteCapture()
-    const capture = {
-      ...baseline,
-      submissionResult: {
-        ...baseline.submissionResult,
-        status,
-        errorMessage: status === 'accepted' ? null : 'captured diagnostic',
-      },
-    }
+    const capture = makeCompleteCapture()
+    const source: LeetCodeSubmissionResult = capture.submissionResult
+    source.status = status
+    source.errorMessage = status === 'accepted' ? null : 'captured diagnostic'
     const { result } = mount({ capture })
     await waitFor(() => expect(result.current.state.status).toBe('ready'))
-    expect(
-      vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock.calls[0]![0]
-        .submission,
-    ).toMatchObject({
+    expect(analyze.mock.calls[0]![0].submission).toMatchObject({
       status,
-      diagnostics: { errorMessage: capture.submissionResult.errorMessage },
+      diagnostics: { errorMessage: source.errorMessage },
     })
   })
   it.each([
@@ -294,17 +270,16 @@ describe('useLeetCodeCodeAnalysis', () => {
     'problemSlug',
     'configurationRevision',
   ] as const)('returns a retryable error for mismatched %s', async (field) => {
-    vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mockImplementation(
-      (request) =>
-        Promise.resolve({
-          ...ready(request),
-          [field]:
-            field === 'configurationRevision'
-              ? 99
-              : field === 'submissionId'
-                ? '999'
-                : 'other',
-        }),
+    analyze.mockImplementation((request) =>
+      Promise.resolve({
+        ...ready(request),
+        [field]:
+          field === 'configurationRevision'
+            ? 99
+            : field === 'submissionId'
+              ? '999'
+              : 'other',
+      }),
     )
     const { result } = mount()
     await waitFor(() =>
@@ -315,20 +290,29 @@ describe('useLeetCodeCodeAnalysis', () => {
       }),
     )
   })
-  it('makes missing metadata recoverable without consuming automatic eligibility', async () => {
-    const capture = makeCompleteCapture()
-    const { result, options, rerender } = mount({
-      capture: { ...capture, metadata: null },
-    })
-    expect(result.current.state).toMatchObject({
-      status: 'unavailable',
-      canRetry: true,
-    })
-    expect(analyzeLeetCodeSubmissionViaRuntime).not.toHaveBeenCalled()
-    rerender({ ...options, capture })
-    await waitFor(() => expect(result.current.state.status).toBe('ready'))
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1)
-  })
+  it.each([false, true])(
+    'missing metadata preserves automatic eligibility after manual Retry=%s',
+    async (retry) => {
+      const capture = makeCompleteCapture()
+      const { result, options, rerender } = mount({
+        capture: { ...capture, metadata: null },
+      })
+      expect(result.current.state).toMatchObject({
+        status: 'unavailable',
+        canRetry: true,
+      })
+      if (retry) {
+        act(() => result.current.retry())
+        await waitFor(() =>
+          expect(result.current.state.status).toBe('unavailable'),
+        )
+      }
+      expect(analyze).not.toHaveBeenCalled()
+      rerender({ ...options, capture })
+      await waitFor(() => expect(result.current.state.status).toBe('ready'))
+      expect(analyze).toHaveBeenCalledOnce()
+    },
+  )
   it('recovers matching metadata after an unavailable manual Retry while retaining the original submission pin', async () => {
     const complete = makeCompleteCapture()
     const { result, options, rerender } = mount({
@@ -340,7 +324,7 @@ describe('useLeetCodeCodeAnalysis', () => {
         ? result.current.state.requestId
         : null
     await waitFor(() => expect(result.current.state.status).toBe('unavailable'))
-    expect(analyzeLeetCodeSubmissionViaRuntime).not.toHaveBeenCalled()
+    expect(analyze).not.toHaveBeenCalled()
     rerender({
       ...options,
       capture: {
@@ -356,21 +340,9 @@ describe('useLeetCodeCodeAnalysis', () => {
     expect(remote.readSubmissionResult).toHaveBeenLastCalledWith(
       expect.objectContaining({ submissionId: '1234567890', refresh: true }),
     )
-    const request = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[0]![0]
+    const request = analyze.mock.calls[0]![0]
     expect(request.submissionId).toBe('1234567890')
     expect(request.requestId).not.toBe(firstId)
-  })
-  it('does not consume automatic eligibility when an explicit Retry still lacks metadata', async () => {
-    const complete = makeCompleteCapture()
-    const { result, options, rerender } = mount({
-      capture: { ...complete, metadata: null },
-    })
-    act(() => result.current.retry())
-    await waitFor(() => expect(result.current.state.status).toBe('unavailable'))
-    rerender({ ...options, capture: complete })
-    await waitFor(() => expect(result.current.state.status).toBe('ready'))
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1)
   })
   it('recovers first missing configuration once availability returns', async () => {
     const { result, options, rerender } = mount({ available: false })
@@ -380,7 +352,7 @@ describe('useLeetCodeCodeAnalysis', () => {
     })
     rerender({ ...options, available: true })
     await waitFor(() => expect(result.current.state.status).toBe('ready'))
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1)
+    expect(analyze).toHaveBeenCalledOnce()
   })
   it('rejects oversized essentials without a generation call', async () => {
     const capture = makeCompleteCapture()
@@ -392,7 +364,7 @@ describe('useLeetCodeCodeAnalysis', () => {
         canRetry: true,
       }),
     )
-    expect(analyzeLeetCodeSubmissionViaRuntime).not.toHaveBeenCalled()
+    expect(analyze).not.toHaveBeenCalled()
   })
   it('retains a discovered pin after unavailable preparation, config changes, disable and reset; Retry refreshes it with a new UUID', async () => {
     remote.readProblemContent.mockResolvedValueOnce({
@@ -411,20 +383,16 @@ describe('useLeetCodeCodeAnalysis', () => {
         },
       ],
     })
-    const baseline = makeCompleteCapture()
-    const capture = {
-      ...baseline,
-      submissionResult: { ...baseline.submissionResult, submissionId: null },
-    }
-    const { result, options, rerender } = mount({
-      capture: { ...capture, problemContent: null },
-    })
+    const capture: LeetCodeCaptureState = makeCompleteCapture()
+    capture.submissionResult!.submissionId = null
+    capture.problemContent = null
+    const { result, options, rerender } = mount({ capture })
     const firstRequestId =
       result.current.state.status === 'pending'
         ? result.current.state.requestId
         : null
     await waitFor(() => expect(result.current.state.status).toBe('unavailable'))
-    expect(analyzeLeetCodeSubmissionViaRuntime).not.toHaveBeenCalled()
+    expect(analyze).not.toHaveBeenCalled()
     act(() => {
       void invalidateTaggedQueries(harness.queryClient, ['genai'])
     })
@@ -435,7 +403,7 @@ describe('useLeetCodeCodeAnalysis', () => {
       capture: {
         ...options.capture,
         submissionResult: {
-          ...capture.submissionResult,
+          ...capture.submissionResult!,
           submissionId: '9999999999',
         },
       },
@@ -443,18 +411,17 @@ describe('useLeetCodeCodeAnalysis', () => {
     act(() => result.current.reset())
     expect(result.current.state.status).toBe('idle')
     await settle()
-    expect(analyzeLeetCodeSubmissionViaRuntime).not.toHaveBeenCalled()
+    expect(analyze).not.toHaveBeenCalled()
     act(() => result.current.retry())
     await waitFor(() => expect(result.current.state.status).toBe('ready'))
     expect(remote.readSubmissionResult).toHaveBeenLastCalledWith(
       expect.objectContaining({
         submissionId: '1234567890',
         refresh: true,
-        attemptId: capture.submissionAttempt.attemptId,
+        attemptId: capture.submissionAttempt!.attemptId,
       }),
     )
-    const request = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[0]![0]
+    const request = analyze.mock.calls[0]![0]
     expect(request.requestId).not.toBe(firstRequestId)
     expect(request.configurationRevision).toBe(1)
     expect(request.submissionId).toBe('1234567890')
@@ -462,17 +429,14 @@ describe('useLeetCodeCodeAnalysis', () => {
   it('bounds hung messaging at 50000ms, cancels, and ignores its late result', async () => {
     vi.useFakeTimers()
     const pending = deferred<AnalyzeLeetCodeSubmissionResponse>()
-    vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mockReturnValue(
-      pending.promise,
-    )
+    analyze.mockReturnValue(pending.promise)
     const { result } = mount()
     await settle()
     expect(result.current.state).toMatchObject({
       status: 'pending',
       phase: 'analysis',
     })
-    const request = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[0]![0]
+    const request = analyze.mock.calls[0]![0]
     await act(async () => {
       await vi.advanceTimersByTimeAsync(49999)
     })
@@ -485,7 +449,7 @@ describe('useLeetCodeCodeAnalysis', () => {
       code: 'timeout',
       canRetry: true,
     })
-    expect(cancelLeetCodeAnalysisViaRuntime).toHaveBeenCalledWith({
+    expect(cancelAnalysis).toHaveBeenCalledWith({
       surface: 'content-script',
       requestId: request.requestId,
     })
@@ -505,15 +469,10 @@ describe('useLeetCodeCodeAnalysis', () => {
     'unmount',
   ] as const)('cancels and hides deferred output on %s', async (change) => {
     const pending = deferred<AnalyzeLeetCodeSubmissionResponse>()
-    vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mockReturnValue(
-      pending.promise,
-    )
+    analyze.mockReturnValue(pending.promise)
     const { result, options, rerender, unmount, observed } = mount()
-    await waitFor(() =>
-      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1),
-    )
-    const request = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[0]![0]
+    await waitFor(() => expect(analyze).toHaveBeenCalledOnce())
+    const request = analyze.mock.calls[0]![0]
     observed.length = 0
     if (change === 'navigation')
       rerender({ ...options, activeSlug: 'three-sum' })
@@ -529,7 +488,7 @@ describe('useLeetCodeCodeAnalysis', () => {
         void invalidateTaggedQueries(harness.queryClient, ['genai'])
       })
     if (change === 'unmount') unmount()
-    expect(cancelLeetCodeAnalysisViaRuntime).toHaveBeenCalledWith({
+    expect(cancelAnalysis).toHaveBeenCalledWith({
       surface: 'content-script',
       requestId: request.requestId,
     })
@@ -542,15 +501,12 @@ describe('useLeetCodeCodeAnalysis', () => {
         (state) => state.status === 'ready' || state.status === 'pending',
       ),
     ).toBe(false)
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1)
+    expect(analyze).toHaveBeenCalledOnce()
   })
   it.each(['ready', 'pending'] as const)(
     'hides %s and cancels active work when availability becomes false independently',
     async (status) => {
-      if (status === 'pending')
-        vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mockReturnValue(
-          new Promise(() => {}),
-        )
+      if (status === 'pending') analyze.mockReturnValue(new Promise(() => {}))
       const { result, options, rerender, observed } = mount()
       await waitFor(() => expect(result.current.state.status).toBe(status))
       observed.length = 0
@@ -559,15 +515,14 @@ describe('useLeetCodeCodeAnalysis', () => {
         status: 'unavailable',
         showSettings: true,
       })
-      if (status === 'pending')
-        expect(cancelLeetCodeAnalysisViaRuntime).toHaveBeenCalledTimes(1)
+      if (status === 'pending') expect(cancelAnalysis).toHaveBeenCalledTimes(1)
       rerender(options)
       await settle()
       expect(result.current.state).toMatchObject({
         status: 'unavailable',
         canRetry: true,
       })
-      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1)
+      expect(analyze).toHaveBeenCalledOnce()
     },
   )
   it('requires manual Retry after disable/enable or config changes on a handled attempt', async () => {
@@ -584,26 +539,18 @@ describe('useLeetCodeCodeAnalysis', () => {
       void invalidateTaggedQueries(harness.queryClient, ['genai'])
     })
     await settle()
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1)
+    expect(analyze).toHaveBeenCalledOnce()
     act(() => result.current.retry())
     await waitFor(() => expect(result.current.state.status).toBe('ready'))
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(2)
-    expect(
-      vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock.calls[1]![0]
-        .configurationRevision,
-    ).toBe(1)
+    expect(analyze).toHaveBeenCalledTimes(2)
+    expect(analyze.mock.calls[1]![0].configurationRevision).toBe(1)
   })
   it('rejects a response if revision changes synchronously before React effects', async () => {
     const pending = deferred<AnalyzeLeetCodeSubmissionResponse>()
-    vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mockReturnValue(
-      pending.promise,
-    )
+    analyze.mockReturnValue(pending.promise)
     const { result, observed } = mount()
-    await waitFor(() =>
-      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1),
-    )
-    const request = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[0]![0]
+    await waitFor(() => expect(analyze).toHaveBeenCalledOnce())
+    const request = analyze.mock.calls[0]![0]
     observed.length = 0
     await act(async () => {
       void invalidateTaggedQueries(harness.queryClient, ['genai'])
@@ -622,11 +569,8 @@ describe('useLeetCodeCodeAnalysis', () => {
       await Promise.resolve()
     })
     await waitFor(() => expect(result.current.state.status).toBe('ready'))
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(2)
-    expect(
-      vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock.calls[1]![0]
-        .configurationRevision,
-    ).toBe(1)
+    expect(analyze).toHaveBeenCalledTimes(2)
+    expect(analyze.mock.calls[1]![0].configurationRevision).toBe(1)
   })
   it('reset suppresses retained capture while a new submit remains eligible', async () => {
     const { result, options, rerender } = mount()
@@ -635,10 +579,10 @@ describe('useLeetCodeCodeAnalysis', () => {
     rerender({ ...options, capture: { ...options.capture } })
     await settle()
     expect(result.current.state.status).toBe('idle')
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1)
+    expect(analyze).toHaveBeenCalledOnce()
     rerender({ ...options, capture: nextAttempt(options.capture) })
     await waitFor(() => expect(result.current.state.status).toBe('ready'))
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(2)
+    expect(analyze).toHaveBeenCalledTimes(2)
   })
   it.each(['configuration', 'disable-enable', 'availability'] as const)(
     'keeps a reset attempt idle through %s until explicit Retry',
@@ -666,11 +610,11 @@ describe('useLeetCodeCodeAnalysis', () => {
       }
       await settle()
       expect(result.current.state.status).toBe('idle')
-      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1)
+      expect(analyze).toHaveBeenCalledOnce()
       act(() => result.current.retry())
       await waitFor(() => expect(result.current.state.status).toBe('ready'))
-      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(2)
-      const requests = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock.calls
+      expect(analyze).toHaveBeenCalledTimes(2)
+      const requests = analyze.mock.calls
       expect(requests[1]![0].submissionId).toBe(requests[0]![0].submissionId)
       expect(requests[1]![0].requestId).not.toBe(requests[0]![0].requestId)
     },
@@ -678,21 +622,15 @@ describe('useLeetCodeCodeAnalysis', () => {
   it('an old finally cannot clear a newer operation', async () => {
     const first = deferred<AnalyzeLeetCodeSubmissionResponse>()
     const second = deferred<AnalyzeLeetCodeSubmissionResponse>()
-    vi.mocked(analyzeLeetCodeSubmissionViaRuntime)
+    analyze
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise)
     const { result, options, rerender } = mount()
-    await waitFor(() =>
-      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(1),
-    )
-    const request1 = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[0]![0]
+    await waitFor(() => expect(analyze).toHaveBeenCalledOnce())
+    const request1 = analyze.mock.calls[0]![0]
     rerender({ ...options, capture: nextAttempt(options.capture) })
-    await waitFor(() =>
-      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(2),
-    )
-    const request2 = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[1]![0]
+    await waitFor(() => expect(analyze).toHaveBeenCalledTimes(2))
+    const request2 = analyze.mock.calls[1]![0]
     await act(async () => {
       first.resolve(ready(request1))
       await Promise.resolve()
@@ -718,14 +656,13 @@ describe('useLeetCodeCodeAnalysis', () => {
     'not-configured',
     'stale-configuration',
   ] as const)('offers Settings for %s', async (code) => {
-    vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mockImplementation(
-      (request) =>
-        Promise.resolve({
-          status: 'error',
-          ...analysisIdentity(request),
-          code,
-          message: 'Controlled message.',
-        }),
+    analyze.mockImplementation((request) =>
+      Promise.resolve({
+        status: 'error',
+        ...analysisIdentity(request),
+        code,
+        message: 'Controlled message.',
+      }),
     )
     const { result } = mount()
     await waitFor(() =>
@@ -738,9 +675,7 @@ describe('useLeetCodeCodeAnalysis', () => {
     )
   })
   it('redacts unexpected transport exceptions', async () => {
-    vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mockRejectedValue(
-      new Error('private-token-and-code'),
-    )
+    analyze.mockRejectedValue(new Error('private-token-and-code'))
     const { result } = mount()
     await waitFor(() => expect(result.current.state.status).toBe('error'))
     expect(JSON.stringify(result.current.state)).not.toContain(

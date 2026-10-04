@@ -20,13 +20,7 @@ describe('fetchLeetCodeProblemContent', () => {
   ])(
     'preserves plain comparison operators in GraphQL hints: %s',
     async (hint) => {
-      const fetcher = vi.fn().mockResolvedValue(
-        Response.json({
-          data: {
-            question: { content: '<p>Return indices.</p>', hints: [hint] },
-          },
-        }),
-      )
+      const fetcher = graphQlContentFetcher('<p>Return indices.</p>', [hint])
 
       await expect(
         fetchLeetCodeProblemContent(location, { fetch: fetcher, document }),
@@ -38,12 +32,8 @@ describe('fetchLeetCodeProblemContent', () => {
   )
 
   it('maps LeetCode GraphQL content into statement examples constraints and hints', async () => {
-    const fetcher = vi.fn(() =>
-      Promise.resolve(
-        Response.json({
-          data: {
-            question: {
-              content: `
+    const fetcher = graphQlContentFetcher(
+      `
                 <p>Given an array of integers <code>nums</code> and an integer <code>target</code>, return indices of the two numbers.</p>
                 <p>You may assume that each input would have exactly one solution.</p>
                 <p><strong>Example 1:</strong></p>
@@ -58,11 +48,7 @@ Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].
                   <li><code>-10^9 <= nums[i] <= 10^9</code></li>
                 </ul>
               `,
-              hints: ['Use a hash map.'],
-            },
-          },
-        }),
-      ),
+      ['Use a hash map.'],
     )
 
     await expect(
@@ -97,12 +83,8 @@ Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].
   })
 
   it('sanitizes malicious markup while extracting valid problem content', async () => {
-    const fetcher = vi.fn(() =>
-      Promise.resolve(
-        Response.json({
-          data: {
-            question: {
-              content: `
+    const fetcher = graphQlContentFetcher(
+      `
                 <p>Given an array <script>alert("xss")</script>of integers <code>nums</code>.</p>
                 <p>You <img src="x" onerror="alert(1)">may assume that each input would have exactly one solution.</p>
                 <p><a href="javascript:alert(1)"><strong>Example 1:</strong></a></p>
@@ -115,11 +97,7 @@ Output: [0,1]
                   <li><code>2 <= nums.length <= 10^4</code></li>
                 </ul>
               `,
-              hints: ['Use a hash map <script>alert(1)</script>.'],
-            },
-          },
-        }),
-      ),
+      ['Use a hash map <script>alert(1)</script>.'],
     )
 
     await expect(
@@ -153,25 +131,14 @@ Output: [0,1]
   })
 
   it('preserves chained comparison constraints from LeetCode markup', async () => {
-    const fetcher = vi.fn(() =>
-      Promise.resolve(
-        Response.json({
-          data: {
-            question: {
-              content: `
+    const fetcher = graphQlContentFetcher(`
                 <p>You are given two non-empty linked lists.</p>
                 <p><strong>Constraints:</strong></p>
                 <ul>
                   <li>The number of nodes in each linked list is in the range <code>[1, 100]</code>.</li>
                   <li><code>0 <= Node.val <= 9</code></li>
                 </ul>
-              `,
-              hints: [],
-            },
-          },
-        }),
-      ),
-    )
+              `)
 
     await expect(
       fetchLeetCodeProblemContent(location, {
@@ -306,16 +273,8 @@ Output: [1,2]</pre></section>`
 
 describe('readLeetCodeProblemContent', () => {
   it('preserves follow-up requirements separately from the statement', async () => {
-    const fetcher = vi.fn().mockResolvedValue(
-      Response.json({
-        data: {
-          question: {
-            content:
-              '<p>Find two distinct indices.</p><p>Constraints:</p><ul><li>2 &lt;= n &lt;= 10000</li></ul><p>Follow-up:</p><p>Can you achieve expected linear time?</p>',
-            hints: [],
-          },
-        },
-      }),
+    const fetcher = graphQlContentFetcher(
+      '<p>Find two distinct indices.</p><p>Constraints:</p><ul><li>2 &lt;= n &lt;= 10000</li></ul><p>Follow-up:</p><p>Can you achieve expected linear time?</p>',
     )
     await expect(
       readLeetCodeProblemContent(location, { fetch: fetcher, document }),
@@ -331,16 +290,7 @@ describe('readLeetCodeProblemContent', () => {
   })
 
   it('marks absent optional GraphQL sections as known empty', async () => {
-    const fetcher = vi.fn().mockResolvedValue(
-      Response.json({
-        data: {
-          question: {
-            content: '<p>Return the only answer.</p>',
-            hints: [],
-          },
-        },
-      }),
-    )
+    const fetcher = graphQlContentFetcher('<p>Return the only answer.</p>')
     await expect(
       readLeetCodeProblemContent(location, { fetch: fetcher, document }),
     ).resolves.toMatchObject({
@@ -425,11 +375,7 @@ describe('readLeetCodeProblemContent', () => {
 
   it('marks empty GraphQL markup as missing when no DOM content is available', async () => {
     document.body.innerHTML = '<main></main>'
-    const fetcher = vi.fn().mockResolvedValue(
-      Response.json({
-        data: { question: { content: '<p> </p>', hints: [] } },
-      }),
-    )
+    const fetcher = graphQlContentFetcher('<p> </p>')
     await expect(
       readLeetCodeProblemContent(location, { fetch: fetcher, document }),
     ).resolves.toMatchObject({
@@ -467,7 +413,7 @@ describe('readLeetCodeProblemContent', () => {
   })
 
   it('creates a stable fingerprint from semantic content only', () => {
-    const contentFingerprint = createLeetCodeProblemContentFingerprint({
+    const content = {
       location,
       statement: 'Return indices.',
       examples: [
@@ -482,27 +428,14 @@ describe('readLeetCodeProblemContent', () => {
       constraints: ['2 <= nums.length'],
       hints: ['Use a map.'],
       followUps: [],
-      completeness: 'complete',
-    })
-
+      completeness: 'complete' as const,
+    }
+    const contentFingerprint = createLeetCodeProblemContentFingerprint(content)
     expect(contentFingerprint).toMatch(/^lc-content-[a-f0-9]+$/)
     expect(
       createLeetCodeProblemContentFingerprint({
-        location,
+        ...content,
         statement: 'Return   indices.',
-        examples: [
-          {
-            label: 'Example 1',
-            input: 'nums = [2,7]',
-            output: '[0,1]',
-            explanation: null,
-            rawText: 'Input: nums = [2,7]\nOutput: [0,1]',
-          },
-        ],
-        constraints: ['2 <= nums.length'],
-        hints: ['Use a map.'],
-        followUps: [],
-        completeness: 'complete',
       }),
     ).toBe(contentFingerprint)
   })
@@ -703,12 +636,14 @@ async function readContentForPath(html: string, path: string) {
   }
   const result = await readLeetCodeProblemContent(location, {
     document,
-    fetch: vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({ data: { question: { content: html, hints: [] } } }),
-      ),
+    fetch: graphQlContentFetcher(html),
   })
   if (!result.ok) throw result.error
   return result.content
+}
+
+function graphQlContentFetcher(content: string, hints: string[] = []) {
+  return vi.fn(() =>
+    Promise.resolve(Response.json({ data: { question: { content, hints } } })),
+  )
 }

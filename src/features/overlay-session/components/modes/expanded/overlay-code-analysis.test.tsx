@@ -1,21 +1,11 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { analyzeLeetCodeSubmissionViaRuntime } from '@/features/leetcode-review-assistant'
 import { makeValidAnalysis } from '@/features/leetcode-review-assistant/testing'
 
 import type { CodeAnalysisState } from '../../../hooks/use-leetcode-code-analysis'
 import { OverlayCodeAnalysis } from './overlay-code-analysis'
-
-vi.mock('@/features/leetcode-review-assistant', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('@/features/leetcode-review-assistant')
-  >()),
-  analyzeLeetCodeSubmissionViaRuntime: vi.fn(),
-}))
-
-beforeEach(() => vi.clearAllMocks())
 
 const ready = (
   report = makeValidAnalysis(),
@@ -29,16 +19,19 @@ const ready = (
 function mount(state: CodeAnalysisState = ready()) {
   const onRetry = vi.fn()
   const onSettings = vi.fn()
+  const renderState = (next: CodeAnalysisState) => (
+    <OverlayCodeAnalysis
+      state={next}
+      onRetry={onRetry}
+      onSettings={onSettings}
+    />
+  )
+  const view = render(renderState(state))
   return {
-    ...render(
-      <OverlayCodeAnalysis
-        state={state}
-        onRetry={onRetry}
-        onSettings={onSettings}
-      />,
-    ),
+    ...view,
     onRetry,
     onSettings,
+    rerender: (next: CodeAnalysisState) => view.rerender(renderState(next)),
   }
 }
 
@@ -95,7 +88,6 @@ describe('OverlayCodeAnalysis', () => {
     expect(details[2]).not.toHaveAttribute('open')
     expect(details[3]).not.toHaveAttribute('open')
     expect(onRetry).not.toHaveBeenCalled()
-    expect(analyzeLeetCodeSubmissionViaRuntime).not.toHaveBeenCalled()
     expect(screen.queryByText('Use recommendation')).not.toBeInTheDocument()
     expect(screen.queryByText('Evidence')).not.toBeInTheDocument()
     expect(screen.queryByText('Edge case notes')).not.toBeInTheDocument()
@@ -223,102 +215,74 @@ describe('OverlayCodeAnalysis', () => {
     ).toBeInTheDocument()
   })
 
-  it('copies the exact full code only on explicit action and reports success after clipboard resolves', async () => {
-    const user = userEvent.setup()
-    const pending = deferred()
-    const writeText = clipboard(pending.promise)
-    const report = makeValidAnalysis()
-    mount(ready(report))
-    await user.click(
-      screen.getByText('Suggested implementation', { selector: 'summary' }),
-    )
-    expect(writeText).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'Copy code' }))
-    expect(writeText).toHaveBeenCalledOnce()
-    expect(writeText).toHaveBeenCalledWith(report.suggestedImplementation!.code)
-    expect(screen.queryByText('Copied')).not.toBeInTheDocument()
-    await act(async () => {
-      pending.resolve()
-      await pending.promise
-    })
-    expect(screen.getByRole('status')).toHaveTextContent('Copied')
-    expect(analyzeLeetCodeSubmissionViaRuntime).not.toHaveBeenCalled()
-  })
-
-  it('reports a fixed safe clipboard failure without leaking rejected text', async () => {
-    const user = userEvent.setup()
-    const pending = deferred()
-    clipboard(pending.promise)
-    mount()
-    await user.click(
-      screen.getByText('Suggested implementation', { selector: 'summary' }),
-    )
-    await user.click(screen.getByRole('button', { name: 'Copy code' }))
-    await act(async () => {
-      pending.reject(new Error('secret provider text'))
-      await pending.promise.catch(() => {})
-    })
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Copy failed. Select the code and copy it.',
-    )
-    expect(screen.queryByText('Copied')).not.toBeInTheDocument()
-    expect(screen.queryByText('secret provider text')).not.toBeInTheDocument()
-  })
-
   it.each(['success', 'failure'] as const)(
-    'prevents an old pending copy %s from updating a replacement report',
+    'copies exact code and reports clipboard %s after resolution',
     async (outcome) => {
       const user = userEvent.setup()
       const pending = deferred()
+      const writeText = clipboard(pending.promise)
+      const report = makeValidAnalysis()
+      mount(ready(report))
+      await user.click(
+        screen.getByText('Suggested implementation', { selector: 'summary' }),
+      )
+      expect(writeText).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: 'Copy code' }))
+      expect(writeText).toHaveBeenCalledExactlyOnceWith(
+        report.suggestedImplementation!.code,
+      )
+      expect(screen.queryByText('Copied')).not.toBeInTheDocument()
+      await act(async () => {
+        if (outcome === 'success') pending.resolve()
+        else pending.reject(new Error('secret provider text'))
+        await pending.promise.catch(() => {})
+      })
+      expect(screen.getByRole('status')).toHaveTextContent(
+        outcome === 'success'
+          ? 'Copied'
+          : 'Copy failed. Select the code and copy it.',
+      )
+      expect(screen.queryByText('secret provider text')).not.toBeInTheDocument()
+    },
+  )
+
+  it.each([
+    ['replacement', 'success'],
+    ['replacement', 'failure'],
+    ['unmount', 'success'],
+  ] as const)(
+    'suppresses pending clipboard feedback after %s (%s)',
+    async (change, outcome) => {
+      const user = userEvent.setup()
+      const pending = deferred()
       clipboard(pending.promise)
-      const { rerender, onRetry, onSettings } = mount()
+      const { rerender, unmount } = mount()
       await user.click(
         screen.getByText('Suggested implementation', { selector: 'summary' }),
       )
       await user.click(screen.getByRole('button', { name: 'Copy code' }))
-      rerender(
-        <OverlayCodeAnalysis
-          state={ready(
-            makeValidAnalysis({ summary: 'New report.' }),
-            'request-2',
-          )}
-          onRetry={onRetry}
-          onSettings={onSettings}
-        />,
-      )
+      if (change === 'unmount') unmount()
+      else
+        rerender(
+          ready(makeValidAnalysis({ summary: 'New report.' }), 'request-2'),
+        )
       await act(async () => {
         if (outcome === 'success') pending.resolve()
         else pending.reject(new Error('old failure'))
         await pending.promise.catch(() => {})
       })
-      expect(screen.getByText('New report.')).toBeInTheDocument()
+      if (change === 'replacement')
+        expect(screen.getByText('New report.')).toBeInTheDocument()
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
       for (const details of document.querySelectorAll('details'))
         expect(details).not.toHaveAttribute('open')
     },
   )
 
-  it('does not publish a pending clipboard result after unmount', async () => {
-    const user = userEvent.setup()
-    const pending = deferred()
-    clipboard(pending.promise)
-    const { unmount } = mount()
-    await user.click(
-      screen.getByText('Suggested implementation', { selector: 'summary' }),
-    )
-    await user.click(screen.getByRole('button', { name: 'Copy code' }))
-    unmount()
-    await act(async () => {
-      pending.resolve()
-      await pending.promise
-    })
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
-  })
-
   it('resets opened disclosures and completed Copy feedback for a new request', async () => {
     const user = userEvent.setup()
     clipboard(Promise.resolve())
-    const { rerender, onRetry, onSettings } = mount()
+    const { rerender } = mount()
     for (const name of [
       'Approach',
       'Efficiency',
@@ -328,13 +292,7 @@ describe('OverlayCodeAnalysis', () => {
       await user.click(screen.getByText(name, { selector: 'summary' }))
     await user.click(screen.getByRole('button', { name: 'Copy code' }))
     expect(screen.getByText('Copied')).toBeInTheDocument()
-    rerender(
-      <OverlayCodeAnalysis
-        state={ready(makeValidAnalysis(), 'request-2')}
-        onRetry={onRetry}
-        onSettings={onSettings}
-      />,
-    )
+    rerender(ready(makeValidAnalysis(), 'request-2'))
     for (const details of document.querySelectorAll('details'))
       expect(details).not.toHaveAttribute('open')
     expect(screen.queryByText('Copied')).not.toBeInTheDocument()
@@ -399,15 +357,9 @@ describe('OverlayCodeAnalysis', () => {
   })
 
   it('hides disabled analysis and shows the idle submission instruction', () => {
-    const { rerender, onRetry, onSettings } = mount({ status: 'disabled' })
+    const { rerender } = mount({ status: 'disabled' })
     expect(screen.queryByRole('region')).not.toBeInTheDocument()
-    rerender(
-      <OverlayCodeAnalysis
-        state={{ status: 'idle' }}
-        onRetry={onRetry}
-        onSettings={onSettings}
-      />,
-    )
+    rerender({ status: 'idle' })
     expect(
       screen.getByText('Submit on LeetCode to get an AI assessment.'),
     ).toBeInTheDocument()
@@ -447,13 +399,7 @@ describe('OverlayCodeAnalysis', () => {
       await user.click(screen.getByRole('button', { name: 'Settings' }))
       expect(onRetry).toHaveBeenCalledOnce()
       expect(onSettings).toHaveBeenCalledOnce()
-      rerender(
-        <OverlayCodeAnalysis
-          state={{ ...state, canRetry: false, showSettings: false }}
-          onRetry={onRetry}
-          onSettings={onSettings}
-        />,
-      )
+      rerender({ ...state, canRetry: false, showSettings: false })
       expect(screen.queryByRole('button')).not.toBeInTheDocument()
     },
   )

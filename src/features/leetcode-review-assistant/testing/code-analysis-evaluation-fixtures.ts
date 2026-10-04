@@ -10,7 +10,7 @@ export type CodeAnalysisEvaluationFixture = {
 }
 
 function makeEvaluationRequest(): AnalyzeLeetCodeSubmissionRequest {
-  const request = structuredClone(makeAnalysisRequest())
+  const request = makeAnalysisRequest()
   request.submission.languageVersion = null
   request.submission.runtime = null
   request.submission.memory = null

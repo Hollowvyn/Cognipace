@@ -44,29 +44,62 @@ beforeEach(async () => {
   service = await import('./leetcode-capture-service')
 })
 
+function readResult(
+  overrides: Partial<
+    Parameters<typeof service.readLeetCodeSubmissionResultInBackground>[0]
+  > = {},
+) {
+  return service.readLeetCodeSubmissionResultInBackground({
+    ...request,
+    ...overrides,
+  })
+}
+
+function readContent(
+  overrides: Partial<
+    Parameters<typeof service.readLeetCodeProblemContentInBackground>[0]
+  > = {},
+) {
+  return service.readLeetCodeProblemContentInBackground({
+    location,
+    ...overrides,
+  })
+}
+
+function readMetadata(
+  overrides: Partial<
+    Parameters<typeof service.readLeetCodeProblemMetadataInBackground>[0]
+  > = {},
+) {
+  return service.readLeetCodeProblemMetadataInBackground({
+    location,
+    ...overrides,
+  })
+}
+
+function mockSubmissionFixture(
+  fixture: typeof leetcodeAcceptedSubmissionApiFixture,
+) {
+  const fetcher = createLeetCodeSubmissionApiFixtureFetcher(fixture)
+  remote.readSubmissionResult.mockImplementation(
+    createLeetCodeFetchRemoteClient({ fetch: fetcher, now: () => 7000 })
+      .readSubmissionResult,
+  )
+  return fetcher
+}
+
 describe('recoverable submission caches', () => {
   it('reaches transport after partial details, then reuses the complete result', async () => {
     const fixture = {
       ...leetcodeAcceptedSubmissionApiFixture,
       graphQlPayload: null,
     } as typeof leetcodeAcceptedSubmissionApiFixture
-    const fetcher = createLeetCodeSubmissionApiFixtureFetcher(fixture)
-    remote.readSubmissionResult.mockImplementation(
-      createLeetCodeFetchRemoteClient({ fetch: fetcher, now: () => 7000 })
-        .readSubmissionResult,
-    )
-    const first =
-      await service.readLeetCodeSubmissionResultInBackground(request)
+    const fetcher = mockSubmissionFixture(fixture)
+    const first = await readResult()
     expect(first.result?.resultCodeSnapshot.completeness).toBe('partial')
     fixture.graphQlPayload = leetcodeAcceptedSubmissionApiFixture.graphQlPayload
-    const second = await service.readLeetCodeSubmissionResultInBackground({
-      ...request,
-      submissionId: '1234567890',
-    })
-    const third = await service.readLeetCodeSubmissionResultInBackground({
-      ...request,
-      submissionId: '1234567890',
-    })
+    const second = await readResult({ submissionId: '1234567890' })
+    const third = await readResult({ submissionId: '1234567890' })
     expect(second.result?.resultCodeSnapshot).toMatchObject({
       completeness: 'complete',
       source: 'api',
@@ -78,12 +111,8 @@ describe('recoverable submission caches', () => {
 
   it('refreshes a complete pinned result and retains fresh details in both caches', async () => {
     const fixture = structuredClone(leetcodeAcceptedSubmissionApiFixture)
-    const fetcher = createLeetCodeSubmissionApiFixtureFetcher(fixture)
-    remote.readSubmissionResult.mockImplementation(
-      createLeetCodeFetchRemoteClient({ fetch: fetcher, now: () => 7000 })
-        .readSubmissionResult,
-    )
-    await service.readLeetCodeSubmissionResultInBackground(request)
+    const fetcher = mockSubmissionFixture(fixture)
+    await readResult()
     fixture.submissionListPayload = {
       submission_list: [{ id: '9999999999', timestamp: 6 }],
     }
@@ -96,17 +125,12 @@ describe('recoverable submission caches', () => {
         },
       },
     }
-    const refreshed = await service.readLeetCodeSubmissionResultInBackground({
-      ...request,
+    const refreshed = await readResult({
       submissionId: '1234567890',
       refresh: true,
     })
-    const cached = await service.readLeetCodeSubmissionResultInBackground({
-      ...request,
-      submissionId: '1234567890',
-    })
-    const cachedAttempt =
-      await service.readLeetCodeSubmissionResultInBackground(request)
+    const cached = await readResult({ submissionId: '1234567890' })
+    const cachedAttempt = await readResult()
     expect(refreshed.result?.resultCodeSnapshot.code).toBe(
       '  fresh full code\n',
     )
@@ -119,9 +143,8 @@ describe('recoverable submission caches', () => {
   it('reuses the ID cache before transport for another attempt pinned to that ID', async () => {
     const response = await completeResponse()
     remote.readSubmissionResult.mockResolvedValue(response)
-    await service.readLeetCodeSubmissionResultInBackground(request)
-    const cached = await service.readLeetCodeSubmissionResultInBackground({
-      ...request,
+    await readResult()
+    const cached = await readResult({
       attemptId: 'attempt-2',
       submissionId: '1234567890',
     })
@@ -137,11 +160,8 @@ describe('recoverable submission caches', () => {
         ...response,
         result: { ...response.result!, submissionId: '9999999999' },
       })
-    await service.readLeetCodeSubmissionResultInBackground(request)
-    const next = await service.readLeetCodeSubmissionResultInBackground({
-      ...request,
-      submissionId: '9999999999',
-    })
+    await readResult()
+    const next = await readResult({ submissionId: '9999999999' })
     expect(next.result?.submissionId).toBe('9999999999')
     expect(remote.readSubmissionResult).toHaveBeenCalledTimes(2)
   })
@@ -151,11 +171,8 @@ describe('recoverable submission caches', () => {
     remote.readSubmissionResult
       .mockResolvedValueOnce(response)
       .mockResolvedValueOnce({ result: null, debugEvents: [] })
-    await service.readLeetCodeSubmissionResultInBackground(request)
-    const next = await service.readLeetCodeSubmissionResultInBackground({
-      ...request,
-      attemptId: 'attempt-2',
-    })
+    await readResult()
+    const next = await readResult({ attemptId: 'attempt-2' })
     expect(next.result).toBeNull()
     expect(remote.readSubmissionResult).toHaveBeenCalledTimes(2)
   })
@@ -181,10 +198,9 @@ describe('recoverable submission caches', () => {
       remote.readSubmissionResult
         .mockResolvedValueOnce(wrong)
         .mockResolvedValueOnce(response)
-      const pinned = { ...request, submissionId: '1234567890' }
-      await service.readLeetCodeSubmissionResultInBackground(pinned)
-      const next =
-        await service.readLeetCodeSubmissionResultInBackground(pinned)
+      const pinned = { submissionId: '1234567890' }
+      await readResult(pinned)
+      const next = await readResult(pinned)
       expect(next).toEqual(response)
       expect(remote.readSubmissionResult).toHaveBeenCalledTimes(2)
     },
@@ -197,13 +213,12 @@ describe('recoverable submission caches', () => {
       remote.readSubmissionResult
         .mockResolvedValueOnce(response)
         .mockResolvedValueOnce({ result: null, debugEvents: [] })
-      await service.readLeetCodeSubmissionResultInBackground(request)
+      await readResult()
       const changedLocation =
         field === 'host'
           ? createLocation('two-sum', 'www.leetcode.com')
           : createLocation('three-sum')
-      const next = await service.readLeetCodeSubmissionResultInBackground({
-        ...request,
+      const next = await readResult({
         location: changedLocation,
         attemptId: 'attempt-2',
         submissionId: '1234567890',
@@ -231,11 +246,9 @@ describe('recoverable submission caches', () => {
           result: { ...response.result!, resultCodeSnapshot: snapshot },
         })
         .mockResolvedValueOnce(response)
-      const pinned = { ...request, submissionId: '1234567890' }
-      await service.readLeetCodeSubmissionResultInBackground(pinned)
-      expect(
-        await service.readLeetCodeSubmissionResultInBackground(pinned),
-      ).toEqual(response)
+      const pinned = { submissionId: '1234567890' }
+      await readResult(pinned)
+      expect(await readResult(pinned)).toEqual(response)
       expect(remote.readSubmissionResult).toHaveBeenCalledTimes(2)
     },
   )
@@ -252,10 +265,10 @@ describe('recoverable submission caches', () => {
     remote.readSubmissionResult
       .mockResolvedValueOnce(response)
       .mockResolvedValueOnce(partial)
-    const pinned = { ...request, submissionId: '1234567890' }
-    await service.readLeetCodeSubmissionResultInBackground(pinned)
+    const pinned = { submissionId: '1234567890' }
+    await readResult(pinned)
     expect(
-      await service.readLeetCodeSubmissionResultInBackground({
+      await readResult({
         ...pinned,
         refresh: true,
       }),
@@ -284,14 +297,10 @@ describe('problem caches', () => {
       remote.readProblemContent
         .mockResolvedValueOnce(unusable)
         .mockResolvedValueOnce(complete)
-      await service.readLeetCodeProblemContentInBackground({ location })
-      const second = await service.readLeetCodeProblemContentInBackground({
-        location,
-      })
+      await readContent()
+      const second = await readContent()
       expect(second).toEqual(complete)
-      expect(
-        await service.readLeetCodeProblemContentInBackground({ location }),
-      ).toEqual(second)
+      expect(await readContent()).toEqual(second)
       expect(remote.readProblemContent).toHaveBeenCalledTimes(2)
     },
   )
@@ -311,23 +320,11 @@ describe('problem caches', () => {
       .mockResolvedValueOnce(fresh)
       .mockResolvedValueOnce({ ok: false, error: new Error('temporary') })
       .mockResolvedValueOnce(original)
-    await service.readLeetCodeProblemContentInBackground({ location })
-    expect(
-      await service.readLeetCodeProblemContentInBackground({
-        location,
-        refresh: true,
-      }),
-    ).toEqual(fresh)
-    expect(
-      await service.readLeetCodeProblemContentInBackground({ location }),
-    ).toEqual(fresh)
-    await service.readLeetCodeProblemContentInBackground({
-      location,
-      refresh: true,
-    })
-    expect(
-      await service.readLeetCodeProblemContentInBackground({ location }),
-    ).toEqual(original)
+    await readContent()
+    expect(await readContent({ refresh: true })).toEqual(fresh)
+    expect(await readContent()).toEqual(fresh)
+    await readContent({ refresh: true })
+    expect(await readContent()).toEqual(original)
     expect(remote.readProblemContent).toHaveBeenCalledTimes(4)
   })
 
@@ -336,10 +333,8 @@ describe('problem caches', () => {
     remote.readProblemContent
       .mockResolvedValueOnce(completeContent(location))
       .mockResolvedValueOnce(completeContent(wwwLocation))
-    await service.readLeetCodeProblemContentInBackground({ location })
-    const wwwResult = await service.readLeetCodeProblemContentInBackground({
-      location: wwwLocation,
-    })
+    await readContent()
+    const wwwResult = await readContent({ location: wwwLocation })
     expect(wwwResult.ok && wwwResult.content.location.host).toBe(
       'www.leetcode.com',
     )
@@ -365,18 +360,12 @@ describe('problem caches', () => {
         ok: true,
         metadata: { ...metadata, location: wwwLocation },
       })
-    await service.readLeetCodeProblemMetadataInBackground({ location })
-    const wwwResult = await service.readLeetCodeProblemMetadataInBackground({
-      location: wwwLocation,
-    })
+    await readMetadata()
+    const wwwResult = await readMetadata({ location: wwwLocation })
     expect(wwwResult.ok && wwwResult.metadata.location.host).toBe(
       'www.leetcode.com',
     )
-    expect(
-      await service.readLeetCodeProblemMetadataInBackground({
-        location: wwwLocation,
-      }),
-    ).toEqual(wwwResult)
+    expect(await readMetadata({ location: wwwLocation })).toEqual(wwwResult)
     expect(remote.readProblemMetadata).toHaveBeenCalledTimes(2)
   })
 })

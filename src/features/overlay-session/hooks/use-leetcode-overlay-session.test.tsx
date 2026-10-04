@@ -181,6 +181,11 @@ const nextStep = {
   title: 'Valid Parentheses',
 } satisfies NonNullable<OverlayAppShellData['overlay']['nextStep']>
 
+const analyze = vi.mocked(analyzeLeetCodeSubmissionViaRuntime)
+const saveReview = vi.mocked(saveReviewResultViaRuntime)
+const overrideReview = vi.mocked(overrideLastReviewResultViaRuntime)
+const loadOverlayData = vi.mocked(getOverlayAppShellDataViaRuntime)
+
 const AI_PROBE_SUMMARY = '__AI_PROBE_summary__'
 describe('useLeetCodeOverlaySession', () => {
   beforeEach(() => {
@@ -188,15 +193,9 @@ describe('useLeetCodeOverlaySession', () => {
     vi.clearAllMocks()
     leetcodeMockState.onEvent = null
     vi.mocked(upsertProblemFromPageViaRuntime).mockResolvedValue(problemRecord)
-    vi.mocked(saveReviewResultViaRuntime).mockResolvedValue(
-      createSavedPracticeDetails(),
-    )
-    vi.mocked(overrideLastReviewResultViaRuntime).mockResolvedValue(
-      createSavedPracticeDetails(),
-    )
-    vi.mocked(getOverlayAppShellDataViaRuntime).mockResolvedValue(
-      createOverlayData(),
-    )
+    saveReview.mockResolvedValue(createSavedPracticeDetails())
+    overrideReview.mockResolvedValue(createSavedPracticeDetails())
+    loadOverlayData.mockResolvedValue(createOverlayData())
     remote.readProblemContent.mockReset().mockResolvedValue({
       ok: true,
       content: makeCompleteCapture().problemContent,
@@ -205,229 +204,145 @@ describe('useLeetCodeOverlaySession', () => {
       result: makeCompleteCapture().submissionResult,
       debugEvents: [],
     })
-    vi.mocked(analyzeLeetCodeSubmissionViaRuntime)
-      .mockReset()
-      .mockImplementation((request) =>
-        Promise.resolve({
-          status: 'ready',
-          ...analysisIdentity(request),
-          report: makeValidAnalysis({ summary: AI_PROBE_SUMMARY }),
-          providerMetadata: {
-            provider: 'openai',
-            model: 'fixture',
-            durationMs: 10,
-          },
-        }),
-      )
+    analyze.mockReset().mockImplementation((request) =>
+      Promise.resolve({
+        status: 'ready',
+        ...analysisIdentity(request),
+        report: makeValidAnalysis({ summary: AI_PROBE_SUMMARY }),
+        providerMetadata: {
+          provider: 'openai',
+          model: 'fixture',
+          durationMs: 10,
+        },
+      }),
+    )
     vi.mocked(cancelLeetCodeAnalysisViaRuntime)
       .mockReset()
       .mockResolvedValue({ requestId: 'ignored', cancelled: true })
     vi.mocked(sendMessage).mockResolvedValue(undefined)
   })
 
-  it('quick submits from collapsed while analysis is pending using the assessment policy', async () => {
-    const analysis = createPendingAnalysis()
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-    })
-    emitCompleteAnalysisSubmission()
-    await expectPendingAnalysis(result)
-
-    await runOverlayAction(result.current.actions.prepareQuickSubmit)
-
-    expect(latestSavedReviewRequest()).toMatchObject({
-      rating: 'good',
-      elapsedSeconds: null,
-      isCorrect: true,
-    })
-    expect(result.current.overlay.visualMode).toBe('expanded')
-    expect(result.current.overlay.selectedRating).toBe('good')
-    expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
-    expect(result.current.aiAnalysis.status).toBe('pending')
-    await completePendingAnalysis(analysis, result)
-    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-    expect(result.current.overlay.submittedSession?.rating).toBe('good')
-  })
-
-  it('fires the Easy gate on a fast recall solve beating the previous best', async () => {
-    const startTime = Date.now()
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startTime)
-    const { result } = await renderReadySession({
-      practice: createSavedPracticeDetails({
-        latestAttempt: { elapsedSeconds: 1800 },
-      }),
-    })
-
-    act(() => {
-      result.current.actions.startTimer()
-    })
-    // Medium target = 35 * 60 = 2100s. 600s is 28% of target and beats prior best (1800s).
-    nowSpy.mockReturnValue(startTime + 600 * 1000)
-
-    await runOverlayAction(result.current.actions.prepareQuickSubmit)
-
-    expect(latestSavedReviewRequest()).toMatchObject({
-      rating: 'easy',
-      elapsedSeconds: 600,
-      isCorrect: true,
-    })
-  })
-
-  it('does not fire the Easy gate on a first solve even with a fast time', async () => {
-    const startTime = Date.now()
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startTime)
-    const { result } = await renderReadySession({
-      // Default practice is null → first-solve. Easy gate cannot fire.
-    })
-
-    act(() => {
-      result.current.actions.startTimer()
-    })
-    nowSpy.mockReturnValue(startTime + 600 * 1000)
-
-    await runOverlayAction(result.current.actions.prepareQuickSubmit)
-
-    expect(latestSavedReviewRequest()).toMatchObject({
-      rating: 'good',
-      elapsedSeconds: 600,
-      isCorrect: true,
-    })
-  })
-
-  it('submits an untimed manual rating while analysis is pending even when solve time is required', async () => {
-    const analysis = createPendingAnalysis()
-    vi.mocked(saveReviewResultViaRuntime).mockResolvedValueOnce(
-      createSavedPracticeDetails({ latestAttempt: { rating: 'hard' } }),
-    )
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-      timing: { requireSolveTime: true },
-    })
-    emitCompleteAnalysisSubmission()
-    await expectPendingAnalysis(result)
-    act(() => result.current.actions.selectRating('hard'))
-
-    await runOverlayAction(result.current.actions.submitReview)
-
-    expect(latestSavedReviewRequest()).toEqual({
-      surface: 'content-script',
-      problemSlug: 'two-sum',
-      rating: 'hard',
-      reviewMode: 'leetcode',
-      elapsedSeconds: null,
-      isCorrect: true,
-    })
-    expect(latestSavedReviewRequest()).not.toHaveProperty('log')
-    expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
-    expect(result.current.aiAnalysis.status).toBe('pending')
-    await completePendingAnalysis(analysis, result)
-    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-    expect(result.current.overlay.submittedSession).toEqual({
-      rating: 'hard',
-      elapsedSeconds: null,
-      isCorrect: true,
-      lockReason: null,
-    })
-  })
-
-  it('saves the manual decision before pending analysis completes and keeps it after the report arrives', async () => {
-    const analysis = createDeferred<AnalyzeLeetCodeSubmissionResponse>()
-    vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mockReturnValueOnce(
-      analysis.promise,
-    )
-    const startedAt = Date.now()
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startedAt)
-    vi.mocked(saveReviewResultViaRuntime).mockResolvedValueOnce(
-      createSavedPracticeDetails({ latestAttempt: { elapsedSeconds: 73 } }),
-    )
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-      autoDetectSolved: false,
-    })
-    act(() => result.current.actions.startTimer())
-    nowSpy.mockReturnValue(startedAt + 73_000)
-    emitCompleteAnalysisSubmission()
-    await waitFor(() =>
-      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledOnce(),
-    )
-    expect(result.current.aiAnalysis.status).toBe('pending')
-    act(() => result.current.actions.selectRating('good'))
-    let save!: Promise<void>
-    act(() => {
-      save = result.current.actions.submitReview()
-    })
-
-    await waitFor(() =>
-      expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce(),
-    )
-    await act(async () => {
-      await save
-    })
-    expect(latestSavedReviewRequest()).toEqual({
-      surface: 'content-script',
-      problemSlug: 'two-sum',
-      rating: 'good',
-      reviewMode: 'leetcode',
-      elapsedSeconds: 73,
-      isCorrect: true,
-    })
-    expect(result.current.overlay.submittedSession).toEqual({
-      rating: 'good',
-      elapsedSeconds: 73,
-      isCorrect: true,
-      lockReason: null,
-    })
-    expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
-    expect(result.current.timer).toMatchObject({
-      status: 'locked',
-      elapsedSeconds: 73,
-    })
-    expect(result.current.overlay.nextStep.value).toEqual(nextStep)
-    expect(result.current.aiAnalysis.status).toBe('pending')
-
-    const request = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[0]![0]
-    const capture = makeCompleteCapture()
-    expect(analysisIdentity(request)).toEqual({
-      requestId: request.requestId,
-      attemptId: capture.submissionAttempt.attemptId,
-      submissionId: capture.submissionResult.submissionId,
-      problemSlug: capture.location.slug,
-      configurationRevision: request.configurationRevision,
-    })
-    expect(request.requestId).toMatch(/^[0-9a-f-]{36}$/i)
-    expect(Number.isInteger(request.configurationRevision)).toBe(true)
-    expect(request.configurationRevision).toBeGreaterThanOrEqual(0)
-    act(() => {
-      analysis.resolve({
-        status: 'ready',
-        ...analysisIdentity(request),
-        report: makeValidAnalysis(),
-        providerMetadata: {
-          provider: 'openai',
-          model: 'fixture',
-          durationMs: 10,
-        },
+  it.each([
+    ['quick submit', 'prepareQuickSubmit', null, 'good', null, {}],
+    [
+      'untimed manual',
+      'submitReview',
+      null,
+      'hard',
+      null,
+      { requireSolveTime: true },
+    ],
+    ['timed manual', 'submitReview', 73, 'good', null, {}],
+    [
+      'strict overtime',
+      'submitReview',
+      1260,
+      'again',
+      'hard-mode-overtime',
+      { strictTiming: true },
+    ],
+    ['explicit failure', 'failReview', null, 'again', 'failed', {}],
+    ['accepted autosave', 'auto', 95, 'good', null, {}],
+    ['failed autosave', 'auto', null, 'again', 'failed', {}],
+  ] as const)(
+    '%s persists before analysis finishes and retains its rating, timing and lock',
+    async (_name, action, elapsedSeconds, rating, lockReason, timing) => {
+      const analysis = createPendingAnalysis()
+      const now = Date.now()
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+      const expected = { rating, elapsedSeconds, isCorrect: rating !== 'again' }
+      saveReview.mockResolvedValueOnce(
+        createSavedPracticeDetails({ latestAttempt: expected }),
+      )
+      const { result } = await renderReadySession({
+        aiAssessmentEnabled: true,
+        aiAssessmentAvailable: true,
+        autoDetectSolved: action === 'auto',
+        timing,
       })
-    })
-    await waitFor(() => expect(result.current.aiAnalysis.status).toBe('ready'))
-    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-    expect(overrideLastReviewResultViaRuntime).not.toHaveBeenCalled()
-    expect(result.current.overlay.selectedRating).toBe('good')
-    expect(result.current.overlay.submittedSession).toEqual({
-      rating: 'good',
-      elapsedSeconds: 73,
-      isCorrect: true,
-      lockReason: null,
-    })
-    expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
-  })
+      if (elapsedSeconds !== null) {
+        if (action !== 'auto') act(() => result.current.actions.startTimer())
+        clock.mockReturnValue(now + elapsedSeconds * 1000)
+      }
+      const submission = makeCompleteCapture().submissionResult
+      if (lockReason === 'failed')
+        Object.assign(submission, {
+          status: 'wrong-answer',
+          statusText: 'Wrong Answer',
+        })
+      emitCompleteAnalysisSubmission(submission)
+      await expectPendingAnalysis(result)
+      if (action !== 'auto') {
+        act(() =>
+          result.current.actions.selectRating(lockReason ? 'good' : rating),
+        )
+        await runOverlayAction(result.current.actions[action])
+      }
+      await waitFor(() =>
+        expect(result.current.overlay.reviewStatus).toBe('submitted-clean'),
+      )
+      expect(latestSavedReviewRequest()).toEqual({
+        surface: 'content-script',
+        problemSlug: 'two-sum',
+        reviewMode: 'leetcode',
+        ...expected,
+      })
+      for (const status of ['pending', 'ready'] as const) {
+        if (status === 'ready') await completePendingAnalysis(analysis, result)
+        expect(result.current.aiAnalysis.status).toBe(status)
+        expect(result.current.overlay.submittedSession).toEqual({
+          ...expected,
+          lockReason,
+        })
+        expect(result.current.overlay.visualMode).toBe('expanded')
+        expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
+        if (elapsedSeconds !== null)
+          expect(result.current.timer).toMatchObject({
+            status: 'locked',
+            elapsedSeconds,
+          })
+        if (lockReason) {
+          act(() => result.current.actions.selectRating('easy'))
+          await runOverlayAction(result.current.actions.updateReview)
+        }
+        expect(result.current.overlay.selectedRating).toBe(rating)
+        expect(result.current.overlay.ratingLockReason).toBe(lockReason)
+        expect(saveReview).toHaveBeenCalledOnce()
+        expect(overrideReview).not.toHaveBeenCalled()
+      }
+      expect(result.current.overlay.nextStep.value).toEqual(nextStep)
+    },
+  )
+
+  it.each([
+    [1800, 'easy'],
+    [null, 'good'],
+  ] as const)(
+    'quick-submit Easy gate with prior solve %j selects %s',
+    async (prior, rating) => {
+      const startTime = Date.now()
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startTime)
+      const { result } = await renderReadySession({
+        practice:
+          prior === null
+            ? null
+            : createSavedPracticeDetails({
+                latestAttempt: { elapsedSeconds: prior },
+              }),
+      })
+      act(() => result.current.actions.startTimer())
+      nowSpy.mockReturnValue(startTime + 600_000)
+      await runOverlayAction(result.current.actions.prepareQuickSubmit)
+      expect(latestSavedReviewRequest()).toMatchObject({
+        rating,
+        elapsedSeconds: 600,
+        isCorrect: true,
+      })
+    },
+  )
 
   it('keeps a saved review submitted when the next-step refresh fails', async () => {
-    vi.mocked(getOverlayAppShellDataViaRuntime)
+    loadOverlayData
       .mockResolvedValueOnce(createOverlayData())
       .mockRejectedValueOnce(new Error('Next problem unavailable.'))
     const { result } = await renderReadySession()
@@ -442,105 +357,13 @@ describe('useLeetCodeOverlaySession', () => {
     )
   })
 
-  it('keeps strict timing overtime locked to Again while analysis is pending and after it completes', async () => {
-    const analysis = createPendingAnalysis()
-    const startTime = Date.now()
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startTime)
-    vi.mocked(saveReviewResultViaRuntime).mockResolvedValueOnce(
-      createSavedPracticeDetails({
-        latestAttempt: {
-          rating: 'again',
-          elapsedSeconds: 21 * 60,
-          isCorrect: false,
-        },
-      }),
-    )
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-      timing: { strictTiming: true },
-    })
-    act(() => result.current.actions.startTimer())
-    nowSpy.mockReturnValue(startTime + 21 * 60 * 1000)
-    emitCompleteAnalysisSubmission()
-    await expectPendingAnalysis(result)
-
-    await runOverlayAction(result.current.actions.submitReview)
-
-    expect(latestSavedReviewRequest()).toMatchObject({
-      rating: 'again',
-      elapsedSeconds: 21 * 60,
-      isCorrect: false,
-    })
-    expect(result.current.overlay.ratingLockReason).toBe('hard-mode-overtime')
-    expect(result.current.aiAnalysis.status).toBe('pending')
-    act(() => result.current.actions.selectRating('good'))
-    await runOverlayAction(result.current.actions.updateReview)
-    await completePendingAnalysis(analysis, result)
-    expect(result.current.overlay.submittedSession).toEqual({
-      rating: 'again',
-      elapsedSeconds: 21 * 60,
-      isCorrect: false,
-      lockReason: 'hard-mode-overtime',
-    })
-    expect(result.current.overlay.selectedRating).toBe('again')
-    expect(result.current.timer).toMatchObject({
-      status: 'locked',
-      elapsedSeconds: 21 * 60,
-    })
-    expect(result.current.overlay.nextStep.value).toEqual(nextStep)
-    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-    expect(overrideLastReviewResultViaRuntime).not.toHaveBeenCalled()
-  })
-
-  it('saves failed attempts immediately as Again and keeps the lock after pending analysis completes', async () => {
-    const analysis = createPendingAnalysis()
-    vi.mocked(saveReviewResultViaRuntime).mockResolvedValueOnce(
-      createSavedPracticeDetails({
-        latestAttempt: { rating: 'again', isCorrect: false },
-      }),
-    )
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-    })
-    emitCompleteAnalysisSubmission({
-      ...makeCompleteCapture().submissionResult,
-      status: 'wrong-answer',
-      statusText: 'Wrong Answer',
-    })
-    await expectPendingAnalysis(result)
-
-    await runOverlayAction(result.current.actions.failReview)
-
-    expect(latestSavedReviewRequest()).toMatchObject({
-      rating: 'again',
-      isCorrect: false,
-    })
-    expect(result.current.overlay.visualMode).toBe('expanded')
-    expect(result.current.overlay.ratingLockReason).toBe('failed')
-    expect(result.current.aiAnalysis.status).toBe('pending')
-    await completePendingAnalysis(analysis, result)
-    act(() => result.current.actions.selectRating('easy'))
-    await runOverlayAction(result.current.actions.updateReview)
-    expect(result.current.overlay.submittedSession).toEqual({
-      rating: 'again',
-      elapsedSeconds: null,
-      isCorrect: false,
-      lockReason: 'failed',
-    })
-    expect(result.current.overlay.selectedRating).toBe('again')
-    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-    expect(overrideLastReviewResultViaRuntime).not.toHaveBeenCalled()
-  })
-
   it('ignores LeetCode submission results when auto-detect is disabled', async () => {
     await renderReadySession()
 
     emitSubmissionResult()
     await flushEffects()
 
-    expect(saveReviewResultViaRuntime).not.toHaveBeenCalled()
+    expect(saveReview).not.toHaveBeenCalled()
   })
 
   it('starts the timer once the current problem is ready when auto-detect is enabled', async () => {
@@ -548,90 +371,6 @@ describe('useLeetCodeOverlaySession', () => {
 
     await waitFor(() => {
       expect(result.current.timer.status).toBe('running')
-    })
-  })
-
-  it('auto-saves accepted LeetCode submission results while analysis is pending', async () => {
-    const analysis = createPendingAnalysis()
-    const startTime = Date.now()
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startTime)
-    vi.mocked(saveReviewResultViaRuntime).mockResolvedValueOnce(
-      createSavedPracticeDetails({ latestAttempt: { elapsedSeconds: 95 } }),
-    )
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-      autoDetectSolved: true,
-    })
-    nowSpy.mockReturnValue(startTime + 95_000)
-    emitCompleteAnalysisSubmission()
-
-    await waitFor(() => {
-      expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-      expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
-    })
-    await expectPendingAnalysis(result)
-    expect(latestSavedReviewRequest()).toMatchObject({
-      rating: 'good',
-      elapsedSeconds: 95,
-      isCorrect: true,
-    })
-    await completePendingAnalysis(analysis, result)
-    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-    expect(overrideLastReviewResultViaRuntime).not.toHaveBeenCalled()
-    expect(result.current.overlay.submittedSession).toEqual({
-      rating: 'good',
-      elapsedSeconds: 95,
-      isCorrect: true,
-      lockReason: null,
-    })
-    expect(result.current.timer).toMatchObject({
-      status: 'locked',
-      elapsedSeconds: 95,
-    })
-    expect(result.current.overlay.nextStep.value).toEqual(nextStep)
-  })
-
-  it('auto-saves failed LeetCode submission results as Again while analysis is pending', async () => {
-    const analysis = createPendingAnalysis()
-    vi.spyOn(Date, 'now').mockReturnValue(Date.now())
-    vi.mocked(saveReviewResultViaRuntime).mockResolvedValueOnce(
-      createSavedPracticeDetails({
-        latestAttempt: { rating: 'again', isCorrect: false },
-      }),
-    )
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-      autoDetectSolved: true,
-    })
-    emitCompleteAnalysisSubmission({
-      ...makeCompleteCapture().submissionResult,
-      status: 'wrong-answer',
-      statusText: 'Wrong Answer',
-      passedTestCount: 10,
-      totalTestCount: 11,
-      failingTestcase: '[2,7,11,15]\n9',
-    })
-
-    await waitFor(() => {
-      expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-      expect(result.current.overlay.ratingLockReason).toBe('failed')
-    })
-    await expectPendingAnalysis(result)
-    expect(latestSavedReviewRequest()).toMatchObject({
-      rating: 'again',
-      elapsedSeconds: null,
-      isCorrect: false,
-    })
-    await completePendingAnalysis(analysis, result)
-    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-    expect(overrideLastReviewResultViaRuntime).not.toHaveBeenCalled()
-    expect(result.current.overlay.submittedSession).toEqual({
-      rating: 'again',
-      elapsedSeconds: null,
-      isCorrect: false,
-      lockReason: 'failed',
     })
   })
 
@@ -643,17 +382,17 @@ describe('useLeetCodeOverlaySession', () => {
 
     emitSubmissionResult(submissionResult)
     await waitFor(() => {
-      expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
+      expect(saveReview).toHaveBeenCalledOnce()
     })
 
     emitSubmissionResult(submissionResult)
     await flushEffects()
 
-    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
+    expect(saveReview).toHaveBeenCalledOnce()
   })
 
   it('can retry the same terminal result after an auto-save failure', async () => {
-    vi.mocked(saveReviewResultViaRuntime)
+    saveReview
       .mockRejectedValueOnce(new Error('Review save failed.'))
       .mockResolvedValueOnce(createSavedPracticeDetails())
     const { result } = await renderReadySession({ autoDetectSolved: true })
@@ -664,7 +403,7 @@ describe('useLeetCodeOverlaySession', () => {
     emitSubmissionResult(submissionResult)
 
     await waitFor(() => {
-      expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
+      expect(saveReview).toHaveBeenCalledOnce()
       expect(result.current.overlay.feedback?.message).toBe(
         'Review save failed.',
       )
@@ -673,7 +412,7 @@ describe('useLeetCodeOverlaySession', () => {
     emitSubmissionResult({ ...submissionResult })
 
     await waitFor(() => {
-      expect(saveReviewResultViaRuntime).toHaveBeenCalledTimes(2)
+      expect(saveReview).toHaveBeenCalledTimes(2)
       expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
     })
   })
@@ -685,17 +424,17 @@ describe('useLeetCodeOverlaySession', () => {
     emitSubmissionResult()
     await flushEffects()
 
-    expect(saveReviewResultViaRuntime).not.toHaveBeenCalled()
+    expect(saveReview).not.toHaveBeenCalled()
   })
 
   it('updates the latest submitted review while analysis is pending instead of appending another attempt', async () => {
     const analysis = createPendingAnalysis()
     const startTime = Date.now()
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startTime)
-    vi.mocked(saveReviewResultViaRuntime).mockResolvedValueOnce(
+    saveReview.mockResolvedValueOnce(
       createSavedPracticeDetails({ latestAttempt: { elapsedSeconds: 95 } }),
     )
-    vi.mocked(overrideLastReviewResultViaRuntime).mockResolvedValueOnce(
+    overrideReview.mockResolvedValueOnce(
       createSavedPracticeDetails({
         latestAttempt: {
           rating: 'again',
@@ -717,9 +456,7 @@ describe('useLeetCodeOverlaySession', () => {
     await runOverlayAction(result.current.actions.updateReview)
 
     expect(latestSavedReviewRequest()).not.toHaveProperty('log')
-    expect(
-      vi.mocked(overrideLastReviewResultViaRuntime).mock.calls[0]?.[0],
-    ).toEqual({
+    expect(overrideReview.mock.calls[0]?.[0]).toEqual({
       surface: 'content-script',
       problemSlug: 'two-sum',
       rating: 'again',
@@ -728,8 +465,8 @@ describe('useLeetCodeOverlaySession', () => {
     })
     expect(result.current.aiAnalysis.status).toBe('pending')
     await completePendingAnalysis(analysis, result)
-    expect(saveReviewResultViaRuntime).toHaveBeenCalledOnce()
-    expect(overrideLastReviewResultViaRuntime).toHaveBeenCalledOnce()
+    expect(saveReview).toHaveBeenCalledOnce()
+    expect(overrideReview).toHaveBeenCalledOnce()
     expect(result.current.overlay.submittedSession).toEqual({
       rating: 'again',
       elapsedSeconds: 95,
@@ -758,7 +495,7 @@ describe('useLeetCodeOverlaySession', () => {
       })
       await flushEffects()
       expect(sendMessage).not.toHaveBeenCalled()
-      expect(saveReviewResultViaRuntime).not.toHaveBeenCalled()
+      expect(saveReview).not.toHaveBeenCalled()
       expect(result.current.context?.practice?.currentLog.notes).toBe(
         'Keep this saved note.',
       )
@@ -780,7 +517,7 @@ describe('useLeetCodeOverlaySession', () => {
 
   it('refreshes live overlay context after cross-surface cache invalidation', async () => {
     const { queryClient, result } = await renderReadySession()
-    vi.mocked(getOverlayAppShellDataViaRuntime).mockResolvedValueOnce(
+    loadOverlayData.mockResolvedValueOnce(
       createOverlayData({ timing: { strictTiming: true } }),
     )
 
@@ -793,7 +530,7 @@ describe('useLeetCodeOverlaySession', () => {
     await waitFor(() => {
       expect(result.current.context?.timing.strictTiming).toBe(true)
     })
-    expect(getOverlayAppShellDataViaRuntime).toHaveBeenLastCalledWith('two-sum')
+    expect(loadOverlayData).toHaveBeenLastCalledWith('two-sum')
   })
 
   it('sends captured topic labels when syncing the LeetCode page', async () => {
@@ -825,9 +562,7 @@ describe('useLeetCodeOverlaySession', () => {
     'ignores an in-flight submit $outcome after page navigation',
     async ({ finishSave }) => {
       const deferredSave = createDeferred<SerializedPracticeDetails>()
-      vi.mocked(saveReviewResultViaRuntime).mockReturnValueOnce(
-        deferredSave.promise,
-      )
+      saveReview.mockReturnValueOnce(deferredSave.promise)
       const { result } = await renderReadySession()
 
       const savePromise = runOverlayAction(result.current.actions.submitReview)
@@ -838,7 +573,7 @@ describe('useLeetCodeOverlaySession', () => {
 
       expect(result.current.status).toBe('reading-page')
       expect(result.current.overlay.submittedSession).toBeNull()
-      expect(getOverlayAppShellDataViaRuntime).toHaveBeenCalledTimes(1)
+      expect(loadOverlayData).toHaveBeenCalledTimes(1)
     },
   )
 
@@ -850,8 +585,7 @@ describe('useLeetCodeOverlaySession', () => {
     act(() => result.current.actions.selectRating('easy'))
     emitCompleteAnalysisSubmission()
     await waitFor(() => expect(result.current.aiAnalysis.status).toBe('ready'))
-    const request = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[0]![0]
+    const request = analyze.mock.calls[0]![0]
     const capture = makeCompleteCapture()
     expect(request).toMatchObject({
       attemptId: capture.submissionAttempt.attemptId,
@@ -867,7 +601,7 @@ describe('useLeetCodeOverlaySession', () => {
       await flushEffects()
       expect(result.current.aiAnalysis.status).toBe('ready')
     }
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledOnce()
+    expect(analyze).toHaveBeenCalledOnce()
   })
 
   it('exposes Retry for the same pinned attempt with a new request identity', async () => {
@@ -877,15 +611,11 @@ describe('useLeetCodeOverlaySession', () => {
     })
     emitCompleteAnalysisSubmission()
     await waitFor(() => expect(result.current.aiAnalysis.status).toBe('ready'))
-    const first = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[0]![0]
+    const first = analyze.mock.calls[0]![0]
     act(() => result.current.retryAiAnalysis())
-    await waitFor(() =>
-      expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledTimes(2),
-    )
+    await waitFor(() => expect(analyze).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(result.current.aiAnalysis.status).toBe('ready'))
-    const second = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-      .calls[1]![0]
+    const second = analyze.mock.calls[1]![0]
     expect(second.requestId).not.toBe(first.requestId)
     expect(second.attemptId).toBe(first.attemptId)
     expect(second.submissionId).toBe(first.submissionId)
@@ -900,93 +630,48 @@ describe('useLeetCodeOverlaySession', () => {
     emitCompleteAnalysisSubmission()
     await flushEffects()
     expect(result.current.aiAnalysis.status).toBe('disabled')
-    expect(analyzeLeetCodeSubmissionViaRuntime).not.toHaveBeenCalled()
+    expect(analyze).not.toHaveBeenCalled()
   })
 
-  it('clears the AI analysis when the overlay restart action runs', async () => {
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-      autoDetectSolved: true,
-    })
+  it.each(['restart', 'navigation'] as const)(
+    'clears ready analysis on %s',
+    async (action) => {
+      const { result } = await renderReadySession({
+        aiAssessmentEnabled: true,
+        aiAssessmentAvailable: true,
+        autoDetectSolved: true,
+      })
+      emitCompleteAnalysisSubmission()
+      await waitFor(() =>
+        expect(result.current.aiAnalysis.status).toBe('ready'),
+      )
+      if (action === 'restart')
+        act(() => result.current.actions.restartLocalSession())
+      else emitNextPage()
+      expect(result.current.aiAnalysis.status).toBe(
+        action === 'restart' ? 'idle' : 'disabled',
+      )
+    },
+  )
 
-    emitCompleteAnalysisSubmission()
-
-    await waitFor(() => {
-      expect(result.current.aiAnalysis.status).toBe('ready')
-    })
-
-    act(() => {
-      result.current.actions.restartLocalSession()
-    })
-
-    expect(result.current.aiAnalysis.status).toBe('idle')
-  })
-
-  it('clears the AI analysis when the LeetCode page changes', async () => {
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-      autoDetectSolved: true,
-    })
-
-    emitCompleteAnalysisSubmission()
-
-    await waitFor(() => {
-      expect(result.current.aiAnalysis.status).toBe('ready')
-    })
-
-    emitNextPage()
-
-    expect(result.current.aiAnalysis.status).toBe('disabled')
-  })
-
-  it('excludes AI-authored text from the save review payload', async () => {
-    const { result } = await renderReadySession({
-      aiAssessmentEnabled: true,
-      aiAssessmentAvailable: true,
-      autoDetectSolved: true,
-    })
-
-    emitCompleteAnalysisSubmission()
-
-    await waitFor(() => {
-      expect(result.current.aiAnalysis.status).toBe('ready')
-    })
-
-    await waitFor(() => {
-      expect(saveReviewResultViaRuntime).toHaveBeenCalled()
-    })
-
-    const payload = latestSavedReviewRequest()
-    expectNoAiLeak(payload)
-    expect(payload).not.toHaveProperty('log')
-  })
-
-  it('excludes AI-authored text from the update review payload', async () => {
+  it('excludes a ready AI report from both save and update payloads', async () => {
     const { result } = await renderReadySession({
       aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
     })
-
     emitCompleteAnalysisSubmission()
     await waitFor(() => expect(result.current.aiAnalysis.status).toBe('ready'))
-
     await runOverlayAction(result.current.actions.submitReview)
-    act(() => {
-      result.current.actions.selectRating('hard')
-    })
+    act(() => result.current.actions.selectRating('hard'))
     await runOverlayAction(result.current.actions.updateReview)
-
-    expect(overrideLastReviewResultViaRuntime).toHaveBeenCalled()
-    const payload = vi
-      .mocked(overrideLastReviewResultViaRuntime)
-      .mock.calls.at(-1)?.[0]
-    if (!payload) {
-      throw new Error('Expected an override review request.')
+    expect(overrideReview).toHaveBeenCalledOnce()
+    for (const payload of [
+      latestSavedReviewRequest(),
+      overrideReview.mock.calls[0]![0],
+    ]) {
+      expect(JSON.stringify(payload)).not.toContain(AI_PROBE_SUMMARY)
+      expect(payload).not.toHaveProperty('log')
     }
-    expectNoAiLeak(payload)
-    expect(payload).not.toHaveProperty('log')
   })
 })
 
@@ -995,51 +680,11 @@ type DeferredReviewResult = ReturnType<
   typeof createDeferred<SerializedPracticeDetails>
 >
 
-async function renderReadySession(options?: {
-  aiAssessmentEnabled?: boolean
-  aiAssessmentAvailable?: boolean
-  autoDetectSolved?: boolean
-  timing?: Partial<OverlayAppShellData['overlay']['timing']>
-  practice?: OverlayAppShellData['overlay']['practice']
-}): Promise<RenderedOverlaySession> {
-  if (
-    options?.aiAssessmentEnabled !== undefined ||
-    options?.aiAssessmentAvailable !== undefined ||
-    options?.autoDetectSolved ||
-    options?.timing ||
-    options?.practice !== undefined
-  ) {
-    const overlayDataOptions: Parameters<typeof createOverlayData>[0] = {}
-
-    if (options.aiAssessmentAvailable !== undefined) {
-      overlayDataOptions.overlay = {
-        aiAssessmentAvailable: options.aiAssessmentAvailable,
-      }
-    }
-
-    if (options.aiAssessmentEnabled !== undefined) {
-      overlayDataOptions.overlay = {
-        ...overlayDataOptions.overlay,
-        aiAssessmentEnabled: options.aiAssessmentEnabled,
-      }
-    }
-
-    if (options.autoDetectSolved !== undefined) {
-      overlayDataOptions.autoDetectSolved = options.autoDetectSolved
-    }
-
-    if (options.timing) {
-      overlayDataOptions.timing = options.timing
-    }
-
-    if (options.practice !== undefined) {
-      overlayDataOptions.practice = options.practice
-    }
-
-    vi.mocked(getOverlayAppShellDataViaRuntime).mockResolvedValue(
-      createOverlayData(overlayDataOptions),
-    )
-  }
+async function renderReadySession(
+  options: Parameters<typeof createOverlayData>[0] = {},
+): Promise<RenderedOverlaySession> {
+  if (Object.keys(options).length)
+    loadOverlayData.mockResolvedValue(createOverlayData(options))
 
   const session = renderOverlaySession()
 
@@ -1056,16 +701,12 @@ async function renderReadySession(options?: {
 
 function createPendingAnalysis() {
   const analysis = createDeferred<AnalyzeLeetCodeSubmissionResponse>()
-  vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mockReturnValueOnce(
-    analysis.promise,
-  )
+  analyze.mockReturnValueOnce(analysis.promise)
   return analysis
 }
 
 async function expectPendingAnalysis(result: RenderedOverlaySession['result']) {
-  await waitFor(() =>
-    expect(analyzeLeetCodeSubmissionViaRuntime).toHaveBeenCalledOnce(),
-  )
+  await waitFor(() => expect(analyze).toHaveBeenCalledOnce())
   expect(result.current.aiAnalysis.status).toBe('pending')
 }
 
@@ -1073,8 +714,7 @@ async function completePendingAnalysis(
   analysis: ReturnType<typeof createPendingAnalysis>,
   result: RenderedOverlaySession['result'],
 ) {
-  const request = vi.mocked(analyzeLeetCodeSubmissionViaRuntime).mock
-    .calls[0]![0]
+  const request = analyze.mock.calls[0]![0]
   act(() => {
     analysis.resolve({
       status: 'ready',
@@ -1103,15 +743,8 @@ function flushEffects() {
 }
 
 function latestSavedReviewRequest() {
-  expect(saveReviewResultViaRuntime).toHaveBeenCalled()
-
-  const request = vi.mocked(saveReviewResultViaRuntime).mock.calls.at(-1)?.[0]
-
-  if (!request) {
-    throw new Error('Expected a saved review request.')
-  }
-
-  return request
+  expect(saveReview).toHaveBeenCalled()
+  return saveReview.mock.calls.at(-1)![0]
 }
 
 function emitNextPage() {
@@ -1124,13 +757,11 @@ function emitNextPage() {
 
 function renderOverlaySession() {
   const { queryClient, wrapper } = createQueryTestHarness()
-  const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
 
   return {
     ...renderHook(() => useLeetCodeOverlaySession(), {
       wrapper,
     }),
-    invalidateQueries,
     queryClient,
   }
 }
@@ -1204,6 +835,8 @@ function emitCompleteAnalysisSubmission(
 
 function createOverlayData(options?: {
   autoDetectSolved?: boolean
+  aiAssessmentEnabled?: boolean
+  aiAssessmentAvailable?: boolean
   overlay?: Partial<OverlayAppShellData['overlay']>
   practice?: OverlayAppShellData['overlay']['practice']
   timing?: Partial<OverlayAppShellData['overlay']['timing']>
@@ -1225,8 +858,8 @@ function createOverlayData(options?: {
         ...options?.timing,
       },
       nextStep,
-      aiAssessmentEnabled: false,
-      aiAssessmentAvailable: false,
+      aiAssessmentEnabled: options?.aiAssessmentEnabled ?? false,
+      aiAssessmentAvailable: options?.aiAssessmentAvailable ?? false,
       ...options?.overlay,
     },
   }
@@ -1236,33 +869,10 @@ function createSubmissionResult(
   overrides: Partial<LeetCodeSubmissionResult> = {},
 ): LeetCodeSubmissionResult {
   return {
-    location: problemLocation,
-    submissionId: '1234567890',
-    source: 'api',
-    status: 'accepted',
-    statusText: 'Accepted',
+    ...makeCompleteCapture().submissionResult,
     checkedAt: Date.now(),
-    runtime: '42 ms',
-    memory: '18 MB',
-    passedTestCount: 57,
-    totalTestCount: 57,
-    failingTestcase: null,
-    errorMessage: null,
-    compileError: null,
-    runtimeError: null,
-    lastTestcase: null,
-    codeOutput: null,
-    expectedOutput: null,
-    stdOutput: null,
-    resultCodeSnapshot: {
-      code: 'return nums;',
-      language: 'TypeScript',
-      source: 'api',
-      completeness: 'complete',
-      capturedAt: Date.now(),
-    },
     ...overrides,
-  } satisfies LeetCodeSubmissionResult
+  }
 }
 
 type PracticeAttempt = NonNullable<SerializedPracticeDetails['latestAttempt']>
@@ -1383,7 +993,3 @@ const emptyPracticeLog = {
   languages: null,
   notes: null,
 } satisfies SerializedPracticeDetails['currentLog']
-
-function expectNoAiLeak(payload: unknown): void {
-  expect(JSON.stringify(payload)).not.toContain(AI_PROBE_SUMMARY)
-}

@@ -52,9 +52,6 @@ describe('readEvaluationProviderConfig', () => {
   ])(
     'rejects incomplete or invalid private configuration with a fixed safe error',
     (override) => {
-      expect(() =>
-        readEvaluationProviderConfig({ ...configured, ...override }),
-      ).toThrow(configurationMessage)
       try {
         readEvaluationProviderConfig({ ...configured, ...override })
         throw new Error('Expected invalid evaluation configuration to fail.')

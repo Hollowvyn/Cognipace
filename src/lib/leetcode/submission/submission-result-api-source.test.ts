@@ -181,28 +181,21 @@ describe('readLeetCodeSubmissionResultFromApi', () => {
     },
   )
 
-  it('preserves exact full details code whitespace', async () => {
-    const code = '  class Solution:\n    pass\n\n'
-    const { result } = await readSubmissionApiResult({
-      fixture: fixtureWithDetails({ id: '1234567890', code }),
-      now: 7000,
-    })
-    expect(result?.resultCodeSnapshot).toMatchObject({
-      code,
-      source: 'api',
-      completeness: 'complete',
-    })
-  })
-
-  it('preserves full submitted source beyond 4000 characters', async () => {
-    const code =
-      '\n  class Solution:\n' +
-      Array.from(
-        { length: 400 },
-        (_, index) => `    # preserve source line ${index}`,
-      ).join('\n') +
-      '\n    return []\n\n'
-    expect(code.length).toBeGreaterThan(4000)
+  it.each([
+    { name: 'whitespace', code: '  class Solution:\n    pass\n\n' },
+    {
+      name: 'source beyond 4000 characters',
+      code:
+        '\n  class Solution:\n' +
+        Array.from(
+          { length: 400 },
+          (_, index) => `    # preserve source line ${index}`,
+        ).join('\n') +
+        '\n    return []\n\n',
+    },
+  ])('preserves exact full details $name', async ({ name, code }) => {
+    if (name === 'source beyond 4000 characters')
+      expect(code.length).toBeGreaterThan(4000)
     const { result } = await readSubmissionApiResult({
       fixture: fixtureWithDetails({ id: '1234567890', code }),
       now: 7000,
