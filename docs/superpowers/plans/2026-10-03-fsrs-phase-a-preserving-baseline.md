@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript, SQLite WASM, Vitest, Zod's existing recovery parser, WXT; no new dependency.
 
+**Execution status:** Implemented with required automated checks passing. Human installed-extension proof remains pending before PR review or merge. Exact commands, repaired failures, review evidence and future migration limits are in the [handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md). Execution rebased onto `origin/main` at `b2d9291f`; the frozen SQL prefix was unchanged.
+
 ---
 
 ## Scope and prerequisites
@@ -40,7 +42,7 @@ Keep `src/platform/db/open-snapshot.ts`, shipped migrations, schema declarations
 
 **Files:** create the migration fixture; modify `snapshot-upgrade.ts` and `snapshot-upgrade.test.ts`.
 
-- [ ] **Step 1: Create the frozen fixture and failing source-selection tests.**
+- [x] **Step 1: Create the frozen fixture and failing source-selection tests.**
 
 Create `src/testing/fixtures/fsrs-remediation-legacy-migrations.ts`:
 
@@ -106,8 +108,8 @@ describe('shipped FSRS snapshot baseline', () => {
       index === 9 ? { ...entry, sql: `${entry.sql}\n-- changed` } : entry,
     )
     const reordered = [
-      frozenV9MigrationEntries[1]!,
-      frozenV9MigrationEntries[0]!,
+      frozenV9MigrationEntries[1],
+      frozenV9MigrationEntries[0],
       ...frozenV9MigrationEntries.slice(2),
     ]
 
@@ -127,13 +129,13 @@ describe('shipped FSRS snapshot baseline', () => {
 })
 ```
 
-- [ ] **Step 2: Run the focused red test.**
+- [x] **Step 2: Run the focused red test.**
 
 Run: `rtk npm run test -- src/platform/db/snapshot-upgrade.test.ts -t 'shipped FSRS snapshot baseline'`.
 
 Expected: the new source is rejected as unsupported. If the failure is dependency/toolchain setup, repair setup first; that is not the intended regression failure.
 
-- [ ] **Step 3: Register the immutable baseline.**
+- [x] **Step 3: Register the immutable baseline.**
 
 In `src/platform/db/snapshot-upgrade.ts`, insert after `legacyTrackMigrationPaths`:
 
@@ -168,13 +170,13 @@ Add this complete third object to `supportedBaselines`, after the existing objec
 
 Reuse existing `getSupportedBaseline()` prefix-path/fingerprint validation. Do not widen it to arbitrary fingerprints or infer source SQL from the current schema.
 
-- [ ] **Step 4: Run all source-selection and schema-integrity tests.**
+- [x] **Step 4: Run all source-selection and schema-integrity tests.**
 
 Run: `rtk npm run test -- src/platform/db/snapshot-upgrade.test.ts`.
 
 Expected: new and old baseline tests pass, including corruption and invalid selected-suffix cases.
 
-- [ ] **Step 5: Commit the compatibility boundary.**
+- [x] **Step 5: Commit the compatibility boundary.**
 
 ```sh
 rtk git add src/testing/fixtures/fsrs-remediation-legacy-migrations.ts src/platform/db/snapshot-upgrade.ts src/platform/db/snapshot-upgrade.test.ts
@@ -185,7 +187,7 @@ rtk git commit -m "fix(db): support the shipped FSRS snapshot baseline"
 
 **Files:** modify `snapshot-state.ts` and `snapshot-state.test.ts`.
 
-- [ ] **Step 1: Add failing recovery-slot tests.**
+- [x] **Step 1: Add failing recovery-slot tests.**
 
 Add `FSRS_RECOVERY_KEY` to the `snapshot-state` import in `src/platform/db/snapshot-state.test.ts`. Append:
 
@@ -273,13 +275,13 @@ describe('FSRS baseline recovery', () => {
 })
 ```
 
-- [ ] **Step 2: Run the focused red test.**
+- [x] **Step 2: Run the focused red test.**
 
 Run: `rtk npm run test -- src/platform/db/snapshot-state.test.ts -t 'FSRS baseline recovery'`.
 
 Expected: missing recovery-key export/type support fails the new cases.
 
-- [ ] **Step 3: Add the key and extend the existing recovery argument.**
+- [x] **Step 3: Add the key and extend the existing recovery argument.**
 
 Insert after `TRACK_RECOVERY_KEY` in `src/platform/db/snapshot-state.ts`:
 
@@ -300,13 +302,13 @@ recoveryKey: SnapshotRecoveryKey = RECOVERY_KEY,
 
 Keep the existing strict parser, same-original comparison, original timestamp and collision error. No replacement/removal of earlier recovery slots is permitted.
 
-- [ ] **Step 4: Verify all classification and recovery behavior.**
+- [x] **Step 4: Verify all classification and recovery behavior.**
 
 Run: `rtk npm run test -- src/platform/db/snapshot-state.test.ts src/platform/db/open-snapshot.test.ts`.
 
 Expected: all tests pass; partial fields, read/write failure and old recovery behavior remain covered.
 
-- [ ] **Step 5: Commit the independent recovery slot.**
+- [x] **Step 5: Commit the independent recovery slot.**
 
 ```sh
 rtk git add src/platform/db/snapshot-state.ts src/platform/db/snapshot-state.test.ts
@@ -317,7 +319,7 @@ rtk git commit -m "fix(db): retain an independent FSRS recovery original"
 
 **Files:** create `fsrs-preservation.ts` and `fsrs-preservation.integration.test.ts`; modify `instance.ts`.
 
-- [ ] **Step 1: Create the populated fixture.**
+- [x] **Step 1: Create the populated fixture.**
 
 Create `src/testing/fixtures/fsrs-preservation.ts` with the full code below. Rows are preservation evidence, not an assertion that unknown legacy histories reproduce these cards under a particular profile.
 
@@ -714,7 +716,7 @@ export async function makeFsrsPreservationSnapshot() {
 }
 ```
 
-- [ ] **Step 2: Create the failing real startup test.**
+- [x] **Step 2: Create the failing real startup test.**
 
 Create `src/platform/db/fsrs-preservation.integration.test.ts`:
 
@@ -847,6 +849,9 @@ describe('populated FSRS baseline preservation', () => {
         })
         expect(readPreservationRows(handle)).toEqual(fixture.rows)
         expect(storage.values[SNAPSHOT_KEY]).toBe(originalEncoded)
+        expect(storage.values[FINGERPRINT_KEY]).toBe(
+          expectedV9MigrationFingerprint,
+        )
         expect(storage.values[FSRS_RECOVERY_KEY]).toMatchObject({
           raw: {
             [SNAPSHOT_KEY]: originalEncoded,
@@ -973,13 +978,13 @@ describe('populated FSRS baseline preservation', () => {
 
 This synthetic target is scoped to this test module. Existing `snapshot-upgrade.test.ts`, `open-snapshot.test.ts` and `instance.test.ts` still prove unknown fingerprints, source schema/integrity failure, matching-current opens and older upgrades. The later real schema phase must reuse this fixture against its actual migration and project original columns explicitly when adding columns.
 
-- [ ] **Step 3: Run the focused red test.**
+- [x] **Step 3: Run the focused red test.**
 
 Run: `rtk npm run test -- src/platform/db/fsrs-preservation.integration.test.ts`.
 
 Expected: source selection now succeeds, but the independent FSRS recovery expectation fails because `instance.ts` still routes this source to the Topics slot. That slot is occupied by a different original, so startup rejects rather than overwriting it.
 
-- [ ] **Step 4: Route the exact source to its recovery slot.**
+- [x] **Step 4: Route the exact source to its recovery slot.**
 
 Add `legacyFsrsMigrationFingerprint` to the existing `snapshot-upgrade` import and `FSRS_RECOVERY_KEY` to the existing `snapshot-state` import in `src/platform/db/instance.ts`. Replace the complete `preserve` callback in `openAppDb()` with:
 
@@ -999,7 +1004,7 @@ preserve: (raw) =>
 
 Keep existing restore/validate/upgrade/prepare/publish ordering, error cleanup, active-handle activation and serialized snapshot writes unchanged.
 
-- [ ] **Step 5: Verify the populated lifecycle and existing regressions.**
+- [x] **Step 5: Verify the populated lifecycle and existing regressions.**
 
 ```sh
 rtk npm run test -- src/platform/db/fsrs-preservation.integration.test.ts src/platform/db/snapshot-upgrade.test.ts src/platform/db/snapshot-state.test.ts src/platform/db/open-snapshot.test.ts src/platform/db/instance.test.ts
@@ -1007,7 +1012,7 @@ rtk npm run test -- src/platform/db/fsrs-preservation.integration.test.ts src/pl
 
 Expected: all pass; failed publication retains the old active pair, retry succeeds with the original recovery timestamp, and populated reopen retains every pre-existing value. No production migration is added.
 
-- [ ] **Step 6: Commit the preservation proof and routing.**
+- [x] **Step 6: Commit the preservation proof and routing.**
 
 ```sh
 rtk git add src/testing/fixtures/fsrs-preservation.ts src/platform/db/fsrs-preservation.integration.test.ts src/platform/db/instance.ts
@@ -1018,7 +1023,7 @@ rtk git commit -m "fix(db): preserve populated FSRS state across staged upgrades
 
 **Files:** modify `src/extension/background/app-db.ts`, `app-db.test.ts` and the new integration test.
 
-- [ ] **Step 1: Add a failing bridge test.**
+- [x] **Step 1: Add a failing bridge test.**
 
 In `src/extension/background/app-db.test.ts`, import `legacyFsrsMigrationFingerprint` from `@/platform/db/snapshot-upgrade`. Append this test inside the existing describe block, reusing `handle` and `appDbMocks`:
 
@@ -1036,13 +1041,13 @@ it('does not rerun historical taxonomy conversion for the through-0009 source', 
 })
 ```
 
-- [ ] **Step 2: Run the red bridge test.**
+- [x] **Step 2: Run the red bridge test.**
 
 Run: `rtk npm run test -- src/extension/background/app-db.test.ts`.
 
 Expected: the new test fails because all upgrades currently run taxonomy reconciliation; existing fresh/older/failure tests pass.
 
-- [ ] **Step 3: Guard only the already-current baseline.**
+- [x] **Step 3: Guard only the already-current baseline.**
 
 In `src/extension/background/app-db.ts`, add:
 
@@ -1063,7 +1068,7 @@ if (
 
 Keep the existing fresh/older catalog mapping and failure propagation. Do not broadly skip preparation for every upgrade.
 
-- [ ] **Step 4: Add the real background preservation case.**
+- [x] **Step 4: Add the real background preservation case.**
 
 Add `getBackgroundDb` imported from `@/extension/background/app-db` to `src/platform/db/fsrs-preservation.integration.test.ts`; this is the existing Platform integration-test convention also used by `instance.test.ts`. Append inside its describe block:
 
@@ -1079,13 +1084,13 @@ it('keeps all original rows through the production background bridge', async () 
 })
 ```
 
-- [ ] **Step 5: Run the bridge and populated tests.**
+- [x] **Step 5: Run the bridge and populated tests.**
 
 Run: `rtk npm run test -- src/extension/background/app-db.test.ts src/platform/db/fsrs-preservation.integration.test.ts src/platform/db/instance.test.ts`.
 
 Expected: all pass, including fresh taxonomy setup, older supported conversion and the exact no-reconciliation source.
 
-- [ ] **Step 6: Commit the composition guard.**
+- [x] **Step 6: Commit the composition guard.**
 
 ```sh
 rtk git add src/extension/background/app-db.ts src/extension/background/app-db.test.ts src/platform/db/fsrs-preservation.integration.test.ts
@@ -1096,7 +1101,7 @@ rtk git commit -m "fix(db): preserve current catalog rows during FSRS upgrades"
 
 **Files:** modify `docs/architecture.md` and `docs/testing.md`; record validation and human smoke evidence in the implementation handoff.
 
-- [ ] **Step 1: Update the current architecture documentation.**
+- [x] **Step 1: Update the current architecture documentation.**
 
 In `docs/architecture.md`'s Database And Persistence section, change the exact baseline sentence to:
 
@@ -1145,7 +1150,7 @@ independent recovery and reopen; the actual later schema migration requires
 its own preservation proof.
 ```
 
-- [ ] **Step 2: Update recovery testing and prepare human proof.**
+- [x] **Step 2: Update recovery testing and prepare human proof.**
 
 In `docs/testing.md`'s Local Database Recovery section, replace the allowlist sentence with:
 
@@ -1178,7 +1183,7 @@ future real metadata migration additionally requires human through-0009
 upgrade/failure/retry proof; this phase ships no new schema to trigger it.
 ```
 
-- [ ] **Step 3: Format touched files and run the focused suite.**
+- [x] **Step 3: Format touched files and run the focused suite.**
 
 ```sh
 rtk npx prettier --write src/testing/fixtures/fsrs-remediation-legacy-migrations.ts src/testing/fixtures/fsrs-preservation.ts src/platform/db/snapshot-upgrade.ts src/platform/db/snapshot-upgrade.test.ts src/platform/db/snapshot-state.ts src/platform/db/snapshot-state.test.ts src/platform/db/instance.ts src/platform/db/fsrs-preservation.integration.test.ts src/extension/background/app-db.ts src/extension/background/app-db.test.ts docs/architecture.md docs/testing.md
@@ -1187,7 +1192,7 @@ rtk npm run test -- src/platform/db/fsrs-preservation.integration.test.ts src/pl
 
 Expected: formatting completes and every listed suite passes. Repair concrete failures before the full checks. If a code/API adjustment is necessary, update this plan's affected snippet/signature rather than retaining a misleading example.
 
-- [ ] **Step 4: Run the governance-required checks.**
+- [x] **Step 4: Run the governance-required checks.**
 
 ```sh
 rtk npm run db:check
@@ -1199,7 +1204,7 @@ rtk git diff --check
 
 Expected: all exit successfully. `db:generate` is skipped because no schema changes; `zip` is skipped because packaging/artifact behavior is unchanged. A test failure must not be reported as a passing check. Full checks can expose unrelated failures; record exact failures and resolve only within authorized scope.
 
-- [ ] **Step 5: Commit documentation and prepare the review handoff.**
+- [x] **Step 5: Commit documentation and prepare the review handoff.**
 
 ```sh
 rtk git add docs/architecture.md docs/testing.md
@@ -1220,4 +1225,4 @@ Report the exact focused/full commands run, any skipped command with reason, syn
 
 ## Planning validation status
 
-This document contains prospective code and commands, not executed implementation. The planning pass runs Markdown formatting and whitespace checks only. Exact implementation commands above remain unrun because application code is unchanged and dependencies are absent. `rtk npm run db:generate` remains intentionally inapplicable to this phase; the actual metadata-storage slice must generate/check its appended migration and rerun preservation proof.
+The original planning pass ran Markdown formatting and whitespace checks only. Implementation is now executed and required automated checks pass; the handoff records both earlier failures and final results. Test helper factoring preserves the planned signatures and coverage. Specification review added the active-fingerprint assertion beside the pre-publication snapshot assertion, and full lint removed the unnecessary tuple non-null assertions above. The implementation types three `expect.any(String)` results as `unknown` without changing the recovery assertions. `rtk npm run db:generate` remains intentionally inapplicable to this phase; the actual metadata-storage slice must generate/check its appended migration and rerun preservation proof. Human installed-extension proof is still pending before PR review or merge.

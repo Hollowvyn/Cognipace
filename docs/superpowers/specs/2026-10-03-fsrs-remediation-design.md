@@ -2,9 +2,11 @@
 
 Date: October 3, 2026.
 
-Status: the three design sections and consolidated written specification are approved. The user approved the written specification on October 3, 2026 ("This is cool beans"). The execution map and first detailed preservation plan are authored; application implementation has not started.
+Status: the three design sections and consolidated written specification are approved. The user approved the written specification on October 3, 2026 ("This is cool beans"). Phase A preservation is implemented and automated checks pass; human installed-extension proof remains pending before PR review or merge. Phases B–H remain unimplemented. See the [Phase A handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) for exact evidence and limits.
 
 Baseline: `codex/fsrs-remediation-design`, based on `origin/main` at `dc0fc6f2`. The original audit examined `7cccd2d7`; the newer Analytics and Tracks work is preserved. The lockfile currently resolves ts-fsrs 5.4.0, using FSRS 6.
+
+Phase A execution rebased the planning commits onto `origin/main` at `b2d9291f`, preserving the newer AI provider connection changes. The frozen through-0009 SQL fingerprint stayed `1144ce07`.
 
 ## Purpose and authority
 
@@ -270,7 +272,7 @@ rtk proxy env TZ=America/New_York node /private/tmp/cognipace-fsrs-day-scenarios
 
 This verifies selected first/repeat/failed-review outputs and the 75% comparison. It is not an application migration, browser performance measurement or installed-extension smoke test.
 
-For this docs-only design pass, format and check the touched Markdown with the temporary official Prettier runtime:
+For the original docs-only design pass, formatting checked the touched Markdown with the temporary official Prettier runtime:
 
 ```sh
 rtk proxy node /private/tmp/cognipace-audit-prettier/package/bin/prettier.cjs --ignore-path /dev/null --write docs/superpowers/specs/2026-10-03-fsrs-remediation-design.md docs/superpowers/README.md
@@ -280,7 +282,7 @@ rtk git diff --check
 
 The explicit ignore-path override checks this newly authored specification despite the repository's historical planning-artifact formatting exclusion.
 
-Not run in this design pass: `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run db:check` and the prospective focused commands, because application code is unchanged and repository dependencies are absent. `rtk npm run db:generate` is skipped because no schema is implemented. `rtk npm run zip` is skipped because no packaged artifact changes. Human smoke and browser optimizer/scaling measurements remain required implementation work, not completed proof.
+Not run in the original design pass: `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run db:check` and the prospective focused commands, because application code was unchanged and repository dependencies were absent. Phase A has since run its required automated checks successfully. `rtk npm run db:generate` remains skipped because no schema is implemented. `rtk npm run zip` remains skipped because no packaging behavior changes. Human smoke and browser optimizer/scaling measurements remain required implementation work, not completed proof.
 
 ## Library capabilities and source references
 

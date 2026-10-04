@@ -16,6 +16,8 @@ Source: [approved design](../specs/2026-10-03-fsrs-remediation-design.md). The w
 
 This is the dependency and acceptance map for the whole remediation. The eight priority numbers retain their audit meanings; the letters below identify execution slices. Only slice A currently has a detailed executable plan. Author each subsequent slice's code-level plan against its verified predecessor before executing it. Do not represent this map as eight completed implementations or as code-level plans for every slice.
 
+Execution status: A is implemented with required automated checks passing; human installed-extension proof remains pending before PR review or merge. B–H remain unimplemented. The [Phase A handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) records exact validation, failures repaired, recovery limits and the smoke checklist. Execution rebased onto `origin/main` at `b2d9291f` without changing the frozen SQL prefix.
+
 Worktree: `/Users/tobiolutimehin/.codex/worktrees/46c1/cognipace-v2`. Branch: `codex/fsrs-remediation-design`, based on `origin/main` at `dc0fc6f2`. Preserve the newer Analytics and Tracks work already present. At execution start check the branch, migration list and pinned toolchain; if upstream changes affect the frozen baseline or planned interfaces, revise the affected plan before editing code.
 
 ## File ownership map
@@ -128,7 +130,7 @@ Compare the candidate chronologically against defaults/incumbent on held-out his
 
 ## Completion and validation
 
-- [ ] Execute A from its detailed plan and retain exact passing/failed command evidence.
+- [x] Execute A from its detailed plan and retain exact passing/failed command evidence. Human installed-extension proof remains pending before PR review/merge.
 - [ ] Produce B's complete code-level plan against A's verified baseline, then execute B.
 - [ ] Produce and execute C with the real appended migration and frozen supported backup readers.
 - [ ] Produce and execute D end to end, including durability, conflict and restart evidence.
@@ -139,9 +141,9 @@ Compare the candidate chronologically against defaults/incumbent on held-out his
 
 Each slice's detailed plan uses `docs/agent-governance.md#validation-selection`, focused tests before required full checks, exact run/skipped commands, and current authority-doc updates when behavior ships. Schema changes require `rtk npm run db:generate` and `rtk npm run db:check`; runtime/surface changes require `rtk npm run lint`, `rtk npm run check` and `rtk npm run build`. Packaging changes also require `rtk npm run zip` and applicable artifact checks. Human installed-extension happy/edge smoke with screenshot/recording proof is required before behavior-changing PR review/merge.
 
-This planning pass changes Markdown only. App tests/builds, migrations, performance measurements, optimizer feasibility and human smoke are unrun. The first executable slice is A; the other acceptance sections are future execution boundaries, not claims of completed code-level planning.
+The original planning pass changed Markdown only. Phase A has since been implemented and verified automatically; see its handoff for current evidence. No migration is shipped. Performance measurements, optimizer feasibility and human smoke remain unrun. The other acceptance sections are future execution boundaries, not claims of completed code-level planning.
 
-Planning checks use the temporary official Prettier runtime because local dependencies are absent and historical planning files are normally ignored:
+The original planning checks used the temporary official Prettier runtime because local dependencies were absent and historical planning files are normally ignored:
 
 ```sh
 rtk proxy node /private/tmp/cognipace-audit-prettier/package/bin/prettier.cjs --ignore-path /dev/null --write docs/superpowers/specs/2026-10-03-fsrs-remediation-design.md docs/superpowers/plans/2026-10-03-fsrs-remediation.md docs/superpowers/plans/2026-10-03-fsrs-phase-a-preserving-baseline.md docs/superpowers/README.md
@@ -150,4 +152,4 @@ rtk git diff --check
 rtk git diff --cached --check
 ```
 
-Skipped in this planning pass: `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run db:check`, and the focused test commands in A because application code is unchanged and dependencies are absent. `rtk npm run db:generate` is skipped because no schema changes are implemented; `rtk npm run zip` is skipped because artifact behavior is unchanged. Human smoke and performance/optimizer measurements remain unrun implementation work.
+Skipped in the original planning pass: `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run db:check`, and the focused test commands in A because application code was unchanged and dependencies were absent. Phase A has since run those checks successfully. `rtk npm run db:generate` remains skipped because no schema changes are implemented; `rtk npm run zip` remains skipped because artifact behavior is unchanged. Human smoke and performance/optimizer measurements remain unrun implementation work.
