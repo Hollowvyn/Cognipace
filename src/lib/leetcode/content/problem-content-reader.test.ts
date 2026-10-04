@@ -283,7 +283,7 @@ Output: [1,2]</pre></section>`
 
 describe('readLeetCodeProblemContent', () => {
   it('preserves follow-up requirements separately from the statement', async () => {
-    const fetcher = vi.fn(async () =>
+    const fetcher = vi.fn().mockResolvedValue(
       Response.json({
         data: {
           question: {
@@ -308,7 +308,7 @@ describe('readLeetCodeProblemContent', () => {
   })
 
   it('marks absent optional GraphQL sections as known empty', async () => {
-    const fetcher = vi.fn(async () =>
+    const fetcher = vi.fn().mockResolvedValue(
       Response.json({
         data: {
           question: {
@@ -402,8 +402,10 @@ describe('readLeetCodeProblemContent', () => {
 
   it('marks empty GraphQL markup as missing when no DOM content is available', async () => {
     document.body.innerHTML = '<main></main>'
-    const fetcher = vi.fn(async () =>
-      Response.json({ data: { question: { content: '<p> </p>', hints: [] } } }),
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        data: { question: { content: '<p> </p>', hints: [] } },
+      }),
     )
     await expect(
       readLeetCodeProblemContent(location, { fetch: fetcher, document }),
@@ -623,9 +625,11 @@ async function readContentForPath(html: string, path: string) {
   }
   const result = await readLeetCodeProblemContent(location, {
     document,
-    fetch: vi.fn(async () =>
-      Response.json({ data: { question: { content: html, hints: [] } } }),
-    ),
+    fetch: vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ data: { question: { content: html, hints: [] } } }),
+      ),
   })
   if (!result.ok) throw result.error
   return result.content

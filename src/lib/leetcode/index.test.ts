@@ -27,7 +27,7 @@ describe('LeetCode public API facade', () => {
   })
 
   it('captures complete problem follow-ups through the fetch adapter without a DOM document', async () => {
-    const fetcher = vi.fn(async () =>
+    const fetcher = vi.fn().mockResolvedValue(
       Response.json({
         data: {
           question: {
