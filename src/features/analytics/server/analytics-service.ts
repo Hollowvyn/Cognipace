@@ -143,6 +143,7 @@ export async function getAnalyticsSummary(
       timeZone: presentationTimeFrame.timeZone,
       timeFrame: presentationTimeFrame,
       analyticsTargets: settings.analytics,
+      timeTargetsMinutes: settings.assessment.timeTargetsMinutes,
     },
   )
   const currentStateViews = buildCurrentStateAnalyticsViews(

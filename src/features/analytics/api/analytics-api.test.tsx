@@ -5,6 +5,7 @@ import { sendMessage } from '@/extension/messaging'
 import { defaultUserSettings, type AnalyticsTargets } from '@/features/settings'
 import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
+import { applyHistoricalChartTargets } from '../domain/historical-presentation'
 import type { SerializedAnalyticsSummary } from './analytics-contracts'
 
 import {
@@ -43,7 +44,10 @@ describe('analytics runtime API', () => {
       },
     }
     const freshRangeSummary = summaryWithMeasuredRows(90)
-    freshRangeSummary.views.observedRecallVsFsrs.targetRecall = 0.8
+    freshRangeSummary.views = applyHistoricalChartTargets(
+      freshRangeSummary.views,
+      savedSettings.analytics,
+    )
     let resolveSave!: (settings: typeof savedSettings) => void
     const saveResponse = new Promise<typeof savedSettings>((resolve) => {
       resolveSave = resolve
@@ -155,6 +159,24 @@ describe('analytics runtime API', () => {
           ...before,
           views: {
             ...before.views,
+            problemSolving: {
+              ...before.views.problemSolving,
+              targets: goals,
+              cohorts: {
+                newProblems: {
+                  ...before.views.problemSolving.cohorts.newProblems,
+                  outcomeScale:
+                    cached.views.problemSolving.cohorts.newProblems
+                      .outcomeScale,
+                },
+                followupPractice: {
+                  ...before.views.problemSolving.cohorts.followupPractice,
+                  outcomeScale:
+                    cached.views.problemSolving.cohorts.followupPractice
+                      .outcomeScale,
+                },
+              },
+            },
             observedRecallVsFsrs: {
               ...before.views.observedRecallVsFsrs,
               targetRecall: goals.targetRecall,
@@ -173,6 +195,18 @@ describe('analytics runtime API', () => {
             },
           },
         })
+        for (const [key, references] of [
+          [
+            'newProblems',
+            [goals.targetFirstAttemptSuccess, goals.targetFirstAttemptGoodEasy],
+          ],
+          ['followupPractice', [goals.targetRecall, goals.targetReviewSuccess]],
+        ] as const) {
+          const { domain } =
+            cached.views.problemSolving.cohorts[key].outcomeScale
+          expect(domain[0]).toBeLessThanOrEqual(Math.min(...references))
+          expect(domain[1]).toBeGreaterThanOrEqual(Math.max(...references))
+        }
         if (firstAttempt) {
           expect(cached.views.firstAttemptOutcomes.scale.domain).toEqual([0, 1])
           expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(

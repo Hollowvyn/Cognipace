@@ -1,4 +1,10 @@
 import type { SerializedAnalyticsSummary } from '@/features/analytics/api/analytics-contracts'
+import {
+  applyHistoricalChartTargets,
+  buildHistoricalAnalyticsViews,
+} from '@/features/analytics/domain/historical-presentation'
+import { buildAnalyticsBucketsFromTimeFrame } from '@/features/analytics/domain/analytics-range-policy'
+import { normalizeFsrsSchedulingOptions } from '@/lib/fsrs'
 
 export const analyticsChartPointFixtures = {
   practiceRhythm: [
@@ -69,10 +75,8 @@ function createHistoricalReadiness(): SerializedAnalyticsSummary['historicalRead
 export function createSerializedAnalyticsSummary(
   overrides?: Partial<SerializedAnalyticsSummary>,
 ): SerializedAnalyticsSummary {
-  return {
-    range: 30,
-    generatedAt: '2026-05-30T00:00:00.000Z',
-    timeFrame: {
+  const timeFrame: SerializedAnalyticsSummary['timeFrame'] =
+    overrides?.timeFrame ?? {
       asOf: '2026-05-30T00:00:00.000Z',
       timeZone: 'UTC',
       timeZoneFallback: false,
@@ -89,7 +93,11 @@ export function createSerializedAnalyticsSummary(
           isPartial: false,
         },
       ],
-    },
+    }
+  const summary: SerializedAnalyticsSummary = {
+    range: 30,
+    generatedAt: '2026-05-30T00:00:00.000Z',
+    timeFrame,
     reviewDays: 30,
     totalReviews: 150,
     currentStreak: 7,
@@ -99,6 +107,14 @@ export function createSerializedAnalyticsSummary(
     lowSample: false,
     targetRetention: 0.9,
     views: {
+      problemSolving: buildHistoricalAnalyticsViews([], {
+        start: new Date(timeFrame.periodStart),
+        end: new Date(timeFrame.asOf),
+        timeFrame,
+        timeZone: timeFrame.timeZone,
+        buckets: buildAnalyticsBucketsFromTimeFrame(timeFrame),
+        fsrsOptions: normalizeFsrsSchedulingOptions(),
+      }).problemSolving,
       firstAttemptOutcomes: {
         rows: [],
         totals: {
@@ -198,4 +214,17 @@ export function createSerializedAnalyticsSummary(
     stability: [],
     ...overrides,
   }
+  const { observedRecallVsFsrs, practiceRhythm, firstAttemptOutcomes } =
+    summary.views
+  summary.views = {
+    ...summary.views,
+    problemSolving: applyHistoricalChartTargets(summary.views, {
+      targetRecall: observedRecallVsFsrs.targetRecall,
+      targetReviewSuccess: practiceRhythm.targetReviewSuccess,
+      targetFirstAttemptSuccess: firstAttemptOutcomes.targetFirstAttemptSuccess,
+      targetFirstAttemptGoodEasy:
+        firstAttemptOutcomes.targetFirstAttemptGoodEasy,
+    }).problemSolving,
+  }
+  return summary
 }

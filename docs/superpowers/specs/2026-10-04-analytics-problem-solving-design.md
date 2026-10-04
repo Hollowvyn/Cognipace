@@ -1,8 +1,11 @@
 # Difficulty And Recorded Time Analytics
 
 Status: the user approved the combined preview and chose to expand New Problem
-Success into this section on 2026-10-04. This document describes approved future
-behavior; it does not claim that the production extension implements it.
+Success into this section on 2026-10-04. Implemented on this branch as Problem
+Solving; automated checks and production-component browser validation passed.
+Human happy-path
+and edge-case smoke in the rebuilt installed extension with screenshot or
+recording proof remains pending before review or merge.
 
 ## Purpose And Placement
 
@@ -177,10 +180,14 @@ sync behavior, or timer write change is required.
 
 ## Delivery And Proof
 
-Phase 1 supplies the existing stored fields and reusable raw cohort selector.
-The phase-sized plan is `../plans/2026-10-04-analytics-problem-solving-inputs.md`.
-Subsequent model/contract and UI work must follow this approved design and get
-their own concrete phase-sized plans before execution.
+The phase-sized implementation plans are:
+
+- [Inputs](../plans/2026-10-04-analytics-problem-solving-inputs.md): stored fields
+  and reusable raw first/later selectors.
+- [Model and contract](../plans/2026-10-04-analytics-problem-solving-model.md):
+  bucket/period/prior aggregation, current references and runtime validation.
+- [UI and proof](../plans/2026-10-04-analytics-problem-solving-ui.md): shared
+  controls, paired plots and Mix, authority docs and validation evidence.
 
 Production validation follows `docs/agent-governance.md`: focused tests, lint,
 full check, build, and production-component visual checks for light/dark and

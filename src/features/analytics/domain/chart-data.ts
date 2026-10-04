@@ -1,3 +1,4 @@
+import type { ProblemDifficulty } from '@/features/problems/domain'
 import {
   createInitialFsrsCard,
   isReviewRating,
@@ -27,6 +28,8 @@ export interface AnalyticsReviewEvent {
   cardId: string
   problemSlug: string
   title: string
+  problemDifficulty?: ProblemDifficulty | undefined
+  elapsedSeconds?: number | null | undefined
   topicLabels: string[]
   rating: string
   reviewedAt: Date

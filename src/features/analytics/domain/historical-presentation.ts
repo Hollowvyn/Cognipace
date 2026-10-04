@@ -10,8 +10,14 @@ import {
 } from '@/features/problems/domain/topic-taxonomy'
 import {
   defaultAnalyticsTargets,
+  defaultUserSettings,
   type AnalyticsTargets,
+  type UserSettings,
 } from '@/features/settings/domain'
+import {
+  problemDifficulties,
+  type ProblemDifficulty,
+} from '@/features/problems/domain'
 
 import {
   buildAnalyticsBucketsFromTimeFrame,
@@ -25,6 +31,7 @@ import {
   addAnalyticsCalendarDays,
   buildAnalyticsTimeFrame,
   shiftAnalyticsCalendarDays,
+  getAnalyticsDateKey,
   type AnalyticsTimeFrame,
 } from './analytics-time'
 import {
@@ -38,6 +45,7 @@ import type { WorkloadAnalyticsViews } from './workload-presentation'
 import {
   buildRepeatReviewPairs,
   selectFirstRecordedAttempts,
+  selectLaterRecordedAttempts,
 } from './review-cohorts'
 
 export interface HistoricalAnalyticsReviewEvent {
@@ -48,6 +56,8 @@ export interface HistoricalAnalyticsReviewEvent {
   rating: string
   reviewedAt: Date
   fsrsReviewLog: string | null
+  problemDifficulty?: ProblemDifficulty | undefined
+  elapsedSeconds?: number | null | undefined
 }
 
 type ValidHistoricalReviewEvent = HistoricalAnalyticsReviewEvent & {
@@ -62,12 +72,85 @@ export interface HistoricalPresentationOptions {
   timeZone: string
   timeFrame: AnalyticsTimeFrame
   analyticsTargets?: AnalyticsTargets
+  timeTargetsMinutes?: UserSettings['assessment']['timeTargetsMinutes']
 }
 
 export interface HistoricalPresentationScale {
-  domain: readonly [number, number]
-  ticks: readonly number[]
+  domain: [number, number]
+  ticks: number[]
 }
+
+export interface ProblemSolvingOutcomeStats {
+  again: number
+  hard: number
+  good: number
+  easy: number
+  recordedAssessments: number
+  excludedInvalidRatings: number
+  validRatings: number
+  hardGoodEasy: number
+  goodEasy: number
+  successRate: number | null
+  goodEasyRate: number | null
+}
+
+export interface ProblemSolvingTimeStats {
+  eligibleAssessments: number
+  timedAssessments: number
+  totalSeconds: number
+  medianSeconds: number | null
+  q1Seconds: number | null
+  q3Seconds: number | null
+}
+
+export interface ProblemSolvingDifficultyStats extends ProblemSolvingOutcomeStats {
+  time: { all: ProblemSolvingTimeStats; successful: ProblemSolvingTimeStats }
+}
+
+export type ProblemSolvingDifficulties = Record<
+  ProblemDifficulty,
+  ProblemSolvingDifficultyStats
+>
+
+export interface ProblemSolvingRow {
+  id: string
+  bucketStart: string
+  bucketEnd: string
+  isPartial: boolean
+  difficulties: ProblemSolvingDifficulties
+}
+
+export interface ProblemSolvingPeriodStats extends ProblemSolvingOutcomeStats {
+  assessmentDays: number
+  distinctProblems: number
+  difficulties: ProblemSolvingDifficulties
+}
+
+export interface ProblemSolvingCohortView {
+  rows: ProblemSolvingRow[]
+  totals: ProblemSolvingPeriodStats
+  previous: ProblemSolvingPeriodStats
+  outcomeScale: HistoricalPresentationScale
+  timeScales: Record<
+    'all' | 'successful',
+    {
+      minutes: HistoricalPresentationScale
+      targetPercent: HistoricalPresentationScale
+    }
+  >
+}
+
+export interface ProblemSolvingView {
+  cohorts: {
+    newProblems: ProblemSolvingCohortView
+    followupPractice: ProblemSolvingCohortView
+  }
+  targets: AnalyticsTargets
+  timeTargetsMinutes: UserSettings['assessment']['timeTargetsMinutes']
+  previousPeriod: { start: string; asOf: string }
+}
+
+const knownProblemDifficulties = ['easy', 'medium', 'hard'] as const
 
 export interface ObservedRecallVsFsrsRow {
   id: string
@@ -166,6 +249,7 @@ export interface LowEvidenceTopicRow {
 }
 
 export interface HistoricalAnalyticsViews {
+  problemSolving: ProblemSolvingView
   firstAttemptOutcomes: {
     rows: FirstAttemptOutcomeRow[]
     totals: FirstAttemptOutcomeTotals
@@ -371,6 +455,7 @@ export function buildHistoricalAnalyticsViews(
         rows: firstAttemptRows,
         totals: aggregateFirstAttemptOutcomes(selectedFirstAttempts),
       },
+      problemSolving: buildProblemSolvingView(events, options),
       observedRecallVsFsrs: {
         rows: observedRows,
       },
@@ -431,6 +516,7 @@ export function buildHistoricalAnalyticsViews(
 }
 
 type HistoricalChartTargetViews = {
+  problemSolving: ProblemSolvingView
   firstAttemptOutcomes: Pick<
     HistoricalAnalyticsViews['firstAttemptOutcomes'],
     'rows' | 'totals'
@@ -447,6 +533,29 @@ export function applyHistoricalChartTargets<
 >(views: T, targets: AnalyticsTargets) {
   return {
     ...views,
+    problemSolving: {
+      ...views.problemSolving,
+      targets,
+      cohorts: {
+        newProblems: {
+          ...views.problemSolving.cohorts.newProblems,
+          outcomeScale: problemSolvingOutcomeScale(
+            views.problemSolving.cohorts.newProblems.rows,
+            [
+              targets.targetFirstAttemptSuccess,
+              targets.targetFirstAttemptGoodEasy,
+            ],
+          ),
+        },
+        followupPractice: {
+          ...views.problemSolving.cohorts.followupPractice,
+          outcomeScale: problemSolvingOutcomeScale(
+            views.problemSolving.cohorts.followupPractice.rows,
+            [targets.targetRecall, targets.targetReviewSuccess],
+          ),
+        },
+      },
+    },
     firstAttemptOutcomes: {
       ...views.firstAttemptOutcomes,
       targetFirstAttemptSuccess: targets.targetFirstAttemptSuccess,
@@ -671,27 +780,223 @@ function uniqueNormalizedTopics(labels: readonly string[]) {
 export function aggregateFirstAttemptOutcomes(
   events: readonly HistoricalAnalyticsReviewEvent[],
 ): FirstAttemptOutcomeTotals {
+  const outcomes = aggregateRatingOutcomes(events)
+  const {
+    recordedAssessments,
+    validRatings,
+    successRate,
+    goodEasyRate,
+    ...counts
+  } = outcomes
+  return {
+    ...counts,
+    recordedFirstAttempts: recordedAssessments,
+    validFirstAttempts: validRatings,
+    firstAttemptSuccess: successRate,
+    firstAttemptGoodEasy: goodEasyRate,
+    evidence: validRatings === 0 ? 'not-measured' : 'measured',
+  }
+}
+
+function aggregateRatingOutcomes(
+  events: readonly HistoricalAnalyticsReviewEvent[],
+): ProblemSolvingOutcomeStats {
   const counts = { again: 0, hard: 0, good: 0, easy: 0 }
   for (const event of events) {
     if (isReviewRating(event.rating)) counts[event.rating] += 1
   }
-  const validFirstAttempts =
-    counts.again + counts.hard + counts.good + counts.easy
+  const validRatings = counts.again + counts.hard + counts.good + counts.easy
   const hardGoodEasy = counts.hard + counts.good + counts.easy
   const goodEasy = counts.good + counts.easy
   return {
     ...counts,
-    recordedFirstAttempts: events.length,
-    excludedInvalidRatings: events.length - validFirstAttempts,
-    validFirstAttempts,
+    recordedAssessments: events.length,
+    excludedInvalidRatings: events.length - validRatings,
+    validRatings,
     hardGoodEasy,
     goodEasy,
-    firstAttemptSuccess:
-      validFirstAttempts === 0 ? null : hardGoodEasy / validFirstAttempts,
-    firstAttemptGoodEasy:
-      validFirstAttempts === 0 ? null : goodEasy / validFirstAttempts,
-    evidence: validFirstAttempts === 0 ? 'not-measured' : 'measured',
+    successRate: validRatings === 0 ? null : hardGoodEasy / validRatings,
+    goodEasyRate: validRatings === 0 ? null : goodEasy / validRatings,
   }
+}
+
+function buildProblemSolvingView(
+  events: readonly HistoricalAnalyticsReviewEvent[],
+  options: HistoricalPresentationOptions,
+): ProblemSolvingView {
+  const targets = options.analyticsTargets ?? defaultAnalyticsTargets
+  const timeTargetsMinutes =
+    options.timeTargetsMinutes ??
+    defaultUserSettings.assessment.timeTargetsMinutes
+  const previousStart = shiftAnalyticsCalendarDays(
+    options.start,
+    -options.timeFrame.requestedDays,
+    options.timeZone,
+  )
+  const previousAsOf = shiftAnalyticsCalendarDays(
+    options.end,
+    -options.timeFrame.requestedDays,
+    options.timeZone,
+  )
+  const cohort = (
+    raw: readonly HistoricalAnalyticsReviewEvent[],
+    references: readonly number[],
+  ): ProblemSolvingCohortView => {
+    const selected = raw.filter(
+      (event) =>
+        event.reviewedAt >= options.start && event.reviewedAt <= options.end,
+    )
+    const previous = raw.filter(
+      (event) =>
+        event.reviewedAt >= previousStart && event.reviewedAt <= previousAsOf,
+    )
+    const rows = options.buckets.map((bucket) => ({
+      ...bucketRow(bucket, options.end),
+      difficulties: aggregateDifficulties(
+        selected.filter((event) => inBucket(event.reviewedAt, bucket)),
+      ),
+    }))
+    const scale = (successful: boolean) => {
+      const timed = selected.filter(
+        (event) =>
+          event.problemDifficulty !== undefined &&
+          event.problemDifficulty !== 'unknown' &&
+          (!successful || isSuccessfulRating(event)) &&
+          positiveRecordedSeconds(event) !== null,
+      )
+      return {
+        minutes: toPresentationScale(
+          buildAdaptiveDurationScale([
+            ...timed.map((event) => event.elapsedSeconds! / 60),
+            ...Object.values(timeTargetsMinutes),
+          ]),
+        ),
+        targetPercent: toPresentationScale(
+          buildAdaptiveDurationScale([
+            ...timed.map(
+              (event) =>
+                (event.elapsedSeconds! /
+                  (timeTargetsMinutes[
+                    event.problemDifficulty as keyof typeof timeTargetsMinutes
+                  ] *
+                    60)) *
+                100,
+            ),
+            100,
+          ]),
+        ),
+      }
+    }
+    return {
+      rows,
+      totals: aggregateProblemSolvingPeriod(selected, options.timeZone),
+      previous: aggregateProblemSolvingPeriod(previous, options.timeZone),
+      outcomeScale: problemSolvingOutcomeScale(rows, references),
+      timeScales: { all: scale(false), successful: scale(true) },
+    }
+  }
+  return {
+    cohorts: {
+      newProblems: cohort(selectFirstRecordedAttempts(events), [
+        targets.targetFirstAttemptSuccess,
+        targets.targetFirstAttemptGoodEasy,
+      ]),
+      followupPractice: cohort(selectLaterRecordedAttempts(events), [
+        targets.targetRecall,
+        targets.targetReviewSuccess,
+      ]),
+    },
+    targets,
+    timeTargetsMinutes,
+    previousPeriod: {
+      start: previousStart.toISOString(),
+      asOf: previousAsOf.toISOString(),
+    },
+  }
+}
+
+function aggregateProblemSolvingPeriod(
+  events: readonly HistoricalAnalyticsReviewEvent[],
+  timeZone: string,
+): ProblemSolvingPeriodStats {
+  return {
+    ...aggregateRatingOutcomes(events),
+    assessmentDays: new Set(
+      events.map((event) => getAnalyticsDateKey(event.reviewedAt, timeZone)),
+    ).size,
+    distinctProblems: new Set(events.map((event) => event.problemSlug)).size,
+    difficulties: aggregateDifficulties(events),
+  }
+}
+
+function aggregateDifficulties(
+  events: readonly HistoricalAnalyticsReviewEvent[],
+): ProblemSolvingDifficulties {
+  const stats = (
+    difficulty: ProblemDifficulty,
+  ): ProblemSolvingDifficultyStats => {
+    const selected = events.filter(
+      (event) => (event.problemDifficulty ?? 'unknown') === difficulty,
+    )
+    return {
+      ...aggregateRatingOutcomes(selected),
+      time: {
+        all: aggregateRecordedTime(selected),
+        successful: aggregateRecordedTime(selected.filter(isSuccessfulRating)),
+      },
+    }
+  }
+  return Object.fromEntries(
+    problemDifficulties.map((difficulty) => [difficulty, stats(difficulty)]),
+  ) as ProblemSolvingDifficulties
+}
+
+function isSuccessfulRating(event: HistoricalAnalyticsReviewEvent): boolean {
+  return isReviewRating(event.rating) && event.rating !== 'again'
+}
+
+function positiveRecordedSeconds(
+  event: HistoricalAnalyticsReviewEvent,
+): number | null {
+  return typeof event.elapsedSeconds === 'number' &&
+    Number.isFinite(event.elapsedSeconds) &&
+    event.elapsedSeconds > 0
+    ? event.elapsedSeconds
+    : null
+}
+
+function aggregateRecordedTime(
+  events: readonly HistoricalAnalyticsReviewEvent[],
+): ProblemSolvingTimeStats {
+  const durations = events.flatMap((event) => {
+    const seconds = positiveRecordedSeconds(event)
+    return seconds === null ? [] : [seconds]
+  })
+  const [q1Seconds, q3Seconds] =
+    durations.length >= 4 ? tukeyHinges(durations) : [null, null]
+  return {
+    eligibleAssessments: events.length,
+    timedAssessments: durations.length,
+    totalSeconds: durations.reduce((sum, seconds) => sum + seconds, 0),
+    medianSeconds: median(durations),
+    q1Seconds,
+    q3Seconds,
+  }
+}
+
+function problemSolvingOutcomeScale(
+  rows: readonly ProblemSolvingRow[],
+  references: readonly number[],
+): HistoricalPresentationScale {
+  return percentageScale(
+    rows.flatMap((row) =>
+      knownProblemDifficulties.flatMap((difficulty) => [
+        row.difficulties[difficulty].successRate,
+        row.difficulties[difficulty].goodEasyRate,
+      ]),
+    ),
+    references,
+  )
 }
 
 function buildStabilityObservations(
@@ -772,7 +1077,7 @@ function percentageScale(
 function toPresentationScale(
   scale: AnalyticsScale,
 ): HistoricalPresentationScale {
-  return { domain: scale.domain, ticks: scale.ticks }
+  return { domain: [scale.domain[0], scale.domain[1]], ticks: [...scale.ticks] }
 }
 
 function inBucket(date: Date, bucket: AnalyticsBucket): boolean {

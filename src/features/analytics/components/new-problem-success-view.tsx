@@ -1,449 +1,615 @@
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { ChartTable } from '@/components/ui/chart-table'
+import type { AnalyticsTargets } from '@/features/settings/domain'
 
-import type { AnalyticsViews } from '../api/analytics-contracts'
-import { ChartTrendNote, formatCount } from './charts/chart-shared'
-import { HistoricalChart } from './charts/historical-chart'
+import { AnalyticsTargetEditor } from './analytics-target-editor'
+import { formatCount } from './charts/chart-shared'
 import type { HistoricalChartTimeFrame } from './charts/historical-chart'
 import {
   formatHistoricalBucket,
-  historicalGroupingLabel,
   historicalIntervalContext,
   historicalReportContext,
   trimHistoricalEmptyEdges,
 } from './charts/historical-chart-model'
 import { HistoricalTable } from './charts/historical-table'
-import { HistoricalTargetLine } from './charts/historical-target-line'
-import { LineSegments } from './charts/line-segments'
+import {
+  ComparisonChart,
+  DifficultyMixChart,
+  ProblemTrendChart,
+} from './problem-solving-charts'
+import {
+  comparisonText,
+  difficulties,
+  mixDifficulties,
+  mixShares,
+  outcomeLabel,
+  outcomeNumerator,
+  outcomeText,
+  problemGoal,
+  timeText,
+  timeValue,
+} from './problem-solving-model'
+import type {
+  DifficultyStats,
+  OutcomeMeasure,
+  ProblemCohort,
+  ProblemRow,
+  ProblemView,
+  TimeUnits,
+  TimingPopulation,
+} from './problem-solving-model'
 
-type FirstRow = AnalyticsViews['firstAttemptOutcomes']['rows'][number]
-type FirstView = AnalyticsViews['firstAttemptOutcomes']
-
-const outcomes = [
-  {
-    key: 'firstAttemptSuccess',
-    label: 'Hard + Good + Easy',
-    color: 'var(--cp-analytics-first-success)',
-    shape: 'circle',
-    strokeWidth: 2.5,
-    testId: 'first-attempt-success',
-  },
-  {
-    key: 'firstAttemptGoodEasy',
-    label: 'Good + Easy',
-    color: 'var(--cp-analytics-first-good-easy)',
-    shape: 'diamond',
-    strokeWidth: 1.8,
-    testId: 'first-attempt-good-easy',
-  },
-] as const
+interface ProblemTableRow {
+  id: string
+  difficulty: (typeof difficulties)[number]
+  stats: DifficultyStats
+  interval: ProblemRow | null
+  previous: DifficultyStats | null
+}
 
 export function NewProblemSuccessView({
   view,
   timeFrame,
-  targetControl,
+  onSaveTarget,
 }: {
-  view: FirstView
+  view: ProblemView
   timeFrame?: HistoricalChartTimeFrame | undefined
-  targetControl?: ReactNode
+  onSaveTarget?:
+    | ((patch: Partial<AnalyticsTargets>) => Promise<unknown>)
+    | undefined
 }) {
-  const [series, setSeries] = useState({
-    firstAttemptSuccess: true,
-    firstAttemptGoodEasy: true,
+  const [cohort, setCohort] = useState<ProblemCohort>('newProblems')
+  const [mode, setMode] = useState<'trend' | 'compare'>('trend')
+  const [measure, setMeasure] = useState<OutcomeMeasure>('successRate')
+  const [visible, setVisible] = useState({
+    easy: true,
+    medium: true,
+    hard: true,
   })
-  const rows = trimHistoricalEmptyEdges(
-    view.rows,
-    (row) =>
-      row.firstAttemptSuccess !== null || row.firstAttemptGoodEasy !== null,
+  const [units, setUnits] = useState<TimeUnits>('targetPercent')
+  const [timing, setTiming] = useState<TimingPopulation>('all')
+  const [mixMeasure, setMixMeasure] = useState<'assessments' | 'time'>(
+    'assessments',
   )
-  const sharedTarget =
-    view.targetFirstAttemptSuccess === view.targetFirstAttemptGoodEasy
-  const visibleDescription =
-    outcomes
-      .filter((outcome) => series[outcome.key])
-      .map(
-        (outcome) =>
-          `${outcome.label} uses a solid line with ${outcome.shape === 'circle' ? 'circles' : 'diamonds'}`,
-      )
-      .join('; ') || 'Both data series are hidden'
-  const description = `${visibleDescription}. Both rates use the same valid first-recorded rating population in retained history. Long-dash bridges span unavailable buckets without adding outcomes. Scale: ${percent(view.scale.domain[0])}–${percent(view.scale.domain[1])}. Target First-attempt Success: ${percent(view.targetFirstAttemptSuccess)}. Target Good + Easy: ${percent(view.targetFirstAttemptGoodEasy)}.${sharedTarget ? ' The equal goals share one neutral reference at their saved value.' : ''} ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`
-
+  const selected = view.cohorts[cohort]
+  const shown = difficulties.filter(({ key }) => visible[key])
+  const rows = trimHistoricalEmptyEdges(selected.rows, (row) =>
+    difficulties.some(
+      ({ key }) => row.difficulties[key].recordedAssessments > 0,
+    ),
+  )
+  const mixRows = trimHistoricalEmptyEdges(selected.rows, (row) =>
+    mixDifficulties.some(
+      ({ key }) => row.difficulties[key].recordedAssessments > 0,
+    ),
+  )
+  const goal = problemGoal(view, cohort, measure)
+  const resetKey = `${cohort}:${mode}:${measure}:${units}:${timing}:${shown.map(({ key }) => key).join(':')}`
+  const totals = selected.totals
+  const trendRows = rows.flatMap((row) =>
+    shown.map((difficulty) => ({
+      id: `${row.id}:${difficulty.key}`,
+      difficulty,
+      stats: row.difficulties[difficulty.key],
+      interval: row,
+      previous: null,
+    })),
+  )
+  const compareRows = difficulties.map((difficulty) => ({
+    id: difficulty.key,
+    difficulty,
+    stats: totals.difficulties[difficulty.key],
+    interval: null,
+    previous: selected.previous.difficulties[difficulty.key],
+  }))
+  const tableRows: ProblemTableRow[] =
+    mode === 'trend' ? trendRows : compareRows
+  const period = formatPriorPeriod(view, timeFrame)
+  const timeAxis =
+    units === 'minutes'
+      ? 'Recorded assessment time (min)'
+      : 'Recorded assessment time (% of current target)'
   return (
-    <div className="cp-historical-view cp-historical-first-outcomes grid min-w-0 gap-2">
-      <div className="cp-first-attempt-targets flex min-w-0 flex-wrap items-start justify-end gap-x-4 gap-y-1">
-        {targetControl ?? (
-          <>
-            <TargetCaption
-              color={
-                sharedTarget
-                  ? 'var(--cp-analytics-first-shared-target)'
-                  : outcomes[0].color
-              }
-              label="Target First-attempt Success"
-              value={view.targetFirstAttemptSuccess}
-            />
-            <TargetCaption
-              color={
-                sharedTarget
-                  ? 'var(--cp-analytics-first-shared-target)'
-                  : outcomes[1].color
-              }
-              label="Target Good + Easy"
-              value={view.targetFirstAttemptGoodEasy}
-            />
-          </>
-        )}
+    <div className="cp-historical-view cp-historical-problem-solving grid min-w-0 gap-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <Choice
+          label="Assessment population"
+          value={cohort}
+          onChange={setCohort}
+          options={[
+            ['newProblems', 'New problems'],
+            ['followupPractice', 'Follow-up practice'],
+          ]}
+        />
+        <Choice
+          label="View"
+          value={mode}
+          onChange={setMode}
+          options={[
+            ['trend', 'Trend'],
+            ['compare', 'Compare'],
+          ]}
+        />
       </div>
-      <p className="m-0 text-xs text-muted-foreground">
-        Selected period: {formatCount(view.totals.recordedFirstAttempts)}{' '}
-        recorded first attempts · {formatCount(view.totals.validFirstAttempts)}{' '}
-        valid · {formatCount(view.totals.excludedInvalidRatings)} invalid first
-        ratings excluded.
+      <p className="m-0 text-xs leading-relaxed text-muted-foreground">
+        Selected population: {formatCount(totals.assessmentDays)} assessment
+        days · {formatCount(totals.recordedAssessments)} assessments ·{' '}
+        {formatCount(totals.distinctProblems)} distinct problems · Good + Easy{' '}
+        {formatCount(totals.goodEasy)}/{formatCount(totals.validRatings)} valid
+        ({outcomeText(totals.goodEasyRate)}) ·{' '}
+        {formatCount(totals.excludedInvalidRatings)} invalid ratings excluded
+        from outcomes.
       </p>
-      <ChartTable
-        chart={
-          rows.length > 0 ? (
-            <div className="grid gap-2">
-              <HistoricalChart
-                config={Object.fromEntries(
-                  outcomes.map((outcome) => [
-                    outcome.key,
-                    { label: outcome.label, color: outcome.color },
-                  ]),
-                )}
-                description={description}
-                height={310}
-                initialIndex={Math.max(0, Math.floor(rows.length / 2) - 1)}
-                inspectionResetKey={`${series.firstAttemptSuccess}:${series.firstAttemptGoodEasy}`}
-                name="New Problem Success chart"
-                rows={rows}
-                startAtFirstPoint
-                timeFrame={timeFrame}
-                tooltip={(row) => (
-                  <FirstOutcomeTooltip
-                    row={row}
-                    series={series}
-                    view={view}
-                    timeFrame={timeFrame}
-                  />
-                )}
-                yAxes={[
-                  {
-                    label: 'First outcomes (%)',
-                    scale: view.scale,
-                    format: percent,
-                    padding: { top: 8, bottom: 8 },
-                  },
-                ]}
-              >
-                {(rows, selected) => (
-                  <>
-                    {sharedTarget ? (
-                      <HistoricalTargetLine
-                        stroke="var(--cp-analytics-first-shared-target)"
-                        testId="first-attempt-shared-target"
-                        value={view.targetFirstAttemptSuccess}
-                      />
-                    ) : (
-                      <>
-                        <HistoricalTargetLine
-                          stroke={outcomes[0].color}
-                          testId="first-attempt-success-target"
-                          value={view.targetFirstAttemptSuccess}
-                        />
-                        <HistoricalTargetLine
-                          stroke={outcomes[1].color}
-                          testId="first-attempt-good-easy-target"
-                          value={view.targetFirstAttemptGoodEasy}
-                        />
-                      </>
-                    )}
-                    {outcomes.map((outcome) =>
-                      series[outcome.key] ? (
-                        <LineSegments
-                          activeIndex={rows.findIndex(
-                            (row) => row.id === selected?.id,
-                          )}
-                          bridgeDasharray="9 7"
-                          bridgeStrokeWidth={1.5}
-                          data={rows}
-                          dataKey={outcome.key}
-                          key={outcome.key}
-                          markerFill="var(--color-card)"
-                          markerShape={outcome.shape}
-                          seriesKey={outcome.label}
-                          showMeasuredDots
-                          stroke={outcome.color}
-                          strokeWidth={outcome.strokeWidth}
-                          testId={outcome.testId}
-                          type="linear"
-                        />
-                      ) : null,
-                    )}
-                  </>
-                )}
-              </HistoricalChart>
-              <ChartTrendNote
-                pointCount={
-                  rows.filter(
-                    (row) =>
-                      row.firstAttemptSuccess !== null ||
-                      row.firstAttemptGoodEasy !== null,
-                  ).length
-                }
-              />
-            </div>
-          ) : (
-            <p className="m-0 grid min-h-48 place-items-center text-sm text-muted-foreground">
-              No valid first recorded outcomes in this period.
-            </p>
-          )
-        }
-        table={
-          <HistoricalTable
-            caption="New Problem Success exact values"
-            cells={(row) => [
-              `${formatHistoricalBucket(row, timeFrame)}${row.isPartial ? ' (in progress)' : ''}`,
-              formatCount(row.recordedFirstAttempts),
-              formatCount(row.excludedInvalidRatings),
-              formatCount(row.validFirstAttempts),
-              formatCount(row.again),
-              formatCount(row.hard),
-              formatCount(row.good),
-              formatCount(row.easy),
-              formatCount(row.hardGoodEasy),
-              formatCount(row.goodEasy),
-              percent(row.firstAttemptSuccess),
-              percent(row.firstAttemptGoodEasy),
-              percent(view.targetFirstAttemptSuccess),
-              percent(view.targetFirstAttemptGoodEasy),
-              evidenceText(row.evidence),
-              periodContext(row, timeFrame),
-            ]}
-            headers={[
-              'Bucket',
-              'Recorded first attempts',
-              'Excluded invalid ratings',
-              'Valid first attempts',
-              'Again',
-              'Hard',
-              'Good',
-              'Easy',
-              'Hard + Good + Easy count',
-              'Good + Easy count',
-              'Hard + Good + Easy',
-              'Good + Easy',
-              'Target First-attempt Success',
-              'Target Good + Easy',
-              'Evidence',
-              'Period context',
-            ]}
-            resetKey={rows.map((row) => row.id).join('|')}
-            rows={rows}
-          />
-        }
-      />
-      <div
-        aria-label="First outcome chart series"
-        className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground"
-        role="list"
-      >
-        {outcomes.map((outcome) => (
-          <span key={outcome.key} role="listitem">
+      {cohort === 'followupPractice' ? (
+        <p className="m-0 text-xs text-muted-foreground">
+          Later raw assessments can differ from FSRS-paired Recall. Recall and
+          Review Success goals are rating aspirations for this population.
+        </p>
+      ) : null}
+      {mode === 'trend' ? (
+        <div
+          aria-label="Trend difficulties"
+          className="flex flex-wrap gap-2"
+          role="group"
+        >
+          {difficulties.map(({ key, label, color, symbol }) => (
             <button
-              aria-pressed={series[outcome.key]}
-              className="inline-flex items-center gap-1.5 rounded-sm border-0 bg-transparent py-1 text-xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring aria-[pressed=false]:opacity-45 [@media(pointer:coarse)]:min-h-11"
+              aria-pressed={visible[key]}
+              className={`rounded border px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${visible[key] ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/30 opacity-45'}`}
+              key={key}
               onClick={() =>
-                setSeries((current) => ({
-                  ...current,
-                  [outcome.key]: !current[outcome.key],
-                }))
+                setVisible((current) => ({ ...current, [key]: !current[key] }))
               }
               type="button"
             >
-              <svg aria-hidden="true" height="12" width="22">
-                <line
-                  stroke={outcome.color}
-                  strokeWidth={outcome.strokeWidth}
-                  x1="0"
-                  x2="22"
-                  y1="6"
-                  y2="6"
-                />
-                {outcome.shape === 'circle' ? (
-                  <circle
-                    cx="11"
-                    cy="6"
-                    fill="var(--color-card)"
-                    r="4"
-                    stroke={outcome.color}
-                    strokeWidth="2"
-                  />
-                ) : (
-                  <path
-                    d="M11,2.5L14.5,6L11,9.5L7.5,6Z"
-                    fill="var(--color-card)"
-                    stroke={outcome.color}
-                    strokeWidth="1.5"
-                  />
-                )}
-              </svg>
-              {outcome.label}
+              <span aria-hidden="true" style={{ color }}>
+                {symbol}
+              </span>{' '}
+              {label}
             </button>
+          ))}
+          <span className="self-center text-xs text-muted-foreground">
+            Shared by both Trend plots
           </span>
-        ))}
-        <span className="inline-flex items-center gap-1.5" role="listitem">
-          <svg aria-hidden="true" height="12" width="22">
-            <line
-              stroke="currentColor"
-              strokeDasharray="9 7"
-              x1="0"
-              x2="22"
-              y1="6"
-              y2="6"
-            />
-          </svg>
-          Long dashes: missing buckets
-        </span>
+        </div>
+      ) : (
+        <p className="m-0 text-xs text-muted-foreground">
+          Compare shows all three difficulties. Previous period:{' '}
+          {formatPriorPeriod(view, timeFrame)}. Sparse comparison means fewer
+          than 10 valid ratings in either period.
+        </p>
+      )}
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+        <Plot
+          title="Success by Difficulty"
+          paired
+          controls={
+            <div className="grid min-w-0 justify-items-end gap-2">
+              {onSaveTarget ? (
+                <AnalyticsTargetEditor
+                  key={goal.metric}
+                  metric={goal.metric}
+                  onSave={onSaveTarget}
+                  targets={view.targets}
+                />
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  {goal.label} {outcomeText(goal.value)}
+                </span>
+              )}
+              <Choice
+                label="Outcome measure"
+                value={measure}
+                onChange={setMeasure}
+                options={[
+                  ['successRate', 'Hard + Good + Easy'],
+                  ['goodEasyRate', 'Good + Easy'],
+                ]}
+              />
+            </div>
+          }
+        >
+          <ChartTable
+            chart={
+              mode === 'trend' ? (
+                <ProblemTrendChart
+                  kind="outcome"
+                  rows={rows}
+                  shown={shown}
+                  view={view}
+                  cohort={cohort}
+                  measure={measure}
+                  units={units}
+                  timing={timing}
+                  goal={goal.value}
+                  timeFrame={timeFrame}
+                  resetKey={resetKey}
+                />
+              ) : (
+                <ComparisonChart
+                  kind="outcome"
+                  view={view}
+                  cohort={cohort}
+                  measure={measure}
+                  units={units}
+                  timing={timing}
+                  goal={goal.value}
+                  timeFrame={timeFrame}
+                  resetKey={resetKey}
+                />
+              )
+            }
+            table={
+              <HistoricalTable
+                caption="Success by Difficulty exact values"
+                headers={
+                  mode === 'trend'
+                    ? [
+                        'Interval · difficulty',
+                        'Recorded',
+                        'Valid',
+                        'Invalid excluded',
+                        outcomeLabel(measure),
+                        'Numerator / valid',
+                        goal.label,
+                        'Context',
+                      ]
+                    : [
+                        'Difficulty',
+                        'Recorded',
+                        'Valid',
+                        'Invalid excluded',
+                        outcomeLabel(measure),
+                        'Numerator / valid',
+                        goal.label,
+                        'Prior rate',
+                        'Prior valid',
+                        'Change',
+                        'Prior period',
+                      ]
+                }
+                rows={tableRows}
+                resetKey={resetKey}
+                cells={(row) => [
+                  row.interval
+                    ? `${formatHistoricalBucket(row.interval, timeFrame)} · ${row.difficulty.label}`
+                    : row.difficulty.label,
+                  row.stats.recordedAssessments,
+                  row.stats.validRatings,
+                  row.stats.excludedInvalidRatings,
+                  outcomeText(row.stats[measure]),
+                  `${outcomeNumerator(row.stats, measure)}/${row.stats.validRatings}`,
+                  outcomeText(goal.value),
+                  ...(row.previous
+                    ? [
+                        outcomeText(row.previous[measure]),
+                        row.previous.validRatings,
+                        comparisonText(row.stats, row.previous, measure),
+                        period,
+                      ]
+                    : [
+                        row.interval
+                          ? historicalIntervalContext(row.interval, timeFrame)
+                          : 'Selected period',
+                      ]),
+                ]}
+              />
+            }
+          />
+        </Plot>
+        <Plot
+          title="Recorded Time by Difficulty"
+          paired
+          controls={
+            <div className="grid min-w-0 justify-items-end gap-2">
+              <Choice
+                label="Time units"
+                value={units}
+                onChange={setUnits}
+                options={[
+                  ['targetPercent', '% of current target'],
+                  ['minutes', 'Minutes'],
+                ]}
+              />
+              <Choice
+                label="Timing population"
+                value={timing}
+                onChange={setTiming}
+                options={[
+                  ['all', 'All timed assessments'],
+                  ['successful', 'Successful ratings only'],
+                ]}
+                select
+              />
+              <span className="text-xs text-muted-foreground">
+                {units === 'targetPercent'
+                  ? '100% = current difficulty target'
+                  : difficulties
+                      .map(
+                        ({ key, label }) =>
+                          `${label} ${view.timeTargetsMinutes[key]} min`,
+                      )
+                      .join(' · ')}
+              </span>
+            </div>
+          }
+        >
+          <ChartTable
+            chart={
+              mode === 'trend' ? (
+                <ProblemTrendChart
+                  kind="time"
+                  rows={rows}
+                  shown={shown}
+                  view={view}
+                  cohort={cohort}
+                  measure={measure}
+                  units={units}
+                  timing={timing}
+                  goal={goal.value}
+                  timeFrame={timeFrame}
+                  resetKey={resetKey}
+                />
+              ) : (
+                <ComparisonChart
+                  kind="time"
+                  view={view}
+                  cohort={cohort}
+                  measure={measure}
+                  units={units}
+                  timing={timing}
+                  goal={goal.value}
+                  timeFrame={timeFrame}
+                  resetKey={resetKey}
+                />
+              )
+            }
+            table={
+              <HistoricalTable
+                caption="Recorded Time by Difficulty exact values"
+                headers={[
+                  'Interval · difficulty',
+                  'Raw recorded',
+                  'Valid',
+                  'Invalid',
+                  'Timed / eligible',
+                  'Median',
+                  'Q1',
+                  'Q3',
+                  'Current target',
+                  'Recorded seconds',
+                  'Context',
+                ]}
+                rows={tableRows}
+                resetKey={resetKey}
+                cells={(row) => {
+                  const key = row.difficulty.key
+                  const stats = row.stats.time[timing]
+                  const value = (seconds: number | null) =>
+                    timeText(
+                      timeValue(seconds, key, units, view.timeTargetsMinutes),
+                      units,
+                    )
+                  return [
+                    row.interval
+                      ? `${formatHistoricalBucket(row.interval, timeFrame)} · ${row.difficulty.label}`
+                      : row.difficulty.label,
+                    row.stats.recordedAssessments,
+                    row.stats.validRatings,
+                    row.stats.excludedInvalidRatings,
+                    `${stats.timedAssessments}/${stats.eligibleAssessments}`,
+                    value(stats.medianSeconds),
+                    value(stats.q1Seconds),
+                    value(stats.q3Seconds),
+                    timeText(
+                      units === 'minutes' ? view.timeTargetsMinutes[key] : 100,
+                      units,
+                    ),
+                    stats.totalSeconds,
+                    row.interval
+                      ? historicalIntervalContext(row.interval, timeFrame)
+                      : 'Selected period',
+                  ]
+                }}
+              />
+            }
+          />
+          <p className="m-0 text-xs text-muted-foreground">
+            {timeAxis}. Median with 1–3 timed observations; middle 50% requires
+            at least 4. Isolate one difficulty in Trend to see its quartiles.
+          </p>
+        </Plot>
       </div>
+      <Plot
+        title="Difficulty Mix"
+        controls={
+          <Choice
+            label="Difficulty Mix measure"
+            value={mixMeasure}
+            onChange={setMixMeasure}
+            options={[
+              ['assessments', 'Assessment share'],
+              ['time', 'Recorded-time share'],
+            ]}
+          />
+        }
+      >
+        <div
+          aria-label="Difficulty Mix legend"
+          className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
+        >
+          {mixDifficulties.map(({ key, color, label, symbol }) => (
+            <span key={key}>
+              <span aria-hidden="true" style={{ color }}>
+                {symbol}
+              </span>{' '}
+              {label}
+            </span>
+          ))}
+        </div>
+        <ChartTable
+          chart={
+            <DifficultyMixChart
+              rows={mixRows}
+              measure={mixMeasure}
+              timeFrame={timeFrame}
+              resetKey={`${cohort}:${mixMeasure}`}
+            />
+          }
+          table={
+            <HistoricalTable
+              caption="Difficulty Mix exact values"
+              headers={[
+                'Interval · difficulty',
+                'Assessments',
+                'Recorded seconds',
+                'Share',
+                'Context',
+              ]}
+              resetKey={`${cohort}:${mixMeasure}`}
+              rows={mixRows.flatMap((row) =>
+                mixDifficulties.map((difficulty, index) => ({
+                  ...row,
+                  id: `${row.id}:${difficulty.key}`,
+                  difficulty,
+                  share: mixShares(row, mixMeasure)[index] ?? null,
+                })),
+              )}
+              cells={(row) => [
+                `${formatHistoricalBucket(row, timeFrame)} · ${row.difficulty.label}`,
+                row.difficulties[row.difficulty.key].recordedAssessments,
+                row.difficulties[row.difficulty.key].time.all.totalSeconds,
+                outcomeText(row.share),
+                historicalIntervalContext(row, timeFrame),
+              ]}
+            />
+          }
+        />
+      </Plot>
+      <p className="m-0 text-xs text-muted-foreground">
+        The paired plots include Easy, Medium and Hard only; Unknown remains in
+        the summary and Difficulty Mix. {historicalReportContext(timeFrame)}
+      </p>
       <details className="text-xs leading-relaxed text-muted-foreground">
-        <summary className="cursor-pointer rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
-          Calculation details
-        </summary>
+        <summary>Calculation details</summary>
         <p>
-          First means “first recorded in retained history”: one earliest review
-          per problem, selected before the period and rating filters. Invalid
-          first ratings remain excluded; a later valid review never replaces
-          them. Corrections, resets, deletions, and restored history can change
-          this population. Hints, retries, and prior exposure are unknown, so
-          these ratings do not prove unassisted solving or first-ever exposure.
+          New problems selects the first recorded assessment in retained history
+          per problem across cards and modes, before rating, period, difficulty
+          or time filters. Follow-up practice contains every later raw
+          assessment. Invalid earliest ratings are excluded from outcomes
+          without promoting a later record. Hints, retries and prior exposure
+          are unknown.
         </p>
         <p>
-          Both curves divide by the same valid first attempts: Again + Hard +
-          Good + Easy. Hard share is the gap between Hard + Good + Easy and Good
-          + Easy. Long dashes span unavailable buckets without adding outcomes;
-          a measured 0% remains a real outcome.
+          {outcomeLabel(measure)} divides by all valid ratings, including Again.
+          Current catalog difficulty classifies historical assessments. Unknown
+          is included in Mix and excluded from the three outcome and time
+          series. Mix counts all raw assessments, including invalid ratings;
+          recorded-time share uses positive saved durations.
         </p>
         <p>
-          Selected-period weighted outcomes: Hard + Good + Easy{' '}
-          {percent(view.totals.firstAttemptSuccess)} (
-          {formatCount(view.totals.hardGoodEasy)}/
-          {formatCount(view.totals.validFirstAttempts)}); Good + Easy{' '}
-          {percent(view.totals.firstAttemptGoodEasy)} (
-          {formatCount(view.totals.goodEasy)}/
-          {formatCount(view.totals.validFirstAttempts)}). Both personal goals
-          are independent aspirations.
+          Recorded assessment time excludes paused time, can include running
+          idle time, and cannot recover earlier unsaved work. Only positive
+          finite saved durations count. Successful timing requires Hard, Good or
+          Easy. Current time targets are references, not historical timing
+          compliance or a speed score; Strict Timing can turn an accepted
+          overtime solution into Again. Period rates use summed counts.
+          Long-dash bridges cross missing evidence without creating
+          observations.
         </p>
       </details>
     </div>
   )
 }
 
-function TargetCaption({
-  color,
+function Choice<T extends string>({
   label,
   value,
+  options,
+  onChange,
+  select = false,
 }: {
-  color: string
   label: string
-  value: number
+  value: T
+  options: readonly (readonly [T, string])[]
+  onChange: (value: T) => void
+  select?: boolean
 }) {
-  return (
-    <p className="m-0 inline-flex items-center gap-2 py-1 text-right text-xs text-muted-foreground">
-      <span
-        aria-hidden="true"
-        className="w-5 border-t border-dashed"
-        style={{ borderColor: color }}
-      />
-      {label} {percent(value)}
-    </p>
-  )
-}
-
-function FirstOutcomeTooltip({
-  row,
-  series,
-  view,
-  timeFrame,
-}: {
-  row: FirstRow
-  series: { firstAttemptSuccess: boolean; firstAttemptGoodEasy: boolean }
-  view: FirstView
-  timeFrame?: HistoricalChartTimeFrame | undefined
-}) {
-  const values: Array<readonly [string, string]> = [
-    ...(series.firstAttemptSuccess
-      ? [
-          [
-            'Hard + Good + Easy',
-            `${percent(row.firstAttemptSuccess)} (${formatCount(row.hardGoodEasy)}/${formatCount(row.validFirstAttempts)})`,
-          ] as const,
-        ]
-      : []),
-    ...(series.firstAttemptGoodEasy
-      ? [
-          [
-            'Good + Easy',
-            `${percent(row.firstAttemptGoodEasy)} (${formatCount(row.goodEasy)}/${formatCount(row.validFirstAttempts)})`,
-          ] as const,
-        ]
-      : []),
-    ['Target First-attempt Success', percent(view.targetFirstAttemptSuccess)],
-    ['Target Good + Easy', percent(view.targetFirstAttemptGoodEasy)],
-    ['Evidence', evidenceText(row.evidence)],
-  ]
-  return (
-    <div className="rounded border border-border bg-card px-3 py-2 text-xs text-card-foreground shadow-sm">
-      <p className="m-0 font-medium">
-        {formatHistoricalBucket(row, timeFrame)} ·{' '}
-        {historicalGroupingLabel(timeFrame)}
-      </p>
-      <p className="m-0 mt-1 tabular-nums text-muted-foreground">
-        {formatCount(row.recordedFirstAttempts)} recorded ·{' '}
-        {formatCount(row.validFirstAttempts)} valid ·{' '}
-        {formatCount(row.excludedInvalidRatings)} invalid excluded
-      </p>
-      <p className="m-0 mt-1 tabular-nums text-muted-foreground">
-        Again {formatCount(row.again)} · Hard {formatCount(row.hard)} · Good{' '}
-        {formatCount(row.good)} · Easy {formatCount(row.easy)}
-      </p>
-      <dl className="m-0 mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1">
-        {values.map(([label, value]) => (
-          <Fragment key={label}>
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="m-0 text-right tabular-nums">{value}</dd>
-          </Fragment>
+  return select ? (
+    <label className="grid min-w-0 gap-1 text-xs text-muted-foreground">
+      <span className="sr-only">{label}</span>
+      <select
+        aria-label={label}
+        className="h-9 max-w-full rounded border border-border bg-card px-2 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onChange={(event) => onChange(event.target.value as T)}
+        value={value}
+      >
+        {options.map(([key, title]) => (
+          <option key={key} value={key}>
+            {title}
+          </option>
         ))}
-      </dl>
-      {row.validFirstAttempts === 0 ? (
-        <p className="m-0 mt-1 text-muted-foreground">
-          No valid first recorded outcomes in this bucket
-        </p>
-      ) : null}
-      <p className="m-0 mt-2 text-muted-foreground">
-        {periodContext(row, timeFrame)}
-      </p>
+      </select>
+    </label>
+  ) : (
+    <div
+      aria-label={label}
+      role="group"
+      className="inline-flex max-w-full flex-wrap rounded border border-border bg-muted/30 p-0.5"
+    >
+      {options.map(([key, title]) => (
+        <button
+          type="button"
+          key={key}
+          aria-pressed={value === key}
+          onClick={() => onChange(key)}
+          className={`rounded px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${value === key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          {title}
+        </button>
+      ))}
     </div>
   )
 }
-
-function periodContext(row: FirstRow, timeFrame?: HistoricalChartTimeFrame) {
-  return [
-    historicalIntervalContext(row, timeFrame),
-    historicalReportContext(timeFrame),
-  ]
-    .filter(Boolean)
-    .join(' · ')
+function Plot({
+  title,
+  controls,
+  children,
+  paired = false,
+}: {
+  title: string
+  controls: ReactNode
+  children: ReactNode
+  paired?: boolean
+}) {
+  return (
+    <section
+      aria-label={title}
+      className="relative grid min-w-0 content-start gap-3 rounded border border-border p-3"
+    >
+      <div
+        className={
+          paired
+            ? 'grid min-w-0 content-start gap-2 lg:min-h-32'
+            : 'flex min-w-0 flex-wrap items-start justify-between gap-2'
+        }
+      >
+        <h3 className="m-0 text-sm font-semibold">{title}</h3>
+        {controls}
+      </div>
+      {children}
+    </section>
+  )
 }
-
-function percent(value: number | null) {
-  return value === null
-    ? 'Not measured'
-    : `${Number((value * 100).toFixed(1))}%`
-}
-
-function evidenceText(value: 'measured' | 'not-measured') {
-  return value === 'measured' ? 'Measured' : 'Not measured'
+function formatPriorPeriod(
+  view: ProblemView,
+  timeFrame?: HistoricalChartTimeFrame,
+) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeZone: timeFrame?.timeZone ?? 'UTC',
+  })
+  return `${formatter.format(new Date(view.previousPeriod.start))}–${formatter.format(new Date(view.previousPeriod.asOf))}`
 }

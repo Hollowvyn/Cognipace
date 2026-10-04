@@ -111,6 +111,51 @@ const validSummary = createSerializedAnalyticsSummary({
   historicalReadiness: withRequestedReadiness(readiness, null),
 })
 
+describe('problem-solving runtime contract', () => {
+  it('requires and preserves the complete problem-solving view', () => {
+    const summary = createSerializedAnalyticsSummary()
+    expect(analyticsSummarySchema.parse(summary).views.problemSolving).toEqual(
+      summary.views.problemSolving,
+    )
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...summary,
+        views: { ...summary.views, problemSolving: undefined },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each([
+    'rate',
+    'coverage',
+    'quartiles',
+    'median',
+    'conservation',
+    'finite',
+    'eligibility',
+    'goals',
+  ] as const)('rejects inconsistent %s evidence', (field) => {
+    const summary = createSerializedAnalyticsSummary()
+    const { totals } = summary.views.problemSolving.cohorts.newProblems
+    const easy = totals.difficulties.easy
+    if (field === 'rate') easy.successRate = 0.5
+    if (field === 'coverage') easy.time.all.timedAssessments = 1
+    if (field === 'quartiles')
+      Object.assign(easy.time.all, { q1Seconds: 1, q3Seconds: 2 })
+    if (field === 'median') easy.time.all.medianSeconds = 1
+    if (field === 'conservation')
+      Object.assign(totals, {
+        recordedAssessments: 1,
+        excludedInvalidRatings: 1,
+      })
+    if (field === 'finite') easy.time.all.totalSeconds = Infinity
+    if (field === 'eligibility') easy.time.successful.eligibleAssessments = 1
+    if (field === 'goals')
+      summary.views.problemSolving.targets.targetRecall = 0.8
+    expect(analyticsSummarySchema.safeParse(summary).success).toBe(false)
+  })
+})
+
 const measuredFirstOutcome = {
   again: 0,
   hard: 1,
@@ -237,6 +282,14 @@ describe('analyticsSummaryRequestSchema', () => {
               ...firstOutcomeView(),
               targetFirstAttemptGoodEasy: target,
             },
+            problemSolving: {
+              ...validSummary.views.problemSolving,
+              targets: {
+                ...validSummary.views.problemSolving.targets,
+                targetFirstAttemptSuccess: 0,
+                targetFirstAttemptGoodEasy: target,
+              },
+            },
           },
         }).success,
       ).toBe(target === 1)
@@ -359,7 +412,7 @@ describe('analyticsSummaryRequestSchema', () => {
 
 describe('analyticsSummarySchema', () => {
   it('serializes the personal chart targets separately from scheduling retention', () => {
-    const summary = {
+    const summary = createSerializedAnalyticsSummary({
       ...validSummary,
       targetRetention: 0.8,
       views: {
@@ -373,7 +426,7 @@ describe('analyticsSummarySchema', () => {
           targetReviewSuccess: 0.95,
         },
       },
-    }
+    })
 
     expect(analyticsSummarySchema.parse(summary)).toMatchObject({
       targetRetention: 0.8,

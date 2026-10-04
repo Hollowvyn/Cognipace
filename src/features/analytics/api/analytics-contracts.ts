@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { analyticsTargetsSchema } from '@/features/settings/domain'
+import {
+  analyticsTargetsSchema,
+  timeTargetsMinutesSchema,
+} from '@/features/settings/domain'
+import type { ProblemSolvingOutcomeStats } from '../domain/historical-presentation'
 
 export const analyticsRangeSchema = z.union([
   z.literal(14),
@@ -190,9 +194,11 @@ function validateFirstAttemptOutcomes(
   value: z.infer<typeof firstAttemptOutcomeCountsSchema>,
   context: z.RefinementCtx,
 ) {
-  const valid = value.again + value.hard + value.good + value.easy
-  const hardGoodEasy = value.hard + value.good + value.easy
-  const goodEasy = value.good + value.easy
+  const {
+    validRatings: valid,
+    hardGoodEasy,
+    goodEasy,
+  } = ratingCountTotals(value)
   const expected = {
     validFirstAttempts: valid,
     recordedFirstAttempts: valid + value.excludedInvalidRatings,
@@ -256,6 +262,268 @@ export const firstAttemptOutcomesViewSchema = z
       }
     }
   })
+
+function ratingCountTotals(value: {
+  again: number
+  hard: number
+  good: number
+  easy: number
+}) {
+  return {
+    validRatings: value.again + value.hard + value.good + value.easy,
+    hardGoodEasy: value.hard + value.good + value.easy,
+    goodEasy: value.good + value.easy,
+  }
+}
+
+const problemSolvingOutcomeFields = {
+  again: countSchema,
+  hard: countSchema,
+  good: countSchema,
+  easy: countSchema,
+  recordedAssessments: countSchema,
+  excludedInvalidRatings: countSchema,
+  validRatings: countSchema,
+  hardGoodEasy: countSchema,
+  goodEasy: countSchema,
+  successRate: nullablePercentageSchema,
+  goodEasyRate: nullablePercentageSchema,
+}
+const problemSolvingCountKeys = [
+  'again',
+  'hard',
+  'good',
+  'easy',
+  'recordedAssessments',
+  'excludedInvalidRatings',
+  'validRatings',
+  'hardGoodEasy',
+  'goodEasy',
+] as const
+
+function validateProblemSolvingOutcomes(
+  value: ProblemSolvingOutcomeStats,
+  context: z.RefinementCtx,
+) {
+  const counts = ratingCountTotals(value)
+  const expected = {
+    ...counts,
+    recordedAssessments: counts.validRatings + value.excludedInvalidRatings,
+    successRate:
+      counts.validRatings === 0
+        ? null
+        : counts.hardGoodEasy / counts.validRatings,
+    goodEasyRate:
+      counts.validRatings === 0 ? null : counts.goodEasy / counts.validRatings,
+  }
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    if (value[key as keyof typeof value] !== expectedValue)
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Outcome counts and rates must describe the same valid-rating population.',
+        path: [key],
+      })
+  }
+}
+
+const problemSolvingTimeStatsSchema = z
+  .object({
+    eligibleAssessments: countSchema,
+    timedAssessments: countSchema,
+    totalSeconds: z.number().nonnegative(),
+    medianSeconds: z.number().positive().nullable(),
+    q1Seconds: z.number().positive().nullable(),
+    q3Seconds: z.number().positive().nullable(),
+  })
+  .strict()
+  .superRefine((time, context) => {
+    if (time.timedAssessments > time.eligibleAssessments)
+      context.addIssue({
+        code: 'custom',
+        message: 'Timed assessments cannot exceed their eligible population.',
+        path: ['timedAssessments'],
+      })
+    if (
+      (time.timedAssessments === 0) !== (time.medianSeconds === null) ||
+      (time.timedAssessments === 0) !== (time.totalSeconds === 0)
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Recorded-time availability must match its observed count.',
+        path: ['medianSeconds'],
+      })
+    const quartiles = time.timedAssessments >= 4
+    if (
+      quartiles
+        ? time.q1Seconds === null ||
+          time.q3Seconds === null ||
+          time.medianSeconds === null ||
+          time.q1Seconds > time.medianSeconds ||
+          time.q3Seconds < time.medianSeconds
+        : time.q1Seconds !== null || time.q3Seconds !== null
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Ordered quartiles require at least four timed assessments.',
+        path: ['q1Seconds'],
+      })
+  })
+
+const problemSolvingDifficultyStatsSchema = z
+  .object({
+    ...problemSolvingOutcomeFields,
+    time: z
+      .object({
+        all: problemSolvingTimeStatsSchema,
+        successful: problemSolvingTimeStatsSchema,
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((stats, context) => {
+    validateProblemSolvingOutcomes(stats, context)
+    if (
+      stats.time.all.eligibleAssessments !== stats.recordedAssessments ||
+      stats.time.successful.eligibleAssessments !== stats.hardGoodEasy ||
+      stats.time.successful.timedAssessments >
+        stats.time.all.timedAssessments ||
+      stats.time.successful.totalSeconds > stats.time.all.totalSeconds
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Timing coverage must match the raw and successful rating populations.',
+        path: ['time'],
+      })
+  })
+
+const problemSolvingDifficultiesSchema = z
+  .object({
+    easy: problemSolvingDifficultyStatsSchema,
+    medium: problemSolvingDifficultyStatsSchema,
+    hard: problemSolvingDifficultyStatsSchema,
+    unknown: problemSolvingDifficultyStatsSchema,
+  })
+  .strict()
+
+const problemSolvingRowSchema = historicalRowBaseSchema
+  .extend({ difficulties: problemSolvingDifficultiesSchema })
+  .strict()
+const problemSolvingPeriodStatsSchema = z
+  .object({
+    ...problemSolvingOutcomeFields,
+    assessmentDays: countSchema,
+    distinctProblems: countSchema,
+    difficulties: problemSolvingDifficultiesSchema,
+  })
+  .strict()
+  .superRefine((period, context) => {
+    validateProblemSolvingOutcomes(period, context)
+    for (const key of problemSolvingCountKeys) {
+      if (
+        period[key] !==
+        Object.values(period.difficulties).reduce(
+          (sum, difficulty) => sum + difficulty[key],
+          0,
+        )
+      )
+        context.addIssue({
+          code: 'custom',
+          message: 'Difficulty counts must reconcile to the cohort total.',
+          path: [key],
+        })
+    }
+    if (
+      period.assessmentDays > period.recordedAssessments ||
+      period.distinctProblems > period.recordedAssessments ||
+      (period.recordedAssessments === 0) !== (period.assessmentDays === 0) ||
+      (period.recordedAssessments === 0) !== (period.distinctProblems === 0)
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Assessment days and distinct problems must match raw activity.',
+        path: ['assessmentDays'],
+      })
+  })
+const problemSolvingUnitScalesSchema = z
+  .object({
+    minutes: analyticsScaleSchema,
+    targetPercent: analyticsScaleSchema,
+  })
+  .strict()
+const problemSolvingCohortViewSchema = z
+  .object({
+    rows: z.array(problemSolvingRowSchema),
+    totals: problemSolvingPeriodStatsSchema,
+    previous: problemSolvingPeriodStatsSchema,
+    outcomeScale: analyticsScaleSchema,
+    timeScales: z
+      .object({
+        all: problemSolvingUnitScalesSchema,
+        successful: problemSolvingUnitScalesSchema,
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((cohort, context) => {
+    for (const difficulty of ['easy', 'medium', 'hard', 'unknown'] as const) {
+      const totals = cohort.totals.difficulties[difficulty]
+      for (const key of problemSolvingCountKeys) {
+        if (
+          totals[key] !==
+          cohort.rows.reduce(
+            (sum, row) => sum + row.difficulties[difficulty][key],
+            0,
+          )
+        )
+          context.addIssue({
+            code: 'custom',
+            message: 'Period counts must aggregate all supplied buckets.',
+            path: ['totals', 'difficulties', difficulty, key],
+          })
+      }
+      for (const subset of ['all', 'successful'] as const) {
+        for (const key of [
+          'eligibleAssessments',
+          'timedAssessments',
+          'totalSeconds',
+        ] as const) {
+          const total = cohort.rows.reduce(
+            (sum, row) => sum + row.difficulties[difficulty].time[subset][key],
+            0,
+          )
+          if (
+            Math.abs(totals.time[subset][key] - total) >
+            Number.EPSILON * Math.max(1, total) * cohort.rows.length
+          )
+            context.addIssue({
+              code: 'custom',
+              message:
+                'Period timing counts and recorded seconds must aggregate all buckets.',
+              path: ['totals', 'difficulties', difficulty, 'time', subset, key],
+            })
+        }
+      }
+    }
+  })
+
+export const problemSolvingViewSchema = z
+  .object({
+    cohorts: z
+      .object({
+        newProblems: problemSolvingCohortViewSchema,
+        followupPractice: problemSolvingCohortViewSchema,
+      })
+      .strict(),
+    targets: analyticsTargetsSchema,
+    timeTargetsMinutes: timeTargetsMinutesSchema,
+    previousPeriod: z
+      .object({ start: z.iso.datetime(), asOf: z.iso.datetime() })
+      .strict(),
+  })
+  .strict()
 
 export const memoryStrengthRowSchema = historicalRowBaseSchema.extend({
   medianStrengthDays: z.number().positive().nullable(),
@@ -369,6 +637,7 @@ const upcomingReviewLoadViewRowSchema = z.object({
 
 export const analyticsViewsSchema = z
   .object({
+    problemSolving: problemSolvingViewSchema,
     firstAttemptOutcomes: firstAttemptOutcomesViewSchema,
     observedRecallVsFsrs: z.object({
       rows: z.array(observedRecallVsFsrsRowSchema),
@@ -444,6 +713,20 @@ export const analyticsViewsSchema = z
                 ? ['practiceRhythm', 'targetReviewSuccess']
                 : ['firstAttemptOutcomes', ...issue.path],
         })
+      }
+    } else {
+      for (const [key, value] of Object.entries(targets.data)) {
+        if (
+          views.problemSolving.targets[key as keyof typeof targets.data] !==
+          value
+        ) {
+          context.addIssue({
+            code: 'custom',
+            message:
+              'Problem-solving goals must match the saved historical chart goals.',
+            path: ['problemSolving', 'targets', key],
+          })
+        }
       }
     }
 

@@ -4,6 +4,8 @@
 > superpowers:subagent-driven-development or superpowers:executing-plans to
 > implement this plan task by task. Track execution with the checkboxes below.
 
+**Execution:** Implemented in three independently reviewed phases, consolidated into the final feature commit. Automated and production-component checks passed; human installed-extension smoke remains pending. The [UI validation record](./2026-10-04-analytics-problem-solving-ui.md#validation-record) owns the final evidence.
+
 **Goal:** Supply current problem difficulty and recorded elapsed time to
 Analytics, and select complementary raw first/later assessment populations.
 
@@ -25,7 +27,7 @@ Files:
 - Modify `src/features/analytics/domain/chart-data.ts`.
 - Reuse `ProblemDifficulty` from `src/features/problems/domain`.
 
-- [ ] Extend an existing review-history repository test with two topics on one
+- [x] Extend an existing review-history repository test with two topics on one
       problem and a saved timed attempt. Read history and assert one event,
       both topic labels, current catalog difficulty, and exact saved seconds.
       Also retain an untimed record with null elapsed time. Use the existing
@@ -44,14 +46,14 @@ Files:
   })
   ```
 
-- [ ] Run the focused test and confirm the new metadata assertion fails before
+- [x] Run the focused test and confirm the new metadata assertion fails before
       the projection changes:
 
   ```sh
   rtk proxy npm test -- src/features/analytics/data/analytics-repository.test.ts
   ```
 
-- [ ] Add the required fields to repository `ReviewEvent`, the SQL selection,
+- [x] Add the required fields to repository `ReviewEvent`, the SQL selection,
       and the deduplicated event mapping:
 
   ```ts
@@ -72,7 +74,7 @@ Files:
   Keep `CurrentFsrsCard.difficulty` numeric and unchanged. Do not alter sorting,
   report filtering, or topic-join deduplication.
 
-- [ ] Add optional metadata to the generic `AnalyticsReviewEvent` to preserve
+- [x] Add optional metadata to the generic `AnalyticsReviewEvent` to preserve
       older callers and existing compact fixtures:
 
   ```ts
@@ -84,7 +86,7 @@ Files:
   must interpret an absent difficulty as Unknown and absent time as unavailable.
   Do not backfill dummy zero durations across unrelated tests.
 
-- [ ] Rerun the focused command; require the metadata and dedup assertions to
+- [x] Rerun the focused command; require the metadata and dedup assertions to
       pass, along with existing repository behavior.
 
 ## Task 2: Select Later Raw Records
@@ -94,7 +96,7 @@ Files:
 - Modify `src/features/analytics/domain/review-cohorts.ts` and its existing
   `review-cohorts.test.ts`.
 
-- [ ] Extend existing cohort coverage with a complementary later-record
+- [x] Extend existing cohort coverage with a complementary later-record
       assertion using the existing `event()` helper. Include an invalid first,
       a later valid assessment on a different card, and a same-time lexical-ID
       tie. Confirm input order and object references are preserved.
@@ -113,14 +115,14 @@ Files:
   expect(input).toEqual([later, other, first])
   ```
 
-- [ ] Run the focused command and confirm the new later selector expectation
+- [x] Run the focused command and confirm the new later selector expectation
       fails before implementation:
 
   ```sh
   rtk proxy npm test -- src/features/analytics/domain/review-cohorts.test.ts
   ```
 
-- [ ] Export this narrow helper alongside `selectFirstRecordedAttempts`:
+- [x] Export this narrow helper alongside `selectFirstRecordedAttempts`:
 
   ```ts
   /** Select raw retained later records before report or eligibility filters. */
@@ -140,12 +142,12 @@ Files:
   difficulty filters happen after cohort selection. Existing DB attempt IDs
   are unique. Do not use per-card FSRS pairing or correctness flags here.
 
-- [ ] Rerun the cohort test, including existing FSRS reconstruction tests;
+- [x] Rerun the cohort test, including existing FSRS reconstruction tests;
       require both populations to pass without changing repeat-pair behavior.
 
 ## Task 3: Validate And Hand Off The Inputs
 
-- [ ] Run the two focused files together, then the required full normal-code
+- [x] Run the two focused files together, then the required full normal-code
       validation in the pinned repository toolchain:
 
   ```sh
@@ -154,14 +156,14 @@ Files:
   rtk proxy npm run check
   ```
 
-- [ ] Inspect the diff and run formatting on touched source/test files. Require
+- [x] Inspect the diff and run formatting on touched source/test files. Require
       added test/fixture lines to stay at or below added production source
       lines; extend existing useful cases rather than duplicate them.
-- [ ] Commit the completed phase with
-      `feat(analytics): expose difficulty and timing inputs`.
-- [ ] Record exact commands/results. No app behavior changes in this phase;
+- [x] Include the completed input phase in the final feature commit,
+      `feat(analytics): show difficulty outcomes and recorded time`.
+- [x] Record exact commands/results. No app behavior changes in this phase;
       production UI proof belongs to the later visible phase. Do not claim the
-      approved graphs are implemented by this input-only commit.
+      approved graphs are implemented by the input changes alone.
 
 Done when deduplicated repository events carry current problem difficulty and
 saved elapsed time, raw later-record selection excludes every raw earliest

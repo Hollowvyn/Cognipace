@@ -1,5 +1,6 @@
 import { and, asc, count, eq, gte, lt, lte, ne, sql } from 'drizzle-orm'
 
+import type { ProblemDifficulty } from '@/features/problems/domain'
 import { defaultFsrsCardKind } from '@/lib/fsrs'
 
 import type { Db } from '@/platform/db'
@@ -28,6 +29,8 @@ export interface ReviewEvent {
   problemSlug: string
   cardId: string
   title: string
+  problemDifficulty: ProblemDifficulty
+  elapsedSeconds: number | null
   topicLabels: string[]
   rating: string
   reviewedAt: Date
@@ -120,6 +123,8 @@ export async function getReviewEvents(
       problemSlug: reviewAttempts.problemSlug,
       cardId: reviewAttempts.cardId,
       title: problems.title,
+      problemDifficulty: problems.difficulty,
+      elapsedSeconds: reviewAttempts.elapsedSeconds,
       topicLabel: topics.label,
       rating: reviewAttempts.rating,
       reviewedAt: reviewAttempts.reviewedAt,
@@ -162,6 +167,8 @@ export async function getReviewEvents(
       problemSlug: row.problemSlug,
       cardId: row.cardId,
       title: row.title,
+      problemDifficulty: row.problemDifficulty,
+      elapsedSeconds: row.elapsedSeconds,
       topicLabels: row.topicLabel === null ? [] : [row.topicLabel],
       rating: row.rating,
       reviewedAt: new Date(row.reviewedAt),
