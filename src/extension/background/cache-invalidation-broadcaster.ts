@@ -7,6 +7,8 @@ import {
 } from '@/extension/messaging'
 import type { CacheInvalidationTag } from '@/platform/query/cache-invalidation'
 
+import { abortLeetCodeAnalyses } from './leetcode-analysis-operations'
+
 type CacheInvalidationReason = CacheInvalidationEvent['reason']
 
 type BroadcastCacheInvalidationInput = {
@@ -28,6 +30,8 @@ export async function broadcastCacheInvalidation(
     ...input,
     emittedAt: new Date().toISOString(),
   })
+
+  if (event.tags.includes('genai')) abortLeetCodeAnalyses()
 
   await Promise.all([
     sendRuntimeCacheInvalidation(event),

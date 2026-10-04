@@ -20,6 +20,9 @@ export type LeetCodeProblemContentSource = 'graphql' | 'dom' | 'fallback'
 /** Confidence level for captured problem content data. */
 export type LeetCodeProblemContentConfidence = 'high' | 'medium' | 'low'
 
+/** Whether captured content is verified whole, visible-only, or unavailable. */
+export type LeetCodeCaptureCompleteness = 'complete' | 'partial' | 'missing'
+
 /** Source that produced an editor or submitted-code snapshot. */
 export type LeetCodeCodeSnapshotSource =
   | 'api'
@@ -101,12 +104,14 @@ export interface LeetCodeProblemMetadata {
   capturedAt: number
 }
 
-/** Problem statement, examples, constraints, and hints captured from LeetCode. */
+/** Problem statement, examples, constraints, follow-ups, and hints captured from LeetCode. */
 export interface LeetCodeProblemContent {
   location: LeetCodeProblemLocation
   statement: string
   examples: LeetCodeExample[]
   constraints: string[]
+  followUps: string[]
+  completeness: LeetCodeCaptureCompleteness
   hints: string[]
   source: LeetCodeProblemContentSource
   confidence: LeetCodeProblemContentConfidence
@@ -119,6 +124,7 @@ export interface LeetCodeCodeSnapshot {
   code: string | null
   language: string | null
   source: LeetCodeCodeSnapshotSource
+  completeness: LeetCodeCaptureCompleteness
   capturedAt: number
 }
 
@@ -134,6 +140,7 @@ export type LeetCodeSubmittedCodeSnapshot = LeetCodeCodeSnapshot
 
 /** Captured submission attempt before the final LeetCode result is known. */
 export interface LeetCodeSubmissionAttempt {
+  attemptId: string
   location: LeetCodeProblemLocation
   clickedAt: number
   submitButtonText: string

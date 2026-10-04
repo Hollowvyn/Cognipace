@@ -1,16 +1,4 @@
 export {
-  makeAcceptedDecision,
-  makeAcceptedSubmission,
-  makeFailedDecision,
-  makeFailedSubmission,
-  makeFirstSolveSessionContext,
-  makeNoSubmission,
-  makeProblem,
-  makeProviderConfig,
-  makeProviderMetadata,
-  makeRecallSessionContext,
-  makeRecommendAssessmentInput,
-  makeStrictTimingLockedDecision,
-  makeTiming,
-  makeValidRecommendation,
-} from './recommendation-fixtures'
+  makeAnalysisRequest,
+  makeValidAnalysis,
+} from './code-analysis-fixtures'

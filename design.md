@@ -176,7 +176,38 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 - Show a compact inline success or actionable error. A failed test keeps saved
   configuration visible, and replacing configuration clears old verification.
 - Keep AI assessment enablement separate. Testing works while assessment is off,
-  and turning assessment off works after its key is removed.
+  and turning assessment off works after its key is removed. The enable hint
+  describes completed-submission analysis for approach, efficiency, and code
+  style.
+
+## CogniPace LeetCode Analysis Rules
+
+- Use Option A inside the expanded overlay: a concise summary, Approach /5,
+  Efficiency /5, and Code Style /5. Do not add an overall average or recall
+  rating to the report.
+- Use independent native details/summary disclosures, initially closed, for
+  Approach, Efficiency, Code Style, and Suggested implementation. Preserve
+  keyboard Enter/Space activation, visible focus, wrapping labels, and all
+  content at 392px and 320px widths. A replacement report starts closed.
+- Keep Approach rows Current, Suggested, Key idea, and optional Consider;
+  Efficiency rows Current complexity, Suggested complexity, and Suggestions;
+  Code Style rows Readability, Structure, and Suggestions. Show rationale and
+  unavailable dimensions honestly.
+- Style time and auxiliary-space comparisons separately: a time improvement
+  must not make a memory regression look improved. Name complexity assumptions
+  and preserve language-specific signatures and types, including Kotlin Long
+  and retained generic collection types.
+- Keep suggested code as literal text in a horizontally scrollable code block.
+  Show AI-generated and Untested labels, Copy success/failure feedback, changes,
+  complexity, and assumptions. Opening or copying suggestions does not run or
+  submit code.
+- Show compact idle, preparation, generation, unavailable, and controlled-error
+  messages with Settings/Retry when useful. Report disclosure, collapse, and
+  docking do not trigger more API calls. Clearing/resetting keeps a retained
+  handled attempt idle until explicit Retry.
+- Keep manual review controls available while analysis is pending and preserve
+  deterministic ratings, locks, correctness, timing, FSRS, and track guidance.
+  Reports remain session-only and never become saved review fields.
 
 ## CogniPace Popup Rules
 

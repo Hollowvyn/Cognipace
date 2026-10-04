@@ -166,9 +166,11 @@ export function createLeetCodeReviewContext(
     content: state.problemContent,
     currentCode: state.codeSnapshot,
     submittedCode:
-      state.submissionAttempt?.submittedCodeSnapshot ??
-      state.submissionResult?.resultCodeSnapshot ??
-      null,
+      state.submissionResult?.resultCodeSnapshot.completeness === 'complete'
+        ? state.submissionResult.resultCodeSnapshot
+        : (state.submissionAttempt?.submittedCodeSnapshot ??
+          state.submissionResult?.resultCodeSnapshot ??
+          null),
     submissionResult: state.submissionResult,
     capturedAt:
       state.lastUpdatedAt ??

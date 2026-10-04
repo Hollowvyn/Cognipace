@@ -17,6 +17,7 @@ export function readLeetCodeCodeSnapshot(
       : textareaEditorCode
         ? 'textarea'
         : 'none',
+    completeness: detectedEditorCode ? 'partial' : 'missing',
     capturedAt: now(),
   }
 }
@@ -26,9 +27,8 @@ function readVisibleMonacoEditorCode(editorRoot: ParentNode) {
     editorRoot.querySelectorAll('.view-lines .view-line'),
   ).map((line) => line.textContent ?? '')
 
-  return visibleEditorLines.length > 0
-    ? visibleEditorLines.join('\n').trimEnd()
-    : null
+  const code = visibleEditorLines.join('\n').trimEnd()
+  return code.trim() ? code : null
 }
 
 function readTextareaEditorCode(editorRoot: ParentNode) {
@@ -37,7 +37,7 @@ function readTextareaEditorCode(editorRoot: ParentNode) {
   )
   const textareaEditorCode = editorTextarea?.value
 
-  return textareaEditorCode && textareaEditorCode.length > 0
+  return textareaEditorCode && textareaEditorCode.trim().length > 0
     ? textareaEditorCode
     : null
 }

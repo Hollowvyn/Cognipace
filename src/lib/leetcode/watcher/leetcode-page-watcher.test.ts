@@ -1,12 +1,23 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { LeetCodePageEvent } from '../domain/types'
+import type {
+  LeetCodePageEvent,
+  LeetCodeSubmissionResultRemoteResponse,
+  LeetCodeSubmissionPollingDebug,
+} from '../index'
+import type { LeetCodeSubmissionResultRemoteRequest } from '../remote/leetcode-remote-client'
 import {
   createLeetCodeSubmissionApiFixtureFetcher,
   leetcodeAcceptedSubmissionApiFixture,
   leetcodePendingSubmissionApiFixture,
 } from '../testing/submission-result-fixtures'
+import { createLeetCodeProblemContentFingerprint } from '../content/content-fingerprint'
+import { createLeetCodeFetchRemoteClient } from '../remote/leetcode-fetch-remote-client'
 import { createLeetCodePageWatcher } from './leetcode-page-watcher'
+
+type ReadSubmissionResult = (
+  request: LeetCodeSubmissionResultRemoteRequest,
+) => Promise<LeetCodeSubmissionResultRemoteResponse>
 
 type PageWatcherOptions = Parameters<typeof createLeetCodePageWatcher>[0]
 type PageWatcherTestOptions = Omit<Partial<PageWatcherOptions>, 'onEvent'>
@@ -19,12 +30,12 @@ const problemLocation = {
 }
 
 describe('createLeetCodePageWatcher', () => {
+  beforeEach(() => vi.useFakeTimers())
   afterEach(() => {
     vi.useRealTimers()
   })
 
   it('emits page and metadata events for a LeetCode problem page', async () => {
-    vi.useFakeTimers()
     renderProblemHeader()
     const fetcher = createQuestionMetadataFetcher()
     const { events, watcher } = createWatcherTestHarness({
@@ -49,7 +60,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('emits problem content when LeetCode content is readable', async () => {
-    vi.useFakeTimers()
     renderProblemHeader()
     const { events, watcher } = createWatcherTestHarness({
       fetch: createQuestionContentFetcher(),
@@ -78,8 +88,74 @@ describe('createLeetCodePageWatcher', () => {
     })
   })
 
+  it('emits an identical-text content update when partial capture becomes complete', async () => {
+    renderProblemHeader()
+    const content = {
+      location: problemLocation,
+      statement: 'Return indices.',
+      examples: [],
+      constraints: [],
+      hints: [],
+      followUps: [],
+      source: 'dom' as const,
+      confidence: 'medium' as const,
+      completeness: 'partial' as const,
+      capturedAt: 1000,
+    }
+    const completeContent = {
+      ...content,
+      completeness: 'complete' as const,
+      source: 'graphql' as const,
+    }
+    const remoteClient = {
+      readProblemMetadata: vi.fn().mockResolvedValue({
+        ok: true as const,
+        metadata: {
+          location: problemLocation,
+          title: 'Two Sum',
+          frontendId: '1',
+          difficulty: 'Easy' as const,
+          isPremium: false,
+          topics: [],
+          source: 'graphql' as const,
+          confidence: 'high' as const,
+          capturedAt: 1000,
+        },
+      }),
+      readProblemContent: vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          content: {
+            ...content,
+            contentFingerprint:
+              createLeetCodeProblemContentFingerprint(content),
+          },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          content: {
+            ...completeContent,
+            contentFingerprint:
+              createLeetCodeProblemContentFingerprint(completeContent),
+          },
+        }),
+      readSubmissionResult: vi.fn(),
+    }
+    const { events, watcher } = createWatcherTestHarness({ remoteClient })
+    watcher.start()
+    await vi.runAllTimersAsync()
+    watcher.refresh()
+    await vi.runAllTimersAsync()
+    watcher.stop()
+    expect(
+      filterEvents(events, 'problem-content-updated').map(
+        (event) => event.content.completeness,
+      ),
+    ).toEqual(['partial', 'complete'])
+  })
+
   it('reads problem details once for a slug across hydration retries', async () => {
-    vi.useFakeTimers()
     renderProblemHeader()
     const fetcher = createQuestionContentFetcher()
     const { events, watcher } = createWatcherTestHarness({
@@ -97,7 +173,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('emits page changes when the active slug changes', async () => {
-    vi.useFakeTimers()
     let currentUrl = problemUrl
     const { events, watcher } = createWatcherTestHarness({
       getCurrentUrl: () => currentUrl,
@@ -116,7 +191,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('does not schedule full hydration refreshes for noisy same-page mutations', async () => {
-    vi.useFakeTimers()
     renderProblemHeader()
     const fetcher = createQuestionMetadataFetcher({ topicTags: [] })
     const { watcher } = createWatcherTestHarness({
@@ -139,7 +213,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('emits submit-clicked without saving a review', async () => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     const { events, watcher } = createWatcherTestHarness({
       now: () => 2000,
@@ -162,20 +235,236 @@ describe('createLeetCodePageWatcher', () => {
       type: 'submission-started',
       attempt: {
         location: problemLocation,
+        attemptId: expect.any(String) as string,
         clickedAt: 2000,
         submitButtonText: 'Submit',
         submittedCodeSnapshot: {
           code: 'class Solution:\n    pass',
           language: 'Python3',
           source: 'monaco',
+          completeness: 'partial',
           capturedAt: 2000,
         },
       },
     })
   })
 
+  it('mints one identity per submit and forwards the same identity on every poll', async () => {
+    renderProblemEditorPage()
+    const readSubmissionResult = vi
+      .fn<ReadSubmissionResult>()
+      .mockResolvedValue({ result: null, debugEvents: [] })
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [0, 1000],
+      now: () => 5000,
+      remoteClient: submissionRemote(readSubmissionResult),
+    })
+    watcher.start()
+    dispatchSubmitClick()
+    await vi.runAllTimersAsync()
+    dispatchSubmitClick()
+    await vi.runAllTimersAsync()
+    watcher.stop()
+    const attempts = filterEvents(events, 'submission-started').map(
+      (event) => event.attempt,
+    )
+    expect(attempts[0]?.attemptId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(attempts[1]?.attemptId).not.toBe(attempts[0]?.attemptId)
+    expect(
+      readSubmissionResult.mock.calls.map(([request]) => request.attemptId),
+    ).toEqual([
+      attempts[0]?.attemptId,
+      attempts[0]?.attemptId,
+      attempts[1]?.attemptId,
+      attempts[1]?.attemptId,
+    ])
+  })
+
+  it('pins the first discovered submission on later polls', async () => {
+    renderProblemEditorPage()
+    const readSubmissionResult = vi
+      .fn<ReadSubmissionResult>()
+      .mockResolvedValueOnce({
+        result: null,
+        debugEvents: [
+          pollingDebug('1234567890', {
+            checkState: 'STARTED',
+            statusText: null,
+          }),
+        ],
+      })
+      .mockResolvedValue({
+        result: null,
+        debugEvents: [
+          pollingDebug(null, {
+            phase: 'finding-submission',
+            checkState: null,
+            statusText: null,
+            checkedAt: 6000,
+          }),
+          pollingDebug('1234567891', {
+            phase: 'checking-result',
+            statusText: null,
+            checkedAt: 6000,
+          }),
+        ],
+      })
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [0, 1000, 2000],
+      now: () => 5000,
+      remoteClient: submissionRemote(readSubmissionResult),
+    })
+
+    watcher.start()
+    dispatchSubmitClick()
+    await vi.runAllTimersAsync()
+    watcher.stop()
+
+    expect(
+      readSubmissionResult.mock.calls.map(([request]) => request.submissionId),
+    ).toEqual([undefined, '1234567890', '1234567890'])
+    expect(
+      filterEvents(events, 'submission-polling-updated').map(
+        (event) => event.debug.submissionId,
+      ),
+    ).toEqual(['1234567890', '1234567890', '1234567890'])
+  })
+
+  it.each(['new-attempt', 'navigation'])(
+    'ignores late pinned polling diagnostics after %s',
+    async (supersedingEvent) => {
+      renderProblemEditorPage()
+      let currentUrl = problemUrl
+      let finishOldRead!: (
+        response: LeetCodeSubmissionResultRemoteResponse,
+      ) => void
+      const readSubmissionResult = vi
+        .fn<ReadSubmissionResult>()
+        .mockResolvedValueOnce({
+          result: null,
+          debugEvents: [
+            pollingDebug('1234567890', {
+              checkState: 'STARTED',
+              statusText: null,
+            }),
+          ],
+        })
+        .mockImplementationOnce(
+          () =>
+            new Promise<LeetCodeSubmissionResultRemoteResponse>((resolve) => {
+              finishOldRead = resolve
+            }),
+        )
+        .mockResolvedValue({
+          result: null,
+          debugEvents: [
+            pollingDebug('1234567891', {
+              checkState: 'STARTED',
+              statusText: null,
+              checkedAt: 6000,
+            }),
+          ],
+        })
+      const { events, watcher } = createWatcherTestHarness({
+        getCurrentUrl: () => currentUrl,
+        hydrationDelays: [],
+        submissionResultReadDelays: [0, 1000],
+        now: () => 5000,
+        remoteClient: submissionRemote(readSubmissionResult),
+      })
+      watcher.start()
+      dispatchSubmitClick()
+      await vi.advanceTimersByTimeAsync(1000)
+      if (supersedingEvent === 'navigation') {
+        currentUrl = 'https://leetcode.com/problems/valid-parentheses/'
+        watcher.refresh()
+      }
+      dispatchSubmitClick()
+      finishOldRead({
+        result: null,
+        debugEvents: [
+          pollingDebug('9999999999', {
+            phase: 'checking-result',
+            checkState: 'SUCCESS',
+            statusText: 'Old result',
+            checkedAt: 6000,
+          }),
+        ],
+      })
+      await vi.advanceTimersByTimeAsync(1000)
+      watcher.stop()
+
+      const attempts = filterEvents(events, 'submission-started').map(
+        (event) => event.attempt,
+      )
+      expect(
+        readSubmissionResult.mock.calls.map(([request]) => ({
+          attemptId: request.attemptId,
+          submissionId: request.submissionId,
+        })),
+      ).toEqual([
+        { attemptId: attempts[0]?.attemptId, submissionId: undefined },
+        { attemptId: attempts[0]?.attemptId, submissionId: '1234567890' },
+        { attemptId: attempts[1]?.attemptId, submissionId: undefined },
+        { attemptId: attempts[1]?.attemptId, submissionId: '1234567891' },
+      ])
+      expect(
+        filterEvents(events, 'submission-polling-updated').map(
+          (event) => event.debug.submissionId,
+        ),
+      ).toEqual(['1234567890', '1234567891', '1234567891'])
+      expect(filterEvents(events, 'submission-result-updated')).toHaveLength(0)
+    },
+  )
+
+  it('suppresses a delayed non-null result after a rapid new attempt', async () => {
+    renderProblemEditorPage()
+    const fetchedResponse = await acceptedApiResponse(
+      6000,
+      'class Solution:\n    pass',
+      'old-attempt',
+    )
+    if (!fetchedResponse.result)
+      throw new Error('Expected a terminal fixture result.')
+    let finishOldRead!: (
+      response: LeetCodeSubmissionResultRemoteResponse,
+    ) => void
+    const readSubmissionResult = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<LeetCodeSubmissionResultRemoteResponse>((resolve) => {
+            finishOldRead = resolve
+          }),
+      )
+      .mockResolvedValueOnce({
+        result: { ...fetchedResponse.result, submissionId: '1234567891' },
+        debugEvents: [],
+      })
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [0],
+      now: () => 5000,
+      remoteClient: submissionRemote(readSubmissionResult),
+    })
+    watcher.start()
+    dispatchSubmitClick()
+    await vi.advanceTimersByTimeAsync(0)
+    dispatchSubmitClick()
+    finishOldRead(fetchedResponse)
+    await vi.advanceTimersByTimeAsync(0)
+    watcher.stop()
+    expect(filterEvents(events, 'submission-started')).toHaveLength(2)
+    expect(
+      filterEvents(events, 'submission-result-updated').map(
+        (event) => event.result.submissionId,
+      ),
+    ).toEqual(['1234567891'])
+  })
+
   it('emits submission-result-updated after LeetCode renders the result', async () => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     const { events, watcher } = createWatcherTestHarness({
       submissionResultReadDelays: [0],
@@ -193,13 +482,12 @@ describe('createLeetCodePageWatcher', () => {
     expect(events).toContainEqual({
       type: 'submission-polling-updated',
       location: problemLocation,
-      debug: {
+      debug: pollingDebug(null, {
         phase: 'dom-fallback-used',
-        submissionId: null,
         checkState: null,
         statusText: 'No matching submission found',
         checkedAt: 3000,
-      },
+      }),
     })
     expect(findEvent(events, 'submission-result-updated')).toMatchObject({
       result: {
@@ -215,6 +503,7 @@ describe('createLeetCodePageWatcher', () => {
           code: 'class Solution:\n    pass',
           language: 'Python3',
           source: 'code-block',
+          completeness: 'partial',
         },
       },
     })
@@ -224,7 +513,6 @@ describe('createLeetCodePageWatcher', () => {
     { shortcut: 'Command+Enter', metaKey: true },
     { shortcut: 'Ctrl+Enter', ctrlKey: true },
   ])('polls for the API result after $shortcut', async (shortcut) => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     const fetcher = createLeetCodeSubmissionApiFixtureFetcher(
       leetcodeAcceptedSubmissionApiFixture,
@@ -262,6 +550,7 @@ describe('createLeetCodePageWatcher', () => {
           code: 'class Solution:\n    pass',
           language: 'Python3',
           source: 'monaco',
+          completeness: 'partial',
           capturedAt: 5000,
         },
       },
@@ -282,7 +571,6 @@ describe('createLeetCodePageWatcher', () => {
     { key: 'Enter', metaKey: true, repeat: true },
     { key: 'Enter', ctrlKey: true, isComposing: true },
   ])('ignores non-submit or repeated keyboard input: %j', async (input) => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     const fetcher = createLeetCodeSubmissionApiFixtureFetcher(
       leetcodeAcceptedSubmissionApiFixture,
@@ -303,7 +591,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('removes the shortcut listener and clears its polling on stop', async () => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     const fetcher = createLeetCodeSubmissionApiFixtureFetcher(
       leetcodeAcceptedSubmissionApiFixture,
@@ -329,7 +616,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('ignores the shortcut after navigating away from problem pages', async () => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     let currentUrl = problemUrl
     const fetcher = createLeetCodeSubmissionApiFixtureFetcher(
@@ -356,7 +642,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('emits API submission details after LeetCode finishes judging', async () => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     const { events, watcher } = createWatcherTestHarness({
       hydrationDelays: [],
@@ -394,13 +679,130 @@ describe('createLeetCodePageWatcher', () => {
           code: 'class Solution:\n    def twoSum(self):\n        return []',
           language: 'Python3',
           source: 'api',
+          completeness: 'complete',
         },
       },
     })
   })
 
+  it.each(['9999999999', null])(
+    'rejects conflicting API result ID %j while retaining the pin',
+    async (conflictingId) => {
+      renderProblemEditorPage()
+      const response = await acceptedApiResponse(5000)
+      if (!response.result)
+        throw new Error('Expected a terminal fixture result.')
+      const readSubmissionResult = vi
+        .fn<ReadSubmissionResult>()
+        .mockResolvedValueOnce({
+          result: null,
+          debugEvents: [pollingDebug('1234567890')],
+        })
+        .mockResolvedValueOnce({
+          result: { ...response.result, submissionId: conflictingId },
+          debugEvents: [],
+        })
+        .mockResolvedValue(response)
+      const { events, watcher } = createWatcherTestHarness({
+        hydrationDelays: [],
+        submissionResultReadDelays: [0, 1000, 2000],
+        now: () => 5000,
+        remoteClient: submissionRemote(readSubmissionResult),
+      })
+      watcher.start()
+      dispatchSubmitClick()
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(filterEvents(events, 'submission-result-updated')).toHaveLength(0)
+      await vi.advanceTimersByTimeAsync(1000)
+      watcher.stop()
+      expect(
+        readSubmissionResult.mock.calls.map(
+          ([request]) => request.submissionId,
+        ),
+      ).toEqual([undefined, '1234567890', '1234567890'])
+      expect(
+        filterEvents(events, 'submission-result-updated').map(
+          (event) => event.result.submissionId,
+        ),
+      ).toEqual(['1234567890'])
+      expect(
+        filterEvents(events, 'submission-polling-updated')
+          .map((event) => event.debug.submissionId)
+          .every((id) => id === '1234567890'),
+      ).toBe(true)
+    },
+  )
+
+  it.each(['9999999999', null, '1234567890'])(
+    'accepts only DOM ID matching the API pin after fallback: %j',
+    async (domId) => {
+      renderProblemEditorPage()
+      appendAcceptedSubmissionResult({ runtime: '4 ms' })
+      const resultRoot = document.querySelector(
+        '[data-e2e-locator="submission-result"]',
+      )
+      if (domId)
+        resultRoot?.insertAdjacentHTML(
+          'beforeend',
+          `<a href="/submissions/detail/${domId}/">Details</a>`,
+        )
+      const code = resultRoot?.querySelector('pre')
+      if (code && domId !== '1234567890') code.textContent = 'old solution B'
+      let currentTime = 5000
+      const readSubmissionResult = vi
+        .fn<ReadSubmissionResult>()
+        .mockResolvedValue({
+          result: null,
+          debugEvents: [pollingDebug('1234567890')],
+        })
+      const { events, watcher } = createWatcherTestHarness({
+        hydrationDelays: [],
+        submissionResultReadDelays: [0, 45000, 46000, 47000],
+        domSubmissionResultFallbackDelayMs: 45000,
+        submissionResultWatchDurationMs: 47000,
+        now: () => currentTime,
+        remoteClient: submissionRemote(readSubmissionResult),
+      })
+      watcher.start()
+      dispatchSubmitClick()
+      await vi.advanceTimersByTimeAsync(0)
+      currentTime = 50000
+      await vi.advanceTimersByTimeAsync(45000)
+      if (domId === '1234567890') {
+        watcher.stop()
+        expect(
+          findEvent(events, 'submission-result-updated')?.result,
+        ).toMatchObject({
+          submissionId: '1234567890',
+          source: 'dom',
+          resultCodeSnapshot: { completeness: 'partial', source: 'code-block' },
+        })
+        expect(readSubmissionPollingPhases(events)).not.toContain('timed-out')
+        return
+      }
+      expect(filterEvents(events, 'submission-result-updated')).toHaveLength(0)
+      currentTime = 51000
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(
+        readSubmissionResult.mock.calls.map(
+          ([request]) => request.submissionId,
+        ),
+      ).toEqual([undefined, '1234567890', '1234567890'])
+      currentTime = 52000
+      await vi.advanceTimersByTimeAsync(1000)
+      watcher.stop()
+      expect(filterEvents(events, 'submission-result-updated')).toHaveLength(0)
+      expect(
+        filterEvents(events, 'submission-polling-updated').at(-1)?.debug,
+      ).toMatchObject({
+        phase: 'timed-out',
+        submissionId: '1234567890',
+        statusText: 'Pending',
+      })
+    },
+  )
+
   it('keeps waiting instead of emitting DOM fallback while API polling is active', async () => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     const { events, watcher } = createWatcherTestHarness({
       hydrationDelays: [],
@@ -424,7 +826,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('emits polling timeout debug when no result becomes available', async () => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     let currentTime = 0
     const { events, watcher } = createWatcherTestHarness({
@@ -450,7 +851,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('stops polling after an API submission result is emitted', async () => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     let currentTime = 5000
     const fetcher = createLeetCodeSubmissionApiFixtureFetcher(
@@ -479,7 +879,6 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('reads the submission result when LeetCode updates the page after submit', async () => {
-    vi.useFakeTimers()
     renderProblemEditorPage()
     const { events, watcher } = createWatcherTestHarness({
       submissionResultReadDelays: [10000],
@@ -503,6 +902,52 @@ describe('createLeetCodePageWatcher', () => {
     })
   })
 })
+
+function submissionRemote(readSubmissionResult: ReadSubmissionResult) {
+  return {
+    readSubmissionResult,
+    readProblemMetadata: vi.fn(),
+    readProblemContent: vi.fn(),
+  }
+}
+
+function pollingDebug(
+  submissionId: string | null,
+  overrides: Partial<LeetCodeSubmissionPollingDebug> = {},
+): LeetCodeSubmissionPollingDebug {
+  return {
+    phase: 'submission-found',
+    submissionId,
+    checkState: 'PENDING',
+    statusText: 'Pending',
+    checkedAt: 5000,
+    ...overrides,
+  }
+}
+
+function acceptedApiResponse(
+  now: number,
+  code = 'fragment',
+  attemptId = 'fixture-attempt',
+) {
+  return createLeetCodeFetchRemoteClient({
+    fetch: createLeetCodeSubmissionApiFixtureFetcher(
+      leetcodeAcceptedSubmissionApiFixture,
+    ),
+    now: () => now,
+  }).readSubmissionResult({
+    attemptId,
+    location: problemLocation,
+    click: { location: problemLocation, clickedAt: 5000, buttonText: 'Submit' },
+    submittedCodeSnapshot: {
+      code,
+      language: 'Python3',
+      source: 'monaco',
+      completeness: 'partial',
+      capturedAt: 5000,
+    },
+  })
+}
 
 function createWatcherTestHarness(options: PageWatcherTestOptions = {}) {
   const events: LeetCodePageEvent[] = []

@@ -5,7 +5,7 @@ import type {
   LeetCodeSubmissionPollingDebug,
   LeetCodeSubmissionPollingPhase,
   LeetCodeSubmissionResult,
-  LeetCodeSubmittedCodeSnapshot,
+  LeetCodeSubmissionAttempt,
 } from '../domain/types'
 import { readLeetCodeRemoteAuthFromDocument } from '../remote/leetcode-remote-auth'
 import type { LeetCodeRemoteClient } from '../remote/leetcode-remote-client'
@@ -15,11 +15,7 @@ import {
 } from '../submission/submission-result-reader'
 
 export type LeetCodeSubmissionResultWatch = {
-  start: (
-    click: LeetCodeSubmissionClick,
-    submittedCodeSnapshot: LeetCodeSubmittedCodeSnapshot,
-    token: number,
-  ) => void
+  start: (attempt: LeetCodeSubmissionAttempt, token: number) => void
   clear: () => void
   readAfterMutation: (location: LeetCodeProblemLocation) => void
   isWatchingLocation: (location: LeetCodeProblemLocation) => boolean
@@ -27,7 +23,7 @@ export type LeetCodeSubmissionResultWatch = {
 
 type ActiveSubmissionResultWatch = {
   click: LeetCodeSubmissionClick
-  submittedCodeSnapshot: LeetCodeSubmittedCodeSnapshot
+  attempt: LeetCodeSubmissionAttempt
   location: LeetCodeProblemLocation
   token: number
   expiresAt: number
@@ -56,18 +52,18 @@ export function createLeetCodeSubmissionResultWatch(options: {
     promise: Promise<void>
   } | null = null
 
-  function start(
-    click: LeetCodeSubmissionClick,
-    submittedCodeSnapshot: LeetCodeSubmittedCodeSnapshot,
-    token: number,
-  ) {
+  function start(attempt: LeetCodeSubmissionAttempt, token: number) {
     clear()
     latestSubmissionResultFingerprint = null
     activeSubmissionResultRead = null
     activeSubmissionResultWatch = {
-      click,
-      submittedCodeSnapshot,
-      location: click.location,
+      attempt,
+      click: {
+        location: attempt.location,
+        clickedAt: attempt.clickedAt,
+        buttonText: attempt.submitButtonText,
+      },
+      location: attempt.location,
       token,
       expiresAt: options.now() + options.submissionResultWatchDurationMs,
       submissionId: null,
@@ -81,7 +77,7 @@ export function createLeetCodeSubmissionResultWatch(options: {
           submissionResultReadTimers = submissionResultReadTimers.filter(
             (scheduledTimer) => scheduledTimer !== timer,
           )
-          void readAndEmitSubmissionResult(token, click.location)
+          void readAndEmitSubmissionResult(token, attempt.location)
         }, delayMs)
 
         return timer
@@ -167,13 +163,6 @@ export function createLeetCodeSubmissionResultWatch(options: {
       ? await readSubmissionResultFromRemoteClient(submissionResultWatch)
       : null
 
-    if (submissionResultWatch && apiResponse) {
-      for (const debug of apiResponse.debugEvents) {
-        updateActiveSubmissionResultWatchDebug(submissionResultWatch, debug)
-        emitSubmissionPollingDebug(location, debug)
-      }
-    }
-
     if (options.isStaleRead(token, location)) {
       return
     }
@@ -185,7 +174,32 @@ export function createLeetCodeSubmissionResultWatch(options: {
       return
     }
 
-    if (apiResponse?.result) {
+    if (submissionResultWatch && apiResponse) {
+      for (const debug of apiResponse.debugEvents) {
+        if (
+          submissionResultWatch.submissionId &&
+          debug.submissionId &&
+          debug.submissionId !== submissionResultWatch.submissionId
+        ) {
+          continue
+        }
+
+        updateActiveSubmissionResultWatchDebug(submissionResultWatch, debug)
+        emitSubmissionPollingDebug(location, {
+          ...debug,
+          submissionId: submissionResultWatch.submissionId,
+        })
+      }
+    }
+
+    if (
+      apiResponse?.result &&
+      (!submissionResultWatch?.submissionId ||
+        apiResponse.result.submissionId === submissionResultWatch.submissionId)
+    ) {
+      if (submissionResultWatch) {
+        submissionResultWatch.submissionId ??= apiResponse.result.submissionId
+      }
       emitSubmissionResult(apiResponse.result)
       completeSubmissionResultWatch(submissionResultWatch)
       return
@@ -215,7 +229,11 @@ export function createLeetCodeSubmissionResultWatch(options: {
       now: options.now,
     })
 
-    if (!result) {
+    if (
+      !result ||
+      (submissionResultWatch?.submissionId &&
+        result.submissionId !== submissionResultWatch.submissionId)
+    ) {
       if (
         submissionResultWatch &&
         options.now() >= submissionResultWatch.expiresAt
@@ -240,7 +258,10 @@ export function createLeetCodeSubmissionResultWatch(options: {
       return await options.remoteClient.readSubmissionResult({
         location: submissionResultWatch.location,
         click: submissionResultWatch.click,
-        submittedCodeSnapshot: submissionResultWatch.submittedCodeSnapshot,
+        attemptId: submissionResultWatch.attempt.attemptId,
+        submissionId: submissionResultWatch.submissionId ?? undefined,
+        submittedCodeSnapshot:
+          submissionResultWatch.attempt.submittedCodeSnapshot,
         auth: readLeetCodeRemoteAuthFromDocument(options.documentRef),
       })
     } catch {
@@ -265,8 +286,7 @@ export function createLeetCodeSubmissionResultWatch(options: {
     submissionResultWatch: ActiveSubmissionResultWatch,
     debug: LeetCodeSubmissionPollingDebug,
   ) {
-    submissionResultWatch.submissionId =
-      debug.submissionId ?? submissionResultWatch.submissionId
+    submissionResultWatch.submissionId ??= debug.submissionId
     submissionResultWatch.checkState =
       debug.checkState ?? submissionResultWatch.checkState
     submissionResultWatch.statusText =

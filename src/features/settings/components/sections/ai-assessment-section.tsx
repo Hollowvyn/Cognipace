@@ -181,7 +181,7 @@ export function AiAssessmentSection({
       </SettingsRow>
       <SettingsRow
         controlClassName="w-full md:max-w-28"
-        hint="When on, CogniPace asks the saved AI connection to refine the deterministic rating."
+        hint="When on, CogniPace analyzes completed LeetCode submissions for approach, efficiency, and code style."
         id="ai-enabled-row"
         label="AI assessment"
         labelFor="ai-enabled"

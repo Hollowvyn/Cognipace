@@ -33,6 +33,7 @@ export function createLeetCodeCaptureRemoteClient(
           await sendMessage('leetcode.readProblemMetadata', {
             surface: 'content-script',
             location: request.location,
+            refresh: request.refresh,
             auth: request.auth ?? getAuth(),
           } satisfies LeetCodeProblemRemoteRuntimeRequest),
         )
@@ -49,6 +50,7 @@ export function createLeetCodeCaptureRemoteClient(
           await sendMessage('leetcode.readProblemContent', {
             surface: 'content-script',
             location: request.location,
+            refresh: request.refresh,
             auth: request.auth ?? getAuth(),
           } satisfies LeetCodeProblemRemoteRuntimeRequest),
         )
@@ -64,6 +66,9 @@ export function createLeetCodeCaptureRemoteClient(
         return await sendMessage('leetcode.readSubmissionResult', {
           surface: 'content-script',
           location: request.location,
+          attemptId: request.attemptId,
+          submissionId: request.submissionId,
+          refresh: request.refresh,
           click: request.click,
           submittedCodeSnapshot: request.submittedCodeSnapshot,
           auth: request.auth ?? getAuth(),

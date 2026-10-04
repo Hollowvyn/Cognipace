@@ -27,10 +27,12 @@ describe('readLeetCodeSubmissionAttempt', () => {
 
     expect(
       readLeetCodeSubmissionAttempt({
+        attemptId: 'attempt-fixed',
         click: submissionClick,
         editorRoot: document,
       }),
     ).toEqual({
+      attemptId: 'attempt-fixed',
       location: submissionClick.location,
       clickedAt: 5000,
       submitButtonText: 'Submit',
@@ -38,6 +40,7 @@ describe('readLeetCodeSubmissionAttempt', () => {
         code: 'class Solution:\n    def twoSum(self, nums, target):\n\n        return []',
         language: 'Python3',
         source: 'monaco',
+        completeness: 'partial',
         capturedAt: 5000,
       },
     })
@@ -48,6 +51,7 @@ describe('readLeetCodeSubmissionAttempt', () => {
 
     expect(
       readLeetCodeSubmissionAttempt({
+        attemptId: 'attempt-fixed',
         click: submissionClick,
         editorRoot: document,
       }).submittedCodeSnapshot,
@@ -55,6 +59,7 @@ describe('readLeetCodeSubmissionAttempt', () => {
       code: null,
       language: null,
       source: 'none',
+      completeness: 'missing',
       capturedAt: 5000,
     })
   })

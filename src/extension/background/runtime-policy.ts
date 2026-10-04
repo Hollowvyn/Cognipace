@@ -1,4 +1,5 @@
 import type { ExtensionSurface } from '@/extension/messaging'
+import { isLeetCodeHost, parseLeetCodeProblemLocation } from '@/lib/leetcode'
 
 const methodSurfaceAccess = {
   'analytics.getSummary': ['dashboard'],
@@ -14,7 +15,8 @@ const methodSurfaceAccess = {
   'genai.setAiProviderSecret': ['popup', 'dashboard'],
   'genai.clearAiProviderSecret': ['popup', 'dashboard'],
   'genai.testConnection': ['dashboard'],
-  'genai.recommendLeetCodeAssessment': ['content-script'],
+  'genai.analyzeLeetCodeSubmission': ['content-script'],
+  'genai.cancelLeetCodeAnalysis': ['content-script'],
   'imports.preview': ['dashboard'],
   'imports.apply': ['dashboard'],
   'imports.retryPersistence': ['dashboard'],
@@ -154,6 +156,26 @@ export function assertCanSenderCallExtensionMethod(
   }
 
   assertCanCallExtensionMethod(method, senderSurface)
+  if (
+    method === 'genai.analyzeLeetCodeSubmission' ||
+    method === 'genai.cancelLeetCodeAnalysis'
+  ) {
+    const senderUrl = readMessageSender(sender).url
+    const actualUrl = senderUrl ? readUrl(senderUrl) : null
+    if (
+      !actualUrl ||
+      actualUrl.protocol !== 'https:' ||
+      !isLeetCodeHost(actualUrl.hostname)
+    )
+      throw new Error('Analysis requires an actual HTTPS LeetCode sender.')
+    if (
+      method === 'genai.analyzeLeetCodeSubmission' &&
+      !parseLeetCodeProblemLocation(actualUrl)
+    )
+      throw new Error(
+        'Analysis requires an actual LeetCode problem page sender.',
+      )
+  }
 }
 
 function readMessageSender(sender: unknown) {

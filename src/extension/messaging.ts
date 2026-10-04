@@ -70,13 +70,11 @@ import {
   type SerializedLeetCodeSubmissionResultRemoteResponse,
 } from '@/features/leetcode-capture/api/leetcode-capture-contracts'
 import type {
-  RecommendLeetCodeAssessmentRequest,
-  RecommendLeetCodeAssessmentResponse,
-} from '@/features/leetcode-review-assistant'
-export {
-  recommendLeetCodeAssessmentRequestSchema,
-  recommendLeetCodeAssessmentResponseSchema,
-} from '@/features/leetcode-review-assistant'
+  AnalyzeLeetCodeSubmissionRequest,
+  AnalyzeLeetCodeSubmissionResponse,
+  CancelLeetCodeAnalysisRequest,
+  CancelLeetCodeAnalysisResponse,
+} from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
 import {
   normalizedPracticeStateSchema,
   type PracticeDetailsRequest,
@@ -338,9 +336,12 @@ export interface ProtocolMap {
   'genai.testConnection'(
     request: TestAiConnectionRequest,
   ): TestAiConnectionResponse
-  'genai.recommendLeetCodeAssessment'(
-    request: RecommendLeetCodeAssessmentRequest,
-  ): RecommendLeetCodeAssessmentResponse
+  'genai.analyzeLeetCodeSubmission'(
+    request: AnalyzeLeetCodeSubmissionRequest,
+  ): AnalyzeLeetCodeSubmissionResponse
+  'genai.cancelLeetCodeAnalysis'(
+    request: CancelLeetCodeAnalysisRequest,
+  ): CancelLeetCodeAnalysisResponse
   'imports.preview'(request: ImportPreviewRequest): ImportPreviewResponse
   'imports.apply'(request: ImportApplyRequest): ImportApplyResponse
   'imports.retryPersistence'(
@@ -444,7 +445,8 @@ export const protocolMethodNames = [
   'genai.setAiProviderSecret',
   'genai.clearAiProviderSecret',
   'genai.testConnection',
-  'genai.recommendLeetCodeAssessment',
+  'genai.analyzeLeetCodeSubmission',
+  'genai.cancelLeetCodeAnalysis',
   'imports.preview',
   'imports.apply',
   'imports.retryPersistence',
