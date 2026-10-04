@@ -3,9 +3,15 @@ import type { FsrsSchedulingOptions } from '../domain/scheduling-options'
 import type { FsrsReviewLogSnapshot } from '../domain/review-log-snapshot'
 import type { ReviewRating } from '../domain/review-rating'
 import {
+  readFsrsSchedulerProfile,
+  type FsrsSchedulerProfile,
+} from '../domain/scheduler-profile'
+import {
+  assertExactFsrsSchedulerProfile,
   calculateCardRetrievability,
   calculateCardTargetRetentionDuration,
   createEmptyCardSnapshot,
+  resolveFsrsSchedulerProfile,
   scheduleCardReview,
 } from '../adapter/ts-fsrs-adapter'
 
@@ -33,6 +39,36 @@ export interface FsrsReviewScheduleProjectionOptions extends FsrsSchedulingOptio
 
 /** One simulated future review and the resulting card/log state. */
 export type FsrsProjectedReview = FsrsScheduledReview
+
+/** Captures the complete effective configuration of the supported FSRS engine. */
+export function createFsrsSchedulerProfile(
+  options: FsrsSchedulingOptions = {},
+): FsrsSchedulerProfile {
+  return resolveFsrsSchedulerProfile(options)
+}
+
+/** Decodes a detached profile and requires exact native reconstruction. */
+export function parseFsrsSchedulerProfile(
+  value: unknown,
+): FsrsSchedulerProfile {
+  const profile = readFsrsSchedulerProfile(value)
+  assertExactFsrsSchedulerProfile(profile)
+  return profile
+}
+
+/** Serializes a validated profile in canonical field order. */
+export function serializeFsrsSchedulerProfile(
+  profile: FsrsSchedulerProfile,
+): string {
+  return JSON.stringify(parseFsrsSchedulerProfile(profile))
+}
+
+/** Decodes a serialized profile without changing its effective parameters. */
+export function parseSerializedFsrsSchedulerProfile(
+  value: string,
+): FsrsSchedulerProfile {
+  return parseFsrsSchedulerProfile(JSON.parse(value))
+}
 
 /** Creates a new dependency-free FSRS card snapshot. */
 export function createInitialFsrsCard(now = new Date()): FsrsCardSnapshot {
@@ -166,6 +202,8 @@ function readSchedulingOptions(
 ): FsrsSchedulingOptions {
   return {
     targetRetention: options.targetRetention,
+    maximumInterval: options.maximumInterval,
+    weights: options.weights,
     enableFuzz: options.enableFuzz,
     enableShortTerm: options.enableShortTerm,
     learningSteps: options.learningSteps,

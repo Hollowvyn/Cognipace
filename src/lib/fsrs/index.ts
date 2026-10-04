@@ -33,13 +33,21 @@ export {
   type FsrsReviewLogSnapshot,
 } from './domain/review-log-snapshot'
 export {
+  type FsrsEffectiveParameters,
+  type FsrsSchedulerProfile,
+} from './domain/scheduler-profile'
+export {
+  createFsrsSchedulerProfile,
   createInitialFsrsCard,
   getRetrievability,
   getTargetRetentionDuration,
+  parseFsrsSchedulerProfile,
+  parseSerializedFsrsSchedulerProfile,
   projectReviewSchedule,
   replayReviewHistory,
   replayReviewHistorySequence,
   scheduleReview,
+  serializeFsrsSchedulerProfile,
   type FsrsProjectedReview,
   type FsrsReviewHistoryEntry,
   type FsrsReviewScheduleProjectionOptions,
