@@ -5,6 +5,7 @@ import {
   type LeetCodeRemoteClient,
   type LeetCodeReviewContext,
 } from '@/lib/leetcode'
+import { withAiDeadline } from '@/lib/ai/operation'
 
 export type PreparedCodeAnalysisContext =
   | {
@@ -63,22 +64,6 @@ export async function prepareLeetCodeAnalysisContext(
   }
   let active = true
   let submissionReadSucceeded = false
-  const controller = new AbortController()
-  const abortFromParent = () => controller.abort(signal.reason)
-  signal.addEventListener('abort', abortFromParent)
-  const timeout = setTimeout(
-    () => controller.abort(new Error(unavailableMessage)),
-    captureTimeoutMs,
-  )
-  let rejectOnAbort: () => void = () => {}
-  const aborted = new Promise<never>((_resolve, reject) => {
-    rejectOnAbort = () => {
-      const reason: unknown = controller.signal.reason
-      reject(reason instanceof Error ? reason : new Error(unavailableMessage))
-    }
-    controller.signal.addEventListener('abort', rejectOnAbort)
-  })
-
   const readContent = async () => {
     try {
       const response = await remote.readProblemContent({
@@ -163,10 +148,10 @@ export async function prepareLeetCodeAnalysisContext(
 
   try {
     // Each read settles separately so one failure cannot discard a discovered pin.
-    const completed = await Promise.race([
-      Promise.all([readContent(), readSubmission()]),
-      aborted,
-    ])
+    const completed = await withAiDeadline(
+      { timeoutMs: captureTimeoutMs, signal },
+      () => Promise.all([readContent(), readSubmission()]),
+    )
     signal.throwIfAborted()
     if (completed.every(Boolean)) {
       const ready = readyContext(preparedCapture, location)
@@ -176,9 +161,6 @@ export async function prepareLeetCodeAnalysisContext(
     signal.throwIfAborted()
   } finally {
     active = false
-    clearTimeout(timeout)
-    signal.removeEventListener('abort', abortFromParent)
-    controller.signal.removeEventListener('abort', rejectOnAbort)
   }
   // Old verified code stays honest, but cannot form a ready context after failure.
   if (!submissionReadSucceeded) {

@@ -102,6 +102,7 @@ describe('prepareLeetCodeAnalysisContext', () => {
     remote.readProblemContent.mockReturnValue(content.promise)
     remote.readSubmissionResult.mockReturnValue(result.promise)
     const pending = prepare(capture, remote, true)
+    await Promise.resolve()
 
     expect(remote.readProblemContent).toHaveBeenCalledExactlyOnceWith({
       location: capture.submissionAttempt.location,
