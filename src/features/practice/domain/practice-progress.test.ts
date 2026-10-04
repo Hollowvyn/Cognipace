@@ -199,7 +199,7 @@ describe('buildPracticeProgressSummary', () => {
     expect(summary.currentStreak).toBe(2)
   })
 
-  it('does not preserve the current streak before today meets the goal', () => {
+  it('preserves the current streak while today is partially complete', () => {
     const summary = buildPracticeProgressSummary(
       [
         attempt('today-a', '2026-05-25T10:00:00.000Z'),
@@ -211,8 +211,94 @@ describe('buildPracticeProgressSummary', () => {
 
     expect(summary.completedToday).toBe(1)
     expect(summary.goalMetToday).toBe(false)
-    expect(summary.currentStreak).toBe(0)
+    expect(summary.currentStreak).toBe(1)
   })
+
+  it.each([
+    [new Date(2026, 4, 25, 23, 59, 59, 999), 2, 2, true],
+    [new Date(2026, 4, 26, 0), 2, 0, false],
+    [new Date(2026, 4, 26, 23, 59, 59, 999), 2, 0, false],
+    [new Date(2026, 4, 27, 0), 0, 0, false],
+  ])(
+    'reports streak %s through local day rollover',
+    (localNow, currentStreak, completedToday, goalMetToday) => {
+      const attempts = [24, 25].flatMap((day) =>
+        ['two-sum', 'valid-parentheses'].map((slug) =>
+          attempt(slug, new Date(2026, 4, day, 12)),
+        ),
+      )
+
+      expect(
+        buildPracticeProgressSummary(attempts, { dailyGoal: 2, now: localNow }),
+      ).toMatchObject({ currentStreak, completedToday, goalMetToday })
+    },
+  )
+
+  it('extends the preserved streak once today meets the goal', () => {
+    const attempts = [24, 25].flatMap((day) =>
+      ['two-sum', 'valid-parentheses'].map((slug) =>
+        attempt(slug, new Date(2026, 4, day, 12)),
+      ),
+    )
+    const localNow = new Date(2026, 4, 26, 12)
+
+    expect(
+      buildPracticeProgressSummary(attempts, { dailyGoal: 2, now: localNow })
+        .currentStreak,
+    ).toBe(2)
+
+    attempts.push(
+      attempt('two-sum', localNow),
+      attempt('valid-parentheses', localNow),
+    )
+
+    expect(
+      buildPracticeProgressSummary(attempts, { dailyGoal: 2, now: localNow }),
+    ).toMatchObject({ currentStreak: 3, goalMetToday: true })
+  })
+
+  it('breaks the streak after a partially completed day ends', () => {
+    const attempts = [
+      attempt('two-sum', new Date(2026, 4, 24, 12)),
+      attempt('valid-parentheses', new Date(2026, 4, 24, 12)),
+      attempt('two-sum', new Date(2026, 4, 25, 12)),
+      attempt('two-sum', new Date(2026, 4, 25, 13)),
+    ]
+
+    expect(
+      buildPracticeProgressSummary(attempts, {
+        dailyGoal: 2,
+        now: new Date(2026, 4, 26, 0),
+      }).currentStreak,
+    ).toBe(0)
+
+    attempts.push(
+      attempt('two-sum', new Date(2026, 4, 26, 12)),
+      attempt('valid-parentheses', new Date(2026, 4, 26, 12)),
+    )
+
+    expect(
+      buildPracticeProgressSummary(attempts, {
+        dailyGoal: 2,
+        now: new Date(2026, 4, 26, 13),
+      }).currentStreak,
+    ).toBe(1)
+  })
+
+  it.each([new Date(2026, 0, 1, 0), new Date(2026, 2, 1, 0)])(
+    'preserves yesterday across a local calendar boundary at %s',
+    (localNow) => {
+      const yesterday = new Date(localNow)
+      yesterday.setDate(yesterday.getDate() - 1)
+
+      expect(
+        buildPracticeProgressSummary([attempt('two-sum', yesterday)], {
+          dailyGoal: 1,
+          now: localNow,
+        }).currentStreak,
+      ).toBe(1)
+    },
+  )
 
   it('handles a disabled daily goal without divide-by-zero behavior', () => {
     const summary = buildPracticeProgressSummary(
