@@ -343,3 +343,24 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   outside labels associated with their bar. Deconflict neighboring labels and
   plot edges without inflating bars, shrinking text or duplicating totals.
   Keep zero-date slots, the fixed 14-day horizon and full inspection/Table data.
+
+## CogniPace Retention Map Rules
+
+- Show the full eligible memory landscape with exact points, a positive log
+  durability axis and fitted estimated-recall axis. Keep the FSRS scheduling
+  target and seven-day benchmark distinct from personal chart goals and due
+  dates. Put reference captions above the plot and remove competing region text.
+- Use three consistent circle/diamond/triangle status keys with full counts.
+  Draw healthy points softly behind risk marks; highlight inspection without
+  jitter, sampling or changing quantitative glyph sizes.
+- Keep All/Below target controls compact and full-cohort domains stable across
+  filters. Retain every filtered question in the seven-row Table. Use a single
+  native keyboard inspector and an overlap chooser; pin complete linked details
+  below the plot so inspection does not cover dense clusters.
+- Primary drag draws a box and release magnifies the entire selected area.
+  Double-click/Reset restores the full landscape without replacing a pin.
+  Preserve anchored wheel/pinch zoom, Shift-drag/touch pan and accessible
+  plus/minus controls. Keep true axes and screen-sized marks. Escape cancels a
+  box before dismissing details; canceled/tiny drags must not pin a question.
+- Reflow controls and details at 320px; reduce ticks rather than shrinking text.
+  Use product tokens in both themes, subtle status bands and clear native focus.
