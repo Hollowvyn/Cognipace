@@ -401,6 +401,28 @@ it.each([
   },
 )
 
+it.each(['latest only', 'missing middle'])(
+  'rejects sparse legacy history with %s entries without mutation',
+  (shape) => {
+    const { card, history } = legacyHistory(undefined, ['easy', 'good', 'good'])
+    const first = history[0]
+    const latest = history.at(-1)
+    if (!first || !latest) throw new Error('Missing fixture entries.')
+    const sparse: FsrsLegacyReviewEntry[] = new Array(history.length)
+    sparse[history.length - 1] = latest
+    if (shape === 'missing middle') sparse[0] = first
+    const before = JSON.stringify({ card, history: sparse })
+    const keys = Object.keys(sparse)
+
+    expect(card.lapses).toBe(0)
+    expect(() => correctLegacyReview(card, sparse, 'easy', 0.9)).toThrow(
+      'Unsupported or ambiguous legacy FSRS correction evidence.',
+    )
+    expect(JSON.stringify({ card, history: sparse })).toBe(before)
+    expect(Object.keys(sparse)).toEqual(keys)
+  },
+)
+
 it('rejects missing, incomplete and inconsistent saved evidence without mutation', () => {
   const { card, history } = legacyHistory()
   const missing = history.map((event, index) =>

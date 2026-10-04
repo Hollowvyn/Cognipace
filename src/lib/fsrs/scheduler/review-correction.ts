@@ -73,7 +73,8 @@ export function correctLegacyReview(
 
   if (!latest || card.reps !== history.length) rejectLegacyCorrection()
 
-  const logs = history.map((entry, index) => {
+  const logs = Array.from(history, (entry, index) => {
+    if (!entry) rejectLegacyCorrection()
     const log = parseFsrsReviewLogSnapshot(entry.log)
     const previous = history[index - 1]
 
