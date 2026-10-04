@@ -2,13 +2,15 @@
 
 Date: 2026-10-03.
 
-Status: the user approved this written specification on 2026-10-03 and requested
-the implementation plan. The [phase execution map](../plans/2026-10-03-leetcode-code-analysis.md)
-links three ordered plans. The first nine implementation tasks have passed SPEC
-and QUALITY review. Final Phase 3 Task 4 evaluation tooling, current docs, and
-proof handoff are in progress; its review and root integration checks remain
-pending. Live provider evaluation, generated-code execution/compilation, and
-human installed-extension smoke with visual proof remain pending.
+Status on 2026-10-04: the user approved this specification and its ordered
+phase plans. All ten implementation tasks have passed independent SPEC and
+then QUALITY review; final automated gates and whole-source technical review
+passed at `bceb969baae7bb167e0899dc65a93c575c903fa6` on the primary
+`codex/leetcode-code-analysis` branch. See the
+[final handoff](../handoffs/2026-10-03-leetcode-code-analysis.md) for exact proof.
+Live provider quality, generated-code execution/compilation, and human
+installed-extension smoke with visual proof remain pending; no PR review or
+merge readiness is claimed.
 
 This replaces the phase-two proposal in
 [the earlier AI repair draft](2026-10-03-ai-repair-and-code-analysis-design.md).

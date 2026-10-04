@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-03-leetcode-code-analysis-design.md`](./specs/2026-10-03-leetcode-code-analysis-design.md): user-selected Option A for Approach, Efficiency, and Code Style scores, explicit resource tradeoffs, language-aware style advice, and a collapsed suggested implementation; written specification approved, with ordered capture, report/runtime, and overlay/proof plans; the first nine tasks are implemented and reviewed, with final Task 4 review/root integration and provider/human proof pending.
+- [`specs/2026-10-03-leetcode-code-analysis-design.md`](./specs/2026-10-03-leetcode-code-analysis-design.md): approved Option A specification; all ten tasks implemented with independent SPEC/QUALITY passes and final automated validation on 2026-10-04; live provider, generated-code, and human installed-extension proof pending.
 
 - [`specs/2026-10-04-analytics-retention-landscape-design.md`](./specs/2026-10-04-analytics-retention-landscape-design.md): approved full eligible memory landscape, exact status marks, complete overlap/keyboard/Table access and box zoom with reset.
 
@@ -61,7 +61,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
-- [`plans/2026-10-03-leetcode-code-analysis.md`](./plans/2026-10-03-leetcode-code-analysis.md): execution map for the approved Option A assessment, linking three ordered phase plans for complete capture, structured reports and trusted runtime, and overlay integration/retirement/proof; the first nine tasks are implemented and reviewed; final Task 4 review/root integration and provider/human proof remain pending.
+- [`plans/2026-10-03-leetcode-code-analysis.md`](./plans/2026-10-03-leetcode-code-analysis.md): completed ten-task execution map across capture, report/runtime, and overlay/retirement/evaluation tooling; final automated gates passed, with provider/generated-code/human proof still unchecked.
 
 - [`plans/2026-10-04-analytics-retention-landscape.md`](./plans/2026-10-04-analytics-retention-landscape.md): complete-cohort contract and feature-local interactive scatter implementation, lean regressions, production-component proof and required human extension smoke.
 
@@ -119,7 +119,7 @@ Use these files to understand why work was shaped a certain way. Before changing
 
 ## Handoffs
 
-- [`handoffs/2026-10-03-leetcode-code-analysis.md`](./handoffs/2026-10-03-leetcode-code-analysis.md): implemented session-only analysis, six opt-in evaluation inputs, scoped checks, and prepared provider/generated-code/human installed-extension proof; final review and root integration checks pending.
+- [`handoffs/2026-10-03-leetcode-code-analysis.md`](./handoffs/2026-10-03-leetcode-code-analysis.md): final reviewed source, exact automated results and commands, parser/deadline fixes, supplemental fixtures, and pending live provider/generated-code/human proof; no PR review/merge readiness claimed.
 
 - [`handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md`](./handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md): approved written spec, three phase plans, planning checks, and remaining implementation/model/human proof.
 

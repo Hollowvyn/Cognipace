@@ -4,14 +4,14 @@ Started: 2026-10-03. Validation recorded: 2026-10-04.
 
 Primary checkout: `/Users/tobiolutimehin/WebstormProjects/cognipace-v2`.
 Branch: `codex/leetcode-code-analysis`.
-Reviewed Task 3 parent: `fcb7ebb27af1a3eea1be1ce3b7171c2d1c3f2c83`.
+Final reviewed source: `bceb969baae7bb167e0899dc65a93c575c903fa6`.
+Task 4 implementation: `c9bd945e72d0e0f04e5c3eebe97ca8a9706c6fe2`.
 
-Status: the prior nine tasks are implemented and have passed independent SPEC
-and QUALITY review. Phase 3 Task 4 provides evaluation inputs, opt-in tooling,
-current authority docs, the Settings hint, and the prepared proof checklist.
-Task 4 independent SPEC/QUALITY review and root integration validation remain
-pending. No PR review/merge readiness is claimed. Live provider quality,
-generated-code checks, and human installed-extension smoke remain pending.
+Status on 2026-10-04: all ten approved tasks are implemented and have passed
+independent SPEC and then QUALITY review. Final root automated gates and the
+whole-source technical review passed at the source commit above. Live provider
+quality, generated-code checks, and human installed-extension smoke remain
+pending. No full-verification or PR review/merge readiness is claimed.
 
 ## Implemented behavior
 
@@ -94,40 +94,79 @@ Schema/consistency success does not establish human criteria, compilation,
 correctness, or optimality. Inspect every actual report; rerun failed cases
 and unresolved concerns after changes rather than blindly rerunning all six.
 
-## Scoped automated verification
+## Final automated verification
 
-All Task 4 write/check commands were run from the primary checkout with
-`rtk`, authorized `require_escalated`, and a branch/HEAD guard. Ordinary checks
-forced `COGNIPACE_AI_EVAL=0`. Node was 24.20.0 and npm 11.19.0.
+Root ran the final commands on 2026-10-04 from the primary checkout at
+`bceb969baae7bb167e0899dc65a93c575c903fa6`, with Node 24.20.0/npm 11.19.0,
+a branch/HEAD guard, and `COGNIPACE_AI_EVAL=0`. All automatic gates passed:
 
-Test-first proof: the three focused test files first reported 18 failed and
-13 passed because the fixtures were empty, the config helper returned null
-without validating opted-in configuration, and the old hint remained. After
-implementation, the Settings assertion needed to open the existing tooltip;
-that test interaction was corrected. Final focused checks reported 31 passed
-and six live-provider tests skipped across three passed files and one skipped
-file. No provider call was made.
+| Check                         | Final result                                                                                                                            |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Focused feature/runtime tests | 1,059 passed, six live cases skipped; 67 passed files, one skipped file; 9.68s                                                          |
+| `npm run lint`                | Exit 0                                                                                                                                  |
+| `npm run check`               | Exit 0: DB check, WXT/typecheck, lint, and full suite; 2,589 passed, six live cases skipped; 205 passed files, one skipped file; 24.57s |
+| `npm run build`               | Exit 0; WXT 0.21.3/Vite 8.2.1; `dist/chrome-mv3`, 4.67 MB                                                                               |
+| `npm run format`              | Exit 0; all matched files use Prettier style                                                                                            |
+| `rtk git diff --check`        | Exit 0                                                                                                                                  |
 
-Commands run:
+The full suite emitted existing jsdom `Window.scrollTo` messages without
+failures. The build emitted only the existing warning for chunks over 500 kB.
+The 2,589-pass result is the final source result, not an earlier baseline count.
 
-```sh
-rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = fcb7ebb27af1a3eea1be1ce3b7171c2d1c3f2c83 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && COGNIPACE_AI_EVAL=0 npm run test -- src/features/leetcode-review-assistant/testing/code-analysis-evaluation-fixtures.test.ts src/features/genai/testing/evaluation-provider-config.test.ts src/features/settings/components/sections/ai-assessment-section.test.tsx --maxWorkers=1'
-rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = fcb7ebb27af1a3eea1be1ce3b7171c2d1c3f2c83 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && COGNIPACE_AI_EVAL=0 npm run test -- src/features/leetcode-review-assistant/testing/code-analysis-evaluation-fixtures.test.ts src/features/genai/testing/evaluation-provider-config.test.ts src/features/settings/components/sections/ai-assessment-section.test.tsx src/features/leetcode-review-assistant/server/code-analysis-provider-evaluation.test.ts --maxWorkers=1'
-rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = fcb7ebb27af1a3eea1be1ce3b7171c2d1c3f2c83 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && COGNIPACE_AI_EVAL=0 npm run typecheck'
-rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = fcb7ebb27af1a3eea1be1ce3b7171c2d1c3f2c83 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && COGNIPACE_AI_EVAL=0 npx eslint src/features/leetcode-review-assistant/testing/code-analysis-evaluation-fixtures.ts src/features/leetcode-review-assistant/testing/code-analysis-evaluation-fixtures.test.ts src/features/genai/testing/evaluation-provider-config.ts src/features/genai/testing/evaluation-provider-config.test.ts src/features/leetcode-review-assistant/server/code-analysis-provider-evaluation.test.ts src/features/settings/components/sections/ai-assessment-section.tsx src/features/settings/components/sections/ai-assessment-section.test.tsx'
-```
-
-Typecheck (`wxt prepare` and `tsc --noEmit -p tsconfig.json`), scoped ESLint,
-scoped Prettier checks, and diff verification exited 0. Prettier explicitly
-included the ignored planning artifacts with `--ignore-path /dev/null`:
+Exact root commands:
 
 ```sh
-rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = fcb7ebb27af1a3eea1be1ce3b7171c2d1c3f2c83 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && npx prettier --write src/features/leetcode-review-assistant/testing/code-analysis-evaluation-fixtures.ts src/features/leetcode-review-assistant/testing/code-analysis-evaluation-fixtures.test.ts src/features/genai/testing/evaluation-provider-config.ts src/features/genai/testing/evaluation-provider-config.test.ts src/features/leetcode-review-assistant/server/code-analysis-provider-evaluation.test.ts src/features/settings/components/sections/ai-assessment-section.tsx src/features/settings/components/sections/ai-assessment-section.test.tsx docs/product.md docs/architecture.md docs/testing.md design.md && npx prettier --ignore-path /dev/null --write docs/superpowers/README.md docs/superpowers/specs/2026-10-03-leetcode-code-analysis-design.md docs/superpowers/handoffs/2026-10-03-leetcode-code-analysis.md'
-rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = fcb7ebb27af1a3eea1be1ce3b7171c2d1c3f2c83 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && npx prettier --check src/features/leetcode-review-assistant/testing/code-analysis-evaluation-fixtures.ts src/features/leetcode-review-assistant/testing/code-analysis-evaluation-fixtures.test.ts src/features/genai/testing/evaluation-provider-config.ts src/features/genai/testing/evaluation-provider-config.test.ts src/features/leetcode-review-assistant/server/code-analysis-provider-evaluation.test.ts src/features/settings/components/sections/ai-assessment-section.tsx src/features/settings/components/sections/ai-assessment-section.test.tsx docs/product.md docs/architecture.md docs/testing.md design.md && npx prettier --ignore-path /dev/null --check docs/superpowers/README.md docs/superpowers/specs/2026-10-03-leetcode-code-analysis-design.md docs/superpowers/handoffs/2026-10-03-leetcode-code-analysis.md && git diff --check'
+rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = bceb969baae7bb167e0899dc65a93c575c903fa6 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && COGNIPACE_AI_EVAL=0 npm run test -- src/features/leetcode-review-assistant src/features/leetcode-capture src/features/overlay-session src/features/app-shell src/features/genai src/features/settings src/lib/leetcode src/lib/ai src/extension/background/runtime-policy.test.ts src/extension/background/register-handlers.test.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/testing/architecture-boundaries.test.ts'
+rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = bceb969baae7bb167e0899dc65a93c575c903fa6 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && COGNIPACE_AI_EVAL=0 npm run lint'
+rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = bceb969baae7bb167e0899dc65a93c575c903fa6 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && COGNIPACE_AI_EVAL=0 npm run check'
+rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = bceb969baae7bb167e0899dc65a93c575c903fa6 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && COGNIPACE_AI_EVAL=0 npm run build'
+rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = bceb969baae7bb167e0899dc65a93c575c903fa6 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && COGNIPACE_AI_EVAL=0 npm run format'
+rtk git diff --check
+rtk rg -n 'recommendLeetCodeAssessment|RecommendLeetCodeAssessment|AssessmentRecommendation|recommendedRating|shouldUpdateRating|ai-preselect-rating|maybeApplyAiRecommendation|useLeetCodeAssessmentRecommendation|OverlayAssessmentRecommendation|userTouchedRating|leetcode-assessment-v1' src
 ```
 
-Full integration commands belong to root after independent SPEC and QUALITY
-review; they have not been represented as passed here.
+The retired-symbol audit exited 1 with no output, as expected: the 11 retired
+symbols have no source matches, and 20 obsolete files were removed.
+
+Task 4 history: the initial test-first pass reported 18 failed and 13 passed
+for missing fixtures/configuration behavior and the old hint. Its final scoped
+pass at `c9bd945e72d0e0f04e5c3eebe97ca8a9706c6fe2` reported 31 passed and
+six live cases skipped; typecheck passed. Independent SPEC and then QUALITY
+review passed, including scoped checks on its seven TypeScript and seven
+Markdown files. All ten approved tasks have independent SPEC and QUALITY
+passes. The final whole-source-delta review at `bceb969` also passed with no
+remaining actionable correctness or architecture finding. These automated
+and technical reviews do not establish live model quality or human proof.
+
+The final documentation update touches only seven planning/handoff Markdown
+files. It uses the explicit ignore-path override below; source gates are not
+rerun because the reviewed source is unchanged:
+
+```sh
+rtk proxy zsh -c 'test "$(git branch --show-current)" = codex/leetcode-code-analysis && test "$(git rev-parse HEAD)" = bceb969baae7bb167e0899dc65a93c575c903fa6 && source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && npx --no-install prettier --ignore-path /dev/null --write docs/superpowers/handoffs/2026-10-03-leetcode-code-analysis.md docs/superpowers/README.md docs/superpowers/specs/2026-10-03-leetcode-code-analysis-design.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-1-capture.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-2-report-runtime.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-3-overlay-proof.md && npx --no-install prettier --ignore-path /dev/null --check docs/superpowers/handoffs/2026-10-03-leetcode-code-analysis.md docs/superpowers/README.md docs/superpowers/specs/2026-10-03-leetcode-code-analysis-design.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-1-capture.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-2-report-runtime.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-3-overlay-proof.md && git diff --check'
+```
+
+## Post-implementation review and fixes
+
+Root merged `origin/main` commit
+`cb56d9a62d62727108550bbbac7a5786ec016438` as
+`4edf96f65dc9dfa0f6d1107b2991a04763dccb50`, incorporating the user-merged
+daily practice time, retention, and streak changes from PRs #191–#193. The only
+README index conflict retained both entries.
+
+Whole-feature review found a cold MV3 worker GraphQL-hints sanitizer failure
+and HTML sup/sub flattening. Fix
+`4db270af97a96db19e3d2fb237ece5392ff6d6a1` and comparison regression
+`04dfce5a9fdfb1e99fcba0658fd9ff9106355173` preserve complete/high content,
+plain-text math such as `10^(4)`, `n^(2)`, and `a_(i)`, and comparisons such
+as `i < j`. Independent SPEC and QUALITY reviews passed with 45 content tests
+and 231 focused tests.
+
+The one justified cleanup at `bceb969` reuses the pure `withAiDeadline` helper
+for one parallel fresh capture batch, replacing duplicate timer/controller/race
+logic. Its diff is six insertions and 23 deletions across two files, 17 net lines
+removed; separate SPEC and QUALITY reviews passed 52 tests. No other justified
+cut was identified.
 
 ## Supplemental production-component browser evidence
 
@@ -143,27 +182,35 @@ closed.
 - [Expanded production-component fixture](/Users/tobiolutimehin/.codex/visualizations/2026/10/03/01a1040b-c67f-7ab1-93d5-c6a201bb042d/implemented-analysis-preview.jpg)
 - [Closed production-component fixture](/Users/tobiolutimehin/.codex/visualizations/2026/10/03/01a1040b-c67f-7ab1-93d5-c6a201bb042d/implemented-analysis-collapsed-preview.jpg)
 
+Root repeated the actual cold-worker and DOM parser fixture checks on
+2026-10-04 at `bceb969`:
+
+```sh
+rtk proxy /Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin/node /private/tmp/cognipace-analysis-parser-review.cjs worker
+rtk proxy /Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin/node /private/tmp/cognipace-analysis-parser-review.cjs dom
+```
+
+Both passed with complete/high content, usable hints, matching fingerprints,
+and preserved math/comparisons. These exercise actual worker/DOM APIs in a
+fixture and supplement the proof; they are not live installed-extension smoke.
+
 These artifacts supplement the checklist. They are not human installed-extension
 proof or live provider/model quality proof. The older prototype/mock reports
 also do not establish either.
 
 ## Exact skipped or pending validation
 
-Root-owned final checks, pending after Task 4 SPEC and QUALITY review:
+Live quality and human proof remain pending despite the completed automatic
+gates. For this final documentation-only pass, `rtk npm run lint`,
+`rtk npm run check`, `rtk npm run build`, and `rtk npm run format` were not
+rerun: root just ran the guarded commands above on the unchanged source. The
+seven touched Markdown files receive their own explicit formatting check.
 
-```sh
-rtk npm run test -- src/features/leetcode-capture src/features/leetcode-review-assistant src/features/overlay-session src/features/genai src/features/settings src/lib/ai src/lib/leetcode src/extension/background/runtime-policy.test.ts src/extension/background/register-handlers.test.ts src/testing/architecture-boundaries.test.ts
-rtk npm run lint
-rtk npm run check
-rtk npm run build
-rtk npm run format
-```
-
-These commands use the pinned toolchain and disabled evaluation opt-in when
-root executes them. No duplicate full run was made in Task 4. Standalone
-`rtk npm run db:generate` and `rtk npm run db:check` were not run in Task 4
-because it makes no schema/database changes; root's `check` includes database
-verification.
+`rtk npm run db:generate` was skipped because the feature adds no schema or
+migration. A standalone `rtk npm run db:check` was not repeated because the
+final successful `npm run check` already ran it. `rtk npm run zip` and
+`rtk npm run store:check` were skipped because this request is not a packaging
+or store-artifact workflow and no distributable ZIP was requested.
 
 Live provider evaluation skipped: no paid call, evaluation opt-in, key
 extraction, or private provider configuration was performed. After the human
@@ -195,7 +242,9 @@ Do not claim generated code compiled or passed from schema or fixture tests.
 
 Prepared and pending; never N/A for this behavior change. Run in the installed
 extension and attach happy-path and edge-case screenshots or recording before
-PR review or merge, as required by `docs/agent-governance.md`.
+PR review or merge. The [CogniPace workflow skill](../../../.agents/skills/cognipace-agent-workflow/SKILL.md) requires
+"happy-path and edge-case realtime smoke tests with screenshot or screen
+recording proof before PR review or merge." See `docs/agent-governance.md`.
 
 - [ ] Confirm Gemini connection, enable assessment, refresh the page, and see
       idle. Submit accepted and useful wrong-answer, runtime-error,
