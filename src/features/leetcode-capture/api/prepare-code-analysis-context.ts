@@ -114,6 +114,16 @@ export async function prepareLeetCodeAnalysisContext(
         ...(pinnedSubmissionId ? { submissionId: pinnedSubmissionId } : {}),
       })
       if (!active) return false
+      const firstDiscovery = response.debugEvents.find((event) =>
+        validSubmissionId(event.submissionId),
+      )
+      if (!pinnedSubmissionId && firstDiscovery) {
+        pinnedSubmissionId = firstDiscovery.submissionId
+        preparedCapture = {
+          ...preparedCapture,
+          submissionPollingDebug: firstDiscovery,
+        }
+      }
       if (
         response.result &&
         !matchesLocation(response.result.location, location)
@@ -123,18 +133,10 @@ export async function prepareLeetCodeAnalysisContext(
       const resultPin = validSubmissionId(response.result?.submissionId)
         ? response.result.submissionId
         : null
-      const firstDiscovery = response.debugEvents.find((event) =>
-        validSubmissionId(event.submissionId),
-      )
-      const responsePin = resultPin ?? firstDiscovery?.submissionId ?? null
-      if (
-        pinnedSubmissionId &&
-        responsePin &&
-        responsePin !== pinnedSubmissionId
-      ) {
+      if (pinnedSubmissionId && resultPin && resultPin !== pinnedSubmissionId) {
         return false
       }
-      pinnedSubmissionId ??= responsePin
+      pinnedSubmissionId ??= resultPin
       const matchingDebug = response.debugEvents.find(
         (event) =>
           event.submissionId === pinnedSubmissionId &&

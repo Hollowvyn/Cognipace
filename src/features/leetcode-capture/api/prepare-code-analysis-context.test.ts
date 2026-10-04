@@ -421,24 +421,43 @@ describe('prepareLeetCodeAnalysisContext', () => {
     )
   })
 
-  it('discovers the result pin ahead of conflicting response debug IDs', async () => {
+  it('retains the first fresh discovery when terminal result conflicts, then retries the discovered ID', async () => {
     const complete = makeCompleteCapture()
     const capture: LeetCodeCaptureState = {
       ...complete,
       submissionResult: null,
     }
+    const original = structuredClone(capture)
     const remote = makeRemote()
-    remote.readSubmissionResult.mockResolvedValue({
-      result: complete.submissionResult,
-      debugEvents: [makeDebug('999')],
+    remote.readSubmissionResult.mockResolvedValueOnce({
+      result: { ...complete.submissionResult, submissionId: '999' },
+      debugEvents: [
+        makeDebug(null),
+        makeDebug('bad-id'),
+        makeDebug('1234567890'),
+      ],
     })
     const prepared = await prepare(capture, remote)
     expect(prepared).toMatchObject({
-      status: 'ready',
-      submissionId: '1234567890',
+      status: 'unavailable',
+      capture: { submissionPollingDebug: { submissionId: '1234567890' } },
     })
-    expect(prepared.capture.submissionPollingDebug?.submissionId).not.toBe(
-      '999',
+    expect(prepared.capture.submissionResult).toBeNull()
+    expect(prepared.capture.problemContent).toBeNull()
+    expect(capture).toEqual(original)
+    remote.readSubmissionResult.mockImplementation((request) =>
+      Promise.resolve({
+        result:
+          request.submissionId === '1234567890'
+            ? complete.submissionResult
+            : { ...complete.submissionResult, submissionId: '999' },
+        debugEvents: [],
+      }),
+    )
+    const retry = await prepare(prepared.capture, remote, true)
+    expect(retry).toMatchObject({ status: 'ready', submissionId: '1234567890' })
+    expect(remote.readSubmissionResult).toHaveBeenLastCalledWith(
+      expect.objectContaining({ submissionId: '1234567890', refresh: true }),
     )
   })
 
