@@ -294,6 +294,7 @@ function createOverlayContext(): ExpandedOverlayProps['view']['context'] {
       },
     },
     nextStep: null,
+    aiAssessmentEnabled: false,
     aiAssessmentAvailable: false,
   }
 }

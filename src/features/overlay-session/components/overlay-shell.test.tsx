@@ -229,6 +229,7 @@ function createSession(
           hard: 50,
         },
       },
+      aiAssessmentEnabled: false,
       aiAssessmentAvailable: false,
     },
     feedback: null,

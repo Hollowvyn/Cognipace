@@ -81,6 +81,7 @@ const baseContext: LeetCodeOverlayContext = {
     timeTargetsMinutes: { easy: 15, medium: 25, hard: 35 },
   },
   nextStep: null,
+  aiAssessmentEnabled: true,
   aiAssessmentAvailable: true,
 } as unknown as LeetCodeOverlayContext
 

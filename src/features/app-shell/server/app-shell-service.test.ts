@@ -525,6 +525,7 @@ describe('AI assessment exposure', () => {
     const handle = await createTestDb({ seed: false })
     const payload = await getOverlayPayload(handle)
     expect(payload.overlay.aiAssessmentAvailable).toBe(false)
+    expect(payload.overlay.aiAssessmentEnabled).toBe(false)
   })
 
   it('overlay payload reports aiAssessmentAvailable=false when enabled but key missing', async () => {
@@ -535,6 +536,7 @@ describe('AI assessment exposure', () => {
     // no setAiProviderSecret call
     const payload = await getOverlayPayload(handle)
     expect(payload.overlay.aiAssessmentAvailable).toBe(false)
+    expect(payload.overlay.aiAssessmentEnabled).toBe(true)
   })
 
   it('overlay payload reports aiAssessmentAvailable=true when fully configured', async () => {
@@ -547,6 +549,7 @@ describe('AI assessment exposure', () => {
     })
     const payload = await getOverlayPayload(handle)
     expect(payload.overlay.aiAssessmentAvailable).toBe(true)
+    expect(payload.overlay.aiAssessmentEnabled).toBe(true)
   })
 
   it('overlay payload never contains apiKey or the literal key string', async () => {

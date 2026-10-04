@@ -177,6 +177,7 @@ export const overlayAppShellDataSchema = z.object({
     practice: practiceDetailsSchema.nullable(),
     timing: appShellAssessmentSettingsSchema,
     nextStep: overlayNextStepSchema.nullable(),
+    aiAssessmentEnabled: z.boolean(),
     aiAssessmentAvailable: z.boolean(),
   }),
 })

@@ -304,6 +304,7 @@ describe('useLeetCodeOverlaySession', () => {
       submissionFingerprint: 'two-sum:quick-submit:good:null',
     })
     const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
     })
 
@@ -336,6 +337,7 @@ describe('useLeetCodeOverlaySession', () => {
       submissionFingerprint: 'two-sum:quick-submit:good:null',
     })
     const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
     })
 
@@ -353,6 +355,7 @@ describe('useLeetCodeOverlaySession', () => {
       new Error('Provider unavailable.'),
     )
     const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
     })
 
@@ -649,6 +652,7 @@ describe('useLeetCodeOverlaySession', () => {
   it('clears the AI recommendation when the overlay restart action runs', async () => {
     setSendMessageRecommendationReady()
     const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
       autoDetectSolved: true,
     })
@@ -669,6 +673,7 @@ describe('useLeetCodeOverlaySession', () => {
   it('clears the AI recommendation when the LeetCode page changes', async () => {
     setSendMessageRecommendationReady()
     const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
       autoDetectSolved: true,
     })
@@ -687,6 +692,7 @@ describe('useLeetCodeOverlaySession', () => {
   it('excludes AI-authored text from the save review payload', async () => {
     setSendMessageRecommendationReady()
     const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
       autoDetectSolved: true,
     })
@@ -714,6 +720,7 @@ describe('useLeetCodeOverlaySession', () => {
     // only rating and review facts.
     setSendMessageRecommendationReady()
     const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
       aiAssessmentAvailable: true,
     })
 
@@ -741,12 +748,14 @@ type DeferredReviewResult = ReturnType<
 >
 
 async function renderReadySession(options?: {
+  aiAssessmentEnabled?: boolean
   aiAssessmentAvailable?: boolean
   autoDetectSolved?: boolean
   timing?: Partial<OverlayAppShellData['overlay']['timing']>
   practice?: OverlayAppShellData['overlay']['practice']
 }): Promise<RenderedOverlaySession> {
   if (
+    options?.aiAssessmentEnabled !== undefined ||
     options?.aiAssessmentAvailable !== undefined ||
     options?.autoDetectSolved ||
     options?.timing ||
@@ -757,6 +766,13 @@ async function renderReadySession(options?: {
     if (options.aiAssessmentAvailable !== undefined) {
       overlayDataOptions.overlay = {
         aiAssessmentAvailable: options.aiAssessmentAvailable,
+      }
+    }
+
+    if (options.aiAssessmentEnabled !== undefined) {
+      overlayDataOptions.overlay = {
+        ...overlayDataOptions.overlay,
+        aiAssessmentEnabled: options.aiAssessmentEnabled,
       }
     }
 
@@ -918,6 +934,7 @@ function createOverlayData(options?: {
         ...options?.timing,
       },
       nextStep,
+      aiAssessmentEnabled: false,
       aiAssessmentAvailable: false,
       ...options?.overlay,
     },

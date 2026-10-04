@@ -136,6 +136,7 @@ async function getOverlayAppShellData(
     surface: 'overlay',
     overlay: {
       ...(await getOverlayPayload(db, request, now, settings)),
+      aiAssessmentEnabled: settings.aiAssessment.enabled,
       aiAssessmentAvailable,
     },
   } satisfies AppShellData

@@ -221,6 +221,7 @@ export function useLeetCodePageSync({
   )
 
   return {
+    capture: captureState,
     context,
     feedback: resolvedFeedback,
     latestContextRef,
