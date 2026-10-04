@@ -19,6 +19,11 @@ export const legacyTrackMigrationPaths = [
   './migrations/0008_topics_typed_relations.sql',
 ] as const
 
+export const legacyFsrsMigrationPaths = [
+  ...legacyTrackMigrationPaths,
+  './migrations/0009_mushy_beyonder.sql',
+] as const
+
 function readBaselineSql(paths: readonly string[]) {
   return paths
     .map((path) => {
@@ -37,10 +42,12 @@ export const legacyTopicMigrationSql = readBaselineSql(
 export const legacyTrackMigrationSql = readBaselineSql(
   legacyTrackMigrationPaths,
 )
+export const legacyFsrsMigrationSql = readBaselineSql(legacyFsrsMigrationPaths)
 
 // Shipped SQL fingerprints are fixed compatibility boundaries.
 export const legacyTopicMigrationFingerprint = 'b1c2b4d7'
 export const legacyTrackMigrationFingerprint = 'a35941fc'
+export const legacyFsrsMigrationFingerprint = '1144ce07'
 
 const supportedBaselines = [
   {
@@ -52,6 +59,11 @@ const supportedBaselines = [
     fingerprint: legacyTrackMigrationFingerprint,
     paths: legacyTrackMigrationPaths,
     sql: legacyTrackMigrationSql,
+  },
+  {
+    fingerprint: legacyFsrsMigrationFingerprint,
+    paths: legacyFsrsMigrationPaths,
+    sql: legacyFsrsMigrationSql,
   },
 ] as const
 
