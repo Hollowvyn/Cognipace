@@ -542,7 +542,7 @@ describe('AI assessment exposure', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: true, provider: 'openai', model: 'gpt-test' },
     })
-    await setAiProviderSecret(handle.db, 'openai', {
+    await setAiProviderSecret('openai', {
       apiKey: 'sk-must-not-leak',
     })
     const payload = await getOverlayPayload(handle)
@@ -554,7 +554,7 @@ describe('AI assessment exposure', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: true, provider: 'openai', model: 'gpt-test' },
     })
-    await setAiProviderSecret(handle.db, 'openai', {
+    await setAiProviderSecret('openai', {
       apiKey: 'sk-must-not-leak',
     })
     const payload = await getOverlayPayload(handle)
@@ -568,7 +568,7 @@ describe('AI assessment exposure', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: true, provider: 'anthropic', model: 'claude-x' },
     })
-    await setAiProviderSecret(handle.db, 'anthropic', {
+    await setAiProviderSecret('anthropic', {
       apiKey: 'sk-ant-must-not-leak',
     })
     const payload = await getPopupPayload(handle)
@@ -587,7 +587,7 @@ describe('AI assessment exposure', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: true, provider: 'gemini', model: 'gemini-x' },
     })
-    await setAiProviderSecret(handle.db, 'gemini', {
+    await setAiProviderSecret('gemini', {
       apiKey: 'g-must-not-leak',
     })
     const payload = await getDashboardPayload(handle)

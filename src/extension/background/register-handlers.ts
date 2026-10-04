@@ -28,7 +28,10 @@ import {
   problemsUpsertFromPageRequestSchema,
   queueRequestSchema,
   recommendLeetCodeAssessmentRequestSchema,
+  recommendLeetCodeAssessmentResponseSchema,
   setAiProviderSecretRequestSchema,
+  testAiConnectionRequestSchema,
+  testAiConnectionResponseSchema,
   settingsCycleThemeModeRequestSchema,
   settingsRequestSchema,
   settingsToggleStudyModeRequestSchema,
@@ -73,7 +76,9 @@ import {
   loadActiveProviderConfig,
   setAiProviderSecret,
 } from '@/features/genai/server/genai-settings-service'
-import { generateJson } from '@/features/genai/server'
+import { testAiConnection } from '@/features/genai/server/genai-connection-service'
+import { aiProviderSecretPresenceSchema } from '@/features/genai/domain'
+import { generateJson } from '@/lib/ai'
 import {
   exportFullBackup,
   resetLocalData,
@@ -903,7 +908,7 @@ export function registerBackgroundHandlers() {
         readGenAiConfig: async () => {
           const settings = await getSettings(db)
           const ai = settings.aiAssessment
-          const secretPresence = await getAiProviderSecretPresence(db)
+          const secretPresence = await getAiProviderSecretPresence()
           const hasConfiguredModel = ai.model.trim() !== ''
 
           if (!ai.enabled || !hasConfiguredModel) {
@@ -1158,8 +1163,10 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runSettingsMutation(request.surface, (db) =>
-      updateSettings(db, request.patch),
+    return runSettingsMutation(
+      request.surface,
+      (db) => updateSettings(db, request.patch),
+      request.patch.aiAssessment !== undefined,
     )
   })
 
@@ -1197,7 +1204,11 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(({ db }) => getAiProviderSecretPresence(db))
+    return getAiProviderSecretPresence()
+      .then((presence) => aiProviderSecretPresenceSchema.parse(presence))
+      .catch(() => {
+        throw new Error('Saved AI keys could not be loaded. Please retry.')
+      })
   })
 
   onMessage('genai.setAiProviderSecret', ({ data, sender }) => {
@@ -1208,21 +1219,50 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(({ db }) =>
-      setAiProviderSecret(db, request.provider, request.secret),
-    )
+    return setAiProviderSecret(request.provider, request.secret, async () => {
+      await broadcastCacheInvalidation({
+        reason: 'genai-updated',
+        source: request.surface,
+        tags: ['genai'],
+      })
+    })
+      .then((presence) => aiProviderSecretPresenceSchema.parse(presence))
+      .catch(() => {
+        throw new Error('The AI key save could not be completed. Please retry.')
+      })
   })
 
   onMessage('genai.clearAiProviderSecret', ({ data, sender }) => {
     const request = clearAiProviderSecretRequestSchema.parse(data)
-
     assertCanSenderCallExtensionMethod(
       'genai.clearAiProviderSecret',
       request.surface,
       sender,
     )
-    return getAppDb().then(({ db }) =>
-      clearAiProviderSecret(db, request.provider),
+    return clearAiProviderSecret(request.provider, async () => {
+      await broadcastCacheInvalidation({
+        reason: 'genai-updated',
+        source: request.surface,
+        tags: ['genai'],
+      })
+    })
+      .then((presence) => aiProviderSecretPresenceSchema.parse(presence))
+      .catch(() => {
+        throw new Error(
+          'The AI key removal could not be completed. Please retry.',
+        )
+      })
+  })
+
+  onMessage('genai.testConnection', ({ data, sender }) => {
+    const request = testAiConnectionRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'genai.testConnection',
+      request.surface,
+      sender,
+    )
+    return testAiConnection(request, async () => (await getAppDb()).db).then(
+      (result) => testAiConnectionResponseSchema.parse(result),
     )
   })
 
@@ -1234,8 +1274,10 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(({ db }) =>
-      recommendLeetCodeAssessmentInBackground(db, request),
+    return getAppDb().then(async ({ db }) =>
+      recommendLeetCodeAssessmentResponseSchema.parse(
+        await recommendLeetCodeAssessmentInBackground(db, request),
+      ),
     )
   })
 
@@ -1339,6 +1381,7 @@ async function runLiveGenAiSmoke(db: Db) {
 async function runSettingsMutation(
   source: 'popup' | 'dashboard',
   writeSettings: (db: Db) => Promise<UserSettings>,
+  affectsGenAi = false,
 ) {
   let prev: UserSettings | undefined
   return runDbMutation(
@@ -1350,7 +1393,7 @@ async function runSettingsMutation(
       await broadcastCacheInvalidation({
         reason: 'settings-updated',
         source,
-        tags: ['settings'],
+        tags: affectsGenAi ? ['settings', 'genai'] : ['settings'],
       })
       if (prev !== undefined) {
         try {
@@ -1585,7 +1628,15 @@ function broadcastDataManagementInvalidation(source: 'dashboard') {
   return broadcastCacheInvalidation({
     reason: 'problem-catalog-updated',
     source,
-    tags: ['settings', 'problems', 'practice', 'queue', 'tracks', 'app-shell'],
+    tags: [
+      'settings',
+      'genai',
+      'problems',
+      'practice',
+      'queue',
+      'tracks',
+      'app-shell',
+    ],
   })
 }
 

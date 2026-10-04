@@ -181,7 +181,6 @@ describe('recommendLeetCodeAssessmentInBackground — secrets redaction', () => 
     loadActiveProviderConfigMock.mockResolvedValue(providerConfig)
     recommendAssessmentMock.mockResolvedValue({
       status: 'fallback',
-      recommendation: makeValidRecommendation(),
       error: {
         code: 'auth',
         message: 'Authentication failed',
@@ -191,6 +190,12 @@ describe('recommendLeetCodeAssessmentInBackground — secrets redaction', () => 
       fakeDb,
       makeRequest(),
     )
+    expect(error).toEqual({
+      status: 'error',
+      code: 'auth',
+      message: 'AI authentication failed. Check the API key in settings.',
+      submissionFingerprint: 'fp-abc-123',
+    })
     expect(JSON.stringify(error)).not.toMatch(/apiKey/i)
     expect(JSON.stringify(error)).not.toContain(providerConfig.apiKey)
   })

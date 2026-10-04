@@ -190,15 +190,52 @@ describe('recommendLeetCodeAssessmentRequestSchema', () => {
 })
 
 describe('recommendLeetCodeAssessmentResponseSchema', () => {
+  it('accepts safe provider identity and timing while rejecting raw response fields', () => {
+    const response = {
+      status: 'ready',
+      recommendation: validRecommendation,
+      providerMetadata: validProviderMetadata,
+      submissionFingerprint: 'fp-abc-123',
+    }
+
+    expect(() =>
+      recommendLeetCodeAssessmentResponseSchema.parse(response),
+    ).not.toThrow()
+    expect(() =>
+      recommendLeetCodeAssessmentResponseSchema.parse({
+        ...response,
+        providerMetadata: { ...response.providerMetadata, responseBody: 'raw' },
+      }),
+    ).toThrow()
+  })
+
   it('accepts a ready response', () => {
+    const response = recommendLeetCodeAssessmentResponseSchema.parse({
+      status: 'ready',
+      recommendation: validRecommendation,
+      providerMetadata: validProviderMetadata,
+      submissionFingerprint: 'fp-abc-123',
+    })
+
+    expect(response.status).toBe('ready')
+    if (response.status === 'ready') {
+      expect(Object.isFrozen(response.recommendation.evidence)).toBe(true)
+      expect(Object.isFrozen(response.recommendation.improvementPoints)).toBe(
+        true,
+      )
+      expect(Object.isFrozen(response.recommendation.edgeCaseNotes)).toBe(true)
+    }
+  })
+
+  it('retains the canonical recommendation limits at the runtime boundary', () => {
     expect(() =>
       recommendLeetCodeAssessmentResponseSchema.parse({
         status: 'ready',
-        recommendation: validRecommendation,
+        recommendation: { ...validRecommendation, summary: 'x'.repeat(201) },
         providerMetadata: validProviderMetadata,
         submissionFingerprint: 'fp-abc-123',
       }),
-    ).not.toThrow()
+    ).toThrow()
   })
 
   it('accepts an unavailable response', () => {

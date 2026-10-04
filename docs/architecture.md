@@ -114,7 +114,7 @@ Not every feature needs every folder. Add only the folder needed for the change.
 - `sync`: GitHub Gist configuration, sync metadata, directional pull/push
   rules, Settings/header sync UI, and background orchestration.
 - `genai`: AI provider settings contracts, trusted provider key storage,
-  provider network adapters, and background-owned BYOK provider calls.
+  connection testing, and background-owned BYOK calls through `src/lib/ai`.
 - `dev-smoke`: hidden dashboard-only extension development smoke checks for
   background health, Analytics, queue, notifications, GenAI config, and opt-in
   live GenAI provider validation.
@@ -490,24 +490,29 @@ present.
 
 ## External APIs And Secrets
 
-External network calls use request declarations over `src/platform/http`. REST
-and GraphQL integrations should define typed request functions in the owning
+REST and GraphQL calls use request declarations over `src/platform/http`.
+These integrations should define typed request functions in the owning
 `src/lib/<integration>/api` module and inject `fetch` in tests. Feature services
 or readers call those declarations instead of constructing ad hoc `fetch` calls.
+SDK-backed AI transport instead stays inside `src/lib/ai`, which supplies a
+controlled fetch wrapper to the official adapters and tests native wire responses.
 
 Current integrations:
 
 - `src/lib/github/api`: GitHub Gist REST requests for sync.
 - `src/lib/leetcode/api`: LeetCode GraphQL and submission REST requests used by
   LeetCode capture readers.
-- `src/features/genai/server/providers`: approved BYOK GenAI provider calls from
-  trusted background code.
+- `src/lib/ai`: reusable structured generation through Vercel AI SDK and its
+  official OpenAI, Anthropic, and Google adapters. The library accepts explicit
+  credentials, model, prompt, and Zod schema; it does not own Settings,
+  assessment, runtime messaging, or secret persistence. Feature services call
+  this library directly; GenAI owns configuration and trusted credential loading.
 
 BYOK secrets use `src/platform/secrets`, backed by `chrome.storage.local` with
 trusted-context access. UI surfaces may save or delete secrets through runtime
 messages, but secret reads stay in the background service worker. Secret values
 must not be exported in backups, serialized in sync envelopes, logged, or stored
-in TanStack Query cache payloads. Stored-token validation also runs through a
+in TanStack Query cache payloads or mutation variables. Stored-token validation also runs through a
 dashboard-authorized runtime method so the UI can test the saved token without
 receiving or echoing the secret value.
 
@@ -522,8 +527,30 @@ provider host permissions are exactly:
 - `https://generativelanguage.googleapis.com/*`
 
 Provider calls run from trusted background code after settings and BYOK secret
-presence checks. Development smoke may optionally call the configured provider,
-and smoke output must redact any provider error details that could contain a
+checks. The SDK receives explicit direct-provider model objects and approved
+hosts, with retries disabled, bounded output, and telemetry disabled. The
+SDK validates structured output against the supplied Zod schema. The library
+returns controlled errors and provider/model/duration metadata; raw SDK errors
+and provider response bodies do not cross the runtime boundary. Its deadline
+covers request preparation, headers, body consumption, and output validation.
+
+Dashboard-only `genai.testConnection` accepts the saved provider and model
+identity. It loads credentials in the background, makes a fixed small
+structured request, and rejects stale configuration or credential results.
+Its 20-second deadline includes database and secret preparation; the client
+has a separate 25-second deadline for a missing worker response. Secret
+operations await retryable trusted-storage readiness without waiting for the
+database. Background runtime listeners register synchronously during startup.
+
+Settings owns a separate AI connection draft and serializes its writes with
+ordinary preference saves and Reset Defaults. AI configuration writes and
+secret changes broadcast GenAI invalidation; a volatile query-cache revision
+invalidates connection results even when key-presence booleans stay the same.
+Pending presence/availability reads are cancelled before refetch; combined
+Settings/GenAI events also cancel the initial Settings read so it cannot restore
+an obsolete provider or model. The existing application cache listener owns these events. Secret writes do
+not dirty database sync state. Development smoke may also call the configured
+provider, and smoke output redacts provider error details that could contain a
 secret.
 
 ## Database And Persistence

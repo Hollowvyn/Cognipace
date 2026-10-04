@@ -131,6 +131,7 @@ const backgroundMocks = vi.hoisted(() => {
     clearAiProviderSecret: vi.fn(),
     loadActiveProviderConfig: vi.fn(),
     generateJson: vi.fn(),
+    testAiConnection: vi.fn(),
     cycleThemeMode: vi.fn(),
     toggleStudyMode: vi.fn(),
     tabsCreate: vi.fn(),
@@ -225,7 +226,11 @@ vi.mock('@/features/genai/server/genai-settings-service', () => ({
   loadActiveProviderConfig: backgroundMocks.loadActiveProviderConfig,
 }))
 
-vi.mock('@/features/genai/server', () => ({
+vi.mock('@/features/genai/server/genai-connection-service', () => ({
+  testAiConnection: backgroundMocks.testAiConnection,
+}))
+
+vi.mock('@/lib/ai', () => ({
   generateJson: backgroundMocks.generateJson,
 }))
 
@@ -459,16 +464,22 @@ describe('background handler registration', () => {
       anthropic: false,
       gemini: false,
     })
-    backgroundMocks.setAiProviderSecret.mockResolvedValue({
-      openai: true,
-      anthropic: false,
-      gemini: false,
-    })
-    backgroundMocks.clearAiProviderSecret.mockResolvedValue({
-      openai: false,
-      anthropic: false,
-      gemini: false,
-    })
+    backgroundMocks.setAiProviderSecret.mockImplementation(
+      async (
+        _provider: unknown,
+        _secret: unknown,
+        afterPersist?: () => Promise<void>,
+      ) => {
+        await afterPersist?.()
+        return { openai: true, anthropic: false, gemini: false }
+      },
+    )
+    backgroundMocks.clearAiProviderSecret.mockImplementation(
+      async (_provider: unknown, afterPersist?: () => Promise<void>) => {
+        await afterPersist?.()
+        return { openai: false, anthropic: false, gemini: false }
+      },
+    )
     backgroundMocks.loadActiveProviderConfig.mockResolvedValue(null)
     backgroundMocks.generateJson.mockResolvedValue({
       status: 'success',
@@ -559,6 +570,89 @@ describe('background handler registration', () => {
   afterEach(() => {
     vi.clearAllTimers()
     vi.useRealTimers()
+  })
+
+  it.each([
+    ['genai.getAiProviderSecretPresence', { surface: 'dashboard' }],
+    [
+      'genai.setAiProviderSecret',
+      {
+        surface: 'dashboard',
+        provider: 'gemini',
+        secret: { apiKey: 'fake-key' },
+      },
+    ],
+    [
+      'genai.clearAiProviderSecret',
+      { surface: 'dashboard', provider: 'gemini' },
+    ],
+  ])(
+    'runs %s without opening the database or marking sync dirty',
+    async (method, request) => {
+      backgroundMocks.getAppDb.mockRejectedValue(
+        new Error('database unavailable'),
+      )
+      await expect(sendRuntimeMessage(method, request)).resolves.toBeDefined()
+      expect(backgroundMocks.getAppDb).not.toHaveBeenCalled()
+      expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+      expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+      if (method !== 'genai.getAiProviderSecretPresence') {
+        expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith(
+          { reason: 'genai-updated', source: 'dashboard', tags: ['genai'] },
+        )
+      }
+    },
+  )
+
+  it('adds GenAI invalidation only to AI Settings patches', async () => {
+    await sendRuntimeMessage('settings.updateSettings', {
+      surface: 'dashboard',
+      patch: { aiAssessment: { model: 'gemini-test' } },
+    })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      reason: 'settings-updated',
+      source: 'dashboard',
+      tags: ['settings', 'genai'],
+    })
+  })
+
+  it('registers the fixed connection service with a lazy database loader and validates its response', async () => {
+    const request = {
+      surface: 'dashboard',
+      provider: 'gemini',
+      model: 'gemini-test',
+    }
+    backgroundMocks.testAiConnection.mockResolvedValue({
+      status: 'success',
+      provider: 'gemini',
+      model: 'gemini-test',
+      durationMs: 1,
+    })
+    await expect(
+      sendRuntimeMessage('genai.testConnection', request),
+    ).resolves.toMatchObject({ status: 'success' })
+    expectRuntimePolicy('genai.testConnection', 'dashboard')
+    expect(backgroundMocks.getAppDb).not.toHaveBeenCalled()
+    expect(backgroundMocks.testAiConnection).toHaveBeenCalledWith(
+      request,
+      expect.any(Function),
+    )
+    backgroundMocks.testAiConnection.mockResolvedValue({
+      status: 'success',
+      provider: 'gemini',
+      model: 'gemini-test',
+      durationMs: 1,
+      apiKey: 'fake-key',
+    })
+    await expect(
+      sendRuntimeMessage('genai.testConnection', request),
+    ).rejects.toThrow()
+    expect(() =>
+      sendRuntimeMessage('genai.testConnection', {
+        ...request,
+        apiKey: 'fake-key',
+      }),
+    ).toThrow()
   })
 
   it('registers and repairs sync auto-sync alarm jobs on startup', () => {
@@ -826,9 +920,7 @@ describe('background handler registration', () => {
       expect.any(Date),
     )
     expect(backgroundMocks.getSettings).toHaveBeenCalledWith(backgroundMocks.db)
-    expect(backgroundMocks.getAiProviderSecretPresence).toHaveBeenCalledWith(
-      backgroundMocks.db,
-    )
+    expect(backgroundMocks.getAiProviderSecretPresence).toHaveBeenCalledWith()
     expect(backgroundMocks.loadActiveProviderConfig).not.toHaveBeenCalled()
     expect(backgroundMocks.readDueNotificationState).toHaveBeenCalledTimes(1)
     expect(backgroundMocks.writeDueNotificationState).not.toHaveBeenCalled()
@@ -1697,6 +1789,7 @@ describe('background handler registration', () => {
       source: 'dashboard',
       tags: [
         'settings',
+        'genai',
         'problems',
         'practice',
         'queue',
@@ -1722,6 +1815,7 @@ describe('background handler registration', () => {
       source: 'dashboard',
       tags: [
         'settings',
+        'genai',
         'problems',
         'practice',
         'queue',

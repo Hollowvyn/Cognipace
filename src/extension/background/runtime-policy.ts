@@ -13,6 +13,7 @@ const methodSurfaceAccess = {
   'genai.getAiProviderSecretPresence': ['popup', 'dashboard'],
   'genai.setAiProviderSecret': ['popup', 'dashboard'],
   'genai.clearAiProviderSecret': ['popup', 'dashboard'],
+  'genai.testConnection': ['dashboard'],
   'genai.recommendLeetCodeAssessment': ['content-script'],
   'imports.preview': ['dashboard'],
   'imports.apply': ['dashboard'],

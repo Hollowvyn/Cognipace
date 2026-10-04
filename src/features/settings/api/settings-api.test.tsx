@@ -74,6 +74,32 @@ describe('settings API hooks', () => {
     })
   })
 
+  it('cancels stale Settings reads and applies authoritative AI Settings before resolving', async () => {
+    const { queryClient, wrapper } = createQueryTestHarness()
+    const cancelQueries = vi.spyOn(queryClient, 'cancelQueries')
+    const saved = {
+      ...defaultUserSettings,
+      aiAssessment: {
+        enabled: false,
+        provider: 'gemini' as const,
+        model: 'custom-model',
+      },
+    }
+    queryClient.setQueryData(queryKeys.settings.all, defaultUserSettings)
+    vi.mocked(sendMessage).mockResolvedValue(saved)
+    const { result } = renderHook(() => useUpdateSettings(), { wrapper })
+    await act(async () => {
+      await result.current.mutateAsync({
+        surface: 'dashboard',
+        patch: { aiAssessment: { provider: 'gemini', model: 'custom-model' } },
+      })
+    })
+    expect(cancelQueries).toHaveBeenCalledWith({
+      queryKey: queryKeys.settings.all,
+    })
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toEqual(saved)
+  })
+
   it('sends study-mode toggles and invalidates DB-backed settings state', async () => {
     vi.mocked(sendMessage).mockResolvedValue(null)
     const { queryClient, wrapper } = createQueryTestHarness()

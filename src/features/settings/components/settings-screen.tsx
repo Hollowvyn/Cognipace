@@ -7,6 +7,8 @@ import { Surface } from '@/components/ui/surface'
 import { DataManagementScreen } from '@/features/backup'
 
 import { useSettingsDraft } from '../hooks/use-settings-draft'
+import { useAiConnectionController } from '../hooks/use-ai-connection-controller'
+import { useSettingsOperationGate } from '../hooks/use-settings-operation-gate'
 import { AdvancedReviewSection } from './sections/advanced-review-section'
 import { AiAssessmentSection } from './sections/ai-assessment-section'
 import { AppearanceSection } from './sections/appearance-section'
@@ -17,7 +19,9 @@ import { SettingsSaveDock } from './settings-save-bar'
 import { SettingsToast } from './settings-toast'
 
 export function SettingsScreen() {
-  const controller = useSettingsDraft()
+  const gate = useSettingsOperationGate()
+  const aiController = useAiConnectionController(gate)
+  const controller = useSettingsDraft(gate, aiController.actions.reset)
 
   if (controller.isInitialLoading) {
     return (
@@ -74,7 +78,13 @@ export function SettingsScreen() {
         onSubmit={handleSubmit}
       >
         <Surface className="grid p-0">
-          <div className="px-4 pb-6 pt-4 md:px-5 lg:px-7">
+          <fieldset
+            className="min-w-0 border-0 px-4 pb-6 pt-4 md:px-5 lg:px-7"
+            disabled={
+              gate.activeOperation === 'preferences' ||
+              gate.activeOperation === 'reset'
+            }
+          >
             <AppearanceSection
               actions={controller.actions}
               draft={controller.draft}
@@ -102,18 +112,13 @@ export function SettingsScreen() {
               fieldErrors={controller.fieldErrors}
               numberInputs={controller.numberInputs}
             />
-            <AiAssessmentSection
-              actions={{
-                setAiEnabled: controller.actions.setAiEnabled,
-                setAiModel: controller.actions.setAiModel,
-                setAiProvider: controller.actions.setAiProvider,
-              }}
-              draft={controller.draft}
-            />
-          </div>
+          </fieldset>
           <SettingsSaveDock
             canDiscard={controller.canDiscard}
-            canResetDefaults={controller.canResetDefaults}
+            canResetDefaults={
+              controller.canResetDefaults ||
+              (aiController.hasChanges && !gate.activeOperation)
+            }
             canSave={controller.canSave}
             hasChanges={controller.hasChanges}
             hasValidationErrors={controller.hasValidationErrors}
@@ -126,6 +131,22 @@ export function SettingsScreen() {
           />
         </Surface>
         <SettingsToast status={controller.status} />
+      </form>
+      <form
+        aria-label="AI connection"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void aiController.actions.submit()
+        }}
+      >
+        <Surface className="grid">
+          <fieldset
+            className="min-w-0 border-0 p-0"
+            disabled={aiController.isBusy}
+          >
+            <AiAssessmentSection controller={aiController} />
+          </fieldset>
+        </Surface>
       </form>
       <DataManagementScreen />
     </div>

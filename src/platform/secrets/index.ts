@@ -5,6 +5,7 @@ export {
   deleteSecret,
   getSecretStatus,
   readSecret,
+  readSecretSnapshot,
   restrictSecretStorageAccess,
   saveSecret,
 } from './secret-store'

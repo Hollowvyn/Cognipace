@@ -1,14 +1,9 @@
 import { z } from 'zod'
 
-import { genAiProviderIds } from '../domain/genai-types'
+import { aiProviderSecretSchema } from '../domain/genai-secrets-types'
+import { genAiErrorCodes, genAiProviderIds } from '../domain/genai-types'
 
 const surfaceSchema = z.enum(['popup', 'dashboard'])
-
-const aiProviderSecretBodySchema = z
-  .object({
-    apiKey: z.string().min(1),
-  })
-  .strict()
 
 export const getAiProviderSecretPresenceRequestSchema = z
   .object({
@@ -20,7 +15,7 @@ export const setAiProviderSecretRequestSchema = z
   .object({
     surface: surfaceSchema,
     provider: z.enum(genAiProviderIds),
-    secret: aiProviderSecretBodySchema,
+    secret: aiProviderSecretSchema,
   })
   .strict()
 
@@ -39,4 +34,33 @@ export type SetAiProviderSecretRequest = z.infer<
 >
 export type ClearAiProviderSecretRequest = z.infer<
   typeof clearAiProviderSecretRequestSchema
+>
+
+export const testAiConnectionRequestSchema = z.strictObject({
+  surface: z.literal('dashboard'),
+  provider: z.enum(genAiProviderIds),
+  model: z.string().trim().min(1).max(120),
+})
+
+const connectionIdentity = {
+  provider: z.enum(genAiProviderIds),
+  model: z.string().min(1).max(120),
+  durationMs: z.number().finite().min(0),
+}
+
+export const testAiConnectionResponseSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('success'), ...connectionIdentity }),
+  z.strictObject({
+    status: z.literal('error'),
+    ...connectionIdentity,
+    code: z.enum([...genAiErrorCodes, 'stale-configuration']),
+    message: z.string().min(1).max(500),
+  }),
+])
+
+export type TestAiConnectionRequest = z.infer<
+  typeof testAiConnectionRequestSchema
+>
+export type TestAiConnectionResponse = z.infer<
+  typeof testAiConnectionResponseSchema
 >

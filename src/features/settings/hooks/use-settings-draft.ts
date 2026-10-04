@@ -1,10 +1,12 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef } from 'react'
 
 import { readErrorMessage } from '@/utils/errors'
 
-import type { GenAiProviderId } from '@/features/genai'
-
 import { useSettings, useUpdateSettings } from '../api/settings-api'
+import {
+  useSettingsOperationGate,
+  type SettingsOperationGate,
+} from './use-settings-operation-gate'
 import {
   createUserSettingsPatch,
   defaultAnalyticsTargets,
@@ -40,9 +42,6 @@ export interface SettingsDraftActions {
   resetDefaults: () => Promise<void>
   retry: () => void
   save: () => Promise<void>
-  setAiEnabled: (value: boolean) => void
-  setAiModel: (value: string) => void
-  setAiProvider: (value: GenAiProviderId) => void
   setAutoDetectSolved: (value: boolean) => void
   setNumberInput: (field: SettingsNumberField, value: string) => void
   setRemindersEnabled: (value: boolean) => void
@@ -85,9 +84,6 @@ type SettingsDraftAction =
   | { type: 'loaded'; settings: UserSettings }
   | { type: 'number-input-changed'; field: SettingsNumberField; value: string }
   | { type: 'saved'; settings: UserSettings }
-  | { type: 'set-ai-enabled'; value: boolean }
-  | { type: 'set-ai-model'; value: string }
-  | { type: 'set-ai-provider'; value: GenAiProviderId }
   | { type: 'set-auto-detect-solved'; value: boolean }
   | { type: 'set-reminders-enabled'; value: boolean }
   | { type: 'set-reminders-time'; value: string }
@@ -108,14 +104,16 @@ const initialDraftState: SettingsDraftState = {
   status: null,
 }
 
-type SettingsMutationKind = 'resetDefaults' | 'save'
-
-export function useSettingsDraft(): SettingsDraftController {
+export function useSettingsDraft(
+  sharedGate?: SettingsOperationGate,
+  onReset?: (settings: UserSettings) => void,
+): SettingsDraftController {
+  const localGate = useSettingsOperationGate()
+  const gate = sharedGate ?? localGate
   const settingsQuery = useSettings()
   const updateSettings = useUpdateSettings()
   const [state, dispatch] = useReducer(settingsDraftReducer, initialDraftState)
-  const [pendingMutation, setPendingMutation] =
-    useState<SettingsMutationKind | null>(null)
+  const ownMutationPending = useRef(false)
 
   useEffect(() => {
     if (settingsQuery.data) {
@@ -133,14 +131,13 @@ export function useSettingsDraft(): SettingsDraftController {
   const hasChanges = hasLocalChanges(state)
   const hasSettingsChanges = hasPersistableSettingsChanges(state)
   const isMutatingSettings = updateSettings.isPending
-  const isResettingDefaults =
-    isMutatingSettings && pendingMutation === 'resetDefaults'
-  const isSaving = isMutatingSettings && pendingMutation === 'save'
+  const isResettingDefaults = gate.activeOperation === 'reset'
+  const isSaving = gate.activeOperation === 'preferences'
   const canSave =
     Boolean(state.saved && state.draft) &&
     hasSettingsChanges &&
     !hasValidationErrors &&
-    !isMutatingSettings
+    !gate.activeOperation
   const canDiscard =
     Boolean(state.saved && state.draft) && hasChanges && !isMutatingSettings
   const canResetDefaults =
@@ -150,29 +147,26 @@ export function useSettingsDraft(): SettingsDraftController {
       (hasUserSettingsChanges(defaultUserSettings, state.saved) ||
         hasUserSettingsChanges(defaultUserSettings, state.draft) ||
         hasNumberInputChanges(state)),
-    ) && !isMutatingSettings
+    ) && !gate.activeOperation
   const loadError = settingsQuery.isError
     ? readErrorMessage(settingsQuery.error, 'Failed to load settings.')
     : null
 
   async function save() {
-    if (
-      !state.saved ||
-      !state.draft ||
-      hasValidationErrors ||
-      isMutatingSettings
-    ) {
+    if (!state.saved || !state.draft || hasValidationErrors || gate.isBusy()) {
       return
     }
 
-    const patch = createUserSettingsPatch(state.saved, state.draft)
+    const patch = createPreferencesPatch(state.saved, state.draft)
 
     if (!patch) {
       return
     }
 
+    const release = gate.acquire('preferences')
+    if (!release) return
+    ownMutationPending.current = true
     dispatch({ type: 'set-status', status: null })
-    setPendingMutation('save')
 
     try {
       const savedSettings = await updateSettings.mutateAsync({
@@ -194,21 +188,27 @@ export function useSettingsDraft(): SettingsDraftController {
         },
       })
     } finally {
-      setPendingMutation(null)
+      ownMutationPending.current = false
+      release()
     }
   }
 
   async function resetDefaults() {
-    if (!state.saved || !state.draft || isMutatingSettings) {
+    if (!state.saved || !state.draft || gate.isBusy()) {
       return
     }
 
+    const release = gate.acquire('reset')
+    if (!release) return
+    ownMutationPending.current = true
     dispatch({ type: 'set-status', status: null })
-    setPendingMutation('resetDefaults')
 
     try {
       const patch = {
-        ...createUserSettingsPatch(state.saved, defaultUserSettings),
+        ...createUserSettingsPatch(
+          settingsQuery.data ?? state.saved,
+          defaultUserSettings,
+        ),
         analytics: defaultAnalyticsTargets,
       }
       const savedSettings = await updateSettings.mutateAsync({
@@ -217,6 +217,7 @@ export function useSettingsDraft(): SettingsDraftController {
       })
 
       dispatch({ type: 'saved', settings: savedSettings })
+      onReset?.(savedSettings)
 
       dispatch({
         type: 'set-status',
@@ -231,8 +232,13 @@ export function useSettingsDraft(): SettingsDraftController {
         },
       })
     } finally {
-      setPendingMutation(null)
+      ownMutationPending.current = false
+      release()
     }
+  }
+
+  function dispatchEdit(action: SettingsDraftAction) {
+    if (!ownMutationPending.current) dispatch(action)
   }
 
   return {
@@ -252,6 +258,7 @@ export function useSettingsDraft(): SettingsDraftController {
     canSave,
     actions: {
       discard: () => {
+        if (ownMutationPending.current) return
         dispatch({ type: 'discard' })
       },
       resetDefaults,
@@ -259,36 +266,33 @@ export function useSettingsDraft(): SettingsDraftController {
         void settingsQuery.refetch()
       },
       save,
-      setAiEnabled: (value) => dispatch({ type: 'set-ai-enabled', value }),
-      setAiModel: (value) => dispatch({ type: 'set-ai-model', value }),
-      setAiProvider: (value) => dispatch({ type: 'set-ai-provider', value }),
       setAutoDetectSolved: (value) => {
-        dispatch({ type: 'set-auto-detect-solved', value })
+        dispatchEdit({ type: 'set-auto-detect-solved', value })
       },
       setNumberInput: (field, value) => {
-        dispatch({ type: 'number-input-changed', field, value })
+        dispatchEdit({ type: 'number-input-changed', field, value })
       },
       setRequireSolveTime: (value) => {
-        dispatch({ type: 'set-require-solve-time', value })
+        dispatchEdit({ type: 'set-require-solve-time', value })
       },
       setRemindersEnabled: (value) =>
-        dispatch({ type: 'set-reminders-enabled', value }),
+        dispatchEdit({ type: 'set-reminders-enabled', value }),
       setRemindersTime: (value) =>
-        dispatch({ type: 'set-reminders-time', value }),
+        dispatchEdit({ type: 'set-reminders-time', value }),
       setSkipPremium: (value) => {
-        dispatch({ type: 'set-skip-premium', value })
+        dispatchEdit({ type: 'set-skip-premium', value })
       },
       setStudyMode: (value) => {
-        dispatch({ type: 'set-study-mode', value })
+        dispatchEdit({ type: 'set-study-mode', value })
       },
       setStrictTiming: (value) => {
-        dispatch({ type: 'set-strict-timing', value })
+        dispatchEdit({ type: 'set-strict-timing', value })
       },
       setTargetRetention: (value) => {
-        dispatch({ type: 'set-target-retention', value })
+        dispatchEdit({ type: 'set-target-retention', value })
       },
       setThemeMode: (value) => {
-        dispatch({ type: 'set-theme-mode', value })
+        dispatchEdit({ type: 'set-theme-mode', value })
       },
     },
   }
@@ -314,33 +318,6 @@ function settingsDraftReducer(
       return applyNumberInputChange(state, action.field, action.value)
     case 'saved':
       return createStateFromSettings(action.type, action.settings)
-    case 'set-ai-enabled':
-      if (!state.draft) return state
-      return {
-        ...state,
-        draft: {
-          ...state.draft,
-          aiAssessment: { ...state.draft.aiAssessment, enabled: action.value },
-        },
-      }
-    case 'set-ai-model':
-      if (!state.draft) return state
-      return {
-        ...state,
-        draft: {
-          ...state.draft,
-          aiAssessment: { ...state.draft.aiAssessment, model: action.value },
-        },
-      }
-    case 'set-ai-provider':
-      if (!state.draft) return state
-      return {
-        ...state,
-        draft: {
-          ...state.draft,
-          aiAssessment: { ...state.draft.aiAssessment, provider: action.value },
-        },
-      }
     case 'set-auto-detect-solved':
       return updateDraft(state, (draft) => ({
         ...draft,
@@ -492,10 +469,17 @@ function hasPersistableSettingsChanges(state: SettingsDraftState) {
   return Boolean(
     state.saved &&
     state.draft &&
-    hasUserSettingsChanges(state.saved, state.draft),
+    createPreferencesPatch(state.saved, state.draft),
   )
 }
 
 function hasNumberInputChanges(state: SettingsDraftState) {
   return hasNumberInputTextChanges(state.draft, state.numberInputs)
+}
+
+function createPreferencesPatch(saved: UserSettings, draft: UserSettings) {
+  const patch = createUserSettingsPatch(saved, draft)
+  if (!patch) return null
+  delete patch.aiAssessment
+  return Object.keys(patch).length === 0 ? null : patch
 }

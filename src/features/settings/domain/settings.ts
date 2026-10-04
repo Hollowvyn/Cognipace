@@ -229,9 +229,11 @@ export const userSettingsPatchSchema = z
       .optional(),
     aiAssessment: z
       .object({
-        enabled: aiAssessmentSettingsSchema.shape.enabled.optional(),
-        provider: aiAssessmentSettingsSchema.shape.provider.optional(),
-        model: aiAssessmentSettingsSchema.shape.model.optional(),
+        // PATCH fields must not inherit persisted-row defaults: Zod applies
+        // defaults inside optional fields even when the caller omits them.
+        enabled: z.boolean().optional(),
+        provider: aiAssessmentProviderSchema.optional(),
+        model: aiAssessmentModelSchema.optional(),
       })
       .strict()
       .optional(),

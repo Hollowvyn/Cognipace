@@ -6,12 +6,7 @@ import {
 } from '@/features/problems/api/problems-contracts'
 import { z } from 'zod'
 
-import {
-  PROMPT_VERSION,
-  assessmentRecommendationConfidenceLevels,
-  assessmentRecommendationRatings,
-  type AssessmentRecommendation,
-} from '../domain/recommendation-types'
+import { assessmentRecommendationSchema } from '../domain/recommendation-schema'
 
 const reviewRatingSchema = z.enum(['again', 'hard', 'good', 'easy'])
 
@@ -152,40 +147,33 @@ export type RecommendLeetCodeAssessmentRequest = z.infer<
   typeof recommendLeetCodeAssessmentRequestSchema
 >
 
-const assessmentRecommendationSchemaForResponse = z
-  .object({
-    recommendedRating: z.enum(assessmentRecommendationRatings),
-    confidence: z.enum(assessmentRecommendationConfidenceLevels),
-    summary: z.string(),
-    primaryReason: z.string(),
-    evidence: z.array(z.string()).readonly(),
-    complexity: z
-      .object({
-        time: z.string(),
-        space: z.string(),
-        confidence: z.enum(assessmentRecommendationConfidenceLevels),
-      })
-      .strict(),
-    improvementPoints: z.array(z.string()).readonly(),
-    edgeCaseNotes: z.array(z.string()).readonly(),
-    shouldUpdateRating: z.boolean(),
-    promptVersion: z.literal(PROMPT_VERSION),
+const assessmentRecommendationSchemaForResponse =
+  assessmentRecommendationSchema.extend({
+    evidence: assessmentRecommendationSchema.shape.evidence.readonly(),
+    improvementPoints:
+      assessmentRecommendationSchema.shape.improvementPoints.readonly(),
+    edgeCaseNotes:
+      assessmentRecommendationSchema.shape.edgeCaseNotes.readonly(),
   })
-  .strict() satisfies z.ZodType<AssessmentRecommendation>
 
 const genAiProviderMetadataSchemaForResponse = z
   .object({
     provider: z.enum(genAiProviderIds),
     model: z.string(),
-    durationMs: z.number(),
+    durationMs: z.number().nonnegative(),
   })
   .strict()
 
 const recommendLeetCodeAssessmentErrorCodeSchema = z.enum([
   'auth',
+  'permission',
+  'bad-request',
+  'model-unavailable',
   'rate-limit',
   'network',
   'timeout',
+  'cancelled',
+  'refused',
   'invalid-output',
   'unknown',
 ])

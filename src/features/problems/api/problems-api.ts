@@ -107,7 +107,7 @@ function useProblemMutation<TRequest, TResponse>(
   return useMutation({
     mutationFn,
     onSuccess: () => {
-      invalidateTaggedQueries(queryClient, ['problems'])
+      void invalidateTaggedQueries(queryClient, ['problems'])
     },
   })
 }

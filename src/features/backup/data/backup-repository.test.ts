@@ -286,7 +286,7 @@ describe('backup repository', () => {
     await insertCustomState(db)
 
     // Store a real AI provider secret so backup export covers secret exclusion.
-    await setAiProviderSecret(db, 'openai', { apiKey: 'sk-test' })
+    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
 
     // Export must not throw and must never include trusted secret material.
     const backupData = await createBackupRepository(db).readBackupData()

@@ -2,6 +2,7 @@ import {
   deleteSecret,
   getSecretStatus,
   readSecret,
+  readSecretSnapshot,
   saveSecret,
   type SecretProviderId,
 } from '@/platform/secrets'
@@ -67,6 +68,26 @@ export async function loadAiProviderSecretFromTrustedStorage(
   }
 
   return parseStoredAiProviderSecret(stored)
+}
+
+export async function loadAiProviderSecretSnapshotFromTrustedStorage(
+  provider: GenAiProviderId,
+) {
+  const stored = await readSecretSnapshot(
+    secretProviderByGenAiProvider[provider],
+  )
+  if (!stored) return null
+  const secret = parseStoredAiProviderSecret(stored.value)
+  if (!secret) return null
+  return {
+    secret,
+    identity: JSON.stringify([
+      stored.updatedAt,
+      stored.fingerprint,
+      stored.revision,
+      stored.value,
+    ]),
+  }
 }
 
 function parseStoredAiProviderSecret(value: string): AiProviderSecret | null {

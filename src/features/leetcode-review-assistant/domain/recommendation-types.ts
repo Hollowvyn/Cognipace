@@ -99,7 +99,6 @@ export type RecommendAssessmentOutput =
     }
   | {
       status: 'fallback'
-      recommendation: AssessmentRecommendation
       error: {
         code: GenAiError
         message: string

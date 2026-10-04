@@ -37,6 +37,9 @@
     "format:write": "prettier --write ."
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "4.0.71",
+    "@ai-sdk/google": "4.0.87",
+    "@ai-sdk/openai": "4.0.83",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
@@ -44,6 +47,7 @@
     "@tanstack/react-router": "^1.170.4",
     "@tanstack/react-table": "^8.21.3",
     "@webext-core/messaging": "^2.3.0",
+    "ai": "7.0.127",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.2.1",

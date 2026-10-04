@@ -11,7 +11,7 @@ export function CacheInvalidationListener() {
     return onMessage('cache.invalidate', ({ data }) => {
       const event = cacheInvalidationEventSchema.parse(data)
 
-      invalidateTaggedQueries(queryClient, event.tags)
+      void invalidateTaggedQueries(queryClient, event.tags)
 
       return null
     })

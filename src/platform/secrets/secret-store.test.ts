@@ -89,6 +89,38 @@ describe('secret store', () => {
     })
   })
 
+  it('waits for one restriction attempt before any concurrent secret access', async () => {
+    let ready!: () => void
+    setAccessLevel.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          ready = resolve
+        }),
+    )
+    const get = vi.spyOn(chrome.storage.local, 'get')
+    const removeFromStorage = vi.spyOn(chrome.storage.local, 'remove')
+    const read = readSecret('github:gist')
+    const save = saveSecret('genai:openai', 'sk-test')
+    const remove = deleteSecret('genai:anthropic')
+    await Promise.resolve()
+    expect(setAccessLevel).toHaveBeenCalledTimes(1)
+    expect(storage.size).toBe(0)
+    expect(get).not.toHaveBeenCalled()
+    expect(removeFromStorage).not.toHaveBeenCalled()
+    ready()
+    await Promise.all([read, save, remove])
+    expect(storage.size).toBe(1)
+  })
+
+  it('fails closed and retries a failed storage restriction', async () => {
+    setAccessLevel.mockRejectedValueOnce(new Error('restriction failed'))
+    await expect(saveSecret('github:gist', 'ghp_secret')).rejects.toThrow()
+    expect(storage.size).toBe(0)
+    await saveSecret('github:gist', 'ghp_secret')
+    expect(setAccessLevel).toHaveBeenCalledTimes(2)
+    await expect(readSecret('github:gist')).resolves.toBe('ghp_secret')
+  })
+
   it('restricts local storage to trusted extension contexts', async () => {
     await restrictSecretStorageAccess()
 
@@ -97,3 +129,23 @@ describe('secret store', () => {
     })
   })
 })
+
+it.each(['read', 'status', 'save', 'delete'] as const)(
+  'fails closed before %s storage access when restriction fails',
+  async (operation) => {
+    setAccessLevel.mockRejectedValueOnce(new Error('restriction failed'))
+    const get = vi.spyOn(chrome.storage.local, 'get')
+    const set = vi.spyOn(chrome.storage.local, 'set')
+    const remove = vi.spyOn(chrome.storage.local, 'remove')
+    const execute = {
+      read: () => readSecret('genai:openai'),
+      status: () => getSecretStatus('genai:openai'),
+      save: () => saveSecret('genai:openai', 'fake-private-key'),
+      delete: () => deleteSecret('genai:openai'),
+    }[operation]
+    await expect(execute()).rejects.toThrow(/trusted secret storage/i)
+    expect(get).not.toHaveBeenCalled()
+    expect(set).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+  },
+)
