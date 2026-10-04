@@ -31,9 +31,11 @@ Independent data specification/quality review and UI specification/quality
 review completed. Three UI findings were corrected: shared empty-state copy,
 hover/Enter identity parity and inverse-scale wheel/pinch anchoring. Browser
 integration also corrected Chart/Table switching dismissing a pin. Ponytail's
-only remaining suggestion removed four redundant gesture-state lines.
+initial suggestion removed four redundant gesture-state lines. The follow-up
+PR review reused the existing sparse-tick helper and fixture point parser,
+removing another 11 lines without removing test cases.
 
-Production adds 1,367 lines and removes 643; tests add 340 and remove 143. There
+Production adds 1,362 lines and removes 643; tests add 334 and remove 143. There
 are no committed bulk fixtures. Both added-line and net-line test/production
 ratios are below the user's maximum 1:1. Browser harnesses and generated data
 remain outside the repository.
@@ -50,6 +52,14 @@ Passed:
 - `npm run build` — production Chrome MV3 extension in `dist/chrome-mv3`.
 - `npx prettier --ignore-path /dev/null --check design.md docs/architecture.md docs/product.md docs/testing.md docs/superpowers/README.md docs/superpowers/specs/2026-10-04-analytics-retention-landscape-design.md docs/superpowers/plans/2026-10-04-analytics-retention-landscape.md docs/superpowers/handoffs/2026-10-04-analytics-retention-landscape.md src/features/analytics/api/analytics-contracts.ts src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/domain/current-state-presentation.ts src/features/analytics/domain/current-state-presentation.test.ts src/features/analytics/components/analytics-screen.tsx src/features/analytics/components/current-state-views.tsx src/features/analytics/components/current-state-views.test.tsx src/features/analytics/components/retention-map-chart.tsx src/features/analytics/components/retention-map-model.ts src/features/analytics/components/retention-map-model.test.ts src/styles/analytics.css` — explicit paths include planning files normally excluded by `.prettierignore`.
 - `git diff --check`.
+
+Follow-up cleanup validation uses the same pinned environment: the focused
+command `npm test -- src/features/analytics/components/current-state-views.test.tsx src/features/analytics/components/retention-map-model.test.ts src/features/analytics/components/charts/historical-chart-model.test.ts`
+passes all 20 tests in three files. Production-component browser checks were
+not repeated for this behavior-equivalent helper reuse; the existing browser
+proof remains below. `npm run lint`, `npm run check` (2,176 tests in 196 files),
+`npm run build`, `npx prettier --ignore-path /dev/null --check src/features/analytics/components/retention-map-model.ts src/features/analytics/components/current-state-views.test.tsx docs/superpowers/handoffs/2026-10-04-analytics-retention-landscape.md`
+and `git diff --check` also pass for the cleanup.
 
 The full test suite emits existing jsdom `scrollTo` notices. Build emits the
 existing large-chunk warning; neither command failed.

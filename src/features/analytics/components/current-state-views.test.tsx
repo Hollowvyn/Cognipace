@@ -91,7 +91,9 @@ function plotFixture(distinct = false) {
     y: top,
     toJSON: () => ({}),
   })
-  const point = document.querySelector('[data-retention-map-point] polygon')!
+  const point = document.querySelector(
+    `[data-retention-map-point="${distinct ? 'overlap-2' : 'overlap-0'}"] polygon`,
+  )!
   const [x, y] = point
     .getAttribute('points')!
     .split(' ')[0]!
@@ -346,16 +348,8 @@ describe('current-state analytics views', () => {
   })
 
   it('pins the hovered preview identity with Enter', () => {
-    const { control } = plotFixture(true)
-    const point = document.querySelector(
-      '[data-retention-map-point="overlap-2"] polygon',
-    )!
-    const [x, y] = point
-      .getAttribute('points')!
-      .split(' ')[0]!
-      .split(',')
-      .map(Number)
-    fireEvent.pointerMove(control, { clientX: x!, clientY: y! + 30 })
+    const { control, x, y } = plotFixture(true)
+    fireEvent.pointerMove(control, { clientX: x, clientY: y })
     expect(screen.getByRole('status')).toHaveTextContent('Overlap 2')
     fireEvent.keyDown(control, { key: 'Enter' })
     expect(

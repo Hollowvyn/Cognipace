@@ -1,4 +1,5 @@
 import type { AnalyticsViews } from '../api/analytics-contracts'
+import { sparseHistoricalYTicks } from './charts/historical-chart-model'
 
 export type RetentionRow = AnalyticsViews['retentionMap']['rows'][number]
 export interface RetentionViewport {
@@ -201,13 +202,7 @@ export function durationTicks(domain: [number, number]): number[] {
     }
   }
   if (candidates.length < 2) return [...domain]
-  return candidates.length <= 5
-    ? candidates
-    : Array.from(
-        { length: 5 },
-        (_, index) =>
-          candidates[Math.round((index * (candidates.length - 1)) / 4)]!,
-      )
+  return sparseHistoricalYTicks(candidates, 5)
 }
 
 export function recallTicks(domain: [number, number]): number[] {
