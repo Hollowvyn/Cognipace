@@ -14,6 +14,8 @@ const methodSurfaceAccess = {
   'genai.setAiProviderSecret': ['popup', 'dashboard'],
   'genai.clearAiProviderSecret': ['popup', 'dashboard'],
   'genai.testConnection': ['dashboard'],
+  'genai.analyzeLeetCodeSubmission': ['content-script'],
+  'genai.cancelLeetCodeAnalysis': ['content-script'],
   'genai.recommendLeetCodeAssessment': ['content-script'],
   'imports.preview': ['dashboard'],
   'imports.apply': ['dashboard'],

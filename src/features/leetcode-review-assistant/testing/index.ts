@@ -1,4 +1,7 @@
-export { makeValidAnalysis } from './code-analysis-fixtures'
+export {
+  makeAnalysisRequest,
+  makeValidAnalysis,
+} from './code-analysis-fixtures'
 
 export {
   makeAcceptedDecision,

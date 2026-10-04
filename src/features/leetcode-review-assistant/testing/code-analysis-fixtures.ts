@@ -1,3 +1,5 @@
+import type { AnalyzeLeetCodeSubmissionRequest } from '../api/code-analysis-contracts'
+
 import {
   CODE_ANALYSIS_VERSION,
   type CodeAnalysisReport,
@@ -86,5 +88,57 @@ export function makeValidAnalysis(
     },
     suggestedImplementationUnavailableReason: null,
     ...overrides,
+  }
+}
+
+export function makeAnalysisRequest(): AnalyzeLeetCodeSubmissionRequest {
+  return {
+    surface: 'content-script',
+    requestId: 'request-1',
+    attemptId: 'attempt-1',
+    submissionId: '1234567890',
+    problemSlug: 'two-sum',
+    configurationRevision: 0,
+    problem: {
+      slug: 'two-sum',
+      title: 'Two Sum',
+      difficulty: 'Easy',
+      topics: ['Array', 'Hash Table'],
+      statement:
+        'Return two distinct zero-based indices whose values add up to target. Exactly one pair exists.',
+      examples: ['nums = [2,7,11,15], target = 9; output [0,1]'],
+      constraints: ['2 <= nums.length <= 10000'],
+      followUps: ['Target expected linear time; extra memory is allowed.'],
+    },
+    submission: {
+      status: 'accepted',
+      code: [
+        'function twoSum(nums, target) {',
+        '  for (let i = 0; i < nums.length; i++) {',
+        '    for (let j = i + 1; j < nums.length; j++) {',
+        '      if (nums[i] + nums[j] === target) return [i, j];',
+        '    }',
+        '  }',
+        '  return [];',
+        '}',
+      ].join('\n'),
+      language: 'JavaScript',
+      languageVersion: null,
+      runtime: '34 ms',
+      memory: null,
+      passedTestCount: 50,
+      totalTestCount: 50,
+      diagnostics: {
+        errorMessage: null,
+        compileError: null,
+        runtimeError: null,
+        failingTestcase: null,
+        lastTestcase: null,
+        codeOutput: null,
+        expectedOutput: null,
+        stdOutput: null,
+      },
+      omittedDiagnostics: [],
+    },
   }
 }

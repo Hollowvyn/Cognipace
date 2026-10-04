@@ -384,3 +384,27 @@ it('keeps connection testing dashboard-only and rejects a forged sender', () => 
     }),
   ).toThrow(/cannot claim/)
 })
+
+it.each([
+  'genai.analyzeLeetCodeSubmission',
+  'genai.cancelLeetCodeAnalysis',
+] as const)(
+  'keeps %s content-script-only and rejects forged surfaces',
+  (method) => {
+    expect(canCallExtensionMethod(method, 'content-script')).toBe(true)
+    for (const surface of ['popup', 'dashboard', 'background'] as const)
+      expect(canCallExtensionMethod(method, surface)).toBe(false)
+    expect(() =>
+      assertCanSenderCallExtensionMethod(method, 'content-script', {
+        tab: { id: 7 },
+        frameId: 0,
+        url: 'https://leetcode.com/problems/two-sum/',
+      }),
+    ).not.toThrow()
+    expect(() =>
+      assertCanSenderCallExtensionMethod(method, 'content-script', {
+        url: 'chrome-extension://extension-id/dashboard.html',
+      }),
+    ).toThrow(/cannot claim/)
+  },
+)
