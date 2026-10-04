@@ -36,6 +36,7 @@ export type {
   LeetCodeReviewContext,
 } from './capture/capture-state'
 export type {
+  LeetCodeCaptureCompleteness,
   LeetCodeCodeSnapshot,
   LeetCodeDifficulty,
   LeetCodeExample,

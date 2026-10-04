@@ -15,12 +15,16 @@ export interface LeetCodeRemoteAuth {
 
 /** Request for slug-scoped LeetCode problem metadata or content. */
 export interface LeetCodeProblemRemoteRequest {
+  refresh?: boolean | undefined
   location: LeetCodeProblemLocation
   auth?: LeetCodeRemoteAuth | undefined
 }
 
 /** Request for one submitted LeetCode attempt result poll. */
 export interface LeetCodeSubmissionResultRemoteRequest {
+  attemptId: string
+  submissionId?: string | undefined
+  refresh?: boolean | undefined
   location: LeetCodeProblemLocation
   click: LeetCodeSubmissionClick
   submittedCodeSnapshot: LeetCodeSubmittedCodeSnapshot

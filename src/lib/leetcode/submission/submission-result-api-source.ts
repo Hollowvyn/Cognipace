@@ -98,6 +98,7 @@ const leetCodeSubmissionDetailsQuery = `
 `
 
 export async function readLeetCodeSubmissionResultFromApi(options: {
+  submissionId?: string | undefined
   location: LeetCodeProblemLocation
   click: LeetCodeSubmissionClick
   submittedCodeSnapshot: LeetCodeSubmittedCodeSnapshot
@@ -107,6 +108,13 @@ export async function readLeetCodeSubmissionResultFromApi(options: {
   now?: (() => number) | undefined
   onDebug?: ((debug: LeetCodeSubmissionPollingDebug) => void) | undefined
 }): Promise<LeetCodeSubmissionResult | null> {
+  if (
+    options.submissionId !== undefined &&
+    !/^\d+$/.test(options.submissionId)
+  ) {
+    return null
+  }
+
   const fetchLeetCode = options.fetch ?? globalThis.fetch?.bind(globalThis)
 
   if (!fetchLeetCode) {
@@ -120,11 +128,20 @@ export async function readLeetCodeSubmissionResultFromApi(options: {
     statusText: null,
   })
 
-  const submissionListEntry = await findSubmissionListEntryForClick({
-    location: options.location,
-    click: options.click,
-    fetch: fetchLeetCode,
-  })
+  const submissionListEntry: SubmissionListEntry | null = options.submissionId
+    ? {
+        id: options.submissionId,
+        timestamp: null,
+        statusText: null,
+        runtime: null,
+        memory: null,
+        language: null,
+      }
+    : await findSubmissionListEntryForClick({
+        location: options.location,
+        click: options.click,
+        fetch: fetchLeetCode,
+      })
 
   if (!submissionListEntry) {
     emitSubmissionPollingDebug(options, {
@@ -265,6 +282,9 @@ export async function readLeetCodeSubmissionResultFromApi(options: {
       source: detailsPayload?.code
         ? 'api'
         : options.submittedCodeSnapshot.source,
+      completeness: detailsPayload?.code
+        ? 'complete'
+        : options.submittedCodeSnapshot.completeness,
       capturedAt,
     },
   }
@@ -303,14 +323,19 @@ async function findSubmissionListEntryForClick(options: {
   const submissions = readSubmissionListEntries(payload)
   const clickedAtSeconds = Math.floor(options.click.clickedAt / 1000)
 
-  return (
-    submissions.find(
-      (submission) =>
-        submission.timestamp !== null &&
-        submission.timestamp >= clickedAtSeconds - 5 &&
-        submission.statusText !== 'Internal Error',
-    ) ?? null
+  // Timestamp association is best effort: same-second clicks and clock skew
+  // cannot establish network-confirmed identity. Refuse ambiguous candidates.
+  const eligibleSubmissions = submissions.filter(
+    (submission) =>
+      submission.timestamp !== null &&
+      submission.timestamp >= clickedAtSeconds &&
+      submission.timestamp <= clickedAtSeconds + 5 &&
+      submission.statusText !== 'Internal Error',
   )
+
+  return eligibleSubmissions.length === 1
+    ? (eligibleSubmissions[0] ?? null)
+    : null
 }
 
 async function readSubmissionCheckPayload(options: {
@@ -413,7 +438,10 @@ async function readSubmissionDetailsPayload(options: {
 
   const details = graphQlResult.payload.data.submissionDetails
 
-  if (!isObjectRecord(details)) {
+  if (
+    !isObjectRecord(details) ||
+    readSubmissionId(details.id) !== options.submissionId
+  ) {
     return null
   }
 
@@ -442,7 +470,10 @@ async function readSubmissionDetailsPayload(options: {
     errorMessage: readTrimmedString(
       details.runtimeError ?? details.compileError,
     ),
-    code: readTrimmedString(details.code),
+    code:
+      typeof details.code === 'string' && details.code.trim()
+        ? details.code
+        : null,
     language,
   }
 }
@@ -541,9 +572,9 @@ function readLanguageLabel(value: unknown) {
 }
 
 function readSubmissionId(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return String(value)
-  }
-
-  return readTrimmedString(value)
+  const id =
+    typeof value === 'number' && Number.isSafeInteger(value)
+      ? String(value)
+      : readTrimmedString(value)
+  return id && /^\d+$/.test(id) ? id : null
 }

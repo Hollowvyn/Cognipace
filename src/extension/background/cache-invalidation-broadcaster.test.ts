@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { broadcastCacheInvalidation } from './cache-invalidation-broadcaster'
 
+const analysisMocks = vi.hoisted(() => ({ abortLeetCodeAnalyses: vi.fn() }))
+vi.mock('./leetcode-analysis-operations', () => analysisMocks)
+
 type LeetCodeTab = { id?: number | undefined }
 
 type TabsQuery = (queryInfo: { url: string[] }) => Promise<LeetCodeTab[]>
@@ -41,27 +44,63 @@ describe('cache invalidation broadcaster', () => {
     browserMocks.tabsQuery.mockResolvedValue([{ id: 10 }, { id: 20 }, {}])
   })
 
+  it('aborts analyses synchronously before an unresolved GenAI broadcast', async () => {
+    let finish!: (value: null) => void
+    messagingMocks.sendMessage.mockImplementation(
+      () =>
+        new Promise<null>((resolve) => {
+          finish = resolve
+        }),
+    )
+    browserMocks.tabsQuery.mockResolvedValue([])
+    const pending = broadcastCacheInvalidation({
+      reason: 'genai-updated',
+      source: 'dashboard',
+      tags: ['genai'],
+    })
+    expect(analysisMocks.abortLeetCodeAnalyses).toHaveBeenCalledTimes(1)
+    expect(
+      analysisMocks.abortLeetCodeAnalyses.mock.invocationCallOrder[0],
+    ).toBeLessThan(messagingMocks.sendMessage.mock.invocationCallOrder[0]!)
+    finish(null)
+    await pending
+  })
+
+  it('leaves analyses active for unrelated invalidation tags', async () => {
+    await broadcastCacheInvalidation({
+      reason: 'settings-updated',
+      source: 'dashboard',
+      tags: ['settings'],
+    })
+    expect(analysisMocks.abortLeetCodeAnalyses).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed events before cancelling work', async () => {
+    await expect(
+      broadcastCacheInvalidation({
+        reason: 'genai-updated',
+        source: 'dashboard',
+        tags: ['genai', 'invalid' as never],
+      }),
+    ).rejects.toThrow()
+    expect(analysisMocks.abortLeetCodeAnalyses).not.toHaveBeenCalled()
+  })
+
   it('broadcasts typed cache invalidation events to extension pages and LeetCode tabs', async () => {
+    const input = {
+      problemSlug: 'two-sum',
+      reason: 'practice-updated',
+      source: 'content-script',
+      tags: ['practice', 'queue', 'app-shell'],
+    } as const
     const event = await broadcastCacheInvalidation({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'content-script',
-      tags: ['practice', 'queue', 'app-shell'],
+      ...input,
+      tags: [...input.tags],
     })
-
-    expect(event).toMatchObject({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'content-script',
-      tags: ['practice', 'queue', 'app-shell'],
-    })
-
+    expect(event).toMatchObject(input)
     expect(messagingMocks.sendMessage).toHaveBeenCalledWith(
       'cache.invalidate',
-      expect.objectContaining({
-        reason: 'practice-updated',
-        tags: ['practice', 'queue', 'app-shell'],
-      }),
+      expect.objectContaining(input),
     )
     expect(browserMocks.tabsQuery).toHaveBeenCalledWith({
       url: [
@@ -69,22 +108,12 @@ describe('cache invalidation broadcaster', () => {
         'https://www.leetcode.com/problems/*',
       ],
     })
-    expect(messagingMocks.sendMessage).toHaveBeenCalledWith(
-      'cache.invalidate',
-      expect.objectContaining({
-        reason: 'practice-updated',
-        tags: ['practice', 'queue', 'app-shell'],
-      }),
-      10,
-    )
-    expect(messagingMocks.sendMessage).toHaveBeenCalledWith(
-      'cache.invalidate',
-      expect.objectContaining({
-        reason: 'practice-updated',
-        tags: ['practice', 'queue', 'app-shell'],
-      }),
-      20,
-    )
+    for (const tabId of [10, 20])
+      expect(messagingMocks.sendMessage).toHaveBeenCalledWith(
+        'cache.invalidate',
+        expect.objectContaining(input),
+        tabId,
+      )
   })
 
   it('does not fail the source mutation when no surface can receive the event', async () => {

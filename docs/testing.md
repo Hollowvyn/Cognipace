@@ -391,7 +391,8 @@ count as completed browser proof.
 5. Leave Settings and reopen it. Confirm Gemini and the exact custom model
    remain selected, the key input is empty, and the saved-key status is present.
 6. Choose Test connection without re-entering the key. Enable AI assessment and
-   exercise the existing LeetCode recommendation with a submitted solution.
+   exercise automatic LeetCode code analysis with a completed submission.
+   Follow the installed-extension analysis checklist below.
 7. Change an unrelated preference and save it while AI edits are unfinished.
    Confirm those edits remain available and are not persisted by Save Settings.
 8. Repeat connection testing with OpenAI and Anthropic if you have their keys;
@@ -1257,6 +1258,129 @@ merge. Automated checks do not replace that proof.
 Human-run happy-path and edge-case smoke with screenshot or screen-recording
 proof is required before PR review or merge. This shortcut fix has automated
 watcher coverage; real-browser proof remains pending.
+
+#### Code analysis provider evaluation
+
+The six authored evaluation inputs in
+`src/features/leetcode-review-assistant/testing/code-analysis-evaluation-fixtures.ts`
+cover correct brute-force Two Sum with an expected linear-time goal, small
+constant-space Two Sum, sorted one-based Two Sum with a map space violation,
+insert-before-lookup wrong answer, Kotlin initialized Int inference, and Kotlin
+Long prefix sums with an empty generic collection. Neutral problem titles,
+constraints, examples, and current code go to the model. Fixture ids and human
+criteria stay outside the prompt. Fixture tests strictly parse the requests,
+check constraint differences and metadata isolation, and execute only authored
+JavaScript baseline inputs; that does not test generated suggestions.
+
+Normal checks leave `COGNIPACE_AI_EVAL` unset or set it to `0`. All six live
+cases skip before reading evaluation configuration. Only a human who intends
+a provider request should privately prepare `COGNIPACE_AI_EVAL=1`,
+`COGNIPACE_AI_EVAL_PROVIDER` (openai, anthropic, or gemini),
+`COGNIPACE_AI_EVAL_MODEL`, and `COGNIPACE_AI_EVAL_KEY` in the process environment.
+Never paste a key into commands, reports, logs, screenshots, or Git. These
+test-only variables do not read or change the app's trusted provider keys.
+Missing or invalid opted-in configuration throws one fixed redacted message.
+
+With that private environment already ready, use the pinned Node 24.20.0 and
+npm 11.19.0 toolchain:
+
+```sh
+rtk proxy zsh -c 'source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && rtk npm run test -- src/features/leetcode-review-assistant/server/code-analysis-provider-evaluation.test.ts --maxWorkers=1'
+```
+
+Each case calls the actual `analyzeCode` service with a 30-second deadline and
+35-second test timeout, using the existing single 8,192-token SDK path. A
+successful case writes only report, providerMetadata, criterion, and checkedAt
+to `/private/tmp/cognipace-ai-evaluation/<fixture.id>.json`. It never writes raw
+requests, configuration, provider bodies, environments, or keys. Verify the
+current checkedAt, provider, and model before citing an artifact; an older file
+does not prove the latest run passed. Passing schema and consistency validation
+does not establish human rubric quality, compilation, test success, or
+optimality. Inspect each report and record provider/model/date and results:
+
+- Brute force with the linear goal: a material hash-map replacement needs
+  Approach below 5 without forcing a particular score; expected linear time is
+  better and linear auxiliary space is worse independently.
+- Small constant-space case: the correct brute force is appropriate for at most
+  190 pairs. Do not automatically cap Approach, describe a hash map as O(1),
+  modify the input, or hide a copying/sorting memory violation.
+- Sorted one-based case: a material two-pointer replacement needs Approach
+  below 5 and primarily improves auxiliary space to O(1), retaining O(n) time,
+  nondecreasing order, unchanged input, and ordered one-based indices. Do not
+  claim a false asymptotic time-order improvement.
+- Wrong answer: catch the same-index defect for [3,2,4], target 6; check the
+  complement before insertion and return distinct indices 1 and 2 in either
+  order. Do not praise the incorrect early exit.
+- Kotlin insertion: explicit initialized Int types are valid; inference is
+  optional. Preserve the required IntArray/Int parameters, Int return type,
+  lower-bound invariant, and found/absent/before/after positions.
+- Kotlin prefix sum: preserve the same-length inclusive LongArray output and
+  signature. Inferred zero must be 0L; retain generic typing on the annotation
+  or initializer if keeping the empty collection. A direct LongArray is valid,
+  with O(n) time and O(1) auxiliary space excluding required O(n) output, versus
+  the current intermediate list's O(n) auxiliary space.
+
+Inspect agreement among summary, scores, strategy, comparisons, and suggested
+code for every case. After changes, rerun failed cases only, plus cases with an
+unresolved concern, using the test-name filter. Keep generated-code checks
+pending until actual provider outputs have been inspected. Then save the
+JavaScript suggestion and a small assertion runner at the path below. The
+runner must verify distinct valid indices and unchanged input for [2,7,11,15]
+with 9, [3,2,4] with 6, [3,3] with 6, and [-5,2,8] with 3. The sorted suggestion
+must retain ordered one-based indices. Run:
+
+```sh
+rtk proxy /Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin/node --check /private/tmp/cognipace-ai-evaluation/two-sum.js
+rtk proxy /Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin/node /private/tmp/cognipace-ai-evaluation/two-sum.js
+rtk proxy kotlinc /private/tmp/cognipace-ai-evaluation/kotlin-types.kt -d /private/tmp/cognipace-ai-evaluation/kotlin-types.jar
+```
+
+The Kotlin check should include both generated functions with their exact
+signatures, and assertions for insertion boundaries, inclusive prefix sums,
+and [2147483647,1] producing [2147483647L,2147483648L]. Do not infer compilation
+from visual inspection or schema success. Kotlin tooling was unavailable on
+the current PATH when checked on 2026-10-04; it was not installed. No live
+provider or generated-code proof has been run for this implementation.
+
+#### Required human installed-extension analysis smoke
+
+Status: prepared, pending. A human engineer must run these happy-path and
+edge-case realtime flows in the installed extension and attach screenshots or
+a recording before PR review or merge. Browser fixtures and mock provider
+reports supplement this proof and cannot replace it.
+
+1. With a confirmed Gemini connection, enable AI assessment, refresh the
+   LeetCode page, and verify idle before submission. Submit accepted code and
+   useful wrong-answer, runtime-error, compile-error, timeout, memory-limit,
+   output-limit, and unknown results when full matching context is available.
+   Verify one report per attempt and honest unavailable dimensions.
+2. Submit long/scrolled code and a problem with follow-ups. Verify complete
+   input, three /5 scores, all selected rows, independent time-better /
+   space-worse styling, and Kotlin Int, Long, generic types, and signatures.
+3. Make capture incomplete, then Retry after a newer submission exists.
+   Confirm Retry targets the original submission. Exercise rapid consecutive
+   submissions and ambiguous discovery; stale code/results must not attach to
+   another attempt.
+4. Exercise timeout, authentication, quota, network, and invalid-output errors.
+   Verify useful Settings/Retry actions. Change provider, key, or model during
+   preparation and generation; old results must not appear and Retry must use
+   the saved connection.
+5. Navigate during generation, restart, disable AI, and clear/reset. Confirm
+   stale work cannot reappear, the retained handled attempt stays idle until
+   explicit Retry, and new attempts can run. Collapse/dock/restore and open
+   details without extra provider requests; a replacement report starts closed.
+6. While AI is pending, save manual, quick, untimed, failed, and strict-overtime
+   reviews, accepted and failed deterministic autosaves, and a rating update.
+   Confirm immediate persistence, correct locks, rating/correctness/time,
+   FSRS/track progress, and one attempt only. Report arrival must make no extra
+   review write or rating change. Repeat with AI unavailable and disabled.
+7. Use Enter and Space on each independent native disclosure. Verify literal
+   model text stays inert, Copy success and failure feedback work, and 392px
+   and 320px layouts retain all labels and content with horizontal scrolling
+   confined to code.
+8. Record extension version, provider/model/date, happy and edge results, and
+   screenshot/recording paths. Recovery is to turn AI assessment off; review
+   saving and connection testing continue, with no migration or new permission.
 
 ### Cross-Surface Refresh
 

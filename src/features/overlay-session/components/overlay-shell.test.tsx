@@ -1,4 +1,6 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { CodeAnalysisState } from '../hooks/use-leetcode-code-analysis'
 import { describe, expect, it, vi } from 'vitest'
 
 import { initialOverlaySessionState } from '../domain'
@@ -21,17 +23,28 @@ vi.mock('./modes/expanded/expanded-overlay', () => ({
   ExpandedOverlay: ({
     themeMode,
     view,
+    commands,
   }: {
     themeMode: string
-    view: { helpSearchQuery: string | null; problemTitle: string }
+    view: {
+      helpSearchQuery: string | null
+      problemTitle: string
+      aiAnalysis: CodeAnalysisState
+    }
+    commands: { onRetryAiAnalysis: () => void; onSettings: () => void }
   }) => (
     <div
       data-help-search-query={view.helpSearchQuery ?? 'unavailable'}
       data-problem-title={view.problemTitle}
       data-testid="expanded-overlay"
     >
-      Expanded mode: {view.problemTitle}: {themeMode}; Help query:{' '}
-      {view.helpSearchQuery ?? 'unavailable'}
+      <button onClick={commands.onRetryAiAnalysis}>Retry AI</button>
+      <button onClick={commands.onSettings}>AI Settings</button>
+      <span>Analysis: {view.aiAnalysis?.status ?? 'missing'}</span>
+      <span>
+        Expanded mode: {view.problemTitle}: {themeMode}; Help query:{' '}
+        {view.helpSearchQuery ?? 'unavailable'}
+      </span>
     </div>
   ),
 }))
@@ -60,6 +73,25 @@ describe('OverlayShell', () => {
     )
 
     expect(screen.getByText(text)).toBeInTheDocument()
+  })
+
+  it('wires the scored report and actual recovery commands to expanded mode', async () => {
+    const user = userEvent.setup()
+    const session = createSession({
+      aiAnalysis: {
+        status: 'unavailable',
+        message: 'Configure AI.',
+        canRetry: true,
+        showSettings: true,
+      },
+      overlay: { ...initialOverlaySessionState, visualMode: 'expanded' },
+    })
+    render(<OverlayShell {...session} />)
+    expect(screen.getByText('Analysis: unavailable')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry AI' }))
+    await user.click(screen.getByRole('button', { name: 'AI Settings' }))
+    expect(session.retryAiAnalysis).toHaveBeenCalledOnce()
+    expect(session.actions.openSettings).toHaveBeenCalledOnce()
   })
 
   it('falls back to the LeetCode slug for the expanded Help query', () => {
@@ -229,6 +261,7 @@ function createSession(
           hard: 50,
         },
       },
+      aiAssessmentEnabled: false,
       aiAssessmentAvailable: false,
     },
     feedback: null,
@@ -242,7 +275,8 @@ function createSession(
       status: 'idle',
       targetSeconds: 20 * 60,
     },
-    aiRecommendation: { status: 'idle' },
+    aiAnalysis: { status: 'idle' },
+    retryAiAnalysis: vi.fn(),
     ...overrides,
   }
 }

@@ -198,3 +198,26 @@ dependencies are unchanged since the successful clean install; `npm run zip`
 and `npm run db:generate` remain skipped because packaging and schema are
 unchanged. Human installed-extension happy-path and edge-case smoke with visual
 proof remains pending; PR #195 stays draft.
+
+### Main Integration Validation
+
+Merged `origin/main` at `bbb3b5d8`. The only conflict was the planning index;
+both Analytics and LeetCode analysis spec/plan entries are retained.
+
+Commands rerun successfully:
+
+```sh
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npm run check
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npm run build
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npm run format
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH npx prettier --check --ignore-path /dev/null docs/superpowers/README.md docs/superpowers/plans/2026-10-04-analytics-problem-solving-ui.md
+rtk proxy git diff --cached --check
+```
+
+Full check passed database checks, typecheck, lint and **206 test files / 2,607
+tests**. One provider evaluation file / six tests remain skipped by the suite.
+Build retains the existing chunk-size warning. The browser interaction command
+above was not repeated because the conflict resolution changes only the planning
+index. Human installed-extension smoke and visual proof remain pending; the PR
+stays draft. Packaging and database generation remain skipped for the reasons
+recorded above.

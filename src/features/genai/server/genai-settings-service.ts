@@ -12,7 +12,7 @@ import type {
 import {
   clearAiProviderSecretFromTrustedStorage,
   getAiProviderSecretPresenceFromTrustedStorage,
-  loadAiProviderSecretFromTrustedStorage,
+  loadAiProviderSecretSnapshotFromTrustedStorage,
   saveAiProviderSecretToTrustedStorage,
 } from './genai-secret-storage'
 
@@ -42,19 +42,26 @@ export async function clearAiProviderSecret(
 export async function loadActiveProviderConfig(
   db: Db,
 ): Promise<GenAiProviderConfig | null> {
+  return (await loadActiveProviderConfigSnapshot(db))?.config ?? null
+}
+
+/** Trusted memory only: identity may contain credential material. Never serialize it. */
+export async function loadActiveProviderConfigSnapshot(
+  db: Db,
+): Promise<{ config: GenAiProviderConfig; identity: string } | null> {
   const settings = await getSettings(db)
   const ai = settings.aiAssessment
+  const model = ai.model.trim()
+  if (!ai.enabled || !model) return null
 
-  if (!ai.enabled) return null
-  if (ai.model.trim() === '') return null
-
-  const secret = await loadAiProviderSecretFromTrustedStorage(ai.provider)
-  if (!secret) return null
+  const saved = await loadAiProviderSecretSnapshotFromTrustedStorage(
+    ai.provider,
+  )
+  if (!saved) return null
 
   return {
-    provider: ai.provider,
-    model: ai.model,
-    apiKey: secret.apiKey,
+    config: { provider: ai.provider, model, apiKey: saved.secret.apiKey },
+    identity: JSON.stringify([ai.provider, model, saved.identity]),
   }
 }
 

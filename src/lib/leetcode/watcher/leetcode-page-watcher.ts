@@ -358,6 +358,7 @@ export function createLeetCodePageWatcher(
   function handleSubmission(click: LeetCodeSubmissionClick) {
     options.onEvent({ type: 'submit-clicked', click })
     const attempt = readLeetCodeSubmissionAttempt({
+      attemptId: crypto.randomUUID(),
       click,
       editorRoot: documentRef,
     })
@@ -366,11 +367,7 @@ export function createLeetCodePageWatcher(
       type: 'submission-started',
       attempt,
     })
-    submissionResultWatch.start(
-      click,
-      attempt.submittedCodeSnapshot,
-      activeToken,
-    )
+    submissionResultWatch.start(attempt, activeToken)
   }
 
   function emitProblemMetadataIfUseful(
@@ -417,7 +414,8 @@ export function createLeetCodePageWatcher(
       content.statement.length > 0 ||
       content.examples.length > 0 ||
       content.constraints.length > 0 ||
-      content.hints.length > 0
+      content.hints.length > 0 ||
+      content.followUps.length > 0
     )
   }
 

@@ -6,7 +6,7 @@ import type { OverlayAppShellData } from '@/features/app-shell'
 import type { ThemeMode } from '@/features/settings'
 import type { ReviewRating } from '@/lib/fsrs'
 
-import type { AssessmentRecommendationState } from '../../..'
+import type { CodeAnalysisState } from '../../../hooks/use-leetcode-code-analysis'
 
 import {
   hasSubmittedSessionChanges,
@@ -14,7 +14,7 @@ import {
 } from '../../../domain'
 import type { OverlayTimerStatus } from '../../../hooks/use-overlay-timer'
 import { OverlayActions } from './overlay-actions'
-import { OverlayAssessmentRecommendation } from './overlay-assessment-recommendation'
+import { OverlayCodeAnalysis } from './overlay-code-analysis'
 import { OverlayAssessmentRail } from './overlay-assessment-rail'
 import {
   OverlayContextStrip,
@@ -26,7 +26,7 @@ import { OverlayNextCard } from './overlay-next-card'
 import { OverlayTimerCard } from './overlay-timer-card'
 
 type ExpandedOverlayViewModel = {
-  aiRecommendation: AssessmentRecommendationState
+  aiAnalysis: CodeAnalysisState
   context: OverlayAppShellData['overlay'] | null
   elapsedSeconds: number
   helpSearchQuery: string | null
@@ -46,6 +46,7 @@ type ExpandedOverlayCommands = {
   onPauseTimer: () => void
   onResetTimer: () => void
   onRestart: () => void
+  onRetryAiAnalysis: () => void
   onSelectRating: (rating: ReviewRating) => void
   onSettings: () => void
   onStartTimer: () => void
@@ -65,7 +66,7 @@ export function ExpandedOverlay({
   view,
 }: ExpandedOverlayProps) {
   const {
-    aiRecommendation,
+    aiAnalysis,
     context,
     elapsedSeconds,
     helpSearchQuery,
@@ -84,6 +85,7 @@ export function ExpandedOverlay({
     onPauseTimer,
     onResetTimer,
     onRestart,
+    onRetryAiAnalysis,
     onSelectRating,
     onSettings,
     onStartTimer,
@@ -116,8 +118,8 @@ export function ExpandedOverlay({
         />
         <OverlayContextStrip context={context} isSubmitted={submitted} />
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
-          <div className="grid gap-4">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3">
+          <div className="grid min-w-0 gap-4">
             {syncStatus === 'error' && syncFeedback ? (
               <InlineStatus tone="danger">
                 <AlertCircle aria-hidden="true" />
@@ -144,12 +146,10 @@ export function ExpandedOverlay({
               selectedRating={overlay.selectedRating}
             />
 
-            <OverlayAssessmentRecommendation
-              isMutating={isMutating}
-              isRatingLocked={Boolean(overlay.ratingLockReason)}
-              onUseRecommendation={onSelectRating}
-              selectedRating={overlay.selectedRating}
-              state={aiRecommendation}
+            <OverlayCodeAnalysis
+              onRetry={onRetryAiAnalysis}
+              onSettings={onSettings}
+              state={aiAnalysis}
             />
 
             {showUntimedWarning ? (

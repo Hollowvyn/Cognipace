@@ -53,6 +53,8 @@ const content = {
   ],
   constraints: ['2 <= nums.length <= 10^4'],
   hints: ['Use a hash map.'],
+  followUps: [],
+  completeness: 'complete',
   source: 'graphql',
   confidence: 'high',
   capturedAt: 1200,
@@ -60,6 +62,7 @@ const content = {
 } satisfies LeetCodeProblemContent
 
 const submissionAttempt = {
+  attemptId: 'attempt-fixed',
   location,
   clickedAt: 2000,
   submitButtonText: 'Submit',
@@ -67,6 +70,7 @@ const submissionAttempt = {
     code: 'class Solution:\n    return [0, 1]',
     language: 'Python3',
     source: 'monaco',
+    completeness: 'partial',
     capturedAt: 2000,
   },
 } satisfies LeetCodeSubmissionAttempt
@@ -94,6 +98,7 @@ const submissionResult = {
     code: submissionAttempt.submittedCodeSnapshot.code,
     language: 'Python3',
     source: 'api',
+    completeness: 'complete',
     capturedAt: 3000,
   },
 } satisfies LeetCodeSubmissionResult
@@ -178,6 +183,30 @@ describe('LeetCode capture state', () => {
     })
   })
 
+  it('keeps the attempt fragment when result code is partial or missing', () => {
+    for (const completeness of ['partial', 'missing'] as const) {
+      const state = reduceEvents(
+        { type: 'metadata-updated', location, metadata },
+        { type: 'problem-content-updated', location, content },
+        { type: 'submission-started', attempt: submissionAttempt },
+        {
+          type: 'submission-result-updated',
+          result: {
+            ...submissionResult,
+            resultCodeSnapshot: {
+              ...submissionResult.resultCodeSnapshot,
+              code: null,
+              completeness,
+            },
+          },
+        },
+      )
+      expect(createLeetCodeReviewContext(state)?.submittedCode).toBe(
+        submissionAttempt.submittedCodeSnapshot,
+      )
+    }
+  })
+
   it('creates review context only after metadata and problem content exist', () => {
     const emptyState = createEmptyLeetCodeCaptureState(location)
     const metadataOnlyState = reduceEvents({
@@ -208,7 +237,7 @@ describe('LeetCode capture state', () => {
     })
     expect(createLeetCodeReviewContext(submittedState)).toMatchObject({
       currentCode: submissionAttempt.submittedCodeSnapshot,
-      submittedCode: submissionAttempt.submittedCodeSnapshot,
+      submittedCode: submissionResult.resultCodeSnapshot,
       submissionResult,
       capturedAt: 3000,
     })

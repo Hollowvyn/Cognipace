@@ -14,6 +14,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-04-analytics-problem-solving-design.md`](./specs/2026-10-04-analytics-problem-solving-design.md): approved expansion of New Problem Success into one section for difficulty outcomes, recorded time, and difficulty mix; implemented as Problem Solving with passing automated checks and production-component browser proof; human installed-extension smoke remains pending.
 
+- [`specs/2026-10-03-leetcode-code-analysis-design.md`](./specs/2026-10-03-leetcode-code-analysis-design.md): approved Option A specification; all ten tasks implemented with independent SPEC/QUALITY passes and final automated validation on 2026-10-04; live provider, generated-code, and human installed-extension proof pending.
+
 - [`specs/2026-10-04-analytics-retention-landscape-design.md`](./specs/2026-10-04-analytics-retention-landscape-design.md): approved full eligible memory landscape, exact status marks, complete overlap/keyboard/Table access and box zoom with reset.
 
 - [`specs/2026-10-03-overview-daily-time-design.md`](./specs/2026-10-03-overview-daily-time-design.md): approved fourth Overview card for saved elapsed time from today's local-date assessments, including repeats and failures.
@@ -68,6 +70,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`plans/2026-10-04-analytics-problem-solving-model.md`](./plans/2026-10-04-analytics-problem-solving-model.md): second phase aggregating raw difficulty outcomes, recorded-time distributions, Mix accounting, current references and prior evidence through the existing validated summary.
 
 - [`plans/2026-10-04-analytics-problem-solving-ui.md`](./plans/2026-10-04-analytics-problem-solving-ui.md): third phase replacing the old renderer with shared difficulty controls, paired Trend/Compare views and Mix, production-component proof, authority-doc alignment and required human extension smoke.
+
+- [`plans/2026-10-03-leetcode-code-analysis.md`](./plans/2026-10-03-leetcode-code-analysis.md): completed ten-task execution map across capture, report/runtime, and overlay/retirement/evaluation tooling; final automated gates passed, with provider/generated-code/human proof still unchecked.
 
 - [`plans/2026-10-04-analytics-retention-landscape.md`](./plans/2026-10-04-analytics-retention-landscape.md): complete-cohort contract and feature-local interactive scatter implementation, lean regressions, production-component proof and required human extension smoke.
 
@@ -127,6 +131,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-03-leetcode-code-analysis.md`](./handoffs/2026-10-03-leetcode-code-analysis.md): final reviewed source, exact automated results and commands, parser/deadline fixes, supplemental fixtures, and pending live provider/generated-code/human proof; no PR review/merge readiness claimed.
+
+- [`handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md`](./handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md): approved written spec, three phase plans, planning checks, and remaining implementation/model/human proof.
 
 - [`handoffs/2026-10-04-analytics-retention-landscape.md`](./handoffs/2026-10-04-analytics-retention-landscape.md): full-cohort Retention Map with box zoom, complete inspection, validation/browser proof and pending human extension smoke.
 

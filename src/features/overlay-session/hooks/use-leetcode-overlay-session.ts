@@ -13,9 +13,9 @@ import {
   type OverlaySessionState,
 } from '../domain'
 import {
-  useLeetCodeAssessmentRecommendation,
-  type AssessmentRecommendationState,
-} from './use-leetcode-assessment-recommendation'
+  useLeetCodeCodeAnalysis,
+  type CodeAnalysisState,
+} from './use-leetcode-code-analysis'
 import {
   useLeetCodePageSync,
   type LeetCodeOverlayContext,
@@ -42,7 +42,8 @@ export type LeetCodeOverlaySession = {
     status: OverlayTimerStatus
   }
   actions: OverlayReviewActions
-  aiRecommendation: AssessmentRecommendationState
+  aiAnalysis: CodeAnalysisState
+  retryAiAnalysis: () => void
 }
 
 export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
@@ -119,9 +120,9 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     onProblemLoaded: handleProblemLoaded,
   })
 
-  const recommendationResetRef = useRef<() => void>(() => undefined)
+  const analysisResetRef = useRef<() => void>(() => undefined)
   const handleRestart = useCallback(() => {
-    recommendationResetRef.current()
+    analysisResetRef.current()
   }, [])
 
   const actions = useOverlayReviewActions({
@@ -148,25 +149,16 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
   const targetSeconds = getTargetSeconds(pageSync.context)
   const elapsedSeconds = timer.elapsedSeconds
 
-  const recommendation = useLeetCodeAssessmentRecommendation({
-    activeProblemSlug: overlay.activeProblemSlug,
-    metadata: pageSync.metadata,
-    submissionResult: pageSync.submission.result,
-    submittedSession: overlay.submittedSession,
-    overlayState: overlay,
-    context: pageSync.context,
-    timing: {
-      elapsedSeconds,
-      targetSeconds,
-      timerUsed: timer.status !== 'idle',
-    },
-    aiEnabled: pageSync.context?.aiAssessmentAvailable ?? false,
-    dispatch,
+  const analysis = useLeetCodeCodeAnalysis({
+    activeSlug: overlay.activeProblemSlug,
+    capture: pageSync.capture,
+    enabled: pageSync.context?.aiAssessmentEnabled ?? false,
+    available: pageSync.context?.aiAssessmentAvailable ?? false,
   })
 
   useEffect(() => {
-    recommendationResetRef.current = recommendation.reset
-  }, [recommendation.reset])
+    analysisResetRef.current = analysis.reset
+  }, [analysis.reset])
 
   return {
     location: pageSync.location,
@@ -182,7 +174,8 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
       status: timer.status,
     },
     actions,
-    aiRecommendation: recommendation.state,
+    aiAnalysis: analysis.state,
+    retryAiAnalysis: analysis.retry,
   }
 }
 

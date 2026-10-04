@@ -86,6 +86,7 @@ describe('readLeetCodeCodeSnapshot', () => {
       code: 'function twoSum(nums: number[]) {\n\n  return nums\n}',
       language: 'TypeScript',
       source: 'monaco',
+      completeness: 'partial',
       capturedAt: 200,
     })
   })
@@ -100,6 +101,7 @@ describe('readLeetCodeCodeSnapshot', () => {
       code: 'def two_sum(nums):\n\n    return nums\n',
       language: 'Python3',
       source: 'textarea',
+      completeness: 'partial',
       capturedAt: 220,
     })
   })
@@ -122,6 +124,7 @@ describe('readLeetCodeCodeSnapshot', () => {
       code: 'class Solution:\n    pass',
       language: 'Python3',
       source: 'monaco',
+      completeness: 'partial',
     })
   })
 
@@ -140,12 +143,28 @@ describe('readLeetCodeCodeSnapshot', () => {
       code: 'class Solution:\n    pass',
       language: 'Python3',
       source: 'monaco',
+      completeness: 'partial',
+    })
+  })
+
+  it.each([
+    '<div class="view-lines"><div class="view-line">   </div></div>',
+    '<textarea>  </textarea>',
+  ])('marks whitespace-only editor content missing: %s', (html) => {
+    document.body.innerHTML = html
+    expect(readLeetCodeCodeSnapshot(document)).toMatchObject({
+      code: null,
+      source: 'none',
+      completeness: 'missing',
     })
   })
 
   it('returns an empty source when no editor is present', () => {
     document.body.innerHTML = '<main></main>'
 
-    expect(readLeetCodeCodeSnapshot(document).source).toBe('none')
+    expect(readLeetCodeCodeSnapshot(document)).toMatchObject({
+      source: 'none',
+      completeness: 'missing',
+    })
   })
 })

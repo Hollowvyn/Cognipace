@@ -323,30 +323,6 @@ describe('runtime-policy', () => {
         expect(canCallExtensionMethod(method, 'background')).toBe(false)
       }
     })
-
-    it('allows only content-script to call genai.recommendLeetCodeAssessment', () => {
-      expect(
-        canCallExtensionMethod(
-          'genai.recommendLeetCodeAssessment',
-          'content-script',
-        ),
-      ).toBe(true)
-      expect(
-        canCallExtensionMethod('genai.recommendLeetCodeAssessment', 'popup'),
-      ).toBe(false)
-      expect(
-        canCallExtensionMethod(
-          'genai.recommendLeetCodeAssessment',
-          'dashboard',
-        ),
-      ).toBe(false)
-      expect(
-        canCallExtensionMethod(
-          'genai.recommendLeetCodeAssessment',
-          'background',
-        ),
-      ).toBe(false)
-    })
   })
 
   it('allows content scripts to use practice controls for the current problem', () => {
@@ -383,4 +359,88 @@ it('keeps connection testing dashboard-only and rejects a forged sender', () => 
       url: 'https://leetcode.com/problems/two-sum/',
     }),
   ).toThrow(/cannot claim/)
+})
+
+it.each([
+  'genai.analyzeLeetCodeSubmission',
+  'genai.cancelLeetCodeAnalysis',
+] as const)(
+  'keeps %s content-script-only and rejects forged surfaces',
+  (method) => {
+    expect(canCallExtensionMethod(method, 'content-script')).toBe(true)
+    for (const surface of ['popup', 'dashboard', 'background'] as const)
+      expect(canCallExtensionMethod(method, surface)).toBe(false)
+    expect(() =>
+      assertCanSenderCallExtensionMethod(method, 'content-script', {
+        tab: { id: 7 },
+        frameId: 0,
+        url: 'https://leetcode.com/problems/two-sum/',
+      }),
+    ).not.toThrow()
+    expect(() =>
+      assertCanSenderCallExtensionMethod(method, 'content-script', {
+        url: 'chrome-extension://extension-id/dashboard.html',
+      }),
+    ).toThrow(/cannot claim/)
+  },
+)
+
+describe.each([
+  'genai.analyzeLeetCodeSubmission',
+  'genai.cancelLeetCodeAnalysis',
+] as const)('%s actual LeetCode page authorization', (method) => {
+  it.each([
+    'https://leetcode.com/problems/two-sum/',
+    'https://www.leetcode.com/problems/valid-parentheses/description/',
+  ])('accepts actual problem URL %s', (url) => {
+    expect(() =>
+      assertCanSenderCallExtensionMethod(method, 'content-script', {
+        tab: { id: 0 },
+        frameId: 0,
+        url,
+      }),
+    ).not.toThrow()
+  })
+  it.each([
+    undefined,
+    'not-a-url',
+    'http://leetcode.com/problems/two-sum/',
+    'https://example.com/problems/two-sum/',
+    'https://leetcode.com.evil.test/problems/two-sum/',
+    'chrome-extension://extension-id/other.html',
+  ])(
+    'rejects actual URL %s even with a trusted tab URL or origin claim',
+    (url) => {
+      expect(() =>
+        assertCanSenderCallExtensionMethod(method, 'content-script', {
+          tab: { id: 1, url: 'https://leetcode.com/problems/two-sum/' },
+          frameId: 0,
+          url,
+          origin: 'https://leetcode.com',
+        }),
+      ).toThrow(/LeetCode/i)
+    },
+  )
+})
+
+it('allows owner cancellation after LeetCode SPA navigation while rejecting new generation off problem pages', () => {
+  const sender = {
+    tab: { id: 7 },
+    frameId: 0,
+    url: 'https://leetcode.com/explore/',
+  }
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.cancelLeetCodeAnalysis',
+      'content-script',
+      sender,
+    ),
+  ).not.toThrow()
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.analyzeLeetCodeSubmission',
+      'content-script',
+      sender,
+    ),
+  ).toThrow(/LeetCode/i)
 })

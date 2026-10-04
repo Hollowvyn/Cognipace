@@ -193,6 +193,7 @@ export function createLeetCodeSubmissionResultFingerprint(
     result.stdOutput,
     result.resultCodeSnapshot.language,
     result.resultCodeSnapshot.source,
+    result.resultCodeSnapshot.completeness,
     result.resultCodeSnapshot.code,
   ].join('|')
 }
@@ -404,6 +405,7 @@ function readSubmissionResultCodeSnapshot(
       code: null,
       language: null,
       source: 'none',
+      completeness: 'missing',
       capturedAt: now(),
     }
   }
@@ -418,6 +420,7 @@ function readSubmissionResultCodeSnapshot(
     code: resultCodeCandidate?.code ?? null,
     language: readLanguageFromCodeHeading(pageCodeHeading),
     source: resultCodeCandidate?.source ?? 'none',
+    completeness: resultCodeCandidate ? 'partial' : 'missing',
     capturedAt: now(),
   }
 }

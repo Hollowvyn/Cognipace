@@ -10,8 +10,22 @@ import {
   getAiProviderSecretPresence,
   isAiAssessmentAvailable,
   loadActiveProviderConfig,
+  loadActiveProviderConfigSnapshot,
   setAiProviderSecret,
 } from './genai-settings-service'
+
+async function configuredDb() {
+  const { db } = await createTestDb({ seed: false })
+  await updateSettings(db, {
+    aiAssessment: {
+      enabled: true,
+      provider: 'openai',
+      model: '  gpt-test  ',
+    },
+  })
+  await setAiProviderSecret('openai', { apiKey: 'fake-private-key' })
+  return db
+}
 
 describe('getAiProviderSecretPresence', () => {
   it('returns all-false on empty store', async () => {
@@ -58,47 +72,47 @@ describe('setAiProviderSecret / clearAiProviderSecret', () => {
   })
 })
 
-describe('loadActiveProviderConfig', () => {
-  it('returns null when aiAssessment.enabled is false', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: false, provider: 'openai', model: 'gpt-test' },
-    })
-    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
-    expect(await loadActiveProviderConfig(handle.db)).toBeNull()
-  })
-
-  it('returns null when model is empty', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'openai', model: '' },
-    })
-    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
-    expect(await loadActiveProviderConfig(handle.db)).toBeNull()
-  })
-
-  it('returns null when the active provider has no secret', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'anthropic', model: 'claude' },
-    })
-    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
-    expect(await loadActiveProviderConfig(handle.db)).toBeNull()
-  })
-
-  it('returns a full config when all conditions are met', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'openai', model: 'gpt-test' },
-    })
-    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
-    expect(await loadActiveProviderConfig(handle.db)).toEqual({
-      provider: 'openai',
-      model: 'gpt-test',
-      apiKey: 'sk-test',
-    })
-  })
-
+describe('active AI configuration entrypoints', () => {
+  it.each([
+    'disabled',
+    'empty-model',
+    'blank-model',
+    'other-provider-only',
+    'cleared-key',
+    'configured',
+  ] as const)(
+    'handles %s consistently through all public reads',
+    async (kind) => {
+      const db = await configuredDb()
+      if (kind === 'disabled')
+        await updateSettings(db, { aiAssessment: { enabled: false } })
+      if (kind === 'empty-model')
+        await updateSettings(db, { aiAssessment: { model: '' } })
+      if (kind === 'blank-model')
+        await updateSettings(db, { aiAssessment: { model: '   ' } })
+      if (kind === 'other-provider-only')
+        await updateSettings(db, { aiAssessment: { provider: 'anthropic' } })
+      if (kind === 'cleared-key') await clearAiProviderSecret('openai')
+      const expected =
+        kind === 'configured'
+          ? {
+              provider: 'openai',
+              model: 'gpt-test',
+              apiKey: 'fake-private-key',
+            }
+          : null
+      expect(await loadActiveProviderConfig(db)).toEqual(expected)
+      expect(await isAiAssessmentAvailable(db)).toBe(kind === 'configured')
+      const saved = await loadActiveProviderConfigSnapshot(db)
+      if (kind === 'configured') {
+        expect(saved?.config).toEqual(expected)
+        expect(saved?.identity).toEqual(expect.any(String))
+        expect((await loadActiveProviderConfigSnapshot(db))?.identity).toBe(
+          saved?.identity,
+        )
+      } else expect(saved).toBeNull()
+    },
+  )
   it('does not include baseUrl even when a stale saved secret has one', async () => {
     const handle = await createTestDb({ seed: false })
     await updateSettings(handle.db, {
@@ -117,31 +131,6 @@ describe('loadActiveProviderConfig', () => {
       apiKey: 'g-test',
     })
   })
-
-  it('treats whitespace-only model as empty', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'openai', model: '   ' },
-    })
-    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
-    expect(await loadActiveProviderConfig(handle.db)).toBeNull()
-  })
-})
-
-describe('isAiAssessmentAvailable', () => {
-  it('returns false when no config can be resolved', async () => {
-    const handle = await createTestDb({ seed: false })
-    expect(await isAiAssessmentAvailable(handle.db)).toBe(false)
-  })
-
-  it('returns true when a full config can be resolved', async () => {
-    const handle = await createTestDb({ seed: false })
-    await updateSettings(handle.db, {
-      aiAssessment: { enabled: true, provider: 'openai', model: 'gpt-test' },
-    })
-    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
-    expect(await isAiAssessmentAvailable(handle.db)).toBe(true)
-  })
 })
 
 it('publishes a durable key write before a failed presence refresh', async () => {
@@ -153,4 +142,25 @@ it('publishes a durable key write before a failed presence refresh', async () =>
     setAiProviderSecret('openai', { apiKey: 'fake-private-key' }, published),
   ).rejects.toThrow()
   expect(published).toHaveBeenCalledTimes(1)
+})
+
+describe('trusted active configuration snapshot', () => {
+  it.each(['provider', 'model', 'replacement-key', 'same-key'] as const)(
+    'changes identity on %s replacement',
+    async (kind) => {
+      const db = await configuredDb()
+      const saved = await loadActiveProviderConfigSnapshot(db)
+      if (kind === 'provider') {
+        await setAiProviderSecret('gemini', { apiKey: 'gemini-key' })
+        await updateSettings(db, { aiAssessment: { provider: 'gemini' } })
+      } else if (kind === 'model')
+        await updateSettings(db, { aiAssessment: { model: 'other-model' } })
+      else
+        await setAiProviderSecret('openai', {
+          apiKey: kind === 'same-key' ? 'fake-private-key' : 'replacement-key',
+        })
+      const current = await loadActiveProviderConfigSnapshot(db)
+      expect(current?.identity).not.toBe(saved?.identity)
+    },
+  )
 })

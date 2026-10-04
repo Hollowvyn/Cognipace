@@ -81,6 +81,22 @@ function renderSection(
 beforeEach(() => vi.clearAllMocks())
 
 describe('AiAssessmentSection', () => {
+  it('describes automatic code analysis independently of connection testing', async () => {
+    renderSection()
+    await screen.findByText('No saved key')
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'AI assessment details' }))
+    expect(
+      screen.getByText(
+        'When on, CogniPace analyzes completed LeetCode submissions for approach, efficiency, and code style.',
+      ),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('switch', { name: 'AI assessment' }),
+    ).not.toBeChecked()
+  })
+
   it('renders all providers with a focused connection form', async () => {
     renderSection()
     expect(screen.getByRole('heading', { name: 'AI connection' })).toBeVisible()

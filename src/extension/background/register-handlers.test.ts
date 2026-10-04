@@ -21,6 +21,16 @@ import {
   trackWorkspaceResponseSchema,
   todayQueueSchema,
 } from '@/extension/messaging'
+import {
+  analysisIdentity,
+  type AnalyzeLeetCodeSubmissionResponse,
+} from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
+import {
+  makeAnalysisRequest,
+  makeValidAnalysis,
+} from '@/features/leetcode-review-assistant/testing/code-analysis-fixtures'
+import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
+import { abortLeetCodeAnalyses } from './leetcode-analysis-operations'
 import type { PopupAppShellData } from '@/features/app-shell/api/app-shell-contracts'
 import {
   backupSchemaVersion,
@@ -132,6 +142,10 @@ const backgroundMocks = vi.hoisted(() => {
     loadActiveProviderConfig: vi.fn(),
     generateJson: vi.fn(),
     testAiConnection: vi.fn(),
+    analyzeLeetCodeSubmissionInBackground:
+      vi.fn<
+        (typeof import('@/features/leetcode-review-assistant/server/analysis-runtime-service'))['analyzeLeetCodeSubmissionInBackground']
+      >(),
     cycleThemeMode: vi.fn(),
     toggleStudyMode: vi.fn(),
     tabsCreate: vi.fn(),
@@ -162,7 +176,8 @@ const backgroundMocks = vi.hoisted(() => {
     markSyncLocalDataChanged: vi.fn(),
     readSyncMetadata: vi.fn(),
     writeSyncMetadata: vi.fn(),
-    recommendLeetCodeAssessmentInBackground: vi.fn(),
+    readLeetCodeProblemContentInBackground: vi.fn(),
+    readLeetCodeSubmissionResultInBackground: vi.fn(),
     alarmScheduler,
     syncAutoSync,
     syncService: {
@@ -321,11 +336,19 @@ vi.mock('./app-db', () => ({
   getBackgroundDb: backgroundMocks.getAppDb,
 }))
 
+vi.mock('@/features/leetcode-capture/server/leetcode-capture-service', () => ({
+  readLeetCodeProblemMetadataInBackground: vi.fn(),
+  readLeetCodeProblemContentInBackground:
+    backgroundMocks.readLeetCodeProblemContentInBackground,
+  readLeetCodeSubmissionResultInBackground:
+    backgroundMocks.readLeetCodeSubmissionResultInBackground,
+}))
+
 vi.mock(
-  '@/features/leetcode-review-assistant/server/runtime-handler-service',
+  '@/features/leetcode-review-assistant/server/analysis-runtime-service',
   () => ({
-    recommendLeetCodeAssessmentInBackground:
-      backgroundMocks.recommendLeetCodeAssessmentInBackground,
+    analyzeLeetCodeSubmissionInBackground:
+      backgroundMocks.analyzeLeetCodeSubmissionInBackground,
   }),
 )
 
@@ -568,6 +591,7 @@ describe('background handler registration', () => {
   })
 
   afterEach(() => {
+    abortLeetCodeAnalyses()
     vi.clearAllTimers()
     vi.useRealTimers()
   })
@@ -613,6 +637,225 @@ describe('background handler registration', () => {
       reason: 'settings-updated',
       source: 'dashboard',
       tags: ['settings', 'genai'],
+    })
+  })
+
+  describe('sender-owned submission analysis handlers', () => {
+    const sender = {
+      tab: { id: 7 },
+      frameId: 0,
+      url: 'https://leetcode.com/problems/two-sum/',
+    }
+    const request = makeAnalysisRequest()
+    const ready = (): AnalyzeLeetCodeSubmissionResponse => ({
+      status: 'ready',
+      ...analysisIdentity(request),
+      report: makeValidAnalysis(),
+      providerMetadata: {
+        provider: 'openai',
+        model: 'gpt-test',
+        durationMs: 1,
+      },
+    })
+
+    const analyzeMock = backgroundMocks.analyzeLeetCodeSubmissionInBackground
+    const analyze = (data: unknown = request, from: unknown = sender) =>
+      sendRuntimeMessage('genai.analyzeLeetCodeSubmission', data, from)
+    const cancel = (requestId = request.requestId, from: unknown = sender) =>
+      sendRuntimeMessage(
+        'genai.cancelLeetCodeAnalysis',
+        { surface: 'content-script', requestId },
+        from,
+      )
+
+    beforeEach(async () => {
+      const actualPolicy =
+        await vi.importActual<typeof import('./runtime-policy')>(
+          './runtime-policy',
+        )
+      backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementation(
+        actualPolicy.assertCanSenderCallExtensionMethod,
+      )
+      analyzeMock.mockReset().mockResolvedValue(ready())
+    })
+    afterEach(() => {
+      backgroundMocks.assertCanSenderCallExtensionMethod.mockReset()
+    })
+
+    it('validates analysis and cancel outputs and avoids persistence or invalidation', async () => {
+      await expect(analyze()).resolves.toEqual(ready())
+      expectRuntimePolicy(
+        'genai.analyzeLeetCodeSubmission',
+        'content-script',
+        sender,
+      )
+      expect(analyzeMock).toHaveBeenCalledWith(
+        request,
+        expect.any(Function),
+        expect.any(AbortSignal),
+      )
+      expect(await cancel()).toEqual({
+        requestId: request.requestId,
+        cancelled: false,
+      })
+      expectRuntimePolicy(
+        'genai.cancelLeetCodeAnalysis',
+        'content-script',
+        sender,
+      )
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+      expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+      expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+      analyzeMock.mockResolvedValue(
+        Object.assign(ready(), { apiKey: 'fake-private-key' }),
+      )
+      await expect(analyze()).rejects.toThrow()
+    })
+
+    it.each([
+      {},
+      {
+        url: 'chrome-extension://extension-id/dashboard.html',
+        tab: { id: 7 },
+        frameId: 0,
+      },
+      { url: 'chrome-extension://extension-id/popup.html' },
+      {
+        tab: { id: 7 },
+        frameId: 0,
+        url: 'https://example.com/problems/two-sum/',
+      },
+      { frameId: 0, url: 'https://leetcode.com/problems/two-sum/' },
+      { tab: { id: 7 }, url: 'https://leetcode.com/problems/two-sum/' },
+    ])(
+      'rejects unauthorized or incomplete actual sender %j for both methods',
+      (untrusted) => {
+        expect(() => analyze(request, untrusted)).toThrow()
+        expect(() => cancel(request.requestId, untrusted)).toThrow()
+        expect(analyzeMock).not.toHaveBeenCalled()
+        expect(backgroundMocks.getAppDb).not.toHaveBeenCalled()
+      },
+    )
+
+    it.each([
+      { ...request, surface: 'dashboard' },
+      { ...request, owner: '7:0' },
+      { ...request, frameId: 0 },
+      { ...request, apiKey: 'fake-private-key' },
+      { ...request, submissionId: 'bad-id' },
+    ])('rejects spoofed or malformed analysis payloads', (payload) => {
+      expect(() => analyze(payload)).toThrow()
+      expect(analyzeMock).not.toHaveBeenCalled()
+    })
+
+    it('rejects malformed cancellation payloads', () => {
+      for (const payload of [
+        { surface: 'dashboard', requestId: request.requestId },
+        {
+          surface: 'content-script',
+          requestId: request.requestId,
+          owner: '7:0',
+        },
+        { surface: 'content-script', requestId: '' },
+      ])
+        expect(() =>
+          sendRuntimeMessage('genai.cancelLeetCodeAnalysis', payload, sender),
+        ).toThrow()
+    })
+
+    it('registers ownership before database preparation and cancels while getAppDb is unresolved', async () => {
+      backgroundMocks.getAppDb.mockReturnValue(new Promise(() => {}))
+      analyzeMock.mockImplementation(async (input, loadDb, signal) => {
+        try {
+          return await withAiDeadline(
+            { timeoutMs: 30_000, signal },
+            async (boundedSignal) => {
+              await loadDb()
+              boundedSignal.throwIfAborted()
+              return ready()
+            },
+          )
+        } catch (error) {
+          if (!(error instanceof AiDeadlineError)) throw error
+          return {
+            status: 'error',
+            ...analysisIdentity(input),
+            code: error.code,
+            message: 'Controlled cancellation.',
+          }
+        }
+      })
+      const pending = analyze()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(backgroundMocks.getAppDb).toHaveBeenCalledTimes(1)
+      expect(cancel()).toEqual({
+        requestId: request.requestId,
+        cancelled: true,
+      })
+      await expect(pending).resolves.toMatchObject({
+        status: 'error',
+        code: 'cancelled',
+      })
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('shares active duplicates, supersedes older work, and isolates actual frames and tabs', async () => {
+      const signals: AbortSignal[] = []
+      const finishes: Array<() => void> = []
+      analyzeMock.mockImplementation((input, _loadDb, signal) => {
+        signals.push(signal)
+        return new Promise((resolve) => {
+          finishes.push(() =>
+            resolve({ ...ready(), ...analysisIdentity(input) }),
+          )
+        })
+      })
+      const first = analyze()
+      const duplicate = analyze()
+      expect(duplicate).toBe(first)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(analyzeMock).toHaveBeenCalledTimes(1)
+      const otherFrame = analyze(request, { ...sender, frameId: 1 })
+      const otherTab = analyze(request, { ...sender, tab: { id: 8 } })
+      await vi.advanceTimersByTimeAsync(0)
+      const newerRequest = { ...request, requestId: 'new-request' }
+      const newer = analyze(newerRequest)
+      expect(signals.map((signal) => signal.aborted)).toEqual([
+        true,
+        false,
+        false,
+      ])
+      expect(cancel()).toMatchObject({ cancelled: false })
+      await vi.advanceTimersByTimeAsync(0)
+      finishes[0]!()
+      await first
+      expect(
+        cancel(newerRequest.requestId, {
+          ...sender,
+          url: 'https://leetcode.com/explore/',
+        }),
+      ).toMatchObject({ cancelled: true })
+      expect(signals.map((signal) => signal.aborted)).toEqual([
+        true,
+        false,
+        false,
+        true,
+      ])
+      finishes.slice(1).forEach((finish) => finish())
+      await Promise.all([otherFrame, otherTab, newer])
+    })
+
+    it('registers every protocol request method', async () => {
+      const { extensionMethodNames } =
+        await vi.importActual<typeof import('./runtime-policy')>(
+          './runtime-policy',
+        )
+      registerBackgroundHandlers()
+      expect([...backgroundMocks.handlers.keys()].sort()).toEqual(
+        extensionMethodNames
+          .filter((method) => method !== 'cache.invalidate')
+          .sort(),
+      )
     })
   })
 
@@ -919,7 +1162,6 @@ describe('background handler registration', () => {
       backgroundMocks.db,
       expect.any(Date),
     )
-    expect(backgroundMocks.getSettings).toHaveBeenCalledWith(backgroundMocks.db)
     expect(backgroundMocks.getAiProviderSecretPresence).toHaveBeenCalledWith()
     expect(backgroundMocks.loadActiveProviderConfig).not.toHaveBeenCalled()
     expect(backgroundMocks.readDueNotificationState).toHaveBeenCalledTimes(1)
@@ -2235,138 +2477,46 @@ describe('background handler registration', () => {
     })
   })
 
-  describe('genai.recommendLeetCodeAssessment', () => {
-    const baseRequest = {
-      surface: 'content-script' as const,
-      problemSlug: 'two-sum',
-      submissionFingerprint: 'fp-abc-123',
-      problem: {
-        slug: 'two-sum',
-        title: 'Two Sum',
-        difficulty: 'medium' as const,
-        topics: ['array'],
-      },
-      submission: { status: 'no-submission' as const },
-      timing: {
-        elapsedSeconds: 600,
-        targetSeconds: 2100,
-        timerUsed: true,
-      },
-      deterministicDecision: {
-        status: 'accepted' as const,
-        rating: 'good' as const,
-        isCorrect: true,
-        elapsedSeconds: 600,
-        targetSeconds: 2100,
-        isOverTarget: false,
-        lockReason: null,
-        reason: {
-          code: 'leetcode-good',
-          signals: { elapsedSeconds: 600 },
-        },
-        warnings: [],
-        confidence: 0.8,
-      },
-      sessionContext: {
-        sessionKind: 'first-solve' as const,
-        submissionSource: 'leetcode-watcher' as const,
-        timerUsed: true,
-        previousRating: null,
-        bestElapsedSeconds: null,
-        latestAttempt: null,
+  it('forwards pinned identity and refresh through the authorized capture handlers', async () => {
+    registerBackgroundHandlers()
+    const location = {
+      slug: 'two-sum',
+      host: 'leetcode.com',
+      url: 'https://leetcode.com/problems/two-sum/',
+    }
+    const contentRequest = {
+      surface: 'content-script',
+      location,
+      refresh: true,
+    }
+    const submissionRequest = {
+      ...contentRequest,
+      attemptId: 'attempt-pinned',
+      submissionId: '1234567890',
+      click: { location, clickedAt: 5000, buttonText: 'Submit' },
+      submittedCodeSnapshot: {
+        code: 'fragment',
+        language: 'Python3',
+        source: 'monaco',
+        completeness: 'partial',
+        capturedAt: 5000,
       },
     }
-
-    const contentScriptSender = { tab: { id: 1 } }
-
-    beforeEach(() => {
-      backgroundMocks.handlers.clear()
-      backgroundMocks.recommendLeetCodeAssessmentInBackground.mockReset()
-      backgroundMocks.assertCanSenderCallExtensionMethod.mockReset()
-      backgroundMocks.getAppDb.mockResolvedValue({ db: backgroundMocks.db })
-      registerBackgroundHandlers()
+    const sender = { tab: { id: 1 }, frameId: 0, url: location.url }
+    await backgroundMocks.handlers.get('leetcode.readProblemContent')!({
+      data: contentRequest,
+      sender,
     })
-
-    it('calls the handler when sender is content-script', async () => {
-      backgroundMocks.recommendLeetCodeAssessmentInBackground.mockResolvedValue(
-        {
-          status: 'unavailable',
-          message: 'AI is not configured.',
-          submissionFingerprint: 'fp-abc-123',
-        },
-      )
-
-      const handler = backgroundMocks.handlers.get(
-        'genai.recommendLeetCodeAssessment',
-      )
-      expect(handler).toBeDefined()
-
-      const result = await handler!({
-        data: baseRequest,
-        sender: contentScriptSender,
-      })
-
-      expect(
-        backgroundMocks.recommendLeetCodeAssessmentInBackground,
-      ).toHaveBeenCalledWith(backgroundMocks.db, baseRequest)
-      expect((result as { status: string }).status).toBe('unavailable')
-      expect(
-        backgroundMocks.assertCanSenderCallExtensionMethod,
-      ).toHaveBeenCalledWith(
-        'genai.recommendLeetCodeAssessment',
-        'content-script',
-        contentScriptSender,
-      )
+    await backgroundMocks.handlers.get('leetcode.readSubmissionResult')!({
+      data: submissionRequest,
+      sender,
     })
-
-    it('throws at the schema layer when wire payload claims non-content-script surface', () => {
-      const handler = backgroundMocks.handlers.get(
-        'genai.recommendLeetCodeAssessment',
-      )
-
-      expect(() =>
-        handler!({
-          data: { ...baseRequest, surface: 'popup' },
-          sender: contentScriptSender,
-        }),
-      ).toThrow()
-
-      expect(
-        backgroundMocks.assertCanSenderCallExtensionMethod,
-      ).not.toHaveBeenCalled()
-    })
-
-    it('throws when sender url resolves to a different surface than the claim', () => {
-      // Schema-valid request: surface is 'content-script' as the wire says.
-      // The policy mock throws to simulate the real-world rejection where the
-      // actual sender (popup.html URL) doesn't match the claimed surface.
-      backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementation(
-        (_method: string, surface: string, sender: unknown) => {
-          const senderRecord = sender as { url?: string }
-          if (
-            senderRecord.url?.includes('popup.html') &&
-            surface === 'content-script'
-          ) {
-            throw new Error(`Sender surface "popup" cannot claim "${surface}".`)
-          }
-        },
-      )
-
-      const handler = backgroundMocks.handlers.get(
-        'genai.recommendLeetCodeAssessment',
-      )
-
-      expect(() =>
-        handler!({
-          data: baseRequest, // surface stays 'content-script'
-          sender: { url: 'chrome-extension://extension-id/popup.html' },
-        }),
-      ).toThrow(/cannot claim/i)
-
-      expect(
-        backgroundMocks.recommendLeetCodeAssessmentInBackground,
-      ).not.toHaveBeenCalled()
-    })
+    expect(
+      backgroundMocks.readLeetCodeProblemContentInBackground,
+    ).toHaveBeenCalledWith(contentRequest)
+    expect(
+      backgroundMocks.readLeetCodeSubmissionResultInBackground,
+    ).toHaveBeenCalledWith(submissionRequest)
   })
 })
 

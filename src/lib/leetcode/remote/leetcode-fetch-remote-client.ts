@@ -38,6 +38,7 @@ export function createLeetCodeFetchRemoteClient(
     readSubmissionResult: async (request) => {
       const debugEvents: LeetCodeSubmissionPollingDebug[] = []
       const result = await readLeetCodeSubmissionResultFromApi({
+        submissionId: request.submissionId,
         location: request.location,
         click: request.click,
         submittedCodeSnapshot: request.submittedCodeSnapshot,

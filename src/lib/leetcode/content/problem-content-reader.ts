@@ -2,6 +2,7 @@ import DOMPurify from 'dompurify'
 import { createLeetCodeProblemContentFingerprint } from './content-fingerprint'
 import {
   escapeRegExp,
+  preserveMathNotation,
   readMultilineText,
   readNormalizedText,
   readTextFromHtml,
@@ -11,6 +12,7 @@ import { requestLeetCodeProblemContent } from '../api/problem-content-request'
 import type { LeetCodeGraphQlFetch } from '../core/graphql-client'
 import { isObjectRecord, readTrimmedString } from '../core/value-readers'
 import type {
+  LeetCodeCaptureCompleteness,
   LeetCodeExample,
   LeetCodeProblemContent,
   LeetCodeProblemContentConfidence,
@@ -23,6 +25,12 @@ type ParsedGraphQlQuestionContent = {
   contentHtml: string | null
   hints: string[]
 }
+
+const leetCodeConstraintsHeadingPattern =
+  /\bConstraints[^\S\r\n]*:|(?:^|\n)[^\S\r\n]*Constraints[^\S\r\n]*(?=\n|$)/i
+
+const leetCodeHintRootSelector =
+  '[data-e2e-locator*="hint" i], [data-cy*="hint" i], [class*="hint" i], details'
 
 const leetCodeProblemContentRootSelectors = [
   '[data-track-load="description_content"]',
@@ -72,6 +80,8 @@ export async function readLeetCodeProblemContent(
       statement: '',
       examples: [],
       constraints: [],
+      followUps: [],
+      completeness: 'missing',
       hints: [],
       source: 'fallback',
       confidence: 'low',
@@ -122,6 +132,15 @@ export async function fetchLeetCodeProblemContent(
         readTextFromHtml(parsedQuestionContent.contentHtml),
       )
 
+  if (!contentParts.statement) {
+    return {
+      ok: false,
+      error: new Error(
+        'LeetCode GraphQL response did not include a meaningful statement.',
+      ),
+    }
+  }
+
   return {
     ok: true,
     content: createProblemContent({
@@ -129,6 +148,8 @@ export async function fetchLeetCodeProblemContent(
       statement: contentParts.statement,
       examples: contentParts.examples,
       constraints: contentParts.constraints,
+      followUps: contentParts.followUps,
+      completeness: 'complete',
       hints: parsedQuestionContent.hints,
       source: 'graphql',
       confidence: 'high',
@@ -155,7 +176,8 @@ export function readLeetCodeProblemContentFromDom(
   if (
     !contentParts.statement &&
     contentParts.examples.length === 0 &&
-    contentParts.constraints.length === 0
+    contentParts.constraints.length === 0 &&
+    contentParts.followUps.length === 0
   ) {
     return null
   }
@@ -165,6 +187,8 @@ export function readLeetCodeProblemContentFromDom(
     statement: contentParts.statement,
     examples: contentParts.examples,
     constraints: contentParts.constraints,
+    followUps: contentParts.followUps,
+    completeness: 'partial',
     hints: readHintsFromDomRoot(contentRoot),
     source: 'dom',
     confidence: contentParts.statement ? 'medium' : 'low',
@@ -177,6 +201,8 @@ function createProblemContent(options: {
   statement: string
   examples: LeetCodeExample[]
   constraints: string[]
+  followUps: string[]
+  completeness: LeetCodeCaptureCompleteness
   hints: string[]
   source: LeetCodeProblemContentSource
   confidence: LeetCodeProblemContentConfidence
@@ -187,6 +213,8 @@ function createProblemContent(options: {
     statement: options.statement,
     examples: options.examples,
     constraints: options.constraints,
+    followUps: options.followUps,
+    completeness: options.completeness,
     hints: options.hints,
     source: options.source,
     confidence: options.confidence,
@@ -241,58 +269,79 @@ function createContentDocumentOrNull(
 }
 
 function readContentPartsFromRoot(contentRoot: ParentNode) {
-  const normalizedText = readNormalizedText(contentRoot)
-
-  return {
-    statement: readStatementFromText(normalizedText),
-    examples: readExamplesFromRoot(contentRoot),
-    constraints: readConstraintsFromRoot(contentRoot, normalizedText),
-  }
+  return readContentPartsFromText(readContentText(contentRoot))
 }
 
 function readContentPartsFromText(text: string) {
+  const mainContentText = text.split(/\bFollow[\s-]*up\s*:/i)[0] ?? ''
+  const exampleContentText =
+    mainContentText.split(leetCodeConstraintsHeadingPattern)[0] ?? ''
+  const namedExamples = Array.from(
+    exampleContentText.matchAll(
+      /\bExample\s+(\d+)\s*:\s*([\s\S]*?)(?=\bExample\s+\d+\s*:|\bConstraints\s*:|\bHint\s*\d*\s*:|$)/gi,
+    ),
+  ).map((match) => readExampleFromText(match[0], Number(match[1]) - 1))
+  const examples =
+    namedExamples.length > 0
+      ? namedExamples
+      : Array.from(
+          exampleContentText.matchAll(
+            /\bInput\s*:\s*[\s\S]*?(?=\bInput\s*:|\bConstraints\s*:|\bHint\s*\d*\s*:|$)/gi,
+          ),
+        ).map((match, index) => readExampleFromText(match[0], index))
+
   return {
     statement: readStatementFromText(text),
-    examples: Array.from(
-      text.matchAll(
-        /\bExample\s+(\d+)\s*:\s*([\s\S]*?)(?=\bExample\s+\d+\s*:|\bConstraints\s*:|$)/gi,
-      ),
-    )
-      .map((match) => readExampleFromText(match[0], Number(match[1]) - 1))
-      .filter((example): example is LeetCodeExample => Boolean(example)),
+    examples: examples.filter((example): example is LeetCodeExample =>
+      Boolean(example),
+    ),
     constraints: readConstraintsFromText(text),
+    followUps: readFollowUpsFromText(text),
   }
+}
+
+function readContentText(contentRoot: ParentNode) {
+  const textRoot = contentRoot.cloneNode(true) as ParentNode
+  for (const hint of textRoot.querySelectorAll(leetCodeHintRootSelector)) {
+    if (
+      !hint.matches('details') ||
+      /^Hint\s*\d*/i.test(
+        readNormalizedText(hint.querySelector('summary') ?? hint),
+      )
+    )
+      hint.remove()
+  }
+  preserveMathNotation(textRoot)
+  for (const element of textRoot.querySelectorAll('*')) {
+    if (
+      element.matches('p, div, pre, li, ul, ol, h1, h2, h3, h4, h5, h6, br') ||
+      /^Follow[\s-]*up\s*:/i.test(readNormalizedText(element))
+    ) {
+      element.prepend('\n')
+      element.append('\n')
+    }
+  }
+  return readMultilineText(textRoot)
+}
+
+function readFollowUpsFromText(text: string) {
+  const followUp = text.match(
+    /\bFollow[\s-]*up\s*:\s*([\s\S]*?)(?=\bHint\s*\d*\s*:|$)/i,
+  )?.[1]
+  const normalizedFollowUp = followUp ? stripLeetCodeNoise(followUp) : ''
+  return normalizedFollowUp ? [normalizedFollowUp] : []
 }
 
 function readStatementFromText(text: string) {
   return stripLeetCodeNoise(
-    text.split(/\bExample\s+\d+\s*:|\bConstraints\s*:|\bFollow-up\s*:/i)[0] ??
-      '',
+    text
+      .split(leetCodeConstraintsHeadingPattern)[0]
+      ?.split(/\bExample\s+\d+\s*:|\bFollow[\s-]*up\s*:/i)[0] ?? '',
   )
-}
-
-function readExamplesFromRoot(contentRoot: ParentNode): LeetCodeExample[] {
-  const examplesFromPreBlocks = Array.from(contentRoot.querySelectorAll('pre'))
-    .map((preElement, index) =>
-      readExampleFromText(readMultilineText(preElement), index),
-    )
-    .filter((example): example is LeetCodeExample => Boolean(example))
-
-  if (examplesFromPreBlocks.length > 0) {
-    return examplesFromPreBlocks
-  }
-
-  return Array.from(
-    readNormalizedText(contentRoot).matchAll(
-      /\bExample\s+(\d+)\s*:\s*([\s\S]*?)(?=\bExample\s+\d+\s*:|\bConstraints\s*:|$)/gi,
-    ),
-  )
-    .map((match) => readExampleFromText(match[0], Number(match[1]) - 1))
-    .filter((example): example is LeetCodeExample => Boolean(example))
 }
 
 function readExampleFromText(text: string, index: number) {
-  const rawText = text.trim()
+  const rawText = text.split(/\bFollow[\s-]*up\s*:/i)[0]?.trim() ?? ''
 
   if (!rawText || !/\bInput\s*:/i.test(rawText)) {
     return null
@@ -338,35 +387,11 @@ function readExampleField(
   return fieldValue || null
 }
 
-function readConstraintsFromRoot(
-  contentRoot: ParentNode,
-  normalizedText: string,
-) {
-  const constraintsHeading = Array.from(
-    contentRoot.querySelectorAll('p, div, h1, h2, h3, h4, strong'),
-  ).find((candidateElement) =>
-    /^Constraints\s*:?\s*$/i.test(readNormalizedText(candidateElement)),
-  )
-  const constraintsList = constraintsHeading
-    ? findNextListElement(constraintsHeading)
-    : null
-  const listConstraints = constraintsList
-    ? Array.from(constraintsList.querySelectorAll('li'))
-        .map((constraintElement) => readNormalizedText(constraintElement))
-        .filter(Boolean)
-    : []
-
-  if (listConstraints.length > 0) {
-    return uniqueStrings(listConstraints)
-  }
-
-  return readConstraintsFromText(normalizedText)
-}
-
 function readConstraintsFromText(text: string) {
-  const constraintsText = text.match(
-    /\bConstraints\s*:?\s*([\s\S]*?)(?=\bFollow-up\s*:|\bHint\s*\d*\s*:|$)/i,
-  )?.[1]
+  const mainContentText = text.split(/\bFollow[\s-]*up\s*:/i)[0] ?? ''
+  const constraintsText = mainContentText
+    .split(leetCodeConstraintsHeadingPattern)[1]
+    ?.split(/\bHint\s*\d*\s*:/i)[0]
 
   if (!constraintsText) {
     return []
@@ -392,29 +417,9 @@ function splitConstraintCandidates(constraintsText: string) {
   )
 }
 
-function findNextListElement(element: Element) {
-  let nextElement = element.nextElementSibling
-
-  while (nextElement) {
-    if (nextElement.matches('ul, ol')) {
-      return nextElement
-    }
-
-    if (readNormalizedText(nextElement)) {
-      return null
-    }
-
-    nextElement = nextElement.nextElementSibling
-  }
-
-  return null
-}
-
 function readHintsFromDomRoot(contentRoot: ParentNode) {
   const hintTexts = Array.from(
-    contentRoot.querySelectorAll(
-      '[data-e2e-locator*="hint" i], [data-cy*="hint" i], [class*="hint" i], details',
-    ),
+    contentRoot.querySelectorAll(leetCodeHintRootSelector),
   )
     .map((hintElement) =>
       stripLeetCodeNoise(
@@ -445,11 +450,7 @@ function readStringList(value: unknown) {
 
   return value
     .map(readTrimmedString)
-    .map((text) =>
-      text
-        ? stripLeetCodeNoise(readTextFromHtml(DOMPurify.sanitize(text)))
-        : null,
-    )
+    .map((text) => (text ? stripLeetCodeNoise(readTextFromHtml(text)) : null))
     .filter((text): text is string => Boolean(text))
 }
 
