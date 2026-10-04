@@ -537,9 +537,23 @@ Recall vs FSRS Estimate, Practice Rhythm, Memory Strength, and Recent Overdue Ba
 showing available points when a historical selected range is unready; a
 one-point series says that it is not enough for a trend yet. Retention Map,
 Memory Signals by Problem, and the fixed 14-day Upcoming Review Load remain
-available as current or forecast views. Retention Map compares each active
-problem's current FSRS retrievability with the configured target; its hover/focus
-preview can be pinned for details and provides a canonical LeetCode link.
+available as current or forecast views. Retention Map shows every eligible active
+reviewed problem, with no 30-question cutoff, at its exact current FSRS
+retrievability and total modeled durability. Durability is the interval from
+the latest review until recall crosses the scheduling target, not remaining
+time or time until due. The FSRS target is independent of personal chart goals.
+All/Below target filters preserve full-cohort counts and fitted domains. Three
+status keys pair color with circles, diamonds and triangles. Hover, tap and a
+native keyboard inspector expose the same original questions; a nearby-memory
+chooser preserves access to coincident points. Pinned details sit below the
+plot with a canonical LeetCode link, exact supplied values and dates. The
+seven-row Table retains every filtered question.
+Drag a rectangle to magnify that region; double-click or Reset view restores
+the full landscape while preserving pinned details. Wheel/pinch zoom,
+Shift-drag/touch pan and plus/minus controls remain available. Magnification
+updates true log-duration and linear-recall axes while marks keep their screen
+size. Keyboard inspection reveals offscreen questions. Zoom and filter state
+are presentation-only; they never change FSRS cards, scheduling or Settings.
 Memory Signals by Problem is a compact ranked list with canonical LeetCode
 problem links and wrapping reasons directly beneath each title, five rows per
 page. Reasons identify estimated recall below the FSRS retention target,

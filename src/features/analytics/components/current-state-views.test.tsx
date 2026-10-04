@@ -6,7 +6,7 @@ import {
   within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AnalyticsViews } from '../api/analytics-contracts'
 import { MemorySignalsView, RetentionMapView } from './current-state-views'
@@ -29,8 +29,8 @@ const retentionMap: AnalyticsViews['retentionMap'] = {
       region: 'highest-attention' as const,
     },
   ],
-  totalEligible: 31,
-  statusCounts: { onTarget: 12, watch: 8, needsAttention: 11 },
+  totalEligible: 1,
+  statusCounts: { onTarget: 0, watch: 0, needsAttention: 1 },
   recallScale: {
     domain: [0.6, 1] as [number, number],
     ticks: [0.6, 0.7, 0.8, 0.9, 1],
@@ -39,104 +39,111 @@ const retentionMap: AnalyticsViews['retentionMap'] = {
   targetRetention: 0.9,
 }
 
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+function plotFixture(distinct = false) {
+  vi.stubGlobal(
+    'PointerEvent',
+    class extends MouseEvent {
+      readonly pointerId: number
+      readonly pointerType: string
+      constructor(type: string, init: PointerEventInit = {}) {
+        super(type, init)
+        this.pointerId = init.pointerId ?? 1
+        this.pointerType = init.pointerType ?? 'mouse'
+      }
+    },
+  )
+  const rows = Array.from({ length: 3 }, (_, index) => ({
+    ...retentionMap.rows[0]!,
+    rank: index + 1,
+    slug: `overlap-${index}`,
+    title: `Overlap ${index}`,
+    targetDurationDays: distinct && index === 2 ? 6 : 3,
+    retrievability: distinct && index === 2 ? 0.85 : 0.7,
+  }))
+  render(
+    <RetentionMapView
+      view={{
+        ...retentionMap,
+        rows,
+        totalEligible: 3,
+        statusCounts: { onTarget: 0, watch: 0, needsAttention: 3 },
+      }}
+    />,
+  )
+  const control = screen.getByRole('button', { name: /Inspect Retention Map/ })
+  const left = parseFloat(control.style.left),
+    top = parseFloat(control.style.top),
+    width = parseFloat(control.style.width),
+    height = parseFloat(control.style.height)
+  vi.spyOn(control, 'getBoundingClientRect').mockReturnValue({
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  })
+  const point = document.querySelector(
+    `[data-retention-map-point="${distinct ? 'overlap-2' : 'overlap-0'}"] polygon`,
+  )!
+  const [x, y] = point
+    .getAttribute('points')!
+    .split(' ')[0]!
+    .split(',')
+    .map(Number)
+  return { control, left, top, width, height, x: x!, y: y! + 30 }
+}
+
 describe('current-state analytics views', () => {
-  it('keeps Retention Map chart interactions and exact table rows in parity', async () => {
+  it('pins complete native inspection and keeps exact table values in parity', async () => {
     const user = userEvent.setup()
     render(
       <RetentionMapView timeZone="America/Los_Angeles" view={retentionMap} />,
     )
-
-    expect(
-      screen.getByText(
-        'Showing the 1 highest-priority problems of 31 eligible.',
-      ),
-    ).toBeVisible()
-    expect(
-      screen.getByText(
-        '12 on target, 8 watch, and 11 need attention across the full eligible cohort.',
-      ),
-    ).toBeVisible()
-    expect(
-      screen.getByText(
-        'Adaptive Y-scale: current recall spans 60%–100% for this eligible cohort.',
-      ),
-    ).toBeVisible()
-    expect(
-      screen.getByRole('region', { name: 'Retention Map chart' }),
-    ).toBeVisible()
-    expect(
-      screen.queryByRole('img', { name: 'Retention Map chart' }),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('list', { name: 'Retention Map regions' }),
-    ).toHaveTextContent(
-      /Strongest position.*On target now.*Near target, more durable.*Watch closely.*Needs attention.*Highest attention/,
-    )
-    const point = screen.getByRole('button', {
-      name: /Graph Traversal.*Needs attention/i,
+    const control = await screen.findByRole('button', {
+      name: /Inspect Retention Map/,
     })
-    await user.hover(point)
-    const preview = await screen.findByRole('status')
-    expect(preview).toHaveTextContent('Current recall')
+    expect(control.tagName).toBe('BUTTON')
+    fireEvent.focus(control)
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Graph Traversal',
+    )
+    fireEvent.keyDown(control, { key: 'Enter' })
+    const details = await screen.findByRole('dialog', {
+      name: 'Graph Traversal memory details',
+    })
     expect(
-      within(preview).getByRole('link', {
-        name: 'Graph Traversal',
-      }),
+      within(details).getByRole('link', { name: 'Graph Traversal' }),
     ).toHaveAttribute('href', 'https://leetcode.com/problems/graph-traversal/')
-    await user.click(
-      screen.getByRole('button', { name: /Graph Traversal.*Needs attention/i }),
+    expect(details).toHaveTextContent(
+      /Estimated recall now.*70%.*FSRS scheduling target.*90%.*Target gap.*−20 pp.*Memory durability.*3d/,
     )
-    await waitFor(() =>
-      expect(
-        screen.getByRole('dialog', { name: 'Graph Traversal memory details' }),
-      ).toBeVisible(),
+    expect(details).toHaveTextContent(
+      /Due.*08\/20\/26.*Difficulty.*5.0.*Lapses.*2/,
     )
-    await user.click(
-      screen.getByRole('button', {
-        name: /Close Graph Traversal memory details/,
-      }),
-    )
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', {
-          name: /Graph Traversal.*Needs attention/i,
-        }),
-      ).toHaveFocus(),
-    )
-    fireEvent.keyDown(
-      screen.getByRole('button', {
-        name: /Graph Traversal.*Needs attention/i,
-      }),
-      { key: 'Enter' },
-    )
-    await waitFor(() =>
-      expect(
-        screen.getByRole('dialog', {
-          name: 'Graph Traversal memory details',
-        }),
-      ).toBeVisible(),
-    )
+    await user.click(within(details).getByRole('button', { name: /Close/ }))
+    await waitFor(() => expect(control).toHaveFocus())
+    fireEvent.keyDown(control, { key: ' ' })
     await user.keyboard('{Escape}')
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('dialog', {
-          name: 'Graph Traversal memory details',
-        }),
-      ).not.toBeInTheDocument(),
-    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: 'Table' }))
+    const table = screen.getByRole('table', { name: /Retention Map rows/i })
     expect(
-      screen.getByRole('rowheader', { name: 'Graph Traversal' }),
+      within(table).getByRole('rowheader', { name: 'Graph Traversal' }),
     ).toBeVisible()
     expect(
-      screen.getByRole('columnheader', { name: 'Time above target' }),
+      within(table).getByRole('columnheader', { name: 'Memory durability' }),
     ).toBeVisible()
-    expect(screen.getByText('Retention Map data table')).toBeInTheDocument()
-    const retentionTable = screen.getByRole('table', {
-      name: /Retention Map rows/i,
-    })
-    expect(within(retentionTable).getByText('08/19/26')).toBeVisible()
-    expect(within(retentionTable).getByText('08/20/26')).toBeVisible()
+    expect(within(table).getByText('08/19/26')).toBeVisible()
+    expect(within(table).getByText('08/20/26')).toBeVisible()
   })
 
   it('pages ranked Memory Signals with canonical links and supplied reasons', async () => {
@@ -225,70 +232,161 @@ describe('current-state analytics views', () => {
     expect(screen.getByRole('rowheader', { name: 'Refreshed 1' })).toBeVisible()
   })
 
-  it('keeps one roving chart tab stop in retained rank order across statuses', async () => {
+  it('reaches every filtered row with one native plot control and keeps full counts', async () => {
+    const user = userEvent.setup()
+    const rows = Array.from({ length: 31 }, (_, index) => ({
+      ...retentionMap.rows[0]!,
+      rank: index + 1,
+      slug: `problem-${index}`,
+      title: `Problem ${index}`,
+      targetDurationDays: index === 30 ? 10 : 3,
+      retrievability: index === 30 ? 1 : 0.7,
+      status:
+        index === 30 ? ('on-target' as const) : ('needs-attention' as const),
+    }))
     render(
       <RetentionMapView
         view={{
           ...retentionMap,
-          rows: [
-            { ...retentionMap.rows[0]!, rank: 1, title: 'Risk' },
-            {
-              ...retentionMap.rows[0]!,
-              rank: 2,
-              slug: 'watch',
-              title: 'Watch',
-              status: 'watch',
-              region: 'watch-closely',
-            },
-            {
-              ...retentionMap.rows[0]!,
-              rank: 3,
-              slug: 'on-target',
-              title: 'On target',
-              status: 'on-target',
-              region: 'on-target-now',
-            },
-          ],
-          totalEligible: 3,
-          statusCounts: { onTarget: 1, watch: 1, needsAttention: 1 },
+          rows,
+          totalEligible: 31,
+          statusCounts: { onTarget: 1, watch: 0, needsAttention: 30 },
         }}
       />,
     )
-
-    const region = screen.getByRole('region', { name: 'Retention Map chart' })
-    const summaryId = region.getAttribute('aria-describedby')
-    expect(summaryId).toBeTruthy()
-    expect(document.getElementById(summaryId!)).toHaveTextContent(
-      /Scope: active, non-suspended, reviewed problems.*watch band spans 10 percentage points.*vertical reference is 7 days.*model-estimated/i,
-    )
-
-    const points = screen
-      .getAllByRole('button')
-      .filter((button) => button.hasAttribute('data-retention-map-point'))
+    const control = await screen.findByRole('button', {
+      name: /Inspect Retention Map/,
+    })
     expect(
-      points.map((point) => point.getAttribute('data-retention-map-point')),
-    ).toEqual(['graph-traversal', 'watch', 'on-target'])
-    expect(points.map((point) => point.getAttribute('tabindex'))).toEqual([
-      '0',
-      '-1',
-      '-1',
-    ])
-
-    fireEvent.keyDown(points[0]!, { key: 'ArrowRight' })
-    await waitFor(() =>
-      expect(
-        screen
-          .getAllByRole('button')
-          .filter((button) =>
-            button.hasAttribute('data-retention-map-point'),
-          )[1],
-      ).toHaveFocus(),
-    )
+      screen.getAllByRole('button', { name: /Inspect Retention Map/ }),
+    ).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    fireEvent.keyDown(control, { key: 'End' })
+    expect(await screen.findByRole('status')).toHaveTextContent('Problem 30')
+    fireEvent.keyDown(control, { key: 'Enter' })
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Problem 30')
+    await user.click(screen.getByRole('button', { name: 'Reset view' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Problem 30')
+    await user.click(screen.getByRole('button', { name: 'Below target' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(
-      screen
-        .getAllByRole('button')
-        .filter((button) => button.hasAttribute('data-retention-map-point'))
-        .map((point) => point.getAttribute('tabindex')),
-    ).toEqual(['-1', '0', '-1'])
+      screen.getByRole('list', { name: 'Retention Map status counts' }),
+    ).toHaveTextContent(/1 On target now.*0 Watch.*30 Needs attention/)
+    fireEvent.keyDown(control, { key: 'End' })
+    fireEvent.keyDown(control, { key: 'Enter' })
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Problem 29')
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(screen.getByRole('table')).toHaveAttribute(
+      'aria-label',
+      'Retention Map rows 1 through 7 of 30',
+    )
+  })
+
+  it('retains filtering and Chart/Table when below target has no matches', async () => {
+    const user = userEvent.setup()
+    const rows = [
+      {
+        ...retentionMap.rows[0]!,
+        retrievability: 1,
+        status: 'on-target' as const,
+      },
+    ]
+    render(
+      <RetentionMapView
+        view={{
+          ...retentionMap,
+          rows,
+          statusCounts: { onTarget: 1, watch: 0, needsAttention: 0 },
+        }}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Below target' }))
+    expect(
+      screen.getByText(
+        'No reviewed problems are below the FSRS scheduling target.',
+      ),
+    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All' })).toBeVisible()
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(
+      screen.getByText(
+        'No reviewed problems are below the FSRS scheduling target.',
+      ),
+    ).toBeVisible()
+    expect(screen.getByRole('table')).toHaveAttribute(
+      'aria-label',
+      'Retention Map rows 0 through 0 of 0',
+    )
+  })
+
+  it('offers every nearby candidate and restores the pre-click pin on double-click reset', async () => {
+    const user = userEvent.setup()
+    const { control, x, y, left, top } = plotFixture()
+    fireEvent.click(control, { clientX: x, clientY: y, detail: 1 })
+    const chooser = screen.getByRole('dialog', {
+      name: 'Choose a nearby memory',
+    })
+    expect(
+      within(chooser).getAllByRole('button', { name: /Overlap/ }),
+    ).toHaveLength(3)
+    await user.click(within(chooser).getByRole('button', { name: /Overlap 2/ }))
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    fireEvent.click(control, { clientX: left, clientY: top, detail: 1 })
+    fireEvent.click(control, { clientX: left, clientY: top, detail: 2 })
+    fireEvent.doubleClick(control, { clientX: left, clientY: top })
+    expect(
+      screen.getByRole('dialog', { name: 'Overlap 2 memory details' }),
+    ).toBeVisible()
+    expect(
+      screen.getByText('3 in view · 3 matching · 3 eligible'),
+    ).toBeVisible()
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    await user.click(screen.getByRole('tab', { name: 'Chart' }))
+    expect(
+      screen.getByRole('dialog', { name: 'Overlap 2 memory details' }),
+    ).toBeVisible()
+  })
+
+  it('pins the hovered preview identity with Enter', () => {
+    const { control, x, y } = plotFixture(true)
+    fireEvent.pointerMove(control, { clientX: x, clientY: y })
+    expect(screen.getByRole('status')).toHaveTextContent('Overlap 2')
+    fireEvent.keyDown(control, { key: 'Enter' })
+    expect(
+      screen.getByRole('dialog', { name: 'Overlap 2 memory details' }),
+    ).toBeVisible()
+  })
+
+  it('cancels a box before dismissing pinned details and suppresses the trailing drag click', () => {
+    const { control, left, top, width, height } = plotFixture()
+    fireEvent.keyDown(control, { key: 'Enter' })
+    fireEvent.pointerDown(control, { clientX: left + 10, clientY: top + 10 })
+    fireEvent.pointerMove(control, {
+      clientX: left + width / 2,
+      clientY: top + height / 2,
+    })
+    fireEvent.keyDown(control, { key: 'Escape' })
+    expect(
+      screen.getByRole('dialog', { name: 'Overlap 0 memory details' }),
+    ).toBeVisible()
+    fireEvent.pointerUp(control, {
+      clientX: left + width / 2,
+      clientY: top + height / 2,
+    })
+    fireEvent.click(control, { detail: 1 })
+    expect(
+      screen.getByRole('dialog', { name: 'Overlap 0 memory details' }),
+    ).toBeVisible()
+    fireEvent.keyDown(control, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.pointerDown(control, { clientX: left + 5, clientY: top + 5 })
+    fireEvent.pointerMove(control, {
+      clientX: left + width - 5,
+      clientY: top + height - 5,
+    })
+    fireEvent.pointerCancel(control)
+    expect(
+      screen.getByText('3 in view · 3 matching · 3 eligible'),
+    ).toBeVisible()
   })
 })

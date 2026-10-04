@@ -965,10 +965,27 @@ exact pending case.
     and Overdue counts inside sufficiently large segments, tiny outside labels,
     overdue-only Today, neighboring label collisions, and zero schedules. Inspect
     and Table must retain exact counts, dates and report context.
-19. In Retention Map, hover and keyboard-focus a point to inspect the preview,
-    pin its details, tab through dialog controls, press Escape, and dismiss by
-    clicking outside. Its LeetCode action opens the matching canonical problem
-    in a new tab.
+19. In Retention Map, use more than 30 eligible reviewed questions, including
+    exact overlaps, boundary recall values, sub-day durability and long titles.
+    Confirm every eligible question remains in Chart/Table and the full status
+    counts agree. All/Below target keeps the same fitted landscape; include an
+    empty Below target result. Hover/tap and the native keyboard inspector must
+    agree, nearby-memory choices must include every overlapping question, and
+    Home/End/arrows must reach the final question. Pin details below the chart,
+    check all supplied values/dates and canonical LeetCode links, then close,
+    Escape or click outside; focus must return appropriately.
+    Drag forward and reversed boxes, a nested box and a box reaching each plot
+    edge. Release must magnify the chosen region, keep all selected points
+    visible, update true axes and retain fixed mark sizes. Check tiny/thin drags,
+    release outside the plot, pointer cancellation, blur and resize; none may
+    pin accidentally or leave a marquee. Escape during a box cancels it and
+    preserves pinned details. Wheel zoom stays under the cursor, Shift-drag
+    pans, and touch pinch/pan works with explicit plus/minus/reset alternatives.
+    Double-click/reset must restore the full fitted domains, preserving a pin
+    even for slower double-clicks. Keyboard selection after zoom reveals an
+    offscreen question. Test both themes at 320px and desktop, all Chart/Table
+    pages, and refreshed data removing a selected question. Compare FSRS cards,
+    due dates and Settings before/after to confirm presentation-only changes.
 20. In Memory Signals by Problem, confirm exactly five rows per page when more
     than five exist, Previous/Next and the live row range update correctly, and
     visible problem links open canonical LeetCode problems in new tabs. Confirm

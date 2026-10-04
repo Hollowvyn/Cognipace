@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-04-analytics-retention-landscape-design.md`](./specs/2026-10-04-analytics-retention-landscape-design.md): approved full eligible memory landscape, exact status marks, complete overlap/keyboard/Table access and box zoom with reset.
+
 - [`specs/2026-10-03-overview-daily-time-design.md`](./specs/2026-10-03-overview-daily-time-design.md): approved fourth Overview card for saved elapsed time from today's local-date assessments, including repeats and failures.
 
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
@@ -56,6 +58,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-04-analytics-retention-landscape.md`](./plans/2026-10-04-analytics-retention-landscape.md): complete-cohort contract and feature-local interactive scatter implementation, lean regressions, production-component proof and required human extension smoke.
 
 - [`plans/2026-10-03-overview-daily-time.md`](./plans/2026-10-03-overview-daily-time.md): Practice read-model total, Overview contract/presentation, validation, and required human smoke proof.
 
@@ -110,6 +114,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-04-analytics-retention-landscape.md`](./handoffs/2026-10-04-analytics-retention-landscape.md): full-cohort Retention Map with box zoom, complete inspection, validation/browser proof and pending human extension smoke.
 
 - [`handoffs/2026-10-03-overview-daily-time.md`](./handoffs/2026-10-03-overview-daily-time.md): daily recorded time implementation, validation evidence, and pending human installed-extension smoke.
 

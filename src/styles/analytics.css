@@ -1,5 +1,121 @@
-/* Scoped to the approved historical charts; later panels retain their tokens. */
+/* Keep Analytics panel refinements scoped to their owning views. */
 @layer utilities {
+  .cp-retention-map {
+    --cp-analytics-healthy: light-dark(#34865a, #8fdfa9);
+    --cp-analytics-attention: light-dark(#a87906, #ffd449);
+    --cp-analytics-risk: light-dark(#bd507e, #f3a2c4);
+    --cp-analytics-target: light-dark(#6d786f, #aabbad);
+    container: retention-map / inline-size;
+  }
+
+  .cp-retention-summary,
+  .cp-retention-view-controls,
+  .cp-retention-references {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+  }
+
+  .cp-retention-status-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.75rem;
+  }
+
+  .cp-retention-status-counts li {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .cp-retention-references,
+  .cp-retention-y-title,
+  .cp-retention-x-title {
+    font-size: 0.75rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .cp-retention-plot-host {
+    position: relative;
+    min-width: 0;
+  }
+
+  .cp-retention-y-title {
+    height: 24px;
+    margin: 0;
+  }
+
+  .cp-retention-x-title {
+    margin: 0;
+    text-align: center;
+  }
+
+  .cp-retention-inspection {
+    position: absolute;
+    display: block;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .cp-retention-inspection:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  .cp-retention-details,
+  .cp-retention-preview {
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--cp-control-radius);
+    background: var(--color-card);
+    font-size: 0.75rem;
+  }
+
+  .cp-retention-candidates,
+  .cp-retention-detail-values {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 12px 0 0;
+  }
+
+  .cp-retention-candidates {
+    max-height: 18rem;
+    overflow-y: auto;
+  }
+
+  .cp-retention-candidates button {
+    height: auto;
+    min-height: 44px;
+    justify-content: start;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  @container retention-map (max-width: 430px) {
+    .cp-retention-candidates,
+    .cp-retention-detail-values {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (pointer: coarse) {
+    .cp-retention-map button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
   .cp-analytics-history {
     container: analytics-history / inline-size;
   }

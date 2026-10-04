@@ -137,9 +137,9 @@ function AnalyticsCurrentStateStory({
   return (
     <div className="grid w-full min-w-0 max-w-[64rem] gap-4">
       <AnalyticsChartPanel
-        description="Current FSRS retrievability and total target-crossing duration for active reviewed problems. This is model-estimated memory health, not observed recall or a due queue."
+        description="Every eligible reviewed problem, positioned by estimated recall now and memory durability. Durability is the total modeled interval from the latest review to crossing the FSRS scheduling target."
         id="retention-map"
-        question="Which active memories are below target, and how durable are they?"
+        question="Which reviewed memories are weak now, and how durable are they?"
         title="Retention Map"
       >
         <RetentionMapView
