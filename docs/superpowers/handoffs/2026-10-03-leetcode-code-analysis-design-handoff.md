@@ -3,8 +3,14 @@
 ## Status
 
 The user selected Option A after reviewing the prototype, section rows, resource
-tradeoffs, and Kotlin examples. The written design is ready for user review:
+tradeoffs, and Kotlin examples, then explicitly approved the written specification
+and requested an implementation plan on 2026-10-03. The approved design is
 `docs/superpowers/specs/2026-10-03-leetcode-code-analysis-design.md`.
+
+The [execution map](../plans/2026-10-03-leetcode-code-analysis.md) now links three
+ordered plans: complete capture/pinned refresh; structured report/trusted runtime;
+and overlay/obsolete-path removal/evaluation/proof. They contain exact source and
+test files, concrete code/test examples, phase checks, and completion criteria.
 
 No application behavior, runtime contract, provider configuration, key, database,
 or package was changed. Implementation and provider evaluation have not started.
@@ -84,10 +90,10 @@ proof remain required for implementation before PR review or merge.
 
 ## Next step
 
-Request review of the written specification. The brainstorming skill's written
-spec review gate requires user approval before transitioning to writing-plans.
-After that approval, create a phase-sized plan tied to this spec and then
-implement it in the primary workspace. No new worktree is needed.
+Execute the three ordered phase plans in the primary workspace with subagent
+review between tasks/phases or inline execution checkpoints. The written-spec
+approval gate is satisfied. Implementation has not started, and no new PR was
+created by this planning change. No new worktree is needed.
 
 ## Release and recovery
 
@@ -95,3 +101,32 @@ This commit is documentation only and needs no product rollback. The planned
 feature changes no report persistence format; disabling AI assessment remains
 its recovery control. Use the current PR template and a Conventional Commit
 feature title for the eventual implementation.
+
+## Planning validation on 2026-10-03
+
+Refreshed `origin`; it remains `b2d9291f`. The task branch was clean and ahead
+by the specification commit `87b04aa` before this documentation edit.
+
+```sh
+rtk git status --short --branch
+rtk git fetch origin
+rtk git log -1 --oneline origin/main
+rtk proxy /Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin/node /private/tmp/check-cognipace-plan-snippets.mjs
+rtk proxy /Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin/node /Users/tobiolutimehin/WebstormProjects/cognipace-v2/node_modules/prettier/bin/prettier.cjs --write --ignore-path /dev/null docs/superpowers/plans/2026-10-03-leetcode-code-analysis.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-1-capture.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-2-report-runtime.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-3-overlay-proof.md docs/superpowers/specs/2026-10-03-leetcode-code-analysis-design.md docs/superpowers/handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md docs/superpowers/README.md
+rtk proxy /Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin/node /Users/tobiolutimehin/WebstormProjects/cognipace-v2/node_modules/prettier/bin/prettier.cjs --check --ignore-path /dev/null docs/superpowers/plans/2026-10-03-leetcode-code-analysis.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-1-capture.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-2-report-runtime.md docs/superpowers/plans/2026-10-03-leetcode-code-analysis-phase-3-overlay-proof.md docs/superpowers/specs/2026-10-03-leetcode-code-analysis-design.md docs/superpowers/handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md docs/superpowers/README.md
+rtk git diff --check
+rtk git diff --cached --check
+```
+
+The syntax-only checker passed 41 complete code blocks after insertion fragments
+were labeled as diffs. It did not execute the code or resolve types. Root
+self-review checked specification coverage, unfinished instructions, and type/
+method-name consistency across the plans. Independent agents supplied read-only
+source maps; they did not review or write the plan. Context7 confirmed existing
+SDK structured-output and abort APIs; no SDK source change is needed.
+
+Formatting/whitespace checks passed. The exact skipped implementation commands
+listed above remain skipped for this documentation-only planning change. No
+application test, build, live model call, generated-code compile, or installed
+extension smoke was run. Those commands and the human proof checklist are
+specified for implementation; their future inclusion is not a claim of success.

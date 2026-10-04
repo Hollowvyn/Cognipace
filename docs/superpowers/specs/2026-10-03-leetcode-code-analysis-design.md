@@ -2,9 +2,9 @@
 
 Date: 2026-10-03.
 
-Status: the user selected Option A and agreed the section format and rubric
-corrections. This written specification is ready for user review. Implementation
-and provider evaluation have not started.
+Status: the user approved this written specification on 2026-10-03 and requested
+the implementation plan. The [phase execution map](../plans/2026-10-03-leetcode-code-analysis.md)
+links three ordered plans. Implementation and provider evaluation have not started.
 
 This replaces the phase-two proposal in
 [the earlier AI repair draft](2026-10-03-ai-repair-and-code-analysis-design.md).
