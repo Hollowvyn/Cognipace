@@ -618,6 +618,61 @@ describe('constraints section headings', () => {
   })
 })
 
+describe('mathematical content notation', () => {
+  it.each(['dom', 'graphql', 'fallback'])(
+    'preserves exponents and subscripts without modifying the page in %s content',
+    async (path) => {
+      const html = `
+        <p>For <code>a<sub><i>i</i></sub></code>, compute <code>n<sup><em>2</em></sup></code> pairs.</p>
+        <p><strong>Example 1:</strong></p>
+        <pre>Input: x = 10<sup>4</sup>, a<sub>i</sub> = [1,
+    2]
+Output: -10<sup><strong>9</strong></sup>
+Explanation: Compare a<sub>i + 1</sub> with n<sup><i>k</i> + 1</sup>.</pre>
+        <p>Constraints:</p>
+        <ul>
+          <li>2 &lt;= <code>n</code><sup><span>2</span></sup> &lt;= 10<sup>4</sup></li>
+          <li>-10<sup>9</sup> &lt;= a<sub>i</sub> &lt;= 10<sup>9</sup></li>
+        </ul>
+        <p>Follow-up:</p>
+        <p>Can you improve O(<i>n</i><sup>2</sup>) time using x<sub>i + 1</sub>?</p>
+      `
+      document.body.innerHTML = `<section data-track-load="description_content">${html}</section>`
+      const originalPage = document.body.innerHTML
+      const content =
+        path === 'fallback'
+          ? await readLeetCodeProblemContent(location, {
+              root: document,
+              document,
+              fetch: vi
+                .fn()
+                .mockResolvedValue(new Response('', { status: 500 })),
+            }).then((result) => {
+              if (!result.ok) throw result.error
+              return result.content
+            })
+          : await readContentForPath(html, path)
+
+      expect(content).toMatchObject({
+        statement: 'For a_(i), compute n^(2) pairs.',
+        examples: [
+          {
+            input: 'x = 10^(4), a_(i) = [1,\n    2]',
+            output: '-10^(9)',
+            explanation: 'Compare a_(i + 1) with n^(k + 1).',
+          },
+        ],
+        constraints: ['2 <= n^(2) <= 10^(4)', '-10^(9) <= a_(i) <= 10^(9)'],
+        followUps: ['Can you improve O(n^(2)) time using x_(i + 1)?'],
+        completeness: path === 'graphql' ? 'complete' : 'partial',
+        source: path === 'graphql' ? 'graphql' : 'dom',
+        confidence: path === 'graphql' ? 'high' : 'medium',
+      })
+      expect(document.body.innerHTML).toBe(originalPage)
+    },
+  )
+})
+
 async function readContentForPath(html: string, path: string) {
   if (path === 'dom') {
     document.body.innerHTML = `<section data-track-load="description_content">${html}</section>`

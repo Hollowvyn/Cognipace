@@ -2,6 +2,7 @@ import DOMPurify from 'dompurify'
 import { createLeetCodeProblemContentFingerprint } from './content-fingerprint'
 import {
   escapeRegExp,
+  preserveMathNotation,
   readMultilineText,
   readNormalizedText,
   readTextFromHtml,
@@ -310,6 +311,7 @@ function readContentText(contentRoot: ParentNode) {
     )
       hint.remove()
   }
+  preserveMathNotation(textRoot)
   for (const element of textRoot.querySelectorAll('*')) {
     if (
       element.matches('p, div, pre, li, ul, ol, h1, h2, h3, h4, h5, h6, br') ||
@@ -448,11 +450,7 @@ function readStringList(value: unknown) {
 
   return value
     .map(readTrimmedString)
-    .map((text) =>
-      text
-        ? stripLeetCodeNoise(readTextFromHtml(DOMPurify.sanitize(text)))
-        : null,
-    )
+    .map((text) => (text ? stripLeetCodeNoise(readTextFromHtml(text)) : null))
     .filter((text): text is string => Boolean(text))
 }
 
