@@ -45,6 +45,7 @@ Implemented or meaningfully wired:
 - Popup command surface
 - LeetCode content-script overlay
 - Dashboard shell and navigation
+- Overview guided-practice home with today's progress and recorded practice time
 - Library/Problems management
 - Tracks workspace and management
 - Settings
@@ -55,10 +56,6 @@ Implemented or meaningfully wired:
 - AI assessment settings and trusted local provider key storage for approved
   BYOK providers
 - Runtime messaging, cache invalidation, local database, migrations, and seed data
-
-Currently incomplete or intentionally light:
-
-- Overview is a dashboard route with a planned guided-practice home.
 
 ## Product Surfaces
 
@@ -188,7 +185,14 @@ Current behavior:
   upcoming-review forecast. Its historical charts use the selected 14-, 30-,
   or 90-day range as evidence-gated presentation windows rather than promising
   a trend from sparse local history.
-- Overview currently reserves route ownership for a future guided-practice home.
+- Overview shows the current review recommendation, Reviews Due, Completed
+  Today, Streak, Time Today, active-track guidance, and a Today Queue preview.
+  Time Today sums saved elapsed time for all assessments recorded on today's
+  browser-local calendar date, including repeated and failed attempts. Untimed
+  assessments contribute no time. An overnight session belongs to the date its
+  assessment was recorded. Corrections replace the existing attempt's time;
+  resetting a problem's practice removes its retained time. The total refreshes
+  with the existing practice invalidation and dashboard reread behavior.
 
 ### Background Service Worker
 
@@ -206,6 +210,12 @@ The background service worker owns trusted extension runtime work:
 ## Features
 
 ### Practice Scheduling
+
+The current streak counts consecutive browser-local calendar days meeting the
+daily goal in unique practiced problems. An unfinished today preserves the
+streak earned through yesterday; meeting today's goal adds today. The streak
+breaks only after a day ends below its goal. A disabled daily goal reports no
+streak.
 
 Practice state is local and FSRS-backed. The persisted database owns practice
 facts, and UI surfaces read them through feature services and runtime messages.
@@ -582,9 +592,23 @@ Recall vs FSRS Estimate, Practice Rhythm, Memory Strength, and Recent Overdue Ba
 showing available points when a historical selected range is unready; a
 one-point series says that it is not enough for a trend yet. Retention Map,
 Memory Signals by Problem, and the fixed 14-day Upcoming Review Load remain
-available as current or forecast views. Retention Map compares each active
-problem's current FSRS retrievability with the configured target; its hover/focus
-preview can be pinned for details and provides a canonical LeetCode link.
+available as current or forecast views. Retention Map shows every eligible active
+reviewed problem, with no 30-question cutoff, at its exact current FSRS
+retrievability and total modeled durability. Durability is the interval from
+the latest review until recall crosses the scheduling target, not remaining
+time or time until due. The FSRS target is independent of personal chart goals.
+All/Below target filters preserve full-cohort counts and fitted domains. Three
+status keys pair color with circles, diamonds and triangles. Hover, tap and a
+native keyboard inspector expose the same original questions; a nearby-memory
+chooser preserves access to coincident points. Pinned details sit below the
+plot with a canonical LeetCode link, exact supplied values and dates. The
+seven-row Table retains every filtered question.
+Drag a rectangle to magnify that region; double-click or Reset view restores
+the full landscape while preserving pinned details. Wheel/pinch zoom,
+Shift-drag/touch pan and plus/minus controls remain available. Magnification
+updates true log-duration and linear-recall axes while marks keep their screen
+size. Keyboard inspection reveals offscreen questions. Zoom and filter state
+are presentation-only; they never change FSRS cards, scheduling or Settings.
 Memory Signals by Problem is a compact ranked list with canonical LeetCode
 problem links and wrapping reasons directly beneath each title, five rows per
 page. Reasons identify estimated recall below the FSRS retention target,

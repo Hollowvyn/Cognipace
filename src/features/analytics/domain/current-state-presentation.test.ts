@@ -52,7 +52,7 @@ describe('current-state Analytics presentation', () => {
     expect(views.retentionMap.recallScale.domain).toEqual([0.45, 1])
   })
 
-  it('caps Retention Map rows at 30 while retaining the full eligible count', () => {
+  it('retains every eligible Retention Map row and full counts above 30', () => {
     const views = buildCurrentStateAnalyticsViews(
       Array.from({ length: 31 }, (_, index) =>
         input(`risk-${String(index).padStart(2, '0')}`, {
@@ -64,18 +64,22 @@ describe('current-state Analytics presentation', () => {
     )
 
     expect(views.retentionMap.totalEligible).toBe(31)
-    expect(views.retentionMap.rows).toHaveLength(30)
+    expect(views.retentionMap.rows).toHaveLength(31)
     expect(views.retentionMap.rows[0]).toMatchObject({
       rank: 1,
       slug: 'risk-00',
     })
     expect(views.retentionMap.rows.at(-1)).toMatchObject({
-      rank: 30,
-      slug: 'risk-29',
+      rank: 31,
+      slug: 'risk-30',
     })
-    expect(
-      views.retentionMap.rows.find((row) => row.slug === 'risk-30'),
-    ).toBeUndefined()
+    expect(views.retentionMap.statusCounts).toEqual({
+      onTarget: 0,
+      watch: 0,
+      needsAttention: 31,
+    })
+    expect(views.memorySignals.rows).toHaveLength(25)
+    expect(views.memorySignals.totalQualifying).toBe(31)
   })
 
   it('orders on-target rows by duration and title rather than surplus recall', () => {

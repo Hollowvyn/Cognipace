@@ -115,9 +115,10 @@ export function buildCurrentStateAnalyticsViews(
     ]
   })
   const orderedRetentionRows = retentionRows.toSorted(compareRetentionRows)
-  const retainedRetentionRows = orderedRetentionRows
-    .slice(0, 30)
-    .map((row, index) => ({ ...row, rank: index + 1 }))
+  const retainedRetentionRows = orderedRetentionRows.map((row, index) => ({
+    ...row,
+    rank: index + 1,
+  }))
 
   const signalRows = candidates
     .flatMap((input) => buildMemorySignalCandidate(input, options))

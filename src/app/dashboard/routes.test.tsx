@@ -502,6 +502,7 @@ describe('dashboard routes', () => {
             overview: {
               practiceProgress: {
                 completedToday: 4,
+                recordedSecondsToday: 0,
                 dailyGoal: 4,
                 currentStreak: 3,
                 goalMetToday: true,

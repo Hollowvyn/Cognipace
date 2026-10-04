@@ -209,6 +209,49 @@ Use one of these entry points:
 - Or open `chrome://extensions`, find CogniPace, open Details, copy the
   extension ID, and open `chrome-extension://<extension-id>/dashboard.html`.
 
+### Streak Day Rollover
+
+1. In a disposable profile with a positive daily goal and consecutive goal-met
+   days ending yesterday, reopen/refetch the popup, Overview, and Analytics.
+   Confirm today's zero progress preserves yesterday's streak.
+2. Save fewer unique problems than today's goal, including a repeated review.
+   Confirm the streak is preserved. Meet the goal and confirm it increases by
+   one across the affected surfaces. Capture screenshot or recording proof.
+3. Edge path: leave a local day below its goal. After the next local midnight,
+   reopen/refetch the affected surfaces and confirm the streak is zero. Meeting
+   the new day's goal starts a streak of one. Check both an empty missed day
+   and a partially completed missed day; capture proof.
+
+Human installed-extension happy-path and edge-case smoke with screenshot or
+recording proof is required before PR review or merge.
+
+### Overview Daily Time
+
+1. Rebuild and reload the extension, then open Overview. Confirm the metric row
+   shows Reviews Due, Completed Today, Streak, and Time Today in that order.
+2. Happy path: save a timed assessment today from the LeetCode overlay, then
+   return to Overview. Confirm Time Today includes its saved elapsed time.
+   Save another timed assessment for the same problem, including a failed
+   attempt. Confirm both durations count while Completed Today counts that
+   problem once. Capture a screenshot or recording.
+3. Edge path: save an untimed assessment. Confirm it adds no time. With no timed
+   assessments today, confirm `0m`; with a positive total below a minute,
+   confirm `<1m`. Confirm minute/hour examples such as `35m` and `1h 25m`.
+4. Correct a timed assessment's rating and use Update. Confirm its time is
+   counted once. If its saved duration changes, confirm the total reflects the
+   replacement. Reset that problem's practice and confirm only its retained
+   effort is removed from the total.
+5. Check local date rollover by reopening/refetching Overview after midnight.
+   Confirm yesterday's assessments are excluded and an overnight timed session
+   counts on its saved assessment date. Capture edge-case proof.
+6. Check wide and narrow windows in both themes. Confirm four cards fit in the
+   desktop row, wrap to two on intermediate widths, and stack on small screens
+   without clipped values or horizontal overflow.
+
+Human installed-extension happy-path and edge-case smoke with screenshot or
+recording proof remains required before PR review or merge. Component fixture
+screenshots and automated tests do not replace this real-time proof.
+
 ### Popup
 
 1. Click the CogniPace extension icon.
@@ -939,10 +982,27 @@ exact pending case.
     and Overdue counts inside sufficiently large segments, tiny outside labels,
     overdue-only Today, neighboring label collisions, and zero schedules. Inspect
     and Table must retain exact counts, dates and report context.
-19. In Retention Map, hover and keyboard-focus a point to inspect the preview,
-    pin its details, tab through dialog controls, press Escape, and dismiss by
-    clicking outside. Its LeetCode action opens the matching canonical problem
-    in a new tab.
+19. In Retention Map, use more than 30 eligible reviewed questions, including
+    exact overlaps, boundary recall values, sub-day durability and long titles.
+    Confirm every eligible question remains in Chart/Table and the full status
+    counts agree. All/Below target keeps the same fitted landscape; include an
+    empty Below target result. Hover/tap and the native keyboard inspector must
+    agree, nearby-memory choices must include every overlapping question, and
+    Home/End/arrows must reach the final question. Pin details below the chart,
+    check all supplied values/dates and canonical LeetCode links, then close,
+    Escape or click outside; focus must return appropriately.
+    Drag forward and reversed boxes, a nested box and a box reaching each plot
+    edge. Release must magnify the chosen region, keep all selected points
+    visible, update true axes and retain fixed mark sizes. Check tiny/thin drags,
+    release outside the plot, pointer cancellation, blur and resize; none may
+    pin accidentally or leave a marquee. Escape during a box cancels it and
+    preserves pinned details. Wheel zoom stays under the cursor, Shift-drag
+    pans, and touch pinch/pan works with explicit plus/minus/reset alternatives.
+    Double-click/reset must restore the full fitted domains, preserving a pin
+    even for slower double-clicks. Keyboard selection after zoom reveals an
+    offscreen question. Test both themes at 320px and desktop, all Chart/Table
+    pages, and refreshed data removing a selected question. Compare FSRS cards,
+    due dates and Settings before/after to confirm presentation-only changes.
 20. In Memory Signals by Problem, confirm exactly five rows per page when more
     than five exist, Previous/Next and the live row range update correctly, and
     visible problem links open canonical LeetCode problems in new tabs. Confirm
@@ -1323,7 +1383,8 @@ refresh across surfaces.
 
 ## Current Incomplete Surfaces
 
-- Overview is a reserved dashboard route for a future guided-practice home.
+- Overview is implemented as a guided-practice home; use the daily-time flow
+  above to validate its recorded effort metric.
 
 Do not report these as broken unless they stop rendering or navigation fails.
 

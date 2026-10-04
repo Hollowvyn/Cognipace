@@ -14,6 +14,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-03-leetcode-code-analysis-design.md`](./specs/2026-10-03-leetcode-code-analysis-design.md): user-selected Option A for Approach, Efficiency, and Code Style scores, explicit resource tradeoffs, language-aware style advice, and a collapsed suggested implementation; written specification approved, with ordered capture, report/runtime, and overlay/proof plans; the first nine tasks are implemented and reviewed, with final Task 4 review/root integration and provider/human proof pending.
 
+- [`specs/2026-10-04-analytics-retention-landscape-design.md`](./specs/2026-10-04-analytics-retention-landscape-design.md): approved full eligible memory landscape, exact status marks, complete overlap/keyboard/Table access and box zoom with reset.
+
+- [`specs/2026-10-03-overview-daily-time-design.md`](./specs/2026-10-03-overview-daily-time-design.md): approved fourth Overview card for saved elapsed time from today's local-date assessments, including repeats and failures.
+
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
 - [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): approved two-rate first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall, with the selected preview preserved verbatim; implemented with automated and production-component proof; required human installed-extension smoke remains pending before review or merge.
@@ -58,6 +62,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 ## Plans
 
 - [`plans/2026-10-03-leetcode-code-analysis.md`](./plans/2026-10-03-leetcode-code-analysis.md): execution map for the approved Option A assessment, linking three ordered phase plans for complete capture, structured reports and trusted runtime, and overlay integration/retirement/proof; the first nine tasks are implemented and reviewed; final Task 4 review/root integration and provider/human proof remain pending.
+
+- [`plans/2026-10-04-analytics-retention-landscape.md`](./plans/2026-10-04-analytics-retention-landscape.md): complete-cohort contract and feature-local interactive scatter implementation, lean regressions, production-component proof and required human extension smoke.
+
+- [`plans/2026-10-03-overview-daily-time.md`](./plans/2026-10-03-overview-daily-time.md): Practice read-model total, Overview contract/presentation, validation, and required human smoke proof.
 
 - [`plans/2026-10-03-next-question-group.md`](./plans/2026-10-03-next-question-group.md): focused service and workspace regression plan for membership-derived chapter guidance, local tabs, and required human extension smoke.
 
@@ -114,6 +122,10 @@ Use these files to understand why work was shaped a certain way. Before changing
 - [`handoffs/2026-10-03-leetcode-code-analysis.md`](./handoffs/2026-10-03-leetcode-code-analysis.md): implemented session-only analysis, six opt-in evaluation inputs, scoped checks, and prepared provider/generated-code/human installed-extension proof; final review and root integration checks pending.
 
 - [`handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md`](./handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md): approved written spec, three phase plans, planning checks, and remaining implementation/model/human proof.
+
+- [`handoffs/2026-10-04-analytics-retention-landscape.md`](./handoffs/2026-10-04-analytics-retention-landscape.md): full-cohort Retention Map with box zoom, complete inspection, validation/browser proof and pending human extension smoke.
+
+- [`handoffs/2026-10-03-overview-daily-time.md`](./handoffs/2026-10-03-overview-daily-time.md): daily recorded time implementation, validation evidence, and pending human installed-extension smoke.
 
 - [`handoffs/2026-10-03-next-question-group.md`](./handoffs/2026-10-03-next-question-group.md): membership-derived chapter guidance, local workspace browsing, regression evidence, and required human extension smoke proof.
 
