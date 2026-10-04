@@ -19,6 +19,57 @@ describe('useSettingsDraft', () => {
     vi.clearAllMocks()
   })
 
+  it.each(['save', 'resetDefaults'] as const)(
+    '%s reports its operation and protects local inputs until persistence completes',
+    async (operation) => {
+      const initial = {
+        ...defaultUserSettings,
+        practice: { ...defaultUserSettings.practice, dailyGoal: 8 },
+      }
+      let stored = initial
+      let finish: (() => void) | undefined
+      vi.mocked(sendMessage).mockImplementation((method, payload) => {
+        if (method === 'settings.getSettings') return Promise.resolve(stored)
+        if (method === 'settings.updateSettings') {
+          return new Promise((resolve) => {
+            finish = () => {
+              stored = mergeUserSettings(
+                initial,
+                settingsUpdateRequestSchema.parse(payload).patch,
+              )
+              resolve(stored)
+            }
+          })
+        }
+        return Promise.reject(new Error(`Unexpected method ${method}`))
+      })
+      const { wrapper } = createQueryTestHarness()
+      const { result } = renderHook(() => useSettingsDraft(), { wrapper })
+      await waitFor(() => expect(result.current.draft).toEqual(initial))
+      act(() => result.current.actions.setStudyMode('freePractice'))
+      let completion: Promise<void> | undefined
+      act(() => {
+        completion = result.current.actions[operation]()
+        result.current.actions.discard()
+        result.current.actions.setNumberInput('dailyGoal', '11')
+      })
+      expect(result.current.isSaving).toBe(operation === 'save')
+      expect(result.current.isResettingDefaults).toBe(
+        operation === 'resetDefaults',
+      )
+      expect(result.current.numberInputs.dailyGoal).toBe('8')
+      expect(result.current.draft?.practice.mode).toBe('freePractice')
+      await waitFor(() => expect(finish).toBeDefined())
+      await act(async () => {
+        finish?.()
+        await completion
+      })
+      expect(result.current.isSaving).toBe(false)
+      expect(result.current.isResettingDefaults).toBe(false)
+      expect(result.current.draft).toEqual(stored)
+    },
+  )
+
   it('resets a successful local Save while its Settings refetch is still pending', async () => {
     let storedSettings = defaultUserSettings
     let readCount = 0

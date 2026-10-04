@@ -2,8 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import type { GenAiGenerateJsonRequest, GenAiProviderId } from '../domain'
-import { generateJson } from './genai-service'
+import { generateJson } from './generate-json'
+import type { AiGenerateJsonRequest, AiProviderId } from './types'
 
 const API_KEY = 'fake-provider-key-do-not-use'
 const schema = z.strictObject({ ok: z.literal(true) })
@@ -14,8 +14,8 @@ const models = {
 }
 
 function request(
-  provider: GenAiProviderId,
-  overrides: Partial<GenAiGenerateJsonRequest<{ ok: true }>> = {},
+  provider: AiProviderId,
+  overrides: Partial<AiGenerateJsonRequest<{ ok: true }>> = {},
 ) {
   return {
     provider,
@@ -40,7 +40,7 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-function successBody(provider: GenAiProviderId, text = '{"ok":true}') {
+function successBody(provider: AiProviderId, text = '{"ok":true}') {
   switch (provider) {
     case 'openai':
       return {
@@ -86,7 +86,7 @@ function successBody(provider: GenAiProviderId, text = '{"ok":true}') {
   }
 }
 
-function errorBody(provider: GenAiProviderId, status: number, tag = 'generic') {
+function errorBody(provider: AiProviderId, status: number, tag = 'generic') {
   const message = `private provider diagnostic ${API_KEY}`
   if (provider === 'gemini')
     return { error: { code: status, status: tag, message } }
@@ -120,7 +120,6 @@ describe('generateJson actual SDK wire', () => {
         providerMetadata: {
           provider,
           model: models[provider],
-          totalTokens: 30,
         },
       })
       expectSafe(result)
@@ -170,12 +169,15 @@ describe('generateJson actual SDK wire', () => {
   it.each(['openai', 'anthropic', 'gemini'] as const)(
     'keeps original literals, nullable fields and constraints for %s',
     async (provider) => {
-      const constrained = z.strictObject({
-        ok: z.literal(true),
-        name: z.string().min(2).max(5).nullable(),
-        count: z.number().int().min(1).max(3),
-        tags: z.array(z.enum(['a', 'b'])).max(2),
-      })
+      const refinement = vi.fn(() => Promise.resolve(true))
+      const constrained = z
+        .strictObject({
+          ok: z.literal(true),
+          name: z.string().min(2).max(5).nullable(),
+          count: z.number().int().min(1).max(3),
+          tags: z.array(z.enum(['a', 'b'])).max(2),
+        })
+        .refine(refinement)
       const payload = { ok: true, name: null, count: 2, tags: ['a'] }
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         jsonResponse(successBody(provider, JSON.stringify(payload))),
@@ -185,6 +187,7 @@ describe('generateJson actual SDK wire', () => {
         schema: constrained,
       })
       expect(result).toMatchObject({ status: 'success', data: payload })
+      expect(refinement).toHaveBeenCalledOnce()
     },
   )
 
@@ -409,16 +412,6 @@ describe('generateJson actual SDK wire', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('does not return a credential echoed into provider model metadata', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ ...successBody('openai'), model: API_KEY }),
-    )
-    const result = await generateJson(request('openai'))
-    expect(result.status).toBe('success')
-    expect(result.providerMetadata).not.toHaveProperty('modelVersion')
-    expectSafe(result)
-  })
-
   it('supports the SDK JSON-tool compatibility path for older Anthropic models', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({
@@ -477,35 +470,6 @@ describe('generateJson actual SDK wire', () => {
     },
   )
 
-  it('omits malformed fractional token metadata from a native provider response', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({
-        ...successBody('gemini'),
-        usageMetadata: {
-          promptTokenCount: 1.5,
-          candidatesTokenCount: 1,
-          totalTokenCount: 2.5,
-        },
-      }),
-    )
-    const result = await generateJson(request('gemini'))
-    expect(result.status).toBe('success')
-    expect(result.providerMetadata).not.toHaveProperty('totalTokens')
-  })
-
-  it('preserves zero reported token usage', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({
-        ...successBody('anthropic'),
-        usage: { input_tokens: 0, output_tokens: 0 },
-      }),
-    )
-    expect(await generateJson(request('anthropic'))).toMatchObject({
-      status: 'success',
-      providerMetadata: { totalTokens: 0 },
-    })
-  })
-
   it('keeps unknown SDK failures controlled', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(
       new Error(`private provider diagnostic ${API_KEY}`),
@@ -524,16 +488,5 @@ describe('generateJson actual SDK wire', () => {
     expect(result).toMatchObject({ status: 'error', code: 'invalid-output' })
     expect(fetchMock).not.toHaveBeenCalled()
     expectSafe(result)
-  })
-
-  it('rejects unapproved endpoints before sending credentials', async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(jsonResponse(successBody('gemini')))
-    const result = await generateJson(
-      request('gemini', { baseUrl: 'https://unapproved.example' }),
-    )
-    expect(result).toMatchObject({ status: 'error', code: 'bad-request' })
-    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

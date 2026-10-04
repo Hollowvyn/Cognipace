@@ -3,19 +3,14 @@ import { describe, expect, it } from 'vitest'
 import {
   aiProviderSecretSchema,
   aiProviderSecretPresenceSchema,
-  aiProviderSecretsSchema,
-  emptyAiProviderSecrets,
   makeEmptyAiProviderSecretPresence,
 } from './genai-secrets-types'
 
 describe('genai secrets domain', () => {
-  it('accepts a row with per-provider secrets', () => {
-    const parsed = aiProviderSecretsSchema.parse({
-      openai: { apiKey: 'sk-test' },
-      anthropic: { apiKey: 'sk-ant-test' },
+  it('accepts a per-provider secret', () => {
+    expect(aiProviderSecretSchema.parse({ apiKey: 'sk-test' })).toEqual({
+      apiKey: 'sk-test',
     })
-    expect(parsed.openai?.apiKey).toBe('sk-test')
-    expect(parsed.gemini).toBeUndefined()
   })
 
   it('rejects baseUrl via .strict()', () => {
@@ -27,26 +22,8 @@ describe('genai secrets domain', () => {
     ).toThrow()
   })
 
-  it('accepts an empty row', () => {
-    expect(aiProviderSecretsSchema.parse({})).toEqual({})
-  })
-
-  it('rejects unknown providers via .strict()', () => {
-    expect(() =>
-      aiProviderSecretsSchema.parse({
-        mistral: { apiKey: 'sk-x' },
-      }),
-    ).toThrow()
-  })
-
   it('rejects empty apiKey', () => {
-    expect(() =>
-      aiProviderSecretsSchema.parse({ openai: { apiKey: '' } }),
-    ).toThrow()
-  })
-
-  it('emptyAiProviderSecrets is an empty object', () => {
-    expect(emptyAiProviderSecrets).toEqual({})
+    expect(() => aiProviderSecretSchema.parse({ apiKey: '' })).toThrow()
   })
 
   it('makeEmptyAiProviderSecretPresence returns all-false for known providers', () => {

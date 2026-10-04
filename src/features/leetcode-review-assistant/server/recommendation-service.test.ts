@@ -2,17 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { GenAiError } from '@/features/genai'
 
-vi.mock('@/features/genai/server/genai-service', async () => {
-  const actual = await vi.importActual<
-    typeof import('@/features/genai/server/genai-service')
-  >('@/features/genai/server/genai-service')
+vi.mock('@/lib/ai', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/ai')>('@/lib/ai')
   return {
     ...actual,
     generateJson: vi.fn(),
   }
 })
 
-import { generateJson } from '@/features/genai/server/genai-service'
+import { generateJson } from '@/lib/ai'
 
 import { recommendAssessment } from './recommendation-service'
 import {
@@ -106,7 +104,7 @@ describe('recommendAssessment — AI error → fallback', () => {
     'invalid-output',
     'unknown',
   ] as const)(
-    'returns status:"fallback" with deterministic rating for error code %s',
+    'returns only the controlled fallback error for code %s',
     async (code) => {
       generateJsonMock.mockResolvedValue({
         status: 'error',
@@ -121,39 +119,12 @@ describe('recommendAssessment — AI error → fallback', () => {
 
       const result = await recommendAssessment(makeRecommendAssessmentInput())
 
-      expect(result.status).toBe('fallback')
-      if (result.status === 'fallback') {
-        expect(result.recommendation.recommendedRating).toBe('good')
-        expect(result.error.code).toBe(code)
-        expect(result.error.message).toBe(`${code} error from provider`)
-        expect(result.recommendation.confidence).toBe('low')
-      }
+      expect(result).toEqual({
+        status: 'fallback',
+        error: { code, message: `${code} error from provider` },
+      })
     },
   )
-
-  it('matches deterministic "again" when failed lock + AI error', async () => {
-    generateJsonMock.mockResolvedValue({
-      status: 'error',
-      code: 'network',
-      message: 'down',
-      providerMetadata: {
-        provider: 'openai',
-        model: 'gpt-test',
-        durationMs: 100,
-      },
-    })
-
-    const result = await recommendAssessment(
-      makeRecommendAssessmentInput({
-        deterministicDecision: makeFailedDecision(),
-      }),
-    )
-
-    expect(result.status).toBe('fallback')
-    if (result.status === 'fallback') {
-      expect(result.recommendation.recommendedRating).toBe('again')
-    }
-  })
 })
 
 describe('recommendAssessment — caller cancellation', () => {

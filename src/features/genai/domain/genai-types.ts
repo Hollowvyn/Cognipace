@@ -7,8 +7,5 @@ export type {
   AiProviderId as GenAiProviderId,
   AiErrorCode as GenAiError,
   AiProviderConfig as GenAiProviderConfig,
-  AiPrompt as GenAiPrompt,
-  AiGenerateJsonRequest as GenAiGenerateJsonRequest,
   AiProviderMetadata as GenAiProviderMetadata,
-  AiGenerateJsonResult as GenAiGenerateJsonResult,
 } from '@/lib/ai/types'

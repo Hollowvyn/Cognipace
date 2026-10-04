@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { getSettings } from '@/features/settings/server/settings-service'
-import { AiDeadlineError, withAiDeadline } from '@/lib/ai'
+import { AiDeadlineError, generateJson, withAiDeadline } from '@/lib/ai'
 import type { Db } from '@/platform/db'
 
 import type {
@@ -9,7 +9,6 @@ import type {
   TestAiConnectionResponse,
 } from '../api/genai-settings-contracts'
 import { loadAiProviderSecretSnapshotFromTrustedStorage } from './genai-secret-storage'
-import { generateJson } from './genai-service'
 
 const connectionTimeoutMs = 20_000
 const connectionOutputSchema = z.strictObject({ ok: z.literal(true) })

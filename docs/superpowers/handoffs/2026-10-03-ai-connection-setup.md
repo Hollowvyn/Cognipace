@@ -26,18 +26,20 @@ writes. Partial failures preserve remaining edits and state which stage failed.
 
 `src/lib/ai` is the reusable structured-generation layer. It wraps Vercel AI SDK
 7.0.127 and exact official adapters: OpenAI 4.0.83, Anthropic 4.0.71, Google
-4.0.87. The GenAI feature retains configuration, secret ownership, and the
-existing generation facade. Custom REST adapters and wire-schema conversion
-were removed. Assessment uses the same library; its existing response/fallback
-contracts now support safe SDK metadata and error codes. The requested
+4.0.87. The GenAI feature retains configuration and secret ownership. Connection
+testing, assessment, and development smoke call the library directly. Custom
+REST adapters, wire-schema conversion, and the forwarding generation facade
+were removed. Assessment returns controlled errors instead of building an unused
+artificial fallback recommendation. The requested
 Approach/Efficiency/Code Style scores out of 5 and suggested code remain a later
 phase, recorded in the separate master draft.
 
 Provider calls receive explicit credentials and direct provider model objects,
 fixed approved hosts, disabled retries and telemetry, bounded output, blocked
 redirects, and a complete-call deadline. Raw SDK errors, provider bodies,
-request objects, and credentials are not logged or returned. Google adapter
-metadata currently omits the model version because the SDK does not expose it.
+request objects, and credentials are not logged or returned. Returned metadata
+contains only provider, model, and duration. The SDK validates structured output
+once against the supplied Zod schema.
 
 Dashboard-only `genai.testConnection` validates the saved provider/model, reads
 the key in the background, requests only `{ "ok": true }`, and rejects replaced
@@ -64,6 +66,71 @@ pull request with an editable live-testing checklist. Keep that PR in draft
 until the human happy-path and edge-case proof is complete; no merge is requested.
 
 ## Testing
+
+### Approved Ponytail cleanup of PR #188
+
+The user approved all eleven cleanup findings. Relative to `f5ebcc41`, production
+TypeScript shrank by **194 lines net** (46 added, 240 removed; tests and fixtures
+excluded). The forwarding generation layer, unused endpoint option and metadata,
+artificial fallback recommendation, aggregate secret schema, duplicate validators,
+unused key-save state, mirrored preference-operation state, and duplicate query
+cancellation were removed. No additional review suggestions were applied.
+
+Actual SDK wire tests now live in `src/lib/ai/generate-json.test.ts`. The original
+async refinement regression failed for all three providers when validation ran
+twice and passes with SDK-owned validation. Strict per-provider secrets, runtime
+parsing, safe errors, MutationCache credential exclusion, fixed hosts, deadlines,
+rating locks, shared write gates, cancellation, and stale-result checks remain.
+Independent spec reviews and subsequent code-quality reviews found no remaining
+actionable cleanup defect.
+
+Cleanup focused commands passed:
+
+```sh
+rtk npm run test -- src/features/genai/domain src/features/genai/api/genai-settings-contracts.test.ts src/extension/background/register-handlers.test.ts
+rtk npm run test -- src/lib/ai src/features/genai/server/genai-connection-service.test.ts
+rtk npm run test -- src/features/settings/hooks src/features/genai/api src/platform/query/cache-invalidation.test.ts
+rtk npm run test -- src/features/leetcode-review-assistant
+rtk npm run test -- src/lib/ai src/features/genai/server/genai-connection-service.test.ts src/features/leetcode-review-assistant src/extension/background/register-handlers.test.ts src/testing/architecture-boundaries.test.ts
+rtk npm run test -- src/lib/ai src/features/genai src/features/settings/hooks src/features/leetcode-review-assistant src/features/overlay-session/hooks/use-leetcode-assessment-recommendation.test.tsx src/extension/background/register-handlers.test.ts src/platform/query/cache-invalidation.test.ts src/testing/architecture-boundaries.test.ts
+```
+
+Results respectively: **4 files / 78 tests**, **3 / 61**, **6 / 59**, **6 / 57**,
+**11 / 201**, and **22 / 301**. These overlapping counts must not be summed.
+The full cleanup `rtk npm run check` passed **195 files / 2,144 tests**, including
+database integrity, WXT preparation, typecheck, and lint. Deleted tests covered
+removed options and unused fallback construction; relevant deadline, privacy,
+wire, normalization, and cache-race coverage remains. No paid provider request
+or real credential was used.
+
+Initial cleanup `rtk npm run lint` and `rtk npm run check` failed on
+`@typescript-eslint/require-await` in the refinement test callback. Returning
+`Promise.resolve(true)` preserves its asynchronous validator behavior and fixes
+lint; both commands subsequently passed. Existing jsdom `Window.scrollTo`
+notices remain non-failing. Human installed-extension/live-provider proof and
+the happy-path/edge-case checklist below remain pending.
+
+Required cleanup finish commands passed:
+
+```sh
+rtk npm run lint
+rtk npm run check
+rtk npm run format
+rtk npm run build
+rtk npm run zip
+rtk npm run store:check
+rtk proxy npx prettier --check src/lib/ai/generate-json.test.ts
+rtk proxy npx prettier --check --ignore-path /dev/null docs/architecture.md docs/superpowers/plans/2026-10-03-ai-integration-cleanup.md docs/superpowers/handoffs/2026-10-03-ai-connection-setup.md
+rtk git diff --check
+```
+
+The cleanup Chrome archive is `dist/cognipace-2.1.0-chrome.zip` (1.44 MB);
+the background bundle remains approximately 1.21 MB. Build and zip emit the
+existing large-chunk warning and exit successfully. Skipped commands and human
+smoke requirements remain listed below; no new visual or live-provider proof
+is claimed by this refactor.
+
+### Setup implementation validation before cleanup
 
 The focused final integration command passed **54 files / 677 tests**:
 
@@ -216,7 +283,8 @@ Skipped commands/flows:
   behavior.
 - Live provider requests: no human-owned credentials were supplied for agent
   testing. Credentials were not searched for or read from browser storage.
-- Firefox build/smoke: current target and validation matrix are Chrome MV3.
+- `rtk npm run build -- -b firefox` and Firefox smoke: current target and
+  validation matrix are Chrome MV3.
 
 ## Release and recovery
 

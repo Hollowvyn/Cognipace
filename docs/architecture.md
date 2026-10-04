@@ -488,7 +488,8 @@ Current integrations:
 - `src/lib/ai`: reusable structured generation through Vercel AI SDK and its
   official OpenAI, Anthropic, and Google adapters. The library accepts explicit
   credentials, model, prompt, and Zod schema; it does not own Settings,
-  assessment, runtime messaging, or secret persistence.
+  assessment, runtime messaging, or secret persistence. Feature services call
+  this library directly; GenAI owns configuration and trusted credential loading.
 
 BYOK secrets use `src/platform/secrets`, backed by `chrome.storage.local` with
 trusted-context access. UI surfaces may save or delete secrets through runtime
@@ -511,10 +512,10 @@ provider host permissions are exactly:
 Provider calls run from trusted background code after settings and BYOK secret
 checks. The SDK receives explicit direct-provider model objects and approved
 hosts, with retries disabled, bounded output, and telemetry disabled. The
-library validates structured output and returns controlled errors and safe
-metadata; raw SDK errors and provider response bodies do not cross the runtime
-boundary. Its deadline covers request preparation, headers, body consumption,
-and output validation.
+SDK validates structured output against the supplied Zod schema. The library
+returns controlled errors and provider/model/duration metadata; raw SDK errors
+and provider response bodies do not cross the runtime boundary. Its deadline
+covers request preparation, headers, body consumption, and output validation.
 
 Dashboard-only `genai.testConnection` accepts the saved provider and model
 identity. It loads credentials in the background, makes a fixed small

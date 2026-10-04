@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useEffect, useReducer, useRef } from 'react'
 
 import { readErrorMessage } from '@/utils/errors'
 
@@ -104,8 +104,6 @@ const initialDraftState: SettingsDraftState = {
   status: null,
 }
 
-type SettingsMutationKind = 'resetDefaults' | 'save'
-
 export function useSettingsDraft(
   sharedGate?: SettingsOperationGate,
   onReset?: (settings: UserSettings) => void,
@@ -115,8 +113,6 @@ export function useSettingsDraft(
   const settingsQuery = useSettings()
   const updateSettings = useUpdateSettings()
   const [state, dispatch] = useReducer(settingsDraftReducer, initialDraftState)
-  const [pendingMutation, setPendingMutation] =
-    useState<SettingsMutationKind | null>(null)
   const ownMutationPending = useRef(false)
 
   useEffect(() => {
@@ -135,9 +131,8 @@ export function useSettingsDraft(
   const hasChanges = hasLocalChanges(state)
   const hasSettingsChanges = hasPersistableSettingsChanges(state)
   const isMutatingSettings = updateSettings.isPending
-  const isResettingDefaults =
-    isMutatingSettings && pendingMutation === 'resetDefaults'
-  const isSaving = isMutatingSettings && pendingMutation === 'save'
+  const isResettingDefaults = gate.activeOperation === 'reset'
+  const isSaving = gate.activeOperation === 'preferences'
   const canSave =
     Boolean(state.saved && state.draft) &&
     hasSettingsChanges &&
@@ -172,7 +167,6 @@ export function useSettingsDraft(
     if (!release) return
     ownMutationPending.current = true
     dispatch({ type: 'set-status', status: null })
-    setPendingMutation('save')
 
     try {
       const savedSettings = await updateSettings.mutateAsync({
@@ -195,7 +189,6 @@ export function useSettingsDraft(
       })
     } finally {
       ownMutationPending.current = false
-      setPendingMutation(null)
       release()
     }
   }
@@ -209,7 +202,6 @@ export function useSettingsDraft(
     if (!release) return
     ownMutationPending.current = true
     dispatch({ type: 'set-status', status: null })
-    setPendingMutation('resetDefaults')
 
     try {
       const patch = {
@@ -241,7 +233,6 @@ export function useSettingsDraft(
       })
     } finally {
       ownMutationPending.current = false
-      setPendingMutation(null)
       release()
     }
   }

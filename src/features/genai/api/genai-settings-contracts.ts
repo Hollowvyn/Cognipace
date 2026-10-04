@@ -1,14 +1,9 @@
 import { z } from 'zod'
 
+import { aiProviderSecretSchema } from '../domain/genai-secrets-types'
 import { genAiErrorCodes, genAiProviderIds } from '../domain/genai-types'
 
 const surfaceSchema = z.enum(['popup', 'dashboard'])
-
-const aiProviderSecretBodySchema = z
-  .object({
-    apiKey: z.string().min(1),
-  })
-  .strict()
 
 export const getAiProviderSecretPresenceRequestSchema = z
   .object({
@@ -20,7 +15,7 @@ export const setAiProviderSecretRequestSchema = z
   .object({
     surface: surfaceSchema,
     provider: z.enum(genAiProviderIds),
-    secret: aiProviderSecretBodySchema,
+    secret: aiProviderSecretSchema,
   })
   .strict()
 

@@ -230,7 +230,7 @@ vi.mock('@/features/genai/server/genai-connection-service', () => ({
   testAiConnection: backgroundMocks.testAiConnection,
 }))
 
-vi.mock('@/features/genai/server', () => ({
+vi.mock('@/lib/ai', () => ({
   generateJson: backgroundMocks.generateJson,
 }))
 

@@ -239,9 +239,10 @@ describe('secret cache coherence and privacy', () => {
           provider: 'openai',
           key: 'fake-private-key',
         }),
-      ).rejects.not.toThrow('fake-private-key')
+      ).rejects.toMatchObject({
+        message: 'The AI key save could not be completed. Please retry.',
+      })
     })
-    expect(result.current.error?.message).not.toContain('fake-private-key')
     vi.mocked(sendMessage).mockResolvedValue({
       openai: 'true',
       anthropic: false,

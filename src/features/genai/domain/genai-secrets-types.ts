@@ -10,16 +10,6 @@ export const aiProviderSecretSchema = z
 
 export type AiProviderSecret = z.infer<typeof aiProviderSecretSchema>
 
-export const aiProviderSecretsSchema = z
-  .object({
-    openai: aiProviderSecretSchema.optional(),
-    anthropic: aiProviderSecretSchema.optional(),
-    gemini: aiProviderSecretSchema.optional(),
-  })
-  .strict()
-
-export type AiProviderSecrets = z.infer<typeof aiProviderSecretsSchema>
-
 export const aiProviderSecretPresenceSchema = z.strictObject({
   openai: z.boolean(),
   anthropic: z.boolean(),
@@ -29,8 +19,6 @@ export const aiProviderSecretPresenceSchema = z.strictObject({
 export type AiProviderSecretPresence = z.infer<
   typeof aiProviderSecretPresenceSchema
 >
-
-export const emptyAiProviderSecrets: AiProviderSecrets = {}
 
 export function makeEmptyAiProviderSecretPresence(): AiProviderSecretPresence {
   return Object.fromEntries(

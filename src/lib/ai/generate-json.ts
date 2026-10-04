@@ -81,11 +81,6 @@ export async function generateJson<T>(
         if (!endpoint) throw new ControlledAiError('bad-request')
         if (!request.apiKey.trim() || !request.model.trim())
           throw new ControlledAiError('not-configured')
-        if (
-          request.baseUrl &&
-          !isApprovedEndpoint(request.provider, request.baseUrl)
-        )
-          throw new ControlledAiError('bad-request')
         const maxOutputTokens = request.maxOutputTokens ?? 2048
         if (
           !Number.isInteger(maxOutputTokens) ||
@@ -141,30 +136,10 @@ export async function generateJson<T>(
           throw new ControlledAiError('refused')
         if (result.finishReason === 'length')
           throw new ControlledAiError('invalid-output')
-        const parsed = await request.schema.safeParseAsync(result.output)
-        if (!parsed.success) throw new ControlledAiError('invalid-output')
-        signal.throwIfAborted()
-        const modelVersion =
-          request.provider === 'gemini' ? undefined : result.response.modelId
-        const totalTokens = result.totalUsage.totalTokens
         return {
           status: 'success' as const,
-          data: parsed.data,
-          providerMetadata: {
-            ...metadata(),
-            ...(typeof modelVersion === 'string' &&
-            modelVersion.length > 0 &&
-            modelVersion.length <= 120 &&
-            !modelVersion.includes(request.apiKey) &&
-            /^[a-zA-Z0-9._:/-]+$/.test(modelVersion)
-              ? { modelVersion }
-              : {}),
-            ...(typeof totalTokens === 'number' &&
-            Number.isInteger(totalTokens) &&
-            totalTokens >= 0
-              ? { totalTokens }
-              : {}),
-          },
+          data: result.output,
+          providerMetadata: metadata(),
         }
       },
     )
@@ -207,17 +182,6 @@ function createModel(
         fetch: providerFetch,
       }).languageModel(request.model)
   }
-}
-
-function isApprovedEndpoint(provider: AiProviderId, value: string) {
-  // Preserve legacy canonical Anthropic/Gemini prefixes without accepting routes or hosts.
-  const allowed =
-    provider === 'anthropic'
-      ? [endpoints.anthropic, 'https://api.anthropic.com']
-      : provider === 'gemini'
-        ? [endpoints.gemini, 'https://generativelanguage.googleapis.com']
-        : [endpoints.openai]
-  return allowed.includes(value.replace(/\/$/, ''))
 }
 
 function normalizeError(

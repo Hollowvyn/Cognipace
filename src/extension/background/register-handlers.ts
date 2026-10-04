@@ -78,7 +78,7 @@ import {
 } from '@/features/genai/server/genai-settings-service'
 import { testAiConnection } from '@/features/genai/server/genai-connection-service'
 import { aiProviderSecretPresenceSchema } from '@/features/genai/domain'
-import { generateJson } from '@/features/genai/server'
+import { generateJson } from '@/lib/ai'
 import {
   exportFullBackup,
   resetLocalData,

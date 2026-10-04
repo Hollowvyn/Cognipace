@@ -23,8 +23,6 @@ export type AiProviderConfig = {
   provider: AiProviderId
   model: string
   apiKey: string
-  /** Legacy override: only the provider's fixed approved endpoint is accepted. */
-  baseUrl?: string
 }
 export type AiPrompt = { system: string; user: string }
 export type AiGenerateJsonRequest<T> = AiProviderConfig & {
@@ -41,10 +39,8 @@ export type AiGenerateJsonRequest<T> = AiProviderConfig & {
 export type AiProviderMetadata = {
   provider: AiProviderId
   model: string
-  modelVersion?: string
   /** Whole operation duration, including preparation and validation. */
   durationMs: number
-  totalTokens?: number
 }
 export type AiGenerateJsonResult<T> =
   | { status: 'success'; data: T; providerMetadata: AiProviderMetadata }

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useRef, useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -48,51 +48,27 @@ export function useSetAiProviderSecretMutation(
 ) {
   const queryClient = useQueryClient()
   const pending = useRef(false)
-  const [state, setState] = useState<{
-    isPending: boolean
-    error: Error | null
-    data: AiProviderSecretPresence | undefined
-  }>({ isPending: false, error: null, data: undefined })
-  const mutateAsync = useCallback(
-    async (input: SetAiProviderSecretHookInput) => {
-      if (pending.current)
-        throw new Error('An AI key save is already in progress.')
-      pending.current = true
-      setState({ isPending: true, error: null, data: undefined })
-      try {
-        const presence = aiProviderSecretPresenceSchema.parse(
-          await sendMessage('genai.setAiProviderSecret', {
-            surface,
-            provider: input.provider,
-            secret: { apiKey: input.key },
-          }),
-        )
-        await applySecretPresence(queryClient, presence)
-        setState({ isPending: false, error: null, data: presence })
-        return presence
-      } catch {
-        const error = new Error(
-          'The AI key save could not be completed. Please retry.',
-        )
-        setState({ isPending: false, error, data: undefined })
-        throw error
-      } finally {
-        pending.current = false
-      }
-    },
-    [queryClient, surface],
-  )
-  const reset = useCallback(() => {
-    if (!pending.current)
-      setState({ isPending: false, error: null, data: undefined })
-  }, [])
-  return {
-    ...state,
-    mutateAsync,
-    reset,
-    isError: state.error !== null,
-    isSuccess: state.data !== undefined,
+  async function mutateAsync(input: SetAiProviderSecretHookInput) {
+    if (pending.current)
+      throw new Error('An AI key save is already in progress.')
+    pending.current = true
+    try {
+      const presence = aiProviderSecretPresenceSchema.parse(
+        await sendMessage('genai.setAiProviderSecret', {
+          surface,
+          provider: input.provider,
+          secret: { apiKey: input.key },
+        }),
+      )
+      await applySecretPresence(queryClient, presence)
+      return presence
+    } catch {
+      throw new Error('The AI key save could not be completed. Please retry.')
+    } finally {
+      pending.current = false
+    }
   }
+  return { mutateAsync }
 }
 
 export type ClearAiProviderSecretHookInput = { provider: GenAiProviderId }
@@ -126,9 +102,6 @@ async function applySecretPresence(
   queryClient: QueryClient,
   presence: AiProviderSecretPresence,
 ) {
-  await queryClient.cancelQueries({
-    queryKey: queryKeys.genai.secretPresence(),
-  })
   await invalidateTaggedQueries(queryClient, ['genai'])
   queryClient.setQueryData(queryKeys.genai.secretPresence(), presence)
 }
