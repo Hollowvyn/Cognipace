@@ -14,11 +14,11 @@
 
 Source: [approved design](../specs/2026-10-03-fsrs-remediation-design.md). The written specification was approved on October 3, 2026.
 
-This is the dependency and acceptance map for the whole remediation. The eight priority numbers retain their audit meanings; the letters below identify execution slices. Only slice A currently has a detailed executable plan. Author each subsequent slice's code-level plan against its verified predecessor before executing it. Do not represent this map as eight completed implementations or as code-level plans for every slice.
+This is the dependency and acceptance map for the whole remediation. The eight priority numbers retain their audit meanings; the letters below identify execution slices. A and B have detailed executable plans. Author each subsequent slice's code-level plan against its verified predecessor before executing it. Do not represent this map as eight completed implementations or as code-level plans for every slice.
 
-Execution status: A is implemented with required automated checks passing; human installed-extension proof remains pending before PR review or merge. B–H remain unimplemented. The [Phase A handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) records exact validation, failures repaired, recovery limits and the smoke checklist. Execution rebased onto `origin/main` at `b2d9291f` without changing the frozen SQL prefix.
+Execution status: A merged in [PR #190](https://github.com/Hollowvyn/Cognipace/pull/190) as `92ba67d5` on October 4, 2026. Its [handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) records exact automated validation, failures repaired, recovery limits and the historical human-proof status. [Phase B's detailed plan](./2026-10-04-fsrs-phase-b-scheduling-evidence.md) is written against merged A; B–H remain unimplemented.
 
-Worktree: `/Users/tobiolutimehin/.codex/worktrees/46c1/cognipace-v2`. Branch: `codex/fsrs-remediation-design`, based on `origin/main` at `dc0fc6f2`. Preserve the newer Analytics and Tracks work already present. At execution start check the branch, migration list and pinned toolchain; if upstream changes affect the frozen baseline or planned interfaces, revise the affected plan before editing code.
+Worktree: `/Users/tobiolutimehin/.codex/worktrees/46c1/cognipace-v2`. The original design/Phase A branch was `codex/fsrs-remediation-design`; B is planned on `codex/fsrs-phase-b-scheduling-evidence`, based on merged `origin/main` at `92ba67d5`. Preserve the newer Analytics and Tracks work already present. At execution start check the branch, migration list and pinned toolchain; if upstream changes affect the frozen baseline or planned interfaces, revise the affected plan before editing code.
 
 ## File ownership map
 
@@ -36,16 +36,16 @@ Worktree: `/Users/tobiolutimehin/.codex/worktrees/46c1/cognipace-v2`. Branch: `c
 
 ## Ordered slices
 
-| Slice                                    | Audit priorities                                | Outcome and execution prerequisite                                                                                                                                                                                                        |
-| ---------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A. Protect the shipped snapshot baseline | Preservation portion of 8; prerequisite for 1–3 | [Detailed plan](./2026-10-03-fsrs-phase-a-preserving-baseline.md): freeze through-0009, retain a separate recovery copy and prove populated data equality after staged upgrade/reopen. No new schema or cadence change.                   |
-| B. Complete scheduling evidence          | 2; internal weights support from 7              | Effective immutable profile/card/log codecs and single-event correction operations under the existing legacy defaults. Library-normalized effective parameters are round-trippable; imported evidence is validated exactly. Depends on A. |
-| C. Preserve evidence storage and restore | 2–3 and preservation portion of 8               | Additive schema, inferred legacy sequences, unknown legacy provenance, durable card identities, generation storage and backup compatibility land together. Depends on A/B.                                                                |
-| D. Reliable commands and guarded Update  | 1–3                                             | Frozen accepted commands, transaction receipts, durable acknowledgement and exact attempt/revision correction work end to end through runtime and overlay. Depends on C.                                                                  |
-| E. Daily scheduling and rating meaning   | 4–5, current reminder consistency from 8        | Prospective long-term profile, shared calendar eligibility, overdue/due/new automatic queue, explicit Extra Practice, preserved assessment policy and accurate Analytics evidence. Depends on D.                                          |
-| F. Interval previews                     | 6                                               | Pure `repeat()` previews for both Submit and Update, using the correct authoritative contexts. Depends on D/E.                                                                                                                            |
-| G. Measure and improve local growth      | Performance portion of 8                        | Packaged, end-to-end measurements and justified optimizations with reference-output parity. Record baseline measurements during foundation; optimization follows E/F.                                                                     |
-| H. Evaluate personalization              | Remaining optimizer portion of 7                | A user-started local official-binding pilot, packaged-runtime proof, chronological evaluation and guarded prospective activation. Depends on trustworthy D evidence and measured G budgets.                                               |
+| Slice                                    | Audit priorities                                | Outcome and execution prerequisite                                                                                                                                                                                                 |
+| ---------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Protect the shipped snapshot baseline | Preservation portion of 8; prerequisite for 1–3 | [Detailed plan](./2026-10-03-fsrs-phase-a-preserving-baseline.md): freeze through-0009, retain a separate recovery copy and prove populated data equality after staged upgrade/reopen. No new schema or cadence change.            |
+| B. Complete scheduling evidence          | 2; internal weights support from 7              | [Detailed plan](./2026-10-04-fsrs-phase-b-scheduling-evidence.md): immutable profile/card/log codecs and single-event correction operations under existing legacy defaults; effective parameters round-trip exactly. Depends on A. |
+| C. Preserve evidence storage and restore | 2–3 and preservation portion of 8               | Additive schema, inferred legacy sequences, unknown legacy provenance, durable card identities, generation storage and backup compatibility land together. Depends on A/B.                                                         |
+| D. Reliable commands and guarded Update  | 1–3                                             | Frozen accepted commands, transaction receipts, durable acknowledgement and exact attempt/revision correction work end to end through runtime and overlay. Depends on C.                                                           |
+| E. Daily scheduling and rating meaning   | 4–5, current reminder consistency from 8        | Prospective long-term profile, shared calendar eligibility, overdue/due/new automatic queue, explicit Extra Practice, preserved assessment policy and accurate Analytics evidence. Depends on D.                                   |
+| F. Interval previews                     | 6                                               | Pure `repeat()` previews for both Submit and Update, using the correct authoritative contexts. Depends on D/E.                                                                                                                     |
+| G. Measure and improve local growth      | Performance portion of 8                        | Packaged, end-to-end measurements and justified optimizations with reference-output parity. Record baseline measurements during foundation; optimization follows E/F.                                                              |
+| H. Evaluate personalization              | Remaining optimizer portion of 7                | A user-started local official-binding pilot, packaged-runtime proof, chronological evaluation and guarded prospective activation. Depends on trustworthy D evidence and measured G budgets.                                        |
 
 ### B: scheduling evidence acceptance
 
@@ -130,8 +130,9 @@ Compare the candidate chronologically against defaults/incumbent on held-out his
 
 ## Completion and validation
 
-- [x] Execute A from its detailed plan and retain exact passing/failed command evidence. Human installed-extension proof remains pending before PR review/merge.
-- [ ] Produce B's complete code-level plan against A's verified baseline, then execute B.
+- [x] Execute A from its detailed plan and retain exact passing/failed command evidence. A merged in PR #190; its handoff retains the historical human-proof status.
+- [x] Produce B's complete code-level plan against A's merged, verified baseline.
+- [ ] Execute B and record its implementation validation and human compatibility proof.
 - [ ] Produce and execute C with the real appended migration and frozen supported backup readers.
 - [ ] Produce and execute D end to end, including durability, conflict and restart evidence.
 - [ ] Produce and execute E with historical compatibility and every current due consumer ready before profile activation.
