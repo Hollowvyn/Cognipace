@@ -176,12 +176,27 @@ export function createLeetCodeSubmissionResultWatch(options: {
 
     if (submissionResultWatch && apiResponse) {
       for (const debug of apiResponse.debugEvents) {
+        if (
+          submissionResultWatch.submissionId &&
+          debug.submissionId &&
+          debug.submissionId !== submissionResultWatch.submissionId
+        ) {
+          continue
+        }
+
         updateActiveSubmissionResultWatchDebug(submissionResultWatch, debug)
-        emitSubmissionPollingDebug(location, debug)
+        emitSubmissionPollingDebug(location, {
+          ...debug,
+          submissionId: submissionResultWatch.submissionId,
+        })
       }
     }
 
-    if (apiResponse?.result) {
+    if (
+      apiResponse?.result &&
+      (!submissionResultWatch?.submissionId ||
+        apiResponse.result.submissionId === submissionResultWatch.submissionId)
+    ) {
       if (submissionResultWatch) {
         submissionResultWatch.submissionId ??= apiResponse.result.submissionId
       }
@@ -214,7 +229,11 @@ export function createLeetCodeSubmissionResultWatch(options: {
       now: options.now,
     })
 
-    if (!result) {
+    if (
+      !result ||
+      (submissionResultWatch?.submissionId &&
+        result.submissionId !== submissionResultWatch.submissionId)
+    ) {
       if (
         submissionResultWatch &&
         options.now() >= submissionResultWatch.expiresAt
