@@ -100,7 +100,7 @@ describe('getPracticeProgressSummary', () => {
     })
   })
 
-  it('requires today to meet the daily goal before reporting the current streak', async () => {
+  it('preserves the earned streak before today meets the daily goal', async () => {
     const handle = await createTestDb()
     const repository = createPracticeRepository(handle.db)
     const now = new Date('2026-05-25T16:30:00.000Z')
@@ -117,6 +117,14 @@ describe('getPracticeProgressSummary', () => {
       reviewedAt: new Date('2026-05-24T11:00:00.000Z'),
       reviewMode: 'manual',
     })
+    await expect(
+      getPracticeProgressSummary(handle.db, { dailyGoal: 2, now }),
+    ).resolves.toMatchObject({
+      completedToday: 0,
+      currentStreak: 1,
+      goalMetToday: false,
+    })
+
     await repository.saveReviewResult({
       problemSlug: 'two-sum',
       rating: 'again',
@@ -131,10 +139,17 @@ describe('getPracticeProgressSummary', () => {
       }),
     ).resolves.toMatchObject({
       completedToday: 1,
-      currentStreak: 0,
+      currentStreak: 1,
       dailyGoal: 2,
       goalMetToday: false,
       recordedSecondsToday: 0,
     })
+
+    await expect(
+      getPracticeProgressSummary(handle.db, {
+        dailyGoal: 2,
+        now: new Date('2026-05-26T16:30:00.000Z'),
+      }),
+    ).resolves.toMatchObject({ currentStreak: 0, goalMetToday: false })
   })
 })

@@ -209,6 +209,22 @@ Use one of these entry points:
 - Or open `chrome://extensions`, find CogniPace, open Details, copy the
   extension ID, and open `chrome-extension://<extension-id>/dashboard.html`.
 
+### Streak Day Rollover
+
+1. In a disposable profile with a positive daily goal and consecutive goal-met
+   days ending yesterday, reopen/refetch the popup, Overview, and Analytics.
+   Confirm today's zero progress preserves yesterday's streak.
+2. Save fewer unique problems than today's goal, including a repeated review.
+   Confirm the streak is preserved. Meet the goal and confirm it increases by
+   one across the affected surfaces. Capture screenshot or recording proof.
+3. Edge path: leave a local day below its goal. After the next local midnight,
+   reopen/refetch the affected surfaces and confirm the streak is zero. Meeting
+   the new day's goal starts a streak of one. Check both an empty missed day
+   and a partially completed missed day; capture proof.
+
+Human installed-extension happy-path and edge-case smoke with screenshot or
+recording proof is required before PR review or merge.
+
 ### Overview Daily Time
 
 1. Rebuild and reload the extension, then open Overview. Confirm the metric row

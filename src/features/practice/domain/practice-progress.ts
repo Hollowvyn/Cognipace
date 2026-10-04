@@ -97,6 +97,13 @@ function readCurrentStreak(input: {
   let streak = 0
   let dateKey = input.todayDateKey
 
+  // An unfinished local day can still meet its goal before midnight.
+  if (
+    readCompletedCount(input.problemSlugsByDateKey, dateKey) < input.dailyGoal
+  ) {
+    dateKey = readPreviousDateKey(dateKey)
+  }
+
   while (
     readCompletedCount(input.problemSlugsByDateKey, dateKey) >= input.dailyGoal
   ) {

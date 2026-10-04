@@ -162,6 +162,12 @@ The background service worker owns trusted extension runtime work:
 
 ### Practice Scheduling
 
+The current streak counts consecutive browser-local calendar days meeting the
+daily goal in unique practiced problems. An unfinished today preserves the
+streak earned through yesterday; meeting today's goal adds today. The streak
+breaks only after a day ends below its goal. A disabled daily goal reports no
+streak.
+
 Practice state is local and FSRS-backed. The persisted database owns practice
 facts, and UI surfaces read them through feature services and runtime messages.
 On each saved review, CogniPace passes the rating, review time, and configured
