@@ -1,4 +1,10 @@
 import type { SerializedAnalyticsSummary } from '@/features/analytics/api/analytics-contracts'
+import {
+  applyHistoricalChartTargets,
+  buildHistoricalAnalyticsViews,
+} from '@/features/analytics/domain/historical-presentation'
+import { buildAnalyticsBucketsFromTimeFrame } from '@/features/analytics/domain/analytics-range-policy'
+import { normalizeFsrsSchedulingOptions } from '@/lib/fsrs'
 
 export const analyticsChartPointFixtures = {
   practiceRhythm: [
@@ -69,10 +75,8 @@ function createHistoricalReadiness(): SerializedAnalyticsSummary['historicalRead
 export function createSerializedAnalyticsSummary(
   overrides?: Partial<SerializedAnalyticsSummary>,
 ): SerializedAnalyticsSummary {
-  return {
-    range: 30,
-    generatedAt: '2026-05-30T00:00:00.000Z',
-    timeFrame: {
+  const timeFrame: SerializedAnalyticsSummary['timeFrame'] =
+    overrides?.timeFrame ?? {
       asOf: '2026-05-30T00:00:00.000Z',
       timeZone: 'UTC',
       timeZoneFallback: false,
@@ -89,7 +93,11 @@ export function createSerializedAnalyticsSummary(
           isPartial: false,
         },
       ],
-    },
+    }
+  const summary: SerializedAnalyticsSummary = {
+    range: 30,
+    generatedAt: '2026-05-30T00:00:00.000Z',
+    timeFrame,
     reviewDays: 30,
     totalReviews: 150,
     currentStreak: 7,
@@ -99,26 +107,14 @@ export function createSerializedAnalyticsSummary(
     lowSample: false,
     targetRetention: 0.9,
     views: {
-      firstAttemptOutcomes: {
-        rows: [],
-        totals: {
-          again: 0,
-          hard: 0,
-          good: 0,
-          easy: 0,
-          recordedFirstAttempts: 0,
-          excludedInvalidRatings: 0,
-          validFirstAttempts: 0,
-          hardGoodEasy: 0,
-          goodEasy: 0,
-          firstAttemptSuccess: null,
-          firstAttemptGoodEasy: null,
-          evidence: 'not-measured',
-        },
-        scale: { domain: [0, 1], ticks: [0, 1] },
-        targetFirstAttemptSuccess: 0.9,
-        targetFirstAttemptGoodEasy: 0.9,
-      },
+      problemSolving: buildHistoricalAnalyticsViews([], {
+        start: new Date(timeFrame.periodStart),
+        end: new Date(timeFrame.asOf),
+        timeFrame,
+        timeZone: timeFrame.timeZone,
+        buckets: buildAnalyticsBucketsFromTimeFrame(timeFrame),
+        fsrsOptions: normalizeFsrsSchedulingOptions(),
+      }).problemSolving,
       observedRecallVsFsrs: {
         rows: [],
         scale: { domain: [0, 1], ticks: [0, 1] },
@@ -198,4 +194,13 @@ export function createSerializedAnalyticsSummary(
     stability: [],
     ...overrides,
   }
+  summary.views = {
+    ...summary.views,
+    problemSolving: applyHistoricalChartTargets(summary.views, {
+      ...summary.views.problemSolving.targets,
+      targetRecall: summary.views.observedRecallVsFsrs.targetRecall,
+      targetReviewSuccess: summary.views.practiceRhythm.targetReviewSuccess,
+    }).problemSolving,
+  }
+  return summary
 }

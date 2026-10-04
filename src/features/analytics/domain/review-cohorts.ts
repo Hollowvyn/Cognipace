@@ -44,6 +44,18 @@ export function selectFirstRecordedAttempts<T extends ReviewCohortEvent>(
   return [...firstByProblem.values()]
 }
 
+/** Select raw retained later records before report or eligibility filters. */
+export function selectLaterRecordedAttempts<T extends ReviewCohortEvent>(
+  events: readonly T[],
+): T[] {
+  const firstIds = new Set(
+    selectFirstRecordedAttempts(events).map((event) => event.id),
+  )
+  return events
+    .filter((event) => !firstIds.has(event.id))
+    .sort(compareReviewEvents)
+}
+
 /** Initial reviews build replay state, but only later reviews emit pairs. */
 export function buildRepeatReviewPairs(
   events: readonly ReviewCohortEvent[],

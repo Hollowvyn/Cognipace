@@ -846,7 +846,7 @@ and required before review or merge:
 
 Run this flow against the locally built extension, with separate disposable
 ready-history and sparse-history datasets. Ready history must contain enough
-eligible samples to show all four historical cards and supported Memory
+eligible samples to show the historical views and supported Memory
 Strength quartiles. Sparse history must include empty beginning and ending
 buckets, internal missing buckets, measured 0% rates, one measured point, no
 valid ratings in a period, count-only intervals, known zero counts, and mixed
@@ -878,14 +878,16 @@ exact pending case.
    MM/DD in the report's as-of year and /YY for another year; a cross-year
    tooltip interval shows both years. The current partial interval is marked
    in progress, with no future observations.
-   All four historical charts must remove only unsupported beginning and ending
+   Historical trend charts must remove only unsupported beginning and ending
    buckets from Chart, Table, and inspection while retaining all internal gaps.
    Recall's window starts/ends with either known rate; Memory's starts/ends with
    a finite median, including zero or sub-day values; Practice's starts/ends
    with positive completed reviews, positive valid-rating counts in either
-   source view, or a finite supplied success rate including 0%. Confirm the selected range,
-   period totals, readiness, serialized scales, and report time remain
-   unchanged.
+   source view, or a finite supplied success rate including 0%. The paired
+   difficulty Success/Time plots share a window supported by any known-difficulty
+   raw assessment, including invalid ratings or unavailable time. Confirm the
+   selected range, period totals, readiness, serialized scales, and report time
+   remain unchanged.
 4. In each chart, move the pointer across the plot and tap near its left,
    middle, and right buckets. The nearest retained original bucket must be
    inspected, including an internal empty bucket. Confirm no permanent bottom
@@ -972,7 +974,7 @@ exact pending case.
     remain fixed. Confirm distinct practice/rating readiness warnings, the
     selected-period Hard + Again summary, evidence-gated prior-period comparison,
     and wholly unsupported-period empty state remain truthful.
-14. Switch each of the four historical panels between Chart and Table. When more than
+14. Switch each historical plot between Chart and Table. When more than
     seven rows exist, confirm seven rows per page, Previous/Next boundary
     states, and page reset after a range change. Inspect full interval,
     complete/in-progress state, grouping, report time, and evidence context
@@ -985,7 +987,7 @@ exact pending case.
 15. Repeat ready and sparse paths at wide and 320px dashboard widths in both
     light and dark themes. Check axis/key contrast, sparse ticks, control
     reachability, tap coordinates, keyboard focus, table scrolling, and
-    the First Outcomes/Recall responsive pair, full-width Practice, and
+    the paired Success/Time plots, separate Recall, full-width Practice, and
     Memory/Topic stacking. There must
     be no horizontal document overflow. Include neighboring panels with different
     readiness messages; plots and controls must retain usable alignment without
@@ -1042,53 +1044,84 @@ Expected: Analytics loads through the extension runtime without the failed-load
 state, reflects only local practice data, and tells a truthful chart story
 without filling missing evidence.
 
-#### First Attempt Outcomes and Repeat Recall
+#### Difficulty And Recorded Time and Repeat Recall
 
-The implementation has automated and production-component fixture validation.
-These cases require human realtime smoke in the rebuilt installed extension
-with disposable data and screenshot or recording proof before PR review or
-merge. Record any case that cannot be induced as pending.
+Human happy-path and edge-case smoke is pending. Run these unchecked cases in
+Chrome's rebuilt installed extension with disposable retained history and attach
+screenshots or recording proof before PR review or merge. Agent automated and
+production-component checks are separate evidence; record any uninduced case as
+pending rather than passed.
 
-- [ ] **First-record selection:** record Again, then Good on one problem; its
-      first-outcome result stays Again. Include Hard and Good first records on
-      two other problems: first success is 2/3 and Good + Easy is 1/3. Include
-      duplicate cards/modes, shuffled history, and tied times to check the
-      earliest raw `(reviewedAt, id)` selection across a problem. An invalid
-      earliest rating excludes that problem and never promotes its later Good.
-      An initial before the selected period prevents a recent repeat from being
-      counted as new. Valid ratings with null/conflicting correctness or missing
-      FSRS logs remain eligible.
-- [ ] **Repeat pairing:** with initial-only history, New Problem Success is
-      available and Recall is empty. Add a recent repeat after a pre-range
-      initial; both Recall curves, Table counts, and readiness must use the same
-      repeat pair and its prior replayed memory state. A genuine zero repeat
-      estimate stays measured. Many first records cannot make repeat Recall
-      ready. Memory, Practice, and Topic populations retain their meanings.
-- [ ] **First graph evidence:** compare mint Hard + Good + Easy circles and
-      thinner solid blue Good + Easy diamonds against the same valid-first
-      denominator. All Again is measured zero; no valid first records is
-      unavailable. Check weighted period totals and full-period invalid-first
-      exclusions, including invalid-only outer buckets trimmed from display.
-      Chart/Table/inspection keep internal gaps, exact rating counts, both rates
-      and goals, evidence, full intervals, partial status, timezone/as-of, and
-      retained-history calculation details. There is no mock difficulty row.
-- [ ] **Independent goals:** both new goals default to 90% even in older
-      two-goal settings. Save either above or below the other, including 29%,
-      0%, and 100%, without changing the old pair or measured data. Equal values
-      draw one neutral shared line; both editors and tooltip values remain.
-      Test invalid fractional/out-of-range drafts, Enter/Escape/focus return,
-      pending/failure/retry, reload, other-tab saves, Settings Save/Reset Defaults,
-      and strict full-backup restore. Reset restores all four goals to 90%.
-      Configured disposable Gist sync uses the existing settings path; record
-      it pending if not exercised.
-- [ ] **Presentation and proof:** test unequal/equal references, series switches,
-      sparse zero, singleton, first-only/repeat-only/empty data, seven-row Table,
-      cross-year labels, pointer/tap and keyboard inspection at 14/30/90 days.
-      Series visibility preserves dates and the fitted scale containing both
-      goals. Both new/Recall plots use first-midpoint/12px clearance for multiple
-      intervals and the original interval domain for one. Check the paired
-      layout and stacked 320px layout in light/dark themes without overflow or
-      clipped controls. Attach screenshots or recording of happy and edge paths.
+- [ ] **Opening state and placement:** confirm one expanded section replaces the
+      old standalone chart: paired Success/Time and full-width Mix, with Recall
+      separate. Defaults are New problems, Trend, all Easy/Medium/Hard, Hard +
+      Good + Easy, percent of current target, all timed assessments, and
+      assessment-share Mix. The summary uses selected-period assessment days,
+      recorded assessments/distinct problems, Good + Easy/valid and invalid
+      exclusions, rather than an all-time review count.
+- [ ] **Raw cohorts and Recall:** record Again then Good on one problem; New
+      problems retains Again and Follow-up practice includes Good. Include an
+      invalid first followed by valid Good, different cards/modes, shuffled
+      history, tied timestamps/lexical IDs, a pre-period first, and a post-as-of
+      record. Earliest selection happens before other filters; invalid firsts
+      never promote later records and future records are excluded. With
+      initial-only history, New outcomes can be available while Recall is empty.
+      A recent valid repeat after a pre-range initial supplies Recall's same
+      observed/FSRS pair and prior replayed state; genuine zero estimates remain
+      measured. Raw later-record outcomes are independent of that paired cohort.
+- [ ] **Outcome denominators and prior evidence:** within a difficulty use Again,
+      Hard, and Good: success is 2/3 and Good + Easy is 1/3 over the same valid n.
+      Check all-Again zero versus invalid-only unavailable, weighted period
+      totals, and exact current/prior counts against the immediately preceding
+      equivalent local-calendar period. Either difficulty n below ten says
+      Sparse comparison, including n=9; n=10 on both sides permits a directional
+      change. Unknown stays separate in Mix and leaves the three outcome/time
+      series. Numeric FSRS difficulty is never Easy/Medium/Hard.
+- [ ] **Recorded timing:** include positive saved seconds on Again and an invalid
+      rating; both enter all-timed observations and Mix time, but successful
+      timing includes only valid Hard/Good/Easy. Null, zero, negative, and
+      nonfinite durations remain unavailable; verify timed/eligible counts.
+      Check one to three timed records retain medians without quartiles and four
+      enable quartiles. Isolate one difficulty for Trend whiskers; Compare
+      retains full-period median/quartile values. Toggle minutes/percent and
+      verify current saved difficulty allowances, 100% reference, and overtime
+      above 100%. Pause excludes time, running idle may count, and Strict Timing
+      can record Again for an accepted overtime solution. Caveats must not call
+      these values cumulative solving time or historical policy compliance.
+- [ ] **Shared controls and Mix:** verify mint Easy circles, blue Medium diamonds,
+      amber Hard triangles and matching labels in both plots. Hide/reveal each
+      difficulty without resetting the selected outcome or changing domains or
+      dates. Hidden series leave inspection; all-hidden shows Select a
+      difficulty while Mix still counts the full cohort. Switch raw populations,
+      Trend/Compare, timing subset/units, and Mix assessment/time share. Check
+      Unknown and invalid-rating records reconcile to raw counts/positive-time
+      sums; unavailable time is not zero and one problem may supply several
+      Follow-up assessments.
+- [ ] **Saved references:** only the chosen outcome's goal/editor is shown. New
+      Success/Good + Easy use independent first-attempt goals; Follow-up uses
+      Recall/Review Success aspirations with its different population explained.
+      Exercise 0%, 29%, 100%, equal goals, invalid drafts, Enter/Escape and focus
+      return, failure/retry, other-tab refresh, reload, Settings Save/Reset and
+      existing backup/configured sync paths. The existing Recall/Review Success
+      pair constraint still applies; first-attempt goals remain independent.
+      Changes preserve measured values, timing distributions, FSRS settings/due
+      dates, and Recall pairing. Current time allowances update their references
+      without changing recorded seconds or claiming historical compliance.
+- [ ] **Exact tables and access:** compare Trend/Compare Table values with selected
+      measure, units/subset, raw/valid/excluded counts, prior n, timing coverage,
+      medians/quartiles, complete intervals and timezone/as-of. Check seven-row
+      pagination, links, visible focus, Left/Right/Home/End, Escape, hover and
+      touch pinning. Inspection reports only visible series and measured values;
+      no hidden or unavailable interval gets a fabricated observation.
+- [ ] **Gaps, boundaries and proof:** at 14/30/90 days test empty, Unknown-only,
+      no-time, first-only/follow-up-only, sparse zero, singleton, internal gaps,
+      partial edges and cross-year intervals. Both Trend plots retain their shared
+      raw-activity window regardless of difficulty, measure or timing switches;
+      long-dash bridges create no values. Verify appropriate empty states and
+      marker/whisker clearance. Check wide and 320px layouts in light/dark themes,
+      including all-hidden, saved-goal editors, tables and tooltip placement,
+      without overflow or clipping. Attach happy-path and edge-case proof and
+      list each unexercised condition as pending.
 
 #### Analytics Chart Targets
 

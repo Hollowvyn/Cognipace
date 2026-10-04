@@ -5,6 +5,7 @@ import type { AnalyticsReviewEvent } from './chart-data'
 import {
   buildRepeatReviewPairs,
   selectFirstRecordedAttempts,
+  selectLaterRecordedAttempts,
 } from './review-cohorts'
 
 const options = {
@@ -51,12 +52,16 @@ describe('selectFirstRecordedAttempts', () => {
       id: 'B2',
       problemSlug: 'b',
       rating: 'easy',
+      cardId: 'other-card',
       reviewedAt: new Date('2026-08-02T12:00:00Z'),
     })
-    const input = [later, validAfterInvalid, invalid, first]
+    const input = [validAfterInvalid, later, invalid, first]
+    const subsequent = selectLaterRecordedAttempts(input)
     expect(selectFirstRecordedAttempts(input)).toEqual([first, invalid])
-    expect(input).toEqual([later, validAfterInvalid, invalid, first])
+    expect(subsequent).toEqual([later, validAfterInvalid])
+    expect(input).toEqual([validAfterInvalid, later, invalid, first])
     expect(selectFirstRecordedAttempts(input)[0]).toBe(first)
+    expect(subsequent[0]).toBe(later)
   })
 
   it('uses lexical ID ties and restored earlier chronology rather than insertion order', () => {
@@ -73,6 +78,7 @@ describe('selectFirstRecordedAttempts', () => {
     expect(selectFirstRecordedAttempts([earlierId, laterId, restored])).toEqual(
       [restored],
     )
+    expect(selectLaterRecordedAttempts([laterId, earlierId])).toEqual([laterId])
   })
 })
 

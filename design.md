@@ -219,14 +219,16 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 
 ## CogniPace Analytics Historical Chart Rules
 
-- The implemented historical treatment has four cards: New Problem Success,
-  Recall vs FSRS Estimate, Practice Rhythm with the merged rating composition,
-  and Memory Strength. First outcomes and repeat Recall share a responsive `lg`
-  pair and stack in that order below it, followed by a full-width Practice Rhythm card;
-  Memory Strength and Topic Performance share the next responsive row. Retention
-  Map follows, then a compact Memory Signals card and the responsive workload pair.
+- Difficulty And Recorded Time replaces standalone New Problem Success with
+  one full-width section: paired Success/Time plots stack on narrow screens,
+  followed by full-width Difficulty Mix. Recall vs FSRS Estimate remains
+  separate, followed by Practice Rhythm; Memory Strength and Topic Performance
+  share the next row. Retention Map, compact Memory Signals, and the responsive
+  workload pair retain their placement. The section is implemented on this
+  branch with passing automated checks and production-component browser proof;
+  required human installed-extension happy-path/edge-case smoke remains pending.
 - Keep the explicit 14-day daily, 30-day three-day, and 90-day weekly grouping
-  and feature-supplied values. All four historical charts trim
+  and feature-supplied values. Historical trend charts trim
   unsupported beginning and ending buckets only, using the same contiguous activity
   window for Chart, Table, and inspection. Preserve every internal gap and each
   retained interval's dates.
@@ -246,17 +248,39 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   independent review-count scale on the right. Its goal cannot alter rating
   geometry or the count scale. The serialized legacy Practice percentage scale
   remains available for compatibility; the merged plot does not use it.
-- New Problem Success uses mint solid circles for Hard + Good + Easy and a
-  thinner blue solid line with diamonds for Good + Easy. Both rates share one
-  valid-first denominator; the supplied fit includes both curves and goals and
-  never shifts when either series is hidden. Use matching dashed references for
-  unequal goals and one neutral shared reference for equal goals, retaining both
-  compact target buttons and tooltip values. Target First-attempt Success and
-  Target Good + Easy are independent whole-percent preferences; do not show the
-  old Recall/Review Success counterpart hint for them. Keep recorded/valid/
-  excluded-first period counts concise above the plot and the retained-history
-  caveat in calculation details. Never label these outcomes guaranteed unaided
-  solving or add mock difficulty data.
+- Difficulty And Recorded Time opens on New problems, Trend, all difficulties,
+  Hard + Good + Easy, percent of current target, all timed assessments, and
+  assessment-share Mix. Follow-up practice uses later raw recorded assessments.
+  One shared legend uses Easy mint circles, Medium blue diamonds, and Hard
+  amber triangles across Success and Time. Show one outcome measure at a time;
+  toggling difficulties preserves it and both supplied domains. Hidden
+  difficulties leave inspection; all-hidden shows Select a difficulty. Mix
+  retains the full cohort, including neutral Unknown, on a fixed 0–100% stack
+  of assessments or positive recorded-time sums, with labels only where they fit.
+  Unknown does not enter the three outcome/time series.
+- Both outcome choices use the same valid-rating denominator; period rates are
+  weighted counts. Paired Trend plots use one first-through-last known-difficulty
+  raw activity window and preserve internal gaps despite measure, visibility,
+  or timing-subset changes. Use actual interval midpoints and measured marks;
+  long-dash bridges do not create observations. Combined Time shows medians;
+  isolate one difficulty to show middle-50% whiskers with at least four timed
+  observations. Compare preserves category identities and shows full-period
+  outcome columns, time medians/quartiles, exact prior/current valid counts and
+  percentage-point changes; either count below ten shows Sparse comparison.
+- Only the selected outcome measure's saved goal/editor is visible. New problems
+  uses independent First-attempt Success/Good + Easy goals; Follow-up practice
+  uses Recall/Review Success as raw-rating aspirations, with explicit cohort
+  clarification. Time uses current difficulty allowances from Settings: a 100%
+  reference in percent mode or current minute references. Fit both outcome
+  choices/goals and the full eligible time distributions/current references;
+  hidden series must not move domains. Keep marker/whisker clearance and show
+  overtime above 100%. Recorded assessment time excludes pauses but may include
+  running idle time; prior unsaved work is unknown. Strict Timing may rate an
+  accepted overtime solution Again. Current catalog difficulty/allowances are
+  not historical policy snapshots, cumulative completion time, or a speed score.
+  Keep assessment days, assessments/distinct problems, Good + Easy/valid and
+  invalid exclusions concise. Exact tables expose raw/valid/excluded counts,
+  timing coverage and report context; empty timing stays unavailable.
 - The chart-target editor is implemented and has automated/fixture proof;
   human installed-extension smoke remains pending before review or merge. Place a small native
   **Target Recall 90%** or **Target Review Success 90%** button above the relevant
@@ -300,8 +324,6 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   tooltip and Table. Series switches must not shift the domain. A singleton
   keeps its original interval domain and centered marker. Memory Strength and
   Practice Rhythm retain their interval-boundary X domains and padding.
-  New Problem Success uses the same first-midpoint/12px clearance and singleton
-  behavior, with visibility-stable dates and its own activity window.
 - Memory Strength uses a clear median line and discrete Q1–Q3 whiskers with a
   compact Median/Middle 50% key. Render whiskers only with at least four eligible
   reviews and known quartiles. Fit all finite median/Q1/Q3 extrema by choosing

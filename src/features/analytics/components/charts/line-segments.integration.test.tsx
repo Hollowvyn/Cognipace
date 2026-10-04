@@ -184,24 +184,30 @@ describe('LineSegments in a Recharts line chart', () => {
     ).toHaveAttribute('stroke-width', '2.5')
   })
 
-  it('renders one explicit measured marker for a single-point series', async () => {
-    render(
-      <LineChart data={bridgeData.slice(0, 1)} height={240} width={480}>
-        <XAxis dataKey="bucket" />
-        <YAxis domain={[0, 1]} />
-        <LineSegments
-          data={bridgeData.slice(0, 1)}
-          dataKey="value"
-          markerShape="circle"
-          seriesKey="single"
-          showMeasuredDots
-          stroke="green"
-        />
-      </LineChart>,
-    )
-    expect(await screen.findByTestId('single-marker-0')).toBeInTheDocument()
-    expect(document.querySelectorAll('circle')).toHaveLength(1)
-  })
+  it.each(['circle', 'diamond', 'triangle'] as const)(
+    'renders one measured %s for a single-point series',
+    async (shape) => {
+      render(
+        <LineChart data={bridgeData.slice(0, 1)} height={240} width={480}>
+          <XAxis dataKey="bucket" />
+          <YAxis domain={[0, 1]} />
+          <LineSegments
+            data={bridgeData.slice(0, 1)}
+            dataKey="value"
+            markerShape={shape}
+            seriesKey="single"
+            showMeasuredDots
+            stroke="green"
+          />
+        </LineChart>,
+      )
+      const marker = await screen.findByTestId('single-marker-0')
+      expect(marker).toHaveAttribute('data-marker-shape', shape)
+      expect(
+        marker.querySelectorAll(shape === 'circle' ? 'circle' : 'path'),
+      ).toHaveLength(1)
+    },
+  )
 
   it('preserves categories, bridges without synthetic data, and registers one semantic tooltip row', async () => {
     const { rerender } = render(<AnalyticsLineChart defaultIndex={0} />)

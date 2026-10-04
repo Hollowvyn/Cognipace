@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-04-analytics-problem-solving-design.md`](./specs/2026-10-04-analytics-problem-solving-design.md): approved expansion of New Problem Success into one section for difficulty outcomes, recorded time, and difficulty mix; implemented as Problem Solving with passing automated checks and production-component browser proof; human installed-extension smoke remains pending.
+
 - [`specs/2026-10-03-leetcode-code-analysis-design.md`](./specs/2026-10-03-leetcode-code-analysis-design.md): approved Option A specification; all ten tasks implemented with independent SPEC/QUALITY passes and final automated validation on 2026-10-04; live provider, generated-code, and human installed-extension proof pending.
 
 - [`specs/2026-10-04-analytics-retention-landscape-design.md`](./specs/2026-10-04-analytics-retention-landscape-design.md): approved full eligible memory landscape, exact status marks, complete overlap/keyboard/Table access and box zoom with reset.
@@ -22,10 +24,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
-- [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): approved two-rate first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall, with the selected preview preserved verbatim; implemented with automated and production-component proof; required human installed-extension smoke remains pending before review or merge.
+- [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): historical first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall foundation, with its preview preserved verbatim; the standalone two-rate renderer is superseded by Difficulty And Recorded Time. Required human installed-extension smoke remains pending.
 - [`specs/2026-10-03-analytics-practice-ratings-merge-design.md`](./specs/2026-10-03-analytics-practice-ratings-merge-design.md): approved merged Practice Rhythm chart with exact stacked shares, independent completed-review line, saved Success target, and interval union; its three-card layout is historical context superseded by the first-attempt/repeat pair above.
 - [`specs/2026-10-02-analytics-chart-targets-design.md`](./specs/2026-10-02-analytics-chart-targets-design.md): approved independent saved Recall/Review Success goals, compact graph editors, Settings/backup/configured sync ownership, and unchanged FSRS behavior; implemented with automated/fixture proof; human extension smoke remains pending.
-- [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): earlier four-chart historical treatment and exact design snapshots, retained as implementation history; the first-attempt/repeat design now owns the four-card historical layout and later panels remain deferred.
+- [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): earlier four-chart historical treatment and exact design snapshots, retained as implementation history; its layout was superseded by first-attempt/repeat work and the current Difficulty And Recorded Time section.
 - [`specs/2026-10-02-analytics-recall-approved-design.md`](./specs/2026-10-02-analytics-recall-approved-design.md): exact approved Recall source, screenshots, and checksums.
 - [`specs/2026-10-02-analytics-memory-practice-approved-design.md`](./specs/2026-10-02-analytics-memory-practice-approved-design.md): exact approved fitted Memory Strength and earlier Practice Rhythm snapshots, preserved as historical context.
 - [`specs/2026-10-02-analytics-ratings-mix-approved-design.md`](./specs/2026-10-02-analytics-ratings-mix-approved-design.md): exact earlier standalone Ratings Mix snapshot, missing-period hatch, and segment labels, preserved as historical context.
@@ -62,6 +64,12 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-04-analytics-problem-solving-inputs.md`](./plans/2026-10-04-analytics-problem-solving-inputs.md): first implementation phase exposing stored difficulty/timing metadata and complementary raw first/later cohorts without changing the visible page.
+
+- [`plans/2026-10-04-analytics-problem-solving-model.md`](./plans/2026-10-04-analytics-problem-solving-model.md): second phase aggregating raw difficulty outcomes, recorded-time distributions, Mix accounting, current references and prior evidence through the existing validated summary.
+
+- [`plans/2026-10-04-analytics-problem-solving-ui.md`](./plans/2026-10-04-analytics-problem-solving-ui.md): third phase replacing the old renderer with shared difficulty controls, paired Trend/Compare views and Mix, production-component proof, authority-doc alignment and required human extension smoke.
 
 - [`plans/2026-10-03-leetcode-code-analysis.md`](./plans/2026-10-03-leetcode-code-analysis.md): completed ten-task execution map across capture, report/runtime, and overlay/retirement/evaluation tooling; final automated gates passed, with provider/generated-code/human proof still unchecked.
 

@@ -19,7 +19,7 @@ export interface LineSegmentsProps<T extends Record<string, unknown>> {
   dataKey: keyof T & string
   seriesKey: string
   showMeasuredDots?: boolean
-  markerShape?: 'circle' | 'diamond'
+  markerShape?: 'circle' | 'diamond' | 'triangle'
   markerFill?: string
   activeIndex?: number | null
   bridgeDasharray?: string
@@ -147,7 +147,7 @@ function createMeasuredMarker({
 }: {
   activeIndex: number | null | undefined
   fill: string
-  shape: 'circle' | 'diamond' | undefined
+  shape: 'circle' | 'diamond' | 'triangle' | undefined
   stroke: string
   testId: string
   target: SVGGElement | null
@@ -178,6 +178,13 @@ function createMeasuredMarker({
             {shape === 'diamond' ? (
               <path
                 d={`M${cx},${cy - radius}L${cx + radius},${cy}L${cx},${cy + radius}L${cx - radius},${cy}Z`}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={markerStrokeWidth}
+              />
+            ) : shape === 'triangle' ? (
+              <path
+                d={`M${cx},${cy - radius}L${cx + radius},${cy + radius}L${cx - radius},${cy + radius}Z`}
                 fill={fill}
                 stroke={stroke}
                 strokeWidth={markerStrokeWidth}

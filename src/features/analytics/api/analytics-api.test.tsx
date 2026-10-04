@@ -5,6 +5,12 @@ import { sendMessage } from '@/extension/messaging'
 import { defaultUserSettings, type AnalyticsTargets } from '@/features/settings'
 import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
+import {
+  applyHistoricalChartTargets,
+  buildHistoricalAnalyticsViews,
+} from '../domain/historical-presentation'
+import { buildAnalyticsBucketsFromTimeFrame } from '../domain/analytics-range-policy'
+import { normalizeFsrsSchedulingOptions } from '@/lib/fsrs'
 import type { SerializedAnalyticsSummary } from './analytics-contracts'
 
 import {
@@ -43,7 +49,10 @@ describe('analytics runtime API', () => {
       },
     }
     const freshRangeSummary = summaryWithMeasuredRows(90)
-    freshRangeSummary.views.observedRecallVsFsrs.targetRecall = 0.8
+    freshRangeSummary.views = applyHistoricalChartTargets(
+      freshRangeSummary.views,
+      savedSettings.analytics,
+    )
     let resolveSave!: (settings: typeof savedSettings) => void
     const saveResponse = new Promise<typeof savedSettings>((resolve) => {
       resolveSave = resolve
@@ -151,30 +160,39 @@ describe('analytics runtime API', () => {
         const cached = queryClient.getQueryData<SerializedAnalyticsSummary>(
           analyticsQueryKeys.summary(before.range, 'UTC'),
         )!
-        expect(cached).toEqual({
-          ...before,
-          views: {
-            ...before.views,
-            observedRecallVsFsrs: {
-              ...before.views.observedRecallVsFsrs,
-              targetRecall: goals.targetRecall,
-              scale: cached.views.observedRecallVsFsrs.scale,
-            },
-            practiceRhythm: {
-              ...before.views.practiceRhythm,
-              targetReviewSuccess: goals.targetReviewSuccess,
-              percentageScale: cached.views.practiceRhythm.percentageScale,
-            },
-            firstAttemptOutcomes: {
-              ...before.views.firstAttemptOutcomes,
-              targetFirstAttemptSuccess: goals.targetFirstAttemptSuccess,
-              targetFirstAttemptGoodEasy: goals.targetFirstAttemptGoodEasy,
-              scale: cached.views.firstAttemptOutcomes.scale,
-            },
-          },
-        })
+        expect(cached.views.problemSolving.targets).toEqual(goals)
+        expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(
+          goals.targetRecall,
+        )
+        expect(cached.views.practiceRhythm.targetReviewSuccess).toBe(
+          goals.targetReviewSuccess,
+        )
+        expect(cached.views.observedRecallVsFsrs.rows).toEqual(
+          before.views.observedRecallVsFsrs.rows,
+        )
+        expect(cached.views.practiceRhythm.rows).toEqual(
+          before.views.practiceRhythm.rows,
+        )
+        for (const [key, references] of [
+          [
+            'newProblems',
+            [goals.targetFirstAttemptSuccess, goals.targetFirstAttemptGoodEasy],
+          ],
+          ['followupPractice', [goals.targetRecall, goals.targetReviewSuccess]],
+        ] as const) {
+          const previous = before.views.problemSolving.cohorts[key]
+          expect(cached.views.problemSolving.cohorts[key]).toMatchObject({
+            rows: previous.rows,
+            totals: previous.totals,
+            previous: previous.previous,
+            timeScales: previous.timeScales,
+          })
+          const { domain } =
+            cached.views.problemSolving.cohorts[key].outcomeScale
+          expect(domain[0]).toBeLessThanOrEqual(Math.min(...references))
+          expect(domain[1]).toBeGreaterThanOrEqual(Math.max(...references))
+        }
         if (firstAttempt) {
-          expect(cached.views.firstAttemptOutcomes.scale.domain).toEqual([0, 1])
           expect(cached.views.observedRecallVsFsrs.targetRecall).toBe(
             before.views.observedRecallVsFsrs.targetRecall,
           )
@@ -274,35 +292,35 @@ function summaryWithMeasuredRows(
 ): SerializedAnalyticsSummary {
   const summary = createSerializedAnalyticsSummary({ range })
   summary.timeFrame.requestedDays = range
-  const outcomes = {
-    again: 1,
-    hard: 0,
-    good: 1,
-    easy: 0,
-    recordedFirstAttempts: 2,
-    excludedInvalidRatings: 0,
-    validFirstAttempts: 2,
-    hardGoodEasy: 1,
-    goodEasy: 1,
-    firstAttemptSuccess: 0.5,
-    firstAttemptGoodEasy: 0.5,
-    evidence: 'measured' as const,
-  }
-  summary.views.firstAttemptOutcomes = {
-    rows: [
-      {
-        ...outcomes,
-        id: 'first',
-        bucketStart: '2026-05-01',
-        bucketEnd: '2026-05-03',
-        isPartial: false,
+  const { timeFrame } = summary
+  summary.views.problemSolving = buildHistoricalAnalyticsViews(
+    Array.from({ length: 4 }, (_, index) => ({
+      id: `event-${index}`,
+      cardId: `card-${index % 2}`,
+      problemSlug: `problem-${index % 2}`,
+      problemDifficulty: 'medium' as const,
+      rating: index % 2 ? 'good' : 'again',
+      topicLabels: [],
+      fsrsReviewLog: null,
+      elapsedSeconds: (index + 1) * 60,
+      reviewedAt: new Date(
+        index < 2 ? '2026-05-01T12:00:00Z' : '2026-05-02T12:00:00Z',
+      ),
+    })),
+    {
+      start: new Date(timeFrame.periodStart),
+      end: new Date(timeFrame.asOf),
+      timeFrame,
+      timeZone: 'UTC',
+      buckets: buildAnalyticsBucketsFromTimeFrame(timeFrame),
+      fsrsOptions: normalizeFsrsSchedulingOptions(),
+      analyticsTargets: {
+        ...defaultUserSettings.analytics,
+        targetFirstAttemptSuccess: 0.4,
+        targetFirstAttemptGoodEasy: 0.4,
       },
-    ],
-    totals: outcomes,
-    scale: { domain: [0.4, 0.6], ticks: [0.4, 0.5, 0.6] },
-    targetFirstAttemptSuccess: 0.4,
-    targetFirstAttemptGoodEasy: 0.4,
-  }
+    },
+  ).problemSolving
   summary.views.observedRecallVsFsrs.rows = [
     {
       id: 'observed',

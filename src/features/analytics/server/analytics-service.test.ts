@@ -26,6 +26,63 @@ import { analyticsSummarySchema } from '../api/analytics-contracts'
 import { getAnalyticsSummary } from './analytics-service'
 
 describe('getAnalyticsSummary dashboard views', () => {
+  it('reads saved difficulty time targets and durations through the existing summary', async () => {
+    const handle = await createTestDb({ seed: false })
+    await insertAnalyticsProblem(handle.db, 'timed', 'Timed', [])
+    await insertAnalyticsHistory(handle.db, 'timed', {
+      id: 'timed',
+      dates: [
+        new Date('2026-08-01T12:00:00Z'),
+        new Date('2026-08-02T12:00:00Z'),
+      ],
+      ratings: ['hard', 'again'],
+      correct: [true, false],
+      elapsedSeconds: [120, 240],
+      dueAt: new Date('2026-08-03T12:00:00Z'),
+      stability: 4,
+      difficulty: 4,
+    })
+    const timeTargetsMinutes = { easy: 10, medium: 20, hard: 30 }
+    await updateSettings(handle.db, { assessment: { timeTargetsMinutes } })
+    const summary = await getAnalyticsSummary(handle.db, {
+      range: 14,
+      now: new Date('2026-08-02T12:00:00Z'),
+    })
+    expect(summary.views.problemSolving.timeTargetsMinutes).toEqual(
+      timeTargetsMinutes,
+    )
+    expect(
+      summary.views.problemSolving.cohorts.newProblems.totals.difficulties
+        .medium,
+    ).toMatchObject({
+      validRatings: 1,
+      successRate: 1,
+      goodEasyRate: 0,
+      time: { all: { medianSeconds: 120 }, successful: { medianSeconds: 120 } },
+    })
+    expect(
+      summary.views.problemSolving.cohorts.followupPractice.totals.difficulties
+        .medium,
+    ).toMatchObject({
+      validRatings: 1,
+      successRate: 0,
+      time: {
+        all: { medianSeconds: 240 },
+        successful: { medianSeconds: null, eligibleAssessments: 0 },
+      },
+    })
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...summary,
+        observedRatingQuality: {
+          value: summary.observedRatingQuality,
+          sampleSize: summary.observedRatingSampleSize,
+          lowSample: summary.lowSample,
+        },
+      }).success,
+    ).toBe(true)
+  })
+
   it('makes first-attempt readiness independent from an initial-only Recall cohort and reads persisted goals without changing cards or evidence', async () => {
     const handle = await createTestDb({ seed: false })
     const now = new Date('2026-08-14T12:00:00Z')
@@ -50,12 +107,14 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
     expect(summary.recallQuality).toEqual([])
     expect(summary.predictedRecall.sampleSize).toBe(0)
-    expect(summary.views.firstAttemptOutcomes.totals).toMatchObject({
-      validFirstAttempts: 14,
+    expect(
+      summary.views.problemSolving.cohorts.newProblems.totals,
+    ).toMatchObject({
+      validRatings: 14,
       hardGoodEasy: 14,
       goodEasy: 0,
-      firstAttemptSuccess: 1,
-      firstAttemptGoodEasy: 0,
+      successRate: 1,
+      goodEasyRate: 0,
     })
     const cardsBefore = await handle.db.select().from(fsrsCards)
 
@@ -77,11 +136,18 @@ describe('getAnalyticsSummary dashboard views', () => {
         targetReviewSuccess: 1,
         percentageScale: { domain: [0, 1] },
       },
-      firstAttemptOutcomes: {
-        ...summary.views.firstAttemptOutcomes,
-        targetFirstAttemptSuccess: 0,
-        targetFirstAttemptGoodEasy: 1,
-        scale: { domain: [0, 1] },
+      problemSolving: {
+        targets: {
+          targetFirstAttemptSuccess: 0,
+          targetFirstAttemptGoodEasy: 1,
+        },
+        cohorts: {
+          newProblems: {
+            rows: summary.views.problemSolving.cohorts.newProblems.rows,
+            totals: summary.views.problemSolving.cohorts.newProblems.totals,
+            outcomeScale: { domain: [0, 1] },
+          },
+        },
       },
     })
     expect(after.targetRetention).toBe(0.85)
@@ -1047,13 +1113,13 @@ describe('getAnalyticsSummary dashboard views', () => {
 
     expect(summary.recallQuality).toEqual([])
     expect(
-      summary.views.firstAttemptOutcomes.rows.find(
-        (row) => row.validFirstAttempts > 0,
+      summary.views.problemSolving.cohorts.newProblems.rows.find((row) =>
+        Object.values(row.difficulties).some((stats) => stats.validRatings > 0),
       ),
     ).toMatchObject({
       bucketStart: '2026-03-07',
       bucketEnd: '2026-03-07',
-      validFirstAttempts: 1,
+      difficulties: { medium: { validRatings: 1 } },
       isPartial: false,
     })
     expect(summary.views.upcomingReviewLoad.rows[0]).toMatchObject({
@@ -1161,6 +1227,7 @@ async function insertAnalyticsHistory(
     dates: Date[]
     ratings: ReviewRating[]
     correct: Array<boolean | null>
+    elapsedSeconds?: Array<number | null>
     dueAt: Date
     stability: number
     difficulty: number
@@ -1182,6 +1249,7 @@ async function insertAnalyticsHistory(
       reviewMode: 'manual',
       reviewedAt: reviewedAt.getTime(),
       isCorrect: input.correct[index]!,
+      elapsedSeconds: input.elapsedSeconds?.[index] ?? null,
       fsrsReviewLog: serializeFsrsReviewLogSnapshot(scheduled.log),
       createdAt: reviewedAt.getTime(),
       updatedAt: reviewedAt.getTime(),

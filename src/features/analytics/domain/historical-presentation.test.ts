@@ -16,6 +16,7 @@ import {
   shiftAnalyticsCalendarDays,
 } from './analytics-time'
 import { buildAnalyticsBucketsFromTimeFrame } from './analytics-range-policy'
+import { problemSolvingViewSchema } from '../api/analytics-contracts'
 
 const options: HistoricalPresentationOptions = {
   buckets: [
@@ -74,73 +75,249 @@ function event(
 }
 
 describe('buildHistoricalAnalyticsViews', () => {
-  it('retains invalid-only outer bucket exclusions and uses local-calendar partial intervals', () => {
-    const asOf = new Date('2026-03-08T07:30:00Z')
-    const localOptions = optionsForComparison(asOf, 'America/New_York')
-    const firstBucket = localOptions.buckets[0]!
-    const firstOutcomes = buildHistoricalAnalyticsViews(
+  it('keeps invalid first records and raw later practice in separate difficulty cohorts', () => {
+    const views = buildHistoricalAnalyticsViews(
       [
         event({
           id: 'invalid-first',
-          problemSlug: 'invalid',
           rating: 'invalid',
-          reviewedAt: new Date(firstBucket.start.getTime() + 1000),
+          problemDifficulty: 'easy',
+          elapsedSeconds: 60,
         }),
         event({
-          id: 'local-before-midnight',
-          problemSlug: 'before',
-          rating: 'again',
-          reviewedAt: new Date('2026-03-08T04:30:00Z'),
-        }),
-        event({
-          id: 'local-partial',
-          problemSlug: 'partial',
+          id: 'later',
           rating: 'good',
-          reviewedAt: asOf,
+          problemDifficulty: 'easy',
+          elapsedSeconds: 120,
+          reviewedAt: new Date('2026-08-02T12:00:00Z'),
+        }),
+        event({
+          id: 'old-first',
+          problemSlug: 'old',
+          problemDifficulty: 'medium',
+          reviewedAt: new Date('2026-07-31T12:00:00Z'),
+        }),
+        event({
+          id: 'old-later',
+          problemSlug: 'old',
+          problemDifficulty: 'medium',
+          elapsedSeconds: 180,
+        }),
+        event({
+          id: 'unknown',
+          problemSlug: 'unknown',
+          rating: 'invalid',
+          elapsedSeconds: 240,
         }),
         event({
           id: 'future',
           problemSlug: 'future',
-          rating: 'easy',
-          reviewedAt: new Date(asOf.getTime() + 1000),
+          problemDifficulty: 'hard',
+          reviewedAt: new Date('2026-08-03T12:00:00Z'),
+        }),
+      ],
+      options,
+    )
+    const model = views.problemSolving
+    expect(model).toBeDefined()
+    expect(model.cohorts.newProblems.totals).toMatchObject({
+      recordedAssessments: 2,
+      excludedInvalidRatings: 2,
+      validRatings: 0,
+      assessmentDays: 1,
+      distinctProblems: 2,
+    })
+    expect(model.cohorts.newProblems.totals.difficulties.easy).toMatchObject({
+      successRate: null,
+      time: {
+        all: { eligibleAssessments: 1, timedAssessments: 1, totalSeconds: 60 },
+        successful: { eligibleAssessments: 0, timedAssessments: 0 },
+      },
+    })
+    expect(
+      model.cohorts.newProblems.totals.difficulties.unknown.time.all
+        .totalSeconds,
+    ).toBe(240)
+    expect(model.cohorts.followupPractice.totals).toMatchObject({
+      recordedAssessments: 2,
+      validRatings: 2,
+      goodEasyRate: 1,
+      assessmentDays: 2,
+      distinctProblems: 2,
+    })
+    expect(model.cohorts.followupPractice.rows).toHaveLength(2)
+  })
+
+  it('uses positive seconds, full-period quantiles, rating-specific eligibility, and overtime scales', () => {
+    const reviews = [60, 120, 180, 240, 0, -1, NaN, Infinity].map(
+      (elapsedSeconds, index) =>
+        event({
+          id: `timed-${index}`,
+          problemSlug: `timed-${index}`,
+          problemDifficulty: 'medium',
+          elapsedSeconds,
+          rating: ['invalid', 'again', 'hard', 'good'][index % 4]!,
+          reviewedAt: new Date(
+            index % 2 ? '2026-08-02T12:00:00Z' : '2026-08-01T12:00:00Z',
+          ),
+        }),
+    )
+    reviews.push(
+      event({
+        id: 'overtime',
+        problemSlug: 'overtime',
+        problemDifficulty: 'easy',
+        elapsedSeconds: 2400,
+      }),
+    )
+    const model = buildHistoricalAnalyticsViews(reviews, {
+      ...options,
+      timeTargetsMinutes: { easy: 10, medium: 20, hard: 30 },
+    }).problemSolving
+    expect(model).toBeDefined()
+    const medium = model.cohorts.newProblems.totals.difficulties.medium
+    expect(medium).toMatchObject({
+      recordedAssessments: 8,
+      excludedInvalidRatings: 2,
+      validRatings: 6,
+      hardGoodEasy: 4,
+      goodEasy: 2,
+      successRate: 4 / 6,
+      goodEasyRate: 2 / 6,
+    })
+    expect(medium.time.all).toEqual({
+      eligibleAssessments: 8,
+      timedAssessments: 4,
+      totalSeconds: 600,
+      medianSeconds: 150,
+      q1Seconds: 90,
+      q3Seconds: 210,
+    })
+    expect(medium.time.successful).toEqual({
+      eligibleAssessments: 4,
+      timedAssessments: 2,
+      totalSeconds: 420,
+      medianSeconds: 210,
+      q1Seconds: null,
+      q3Seconds: null,
+    })
+    expect(
+      model.cohorts.newProblems.rows.every(
+        (row) => row.difficulties.medium.time.all.q1Seconds === null,
+      ),
+    ).toBe(true)
+    expect(
+      model.cohorts.newProblems.timeScales.all.targetPercent.domain[1],
+    ).toBeGreaterThan(400)
+    expect(
+      model.cohorts.newProblems.timeScales.all.minutes.domain[1],
+    ).toBeGreaterThan(40)
+    expect(problemSolvingViewSchema.safeParse(model).success).toBe(true)
+  })
+
+  it('counts local days and preserves exact sparse prior rates at shifted local boundaries', () => {
+    const localOptions = optionsForComparison(
+      new Date('2026-03-08T07:30:00Z'),
+      'America/New_York',
+    )
+    const previousStart = shiftAnalyticsCalendarDays(
+      localOptions.start,
+      -14,
+      localOptions.timeZone,
+    )
+    const previousAsOf = shiftAnalyticsCalendarDays(
+      localOptions.end,
+      -14,
+      localOptions.timeZone,
+    )
+    const model = buildHistoricalAnalyticsViews(
+      [
+        event({
+          id: 'invalid-outer',
+          problemSlug: 'invalid-outer',
+          rating: 'invalid',
+          reviewedAt: new Date(localOptions.buckets[0]!.start.getTime() + 1000),
+        }),
+        event({
+          id: 'prior',
+          problemSlug: 'prior',
+          problemDifficulty: 'hard',
+          rating: 'again',
+          reviewedAt: previousAsOf,
+        }),
+        event({
+          id: 'before-prior',
+          problemSlug: 'before-prior',
+          reviewedAt: new Date(previousStart.getTime() - 1),
+        }),
+        event({
+          id: 'current',
+          problemSlug: 'current',
+          problemDifficulty: 'hard',
+          rating: 'again',
+          reviewedAt: new Date('2026-03-08T04:30:00Z'),
+        }),
+        event({
+          id: 'current-later',
+          problemSlug: 'current',
+          problemDifficulty: 'hard',
+          reviewedAt: localOptions.end,
+        }),
+        event({
+          id: 'current-another',
+          problemSlug: 'another',
+          problemDifficulty: 'hard',
+          reviewedAt: localOptions.end,
         }),
       ],
       localOptions,
-    ).firstAttemptOutcomes
-    expect(firstOutcomes.rows[0]).toMatchObject({
+    ).problemSolving
+    expect(model).toBeDefined()
+    expect(model.previousPeriod).toEqual({
+      start: previousStart.toISOString(),
+      asOf: previousAsOf.toISOString(),
+    })
+    expect(model.cohorts.newProblems.previous.difficulties.hard).toMatchObject({
+      validRatings: 1,
+      successRate: 0,
+      goodEasyRate: 0,
+    })
+    expect(model.cohorts.newProblems.totals).toMatchObject({
+      assessmentDays: 3,
+      distinctProblems: 3,
+      recordedAssessments: 3,
       excludedInvalidRatings: 1,
-      validFirstAttempts: 0,
-      firstAttemptSuccess: null,
-      firstAttemptGoodEasy: null,
-      evidence: 'not-measured',
     })
-    expect(firstOutcomes.rows.at(-2)).toMatchObject({
-      bucketStart: '2026-03-07',
-      bucketEnd: '2026-03-07',
-      validFirstAttempts: 1,
-      firstAttemptSuccess: 0,
-      firstAttemptGoodEasy: 0,
-      isPartial: false,
+    expect(model.cohorts.followupPractice.totals).toMatchObject({
+      assessmentDays: 1,
+      distinctProblems: 1,
+      recordedAssessments: 1,
     })
-    expect(firstOutcomes.rows.at(-1)).toMatchObject({
-      bucketStart: '2026-03-08',
-      bucketEnd: '2026-03-08',
-      validFirstAttempts: 1,
-      firstAttemptSuccess: 1,
-      firstAttemptGoodEasy: 1,
-      isPartial: true,
-    })
-    expect(firstOutcomes.totals).toMatchObject({
-      recordedFirstAttempts: 3,
+    const { rows } = model.cohorts.newProblems
+    expect(rows[0]!.difficulties.unknown).toMatchObject({
       excludedInvalidRatings: 1,
-      validFirstAttempts: 2,
-      firstAttemptSuccess: 0.5,
-      firstAttemptGoodEasy: 0.5,
+      validRatings: 0,
+      successRate: null,
+      goodEasyRate: null,
     })
+    for (const [index, date, rate, isPartial] of [
+      [-2, '2026-03-07', 0, false],
+      [-1, '2026-03-08', 1, true],
+    ] as const) {
+      expect(rows.at(index)).toMatchObject({
+        bucketStart: date,
+        bucketEnd: date,
+        isPartial,
+        difficulties: {
+          hard: { validRatings: 1, successRate: rate, goodEasyRate: rate },
+        },
+      })
+    }
   })
+
   it('selects raw first records before rating and report filters and weights the valid denominators across buckets', () => {
     const secondDay = new Date('2026-08-02T12:00:00Z')
-    const firstOutcomes = buildHistoricalAnalyticsViews(
+    const views = buildHistoricalAnalyticsViews(
       [
         ...['again', 'invalid', 'hard', 'good', 'good'].map((rating, index) =>
           event({
@@ -166,42 +343,33 @@ describe('buildHistoricalAnalyticsViews', () => {
         }),
       ],
       options,
-    ).firstAttemptOutcomes
-    expect(firstOutcomes.rows).toMatchObject([
+    ).problemSolving
+    const firstOutcomes = views.cohorts.newProblems
+    expect(problemSolvingViewSchema.safeParse(views).success).toBe(true)
+    expect(
+      firstOutcomes.rows.map((row) => row.difficulties.unknown),
+    ).toMatchObject([
       {
-        recordedFirstAttempts: 2,
+        recordedAssessments: 2,
         excludedInvalidRatings: 1,
-        validFirstAttempts: 1,
-        again: 1,
-        hardGoodEasy: 0,
-        goodEasy: 0,
-        firstAttemptSuccess: 0,
-        firstAttemptGoodEasy: 0,
-        evidence: 'measured',
+        validRatings: 1,
+        successRate: 0,
+        goodEasyRate: 0,
       },
       {
-        recordedFirstAttempts: 3,
+        recordedAssessments: 3,
         excludedInvalidRatings: 0,
-        validFirstAttempts: 3,
-        hardGoodEasy: 3,
-        goodEasy: 2,
-        firstAttemptSuccess: 1,
-        firstAttemptGoodEasy: 2 / 3,
-        evidence: 'measured',
+        validRatings: 3,
+        successRate: 1,
+        goodEasyRate: 2 / 3,
       },
     ])
     expect(firstOutcomes.totals).toMatchObject({
-      again: 1,
-      hard: 1,
-      good: 2,
-      easy: 0,
-      recordedFirstAttempts: 5,
+      recordedAssessments: 5,
       excludedInvalidRatings: 1,
-      validFirstAttempts: 4,
-      hardGoodEasy: 3,
-      goodEasy: 2,
-      firstAttemptSuccess: 0.75,
-      firstAttemptGoodEasy: 0.5,
+      validRatings: 4,
+      successRate: 0.75,
+      goodEasyRate: 0.5,
     })
   })
 
@@ -218,11 +386,11 @@ describe('buildHistoricalAnalyticsViews', () => {
       [[later, first], 0, 0],
     ] as const) {
       expect(
-        buildHistoricalAnalyticsViews(history, options).firstAttemptOutcomes
-          .totals,
+        buildHistoricalAnalyticsViews(history, options).problemSolving.cohorts
+          .newProblems.totals,
       ).toMatchObject({
-        firstAttemptSuccess: success,
-        firstAttemptGoodEasy: goodEasy,
+        successRate: success,
+        goodEasyRate: goodEasy,
       })
     }
   })
@@ -310,6 +478,7 @@ describe('buildHistoricalAnalyticsViews', () => {
 
     expect(after).toEqual({
       ...before,
+      problemSolving: after.problemSolving,
       observedRecallVsFsrs: {
         ...before.observedRecallVsFsrs,
         targetRecall: 0.1,
@@ -320,14 +489,22 @@ describe('buildHistoricalAnalyticsViews', () => {
         targetReviewSuccess: 1,
         percentageScale: after.practiceRhythm.percentageScale,
       },
-      firstAttemptOutcomes: {
-        ...before.firstAttemptOutcomes,
-        targetFirstAttemptSuccess: 0,
-        targetFirstAttemptGoodEasy: 1,
-        scale: after.firstAttemptOutcomes.scale,
-      },
     })
-    expect(after.firstAttemptOutcomes.scale.domain).toEqual([0, 1])
+    expect(after.problemSolving.targets).toEqual({
+      targetRecall: 0.1,
+      targetReviewSuccess: 1,
+      targetFirstAttemptSuccess: 0,
+      targetFirstAttemptGoodEasy: 1,
+    })
+    for (const key of ['newProblems', 'followupPractice'] as const) {
+      expect(after.problemSolving.cohorts[key]).toEqual({
+        ...before.problemSolving.cohorts[key],
+        outcomeScale: {
+          domain: [0, 1],
+          ticks: after.problemSolving.cohorts[key].outcomeScale.ticks,
+        },
+      })
+    }
   })
 
   it('pairs rating-derived recalled outcomes with the FSRS estimate from the exact reviews', () => {

@@ -10,7 +10,6 @@ import {
   analyticsRangeSchema,
   analyticsSummaryRequestSchema,
   analyticsSummarySchema,
-  firstAttemptOutcomesViewSchema,
   hardAgainSummarySchema,
   practiceRhythmPointSchema,
   ratingsMixPointSchema,
@@ -111,38 +110,54 @@ const validSummary = createSerializedAnalyticsSummary({
   historicalReadiness: withRequestedReadiness(readiness, null),
 })
 
-const measuredFirstOutcome = {
-  again: 0,
-  hard: 1,
-  good: 0,
-  easy: 0,
-  recordedFirstAttempts: 1,
-  excludedInvalidRatings: 0,
-  validFirstAttempts: 1,
-  hardGoodEasy: 1,
-  goodEasy: 0,
-  firstAttemptSuccess: 1,
-  firstAttemptGoodEasy: 0,
-  evidence: 'measured' as const,
-}
+describe('problem-solving runtime contract', () => {
+  it('requires and preserves the complete problem-solving view', () => {
+    const summary = createSerializedAnalyticsSummary()
+    expect(analyticsSummarySchema.parse(summary).views.problemSolving).toEqual(
+      summary.views.problemSolving,
+    )
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...summary,
+        views: { ...summary.views, problemSolving: undefined },
+      }).success,
+    ).toBe(false)
+  })
 
-function firstOutcomeView(totals = measuredFirstOutcome) {
-  return {
-    ...validSummary.views.firstAttemptOutcomes,
-    rows: [
-      {
-        ...totals,
-        id: 'first',
-        bucketStart: '2026-01-01',
-        bucketEnd: '2026-01-01',
-        isPartial: true,
-      },
-    ],
-    totals,
-    targetFirstAttemptSuccess: 0,
-    targetFirstAttemptGoodEasy: 1,
-  }
-}
+  it.each([
+    'rate',
+    'coverage',
+    'quartiles',
+    'median',
+    'conservation',
+    'finite',
+    'eligibility',
+    'goals',
+    'negative',
+    'unsupported',
+  ] as const)('rejects inconsistent %s evidence', (field) => {
+    const summary = createSerializedAnalyticsSummary()
+    const { totals } = summary.views.problemSolving.cohorts.newProblems
+    const easy = totals.difficulties.easy
+    if (field === 'rate') easy.successRate = 0.5
+    if (field === 'coverage') easy.time.all.timedAssessments = 1
+    if (field === 'quartiles')
+      Object.assign(easy.time.all, { q1Seconds: 1, q3Seconds: 2 })
+    if (field === 'median') easy.time.all.medianSeconds = 1
+    if (field === 'conservation')
+      Object.assign(totals, {
+        recordedAssessments: 1,
+        excludedInvalidRatings: 1,
+      })
+    if (field === 'finite') easy.time.all.totalSeconds = Infinity
+    if (field === 'eligibility') easy.time.successful.eligibleAssessments = 1
+    if (field === 'goals')
+      summary.views.problemSolving.targets.targetRecall = 0.8
+    if (field === 'negative') easy.validRatings = -1
+    if (field === 'unsupported') Object.assign(easy, { extra: true })
+    expect(analyticsSummarySchema.safeParse(summary).success).toBe(false)
+  })
+})
 
 function withoutSummaryField(field: keyof SerializedAnalyticsSummary) {
   const summary: Partial<SerializedAnalyticsSummary> = { ...validSummary }
@@ -187,13 +202,7 @@ it('accepts all qualifying topics while keeping low-evidence diagnostics bounded
 })
 
 describe('analyticsSummaryRequestSchema', () => {
-  it('requires both first-attempt view and independent readiness', () => {
-    expect(
-      analyticsSummarySchema.safeParse({
-        ...validSummary,
-        views: { ...validSummary.views, firstAttemptOutcomes: undefined },
-      }).success,
-    ).toBe(false)
+  it('requires independent first-attempt readiness', () => {
     expect(
       analyticsSummarySchema.safeParse({
         ...validSummary,
@@ -205,79 +214,20 @@ describe('analyticsSummaryRequestSchema', () => {
     ).toBe(false)
   })
 
-  it.each([0, 1])(
-    'accepts measured boundary rates %s with the valid denominator',
-    (rate) => {
-      const totals = {
-        ...measuredFirstOutcome,
-        again: 1 - rate,
-        hard: 0,
-        good: rate,
-        hardGoodEasy: rate,
-        goodEasy: rate,
-        firstAttemptSuccess: rate,
-        firstAttemptGoodEasy: rate,
-      }
-      expect(
-        firstAttemptOutcomesViewSchema.safeParse(firstOutcomeView(totals))
-          .success,
-      ).toBe(true)
-    },
-  )
-
   it.each([1, 0.123])(
-    'validates independent whole-percent goals at the summary boundary %s',
+    'validates independent whole-percent goals %s',
     (target) => {
-      expect(
-        analyticsSummarySchema.safeParse({
-          ...validSummary,
-          views: {
-            ...validSummary.views,
-            firstAttemptOutcomes: {
-              ...firstOutcomeView(),
-              targetFirstAttemptGoodEasy: target,
-            },
-          },
-        }).success,
-      ).toBe(target === 1)
+      const summary = createSerializedAnalyticsSummary()
+      Object.assign(summary.views.problemSolving.targets, {
+        targetFirstAttemptSuccess: 0,
+        targetFirstAttemptGoodEasy: target,
+      })
+      expect(analyticsSummarySchema.safeParse(summary).success).toBe(
+        target === 1,
+      )
     },
   )
 
-  it('rejects valid totals that differ from the complete bucket population', () => {
-    expect(
-      firstAttemptOutcomesViewSchema.safeParse({
-        ...firstOutcomeView(),
-        totals: {
-          ...measuredFirstOutcome,
-          recordedFirstAttempts: 2,
-          excludedInvalidRatings: 1,
-        },
-      }).success,
-    ).toBe(false)
-  })
-
-  it.each([
-    { validFirstAttempts: -1 },
-    { again: 2 },
-    { recordedFirstAttempts: 3 },
-    { hardGoodEasy: 2 },
-    { goodEasy: 2 },
-    { firstAttemptSuccess: null },
-    { firstAttemptGoodEasy: 0.5 },
-    { evidence: 'not-measured' },
-    { difficulty: 'hard' },
-  ])(
-    'rejects inconsistent counts, rates, evidence, or unsupported fields %j',
-    (invalid) => {
-      const view = firstOutcomeView()
-      expect(
-        firstAttemptOutcomesViewSchema.safeParse({
-          ...view,
-          rows: [{ ...view.rows[0], ...invalid }],
-        }).success,
-      ).toBe(false)
-    },
-  )
   it('requires the feature-owned Ratings Mix and Topic Performance presentation models', () => {
     expect(() =>
       analyticsSummarySchema.parse({
@@ -359,7 +309,7 @@ describe('analyticsSummaryRequestSchema', () => {
 
 describe('analyticsSummarySchema', () => {
   it('serializes the personal chart targets separately from scheduling retention', () => {
-    const summary = {
+    const summary = createSerializedAnalyticsSummary({
       ...validSummary,
       targetRetention: 0.8,
       views: {
@@ -373,7 +323,7 @@ describe('analyticsSummarySchema', () => {
           targetReviewSuccess: 0.95,
         },
       },
-    }
+    })
 
     expect(analyticsSummarySchema.parse(summary)).toMatchObject({
       targetRetention: 0.8,

@@ -216,14 +216,7 @@ function AnalyticsHistoricalStory({
   data: SerializedAnalyticsSummary
 }) {
   const updateTargets = useUpdateAnalyticsTargets()
-  const targets = {
-    targetRecall: data.views.observedRecallVsFsrs.targetRecall,
-    targetReviewSuccess: data.views.practiceRhythm.targetReviewSuccess,
-    targetFirstAttemptSuccess:
-      data.views.firstAttemptOutcomes.targetFirstAttemptSuccess,
-    targetFirstAttemptGoodEasy:
-      data.views.firstAttemptOutcomes.targetFirstAttemptGoodEasy,
-  }
+  const targets = data.views.problemSolving.targets
   const showRatingReadiness =
     (!data.historicalReadiness.ratingsMix.ready ||
       hasTrimmedLeadingHistory(data.historicalReadiness.ratingsMix)) &&
@@ -231,55 +224,41 @@ function AnalyticsHistoricalStory({
       JSON.stringify(data.historicalReadiness.practiceRhythm)
   return (
     <div className="cp-analytics-history grid min-w-0 gap-4">
-      <div className="grid w-full min-w-0 max-w-[64rem] gap-4 lg:grid-cols-2">
-        <PhaseTwoPanel
-          historical
-          description="Hard + Good + Easy and Good + Easy outcomes for the same first recorded problems in retained history. These are recorded assessments; hints and earlier exposure are unknown."
-          id="new-problem-success"
-          question="How are your first recorded outcomes changing?"
-          readiness={data.historicalReadiness.firstAttemptOutcomes}
-          title="New Problem Success"
-        >
-          <NewProblemSuccessView
-            targetControl={
-              <>
-                <AnalyticsTargetEditor
-                  targets={targets}
-                  metric="firstAttemptSuccess"
-                  onSave={updateTargets.mutateAsync}
-                />
-                <AnalyticsTargetEditor
-                  targets={targets}
-                  metric="firstAttemptGoodEasy"
-                  onSave={updateTargets.mutateAsync}
-                />
-              </>
-            }
-            timeFrame={data.timeFrame}
-            view={data.views.firstAttemptOutcomes}
-          />
-        </PhaseTwoPanel>
-        <PhaseTwoPanel
-          historical
-          description="Rating-derived recalled outcomes on repeat reviews compared with reconstructed FSRS retrievability immediately before those exact reviews. First recorded reviews build memory for later comparisons."
-          id="observed-recall-vs-fsrs"
-          question="How did recalled repeat outcomes compare with the FSRS estimate?"
-          readiness={data.historicalReadiness.recallQuality}
-          title="Recall vs FSRS Estimate"
-        >
-          <ObservedRecallVsFsrsView
-            targetControl={
-              <AnalyticsTargetEditor
-                targets={targets}
-                metric="recall"
-                onSave={updateTargets.mutateAsync}
-              />
-            }
-            timeFrame={data.timeFrame}
-            view={data.views.observedRecallVsFsrs}
-          />
-        </PhaseTwoPanel>
-      </div>
+      <PhaseTwoPanel
+        historical
+        description="Recorded outcomes and assessment time by current problem difficulty, with the full recorded difficulty mix. Choose new problems or follow-up practice; retained history cannot establish earlier exposure."
+        id="new-problem-success"
+        question="How are recorded outcomes, time and difficulty mix changing?"
+        readiness={data.historicalReadiness.firstAttemptOutcomes}
+        showReadiness={false}
+        title="Problem Solving"
+      >
+        <NewProblemSuccessView
+          onSaveTarget={updateTargets.mutateAsync}
+          timeFrame={data.timeFrame}
+          view={data.views.problemSolving}
+        />
+      </PhaseTwoPanel>
+      <PhaseTwoPanel
+        historical
+        description="Rating-derived recalled outcomes on repeat reviews compared with reconstructed FSRS retrievability immediately before those exact reviews. First recorded reviews build memory for later comparisons."
+        id="observed-recall-vs-fsrs"
+        question="How did recalled repeat outcomes compare with the FSRS estimate?"
+        readiness={data.historicalReadiness.recallQuality}
+        title="Recall vs FSRS Estimate"
+      >
+        <ObservedRecallVsFsrsView
+          targetControl={
+            <AnalyticsTargetEditor
+              targets={targets}
+              metric="recall"
+              onSave={updateTargets.mutateAsync}
+            />
+          }
+          timeFrame={data.timeFrame}
+          view={data.views.observedRecallVsFsrs}
+        />
+      </PhaseTwoPanel>
 
       <PhaseTwoPanel
         historical

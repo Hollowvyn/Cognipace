@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { analyticsTargetsSchema } from '@/features/settings/domain'
+import {
+  analyticsTargetsSchema,
+  timeTargetsMinutesSchema,
+} from '@/features/settings/domain'
+import type { ProblemSolvingOutcomeStats } from '../domain/historical-presentation'
 
 export const analyticsRangeSchema = z.union([
   z.literal(14),
@@ -169,93 +173,267 @@ export const observedRecallVsFsrsRowSchema = historicalRowBaseSchema.extend({
   evidence: z.enum(['measured', 'not-measured']),
 })
 
-const firstAttemptOutcomeFields = {
+function ratingCountTotals(value: {
+  again: number
+  hard: number
+  good: number
+  easy: number
+}) {
+  return {
+    validRatings: value.again + value.hard + value.good + value.easy,
+    hardGoodEasy: value.hard + value.good + value.easy,
+    goodEasy: value.good + value.easy,
+  }
+}
+
+const problemSolvingOutcomeFields = {
   again: countSchema,
   hard: countSchema,
   good: countSchema,
   easy: countSchema,
-  recordedFirstAttempts: countSchema,
+  recordedAssessments: countSchema,
   excludedInvalidRatings: countSchema,
-  validFirstAttempts: countSchema,
+  validRatings: countSchema,
   hardGoodEasy: countSchema,
   goodEasy: countSchema,
-  firstAttemptSuccess: nullablePercentageSchema,
-  firstAttemptGoodEasy: nullablePercentageSchema,
-  evidence: z.enum(['measured', 'not-measured']),
+  successRate: nullablePercentageSchema,
+  goodEasyRate: nullablePercentageSchema,
 }
+const problemSolvingCountKeys = [
+  'again',
+  'hard',
+  'good',
+  'easy',
+  'recordedAssessments',
+  'excludedInvalidRatings',
+  'validRatings',
+  'hardGoodEasy',
+  'goodEasy',
+] as const
 
-const firstAttemptOutcomeCountsSchema = z.object(firstAttemptOutcomeFields)
-
-function validateFirstAttemptOutcomes(
-  value: z.infer<typeof firstAttemptOutcomeCountsSchema>,
+function validateProblemSolvingOutcomes(
+  value: ProblemSolvingOutcomeStats,
   context: z.RefinementCtx,
 ) {
-  const valid = value.again + value.hard + value.good + value.easy
-  const hardGoodEasy = value.hard + value.good + value.easy
-  const goodEasy = value.good + value.easy
+  const counts = ratingCountTotals(value)
   const expected = {
-    validFirstAttempts: valid,
-    recordedFirstAttempts: valid + value.excludedInvalidRatings,
-    hardGoodEasy,
-    goodEasy,
-    firstAttemptSuccess: valid === 0 ? null : hardGoodEasy / valid,
-    firstAttemptGoodEasy: valid === 0 ? null : goodEasy / valid,
-    evidence: valid === 0 ? 'not-measured' : 'measured',
+    ...counts,
+    recordedAssessments: counts.validRatings + value.excludedInvalidRatings,
+    successRate:
+      counts.validRatings === 0
+        ? null
+        : counts.hardGoodEasy / counts.validRatings,
+    goodEasyRate:
+      counts.validRatings === 0 ? null : counts.goodEasy / counts.validRatings,
   }
   for (const [key, expectedValue] of Object.entries(expected)) {
-    if (value[key as keyof typeof value] !== expectedValue) {
+    if (value[key as keyof typeof value] !== expectedValue)
       context.addIssue({
         code: 'custom',
         message:
-          'First-attempt outcomes must match their rating counts and availability.',
+          'Outcome counts and rates must describe the same valid-rating population.',
         path: [key],
       })
-    }
   }
 }
 
-export const firstAttemptOutcomeRowSchema = historicalRowBaseSchema
-  .extend(firstAttemptOutcomeFields)
-  .strict()
-  .superRefine(validateFirstAttemptOutcomes)
-
-export const firstAttemptOutcomeTotalsSchema = firstAttemptOutcomeCountsSchema
-  .strict()
-  .superRefine(validateFirstAttemptOutcomes)
-
-export const firstAttemptOutcomesViewSchema = z
+const problemSolvingTimeStatsSchema = z
   .object({
-    rows: z.array(firstAttemptOutcomeRowSchema),
-    totals: firstAttemptOutcomeTotalsSchema,
-    scale: analyticsScaleSchema,
-    targetFirstAttemptSuccess: percentageSchema,
-    targetFirstAttemptGoodEasy: percentageSchema,
+    eligibleAssessments: countSchema,
+    timedAssessments: countSchema,
+    totalSeconds: z.number().nonnegative(),
+    medianSeconds: z.number().positive().nullable(),
+    q1Seconds: z.number().positive().nullable(),
+    q3Seconds: z.number().positive().nullable(),
   })
   .strict()
-  .superRefine((view, context) => {
-    for (const key of [
-      'again',
-      'hard',
-      'good',
-      'easy',
-      'recordedFirstAttempts',
-      'excludedInvalidRatings',
-      'validFirstAttempts',
-      'hardGoodEasy',
-      'goodEasy',
-    ] as const) {
+  .superRefine((time, context) => {
+    if (time.timedAssessments > time.eligibleAssessments)
+      context.addIssue({
+        code: 'custom',
+        message: 'Timed assessments cannot exceed their eligible population.',
+        path: ['timedAssessments'],
+      })
+    if (
+      (time.timedAssessments === 0) !== (time.medianSeconds === null) ||
+      (time.timedAssessments === 0) !== (time.totalSeconds === 0)
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Recorded-time availability must match its observed count.',
+        path: ['medianSeconds'],
+      })
+    const quartiles = time.timedAssessments >= 4
+    if (
+      quartiles
+        ? time.q1Seconds === null ||
+          time.q3Seconds === null ||
+          time.medianSeconds === null ||
+          time.q1Seconds > time.medianSeconds ||
+          time.q3Seconds < time.medianSeconds
+        : time.q1Seconds !== null || time.q3Seconds !== null
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Ordered quartiles require at least four timed assessments.',
+        path: ['q1Seconds'],
+      })
+  })
+
+const problemSolvingDifficultyStatsSchema = z
+  .object({
+    ...problemSolvingOutcomeFields,
+    time: z
+      .object({
+        all: problemSolvingTimeStatsSchema,
+        successful: problemSolvingTimeStatsSchema,
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((stats, context) => {
+    validateProblemSolvingOutcomes(stats, context)
+    if (
+      stats.time.all.eligibleAssessments !== stats.recordedAssessments ||
+      stats.time.successful.eligibleAssessments !== stats.hardGoodEasy ||
+      stats.time.successful.timedAssessments >
+        stats.time.all.timedAssessments ||
+      stats.time.successful.totalSeconds > stats.time.all.totalSeconds
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Timing coverage must match the raw and successful rating populations.',
+        path: ['time'],
+      })
+  })
+
+const problemSolvingDifficultiesSchema = z
+  .object({
+    easy: problemSolvingDifficultyStatsSchema,
+    medium: problemSolvingDifficultyStatsSchema,
+    hard: problemSolvingDifficultyStatsSchema,
+    unknown: problemSolvingDifficultyStatsSchema,
+  })
+  .strict()
+
+const problemSolvingRowSchema = historicalRowBaseSchema
+  .extend({ difficulties: problemSolvingDifficultiesSchema })
+  .strict()
+const problemSolvingPeriodStatsSchema = z
+  .object({
+    ...problemSolvingOutcomeFields,
+    assessmentDays: countSchema,
+    distinctProblems: countSchema,
+    difficulties: problemSolvingDifficultiesSchema,
+  })
+  .strict()
+  .superRefine((period, context) => {
+    validateProblemSolvingOutcomes(period, context)
+    for (const key of problemSolvingCountKeys) {
       if (
-        view.totals[key] !== view.rows.reduce((sum, row) => sum + row[key], 0)
-      ) {
+        period[key] !==
+        Object.values(period.difficulties).reduce(
+          (sum, difficulty) => sum + difficulty[key],
+          0,
+        )
+      )
         context.addIssue({
           code: 'custom',
-          message:
-            'First-attempt period totals must aggregate all supplied buckets.',
-          path: ['totals', key],
+          message: 'Difficulty counts must reconcile to the cohort total.',
+          path: [key],
         })
+    }
+    if (
+      period.assessmentDays > period.recordedAssessments ||
+      period.distinctProblems > period.recordedAssessments ||
+      (period.recordedAssessments === 0) !== (period.assessmentDays === 0) ||
+      (period.recordedAssessments === 0) !== (period.distinctProblems === 0)
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Assessment days and distinct problems must match raw activity.',
+        path: ['assessmentDays'],
+      })
+  })
+const problemSolvingUnitScalesSchema = z
+  .object({
+    minutes: analyticsScaleSchema,
+    targetPercent: analyticsScaleSchema,
+  })
+  .strict()
+const problemSolvingCohortViewSchema = z
+  .object({
+    rows: z.array(problemSolvingRowSchema),
+    totals: problemSolvingPeriodStatsSchema,
+    previous: problemSolvingPeriodStatsSchema,
+    outcomeScale: analyticsScaleSchema,
+    timeScales: z
+      .object({
+        all: problemSolvingUnitScalesSchema,
+        successful: problemSolvingUnitScalesSchema,
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((cohort, context) => {
+    for (const difficulty of ['easy', 'medium', 'hard', 'unknown'] as const) {
+      const totals = cohort.totals.difficulties[difficulty]
+      for (const key of problemSolvingCountKeys) {
+        if (
+          totals[key] !==
+          cohort.rows.reduce(
+            (sum, row) => sum + row.difficulties[difficulty][key],
+            0,
+          )
+        )
+          context.addIssue({
+            code: 'custom',
+            message: 'Period counts must aggregate all supplied buckets.',
+            path: ['totals', 'difficulties', difficulty, key],
+          })
+      }
+      for (const subset of ['all', 'successful'] as const) {
+        for (const key of [
+          'eligibleAssessments',
+          'timedAssessments',
+          'totalSeconds',
+        ] as const) {
+          const total = cohort.rows.reduce(
+            (sum, row) => sum + row.difficulties[difficulty].time[subset][key],
+            0,
+          )
+          if (
+            Math.abs(totals.time[subset][key] - total) >
+            Number.EPSILON * Math.max(1, total) * cohort.rows.length
+          )
+            context.addIssue({
+              code: 'custom',
+              message:
+                'Period timing counts and recorded seconds must aggregate all buckets.',
+              path: ['totals', 'difficulties', difficulty, 'time', subset, key],
+            })
+        }
       }
     }
   })
+
+export const problemSolvingViewSchema = z
+  .object({
+    cohorts: z
+      .object({
+        newProblems: problemSolvingCohortViewSchema,
+        followupPractice: problemSolvingCohortViewSchema,
+      })
+      .strict(),
+    targets: analyticsTargetsSchema,
+    timeTargetsMinutes: timeTargetsMinutesSchema,
+    previousPeriod: z
+      .object({ start: z.iso.datetime(), asOf: z.iso.datetime() })
+      .strict(),
+  })
+  .strict()
 
 export const memoryStrengthRowSchema = historicalRowBaseSchema.extend({
   medianStrengthDays: z.number().positive().nullable(),
@@ -369,7 +547,7 @@ const upcomingReviewLoadViewRowSchema = z.object({
 
 export const analyticsViewsSchema = z
   .object({
-    firstAttemptOutcomes: firstAttemptOutcomesViewSchema,
+    problemSolving: problemSolvingViewSchema,
     observedRecallVsFsrs: z.object({
       rows: z.array(observedRecallVsFsrsRowSchema),
       scale: analyticsScaleSchema,
@@ -425,24 +603,23 @@ export const analyticsViewsSchema = z
     }),
   })
   .superRefine((views, context) => {
-    const targets = analyticsTargetsSchema.safeParse({
-      targetRecall: views.observedRecallVsFsrs.targetRecall,
-      targetReviewSuccess: views.practiceRhythm.targetReviewSuccess,
-      targetFirstAttemptSuccess:
-        views.firstAttemptOutcomes.targetFirstAttemptSuccess,
-      targetFirstAttemptGoodEasy:
-        views.firstAttemptOutcomes.targetFirstAttemptGoodEasy,
-    })
-    if (!targets.success) {
-      for (const issue of targets.error.issues) {
+    for (const [view, key, value] of [
+      [
+        'observedRecallVsFsrs',
+        'targetRecall',
+        views.observedRecallVsFsrs.targetRecall,
+      ],
+      [
+        'practiceRhythm',
+        'targetReviewSuccess',
+        views.practiceRhythm.targetReviewSuccess,
+      ],
+    ] as const) {
+      if (views.problemSolving.targets[key] !== value) {
         context.addIssue({
-          ...issue,
-          path:
-            issue.path[0] === 'targetRecall'
-              ? ['observedRecallVsFsrs', 'targetRecall']
-              : issue.path[0] === 'targetReviewSuccess'
-                ? ['practiceRhythm', 'targetReviewSuccess']
-                : ['firstAttemptOutcomes', ...issue.path],
+          code: 'custom',
+          message: 'Chart goals must match the saved problem-solving goals.',
+          path: [view, key],
         })
       }
     }

@@ -1,5 +1,7 @@
+import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
+import { problemDifficulties } from '@/features/problems/domain'
 import type { Db } from '@/platform/db'
 import { createTestDb } from '@/platform/db/test-db'
 import {
@@ -209,7 +211,7 @@ describe('getRecentRatings', () => {
 // ---------------------------------------------------------------------------
 
 describe('review history reads', () => {
-  it('returns range-scoped chronological events with problem identity and topic labels', async () => {
+  it.each(problemDifficulties)('reads %s metadata', async (difficulty) => {
     const { db } = await createTestDb({ seed: false })
     const first = new Date('2026-01-10T09:00:00.000Z')
     const second = new Date('2026-01-11T09:00:00.000Z')
@@ -255,6 +257,7 @@ describe('review history reads', () => {
         rating: 'good',
         reviewMode: 'manual',
         reviewedAt: ts(first),
+        elapsedSeconds: 600,
         isCorrect: true,
         fsrsReviewLog: '{"rating":"good"}',
         createdAt: ts(first),
@@ -262,6 +265,10 @@ describe('review history reads', () => {
       },
     ])
 
+    await db
+      .update(problems)
+      .set({ difficulty })
+      .where(eq(problems.slug, 'topic-problem'))
     const result = await getReviewEvents(db, { since: first, until: second })
 
     expect(result).toEqual([
@@ -270,6 +277,8 @@ describe('review history reads', () => {
         problemSlug: 'topic-problem',
         cardId: topicCardId,
         title: 'Topic Problem',
+        problemDifficulty: difficulty,
+        elapsedSeconds: 600,
         topicLabels: ['Arrays', 'Two Pointers'],
         rating: 'good',
         reviewedAt: first,
@@ -282,6 +291,8 @@ describe('review history reads', () => {
         problemSlug: 'untagged-problem',
         cardId: untaggedCardId,
         title: 'Untagged Problem',
+        problemDifficulty: 'medium',
+        elapsedSeconds: null,
         topicLabels: [],
         rating: 'easy',
         reviewedAt: second,
