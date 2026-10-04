@@ -2,7 +2,7 @@
 
 Date: October 3, 2026.
 
-Status: the three design sections and consolidated written specification are approved. The user approved the written specification on October 3, 2026 ("This is cool beans"). Phase A preservation is implemented and automated checks pass; human installed-extension proof remains pending before PR review or merge. Phases B–H remain unimplemented. See the [Phase A handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) for exact evidence and limits.
+Status: the three design sections and consolidated written specification are approved. The user approved the written specification on October 3, 2026 ("This is cool beans"). Phase A merged in PR #190; its [handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) retains historical evidence and limits. Phase B is implemented on its phase branch with independent reviews and passing automated/build checks; [human compatibility smoke and visual proof](../handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md) remain pending before review or merge. C–H remain unimplemented.
 
 Baseline: `codex/fsrs-remediation-design`, based on `origin/main` at `dc0fc6f2`. The original audit examined `7cccd2d7`; the newer Analytics and Tracks work is preserved. The lockfile currently resolves ts-fsrs 5.4.0, using FSRS 6.
 
