@@ -118,7 +118,9 @@ Not every feature needs every folder. Add only the folder needed for the change.
 - `dev-smoke`: hidden dashboard-only extension development smoke checks for
   background health, Analytics, queue, notifications, GenAI config, and opt-in
   live GenAI provider validation.
-- `assessment`: assessment domain rules.
+- `assessment`: deterministic solve-time and recall-rating domain rules.
+- `leetcode-review-assistant`: session-only code analysis schemas, rubric,
+  prompt, consistency checks, and background service.
 - `leetcode-capture`: LeetCode metadata, content, and submission result reads
   through the content-script/background bridge.
 
@@ -552,6 +554,66 @@ an obsolete provider or model. The existing application cache listener owns thes
 not dirty database sync state. Development smoke may also call the configured
 provider, and smoke output redacts provider error details that could contain a
 secret.
+
+### LeetCode code analysis
+
+Ownership follows the existing feature direction. `src/lib/ai` owns reusable
+structured SDK transport and the direct official provider adapters. GenAI owns
+saved configuration, availability, trusted credentials, and connection testing.
+`leetcode-review-assistant` owns the versioned report and request schemas,
+rubric, prompt, consistency checks, and analysis service.
+`leetcode-capture` and `src/lib/leetcode` own full matching submission and
+problem content, including follow-ups and refreshable capture caches.
+`overlay-session` owns the session controller and Option A presentation.
+Deterministic assessment remains in `assessment`, and persistence/FSRS/progress
+remain behind their existing owning services.
+
+The content script sends strict Zod envelopes to
+`genai.analyzeLeetCodeSubmission` and `genai.cancelLeetCodeAnalysis`.
+`src/extension` authorizes generation against the sender's actual HTTPS
+LeetCode problem URL and tracks cancellation by tab, frame, and request owner.
+Cancellation also permits the owning same-host tab after SPA navigation so it
+can stop obsolete work. Payload identities bind request, attempt, submission,
+problem slug, and configuration revision. The background reloads the trusted
+configuration snapshot before publishing; changed configuration cannot publish
+a successful old report. UI cancellation and identity checks reject stale
+responses after navigation, new attempts, restart, disable, clear, or key/model
+changes.
+
+Analysis requires complete essentials: code up to 32,000 characters and the
+serialized problem context up to 24,000 characters. Optional diagnostics above
+2,000 characters are omitted and named explicitly. Code and problem content are
+never silently truncated. Preparation refreshes the immutable submission pin
+and has a 15-second deadline; the retained pin survives unavailable reads for
+Retry. A request has one SDK generation with an 8,192-token output budget and a
+30-second background deadline including database/configuration/secret loading.
+The controller bounds the complete client operation at 50 seconds. Retry makes
+a fresh request identity for the same retained submission; repeated terminal
+events and disclosure/collapse/dock actions do not generate another request.
+
+The report uses independent /5 category scores and time/auxiliary-space
+comparisons. Consistency validation rejects incompatible strategy/score,
+language, and complexity claims without silently rewriting them or making a
+second provider call. This establishes contract consistency, not compilation,
+correctness, human rubric quality, or universal optimality. Suggested code is
+rendered as text, labeled AI-generated and Untested, and is never executed or
+submitted by the product.
+
+Reports and in-flight operations stay in session/controller state, outside
+TanStack Query query and mutation caches and the database. Report completion
+causes no invalidation, sync, review write, or rating change. The retired
+recommendation endpoint and save-time AI wait/recall override have no forwarding
+aliases. Keys remain in trusted local secret storage and outside analysis
+payloads, report/cache data, logs, exports, and sync. The existing authorized
+key-save transport and provider authentication still carry keys where required.
+
+Evaluation inputs live in the owning review-assistant testing folder, and the
+test-only private environment configuration lives in GenAI testing. The opt-in
+harness calls the real `analyzeCode` SDK path with six cases and stores only
+report, provider metadata, criterion, and checked date in
+`/private/tmp/cognipace-ai-evaluation`. Its environment option does not replace
+or read the application's trusted secret store. Normal tests skip all six live
+cases before reading any evaluation provider/model/key values.
 
 ## Database And Persistence
 

@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-03-leetcode-code-analysis-design.md`](./specs/2026-10-03-leetcode-code-analysis-design.md): user-selected Option A for Approach, Efficiency, and Code Style scores, explicit resource tradeoffs, language-aware style advice, and a collapsed suggested implementation; written specification approved, with ordered capture, report/runtime, and overlay/proof plans; implementation and provider evaluation pending.
+- [`specs/2026-10-03-leetcode-code-analysis-design.md`](./specs/2026-10-03-leetcode-code-analysis-design.md): user-selected Option A for Approach, Efficiency, and Code Style scores, explicit resource tradeoffs, language-aware style advice, and a collapsed suggested implementation; written specification approved, with ordered capture, report/runtime, and overlay/proof plans; the first nine tasks are implemented and reviewed, with final Task 4 review/root integration and provider/human proof pending.
 
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
@@ -57,7 +57,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
-- [`plans/2026-10-03-leetcode-code-analysis.md`](./plans/2026-10-03-leetcode-code-analysis.md): execution map for the approved Option A assessment, linking three ordered phase plans for complete capture, structured reports and trusted runtime, and overlay integration/retirement/proof; implementation has not started.
+- [`plans/2026-10-03-leetcode-code-analysis.md`](./plans/2026-10-03-leetcode-code-analysis.md): execution map for the approved Option A assessment, linking three ordered phase plans for complete capture, structured reports and trusted runtime, and overlay integration/retirement/proof; the first nine tasks are implemented and reviewed; final Task 4 review/root integration and provider/human proof remain pending.
 
 - [`plans/2026-10-03-next-question-group.md`](./plans/2026-10-03-next-question-group.md): focused service and workspace regression plan for membership-derived chapter guidance, local tabs, and required human extension smoke.
 
@@ -110,6 +110,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-03-leetcode-code-analysis.md`](./handoffs/2026-10-03-leetcode-code-analysis.md): implemented session-only analysis, six opt-in evaluation inputs, scoped checks, and prepared provider/generated-code/human installed-extension proof; final review and root integration checks pending.
 
 - [`handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md`](./handoffs/2026-10-03-leetcode-code-analysis-design-handoff.md): approved written spec, three phase plans, planning checks, and remaining implementation/model/human proof.
 

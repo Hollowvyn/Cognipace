@@ -98,6 +98,55 @@ Submission notes stay in LeetCode. Existing saved CogniPace log fields remain
 preserved in local practice history, backups, and sync; overlay review saves and
 rating updates do not edit those fields.
 
+#### Automatic code analysis
+
+When AI assessment is enabled and its saved connection is available, each
+completed matching LeetCode submission can produce one automatic analysis in
+the expanded overlay. Accepted and useful failed results use the full submitted
+code, language, problem statement, examples, constraints, follow-ups, and
+available diagnostics. Incomplete or oversized essentials show an unavailable
+state rather than analyzing a visible editor fragment. Retry refreshes the
+original pinned submission, even if LeetCode now has a newer submission.
+
+The compact Option A report shows a factual summary and three independent
+scores out of five: Approach, Efficiency, and Code Style. Approach exposes
+Current, Suggested, Key idea, and optional Consider. Efficiency exposes
+Current complexity, Suggested complexity, and Suggestions, with time and
+auxiliary-space comparisons shown independently. Code Style exposes
+Readability, Structure, and Suggestions. Each category and Suggested
+implementation uses an independent native disclosure, initially closed.
+
+A materially preferred replacement strategy cannot receive Approach 5. Small
+bounds or a strict memory limit can make brute force appropriate. A hash map
+can improve expected time while worsening auxiliary space; accepted tests and
+runtime milliseconds do not prove optimality or Big-O. Language advice must
+preserve signatures and intentional types. Kotlin inference is optional polish:
+initialized Int locals may omit redundant annotations, Long inference needs a
+Long initializer such as 0L, and a retained empty generic collection needs its
+type on either the annotation or initializer. A justified direct LongArray is
+also valid.
+
+Suggested code is labeled AI-generated and Untested, with Copy feedback and
+complexity assumptions. CogniPace never executes or submits that code. A
+report may explain why no responsible implementation is available.
+
+Analysis remains in overlay session state: no report database, query-cache
+entry, export, sync payload, or analytics score. Saving a review stays immediate
+while analysis is pending. AI never selects or changes recall rating,
+correctness, solve time, FSRS scheduling, or track progress, and report arrival
+causes no review write. The former AI recall-rating override has been retired.
+
+The overlay distinguishes idle, capture preparation, generation, ready,
+unavailable, and controlled-error states, with Settings and Retry where useful.
+Capture preparation has a 15-second deadline, background analysis a 30-second
+deadline including configuration loading, and the whole client operation a
+50-second deadline. There is one provider attempt per request. Explicit Retry
+uses a new request identity for the retained submission. New attempts,
+configuration/key/model changes, navigation, restart, disable, and clear/reset
+cancel or invalidate stale work. Reset keeps the same handled attempt idle
+until an explicit Retry; collapse, docking, and opening report details do not
+start extra provider calls.
+
 ### Dashboard
 
 The dashboard is the control and inspection surface for product state.
@@ -300,9 +349,9 @@ keeps the saved connection and explains whether authentication, model access,
 quota, networking, or provider output needs attention. Saving other preferences
 does not commit or discard unfinished AI connection edits.
 
-AI assessment has a separate enable control. Testing a connection does not
-enable assessment, and assessment can be turned off even when its key or model
-is missing. Reset Defaults disables assessment and clears provider/model
+AI assessment has a separate enable control for automatic completed-submission
+code analysis. Testing a connection does not enable assessment, and assessment
+can be turned off even when its key or model is missing. Reset Defaults disables assessment and clears provider/model
 configuration while preserving saved provider keys. Removing a key refreshes
 its availability across extension surfaces; connection results become stale
 when the configuration or saved key changes.
