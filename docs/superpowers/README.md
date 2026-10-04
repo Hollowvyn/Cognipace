@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-03-leetcode-code-analysis-design.md`](./specs/2026-10-03-leetcode-code-analysis-design.md): user-selected Option A for Approach, Efficiency, and Code Style scores, explicit resource tradeoffs, language-aware style advice, and a collapsed suggested implementation; written specification ready for review, with implementation and provider evaluation pending.
+
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
 - [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): approved two-rate first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall, with the selected preview preserved verbatim; implemented with automated and production-component proof; required human installed-extension smoke remains pending before review or merge.
