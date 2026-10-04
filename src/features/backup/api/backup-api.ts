@@ -10,6 +10,7 @@ import type { BackupFile } from './backup-contracts'
 
 const broadBackupInvalidationTags = [
   'settings',
+  'genai',
   'problems',
   'practice',
   'queue',
@@ -36,7 +37,7 @@ export function useRestoreFullBackup() {
   return useMutation({
     mutationFn: restoreFullBackupViaRuntime,
     onSuccess: () => {
-      invalidateTaggedQueries(queryClient, broadBackupInvalidationTags)
+      void invalidateTaggedQueries(queryClient, broadBackupInvalidationTags)
     },
   })
 }
@@ -48,7 +49,7 @@ export function useResetLocalData() {
     mutationFn: () =>
       sendMessage('backup.resetLocalData', { surface: 'dashboard' }),
     onSuccess: () => {
-      invalidateTaggedQueries(queryClient, broadBackupInvalidationTags)
+      void invalidateTaggedQueries(queryClient, broadBackupInvalidationTags)
     },
   })
 }

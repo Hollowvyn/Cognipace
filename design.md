@@ -162,6 +162,22 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 - **Data Lists**: High density, 40px row heights. Use alternating row stripes or subtle dividers.
 - **Metrics**: Large Nunito Sans text with tabular numerals. Place units (e.g., "kg", "ms") in a smaller, low-opacity label style next to the value.
 
+## CogniPace AI Connection Settings Rules
+
+- Keep AI connection in its own Settings form with the existing compact row,
+  input, status, and panel tokens. Ordinary preference saves do not submit it.
+- Selecting a provider fills an editable model value. Saved custom models stay
+  visible; a blank reset model stays blank rather than looking configured.
+- Mask entered keys and show availability only for the selected provider. Clear
+  the input after saving and when switching providers. Provide Remove key and a
+  Google AI Studio link for Gemini.
+- Use Save & test connection for edits and Test connection for an unchanged
+  connection. Name the current save/test step and disable conflicting controls.
+- Show a compact inline success or actionable error. A failed test keeps saved
+  configuration visible, and replacing configuration clears old verification.
+- Keep AI assessment enablement separate. Testing works while assessment is off,
+  and turning assessment off works after its key is removed.
+
 ## CogniPace Popup Rules
 
 - The popup is a compact Chrome extension command surface, not a mini dashboard.

@@ -128,7 +128,7 @@ function useTrackMutation<TRequest, TResponse>(
   return useMutation({
     mutationFn,
     onSuccess: () => {
-      invalidateTaggedQueries(queryClient, invalidationTags)
+      void invalidateTaggedQueries(queryClient, invalidationTags)
     },
   })
 }

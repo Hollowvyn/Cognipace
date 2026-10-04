@@ -15,6 +15,11 @@ export {
   useClearAiProviderSecretMutation,
   useGenAiSecretPresenceQuery,
   useSetAiProviderSecretMutation,
+  useTestAiConnectionMutation,
+  useGenAiConfigurationRevision,
   type ClearAiProviderSecretHookInput,
   type SetAiProviderSecretHookInput,
+  type TestAiConnectionHookInput,
+  type TestAiConnectionRequest,
+  type TestAiConnectionResponse,
 } from './api'

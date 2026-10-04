@@ -18,9 +18,16 @@ const ERROR_MESSAGE_BY_CODE: Record<
   string
 > = {
   auth: 'AI authentication failed. Check the API key in settings.',
+  permission:
+    'The API key cannot access this model. Check provider permissions.',
+  'bad-request': 'AI rejected the request. Check the model in settings.',
+  'model-unavailable':
+    'The selected model is unavailable. Check it in settings.',
   'rate-limit': 'AI is rate-limited. Try again in a moment.',
   network: 'AI request could not reach the provider.',
   timeout: 'AI request timed out.',
+  cancelled: 'AI request was cancelled.',
+  refused: 'AI could not provide a recommendation for this submission.',
   'invalid-output': 'AI returned an unexpected response.',
   unknown: 'AI request failed.',
 }

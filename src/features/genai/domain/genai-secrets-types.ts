@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { genAiProviderIds, type GenAiProviderId } from './genai-types'
+import { genAiProviderIds } from './genai-types'
 
 export const aiProviderSecretSchema = z
   .object({
@@ -20,7 +20,15 @@ export const aiProviderSecretsSchema = z
 
 export type AiProviderSecrets = z.infer<typeof aiProviderSecretsSchema>
 
-export type AiProviderSecretPresence = Record<GenAiProviderId, boolean>
+export const aiProviderSecretPresenceSchema = z.strictObject({
+  openai: z.boolean(),
+  anthropic: z.boolean(),
+  gemini: z.boolean(),
+})
+
+export type AiProviderSecretPresence = z.infer<
+  typeof aiProviderSecretPresenceSchema
+>
 
 export const emptyAiProviderSecrets: AiProviderSecrets = {}
 

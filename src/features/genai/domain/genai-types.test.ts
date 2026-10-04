@@ -8,11 +8,16 @@ describe('genai domain surface', () => {
   })
 
   it('includes every documented error code without duplicates', () => {
-    expect(genAiErrorCodes).toHaveLength(7)
+    expect(genAiErrorCodes).toHaveLength(12)
     expect(new Set(genAiErrorCodes)).toEqual(
       new Set([
         'not-configured',
         'auth',
+        'permission',
+        'bad-request',
+        'model-unavailable',
+        'refused',
+        'cancelled',
         'rate-limit',
         'network',
         'timeout',

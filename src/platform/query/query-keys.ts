@@ -13,6 +13,8 @@ export const queryKeys = {
   },
   genai: {
     all: ['genai'] as const,
+    configurationRevision: () =>
+      [...queryKeys.genai.all, 'configuration-revision'] as const,
     secretPresence: () => [...queryKeys.genai.all, 'secret-presence'] as const,
   },
   practice: {

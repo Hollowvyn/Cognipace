@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { settingsKv } from '@/platform/db/schema'
 import { createTestDb } from '@/platform/db/test-db'
@@ -15,8 +15,7 @@ import {
 
 describe('getAiProviderSecretPresence', () => {
   it('returns all-false on empty store', async () => {
-    const handle = await createTestDb({ seed: false })
-    expect(await getAiProviderSecretPresence(handle.db)).toEqual({
+    expect(await getAiProviderSecretPresence()).toEqual({
       openai: false,
       anthropic: false,
       gemini: false,
@@ -24,9 +23,8 @@ describe('getAiProviderSecretPresence', () => {
   })
 
   it('reflects which providers have keys', async () => {
-    const handle = await createTestDb({ seed: false })
-    await setAiProviderSecret(handle.db, 'anthropic', { apiKey: 'sk-ant' })
-    expect(await getAiProviderSecretPresence(handle.db)).toEqual({
+    await setAiProviderSecret('anthropic', { apiKey: 'sk-ant' })
+    expect(await getAiProviderSecretPresence()).toEqual({
       openai: false,
       anthropic: true,
       gemini: false,
@@ -36,25 +34,23 @@ describe('getAiProviderSecretPresence', () => {
 
 describe('setAiProviderSecret / clearAiProviderSecret', () => {
   it('set returns updated presence', async () => {
-    const handle = await createTestDb({ seed: false })
-    const presence = await setAiProviderSecret(handle.db, 'openai', {
+    const presence = await setAiProviderSecret('openai', {
       apiKey: 'sk-o',
     })
     expect(presence.openai).toBe(true)
   })
 
   it('clear removes only the named provider', async () => {
-    const handle = await createTestDb({ seed: false })
-    await setAiProviderSecret(handle.db, 'openai', { apiKey: 'sk-o' })
-    await setAiProviderSecret(handle.db, 'gemini', { apiKey: 'g-x' })
-    const presence = await clearAiProviderSecret(handle.db, 'openai')
+    await setAiProviderSecret('openai', { apiKey: 'sk-o' })
+    await setAiProviderSecret('gemini', { apiKey: 'g-x' })
+    const presence = await clearAiProviderSecret('openai')
     expect(presence).toEqual({ openai: false, anthropic: false, gemini: true })
   })
 
   it('does not write GenAI API keys into settings_kv', async () => {
     const handle = await createTestDb({ seed: false })
 
-    await setAiProviderSecret(handle.db, 'openai', { apiKey: 'sk-test' })
+    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
 
     const rows = await handle.db.select().from(settingsKv)
     expect(rows.some((row) => row.key === 'genai-secrets')).toBe(false)
@@ -68,7 +64,7 @@ describe('loadActiveProviderConfig', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: false, provider: 'openai', model: 'gpt-test' },
     })
-    await setAiProviderSecret(handle.db, 'openai', { apiKey: 'sk-test' })
+    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
     expect(await loadActiveProviderConfig(handle.db)).toBeNull()
   })
 
@@ -77,7 +73,7 @@ describe('loadActiveProviderConfig', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: true, provider: 'openai', model: '' },
     })
-    await setAiProviderSecret(handle.db, 'openai', { apiKey: 'sk-test' })
+    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
     expect(await loadActiveProviderConfig(handle.db)).toBeNull()
   })
 
@@ -86,7 +82,7 @@ describe('loadActiveProviderConfig', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: true, provider: 'anthropic', model: 'claude' },
     })
-    await setAiProviderSecret(handle.db, 'openai', { apiKey: 'sk-test' })
+    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
     expect(await loadActiveProviderConfig(handle.db)).toBeNull()
   })
 
@@ -95,7 +91,7 @@ describe('loadActiveProviderConfig', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: true, provider: 'openai', model: 'gpt-test' },
     })
-    await setAiProviderSecret(handle.db, 'openai', { apiKey: 'sk-test' })
+    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
     expect(await loadActiveProviderConfig(handle.db)).toEqual({
       provider: 'openai',
       model: 'gpt-test',
@@ -127,7 +123,7 @@ describe('loadActiveProviderConfig', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: true, provider: 'openai', model: '   ' },
     })
-    await setAiProviderSecret(handle.db, 'openai', { apiKey: 'sk-test' })
+    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
     expect(await loadActiveProviderConfig(handle.db)).toBeNull()
   })
 })
@@ -143,7 +139,18 @@ describe('isAiAssessmentAvailable', () => {
     await updateSettings(handle.db, {
       aiAssessment: { enabled: true, provider: 'openai', model: 'gpt-test' },
     })
-    await setAiProviderSecret(handle.db, 'openai', { apiKey: 'sk-test' })
+    await setAiProviderSecret('openai', { apiKey: 'sk-test' })
     expect(await isAiAssessmentAvailable(handle.db)).toBe(true)
   })
+})
+
+it('publishes a durable key write before a failed presence refresh', async () => {
+  const published = vi.fn(() => Promise.resolve())
+  vi.spyOn(chrome.storage.local, 'get').mockRejectedValueOnce(
+    new Error('readback failed'),
+  )
+  await expect(
+    setAiProviderSecret('openai', { apiKey: 'fake-private-key' }, published),
+  ).rejects.toThrow()
+  expect(published).toHaveBeenCalledTimes(1)
 })

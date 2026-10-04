@@ -291,13 +291,28 @@ user-facing setting: queue ordering follows the fixed waterfall, while the
 legacy stored `review.order` value is retained only for settings schema-v1
 compatibility. Changing target retention never rewrites existing schedules.
 
-AI assessment settings can store provider preference and model configuration.
+Settings exposes an AI connection for OpenAI, Anthropic, or Google Gemini.
+Choosing a provider fills an editable default model; saved custom model ids
+survive reopening Settings. Save & test connection saves the selected provider,
+model, and any newly entered key, then makes a small request to the selected
+provider. Test connection checks an unchanged saved connection. A failed test
+keeps the saved connection and explains whether authentication, model access,
+quota, networking, or provider output needs attention. Saving other preferences
+does not commit or discard unfinished AI connection edits.
+
+AI assessment has a separate enable control. Testing a connection does not
+enable assessment, and assessment can be turned off even when its key or model
+is missing. Reset Defaults disables assessment and clears provider/model
+configuration while preserving saved provider keys. Removing a key refreshes
+its availability across extension surfaces; connection results become stale
+when the configuration or saved key changes.
+
 Provider API keys are stored in trusted local extension secret storage, never in
-backup exports, sync payloads, logs, or unmasked UI payloads. When configured,
-trusted background code can call the approved BYOK provider hosts for OpenAI,
-Anthropic, and Google Gemini. Development smoke testing can optionally run a
-live provider check, but that hidden dashboard smoke route is not normal product
-navigation and never reveals stored secret values.
+backup exports, sync payloads, logs, or unmasked UI payloads. Trusted background
+code calls the approved BYOK provider hosts through a reusable Vercel AI SDK
+integration. Development smoke testing can also run an opt-in live provider
+check from the hidden dashboard smoke route. Neither connection testing flow
+reveals stored secret values.
 
 ### Analytics
 

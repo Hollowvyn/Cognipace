@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   aiProviderSecretSchema,
+  aiProviderSecretPresenceSchema,
   aiProviderSecretsSchema,
   emptyAiProviderSecrets,
   makeEmptyAiProviderSecretPresence,
@@ -55,4 +56,29 @@ describe('genai secrets domain', () => {
       gemini: false,
     })
   })
+})
+
+it('strictly parses only provider-presence booleans', () => {
+  expect(
+    aiProviderSecretPresenceSchema.parse({
+      openai: true,
+      anthropic: false,
+      gemini: false,
+    }),
+  ).toEqual({ openai: true, anthropic: false, gemini: false })
+  expect(
+    aiProviderSecretPresenceSchema.safeParse({
+      openai: 'true',
+      anthropic: false,
+      gemini: false,
+    }).success,
+  ).toBe(false)
+  expect(
+    aiProviderSecretPresenceSchema.safeParse({
+      openai: true,
+      anthropic: false,
+      gemini: false,
+      apiKey: 'fake-key',
+    }).success,
+  ).toBe(false)
 })

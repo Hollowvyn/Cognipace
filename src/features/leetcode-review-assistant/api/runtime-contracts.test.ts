@@ -190,6 +190,29 @@ describe('recommendLeetCodeAssessmentRequestSchema', () => {
 })
 
 describe('recommendLeetCodeAssessmentResponseSchema', () => {
+  it('accepts safe SDK metadata while rejecting raw provider response fields', () => {
+    const response = {
+      status: 'ready',
+      recommendation: validRecommendation,
+      providerMetadata: {
+        ...validProviderMetadata,
+        modelVersion: 'gpt-5.4-mini-2026-03-17',
+        totalTokens: 128,
+      },
+      submissionFingerprint: 'fp-abc-123',
+    }
+
+    expect(() =>
+      recommendLeetCodeAssessmentResponseSchema.parse(response),
+    ).not.toThrow()
+    expect(() =>
+      recommendLeetCodeAssessmentResponseSchema.parse({
+        ...response,
+        providerMetadata: { ...response.providerMetadata, responseBody: 'raw' },
+      }),
+    ).toThrow()
+  })
+
   it('accepts a ready response', () => {
     expect(() =>
       recommendLeetCodeAssessmentResponseSchema.parse({

@@ -10,14 +10,11 @@ export default defineBackground({
   },
 })
 
-async function startTrustedBackground() {
-  try {
-    await restrictSecretStorageAccess()
-    registerBackgroundHandlers()
-  } catch (error) {
+function startTrustedBackground() {
+  registerBackgroundHandlers()
+  void restrictSecretStorageAccess().catch(() => {
     console.error(
-      'CogniPace background failed to initialize trusted storage',
-      error,
+      'CogniPace trusted storage is unavailable; secret operations can retry.',
     )
-  }
+  })
 }

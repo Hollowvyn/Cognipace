@@ -6,12 +6,18 @@ vi.mock('@/extension/messaging', () => ({
   sendMessage: vi.fn(),
 }))
 
+import type { AiProviderSecretPresence } from '../domain/genai-secrets-types'
+import type { TestAiConnectionResponse } from './genai-settings-contracts'
+
 import { sendMessage } from '@/extension/messaging'
+import { invalidateTaggedQueries } from '@/platform/query/cache-invalidation'
 
 import {
   useClearAiProviderSecretMutation,
   useGenAiSecretPresenceQuery,
   useSetAiProviderSecretMutation,
+  useTestAiConnectionMutation,
+  useGenAiConfigurationRevision,
 } from './genai-settings-hooks'
 
 let queryClient: QueryClient
@@ -30,6 +36,7 @@ beforeEach(() => {
 
 afterEach(() => {
   queryClient.clear()
+  vi.useRealTimers()
 })
 
 describe('useGenAiSecretPresenceQuery', () => {
@@ -153,4 +160,228 @@ describe('useClearAiProviderSecretMutation', () => {
       presence,
     )
   })
+})
+
+describe('secret cache coherence and privacy', () => {
+  it('does not retain a secret in the mutation cache and works offline', async () => {
+    const { onlineManager } = await import('@tanstack/react-query')
+    onlineManager.setOnline(false)
+    try {
+      vi.mocked(sendMessage).mockResolvedValue({
+        openai: true,
+        anthropic: false,
+        gemini: false,
+      })
+      const { result } = renderHook(() => useSetAiProviderSecretMutation(), {
+        wrapper,
+      })
+      await act(async () => {
+        await result.current.mutateAsync({
+          provider: 'openai',
+          key: 'fake-private-key',
+        })
+      })
+      expect(
+        JSON.stringify(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((mutation) => mutation.state.variables),
+        ),
+      ).not.toContain('fake-private-key')
+      expect(sendMessage).toHaveBeenCalledTimes(1)
+    } finally {
+      onlineManager.setOnline(true)
+    }
+  })
+  it('prevents a stale presence read from overwriting a successful save', async () => {
+    let finishRead!: (value: AiProviderSecretPresence) => void
+    vi.mocked(sendMessage)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishRead = resolve
+          }),
+      )
+      .mockResolvedValue({ openai: true, anthropic: false, gemini: false })
+    const { result } = renderHook(
+      () => ({
+        presence: useGenAiSecretPresenceQuery(),
+        save: useSetAiProviderSecretMutation(),
+      }),
+      { wrapper },
+    )
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      await result.current.save.mutateAsync({
+        provider: 'openai',
+        key: 'fake-private-key',
+      })
+    })
+    await act(async () => {
+      finishRead({ openai: false, anthropic: false, gemini: false })
+      await Promise.resolve()
+    })
+    expect(queryClient.getQueryData(['genai', 'secret-presence'])).toEqual({
+      openai: true,
+      anthropic: false,
+      gemini: false,
+    })
+  })
+  it('rejects malformed presence responses and hides raw runtime errors', async () => {
+    vi.mocked(sendMessage).mockRejectedValue(new Error('fake-private-key'))
+    const { result } = renderHook(() => useSetAiProviderSecretMutation(), {
+      wrapper,
+    })
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({
+          provider: 'openai',
+          key: 'fake-private-key',
+        }),
+      ).rejects.not.toThrow('fake-private-key')
+    })
+    expect(result.current.error?.message).not.toContain('fake-private-key')
+    vi.mocked(sendMessage).mockResolvedValue({
+      openai: 'true',
+      anthropic: false,
+      gemini: false,
+    } as unknown as AiProviderSecretPresence)
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ provider: 'openai', key: 'other-key' }),
+      ).rejects.toThrow()
+    })
+    expect(
+      queryClient.getQueryData(['genai', 'secret-presence']),
+    ).toBeUndefined()
+  })
+  it('rejects duplicate secret saves while the first is running', async () => {
+    let finish!: (value: AiProviderSecretPresence) => void
+    vi.mocked(sendMessage).mockImplementation(
+      () =>
+        new Promise<AiProviderSecretPresence>((resolve) => {
+          finish = resolve
+        }),
+    )
+    const { result } = renderHook(() => useSetAiProviderSecretMutation(), {
+      wrapper,
+    })
+    await act(async () => {
+      const first = result.current.mutateAsync({
+        provider: 'openai',
+        key: 'first-key',
+      })
+      await expect(
+        result.current.mutateAsync({ provider: 'openai', key: 'second-key' }),
+      ).rejects.toThrow(/progress/)
+      finish({ openai: true, anthropic: false, gemini: false })
+      await first
+    })
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+  })
+  it('reads external configuration revisions synchronously through QueryCache', () => {
+    const { result } = renderHook(() => useGenAiConfigurationRevision(), {
+      wrapper,
+    })
+    expect(result.current.revision).toBe(0)
+    act(() => {
+      void invalidateTaggedQueries(queryClient, ['genai'])
+      expect(result.current.readRevision()).toBe(1)
+    })
+    expect(result.current.revision).toBe(1)
+  })
+})
+
+describe('connection test mutation', () => {
+  it('uses only dashboard provider/model and validates the response', async () => {
+    const response = {
+      status: 'success',
+      provider: 'gemini',
+      model: 'gemini-test',
+      durationMs: 12,
+    } as const
+    vi.mocked(sendMessage).mockResolvedValue(response)
+    const { result } = renderHook(() => useTestAiConnectionMutation(), {
+      wrapper,
+    })
+    await act(async () => {
+      expect(
+        await result.current.mutateAsync({
+          provider: 'gemini',
+          model: ' gemini-test ',
+        }),
+      ).toEqual(response)
+    })
+    expect(sendMessage).toHaveBeenCalledWith('genai.testConnection', {
+      surface: 'dashboard',
+      provider: 'gemini',
+      model: 'gemini-test',
+    })
+    vi.mocked(sendMessage).mockResolvedValue({
+      ...response,
+      apiKey: 'fake-private-key',
+    } as unknown as TestAiConnectionResponse)
+    await act(async () => {
+      expect(
+        await result.current.mutateAsync({
+          provider: 'gemini',
+          model: 'gemini-test',
+        }),
+      ).toMatchObject({ status: 'error', code: 'unknown' })
+    })
+  })
+  it('returns controlled feedback for worker loss without retry', async () => {
+    vi.mocked(sendMessage).mockRejectedValue(new Error('fake-private-key'))
+    const { result } = renderHook(() => useTestAiConnectionMutation(), {
+      wrapper,
+    })
+    await act(async () => {
+      const resultValue = await result.current.mutateAsync({
+        provider: 'gemini',
+        model: 'gemini-test',
+      })
+      expect(resultValue).toMatchObject({ status: 'error', code: 'network' })
+      expect(JSON.stringify(resultValue)).not.toContain('fake-private-key')
+    })
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+  })
+})
+
+it('validates presence query output without caching unknown fields', async () => {
+  vi.mocked(sendMessage).mockResolvedValue({
+    openai: true,
+    anthropic: false,
+    gemini: false,
+    apiKey: 'fake-private-key',
+  } as unknown as AiProviderSecretPresence)
+  const { result } = renderHook(() => useGenAiSecretPresenceQuery(), {
+    wrapper,
+  })
+  await waitFor(() => expect(result.current.isError).toBe(true))
+  expect(result.current.error?.message).not.toContain('fake-private-key')
+  expect(queryClient.getQueryData(['genai', 'secret-presence'])).toBeUndefined()
+})
+
+it('bounds a lost worker response at 25 seconds and cleans the client timer', async () => {
+  vi.useFakeTimers()
+  vi.mocked(sendMessage).mockImplementation(() => new Promise(() => {}))
+  const { result } = renderHook(() => useTestAiConnectionMutation(), {
+    wrapper,
+  })
+  await act(async () => {
+    const pending = result.current.mutateAsync({
+      provider: 'gemini',
+      model: 'gemini-test',
+    })
+    await vi.advanceTimersByTimeAsync(25_000)
+    expect(await pending).toMatchObject({
+      status: 'error',
+      code: 'timeout',
+      durationMs: 25_000,
+    })
+  })
+  expect(sendMessage).toHaveBeenCalledTimes(1)
+  // TanStack's cache-GC timer is separate from the cleared deadline.
+  expect(vi.getTimerCount()).toBeLessThanOrEqual(1)
 })

@@ -34,7 +34,7 @@ export function useApplyContentImport() {
         response.status === 'saved' ||
         response.status === 'persistence-error'
       ) {
-        invalidateTaggedQueries(queryClient, importInvalidationTags)
+        void invalidateTaggedQueries(queryClient, importInvalidationTags)
       }
     },
   })
@@ -48,7 +48,7 @@ export function useRetryImportPersistence() {
       sendMessage('imports.retryPersistence', { surface: 'dashboard' }),
     onSuccess: (response) => {
       if (response.status === 'saved') {
-        invalidateTaggedQueries(queryClient, importInvalidationTags)
+        void invalidateTaggedQueries(queryClient, importInvalidationTags)
       }
     },
   })

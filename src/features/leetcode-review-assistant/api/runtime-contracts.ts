@@ -177,15 +177,22 @@ const genAiProviderMetadataSchemaForResponse = z
   .object({
     provider: z.enum(genAiProviderIds),
     model: z.string(),
-    durationMs: z.number(),
+    durationMs: z.number().nonnegative(),
+    modelVersion: z.string().exactOptional(),
+    totalTokens: z.number().int().nonnegative().exactOptional(),
   })
   .strict()
 
 const recommendLeetCodeAssessmentErrorCodeSchema = z.enum([
   'auth',
+  'permission',
+  'bad-request',
+  'model-unavailable',
   'rate-limit',
   'network',
   'timeout',
+  'cancelled',
+  'refused',
   'invalid-output',
   'unknown',
 ])

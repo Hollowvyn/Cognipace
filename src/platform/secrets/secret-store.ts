@@ -7,18 +7,35 @@ import {
 import { createSecretFingerprint } from './secret-redaction'
 
 const secretKeyPrefix = 'cognipace_secret_v1:'
+const secretRevisions = new Map<SecretProviderId, number>()
+
+// Memoize by the storage area so every operation shares trusted readiness.
+const storageReadiness = new WeakMap<ChromeStorageLocal, Promise<void>>()
 
 export async function restrictSecretStorageAccess() {
   const localStorage = readChromeLocalStorage()
+  let ready = storageReadiness.get(localStorage)
 
-  if (
-    'setAccessLevel' in localStorage &&
-    typeof localStorage.setAccessLevel === 'function'
-  ) {
-    await localStorage.setAccessLevel({
-      accessLevel: 'TRUSTED_CONTEXTS',
-    })
+  if (!ready) {
+    ready = Promise.resolve()
+      .then(async () => {
+        if (typeof localStorage.setAccessLevel !== 'function') {
+          throw new Error(
+            'Trusted secret storage is unavailable. Please retry.',
+          )
+        }
+        await localStorage.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
+      })
+      .catch(() => {
+        storageReadiness.delete(localStorage)
+        throw new Error(
+          'Trusted secret storage could not be initialized. Please retry.',
+        )
+      })
+    storageReadiness.set(localStorage, ready)
   }
+
+  await ready
 }
 
 export async function saveSecret(
@@ -26,6 +43,7 @@ export async function saveSecret(
   value: string,
   now = new Date(),
 ) {
+  await restrictSecretStorageAccess()
   const normalizedValue = value.trim()
 
   if (!normalizedValue) {
@@ -42,6 +60,14 @@ export async function saveSecret(
   await readChromeLocalStorage().set({
     [createSecretStorageKey(provider)]: storedSecret,
   })
+  secretRevisions.set(provider, (secretRevisions.get(provider) ?? 0) + 1)
+}
+
+// Internal trusted snapshot; never serialize this into a runtime response.
+export async function readSecretSnapshot(provider: SecretProviderId) {
+  const revision = secretRevisions.get(provider) ?? 0
+  const stored = await readStoredSecret(provider)
+  return stored ? { ...stored, revision } : null
 }
 
 export async function readSecret(provider: SecretProviderId) {
@@ -50,7 +76,9 @@ export async function readSecret(provider: SecretProviderId) {
 }
 
 export async function deleteSecret(provider: SecretProviderId) {
+  await restrictSecretStorageAccess()
   await readChromeLocalStorage().remove(createSecretStorageKey(provider))
+  secretRevisions.set(provider, (secretRevisions.get(provider) ?? 0) + 1)
 }
 
 export async function getSecretStatus(
@@ -67,6 +95,7 @@ export async function getSecretStatus(
 }
 
 async function readStoredSecret(provider: SecretProviderId) {
+  await restrictSecretStorageAccess()
   const result = await readChromeLocalStorage().get(
     createSecretStorageKey(provider),
   )

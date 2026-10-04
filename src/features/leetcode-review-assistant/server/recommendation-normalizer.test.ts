@@ -84,9 +84,14 @@ describe('buildFallbackRecommendation', () => {
   const reasonByCode: Record<GenAiError, string> = {
     'not-configured': 'AI is not configured.',
     auth: 'AI authentication failed.',
+    permission: 'The API key cannot access this AI model.',
+    'bad-request': 'AI rejected the request configuration.',
+    'model-unavailable': 'The selected AI model is unavailable.',
     'rate-limit': 'AI is rate-limited; try again shortly.',
     network: 'AI request could not reach the provider.',
     timeout: 'AI request timed out.',
+    cancelled: 'AI request was cancelled.',
+    refused: 'AI could not provide a recommendation for this submission.',
     'invalid-output': 'AI returned output that did not validate.',
     unknown: 'AI request failed.',
   }

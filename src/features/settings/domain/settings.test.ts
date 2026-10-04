@@ -523,6 +523,37 @@ describe('settings domain', () => {
 })
 
 describe('aiAssessment settings', () => {
+  it.each([
+    { enabled: true },
+    { enabled: false },
+    { provider: 'gemini' },
+    { model: 'custom-model' },
+    {},
+  ])('preserves absent AI patch fields when parsing %j', (aiAssessment) => {
+    expect(userSettingsPatchSchema.parse({ aiAssessment })).toEqual({
+      aiAssessment,
+    })
+  })
+
+  it('keeps a saved Gemini connection when toggling assessment through a parsed patch', () => {
+    const saved = {
+      ...defaultUserSettings,
+      aiAssessment: {
+        enabled: false,
+        provider: 'gemini' as const,
+        model: 'custom-gemini',
+      },
+    }
+    const patch = userSettingsPatchSchema.parse({
+      aiAssessment: { enabled: true },
+    })
+    expect(mergeUserSettings(saved, patch).aiAssessment).toEqual({
+      enabled: true,
+      provider: 'gemini',
+      model: 'custom-gemini',
+    })
+  })
+
   it('parses old rows missing the aiAssessment block by filling defaults', () => {
     const oldRow = {
       schemaVersion: 1,

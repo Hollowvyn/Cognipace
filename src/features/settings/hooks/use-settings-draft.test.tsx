@@ -55,7 +55,7 @@ describe('useSettingsDraft', () => {
       expect(result.current.draft?.practice.dailyGoal).toBe(9)
     })
     expect(queryClient.getQueryData(queryKeys.settings.all)).toEqual(
-      defaultUserSettings,
+      storedSettings,
     )
 
     await act(async () => {
@@ -578,54 +578,6 @@ describe('useSettingsDraft', () => {
     })
   })
 
-  it('sets aiAssessment.enabled via actions.setAiEnabled', async () => {
-    vi.mocked(sendMessage).mockResolvedValue(defaultUserSettings)
-    const { wrapper } = createQueryTestHarness()
-    const { result } = renderHook(() => useSettingsDraft(), { wrapper })
-
-    await waitFor(() => {
-      expect(result.current.draft).not.toBeNull()
-    })
-
-    act(() => {
-      result.current.actions.setAiEnabled(true)
-    })
-
-    expect(result.current.draft?.aiAssessment.enabled).toBe(true)
-  })
-
-  it('sets aiAssessment.provider via actions.setAiProvider', async () => {
-    vi.mocked(sendMessage).mockResolvedValue(defaultUserSettings)
-    const { wrapper } = createQueryTestHarness()
-    const { result } = renderHook(() => useSettingsDraft(), { wrapper })
-
-    await waitFor(() => {
-      expect(result.current.draft).not.toBeNull()
-    })
-
-    act(() => {
-      result.current.actions.setAiProvider('anthropic')
-    })
-
-    expect(result.current.draft?.aiAssessment.provider).toBe('anthropic')
-  })
-
-  it('sets aiAssessment.model via actions.setAiModel', async () => {
-    vi.mocked(sendMessage).mockResolvedValue(defaultUserSettings)
-    const { wrapper } = createQueryTestHarness()
-    const { result } = renderHook(() => useSettingsDraft(), { wrapper })
-
-    await waitFor(() => {
-      expect(result.current.draft).not.toBeNull()
-    })
-
-    act(() => {
-      result.current.actions.setAiModel('gpt-test')
-    })
-
-    expect(result.current.draft?.aiAssessment.model).toBe('gpt-test')
-  })
-
   it('sets reminders.daily.enabled via setRemindersEnabled', async () => {
     vi.mocked(sendMessage).mockResolvedValue(defaultUserSettings)
     const { wrapper } = createQueryTestHarness()
@@ -678,30 +630,5 @@ describe('useSettingsDraft', () => {
 
     expect(result.current.hasValidationErrors).toBe(true)
     expect(result.current.canSave).toBe(false)
-  })
-
-  it('switching provider does not auto-disable enabled', async () => {
-    const currentSettings = {
-      ...defaultUserSettings,
-      aiAssessment: {
-        enabled: true,
-        provider: 'openai' as const,
-        model: 'gpt-x',
-      },
-    }
-    vi.mocked(sendMessage).mockResolvedValue(currentSettings)
-    const { wrapper } = createQueryTestHarness()
-    const { result } = renderHook(() => useSettingsDraft(), { wrapper })
-
-    await waitFor(() => {
-      expect(result.current.draft).not.toBeNull()
-    })
-
-    act(() => {
-      result.current.actions.setAiProvider('gemini')
-    })
-
-    expect(result.current.draft?.aiAssessment.enabled).toBe(true)
-    expect(result.current.draft?.aiAssessment.provider).toBe('gemini')
   })
 })

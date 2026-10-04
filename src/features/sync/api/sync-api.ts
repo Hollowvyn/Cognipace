@@ -13,6 +13,7 @@ export const syncQueryKeys = queryKeys.sync
 
 const broadSyncInvalidationTags = [
   'settings',
+  'genai',
   'problems',
   'practice',
   'queue',
@@ -111,7 +112,7 @@ export function useSyncAction<TVariables = void, TResult = unknown>(
     },
     onSuccess: (result) => {
       if (options.shouldInvalidateData?.(result)) {
-        invalidateTaggedQueries(queryClient, broadSyncInvalidationTags)
+        void invalidateTaggedQueries(queryClient, broadSyncInvalidationTags)
       }
     },
   })

@@ -315,19 +315,52 @@ Record these human flows and attach redacted screenshots or a recording to the
 implementation PR before merge. Automated validation and this checklist do not
 count as completed browser proof.
 
-### AI Assessment Settings
+### AI Connection And Assessment Settings
 
 1. Open the dashboard.
 2. Navigate to Settings.
-3. Find AI assessment.
-4. Select a provider and enter a model id.
-5. Save and remove a test API key.
-6. Confirm the UI shows key presence without revealing the key value.
+3. Select Gemini in the AI connection section. Confirm a default model appears,
+   then enter a custom model id and your own provider key.
+4. Choose Save & test connection. Confirm it saves the provider/model/key,
+   reports success for an accessible model, and leaves AI assessment disabled.
+5. Leave Settings and reopen it. Confirm Gemini and the exact custom model
+   remain selected, the key input is empty, and the saved-key status is present.
+6. Choose Test connection without re-entering the key. Enable AI assessment and
+   exercise the existing LeetCode recommendation with a submitted solution.
+7. Change an unrelated preference and save it while AI edits are unfinished.
+   Confirm those edits remain available and are not persisted by Save Settings.
+8. Repeat connection testing with OpenAI and Anthropic if you have their keys;
+   confirm each provider uses its own saved key and editable model.
 
-Expected: provider keys are stored locally in trusted extension secret storage.
-Configured AI assessment can call the approved BYOK provider from trusted
-background code without revealing the key value. Backup exports, sync payloads,
-logs, and status payloads must not include raw provider keys.
+Edge cases to run in the installed extension:
+
+- Use an invalid key and an unavailable model. Confirm the saved connection
+  remains visible and the failure offers an actionable message, without raw
+  provider errors or key values.
+- Go offline during a test and interrupt or restart the background worker.
+  Confirm the UI exits its pending state within the bounded timeout and allows
+  retry. Reload the extension and test its saved connection again.
+- Replace or remove the selected provider key in another Settings window during
+  a test. Confirm the original window does not show a valid result for the old
+  key, even when both old and new keys have a presence value of true.
+- Enter a key and press Enter. Confirm the AI action runs once and does not
+  submit unrelated preferences. While saving/testing, confirm conflicting
+  saves, provider/model edits, and Reset Defaults cannot run.
+- Remove the selected key, then turn AI assessment off. Confirm turning it off
+  succeeds without credentials. Reset Defaults and confirm assessment is off,
+  the model is blank, and the remaining saved provider keys are preserved.
+- Export a backup and inspect status/query/mutation data with test credentials.
+  Confirm keys are absent from exports, sync payloads, logs, public runtime
+  results, and TanStack Query caches, including mutation variables.
+
+Attach human-run happy-path and edge-case screenshots or a recording before PR
+review or merge. Automated provider-wire tests and component fixtures do not
+prove live credential access or installed service-worker behavior.
+
+Expected: provider keys stay in trusted local extension secret storage. Save &
+test uses the same reusable provider integration as assessment; settings and
+credentials persist independently of provider availability, and stale results
+cannot validate a replacement key or model.
 
 ### Dashboard Dev Smoke
 

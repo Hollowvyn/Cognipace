@@ -26,8 +26,13 @@ export function useUpdateSettings() {
   return useMutation({
     mutationFn: (request: SettingsUpdateRequest) =>
       sendMessage('settings.updateSettings', request),
-    onSuccess: () => {
-      invalidateTaggedQueries(queryClient, ['settings'])
+    onSuccess: async (settings, request) => {
+      await queryClient.cancelQueries({ queryKey: settingsQueryKeys.all })
+      queryClient.setQueryData(settingsQueryKeys.all, settings)
+      await invalidateTaggedQueries(
+        queryClient,
+        request.patch.aiAssessment ? ['settings', 'genai'] : ['settings'],
+      )
     },
   })
 }
@@ -39,7 +44,7 @@ export function useToggleStudyMode() {
     mutationFn: (request: SettingsToggleStudyModeRequest) =>
       sendMessage('settings.toggleStudyMode', request),
     onSuccess: () => {
-      invalidateTaggedQueries(queryClient, ['settings'])
+      void invalidateTaggedQueries(queryClient, ['settings'])
     },
   })
 }
@@ -51,7 +56,7 @@ export function useCycleThemeMode() {
     mutationFn: (request: SettingsCycleThemeModeRequest) =>
       sendMessage('settings.cycleThemeMode', request),
     onSuccess: () => {
-      invalidateTaggedQueries(queryClient, ['settings'])
+      void invalidateTaggedQueries(queryClient, ['settings'])
     },
   })
 }

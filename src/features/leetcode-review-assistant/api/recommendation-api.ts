@@ -1,9 +1,14 @@
 import { sendMessage } from '@/extension/messaging'
 
-import type { RecommendLeetCodeAssessmentRequest } from './runtime-contracts'
+import {
+  recommendLeetCodeAssessmentResponseSchema,
+  type RecommendLeetCodeAssessmentRequest,
+} from './runtime-contracts'
 
-export function recommendLeetCodeAssessmentViaRuntime(
+export async function recommendLeetCodeAssessmentViaRuntime(
   request: RecommendLeetCodeAssessmentRequest,
 ) {
-  return sendMessage('genai.recommendLeetCodeAssessment', request)
+  return recommendLeetCodeAssessmentResponseSchema.parse(
+    await sendMessage('genai.recommendLeetCodeAssessment', request),
+  )
 }

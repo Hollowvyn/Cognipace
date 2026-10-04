@@ -108,9 +108,10 @@ describe('architecture boundaries', () => {
     expect(offenders.map(toRepoPath)).toEqual([])
   })
 
-  it('keeps the apiKey literal out of every feature except genai', () => {
+  it('keeps credential construction inside genai and the standalone AI integration', () => {
     const apiKeyPattern = /\bapiKey\b/
     const genaiPath = `${join(srcRoot, 'features/genai')}/`
+    const libAiPath = `${join(srcRoot, 'lib/ai')}/`
     const offenders = sourceFiles([
       'app',
       'components',
@@ -121,10 +122,24 @@ describe('architecture boundaries', () => {
       'platform',
       'utils',
     ])
-      .filter((file) => !file.startsWith(genaiPath))
+      .filter(
+        (file) => !file.startsWith(genaiPath) && !file.startsWith(libAiPath),
+      )
       .filter((file) => !toRepoPath(file).includes('/testing/'))
       .filter((file) => apiKeyPattern.test(readFileSync(file, 'utf8')))
 
+    expect(offenders.map(toRepoPath)).toEqual([])
+  })
+
+  it('confines AI SDK and provider package imports to src/lib/ai', () => {
+    const libAiPath = `${join(srcRoot, 'lib/ai')}/`
+    const offenders = productionSourceFiles()
+      .filter((file) => !file.startsWith(libAiPath))
+      .filter((file) =>
+        /(?:from\s+|import\s*\()\s*['"](?:ai|@ai-sdk\/[^'"]+)['"]/.test(
+          readFileSync(file, 'utf8'),
+        ),
+      )
     expect(offenders.map(toRepoPath)).toEqual([])
   })
 

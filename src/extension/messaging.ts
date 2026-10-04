@@ -29,6 +29,8 @@ import type {
   ClearAiProviderSecretRequest,
   GetAiProviderSecretPresenceRequest,
   SetAiProviderSecretRequest,
+  TestAiConnectionRequest,
+  TestAiConnectionResponse,
 } from '@/features/genai/api'
 import type {
   ImportApplyRequest,
@@ -50,6 +52,8 @@ export {
   clearAiProviderSecretRequestSchema,
   getAiProviderSecretPresenceRequestSchema,
   setAiProviderSecretRequestSchema,
+  testAiConnectionRequestSchema,
+  testAiConnectionResponseSchema,
 } from '@/features/genai/api'
 import type { AiProviderSecretPresence } from '@/features/genai'
 import type { DevSmokeReport, DevSmokeRequest } from '@/features/dev-smoke'
@@ -217,6 +221,7 @@ export const cacheInvalidationReasonSchema = z.enum([
   'practice-updated',
   'problem-catalog-updated',
   'settings-updated',
+  'genai-updated',
   'sync-updated',
   'tracks-updated',
 ])
@@ -330,6 +335,9 @@ export interface ProtocolMap {
   'genai.clearAiProviderSecret'(
     request: ClearAiProviderSecretRequest,
   ): AiProviderSecretPresence
+  'genai.testConnection'(
+    request: TestAiConnectionRequest,
+  ): TestAiConnectionResponse
   'genai.recommendLeetCodeAssessment'(
     request: RecommendLeetCodeAssessmentRequest,
   ): RecommendLeetCodeAssessmentResponse
@@ -435,6 +443,7 @@ export const protocolMethodNames = [
   'genai.getAiProviderSecretPresence',
   'genai.setAiProviderSecret',
   'genai.clearAiProviderSecret',
+  'genai.testConnection',
   'genai.recommendLeetCodeAssessment',
   'imports.preview',
   'imports.apply',

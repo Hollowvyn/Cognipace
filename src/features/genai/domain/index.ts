@@ -11,6 +11,7 @@ export {
 } from './genai-types'
 
 export {
+  aiProviderSecretPresenceSchema,
   aiProviderSecretsSchema,
   emptyAiProviderSecrets,
   makeEmptyAiProviderSecretPresence,

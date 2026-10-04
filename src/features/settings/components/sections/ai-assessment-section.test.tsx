@@ -1,193 +1,219 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
-
-vi.mock('@/extension/messaging', () => ({
-  sendMessage: vi.fn(),
-}))
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { sendMessage } from '@/extension/messaging'
+import { createQueryTestHarness } from '@/testing/query-test-harness'
 
+import { settingsUpdateRequestSchema } from '../../api/settings-contracts'
 import {
   defaultUserSettings,
+  mergeUserSettings,
   type UserSettings,
-} from '@/features/settings/domain'
-
+} from '../../domain'
+import { useAiConnectionController } from '../../hooks/use-ai-connection-controller'
+import { useSettingsOperationGate } from '../../hooks/use-settings-operation-gate'
 import { AiAssessmentSection } from './ai-assessment-section'
 
-let queryClient: QueryClient
-function Wrapper({ children }: { children: ReactNode }) {
-  return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  )
-}
+vi.mock('@/extension/messaging', () => ({ sendMessage: vi.fn() }))
 
 function renderSection(
-  draftOverrides: Partial<UserSettings['aiAssessment']> = {},
+  overrides: Partial<UserSettings['aiAssessment']> = {},
+  presenceState: 'ready' | 'loading' | 'error' = 'ready',
 ) {
-  queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  })
-  const draft: UserSettings = {
+  let stored: UserSettings = {
     ...defaultUserSettings,
-    aiAssessment: { ...defaultUserSettings.aiAssessment, ...draftOverrides },
+    aiAssessment: { ...defaultUserSettings.aiAssessment, ...overrides },
   }
-  const actions = {
-    setAiEnabled: vi.fn(),
-    setAiModel: vi.fn(),
-    setAiProvider: vi.fn(),
+  let presence = { openai: false, anthropic: false, gemini: false }
+  vi.mocked(sendMessage).mockImplementation((method, payload) => {
+    if (method === 'settings.getSettings') return Promise.resolve(stored)
+    if (method === 'genai.getAiProviderSecretPresence') {
+      if (presenceState === 'loading') return new Promise(() => undefined)
+      if (presenceState === 'error')
+        return Promise.reject(new Error('worker unavailable'))
+      return Promise.resolve(presence)
+    }
+    if (method === 'genai.setAiProviderSecret') {
+      presence = { ...presence, openai: true }
+      return Promise.resolve(presence)
+    }
+    if (method === 'genai.clearAiProviderSecret') {
+      presence = { ...presence, openai: false }
+      return Promise.resolve(presence)
+    }
+    if (method === 'settings.updateSettings') {
+      stored = mergeUserSettings(
+        stored,
+        settingsUpdateRequestSchema.parse(payload).patch,
+      )
+      return Promise.resolve(stored)
+    }
+    if (method === 'genai.testConnection')
+      return Promise.resolve({
+        status: 'success',
+        provider: 'openai',
+        model: 'custom-model',
+        durationMs: 1,
+      })
+    return Promise.reject(new Error(`Unexpected method ${method}`))
+  })
+  const { wrapper } = createQueryTestHarness()
+  function Fixture() {
+    const controller = useAiConnectionController(useSettingsOperationGate())
+    return (
+      <form
+        aria-label="AI connection"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void controller.actions.submit()
+        }}
+      >
+        <fieldset disabled={controller.isBusy}>
+          <AiAssessmentSection controller={controller} />
+        </fieldset>
+      </form>
+    )
   }
-  return {
-    actions,
-    ...render(<AiAssessmentSection actions={actions} draft={draft} />, {
-      wrapper: Wrapper,
-    }),
-  }
+  return render(<Fixture />, { wrapper })
 }
 
-beforeEach(() => {
-  vi.mocked(sendMessage).mockReset()
-  vi.mocked(sendMessage).mockResolvedValue({
-    openai: false,
-    anthropic: false,
-    gemini: false,
-  })
-})
-
-afterEach(() => {
-  queryClient.clear()
-})
+beforeEach(() => vi.clearAllMocks())
 
 describe('AiAssessmentSection', () => {
-  it('renders a segmented control with all three providers', async () => {
+  it('renders all providers with a focused connection form', async () => {
     renderSection()
-    await waitFor(() => expect(sendMessage).toHaveBeenCalled())
-    expect(screen.getByRole('radio', { name: /openai/i })).toBeInTheDocument()
-    expect(
-      screen.getByRole('radio', { name: /anthropic/i }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /gemini/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'AI connection' })).toBeVisible()
+    expect(screen.getByRole('radio', { name: 'OpenAI' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Anthropic' })).toBeVisible()
+    expect(screen.getByRole('radio', { name: 'Gemini' })).toBeVisible()
+    await screen.findByText('No saved key')
   })
 
-  it('disables the enabled switch when the active provider has no key', async () => {
-    renderSection({ provider: 'openai', model: 'gpt-test', enabled: false })
-    await waitFor(() => expect(sendMessage).toHaveBeenCalled())
-    const toggle = screen.getByRole('switch', { name: /enabled/i })
-    expect(toggle).toHaveAttribute('aria-disabled', 'true')
-  })
-
-  it('disables the enabled switch when the model is empty', async () => {
-    vi.mocked(sendMessage).mockResolvedValueOnce({
-      openai: true,
-      anthropic: false,
-      gemini: false,
-    })
-    renderSection({ provider: 'openai', model: '', enabled: false })
-    await waitFor(() => expect(sendMessage).toHaveBeenCalled())
-    expect(screen.getByRole('switch', { name: /enabled/i })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    )
-  })
-
-  it('suggests the temporary OpenAI test model in the model placeholder', async () => {
-    renderSection({ provider: 'openai', model: '', enabled: false })
-    await waitFor(() => expect(sendMessage).toHaveBeenCalled())
-
-    expect(screen.getByLabelText(/^model$/i)).toHaveAttribute(
+  it('leaves the initial blank model blank and explains the unsaved suggestion', async () => {
+    renderSection()
+    await screen.findByText('No saved key')
+    expect(screen.getByLabelText('Model')).toHaveValue('')
+    expect(screen.getByLabelText('Model')).toHaveAttribute(
       'placeholder',
       'gpt-5.4-mini',
     )
-  })
-
-  it('shows a Key set badge for providers with stored secrets', async () => {
-    vi.mocked(sendMessage).mockResolvedValueOnce({
-      openai: false,
-      anthropic: true,
-      gemini: false,
-    })
-    renderSection()
-    await waitFor(() =>
-      expect(screen.queryByText(/key set/i)).toBeInTheDocument(),
-    )
-    expect(screen.getAllByText(/key set/i)).toHaveLength(1)
-  })
-
-  it('saves a key via the runtime and clears the input on success', async () => {
-    vi.mocked(sendMessage)
-      .mockResolvedValueOnce({ openai: false, anthropic: false, gemini: false }) // initial presence
-      .mockResolvedValueOnce({ openai: true, anthropic: false, gemini: false }) // after set
-    renderSection({ provider: 'openai', model: 'gpt-test', enabled: false })
-    await waitFor(() => expect(sendMessage).toHaveBeenCalled())
-
-    const user = userEvent.setup()
-    const keyInput = screen
-      .getAllByLabelText(/openai api key/i)
-      .find((el) => el.tagName === 'INPUT') as HTMLInputElement
-    await user.type(keyInput, 'sk-test')
-    await user.click(screen.getByRole('button', { name: /save key/i }))
-
-    await waitFor(() =>
-      expect(sendMessage).toHaveBeenCalledWith(
-        'genai.setAiProviderSecret',
-        expect.objectContaining({
-          surface: 'dashboard',
-          provider: 'openai',
-        }),
+    expect(
+      screen.getByText(
+        'Enter a model to save and test the connection. The suggestion is not saved.',
       ),
-    )
-    expect(keyInput).toHaveValue('')
+    ).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Test connection' }),
+    ).toBeDisabled()
   })
 
-  it('removes a key via the runtime when the remove button is clicked', async () => {
-    vi.mocked(sendMessage)
-      .mockResolvedValueOnce({ openai: true, anthropic: false, gemini: false })
-      .mockResolvedValueOnce({ openai: false, anthropic: false, gemini: false })
-    renderSection({ provider: 'openai', model: 'gpt-test', enabled: false })
-    await waitFor(() =>
-      expect(screen.queryByText(/key set/i)).toBeInTheDocument(),
-    )
-
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /remove key/i }))
-
-    await waitFor(() =>
-      expect(sendMessage).toHaveBeenCalledWith('genai.clearAiProviderSecret', {
-        surface: 'dashboard',
-        provider: 'openai',
-      }),
-    )
+  it('shows loading independently of a missing key', () => {
+    renderSection({ model: 'custom-model' }, 'loading')
+    expect(screen.getByText('Loading saved key…')).toBeVisible()
+    expect(screen.queryByText('No saved key')).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Test connection' }),
+    ).toBeDisabled()
   })
 
-  it('calls actions.setAiModel when the model input changes', async () => {
-    const { actions } = renderSection()
-    await waitFor(() => expect(sendMessage).toHaveBeenCalled())
-
-    const user = userEvent.setup()
-    const modelInput = screen.getByLabelText(/^model$/i)
-    await user.type(modelInput, 'gpt-test')
-    expect(actions.setAiModel).toHaveBeenCalled()
+  it('shows a recoverable presence error independently of a missing key', async () => {
+    renderSection({ model: 'custom-model' }, 'error')
+    await screen.findByText('Could not load saved keys.')
+    expect(screen.queryByText('No saved key')).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Retry saved keys' }),
+    ).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'Test connection' }),
+    ).toBeDisabled()
   })
 
-  it('shows an error message when save key fails', async () => {
-    vi.mocked(sendMessage)
-      .mockResolvedValueOnce({ openai: false, anthropic: false, gemini: false }) // initial presence
-      .mockRejectedValueOnce(new Error('Save failed')) // save fails
-
-    renderSection({ provider: 'openai', model: 'gpt-test', enabled: false })
-    await waitFor(() => expect(sendMessage).toHaveBeenCalled())
-
+  it('saves a masked key and model with one connection action then shows verified feedback', async () => {
+    renderSection({ model: 'custom-model' })
+    await screen.findByText('No saved key')
     const user = userEvent.setup()
-    const keyInput = screen
-      .getAllByLabelText(/openai api key/i)
-      .find((el) => el.tagName === 'INPUT') as HTMLInputElement
-    await user.type(keyInput, 'sk-test')
-    await user.click(screen.getByRole('button', { name: /save key/i }))
-
-    await waitFor(() =>
-      expect(screen.getByText(/save failed/i)).toBeInTheDocument(),
+    const input = screen.getByLabelText('OpenAI API key')
+    expect(input).toHaveAttribute('type', 'password')
+    await user.type(input, 'local-key')
+    await user.click(
+      screen.getByRole('button', { name: 'Save & test connection' }),
     )
+    await screen.findByText('Connected to OpenAI · custom-model.')
+    expect(sendMessage).toHaveBeenCalledWith('genai.setAiProviderSecret', {
+      surface: 'dashboard',
+      provider: 'openai',
+      secret: { apiKey: 'local-key' },
+    })
+    expect(input).toHaveValue('')
+    expect(
+      screen.getByRole('button', { name: 'Test connection' }),
+    ).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Remove key' }))
+    await screen.findByText('OpenAI key removed.')
+    expect(screen.queryByText('Connected to OpenAI · custom-model.')).toBeNull()
+    expect(
+      screen.getByRole('switch', { name: 'AI assessment' }),
+    ).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('provider switching clears typed keys, changes the model, and links Gemini key setup', async () => {
+    renderSection({ model: 'custom-model' })
+    await screen.findByText('No saved key')
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('OpenAI API key'), 'temporary-key')
+    await user.click(screen.getByRole('radio', { name: 'Gemini' }))
+    expect(screen.getByLabelText('Gemini API key')).toHaveValue('')
+    expect(screen.getByLabelText('Model')).toHaveValue('gemini-3.5-flash-lite')
+    expect(
+      screen.getByRole('link', { name: 'Get a key in Google AI Studio' }),
+    ).toHaveAttribute('href', 'https://aistudio.google.com/apikey')
+    await user.click(
+      screen.getByRole('button', { name: 'Discard connection changes' }),
+    )
+    expect(screen.getByLabelText('Model')).toHaveValue('custom-model')
+    expect(screen.getByRole('radio', { name: 'OpenAI' })).toBeChecked()
+  })
+
+  it('keeps edited fields after a save failure and only shows safe feedback', async () => {
+    renderSection({ model: 'custom-model' })
+    await screen.findByText('No saved key')
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('OpenAI API key'), 'local-key')
+    vi.mocked(sendMessage).mockRejectedValueOnce(
+      new Error('private provider details'),
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Save & test connection' }),
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not save the connection. Your changes are ready to retry.',
+    )
+    expect(screen.getByLabelText('OpenAI API key')).toHaveValue('local-key')
+  })
+
+  it('freezes every AI control during key persistence', async () => {
+    renderSection({ model: 'custom-model' })
+    await screen.findByText('No saved key')
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('OpenAI API key'), 'local-key')
+    let finish: (() => void) | undefined
+    vi.mocked(sendMessage).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () =>
+            resolve({ openai: true, anthropic: false, gemini: false })
+        }),
+    )
+    fireEvent.submit(screen.getByRole('form', { name: 'AI connection' }))
+    await screen.findByRole('button', { name: 'Saving key…' })
+    expect(screen.getByLabelText('Model')).toBeDisabled()
+    expect(screen.getByLabelText('OpenAI API key')).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'Gemini' })).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Discard connection changes' }),
+    ).toBeDisabled()
+    finish?.()
+    await screen.findByText('Connected to OpenAI · custom-model.')
   })
 })

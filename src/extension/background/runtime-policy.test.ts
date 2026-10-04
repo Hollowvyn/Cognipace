@@ -372,3 +372,15 @@ describe('runtime-policy', () => {
     ).not.toThrow()
   })
 })
+
+it('keeps connection testing dashboard-only and rejects a forged sender', () => {
+  expect(canCallExtensionMethod('genai.testConnection', 'dashboard')).toBe(true)
+  for (const surface of ['popup', 'content-script', 'background'] as const)
+    expect(canCallExtensionMethod('genai.testConnection', surface)).toBe(false)
+  expect(() =>
+    assertCanSenderCallExtensionMethod('genai.testConnection', 'dashboard', {
+      tab: { id: 1 },
+      url: 'https://leetcode.com/problems/two-sum/',
+    }),
+  ).toThrow(/cannot claim/)
+})
