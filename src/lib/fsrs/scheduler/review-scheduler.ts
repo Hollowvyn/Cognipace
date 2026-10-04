@@ -1,4 +1,8 @@
-import type { FsrsCardSnapshot } from '../domain/card-snapshot'
+import {
+  parseFsrsCardSnapshot,
+  toSerializableFsrsCardSnapshot,
+  type FsrsCardSnapshot,
+} from '../domain/card-snapshot'
 import type { FsrsSchedulingOptions } from '../domain/scheduling-options'
 import type { FsrsReviewLogSnapshot } from '../domain/review-log-snapshot'
 import type { ReviewRating } from '../domain/review-rating'
@@ -13,7 +17,9 @@ import {
   createEmptyCardSnapshot,
   resolveFsrsSchedulerProfile,
   scheduleCardReview,
+  scheduleCardReviewWithProfile,
 } from '../adapter/ts-fsrs-adapter'
+import type { FsrsReviewContext } from './review-correction'
 
 /** Result of applying one review rating to a card snapshot. */
 export interface FsrsScheduledReview {
@@ -89,6 +95,44 @@ export function scheduleReview(
     log: scheduledReview.log,
     reviewedAt,
     rating,
+  }
+}
+
+/** Applies one review while capturing its immutable original scheduling inputs. */
+export function scheduleReviewWithProfile(
+  card: FsrsCardSnapshot,
+  rating: ReviewRating,
+  reviewedAt: Date,
+  inputProfile: FsrsSchedulerProfile,
+): FsrsScheduledReview & { readonly context: FsrsReviewContext } {
+  const preCard = toSerializableFsrsCardSnapshot(card)
+
+  if (!(reviewedAt instanceof Date) || !Number.isFinite(reviewedAt.getTime())) {
+    throw new Error('Invalid FSRS review time.')
+  }
+
+  if (card.lastReviewAt && reviewedAt.getTime() < card.lastReviewAt.getTime()) {
+    throw new Error('FSRS review time precedes the captured last review.')
+  }
+
+  const profile = parseFsrsSchedulerProfile(inputProfile)
+  const context: FsrsReviewContext = Object.freeze({
+    preCard,
+    reviewedAt: reviewedAt.toISOString(),
+    profile,
+  })
+  const scheduled = scheduleCardReviewWithProfile(
+    parseFsrsCardSnapshot(preCard),
+    rating,
+    new Date(context.reviewedAt),
+    profile,
+  )
+
+  return {
+    ...scheduled,
+    rating,
+    reviewedAt: new Date(context.reviewedAt),
+    context,
   }
 }
 
