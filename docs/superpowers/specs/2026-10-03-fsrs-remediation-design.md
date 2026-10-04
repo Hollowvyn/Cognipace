@@ -53,7 +53,7 @@ Preserve opaque imported card IDs. Practice reuses a loaded card's durable ID fo
 
 Daily completion and streaks continue using distinct problem slugs grouped by the original local review date. Track completion remains independent of FSRS card state. An explicit later rating correction may reconcile its own linked track credit through the existing workflow; the upgrade itself does not change credit.
 
-There are two intentional visible changes: automatic eligibility/recommendation composition and intervals calculated by future genuine reviews. Existing Learning/Relearning cards keep their saved memory and due timestamps until that next review. Some due indicators change because eligibility receives the next-study-day floor, while raw due values remain intact.
+The two primary changes to existing schedule presentation are automatic eligibility/recommendation composition and intervals calculated by future genuine reviews. Existing Learning/Relearning cards keep their saved memory and due timestamps until that next review. Some due indicators change because eligibility receives the next-study-day floor, while raw due values remain intact. Added previews, evidence labels, conflict handling and any later pilot interface are described separately below.
 
 Observed historical Analytics retains its current first-assessment, repeat-rating, effort and outcome cohort definitions. Changing wrapper defaults must not replay old events as though the new daily profile had always existed. Use recorded card/log evidence and explicit legacy compatibility reconstruction; label unsupported predictions as legacy estimates or insufficient evidence. Unknown old retention or weights must not be invented. Model-derived estimates can gain more accurate provenance without discarding the raw history or changing earned progress.
 
@@ -86,7 +86,7 @@ Generate a stable command ID for a new save or Update and freeze its accepted pa
 
 Practice looks up the compact receipt before checking mutable latest-event/chronology guards or invoking FSRS. An identical accepted payload returns the recorded operation result. Reusing an ID with a different payload conflicts. Retain a payload fingerprint, operation/target identity and bounded result evidence; never store a growing full-history response in each receipt.
 
-Reset/restore must invalidate commands from the replaced practice generation so an old pending save cannot resurrect cleared history. Use a persisted Practice generation guard for those lifecycle transitions. Deduplication within the active generation still precedes mutable review guards. Imported historical receipts retain their original evidence; they do not turn prior-generation commands into new writes.
+Reset/restore must invalidate commands from the replaced practice generation so an old pending save cannot resurrect cleared history. Use a persisted Practice generation guard for those lifecycle transitions and rotate the applicable local token atomically with replacement. Restoring a backup always issues a fresh local token; it never reinstates the backup's former active token. Deduplication within the active generation still precedes mutable review guards. Imported historical receipts retain their original evidence; they do not turn prior-generation commands into new writes.
 
 Commit the attempt/card/evidence/aggregate/track effects and receipt atomically. Return Saved only after the resulting database snapshot is durable. If commit succeeds but flush fails, return persistence pending and retry publication of committed state; do not schedule again. Preserve the last durable snapshot and avoid an invalidation that claims a pending operation is durable.
 
@@ -100,7 +100,7 @@ For new-format evidence, schedule the replacement from the captured pre-review c
 
 The library's 5.4.0 rollback can reconstruct relevant memory fields from a matching log, but does not restore every original due instant. Captured pre-card evidence is the preferred path for new events.
 
-For a latest legacy event, allow a compatibility correction only when its valid matching log/card can be verified through the supported rollback operation. Use the existing legacy scheduler recipe with the user's saved retention captured at command acceptance, original event time and recovered pre-review memory. Label this result and its preview as legacy-derived; it does not establish the unknown original profile. Preserve the existing event and avoid full-history rewriting. Missing/inconsistent legacy evidence rejects the correction with an explanation and intact draft/history; a subsequent genuine review establishes trustworthy new context. This limitation must be documented in the phase handoff and tested.
+For a latest legacy event, allow a compatibility correction only when saved-card evidence and legacy ordering uniquely agree that its valid matching log belongs to the actual last applied transition. A successful native rollback alone does not verify that identity. Ambiguous tied/reordered histories reject compatibility correction without changing data. For verified cases, use the supported rollback operation, existing legacy scheduler recipe with the user's saved retention captured at command acceptance, original event time and recovered pre-review memory. Label this result and its preview as legacy-derived; it does not establish the unknown original profile. Preserve the existing event and avoid full-history rewriting. Missing/inconsistent legacy evidence rejects the correction with an explanation and intact draft/history; a subsequent genuine review establishes trustworthy new context. This limitation must be documented in the phase handoff and tested.
 
 ### Canonical chronology
 
@@ -216,7 +216,7 @@ Each plan names exact files, new meaningful regressions and done-when criteria. 
 
 ### Preservation acceptance proof
 
-Compare every pre-existing column before/after upgrade and after reopen, allowing only the new metadata. Extend existing populated snapshot/backup fixtures with old/current baselines, arbitrary supported card IDs, corrected events, tied times, suspension, track links, active session, external progress and retention at 75%.
+For today's through-0009 baseline, compare every pre-existing column before/after upgrade and after reopen, allowing only the new metadata. For older supported baselines, compare the protected FSRS/Practice/Tracks/settings values while respecting intervening catalog schema transformations and their already-approved semantic mappings. Extend existing populated snapshot/backup fixtures with old/current baselines, arbitrary supported card IDs, corrected events, tied times, suspension, track links, active session, external progress and retention at 75%.
 
 Require unchanged original review rows, card due/memory/counters, aggregates, settings, daily/streak counts and track credit. Retain exact original recovery bytes. Test malformed data, unsupported baselines, quota/publication failure, restore retries and configured Gist round trips. An explicit later Update has its separately asserted intentional effects.
 
@@ -228,7 +228,7 @@ rtk npm run test -- src/platform/db/instance.test.ts src/platform/db/snapshot-up
 
 ### Other meaningful regressions
 
-Foundation: lost acknowledgement, duplicate/mismatched command IDs, persistence retry, stale two-tab Update, revision replay, same-time sequence, backdated rejection, original-profile correction and custom restored card identity. Validate actual snapshot restart and lifecycle generation guards.
+Foundation: lost acknowledgement, duplicate/mismatched command IDs, persistence retry, stale two-tab Update, revision replay, same-time sequence, backdated rejection, original-profile correction and custom restored card identity. Reject an earlier structurally valid legacy log and ambiguous tied/reordered last-transition candidates. Validate actual snapshot restart and fresh reset/restore generation guards, including restoring an earlier backup with old receipt tokens.
 
 Daily experience: all four long-term outcomes, legacy state transitions, spring/autumn DST and local midnight, shared cross-surface due labels/reminders, due/new/extra ordering, preserved locks/AI behavior, ignored stale previews and fixed-input preview/commit parity for both operations.
 
