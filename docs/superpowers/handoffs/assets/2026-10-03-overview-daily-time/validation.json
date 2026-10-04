@@ -1,0 +1,35 @@
+{
+  "url": "http://127.0.0.1:4178/",
+  "results": [
+    {
+      "label": "desktop-dark",
+      "count": 4,
+      "columns": 4,
+      "documentWidth": 1280,
+      "viewportWidth": 1280
+    },
+    {
+      "label": "tablet-dark",
+      "count": 4,
+      "columns": 2,
+      "documentWidth": 768,
+      "viewportWidth": 768
+    },
+    {
+      "label": "narrow-dark",
+      "count": 4,
+      "columns": 1,
+      "documentWidth": 375,
+      "viewportWidth": 375
+    },
+    {
+      "label": "narrow-light",
+      "count": 4,
+      "columns": 1,
+      "documentWidth": 375,
+      "viewportWidth": 375
+    }
+  ],
+  "errors": [],
+  "durationStates": ["0m", "<1m", "1m", "1h", "1h 25m"]
+}

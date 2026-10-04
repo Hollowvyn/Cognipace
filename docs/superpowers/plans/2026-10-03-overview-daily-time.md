@@ -104,7 +104,7 @@ Files: `docs/product.md`, `docs/testing.md`, `docs/superpowers/README.md`, and
 - [x] Render the production Overview metric component with fixture data at
       desktop and narrow widths; inspect and save screenshots.
 - [x] Review against the approved design, then review code quality and fix any
-      findings. Do not create a PR before required human smoke proof.
+      findings. Keep the PR draft until required human smoke proof is attached.
 - [x] Run `rtk proxy npm run lint`, `rtk proxy npm run check`,
       `rtk proxy npm run build`, and
       the exact touched-file Prettier check recorded in the handoff.

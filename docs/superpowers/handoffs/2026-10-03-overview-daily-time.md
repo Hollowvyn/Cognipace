@@ -91,13 +91,13 @@ saved totals. This verifies presentation, not installed-extension persistence.
 | Overflow                | Document width equals viewport width at every tested size   |
 | Time state changes      | `0m`, `<1m`, `1m`, `1h`, `1h 25m` verified after navigation |
 
-Saved local artifacts:
+Preserved production-component evidence (illustrative saved totals):
 
-- [Desktop dark](/Users/tobiolutimehin/.codex/visualizations/2026/10/04/01a104c4-0b26-70b0-9334-33048b0cc7b3/overview-daily-time/desktop-dark.png)
-- [Tablet dark](/Users/tobiolutimehin/.codex/visualizations/2026/10/04/01a104c4-0b26-70b0-9334-33048b0cc7b3/overview-daily-time/tablet-dark.png)
-- [Narrow dark](/Users/tobiolutimehin/.codex/visualizations/2026/10/04/01a104c4-0b26-70b0-9334-33048b0cc7b3/overview-daily-time/narrow-dark.png)
-- [Narrow light](/Users/tobiolutimehin/.codex/visualizations/2026/10/04/01a104c4-0b26-70b0-9334-33048b0cc7b3/overview-daily-time/narrow-light.png)
-- [Layout and console results](/Users/tobiolutimehin/.codex/visualizations/2026/10/04/01a104c4-0b26-70b0-9334-33048b0cc7b3/overview-daily-time/validation.json)
+- [Desktop dark](assets/2026-10-03-overview-daily-time/desktop-dark.png)
+- [Tablet dark](assets/2026-10-03-overview-daily-time/tablet-dark.png)
+- [Narrow dark](assets/2026-10-03-overview-daily-time/narrow-dark.png)
+- [Narrow light](assets/2026-10-03-overview-daily-time/narrow-light.png)
+- [Layout and console results](assets/2026-10-03-overview-daily-time/validation.json)
 
 The temporary harness and verifier are at
 `/private/tmp/cognipace-overview-daily-time-proof`; no fixture files were added
@@ -123,5 +123,6 @@ Suggested Conventional Commit/PR title:
 `feat(overview): show daily recorded practice time`.
 This is a feature release signal. Reverting the change restores the three-card
 Overview without changing stored reviews, backups, or existing configured sync.
-No PR, merge, or release was performed. The user request and supplied screenshot
+The pull request stays draft pending human installed-extension smoke proof. No
+merge or release was performed. The user request and supplied screenshot
 serve as the documented issue-tracking exception for this focused addition.
