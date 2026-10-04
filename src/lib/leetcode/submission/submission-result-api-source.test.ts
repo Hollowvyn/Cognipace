@@ -35,6 +35,7 @@ const submittedCodeSnapshot = {
   code: 'class Solution:\n    pass',
   language: 'Python3',
   source: 'monaco',
+  completeness: 'partial',
   capturedAt: 5000,
 } satisfies LeetCodeSubmittedCodeSnapshot
 
@@ -68,6 +69,7 @@ describe('readLeetCodeSubmissionResultFromApi', () => {
         code: 'class Solution:\n    def twoSum(self):\n        return []',
         language: 'Python3',
         source: 'api',
+        completeness: 'complete',
         capturedAt: 7000,
       },
     })
@@ -86,6 +88,50 @@ describe('readLeetCodeSubmissionResultFromApi', () => {
       'https://leetcode.com/graphql',
     ])
   })
+
+  it('preserves exact full details code whitespace', async () => {
+    const code = '  class Solution:\n    pass\n\n'
+    const { result } = await readSubmissionApiResult({
+      fixture: fixtureWithDetails({ id: '1234567890', code }),
+      now: 7000,
+    })
+    expect(result?.resultCodeSnapshot).toMatchObject({
+      code,
+      source: 'api',
+      completeness: 'complete',
+    })
+  })
+
+  it.each([
+    { id: '9999999999', code: 'wrong submission' },
+    { code: 'unidentified submission' },
+  ])('rejects nonmatching details provenance: %j', async (details) => {
+    const { result, debugEvents } = await readSubmissionApiResult({
+      fixture: fixtureWithDetails(details),
+      now: 7000,
+    })
+    expect(result?.resultCodeSnapshot).toMatchObject({
+      code: submittedCodeSnapshot.code,
+      source: 'monaco',
+      completeness: 'partial',
+    })
+    expect(debugEvents.at(-1)?.phase).toBe('graphql-details-missing')
+  })
+
+  it.each([null, '', '   '])(
+    'keeps fragment provenance when details code is empty: %j',
+    async (code) => {
+      const { result } = await readSubmissionApiResult({
+        fixture: fixtureWithDetails({ id: '1234567890', code }),
+        now: 7000,
+      })
+      expect(result?.resultCodeSnapshot).toMatchObject({
+        code: submittedCodeSnapshot.code,
+        source: 'monaco',
+        completeness: 'partial',
+      })
+    },
+  )
 
   it('returns null while LeetCode is still judging the submission', async () => {
     const { debugEvents, result } = await readSubmissionApiResult({
@@ -139,6 +185,7 @@ describe('readLeetCodeSubmissionResultFromApi', () => {
         resultCodeSnapshot: {
           code: 'class Solution:\n    pass',
           source: 'api',
+          completeness: 'complete',
         },
       },
     },
@@ -196,6 +243,7 @@ describe('readLeetCodeSubmissionResultFromApi', () => {
       resultCodeSnapshot: {
         code: submittedCodeSnapshot.code,
         source: 'monaco',
+        completeness: 'partial',
       },
     })
     expect(debugEvents.at(-1)).toEqual({
@@ -225,4 +273,13 @@ async function readSubmissionApiResult(options: {
   })
 
   return { debugEvents, fetcher, result }
+}
+
+function fixtureWithDetails(
+  details: Record<string, unknown>,
+): LeetCodeSubmissionApiFixture {
+  return {
+    ...leetcodeAcceptedSubmissionApiFixture,
+    graphQlPayload: { data: { submissionDetails: details } },
+  }
 }

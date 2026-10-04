@@ -5,6 +5,7 @@ import type {
 import { readLeetCodeCodeSnapshot } from '../editor/code-snapshot-reader'
 
 export function readLeetCodeSubmissionAttempt(options: {
+  attemptId: string
   click: LeetCodeSubmissionClick
   editorRoot: ParentNode
 }): LeetCodeSubmissionAttempt {
@@ -14,6 +15,7 @@ export function readLeetCodeSubmissionAttempt(options: {
   )
 
   return {
+    attemptId: options.attemptId,
     location: options.click.location,
     clickedAt: options.click.clickedAt,
     submitButtonText: options.click.buttonText,

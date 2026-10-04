@@ -13,6 +13,7 @@ export const leetcodeRemoteAuthSchema = z.object({
 export const leetcodeProblemRemoteRequestSchema = z.object({
   location: leetcodeProblemLocationSchema,
   auth: leetcodeRemoteAuthSchema.optional(),
+  refresh: z.boolean().optional(),
 })
 
 const leetcodeTopicSchema = z.object({
@@ -32,6 +33,13 @@ export const leetcodeProblemMetadataSchema = z.object({
   capturedAt: z.number(),
 })
 
+const leetcodeCaptureCompletenessSchema = z.enum([
+  'complete',
+  'partial',
+  'missing',
+])
+const leetcodeSubmissionIdSchema = z.string().regex(/^\d+$/)
+
 const leetcodeExampleSchema = z.object({
   label: z.string(),
   input: z.string().nullable(),
@@ -45,6 +53,8 @@ export const leetcodeProblemContentSchema = z.object({
   statement: z.string(),
   examples: z.array(leetcodeExampleSchema),
   constraints: z.array(z.string()),
+  followUps: z.array(z.string()),
+  completeness: leetcodeCaptureCompletenessSchema,
   hints: z.array(z.string()),
   source: z.enum(['graphql', 'dom', 'fallback']),
   confidence: z.enum(['high', 'medium', 'low']),
@@ -89,6 +99,7 @@ export const leetcodeCodeSnapshotSchema = z.object({
   code: z.string().nullable(),
   language: z.string().nullable(),
   source: z.enum(['api', 'monaco', 'textarea', 'code-block', 'none']),
+  completeness: leetcodeCaptureCompletenessSchema,
   capturedAt: z.number(),
 })
 
@@ -99,10 +110,16 @@ export const leetcodeSubmissionClickSchema = z.object({
 })
 
 export const leetcodeSubmissionResultRemoteRequestSchema = z.object({
+  attemptId: z
+    .string()
+    .min(1)
+    .refine((value) => value.trim().length > 0),
+  submissionId: leetcodeSubmissionIdSchema.optional(),
   location: leetcodeProblemLocationSchema,
   click: leetcodeSubmissionClickSchema,
   submittedCodeSnapshot: leetcodeCodeSnapshotSchema,
   auth: leetcodeRemoteAuthSchema.optional(),
+  refresh: z.boolean().optional(),
 })
 
 const leetcodeSubmissionPollingDebugSchema = z.object({
@@ -117,7 +134,7 @@ const leetcodeSubmissionPollingDebugSchema = z.object({
     'dom-fallback-used',
     'timed-out',
   ]),
-  submissionId: z.string().nullable(),
+  submissionId: leetcodeSubmissionIdSchema.nullable(),
   checkState: z.string().nullable(),
   statusText: z.string().nullable(),
   checkedAt: z.number(),
@@ -125,7 +142,7 @@ const leetcodeSubmissionPollingDebugSchema = z.object({
 
 export const leetcodeSubmissionResultSchema = z.object({
   location: leetcodeProblemLocationSchema,
-  submissionId: z.string().nullable(),
+  submissionId: leetcodeSubmissionIdSchema.nullable(),
   source: z.enum(['api', 'dom']),
   status: z.enum([
     'accepted',

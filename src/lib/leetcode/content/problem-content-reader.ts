@@ -11,6 +11,7 @@ import { requestLeetCodeProblemContent } from '../api/problem-content-request'
 import type { LeetCodeGraphQlFetch } from '../core/graphql-client'
 import { isObjectRecord, readTrimmedString } from '../core/value-readers'
 import type {
+  LeetCodeCaptureCompleteness,
   LeetCodeExample,
   LeetCodeProblemContent,
   LeetCodeProblemContentConfidence,
@@ -72,6 +73,8 @@ export async function readLeetCodeProblemContent(
       statement: '',
       examples: [],
       constraints: [],
+      followUps: [],
+      completeness: 'missing',
       hints: [],
       source: 'fallback',
       confidence: 'low',
@@ -122,6 +125,15 @@ export async function fetchLeetCodeProblemContent(
         readTextFromHtml(parsedQuestionContent.contentHtml),
       )
 
+  if (!contentParts.statement) {
+    return {
+      ok: false,
+      error: new Error(
+        'LeetCode GraphQL response did not include a meaningful statement.',
+      ),
+    }
+  }
+
   return {
     ok: true,
     content: createProblemContent({
@@ -129,6 +141,8 @@ export async function fetchLeetCodeProblemContent(
       statement: contentParts.statement,
       examples: contentParts.examples,
       constraints: contentParts.constraints,
+      followUps: contentParts.followUps,
+      completeness: 'complete',
       hints: parsedQuestionContent.hints,
       source: 'graphql',
       confidence: 'high',
@@ -165,6 +179,8 @@ export function readLeetCodeProblemContentFromDom(
     statement: contentParts.statement,
     examples: contentParts.examples,
     constraints: contentParts.constraints,
+    followUps: contentParts.followUps,
+    completeness: 'partial',
     hints: readHintsFromDomRoot(contentRoot),
     source: 'dom',
     confidence: contentParts.statement ? 'medium' : 'low',
@@ -177,6 +193,8 @@ function createProblemContent(options: {
   statement: string
   examples: LeetCodeExample[]
   constraints: string[]
+  followUps: string[]
+  completeness: LeetCodeCaptureCompleteness
   hints: string[]
   source: LeetCodeProblemContentSource
   confidence: LeetCodeProblemContentConfidence
@@ -187,6 +205,8 @@ function createProblemContent(options: {
     statement: options.statement,
     examples: options.examples,
     constraints: options.constraints,
+    followUps: options.followUps,
+    completeness: options.completeness,
     hints: options.hints,
     source: options.source,
     confidence: options.confidence,
@@ -241,38 +261,69 @@ function createContentDocumentOrNull(
 }
 
 function readContentPartsFromRoot(contentRoot: ParentNode) {
-  const normalizedText = readNormalizedText(contentRoot)
+  const normalizedText = readContentText(contentRoot)
 
   return {
     statement: readStatementFromText(normalizedText),
     examples: readExamplesFromRoot(contentRoot),
     constraints: readConstraintsFromRoot(contentRoot, normalizedText),
+    followUps: readFollowUpsFromText(normalizedText),
   }
 }
 
 function readContentPartsFromText(text: string) {
+  const mainContentText = text.split(/\bFollow[\s-]*up\s*:/i)[0] ?? ''
   return {
     statement: readStatementFromText(text),
     examples: Array.from(
-      text.matchAll(
-        /\bExample\s+(\d+)\s*:\s*([\s\S]*?)(?=\bExample\s+\d+\s*:|\bConstraints\s*:|$)/gi,
+      mainContentText.matchAll(
+        /\bExample\s+(\d+)\s*:\s*([\s\S]*?)(?=\bExample\s+\d+\s*:|\bConstraints\s*:|\bFollow[\s-]*up\s*:|$)/gi,
       ),
     )
       .map((match) => readExampleFromText(match[0], Number(match[1]) - 1))
       .filter((example): example is LeetCodeExample => Boolean(example)),
     constraints: readConstraintsFromText(text),
+    followUps: readFollowUpsFromText(text),
   }
+}
+
+function readContentText(contentRoot: ParentNode) {
+  const textRoot = contentRoot.cloneNode(true) as ParentNode
+  for (const block of textRoot.querySelectorAll(
+    'p, div, pre, li, ul, ol, h1, h2, h3, h4, h5, h6, br',
+  )) {
+    block.append('\n')
+  }
+  return readNormalizedText(textRoot)
+}
+
+function readFollowUpsFromText(text: string) {
+  const followUp = text.match(
+    /\bFollow[\s-]*up\s*:\s*([\s\S]*?)(?=\bHint\s*\d*\s*:|$)/i,
+  )?.[1]
+  const normalizedFollowUp = followUp ? stripLeetCodeNoise(followUp) : ''
+  return normalizedFollowUp ? [normalizedFollowUp] : []
 }
 
 function readStatementFromText(text: string) {
   return stripLeetCodeNoise(
-    text.split(/\bExample\s+\d+\s*:|\bConstraints\s*:|\bFollow-up\s*:/i)[0] ??
-      '',
+    text.split(
+      /\bExample\s+\d+\s*:|\bConstraints\s*:|\bFollow[\s-]*up\s*:/i,
+    )[0] ?? '',
   )
 }
 
 function readExamplesFromRoot(contentRoot: ParentNode): LeetCodeExample[] {
+  const followUpHeading = findFollowUpHeading(contentRoot)
   const examplesFromPreBlocks = Array.from(contentRoot.querySelectorAll('pre'))
+    .filter(
+      (element) =>
+        !followUpHeading ||
+        !(
+          followUpHeading.compareDocumentPosition(element) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+        ),
+    )
     .map((preElement, index) =>
       readExampleFromText(readMultilineText(preElement), index),
     )
@@ -283,16 +334,24 @@ function readExamplesFromRoot(contentRoot: ParentNode): LeetCodeExample[] {
   }
 
   return Array.from(
-    readNormalizedText(contentRoot).matchAll(
-      /\bExample\s+(\d+)\s*:\s*([\s\S]*?)(?=\bExample\s+\d+\s*:|\bConstraints\s*:|$)/gi,
+    (
+      readContentText(contentRoot).split(/\bFollow[\s-]*up\s*:/i)[0] ?? ''
+    ).matchAll(
+      /\bExample\s+(\d+)\s*:\s*([\s\S]*?)(?=\bExample\s+\d+\s*:|\bConstraints\s*:|\bFollow[\s-]*up\s*:|$)/gi,
     ),
   )
     .map((match) => readExampleFromText(match[0], Number(match[1]) - 1))
     .filter((example): example is LeetCodeExample => Boolean(example))
 }
 
+function findFollowUpHeading(contentRoot: ParentNode) {
+  return Array.from(
+    contentRoot.querySelectorAll('p, div, h1, h2, h3, h4, strong'),
+  ).find((element) => /^Follow[\s-]*up\s*:/i.test(readNormalizedText(element)))
+}
+
 function readExampleFromText(text: string, index: number) {
-  const rawText = text.trim()
+  const rawText = text.split(/\bFollow[\s-]*up\s*:/i)[0]?.trim() ?? ''
 
   if (!rawText || !/\bInput\s*:/i.test(rawText)) {
     return null
@@ -342,10 +401,17 @@ function readConstraintsFromRoot(
   contentRoot: ParentNode,
   normalizedText: string,
 ) {
+  const followUpHeading = findFollowUpHeading(contentRoot)
   const constraintsHeading = Array.from(
     contentRoot.querySelectorAll('p, div, h1, h2, h3, h4, strong'),
-  ).find((candidateElement) =>
-    /^Constraints\s*:?\s*$/i.test(readNormalizedText(candidateElement)),
+  ).find(
+    (candidateElement) =>
+      /^Constraints\s*:?\s*$/i.test(readNormalizedText(candidateElement)) &&
+      (!followUpHeading ||
+        !(
+          followUpHeading.compareDocumentPosition(candidateElement) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+        )),
   )
   const constraintsList = constraintsHeading
     ? findNextListElement(constraintsHeading)
@@ -364,8 +430,9 @@ function readConstraintsFromRoot(
 }
 
 function readConstraintsFromText(text: string) {
-  const constraintsText = text.match(
-    /\bConstraints\s*:?\s*([\s\S]*?)(?=\bFollow-up\s*:|\bHint\s*\d*\s*:|$)/i,
+  const mainContentText = text.split(/\bFollow[\s-]*up\s*:/i)[0] ?? ''
+  const constraintsText = mainContentText.match(
+    /\bConstraints\s*:?\s*([\s\S]*?)(?=\bFollow[\s-]*up\s*:|\bHint\s*\d*\s*:|$)/i,
   )?.[1]
 
   if (!constraintsText) {

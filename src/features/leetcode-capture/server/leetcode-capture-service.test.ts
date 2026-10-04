@@ -97,6 +97,7 @@ describe('leetcode-capture-service', () => {
     vi.stubGlobal('fetch', fetcher)
 
     const request = {
+      attemptId: 'attempt-fixed',
       location: createLocation('two-sum'),
       click: {
         location: createLocation('two-sum'),
@@ -107,6 +108,7 @@ describe('leetcode-capture-service', () => {
         code: 'class Solution:\n    pass',
         language: 'Python3',
         source: 'monaco',
+        completeness: 'partial',
         capturedAt: 4000,
       },
       auth: { csrfToken: null },

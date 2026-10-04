@@ -64,6 +64,8 @@ Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].
         ],
         constraints: ['2 <= nums.length <= 10^4', '-10^9 <= nums[i] <= 10^9'],
         hints: ['Use a hash map.'],
+        followUps: [],
+        completeness: 'complete',
         source: 'graphql',
         confidence: 'high',
         capturedAt: 1000,
@@ -118,6 +120,8 @@ Output: [0,1]
         ],
         constraints: ['2 <= nums.length <= 10^4'],
         hints: ['Use a hash map .'], // <script> tag is removed
+        followUps: [],
+        completeness: 'complete',
         source: 'graphql',
         confidence: 'high',
         capturedAt: 1000,
@@ -201,10 +205,27 @@ Output: [0,1]
       ],
       constraints: ['2 <= nums.length <= 10^4'],
       hints: ['Try complements.'],
+      completeness: 'partial',
       source: 'dom',
       confidence: 'medium',
       capturedAt: 2000,
     })
+  })
+
+  it('does not treat follow-up examples as main problem examples', () => {
+    document.body.innerHTML = `<section data-track-load="description_content"><p>Return indices.</p><p>Example 1:</p><pre>Input: [2,7]
+Output: [0,1]</pre><p>Follow-up:</p><p>Consider larger input.</p><pre>Input: [1,2,3]
+Output: [1,2]</pre></section>`
+    const content = readLeetCodeProblemContentFromDom(document, { location })
+    expect(content?.examples).toHaveLength(1)
+    expect(content?.examples[0]?.input).toBe('[2,7]')
+  })
+
+  it('stops main text examples and constraints before the follow-up section', () => {
+    document.body.innerHTML = `<section data-track-load="description_content"><p>Return indices.</p><p>Example 1: Input: [2,7] Output: [0,1]</p><p>Follow-up:</p><p>Example 2: Input: [1,2,3] Output: [1,2]</p><p>Constraints:</p><ul><li>Use constant extra space.</li></ul></section>`
+    const content = readLeetCodeProblemContentFromDom(document, { location })
+    expect(content?.examples).toHaveLength(1)
+    expect(content?.constraints).toEqual([])
   })
 
   it('reads constraints when the heading text is inside a strong element', () => {
@@ -261,6 +282,96 @@ Output: [0,1]
 })
 
 describe('readLeetCodeProblemContent', () => {
+  it('preserves follow-up requirements separately from the statement', async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json({
+        data: {
+          question: {
+            content:
+              '<p>Find two distinct indices.</p><p>Constraints:</p><ul><li>2 &lt;= n &lt;= 10000</li></ul><p>Follow-up:</p><p>Can you achieve expected linear time?</p>',
+            hints: [],
+          },
+        },
+      }),
+    )
+    await expect(
+      readLeetCodeProblemContent(location, { fetch: fetcher, document }),
+    ).resolves.toMatchObject({
+      ok: true,
+      content: {
+        completeness: 'complete',
+        statement: 'Find two distinct indices.',
+        constraints: ['2 <= n <= 10000'],
+        followUps: ['Can you achieve expected linear time?'],
+      },
+    })
+  })
+
+  it('marks absent optional GraphQL sections as known empty', async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json({
+        data: {
+          question: {
+            content: '<p>Return the only answer.</p>',
+            hints: [],
+          },
+        },
+      }),
+    )
+    await expect(
+      readLeetCodeProblemContent(location, { fetch: fetcher, document }),
+    ).resolves.toMatchObject({
+      ok: true,
+      content: {
+        completeness: 'complete',
+        statement: 'Return the only answer.',
+        constraints: [],
+        followUps: [],
+      },
+    })
+  })
+
+  it.each(['Follow-up', 'Follow up', 'Followup'])(
+    'stops DOM example and constraint fields at %s',
+    (heading) => {
+      document.body.innerHTML = `<section data-track-load="description_content"><p>Return indices.</p><p>Example 1: Input: [2,7] Output: [0,1]</p><p>Constraints: 2 &lt;= n</p><p>${heading}: Use expected linear time.</p><p>Hint 1: Try a map.</p></section>`
+      expect(
+        readLeetCodeProblemContentFromDom(document, { location }),
+      ).toMatchObject({
+        completeness: 'partial',
+        statement: 'Return indices.',
+        examples: [{ output: '[0,1]' }],
+        constraints: ['2 <= n'],
+        followUps: ['Use expected linear time.'],
+      })
+    },
+  )
+
+  it('includes follow-ups and completeness in the content fingerprint', () => {
+    const content = {
+      location,
+      statement: 'Return indices.',
+      examples: [],
+      constraints: [],
+      hints: [],
+      followUps: [],
+      completeness: 'partial' as const,
+    }
+    const fingerprint = createLeetCodeProblemContentFingerprint(content)
+    expect(
+      createLeetCodeProblemContentFingerprint({
+        ...content,
+        completeness: 'complete',
+      }),
+    ).not.toBe(fingerprint)
+    expect(
+      createLeetCodeProblemContentFingerprint({
+        ...content,
+        followUps: ['Use expected linear time.'],
+      }),
+    ).not.toBe(fingerprint)
+  })
+
   it('falls back to DOM content when GraphQL content is unavailable', async () => {
     document.body.innerHTML = `
       <section data-track-load="description_content">
@@ -281,10 +392,24 @@ describe('readLeetCodeProblemContent', () => {
       ok: true,
       content: {
         statement: 'Return the only answer.',
+        completeness: 'partial',
         source: 'dom',
         confidence: 'medium',
         capturedAt: 3000,
       },
+    })
+  })
+
+  it('marks empty GraphQL markup as missing when no DOM content is available', async () => {
+    document.body.innerHTML = '<main></main>'
+    const fetcher = vi.fn(async () =>
+      Response.json({ data: { question: { content: '<p> </p>', hints: [] } } }),
+    )
+    await expect(
+      readLeetCodeProblemContent(location, { fetch: fetcher, document }),
+    ).resolves.toMatchObject({
+      ok: true,
+      content: { completeness: 'missing', statement: '', followUps: [] },
     })
   })
 
@@ -307,6 +432,8 @@ describe('readLeetCodeProblemContent', () => {
         examples: [],
         constraints: [],
         hints: [],
+        followUps: [],
+        completeness: 'missing',
         source: 'fallback',
         confidence: 'low',
         capturedAt: 4000,
@@ -329,6 +456,8 @@ describe('readLeetCodeProblemContent', () => {
       ],
       constraints: ['2 <= nums.length'],
       hints: ['Use a map.'],
+      followUps: [],
+      completeness: 'complete',
     })
 
     expect(contentFingerprint).toMatch(/^lc-content-[a-f0-9]+$/)
@@ -347,6 +476,8 @@ describe('readLeetCodeProblemContent', () => {
         ],
         constraints: ['2 <= nums.length'],
         hints: ['Use a map.'],
+        followUps: [],
+        completeness: 'complete',
       }),
     ).toBe(contentFingerprint)
   })

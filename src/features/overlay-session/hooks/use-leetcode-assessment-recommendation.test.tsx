@@ -114,6 +114,7 @@ function makeSubmissionResult(
       code: 'function twoSum(nums, target) { return [] }',
       language: 'typescript',
       source: 'api',
+      completeness: 'complete',
       capturedAt: 999,
     },
     ...overrides,

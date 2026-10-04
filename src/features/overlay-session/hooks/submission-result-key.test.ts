@@ -41,6 +41,7 @@ describe('createSubmissionResultKey', () => {
         code: longCode,
         language: 'typescript',
         source: 'api',
+        completeness: 'complete',
         capturedAt: 999,
       },
     })
@@ -82,6 +83,7 @@ function createResult(
       code: 'function solution() {}',
       language: 'typescript',
       source: 'api',
+      completeness: 'complete',
       capturedAt: 999,
     },
     ...overrides,

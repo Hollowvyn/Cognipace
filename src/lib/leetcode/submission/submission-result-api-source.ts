@@ -98,6 +98,7 @@ const leetCodeSubmissionDetailsQuery = `
 `
 
 export async function readLeetCodeSubmissionResultFromApi(options: {
+  submissionId?: string | undefined
   location: LeetCodeProblemLocation
   click: LeetCodeSubmissionClick
   submittedCodeSnapshot: LeetCodeSubmittedCodeSnapshot
@@ -265,6 +266,9 @@ export async function readLeetCodeSubmissionResultFromApi(options: {
       source: detailsPayload?.code
         ? 'api'
         : options.submittedCodeSnapshot.source,
+      completeness: detailsPayload?.code
+        ? 'complete'
+        : options.submittedCodeSnapshot.completeness,
       capturedAt,
     },
   }
@@ -413,7 +417,10 @@ async function readSubmissionDetailsPayload(options: {
 
   const details = graphQlResult.payload.data.submissionDetails
 
-  if (!isObjectRecord(details)) {
+  if (
+    !isObjectRecord(details) ||
+    readSubmissionId(details.id) !== options.submissionId
+  ) {
     return null
   }
 
@@ -442,7 +449,10 @@ async function readSubmissionDetailsPayload(options: {
     errorMessage: readTrimmedString(
       details.runtimeError ?? details.compileError,
     ),
-    code: readTrimmedString(details.code),
+    code:
+      typeof details.code === 'string' && details.code.trim()
+        ? details.code
+        : null,
     language,
   }
 }
@@ -541,9 +551,9 @@ function readLanguageLabel(value: unknown) {
 }
 
 function readSubmissionId(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return String(value)
-  }
-
-  return readTrimmedString(value)
+  const id =
+    typeof value === 'number' && Number.isSafeInteger(value)
+      ? String(value)
+      : readTrimmedString(value)
+  return id && /^\d+$/.test(id) ? id : null
 }

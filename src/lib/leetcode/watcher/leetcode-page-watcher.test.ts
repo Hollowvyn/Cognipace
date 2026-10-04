@@ -1,11 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { LeetCodePageEvent } from '../domain/types'
+import type {
+  LeetCodePageEvent,
+  LeetCodeSubmissionResultRemoteResponse,
+} from '../index'
+import type { LeetCodeSubmissionResultRemoteRequest } from '../remote/leetcode-remote-client'
 import {
   createLeetCodeSubmissionApiFixtureFetcher,
   leetcodeAcceptedSubmissionApiFixture,
   leetcodePendingSubmissionApiFixture,
 } from '../testing/submission-result-fixtures'
+import { createLeetCodeProblemContentFingerprint } from '../content/content-fingerprint'
 import { createLeetCodePageWatcher } from './leetcode-page-watcher'
 
 type PageWatcherOptions = Parameters<typeof createLeetCodePageWatcher>[0]
@@ -76,6 +81,74 @@ describe('createLeetCodePageWatcher', () => {
         confidence: 'high',
       },
     })
+  })
+
+  it('emits an identical-text content update when partial capture becomes complete', async () => {
+    vi.useFakeTimers()
+    renderProblemHeader()
+    const content = {
+      location: problemLocation,
+      statement: 'Return indices.',
+      examples: [],
+      constraints: [],
+      hints: [],
+      followUps: [],
+      source: 'dom' as const,
+      confidence: 'medium' as const,
+      completeness: 'partial' as const,
+      capturedAt: 1000,
+    }
+    const completeContent = {
+      ...content,
+      completeness: 'complete' as const,
+      source: 'graphql' as const,
+    }
+    const remoteClient = {
+      readProblemMetadata: vi.fn(async () => ({
+        ok: true as const,
+        metadata: {
+          location: problemLocation,
+          title: 'Two Sum',
+          frontendId: '1',
+          difficulty: 'Easy' as const,
+          isPremium: false,
+          topics: [],
+          source: 'graphql' as const,
+          confidence: 'high' as const,
+          capturedAt: 1000,
+        },
+      })),
+      readProblemContent: vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          content: {
+            ...content,
+            contentFingerprint:
+              createLeetCodeProblemContentFingerprint(content),
+          },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          content: {
+            ...completeContent,
+            contentFingerprint:
+              createLeetCodeProblemContentFingerprint(completeContent),
+          },
+        }),
+      readSubmissionResult: vi.fn(),
+    }
+    const { events, watcher } = createWatcherTestHarness({ remoteClient })
+    watcher.start()
+    await vi.runAllTimersAsync()
+    watcher.refresh()
+    await vi.runAllTimersAsync()
+    watcher.stop()
+    expect(
+      filterEvents(events, 'problem-content-updated').map(
+        (event) => event.content.completeness,
+      ),
+    ).toEqual(['partial', 'complete'])
   })
 
   it('reads problem details once for a slug across hydration retries', async () => {
@@ -162,17 +235,113 @@ describe('createLeetCodePageWatcher', () => {
       type: 'submission-started',
       attempt: {
         location: problemLocation,
+        attemptId: expect.any(String),
         clickedAt: 2000,
         submitButtonText: 'Submit',
         submittedCodeSnapshot: {
           code: 'class Solution:\n    pass',
           language: 'Python3',
           source: 'monaco',
+          completeness: 'partial',
           capturedAt: 2000,
         },
       },
     })
   })
+
+  it('mints one identity per submit and forwards the same identity on every poll', async () => {
+    vi.useFakeTimers()
+    renderProblemEditorPage()
+    const readSubmissionResult = vi.fn(
+      async (_request: LeetCodeSubmissionResultRemoteRequest) => ({
+        result: null,
+        debugEvents: [],
+      }),
+    )
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [0, 1000],
+      now: () => 5000,
+      remoteClient: {
+        readSubmissionResult,
+        readProblemMetadata: vi.fn(),
+        readProblemContent: vi.fn(),
+      },
+    })
+    watcher.start()
+    dispatchSubmitClick()
+    await vi.runAllTimersAsync()
+    dispatchSubmitClick()
+    await vi.runAllTimersAsync()
+    watcher.stop()
+    const attempts = filterEvents(events, 'submission-started').map(
+      (event) => event.attempt,
+    )
+    expect(attempts[0]?.attemptId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(attempts[1]?.attemptId).not.toBe(attempts[0]?.attemptId)
+    expect(
+      readSubmissionResult.mock.calls.map(([request]) => request.attemptId),
+    ).toEqual([
+      attempts[0]?.attemptId,
+      attempts[0]?.attemptId,
+      attempts[1]?.attemptId,
+      attempts[1]?.attemptId,
+    ])
+  })
+
+  it.each(['new-attempt', 'navigation'])(
+    'ignores late polling diagnostics after %s',
+    async (supersedingEvent) => {
+      vi.useFakeTimers()
+      renderProblemEditorPage()
+      let currentUrl = problemUrl
+      let finishOldRead!: (
+        response: LeetCodeSubmissionResultRemoteResponse,
+      ) => void
+      const readSubmissionResult = vi.fn(
+        () =>
+          new Promise<LeetCodeSubmissionResultRemoteResponse>((resolve) => {
+            finishOldRead = resolve
+          }),
+      )
+      const { events, watcher } = createWatcherTestHarness({
+        getCurrentUrl: () => currentUrl,
+        hydrationDelays: [],
+        submissionResultReadDelays: [0],
+        now: () => 5000,
+        remoteClient: {
+          readSubmissionResult,
+          readProblemMetadata: vi.fn(),
+          readProblemContent: vi.fn(),
+        },
+      })
+      watcher.start()
+      dispatchSubmitClick()
+      await vi.advanceTimersByTimeAsync(0)
+      if (supersedingEvent === 'new-attempt') dispatchSubmitClick()
+      else {
+        currentUrl = 'https://leetcode.com/problems/valid-parentheses/'
+        watcher.refresh()
+      }
+      finishOldRead({
+        result: null,
+        debugEvents: [
+          {
+            phase: 'submission-found',
+            submissionId: '1234567890',
+            checkState: 'SUCCESS',
+            statusText: 'Old result',
+            checkedAt: 6000,
+          },
+        ],
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      watcher.stop()
+      expect(filterEvents(events, 'submission-polling-updated')).toHaveLength(0)
+      expect(filterEvents(events, 'submission-result-updated')).toHaveLength(0)
+    },
+  )
 
   it('emits submission-result-updated after LeetCode renders the result', async () => {
     vi.useFakeTimers()
@@ -215,6 +384,7 @@ describe('createLeetCodePageWatcher', () => {
           code: 'class Solution:\n    pass',
           language: 'Python3',
           source: 'code-block',
+          completeness: 'partial',
         },
       },
     })
@@ -262,6 +432,7 @@ describe('createLeetCodePageWatcher', () => {
           code: 'class Solution:\n    pass',
           language: 'Python3',
           source: 'monaco',
+          completeness: 'partial',
           capturedAt: 5000,
         },
       },
@@ -394,6 +565,7 @@ describe('createLeetCodePageWatcher', () => {
           code: 'class Solution:\n    def twoSum(self):\n        return []',
           language: 'Python3',
           source: 'api',
+          completeness: 'complete',
         },
       },
     })

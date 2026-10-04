@@ -46,6 +46,7 @@ describe('readLeetCodeSubmissionResult', () => {
         code: 'class Solution:\n    def twoSum(self):\n        return []',
         language: 'Python3',
         source: 'code-block',
+        completeness: 'partial',
         capturedAt: 7000,
       },
     })
@@ -69,6 +70,7 @@ describe('readLeetCodeSubmissionResult', () => {
           code: null,
           language: null,
           source: 'none',
+          completeness: 'missing',
         },
       },
     },
@@ -126,6 +128,7 @@ describe('readLeetCodeSubmissionResult', () => {
       code: 'class Solution:\n    pass',
       language: 'Python3',
       source: 'code-block',
+      completeness: 'partial',
       capturedAt: 10000,
     })
   })

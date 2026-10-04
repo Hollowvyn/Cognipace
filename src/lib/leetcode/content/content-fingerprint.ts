@@ -3,7 +3,13 @@ import type { LeetCodeProblemContent } from '../domain/types'
 export function createLeetCodeProblemContentFingerprint(
   content: Pick<
     LeetCodeProblemContent,
-    'location' | 'statement' | 'examples' | 'constraints' | 'hints'
+    | 'location'
+    | 'statement'
+    | 'examples'
+    | 'constraints'
+    | 'followUps'
+    | 'hints'
+    | 'completeness'
   >,
 ) {
   return stableHash(
@@ -19,6 +25,8 @@ export function createLeetCodeProblemContentFingerprint(
       })),
       constraints: content.constraints.map(normalizeFingerprintText),
       hints: content.hints.map(normalizeFingerprintText),
+      followUps: content.followUps.map(normalizeFingerprintText),
+      completeness: content.completeness,
     }),
   )
 }

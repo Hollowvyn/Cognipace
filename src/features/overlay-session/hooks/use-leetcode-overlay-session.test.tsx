@@ -950,6 +950,7 @@ function createSubmissionResult(
       code: 'return nums;',
       language: 'TypeScript',
       source: 'api',
+      completeness: 'complete',
       capturedAt: Date.now(),
     },
     ...overrides,
