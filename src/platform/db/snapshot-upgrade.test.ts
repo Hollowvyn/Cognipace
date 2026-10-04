@@ -235,8 +235,8 @@ describe('shipped FSRS snapshot baseline', () => {
       index === 9 ? { ...entry, sql: `${entry.sql}\n-- changed` } : entry,
     )
     const reordered = [
-      frozenV9MigrationEntries[1]!,
-      frozenV9MigrationEntries[0]!,
+      frozenV9MigrationEntries[1],
+      frozenV9MigrationEntries[0],
       ...frozenV9MigrationEntries.slice(2),
     ]
     for (const entries of [

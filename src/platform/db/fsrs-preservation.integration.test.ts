@@ -165,7 +165,7 @@ describe('populated FSRS snapshot preservation', () => {
       expect(storage.values[FSRS_RECOVERY_KEY]).toEqual({
         version: 1,
         raw: original,
-        savedAt: expect.any(String),
+        savedAt: expect.any(String) as unknown,
       })
       expect(await createSettingsRepository(handle.db).getSettings()).toEqual(
         fixture.settings,
@@ -255,7 +255,7 @@ describe('populated FSRS snapshot preservation', () => {
         expect(storage.values[FSRS_RECOVERY_KEY]).toEqual({
           version: 1,
           raw: original,
-          savedAt: expect.any(String),
+          savedAt: expect.any(String) as unknown,
         })
       }
       const firstRecovery = storage.values[FSRS_RECOVERY_KEY]
@@ -272,7 +272,7 @@ describe('populated FSRS snapshot preservation', () => {
           expect(storage.values[FSRS_RECOVERY_KEY]).toEqual({
             version: 1,
             raw: original,
-            savedAt: expect.any(String),
+            savedAt: expect.any(String) as unknown,
           })
       }
     },
