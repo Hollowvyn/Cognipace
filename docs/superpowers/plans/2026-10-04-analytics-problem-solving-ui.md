@@ -65,7 +65,7 @@ const [mixMeasure, setMixMeasure] = useState<'assessments' | 'time'>(
 Completed on 2026-10-04 on `codex/analytics-problem-solving`. The initial full
 check stopped on unsupported role-query options, inferred numeric chart keys,
 and a readonly-versus-transport scale mismatch. All were corrected; the final
-check passed **196 files / 2,204 tests**, typecheck, ESLint, and database checks.
+implementation check passed **196 files / 2,204 tests**, typecheck, ESLint, and database checks.
 The production build passed with a chunk-size warning.
 
 Observed test-first failures: input metadata/later cohort selection (6 failures),
@@ -118,3 +118,19 @@ the Difficulty And Recorded Time checklist in `docs/testing.md` and attach
 screenshot/recording proof. Agent fixture proof does not replace that requirement.
 This feature extends a read-only summary/dashboard using existing saved settings;
 no migrations, new dependencies, timer writes, or permissions changed.
+
+## PR Preparation
+
+Rebased cleanly onto `origin/main` at `92ba67d5` (the merged FSRS snapshot
+preservation fix). The pre-install post-rebase check passed 197 files / 2,218
+tests and `npm run format` passed. The pinned `npm ci` clean install succeeded; final
+`npm run check` passed 197 files / 2,218 tests and `npm run format` passed.
+The final build result is recorded in the PR body. The unchanged lockfile
+install reported 8 vulnerabilities (1 low, 6 moderate, 1 high); dependency
+remediation is outside this Analytics PR. No Analytics source
+changes were needed for the new base.
+
+Three unchanged production-component screenshots were copied into
+`docs/superpowers/handoffs/assets/2026-10-04-analytics-problem-solving/` for
+GitHub-visible proof: desktop dark Trend, Compare, and 320px light. These are
+illustrative fixtures and do not claim human installed-extension smoke.
