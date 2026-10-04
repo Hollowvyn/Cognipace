@@ -22,7 +22,10 @@ import {
   normalizeFsrsSchedulingOptions,
   type FsrsSchedulingOptions,
 } from '../domain/scheduling-options'
-import type { FsrsReviewLogSnapshot } from '../domain/review-log-snapshot'
+import {
+  parseFsrsReviewLogSnapshot,
+  type FsrsReviewLogSnapshot,
+} from '../domain/review-log-snapshot'
 import type { ReviewRating } from '../domain/review-rating'
 import {
   readFsrsSchedulerProfile,
@@ -141,6 +144,28 @@ export function scheduleCardReviewWithProfile(
     card: fromTsFsrsCard(result.card),
     log: fromTsFsrsReviewLog(result.log),
   }
+}
+
+export function rollbackCardReview(
+  card: FsrsCardSnapshot,
+  log: FsrsReviewLogSnapshot,
+): FsrsCardSnapshot {
+  const parsed = parseFsrsReviewLogSnapshot(log)
+
+  return fromTsFsrsCard(
+    fsrs().rollback(toTsFsrsCard(card), {
+      rating: toTsFsrsRating(parsed.rating),
+      state: toTsFsrsState(parsed.state),
+      due: new Date(parsed.dueAt),
+      stability: parsed.stability,
+      difficulty: parsed.difficulty,
+      elapsed_days: parsed.elapsedDays,
+      last_elapsed_days: parsed.lastElapsedDays,
+      scheduled_days: parsed.scheduledDays,
+      learning_steps: parsed.learningSteps,
+      review: new Date(parsed.reviewedAt),
+    }),
+  )
 }
 
 export function calculateCardRetrievability(

@@ -14,13 +14,19 @@ import {
 import type { FsrsCardSnapshot } from '../domain/card-snapshot'
 import type { FsrsReviewLogSnapshot } from '../domain/review-log-snapshot'
 import type { FsrsSchedulerProfile } from '../domain/scheduler-profile'
+import type { ReviewRating } from '../domain/review-rating'
+import { rollbackCardReview } from '../adapter/ts-fsrs-adapter'
 import {
   createInitialFsrsCard,
   createFsrsSchedulerProfile,
   scheduleReview,
   scheduleReviewWithProfile,
 } from './review-scheduler'
-import { correctReviewFromEvidence } from './review-correction'
+import {
+  correctLegacyReview,
+  correctReviewFromEvidence,
+  type FsrsLegacyReviewEntry,
+} from './review-correction'
 
 const firstAt = new Date('2026-01-01T10:00:00.000Z')
 const secondAt = new Date('2026-01-10T10:00:00.000Z')
@@ -321,6 +327,179 @@ it.each(replacementGrades)(
     expect(JSON.stringify(saved.context)).toBe(before)
   },
 )
+
+it('corrects verified latest memory with an explicitly unknown original profile', () => {
+  const { card, history } = legacyHistory()
+  const before = JSON.stringify({ card, history })
+  const corrected = correctLegacyReview(card, history, 'easy', 0.9)
+  const nativeA = native75.next(createEmptyCard(firstAt), firstAt, Rating.Easy)
+  const nativeB = native75.next(nativeA.card, secondAt, Rating.Good)
+  const nativeC = native75.next(nativeB.card, thirdAt, Rating.Again)
+  const recovered = native75.rollback(nativeC.card, nativeC.log)
+  expect(recovered.due).not.toEqual(nativeB.card.due)
+  const expected = fsrs({
+    ...native75.parameters,
+    request_retention: 0.9,
+  }).next(recovered, thirdAt, Rating.Easy)
+
+  expectNativeCard(corrected.card, expected.card)
+  expectNativeLog(corrected.log, expected.log)
+  expect(corrected.card.lapses).toBe(0)
+  expect(corrected.rating).toBe('easy')
+  expect(corrected.reviewedAt.toISOString()).toBe(thirdAt.toISOString())
+  expect(corrected.reviewedAt).not.toBe(history.at(-1)?.reviewedAt)
+  expect(corrected).toMatchObject({
+    evidence: 'legacy-derived',
+    originalProfile: null,
+  })
+  expect(corrected).not.toHaveProperty('context')
+  expect(corrected.profile.parameters.targetRetention).toBe(0.9)
+  expect(JSON.stringify({ card, history })).toBe(before)
+})
+
+it('rejects an earlier valid log even though native rollback accepts it', () => {
+  const { card, history } = legacyHistory()
+  const earlierLog = history[1]?.log
+  if (!earlierLog) throw new Error('Missing earlier fixture log.')
+  const nativeA = native75.next(createEmptyCard(firstAt), firstAt, Rating.Easy)
+  const nativeB = native75.next(nativeA.card, secondAt, Rating.Good)
+  const nativeC = native75.next(nativeB.card, thirdAt, Rating.Again)
+  expect(() => native75.rollback(nativeC.card, nativeB.log)).not.toThrow()
+  expect(() => rollbackCardReview(card, earlierLog)).not.toThrow()
+  const replaced = history.map((event, index) =>
+    index === 2 ? { ...event, log: earlierLog } : event,
+  )
+  const before = JSON.stringify({ card, replaced })
+
+  expect(() => correctLegacyReview(card, replaced, 'easy', 0.9)).toThrow(
+    'Unsupported or ambiguous legacy FSRS correction evidence.',
+  )
+  expect(JSON.stringify({ card, replaced })).toBe(before)
+})
+
+it.each([
+  { label: 'tied', hours: [10, 10, 14] },
+  { label: 'reordered', hours: [10, 18, 14] },
+])(
+  'rejects $label histories in original and sorted order without mutation',
+  ({ hours }) => {
+    const times = hours.map((hour) => new Date(`2026-01-01T${hour}:00:00.000Z`))
+    const { card, history } = legacyHistory(times, ['again', 'hard', 'good'])
+    expect(card.reps).toBe(3)
+    const sorted = history.toSorted(
+      (left, right) => left.reviewedAt.getTime() - right.reviewedAt.getTime(),
+    )
+    const before = JSON.stringify({ card, history, sorted })
+
+    expect(() => correctLegacyReview(card, history, 'easy', 0.9)).toThrow(
+      'Unsupported or ambiguous legacy FSRS correction evidence.',
+    )
+    expect(() => correctLegacyReview(card, sorted, 'easy', 0.9)).toThrow(
+      'Unsupported or ambiguous legacy FSRS correction evidence.',
+    )
+    expect(JSON.stringify({ card, history, sorted })).toBe(before)
+  },
+)
+
+it('rejects missing, incomplete and inconsistent saved evidence without mutation', () => {
+  const { card, history } = legacyHistory()
+  const missing = history.map((event, index) =>
+    index === 2 ? { ...event, log: null } : event,
+  )
+  const unsupported =
+    'Unsupported or ambiguous legacy FSRS correction evidence.'
+  for (const [candidateCard, entries, error] of [
+    [card, [], unsupported],
+    [card, history.slice(1), unsupported],
+    [card, missing, 'Invalid FSRS review log snapshot.'],
+    [{ ...card, lapses: 0 }, history, unsupported],
+    [{ ...card, stability: card.stability + 1 }, history, unsupported],
+    [{ ...card, lastReviewAt: secondAt }, history, unsupported],
+  ] as const) {
+    const before = JSON.stringify({ card: candidateCard, history: entries })
+    expect(() =>
+      correctLegacyReview(candidateCard, entries, 'easy', 0.9),
+    ).toThrow(error)
+    expect(JSON.stringify({ card: candidateCard, history: entries })).toBe(
+      before,
+    )
+  }
+})
+
+it.each([
+  { state: 'new', pairs: [['easy', Rating.Easy]] },
+  {
+    state: 'learning',
+    pairs: [
+      ['again', Rating.Again],
+      ['again', Rating.Again],
+    ],
+  },
+  {
+    state: 'relearning',
+    pairs: [
+      ['easy', Rating.Easy],
+      ['again', Rating.Again],
+      ['again', Rating.Again],
+    ],
+  },
+] as const)(
+  'corrects captured and verified legacy $state pre-states',
+  ({ state, pairs }) => {
+    let card = createInitialFsrsCard(firstAt)
+    let nativeCard = createEmptyCard(firstAt)
+    const history: FsrsLegacyReviewEntry[] = []
+    for (const [index, [rating, grade]] of pairs.entries()) {
+      const at = new Date(firstAt.getTime() + index * 86_400_000)
+      const saved = scheduleReviewWithProfile(card, rating, at, profile75)
+      const nativeSaved = native75.next(nativeCard, at, grade)
+      history.push({ reviewedAt: at, rating, log: saved.log })
+      if (index === pairs.length - 1) {
+        expect(card.state).toBe(state)
+        for (const [replacement, replacementGrade] of replacementGrades) {
+          const expected = native75.next(nativeCard, at, replacementGrade)
+          const captured = correctReviewFromEvidence(saved.context, replacement)
+          const legacy = correctLegacyReview(
+            saved.card,
+            history,
+            replacement,
+            0.75,
+          )
+          expectNativeCard(captured.card, expected.card)
+          expectNativeLog(captured.log, expected.log)
+          expectNativeCard(legacy.card, expected.card)
+          expectNativeLog(legacy.log, expected.log)
+        }
+      }
+      card = saved.card
+      nativeCard = nativeSaved.card
+    }
+    const again = correctLegacyReview(card, history, 'again', 0.75)
+    expect(again.card.lapses).toBe(pairs.length === 3 ? 1 : 0)
+    const latest = history.at(-1)
+    if (!latest) throw new Error('Missing latest fixture entry.')
+    expect(
+      scheduleReviewWithProfile(card, 'good', latest.reviewedAt, profile75).card
+        .reps,
+    ).toBe(card.reps + 1)
+  },
+)
+
+function legacyHistory(
+  times = [firstAt, secondAt, thirdAt],
+  ratings: readonly ReviewRating[] = ['easy', 'good', 'again'],
+) {
+  let card = createInitialFsrsCard(times[0])
+  const history: FsrsLegacyReviewEntry[] = []
+  for (const [index, at] of times.entries()) {
+    const rating = ratings[index]
+    if (!rating) throw new Error('Missing fixture rating.')
+    const result = scheduleReview(card, rating, at, legacy75)
+    history.push({ reviewedAt: at, rating: result.rating, log: result.log })
+    card = result.card
+  }
+  return { card, history }
+}
 
 function customWeights() {
   const weights = [...default_w]
