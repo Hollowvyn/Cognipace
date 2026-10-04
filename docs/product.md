@@ -45,6 +45,7 @@ Implemented or meaningfully wired:
 - Popup command surface
 - LeetCode content-script overlay
 - Dashboard shell and navigation
+- Overview guided-practice home with today's progress and recorded practice time
 - Library/Problems management
 - Tracks workspace and management
 - Settings
@@ -55,10 +56,6 @@ Implemented or meaningfully wired:
 - AI assessment settings and trusted local provider key storage for approved
   BYOK providers
 - Runtime messaging, cache invalidation, local database, migrations, and seed data
-
-Currently incomplete or intentionally light:
-
-- Overview is a dashboard route with a planned guided-practice home.
 
 ## Product Surfaces
 
@@ -139,7 +136,14 @@ Current behavior:
   upcoming-review forecast. Its historical charts use the selected 14-, 30-,
   or 90-day range as evidence-gated presentation windows rather than promising
   a trend from sparse local history.
-- Overview currently reserves route ownership for a future guided-practice home.
+- Overview shows the current review recommendation, Reviews Due, Completed
+  Today, Streak, Time Today, active-track guidance, and a Today Queue preview.
+  Time Today sums saved elapsed time for all assessments recorded on today's
+  browser-local calendar date, including repeated and failed attempts. Untimed
+  assessments contribute no time. An overnight session belongs to the date its
+  assessment was recorded. Corrections replace the existing attempt's time;
+  resetting a problem's practice removes its retained time. The total refreshes
+  with the existing practice invalidation and dashboard reread behavior.
 
 ### Background Service Worker
 

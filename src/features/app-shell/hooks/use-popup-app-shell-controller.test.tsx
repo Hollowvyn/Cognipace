@@ -55,6 +55,7 @@ const popupData = {
   ],
   practiceProgress: {
     completedToday: 0,
+    recordedSecondsToday: 0,
     dailyGoal: 4,
     currentStreak: 0,
     goalMetToday: false,

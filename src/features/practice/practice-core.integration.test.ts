@@ -425,12 +425,29 @@ describe('practice core', () => {
       reviewAttemptId: 'review-2',
     })
 
+    const progressInput = {
+      dailyGoal: 1,
+      now: new Date('2026-01-03T10:01:00.000Z'),
+    }
+    await expect(
+      repository.getPracticeProgressSummary(progressInput),
+    ).resolves.toMatchObject({
+      recordedSecondsToday: 600,
+      completedToday: 1,
+    })
+
     const override = await repository.overrideLastReviewResult({
       problemSlug: 'two-sum',
       rating: 'again',
       elapsedSeconds: 900,
       isCorrect: false,
       log: { notes: 'Missed edge case.' },
+    })
+    await expect(
+      repository.getPracticeProgressSummary(progressInput),
+    ).resolves.toMatchObject({
+      recordedSecondsToday: 900,
+      completedToday: 1,
     })
     const attempts = await handle.db
       .select()
@@ -547,6 +564,7 @@ describe('practice core', () => {
       problemSlug: 'two-sum',
       rating: 'easy',
       reviewedAt: new Date('2026-01-01T10:00:00.000Z'),
+      elapsedSeconds: 120,
       log: { notes: 'Keep the hash-map invariant.' },
       reviewAttemptId: 'review-1',
     })
@@ -559,6 +577,16 @@ describe('practice core', () => {
       handle.db,
       new Date('2026-01-01T10:01:00.000Z'),
     )
+    await expect(
+      repository.getPracticeProgressSummary({
+        dailyGoal: 1,
+        now: new Date('2026-01-01T10:01:00.000Z'),
+      }),
+    ).resolves.toMatchObject({
+      recordedSecondsToday: 120,
+      completedToday: 1,
+      goalMetToday: true,
+    })
     const resumed = await repository.setPracticeSuspended({
       problemSlug: 'two-sum',
       suspended: false,
@@ -683,6 +711,7 @@ describe('practice core', () => {
       problemSlug: 'two-sum',
       rating: 'good',
       reviewedAt: new Date('2026-01-01T10:00:00.000Z'),
+      elapsedSeconds: 180,
       log: {
         interviewPattern: 'Hash map',
         notes: 'Carry this through reset.',
@@ -694,8 +723,33 @@ describe('practice core', () => {
       suspended: true,
     })
 
+    await repository.saveReviewResult({
+      problemSlug: 'valid-parentheses',
+      rating: 'hard',
+      reviewedAt: new Date('2026-01-01T10:00:00.000Z'),
+      elapsedSeconds: 240,
+      reviewAttemptId: 'reset-control',
+    })
+    const progressInput = {
+      dailyGoal: 2,
+      now: new Date('2026-01-01T10:01:00.000Z'),
+    }
+    await expect(
+      repository.getPracticeProgressSummary(progressInput),
+    ).resolves.toMatchObject({
+      recordedSecondsToday: 420,
+      completedToday: 2,
+    })
+
     const reset = await repository.resetPracticeSchedule({
       problemSlug: 'two-sum',
+    })
+    await expect(
+      repository.getPracticeProgressSummary(progressInput),
+    ).resolves.toMatchObject({
+      recordedSecondsToday: 240,
+      completedToday: 1,
+      goalMetToday: false,
     })
     const attempts = await handle.db
       .select()

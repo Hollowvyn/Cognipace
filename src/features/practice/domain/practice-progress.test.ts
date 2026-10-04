@@ -13,6 +13,116 @@ afterEach(() => {
 })
 
 describe('buildPracticeProgressSummary', () => {
+  it('sums each timed attempt independently of unique completed problems', () => {
+    const summary = buildPracticeProgressSummary(
+      [
+        attempt('two-sum', '2026-05-25T10:00:00.000Z', 60.6),
+        attempt('two-sum', '2026-05-25T11:00:00.000Z', 60.6),
+        attempt('valid-parentheses', '2026-05-25T12:00:00.000Z', 78),
+      ],
+      { dailyGoal: 2, now },
+    )
+
+    expect(summary).toMatchObject({
+      recordedSecondsToday: 200,
+      completedToday: 2,
+      goalMetToday: true,
+      currentStreak: 1,
+    })
+  })
+
+  it('ignores absent, null, non-finite, and non-positive elapsed time', () => {
+    const summary = buildPracticeProgressSummary(
+      [
+        attempt('two-sum', '2026-05-25T10:00:00.000Z'),
+        attempt('two-sum', '2026-05-25T11:00:00.000Z', null),
+        attempt('two-sum', '2026-05-25T12:00:00.000Z', Number.NaN),
+        attempt(
+          'two-sum',
+          '2026-05-25T13:00:00.000Z',
+          Number.POSITIVE_INFINITY,
+        ),
+        attempt(
+          'two-sum',
+          '2026-05-25T14:00:00.000Z',
+          Number.NEGATIVE_INFINITY,
+        ),
+        attempt('two-sum', '2026-05-25T15:00:00.000Z', 0),
+        attempt('two-sum', '2026-05-25T16:00:00.000Z', -60),
+        attempt('two-sum', '2026-05-25T17:00:00.000Z', 60),
+      ],
+      { dailyGoal: 2, now },
+    )
+
+    expect(summary.recordedSecondsToday).toBe(60)
+    expect(summary.completedToday).toBe(1)
+  })
+
+  it('includes the full local day from midnight and excludes neighboring days', () => {
+    const localNow = new Date(2026, 4, 25, 12)
+    const summary = buildPracticeProgressSummary(
+      [
+        attempt('two-sum', new Date(2026, 4, 24, 23, 59, 59, 999), 3600),
+        attempt('two-sum', new Date(2026, 4, 25, 0, 0, 0, 0), 40),
+        attempt(
+          'valid-parentheses',
+          new Date(2026, 4, 25, 23, 59, 59, 999),
+          80,
+        ),
+        attempt('valid-parentheses', new Date(2026, 4, 26, 0, 0, 0, 0), 600),
+      ],
+      { dailyGoal: 2, now: localNow },
+    )
+
+    expect(summary.recordedSecondsToday).toBe(120)
+    expect(summary.completedToday).toBe(2)
+    expect(summary.todayDateKey).toBe('2026-05-25')
+  })
+
+  it('does not manufacture recorded time from an invalid review date', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
+
+    const summary = buildPracticeProgressSummary(
+      [
+        attempt('two-sum', new Date(Number.NaN), 900),
+        attempt('valid-parentheses', '2026-05-25T12:00:00.000Z', 60),
+      ],
+      { dailyGoal: 2, now },
+    )
+
+    expect(summary.recordedSecondsToday).toBe(60)
+  })
+
+  it('returns zero recorded time when no attempts are saved', () => {
+    const summary = buildPracticeProgressSummary([], { dailyGoal: 4, now })
+
+    expect(summary).toMatchObject({
+      recordedSecondsToday: 0,
+      completedToday: 0,
+      goalMetToday: false,
+      currentStreak: 0,
+    })
+  })
+
+  it.each([0, -1])(
+    'retains recorded time with a disabled daily goal of %s',
+    (dailyGoal) => {
+      const summary = buildPracticeProgressSummary(
+        [attempt('two-sum', '2026-05-25T10:00:00.000Z', 120)],
+        { dailyGoal, now },
+      )
+
+      expect(summary).toMatchObject({
+        recordedSecondsToday: 120,
+        completedToday: 1,
+        dailyGoal: 0,
+        goalMetToday: false,
+        currentStreak: 0,
+      })
+    },
+  )
+
   it('counts unique practiced problems for the current local day', () => {
     const summary = buildPracticeProgressSummary(
       [
@@ -134,10 +244,12 @@ describe('toPracticeDateKey', () => {
 
 function attempt(
   problemSlug: string,
-  reviewedAt: string,
+  reviewedAt: string | Date,
+  elapsedSeconds?: number | null,
 ): PracticeProgressAttempt {
   return {
     problemSlug,
     reviewedAt: new Date(reviewedAt),
+    ...(elapsedSeconds !== undefined && { elapsedSeconds }),
   }
 }
