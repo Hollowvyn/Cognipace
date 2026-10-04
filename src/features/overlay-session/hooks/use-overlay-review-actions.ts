@@ -4,10 +4,6 @@ import {
 } from '@/features/assessment'
 import { openDashboardViaRuntime } from '@/features/app-shell'
 import {
-  recommendLeetCodeAssessmentViaRuntime,
-  type RecommendLeetCodeAssessmentRequest,
-} from '@/features/leetcode-review-assistant'
-import {
   overrideLastReviewResultViaRuntime,
   saveReviewResultViaRuntime,
   type SerializedPracticeDetails,
@@ -36,12 +32,6 @@ type AcceptedAssessmentDecision = Extract<
   LeetCodeAssessmentDecision,
   { status: 'accepted' }
 >
-
-type SaveAssessmentInput = {
-  decision: AcceptedAssessmentDecision
-  session: ReturnType<typeof deriveOverlayAssessmentSessionContext>
-  submission: RecommendLeetCodeAssessmentRequest['submission']
-}
 
 type UseOverlayReviewActionsOptions = {
   contextRef: LatestRef<LeetCodeOverlayContext | null>
@@ -159,11 +149,7 @@ export function useOverlayReviewActions({
       return
     }
 
-    await saveAcceptedReview({
-      decision,
-      session,
-      submission: { status: 'no-submission' },
-    })
+    await saveAcceptedReview(decision)
   }
 
   async function submitReview() {
@@ -196,11 +182,7 @@ export function useOverlayReviewActions({
       return
     }
 
-    await saveAcceptedReview({
-      decision,
-      session,
-      submission: { status: 'no-submission' },
-    })
+    await saveAcceptedReview(decision)
   }
 
   async function failReview() {
@@ -232,11 +214,7 @@ export function useOverlayReviewActions({
       return
     }
 
-    await saveAcceptedReview({
-      decision,
-      session,
-      submission: { status: 'no-submission' },
-    })
+    await saveAcceptedReview(decision)
   }
 
   async function saveLeetCodeSubmissionResult(
@@ -282,14 +260,10 @@ export function useOverlayReviewActions({
       return false
     }
 
-    return saveAcceptedReview({
-      decision,
-      session,
-      submission: toAssessmentSubmission(result),
-    })
+    return saveAcceptedReview(decision)
   }
 
-  async function saveAcceptedReview(input: SaveAssessmentInput) {
+  async function saveAcceptedReview(decision: AcceptedAssessmentDecision) {
     const saveToken = syncTokenRef.current
     const currentContext = contextRef.current
     const problem = currentContext?.problem
@@ -302,7 +276,6 @@ export function useOverlayReviewActions({
     dispatch({ type: 'save-started' })
 
     try {
-      const decision = await maybeApplyAiRecommendation(input)
       const details = await saveReviewResultViaRuntime({
         surface: 'content-script',
         problemSlug: problem.problemSlug,
@@ -446,72 +419,6 @@ export function useOverlayReviewActions({
     })
   }
 
-  async function maybeApplyAiRecommendation({
-    decision,
-    session,
-    submission,
-  }: SaveAssessmentInput): Promise<AcceptedAssessmentDecision> {
-    const currentContext = contextRef.current
-    const problem = currentContext?.problem
-
-    if (
-      !currentContext?.aiAssessmentAvailable ||
-      !problem ||
-      !decision.isCorrect ||
-      decision.lockReason !== null
-    ) {
-      return decision
-    }
-
-    let response: Awaited<
-      ReturnType<typeof recommendLeetCodeAssessmentViaRuntime>
-    >
-    try {
-      response = await recommendLeetCodeAssessmentViaRuntime({
-        surface: 'content-script',
-        problemSlug: problem.problemSlug,
-        submissionFingerprint: createSubmissionFingerprint({
-          problemSlug: problem.problemSlug,
-          decision,
-          session,
-          submission,
-        }),
-        problem: {
-          slug: problem.problemSlug,
-          title: problem.title,
-          difficulty: problem.difficulty,
-          topics: [],
-        },
-        submission,
-        timing: {
-          elapsedSeconds: decision.elapsedSeconds,
-          targetSeconds: decision.targetSeconds,
-          timerUsed: session.timerUsed,
-        },
-        deterministicDecision: decision,
-        sessionContext: session,
-      })
-    } catch {
-      return decision
-    }
-
-    if (
-      response.status !== 'ready' ||
-      !response.recommendation.shouldUpdateRating ||
-      response.recommendation.recommendedRating === decision.rating
-    ) {
-      return decision
-    }
-
-    const recommendedRating = response.recommendation.recommendedRating
-
-    return {
-      ...decision,
-      rating: recommendedRating,
-      isCorrect: recommendedRating !== 'again',
-    }
-  }
-
   return {
     collapse,
     dock,
@@ -529,54 +436,6 @@ export function useOverlayReviewActions({
     submitReview,
     updateReview,
   }
-}
-
-function toAssessmentSubmission(
-  result: LeetCodeSubmissionResult,
-): RecommendLeetCodeAssessmentRequest['submission'] {
-  const common = {
-    code: result.resultCodeSnapshot?.code ?? undefined,
-    language: result.resultCodeSnapshot?.language ?? undefined,
-    passedTestCount: result.passedTestCount ?? undefined,
-    totalTestCount: result.totalTestCount ?? undefined,
-  }
-
-  if (result.status === 'accepted') {
-    return {
-      status: 'accepted',
-      ...common,
-      runtime: result.runtime ?? undefined,
-      memory: result.memory ?? undefined,
-    }
-  }
-
-  return {
-    status: 'failed',
-    ...common,
-    failingTestcase: result.failingTestcase ?? result.lastTestcase ?? undefined,
-    expectedOutput: result.expectedOutput ?? undefined,
-    actualOutput: result.codeOutput ?? undefined,
-    errorMessage:
-      result.errorMessage ??
-      result.compileError ??
-      result.runtimeError ??
-      undefined,
-  }
-}
-
-function createSubmissionFingerprint(input: {
-  problemSlug: string
-  decision: AcceptedAssessmentDecision
-  session: ReturnType<typeof deriveOverlayAssessmentSessionContext>
-  submission: RecommendLeetCodeAssessmentRequest['submission']
-}) {
-  return [
-    input.problemSlug,
-    input.session.submissionSource,
-    input.decision.rating,
-    input.decision.elapsedSeconds ?? 'untimed',
-    input.submission.status,
-  ].join(':')
 }
 
 function createSubmittedSnapshotFromPracticeDetails(

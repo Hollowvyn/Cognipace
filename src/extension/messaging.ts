@@ -75,14 +75,6 @@ import type {
   CancelLeetCodeAnalysisRequest,
   CancelLeetCodeAnalysisResponse,
 } from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
-import type {
-  RecommendLeetCodeAssessmentRequest,
-  RecommendLeetCodeAssessmentResponse,
-} from '@/features/leetcode-review-assistant/api/runtime-contracts'
-export {
-  recommendLeetCodeAssessmentRequestSchema,
-  recommendLeetCodeAssessmentResponseSchema,
-} from '@/features/leetcode-review-assistant/api/runtime-contracts'
 import {
   normalizedPracticeStateSchema,
   type PracticeDetailsRequest,
@@ -350,9 +342,6 @@ export interface ProtocolMap {
   'genai.cancelLeetCodeAnalysis'(
     request: CancelLeetCodeAnalysisRequest,
   ): CancelLeetCodeAnalysisResponse
-  'genai.recommendLeetCodeAssessment'(
-    request: RecommendLeetCodeAssessmentRequest,
-  ): RecommendLeetCodeAssessmentResponse
   'imports.preview'(request: ImportPreviewRequest): ImportPreviewResponse
   'imports.apply'(request: ImportApplyRequest): ImportApplyResponse
   'imports.retryPersistence'(
@@ -458,7 +447,6 @@ export const protocolMethodNames = [
   'genai.testConnection',
   'genai.analyzeLeetCodeSubmission',
   'genai.cancelLeetCodeAnalysis',
-  'genai.recommendLeetCodeAssessment',
   'imports.preview',
   'imports.apply',
   'imports.retryPersistence',

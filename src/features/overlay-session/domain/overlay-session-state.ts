@@ -43,7 +43,6 @@ export type OverlaySessionState = {
   submittedSession: OverlaySubmittedSession | null
   nextStep: OverlayNextStepState
   feedback: OverlayFeedback | null
-  userTouchedRating: boolean
 }
 
 export type OverlaySessionAction =
@@ -61,7 +60,6 @@ export type OverlaySessionAction =
   | { type: 'page-changed' }
   | { type: 'set-visual-mode'; visualMode: OverlayVisualMode }
   | { type: 'set-selected-rating'; rating: ReviewRating }
-  | { type: 'ai-preselect-rating'; rating: ReviewRating }
   | { type: 'save-started' }
   | { type: 'update-started' }
   | {
@@ -95,7 +93,6 @@ export const initialOverlaySessionState: OverlaySessionState = {
   submittedSession: null,
   nextStep: createHiddenNextStepState(),
   feedback: null,
-  userTouchedRating: false,
 }
 
 export function overlaySessionReducer(
@@ -129,7 +126,6 @@ export function overlaySessionReducer(
             : state.submittedSession,
         ratingLockReason:
           action.submittedSession?.lockReason ?? state.ratingLockReason,
-        userTouchedRating: false,
       }
     case 'page-changed':
       return initialOverlaySessionState
@@ -140,22 +136,6 @@ export function overlaySessionReducer(
       }
     case 'set-selected-rating':
       if (state.ratingLockReason) {
-        return state
-      }
-
-      return withDerivedReviewStatus({
-        ...state,
-        selectedRating: action.rating,
-        userTouchedRating: true,
-      })
-    case 'ai-preselect-rating':
-      if (state.ratingLockReason) {
-        return state
-      }
-      if (state.userTouchedRating) {
-        return state
-      }
-      if (state.selectedRating === action.rating) {
         return state
       }
 
@@ -237,7 +217,6 @@ export function overlaySessionReducer(
         submittedSession: null,
         nextStep: createHiddenNextStepState(),
         feedback: null,
-        userTouchedRating: false,
       }
     case 'set-feedback':
       return {

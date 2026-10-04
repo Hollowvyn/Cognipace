@@ -27,8 +27,6 @@ import {
   problemsUpdateProblemRequestSchema,
   problemsUpsertFromPageRequestSchema,
   queueRequestSchema,
-  recommendLeetCodeAssessmentRequestSchema,
-  recommendLeetCodeAssessmentResponseSchema,
   setAiProviderSecretRequestSchema,
   testAiConnectionRequestSchema,
   testAiConnectionResponseSchema,
@@ -97,7 +95,6 @@ import {
   cancelLeetCodeAnalysisResponseSchema,
 } from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
 import { analyzeLeetCodeSubmissionInBackground } from '@/features/leetcode-review-assistant/server/analysis-runtime-service'
-import { recommendLeetCodeAssessmentInBackground } from '@/features/leetcode-review-assistant/server/runtime-handler-service'
 import {
   practiceDetailsRequestSchema,
   practiceOverrideLastReviewResultRequestSchema,
@@ -1309,21 +1306,6 @@ export function registerBackgroundHandlers() {
       requestId: request.requestId,
       cancelled: cancelOwnedAnalysis(owner, request.requestId),
     })
-  })
-
-  onMessage('genai.recommendLeetCodeAssessment', ({ data, sender }) => {
-    const request = recommendLeetCodeAssessmentRequestSchema.parse(data)
-
-    assertCanSenderCallExtensionMethod(
-      'genai.recommendLeetCodeAssessment',
-      request.surface,
-      sender,
-    )
-    return getAppDb().then(async ({ db }) =>
-      recommendLeetCodeAssessmentResponseSchema.parse(
-        await recommendLeetCodeAssessmentInBackground(db, request),
-      ),
-    )
   })
 
   onMessage('leetcode.readProblemMetadata', ({ data, sender }) => {

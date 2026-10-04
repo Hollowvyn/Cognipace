@@ -323,30 +323,6 @@ describe('runtime-policy', () => {
         expect(canCallExtensionMethod(method, 'background')).toBe(false)
       }
     })
-
-    it('allows only content-script to call genai.recommendLeetCodeAssessment', () => {
-      expect(
-        canCallExtensionMethod(
-          'genai.recommendLeetCodeAssessment',
-          'content-script',
-        ),
-      ).toBe(true)
-      expect(
-        canCallExtensionMethod('genai.recommendLeetCodeAssessment', 'popup'),
-      ).toBe(false)
-      expect(
-        canCallExtensionMethod(
-          'genai.recommendLeetCodeAssessment',
-          'dashboard',
-        ),
-      ).toBe(false)
-      expect(
-        canCallExtensionMethod(
-          'genai.recommendLeetCodeAssessment',
-          'background',
-        ),
-      ).toBe(false)
-    })
   })
 
   it('allows content scripts to use practice controls for the current problem', () => {

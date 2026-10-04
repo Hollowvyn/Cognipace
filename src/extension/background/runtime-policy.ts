@@ -17,7 +17,6 @@ const methodSurfaceAccess = {
   'genai.testConnection': ['dashboard'],
   'genai.analyzeLeetCodeSubmission': ['content-script'],
   'genai.cancelLeetCodeAnalysis': ['content-script'],
-  'genai.recommendLeetCodeAssessment': ['content-script'],
   'imports.preview': ['dashboard'],
   'imports.apply': ['dashboard'],
   'imports.retryPersistence': ['dashboard'],

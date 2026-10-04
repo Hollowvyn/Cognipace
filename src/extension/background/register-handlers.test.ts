@@ -176,7 +176,6 @@ const backgroundMocks = vi.hoisted(() => {
     markSyncLocalDataChanged: vi.fn(),
     readSyncMetadata: vi.fn(),
     writeSyncMetadata: vi.fn(),
-    recommendLeetCodeAssessmentInBackground: vi.fn(),
     readLeetCodeProblemContentInBackground: vi.fn(),
     readLeetCodeSubmissionResultInBackground: vi.fn(),
     alarmScheduler,
@@ -344,14 +343,6 @@ vi.mock('@/features/leetcode-capture/server/leetcode-capture-service', () => ({
   readLeetCodeSubmissionResultInBackground:
     backgroundMocks.readLeetCodeSubmissionResultInBackground,
 }))
-
-vi.mock(
-  '@/features/leetcode-review-assistant/server/runtime-handler-service',
-  () => ({
-    recommendLeetCodeAssessmentInBackground:
-      backgroundMocks.recommendLeetCodeAssessmentInBackground,
-  }),
-)
 
 vi.mock(
   '@/features/leetcode-review-assistant/server/analysis-runtime-service',
@@ -2586,140 +2577,6 @@ describe('background handler registration', () => {
     expect(
       backgroundMocks.readLeetCodeSubmissionResultInBackground,
     ).toHaveBeenCalledWith(submissionRequest)
-  })
-
-  describe('genai.recommendLeetCodeAssessment', () => {
-    const baseRequest = {
-      surface: 'content-script' as const,
-      problemSlug: 'two-sum',
-      submissionFingerprint: 'fp-abc-123',
-      problem: {
-        slug: 'two-sum',
-        title: 'Two Sum',
-        difficulty: 'medium' as const,
-        topics: ['array'],
-      },
-      submission: { status: 'no-submission' as const },
-      timing: {
-        elapsedSeconds: 600,
-        targetSeconds: 2100,
-        timerUsed: true,
-      },
-      deterministicDecision: {
-        status: 'accepted' as const,
-        rating: 'good' as const,
-        isCorrect: true,
-        elapsedSeconds: 600,
-        targetSeconds: 2100,
-        isOverTarget: false,
-        lockReason: null,
-        reason: {
-          code: 'leetcode-good',
-          signals: { elapsedSeconds: 600 },
-        },
-        warnings: [],
-        confidence: 0.8,
-      },
-      sessionContext: {
-        sessionKind: 'first-solve' as const,
-        submissionSource: 'leetcode-watcher' as const,
-        timerUsed: true,
-        previousRating: null,
-        bestElapsedSeconds: null,
-        latestAttempt: null,
-      },
-    }
-
-    const contentScriptSender = { tab: { id: 1 }, frameId: 0 }
-
-    beforeEach(() => {
-      backgroundMocks.handlers.clear()
-      backgroundMocks.recommendLeetCodeAssessmentInBackground.mockReset()
-      backgroundMocks.assertCanSenderCallExtensionMethod.mockReset()
-      backgroundMocks.getAppDb.mockResolvedValue({ db: backgroundMocks.db })
-      registerBackgroundHandlers()
-    })
-
-    it('calls the handler when sender is content-script', async () => {
-      backgroundMocks.recommendLeetCodeAssessmentInBackground.mockResolvedValue(
-        {
-          status: 'unavailable',
-          message: 'AI is not configured.',
-          submissionFingerprint: 'fp-abc-123',
-        },
-      )
-
-      const handler = backgroundMocks.handlers.get(
-        'genai.recommendLeetCodeAssessment',
-      )
-      expect(handler).toBeDefined()
-
-      const result = await handler!({
-        data: baseRequest,
-        sender: contentScriptSender,
-      })
-
-      expect(
-        backgroundMocks.recommendLeetCodeAssessmentInBackground,
-      ).toHaveBeenCalledWith(backgroundMocks.db, baseRequest)
-      expect((result as { status: string }).status).toBe('unavailable')
-      expect(
-        backgroundMocks.assertCanSenderCallExtensionMethod,
-      ).toHaveBeenCalledWith(
-        'genai.recommendLeetCodeAssessment',
-        'content-script',
-        contentScriptSender,
-      )
-    })
-
-    it('throws at the schema layer when wire payload claims non-content-script surface', () => {
-      const handler = backgroundMocks.handlers.get(
-        'genai.recommendLeetCodeAssessment',
-      )
-
-      expect(() =>
-        handler!({
-          data: { ...baseRequest, surface: 'popup' },
-          sender: contentScriptSender,
-        }),
-      ).toThrow()
-
-      expect(
-        backgroundMocks.assertCanSenderCallExtensionMethod,
-      ).not.toHaveBeenCalled()
-    })
-
-    it('throws when sender url resolves to a different surface than the claim', () => {
-      // Schema-valid request: surface is 'content-script' as the wire says.
-      // The policy mock throws to simulate the real-world rejection where the
-      // actual sender (popup.html URL) doesn't match the claimed surface.
-      backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementation(
-        (_method: string, surface: string, sender: unknown) => {
-          const senderRecord = sender as { url?: string }
-          if (
-            senderRecord.url?.includes('popup.html') &&
-            surface === 'content-script'
-          ) {
-            throw new Error(`Sender surface "popup" cannot claim "${surface}".`)
-          }
-        },
-      )
-
-      const handler = backgroundMocks.handlers.get(
-        'genai.recommendLeetCodeAssessment',
-      )
-
-      expect(() =>
-        handler!({
-          data: baseRequest, // surface stays 'content-script'
-          sender: { url: 'chrome-extension://extension-id/popup.html' },
-        }),
-      ).toThrow(/cannot claim/i)
-
-      expect(
-        backgroundMocks.recommendLeetCodeAssessmentInBackground,
-      ).not.toHaveBeenCalled()
-    })
   })
 })
 
