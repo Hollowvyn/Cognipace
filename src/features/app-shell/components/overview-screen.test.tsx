@@ -46,6 +46,27 @@ describe('OverviewScreen', () => {
       within(completedTodayMetric).getByText('Completed Today'),
     ).toBeVisible()
     expect(within(completedTodayMetric).getByText('1/4')).toBeVisible()
+    const timeTodayMetric = screen.getByLabelText('Time Today metric')
+    expect(within(timeTodayMetric).getByText('0m')).toBeVisible()
+    expect(
+      within(timeTodayMetric).getByText(
+        "Recorded time on today's submissions.",
+      ),
+    ).toBeVisible()
+  })
+
+  it('shows saved daily time alongside completed problems', async () => {
+    const data = createDashboardAppShellData()
+    data.overview.practiceProgress.recordedSecondsToday = 5100
+    vi.mocked(sendMessage).mockResolvedValueOnce(data)
+
+    renderOverviewScreen()
+
+    const metric = await screen.findByLabelText('Time Today metric')
+    expect(within(metric).getByText('1h 25m')).toBeVisible()
+    expect(
+      within(screen.getByLabelText('Completed Today metric')).getByText('1/4'),
+    ).toBeVisible()
   })
 
   it('renders queue clear as the primary action while keeping active-track next visible', async () => {
@@ -67,6 +88,7 @@ describe('OverviewScreen', () => {
         overview: {
           practiceProgress: {
             completedToday: 4,
+            recordedSecondsToday: 0,
             dailyGoal: 4,
             currentStreak: 3,
             goalMetToday: true,
@@ -103,6 +125,7 @@ describe('OverviewScreen', () => {
         overview: {
           practiceProgress: {
             completedToday: 1,
+            recordedSecondsToday: 0,
             dailyGoal: 4,
             currentStreak: 0,
             goalMetToday: false,
@@ -373,6 +396,7 @@ describe('OverviewScreen', () => {
         overview: {
           practiceProgress: {
             completedToday: 0,
+            recordedSecondsToday: 0,
             dailyGoal: 4,
             currentStreak: 0,
             goalMetToday: false,

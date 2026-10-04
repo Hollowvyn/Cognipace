@@ -326,7 +326,7 @@ const retentionMapRegionSchema = z.enum([
   'highest-attention',
 ])
 const retentionMapRowSchema = z.object({
-  rank: z.number().int().positive().max(30),
+  rank: z.number().int().positive(),
   slug: z.string(),
   title: z.string(),
   retrievability: percentageSchema,
@@ -398,7 +398,7 @@ export const analyticsViewsSchema = z
       additionalLowEvidenceTopics: countSchema,
     }),
     retentionMap: z.object({
-      rows: z.array(retentionMapRowSchema).max(30),
+      rows: z.array(retentionMapRowSchema),
       totalEligible: countSchema,
       statusCounts: retentionMapStatusCountsSchema,
       recallScale: analyticsScaleSchema,

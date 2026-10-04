@@ -442,6 +442,20 @@ The owners in that flow are:
   and the report context for pointer, tap and keyboard. The reconstructed
   backlog timestamp rule remains distinct from Upcoming's local-date overdue
   classification.
+- Retention Map returns every eligible current-state row. Its Zod contract keeps
+  positive ranks and valid estimates without the former 30-row/rank limit;
+  Memory Signals keeps its separate 25-row limit. Full-cohort scales/counts and
+  eligibility remain domain-owned. `current-state-views.tsx` composes the
+  All/Below target filter and the same filtered Chart/Table rows.
+  `retention-map-chart.tsx` owns a local controlled viewport and native
+  inspection/gesture state; `retention-map-model.ts` keeps presentation math and
+  shared labels feature-local. Public Recharts plot, forward and inverse scales
+  support exact log/linear coordinates. Both axes use `allowDataOverflow` so
+  zoom does not expand to include offscreen rows. Filtering keeps the full
+  fitted domain; zoom never recomputes memory estimates. Fixed-size status marks
+  retain true positions, overlapping points have a member chooser, and keyboard
+  inspection can reveal offscreen rows. No new persistence, message, dependency,
+  permission, migration or generic chart-interaction framework is introduced.
 - `src/lib/leetcode/domain/problem-url.ts` owns canonical problem URLs; the
   retention details and fragile-knowledge rows use `createLeetCodeProblemUrl`
   rather than constructing links in chart components.

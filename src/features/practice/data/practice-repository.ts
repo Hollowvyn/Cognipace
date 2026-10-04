@@ -371,6 +371,7 @@ export class PracticeRepository {
       .select({
         problemSlug: reviewAttempts.problemSlug,
         reviewedAt: reviewAttempts.reviewedAt,
+        elapsedSeconds: reviewAttempts.elapsedSeconds,
       })
       .from(reviewAttempts)
       .orderBy(desc(reviewAttempts.reviewedAt))
@@ -379,6 +380,7 @@ export class PracticeRepository {
       rows.map((row) => ({
         problemSlug: row.problemSlug,
         reviewedAt: new Date(row.reviewedAt),
+        elapsedSeconds: row.elapsedSeconds,
       })),
       input,
     )

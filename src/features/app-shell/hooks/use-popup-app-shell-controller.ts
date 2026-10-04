@@ -62,6 +62,7 @@ const fallbackData = {
   ],
   practiceProgress: {
     completedToday: 0,
+    recordedSecondsToday: 0,
     dailyGoal: 0,
     currentStreak: 0,
     goalMetToday: false,

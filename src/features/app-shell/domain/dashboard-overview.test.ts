@@ -35,7 +35,31 @@ describe('createDashboardOverviewView', () => {
         value: '0',
         caption: 'Goal-qualified days.',
       },
+      {
+        label: 'Time Today',
+        value: '0m',
+        caption: "Recorded time on today's submissions.",
+      },
     ])
+  })
+
+  it.each([
+    [0, '0m'],
+    [45, '<1m'],
+    [60, '1m'],
+    [3599, '59m'],
+    [3600, '1h'],
+    [5100, '1h 25m'],
+    [90_000, '25h'],
+  ])('formats %i recorded seconds as %s', (seconds, value) => {
+    const data = createDashboardAppShellData()
+    data.overview.practiceProgress.recordedSecondsToday = seconds
+
+    expect(createDashboardOverviewView(data).metrics.at(-1)).toEqual({
+      label: 'Time Today',
+      value,
+      caption: "Recorded time on today's submissions.",
+    })
   })
 
   it('keeps queue clear separate from active-track next problem', () => {
@@ -57,6 +81,7 @@ describe('createDashboardOverviewView', () => {
         overview: {
           practiceProgress: {
             completedToday: 4,
+            recordedSecondsToday: 0,
             dailyGoal: 4,
             currentStreak: 3,
             goalMetToday: true,
@@ -95,6 +120,7 @@ describe('createDashboardOverviewView', () => {
         overview: {
           practiceProgress: {
             completedToday: 0,
+            recordedSecondsToday: 0,
             dailyGoal: 4,
             currentStreak: 0,
             goalMetToday: false,

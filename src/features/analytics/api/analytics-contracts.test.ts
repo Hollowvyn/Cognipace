@@ -496,6 +496,35 @@ describe('analyticsSummarySchema', () => {
     expect(analyticsSummarySchema.safeParse(validSummary).success).toBe(true)
   })
 
+  it('accepts the complete Retention Map cohort and ranks above 30', () => {
+    const retentionMap = {
+      ...validSummary.views.retentionMap,
+      rows: Array.from({ length: 31 }, (_, index) => ({
+        rank: index + 1,
+        slug: `risk-${index}`,
+        title: `Risk ${index}`,
+        retrievability: 0.7,
+        targetRetention: 0.9,
+        targetGap: -0.2,
+        targetDurationDays: index + 7,
+        lastReviewedAt: validSummary.generatedAt,
+        dueAt: validSummary.generatedAt,
+        difficulty: 5,
+        lapseCount: 0,
+        status: 'needs-attention' as const,
+        region: 'needs-attention' as const,
+      })),
+      totalEligible: 31,
+      statusCounts: { onTarget: 0, watch: 0, needsAttention: 31 },
+    }
+    expect(
+      analyticsSummarySchema.parse({
+        ...validSummary,
+        views: { ...validSummary.views, retentionMap },
+      }).views.retentionMap,
+    ).toEqual(retentionMap)
+  })
+
   it('rejects a fallback recommendation when the requested range is ready', () => {
     const result = analyticsSummarySchema.safeParse({
       ...validSummary,

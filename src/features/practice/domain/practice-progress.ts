@@ -1,6 +1,7 @@
 export interface PracticeProgressAttempt {
   problemSlug: string
   reviewedAt: Date
+  elapsedSeconds?: number | null | undefined
 }
 
 export interface PracticeProgressSummaryInput {
@@ -10,6 +11,7 @@ export interface PracticeProgressSummaryInput {
 
 export interface PracticeProgressSummary {
   completedToday: number
+  recordedSecondsToday: number
   dailyGoal: number
   currentStreak: number
   goalMetToday: boolean
@@ -25,9 +27,25 @@ export function buildPracticeProgressSummary(
   const problemSlugsByDateKey = groupUniqueProblemSlugsByDateKey(attempts)
   const completedToday = readCompletedCount(problemSlugsByDateKey, todayDateKey)
   const goalMetToday = dailyGoal > 0 && completedToday >= dailyGoal
+  const recordedSecondsToday = attempts.reduce((total, attempt) => {
+    const seconds = attempt.elapsedSeconds
+
+    if (
+      Number.isNaN(attempt.reviewedAt.getTime()) ||
+      toPracticeDateKey(attempt.reviewedAt) !== todayDateKey ||
+      typeof seconds !== 'number' ||
+      !Number.isFinite(seconds) ||
+      seconds <= 0
+    ) {
+      return total
+    }
+
+    return total + Math.round(seconds)
+  }, 0)
 
   return {
     completedToday,
+    recordedSecondsToday,
     dailyGoal,
     currentStreak: readCurrentStreak({
       dailyGoal,
@@ -78,6 +96,13 @@ function readCurrentStreak(input: {
 
   let streak = 0
   let dateKey = input.todayDateKey
+
+  // An unfinished local day can still meet its goal before midnight.
+  if (
+    readCompletedCount(input.problemSlugsByDateKey, dateKey) < input.dailyGoal
+  ) {
+    dateKey = readPreviousDateKey(dateKey)
+  }
 
   while (
     readCompletedCount(input.problemSlugsByDateKey, dateKey) >= input.dailyGoal

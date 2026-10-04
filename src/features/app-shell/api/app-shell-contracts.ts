@@ -122,6 +122,7 @@ const appShellSettingsSummarySchema = z.object({
 
 const appShellPracticeProgressSchema = z.object({
   completedToday: z.number().int().min(0),
+  recordedSecondsToday: z.number().int().min(0),
   dailyGoal: z.number().int().min(0),
   currentStreak: z.number().int().min(0),
   goalMetToday: z.boolean(),
