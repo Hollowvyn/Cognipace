@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-03-fsrs-remediation-design.md`](./specs/2026-10-03-fsrs-remediation-design.md): approved eight-priority FSRS remediation design covering reliable saves/corrections, recorded profiles, daily scheduling, queue and preview behavior, preserving upgrades, measured local scaling and an evaluated personalization pilot; consolidated written review and phase planning pending, application implementation not started.
+
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
 - [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): approved two-rate first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall, with the selected preview preserved verbatim; implemented with automated and production-component proof; required human installed-extension smoke remains pending before review or merge.
