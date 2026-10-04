@@ -31,7 +31,7 @@ export function readTextFromHtml(value: string) {
     .replace(/<\/?(?:code|span|strong|em|b|i|a)\b[^>]*>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(?:p|div|pre|li|ul|ol|h\d)>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
+    .replace(/<\/?[a-z][^>]*>/gi, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')

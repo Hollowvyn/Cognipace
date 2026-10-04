@@ -93,3 +93,25 @@ Explanation: Compare a<sub>i + 1</sub> with n<sup><i>k</i> + 1</sup>.</pre>
     },
   })
 })
+
+it.each([
+  'Check i < j and nums[i] > nums[j].',
+  'Keep values < 10 and counts > 0.',
+])('preserves plain comparison operators in worker hints: %s', async (hint) => {
+  expect(typeof window).toBe('undefined')
+  expect(typeof document).toBe('undefined')
+  const { fetchLeetCodeProblemContent } =
+    await import('./problem-content-reader')
+  const fetcher = vi.fn().mockResolvedValue(
+    Response.json({
+      data: { question: { content: '<p>Return indices.</p>', hints: [hint] } },
+    }),
+  )
+
+  await expect(
+    fetchLeetCodeProblemContent(location, { fetch: fetcher }),
+  ).resolves.toMatchObject({
+    ok: true,
+    content: { hints: [hint], completeness: 'complete', source: 'graphql' },
+  })
+})

@@ -14,6 +14,29 @@ const location = {
 }
 
 describe('fetchLeetCodeProblemContent', () => {
+  it.each([
+    'Check i < j and nums[i] > nums[j].',
+    'Keep values < 10 and counts > 0.',
+  ])(
+    'preserves plain comparison operators in GraphQL hints: %s',
+    async (hint) => {
+      const fetcher = vi.fn().mockResolvedValue(
+        Response.json({
+          data: {
+            question: { content: '<p>Return indices.</p>', hints: [hint] },
+          },
+        }),
+      )
+
+      await expect(
+        fetchLeetCodeProblemContent(location, { fetch: fetcher, document }),
+      ).resolves.toMatchObject({
+        ok: true,
+        content: { hints: [hint], completeness: 'complete', source: 'graphql' },
+      })
+    },
+  )
+
   it('maps LeetCode GraphQL content into statement examples constraints and hints', async () => {
     const fetcher = vi.fn(() =>
       Promise.resolve(
