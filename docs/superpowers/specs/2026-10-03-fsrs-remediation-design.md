@@ -2,7 +2,7 @@
 
 Date: October 3, 2026.
 
-Status: the three design sections are approved; the consolidated written specification awaits user review before phase planning. Application implementation has not started.
+Status: the three design sections and consolidated written specification are approved. The user approved the written specification on October 3, 2026 ("This is cool beans"). The execution map and first detailed preservation plan are authored; application implementation has not started.
 
 Baseline: `codex/fsrs-remediation-design`, based on `origin/main` at `dc0fc6f2`. The original audit examined `7cccd2d7`; the newer Analytics and Tracks work is preserved. The lockfile currently resolves ts-fsrs 5.4.0, using FSRS 6.
 

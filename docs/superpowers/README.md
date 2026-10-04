@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-03-fsrs-remediation-design.md`](./specs/2026-10-03-fsrs-remediation-design.md): approved eight-priority FSRS remediation design covering reliable saves/corrections, recorded profiles, daily scheduling, queue and preview behavior, preserving upgrades, measured local scaling and an evaluated personalization pilot; consolidated written review and phase planning pending, application implementation not started.
+- [`specs/2026-10-03-fsrs-remediation-design.md`](./specs/2026-10-03-fsrs-remediation-design.md): approved eight-priority FSRS remediation design covering reliable saves/corrections, recorded profiles, daily scheduling, queue and preview behavior, preserving upgrades, measured local scaling and an evaluated personalization pilot; consolidated written review approved, execution map and first preservation plan authored, application implementation not started.
 
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
@@ -56,6 +56,9 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-03-fsrs-remediation.md`](./plans/2026-10-03-fsrs-remediation.md): dependency and acceptance map for all eight FSRS findings; foundation precedes daily experience, measured local growth and the optimizer pilot. Later slices require their own code-level plans against verified predecessors.
+- [`plans/2026-10-03-fsrs-phase-a-preserving-baseline.md`](./plans/2026-10-03-fsrs-phase-a-preserving-baseline.md): first executable preservation plan with complete regression/implementation snippets for the frozen through-0009 baseline, independent recovery, populated singleton upgrade/reopen and background preparation guard; implementation unstarted.
 
 - [`plans/2026-10-03-next-question-group.md`](./plans/2026-10-03-next-question-group.md): focused service and workspace regression plan for membership-derived chapter guidance, local tabs, and required human extension smoke.
 
