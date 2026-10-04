@@ -1,3 +1,5 @@
+export { makeValidAnalysis } from './code-analysis-fixtures'
+
 export {
   makeAcceptedDecision,
   makeAcceptedSubmission,

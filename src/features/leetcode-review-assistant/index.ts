@@ -1,4 +1,11 @@
 export {
+  CODE_ANALYSIS_VERSION,
+  codeAnalysisSchema,
+  isCodeAnalysisConsistent,
+  type CodeAnalysisReport,
+} from './domain'
+
+export {
   PROMPT_VERSION,
   assessmentRecommendationConfidenceLevels,
   assessmentRecommendationRatings,
