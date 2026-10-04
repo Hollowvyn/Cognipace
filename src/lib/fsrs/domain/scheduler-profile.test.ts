@@ -102,7 +102,9 @@ describe('effective FSRS profiles', () => {
   })
 
   it('carries internal maximum interval and weights through projection', () => {
-    const options = { maximumInterval: 2, weights: [...default_w] }
+    const weights = [...default_w]
+    weights[3] = 12
+    const options = { maximumInterval: 2, weights }
     const card = createInitialFsrsCard(at)
     const expected = scheduleReview(card, 'easy', at, options)
 
