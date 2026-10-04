@@ -10,6 +10,7 @@ import {
   getAiProviderSecretPresence,
   isAiAssessmentAvailable,
   loadActiveProviderConfig,
+  loadActiveProviderConfigSnapshot,
   setAiProviderSecret,
 } from './genai-settings-service'
 
@@ -153,4 +154,68 @@ it('publishes a durable key write before a failed presence refresh', async () =>
     setAiProviderSecret('openai', { apiKey: 'fake-private-key' }, published),
   ).rejects.toThrow()
   expect(published).toHaveBeenCalledTimes(1)
+})
+
+describe('trusted active configuration snapshot', () => {
+  async function configuredDb() {
+    const { db } = await createTestDb({ seed: false })
+    await updateSettings(db, {
+      aiAssessment: {
+        enabled: true,
+        provider: 'openai',
+        model: '  gpt-test  ',
+      },
+    })
+    await setAiProviderSecret('openai', { apiKey: 'fake-private-key' })
+    return db
+  }
+
+  it('trims the model and keeps credential identity inside the trusted snapshot', async () => {
+    const db = await configuredDb()
+    const saved = await loadActiveProviderConfigSnapshot(db)
+    expect(saved).toMatchObject({
+      config: {
+        provider: 'openai',
+        model: 'gpt-test',
+        apiKey: 'fake-private-key',
+      },
+    })
+    expect(saved?.identity).toEqual(expect.any(String))
+    expect(await loadActiveProviderConfig(db)).toEqual(saved?.config)
+    expect((await loadActiveProviderConfigSnapshot(db))?.identity).toBe(
+      saved?.identity,
+    )
+  })
+
+  it.each(['disabled', 'missing-model', 'missing-key'] as const)(
+    'returns null for %s configuration',
+    async (kind) => {
+      const db = await configuredDb()
+      if (kind === 'disabled')
+        await updateSettings(db, { aiAssessment: { enabled: false } })
+      if (kind === 'missing-model')
+        await updateSettings(db, { aiAssessment: { model: '  ' } })
+      if (kind === 'missing-key') await clearAiProviderSecret('openai')
+      expect(await loadActiveProviderConfigSnapshot(db)).toBeNull()
+    },
+  )
+
+  it.each(['provider', 'model', 'replacement-key', 'same-key'] as const)(
+    'changes identity on %s replacement',
+    async (kind) => {
+      const db = await configuredDb()
+      const saved = await loadActiveProviderConfigSnapshot(db)
+      if (kind === 'provider') {
+        await setAiProviderSecret('gemini', { apiKey: 'gemini-key' })
+        await updateSettings(db, { aiAssessment: { provider: 'gemini' } })
+      } else if (kind === 'model')
+        await updateSettings(db, { aiAssessment: { model: 'other-model' } })
+      else
+        await setAiProviderSecret('openai', {
+          apiKey: kind === 'same-key' ? 'fake-private-key' : 'replacement-key',
+        })
+      const current = await loadActiveProviderConfigSnapshot(db)
+      expect(current?.identity).not.toBe(saved?.identity)
+    },
+  )
 })

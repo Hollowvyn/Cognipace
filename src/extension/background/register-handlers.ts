@@ -90,6 +90,13 @@ import {
   readLeetCodeProblemMetadataInBackground,
   readLeetCodeSubmissionResultInBackground,
 } from '@/features/leetcode-capture/server/leetcode-capture-service'
+import {
+  analyzeLeetCodeSubmissionRequestSchema,
+  analyzeLeetCodeSubmissionResponseSchema,
+  cancelLeetCodeAnalysisRequestSchema,
+  cancelLeetCodeAnalysisResponseSchema,
+} from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
+import { analyzeLeetCodeSubmissionInBackground } from '@/features/leetcode-review-assistant/server/analysis-runtime-service'
 import { recommendLeetCodeAssessmentInBackground } from '@/features/leetcode-review-assistant/server/runtime-handler-service'
 import {
   practiceDetailsRequestSchema,
@@ -154,6 +161,11 @@ import { getDashboardUrl } from '@/platform/chrome/extension-pages'
 import { flushDbSnapshot, type Db } from '@/platform/db'
 import { z } from 'zod'
 
+import {
+  analysisOwner,
+  cancelOwnedAnalysis,
+  runOwnedAnalysis,
+} from './leetcode-analysis-operations'
 import { broadcastCacheInvalidation } from './cache-invalidation-broadcaster'
 import {
   computeNotificationDryRun,
@@ -1264,6 +1276,39 @@ export function registerBackgroundHandlers() {
     return testAiConnection(request, async () => (await getAppDb()).db).then(
       (result) => testAiConnectionResponseSchema.parse(result),
     )
+  })
+
+  onMessage('genai.analyzeLeetCodeSubmission', ({ data, sender }) => {
+    const request = analyzeLeetCodeSubmissionRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'genai.analyzeLeetCodeSubmission',
+      request.surface,
+      sender,
+    )
+    const owner = analysisOwner(sender)
+    return runOwnedAnalysis(owner, request.requestId, async (signal) =>
+      analyzeLeetCodeSubmissionResponseSchema.parse(
+        await analyzeLeetCodeSubmissionInBackground(
+          request,
+          async () => (await getAppDb()).db,
+          signal,
+        ),
+      ),
+    )
+  })
+
+  onMessage('genai.cancelLeetCodeAnalysis', ({ data, sender }) => {
+    const request = cancelLeetCodeAnalysisRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'genai.cancelLeetCodeAnalysis',
+      request.surface,
+      sender,
+    )
+    const owner = analysisOwner(sender)
+    return cancelLeetCodeAnalysisResponseSchema.parse({
+      requestId: request.requestId,
+      cancelled: cancelOwnedAnalysis(owner, request.requestId),
+    })
   })
 
   onMessage('genai.recommendLeetCodeAssessment', ({ data, sender }) => {

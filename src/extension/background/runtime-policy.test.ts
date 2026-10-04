@@ -408,3 +408,63 @@ it.each([
     ).toThrow(/cannot claim/)
   },
 )
+
+describe.each([
+  'genai.analyzeLeetCodeSubmission',
+  'genai.cancelLeetCodeAnalysis',
+] as const)('%s actual LeetCode page authorization', (method) => {
+  it.each([
+    'https://leetcode.com/problems/two-sum/',
+    'https://www.leetcode.com/problems/valid-parentheses/description/',
+  ])('accepts actual problem URL %s', (url) => {
+    expect(() =>
+      assertCanSenderCallExtensionMethod(method, 'content-script', {
+        tab: { id: 0 },
+        frameId: 0,
+        url,
+      }),
+    ).not.toThrow()
+  })
+  it.each([
+    undefined,
+    'not-a-url',
+    'http://leetcode.com/problems/two-sum/',
+    'https://example.com/problems/two-sum/',
+    'https://leetcode.com.evil.test/problems/two-sum/',
+    'chrome-extension://extension-id/other.html',
+  ])(
+    'rejects actual URL %s even with a trusted tab URL or origin claim',
+    (url) => {
+      expect(() =>
+        assertCanSenderCallExtensionMethod(method, 'content-script', {
+          tab: { id: 1, url: 'https://leetcode.com/problems/two-sum/' },
+          frameId: 0,
+          url,
+          origin: 'https://leetcode.com',
+        }),
+      ).toThrow(/LeetCode/i)
+    },
+  )
+})
+
+it('allows owner cancellation after LeetCode SPA navigation while rejecting new generation off problem pages', () => {
+  const sender = {
+    tab: { id: 7 },
+    frameId: 0,
+    url: 'https://leetcode.com/explore/',
+  }
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.cancelLeetCodeAnalysis',
+      'content-script',
+      sender,
+    ),
+  ).not.toThrow()
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.analyzeLeetCodeSubmission',
+      'content-script',
+      sender,
+    ),
+  ).toThrow(/LeetCode/i)
+})

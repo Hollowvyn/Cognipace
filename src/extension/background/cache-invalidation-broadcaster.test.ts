@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { broadcastCacheInvalidation } from './cache-invalidation-broadcaster'
 
+const analysisMocks = vi.hoisted(() => ({ abortLeetCodeAnalyses: vi.fn() }))
+vi.mock('./leetcode-analysis-operations', () => analysisMocks)
+
 type LeetCodeTab = { id?: number | undefined }
 
 type TabsQuery = (queryInfo: { url: string[] }) => Promise<LeetCodeTab[]>
@@ -39,6 +42,48 @@ describe('cache invalidation broadcaster', () => {
     vi.clearAllMocks()
     messagingMocks.sendMessage.mockResolvedValue(null)
     browserMocks.tabsQuery.mockResolvedValue([{ id: 10 }, { id: 20 }, {}])
+  })
+
+  it('aborts analyses synchronously before an unresolved GenAI broadcast', async () => {
+    let finish!: (value: null) => void
+    messagingMocks.sendMessage.mockImplementation(
+      () =>
+        new Promise<null>((resolve) => {
+          finish = resolve
+        }),
+    )
+    browserMocks.tabsQuery.mockResolvedValue([])
+    const pending = broadcastCacheInvalidation({
+      reason: 'genai-updated',
+      source: 'dashboard',
+      tags: ['genai'],
+    })
+    expect(analysisMocks.abortLeetCodeAnalyses).toHaveBeenCalledTimes(1)
+    expect(
+      analysisMocks.abortLeetCodeAnalyses.mock.invocationCallOrder[0],
+    ).toBeLessThan(messagingMocks.sendMessage.mock.invocationCallOrder[0]!)
+    finish(null)
+    await pending
+  })
+
+  it('leaves analyses active for unrelated invalidation tags', async () => {
+    await broadcastCacheInvalidation({
+      reason: 'settings-updated',
+      source: 'dashboard',
+      tags: ['settings'],
+    })
+    expect(analysisMocks.abortLeetCodeAnalyses).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed events before cancelling work', async () => {
+    await expect(
+      broadcastCacheInvalidation({
+        reason: 'genai-updated',
+        source: 'dashboard',
+        tags: ['genai', 'invalid' as never],
+      }),
+    ).rejects.toThrow()
+    expect(analysisMocks.abortLeetCodeAnalyses).not.toHaveBeenCalled()
   })
 
   it('broadcasts typed cache invalidation events to extension pages and LeetCode tabs', async () => {
