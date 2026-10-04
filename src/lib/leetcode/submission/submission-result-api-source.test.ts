@@ -102,6 +102,26 @@ describe('readLeetCodeSubmissionResultFromApi', () => {
     })
   })
 
+  it('preserves full submitted source beyond 4000 characters', async () => {
+    const code =
+      '\n  class Solution:\n' +
+      Array.from(
+        { length: 400 },
+        (_, index) => `    # preserve source line ${index}`,
+      ).join('\n') +
+      '\n    return []\n\n'
+    expect(code.length).toBeGreaterThan(4000)
+    const { result } = await readSubmissionApiResult({
+      fixture: fixtureWithDetails({ id: '1234567890', code }),
+      now: 7000,
+    })
+    expect(result?.resultCodeSnapshot).toMatchObject({
+      code,
+      source: 'api',
+      completeness: 'complete',
+    })
+  })
+
   it.each([
     { id: '9999999999', code: 'wrong submission' },
     { code: 'unidentified submission' },

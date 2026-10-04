@@ -482,3 +482,83 @@ describe('readLeetCodeProblemContent', () => {
     ).toBe(contentFingerprint)
   })
 })
+
+describe('follow-up element boundaries', () => {
+  it.each(['dom', 'graphql'])(
+    'keeps span-labeled follow-up examples separate in %s content',
+    async (path) => {
+      const html =
+        '<p>Return indices.</p><p>Example 1:</p><pre>Input: [2,7]\nOutput: [0,1]</pre><span>Follow-up:</span><pre>Input: [1,2,3]\nOutput: [1,2]</pre>'
+      const content = await readContentForPath(html, path)
+      expect(content?.examples).toHaveLength(1)
+      expect(content?.examples[0]?.input).toBe('[2,7]')
+      expect(content?.followUps).toEqual(['Input: [1,2,3] Output: [1,2]'])
+    },
+  )
+
+  it.each([
+    { path: 'dom', enclosingConstraint: false },
+    { path: 'graphql', enclosingConstraint: false },
+    { path: 'dom', enclosingConstraint: true },
+    { path: 'graphql', enclosingConstraint: true },
+  ])(
+    'stops nested list constraints at follow-up: %j',
+    async ({ path, enclosingConstraint }) => {
+      const items = enclosingConstraint
+        ? '<li>2 &lt;= n<p>Follow-up:</p><ul><li>Use constant extra space.</li></ul></li>'
+        : '<li>2 &lt;= n</li><li><p>Follow-up:</p><ul><li>Use constant extra space.</li></ul></li>'
+      const content = await readContentForPath(
+        `<p>Return indices.</p><p>Constraints:</p><ul>${items}</ul>`,
+        path,
+      )
+      expect(content?.constraints).toEqual(['2 <= n'])
+      expect(content?.followUps).toEqual(['Use constant extra space.'])
+      expect(content?.completeness).toBe(
+        path === 'graphql' ? 'complete' : 'partial',
+      )
+    },
+  )
+
+  it.each(['dom', 'graphql'])(
+    'preserves separate unlabeled examples, internal whitespace and adjacent constraints in %s content',
+    async (path) => {
+      const html =
+        '<p>Return indices.</p><pre>Input: nums = [2,\n    7]\nOutput: [0,\n    1]</pre><pre>Input: [3,4]\nOutput: [0,1]</pre><p>Constraints:</p><ul><li>2 &lt;= n</li><li>n &lt;= 10000</li></ul>'
+      const content = await readContentForPath(html, path)
+      expect(content?.examples).toMatchObject([
+        {
+          label: 'Example 1',
+          input: 'nums = [2,\n    7]',
+          output: '[0,\n    1]',
+        },
+        { label: 'Example 2', input: '[3,4]', output: '[0,1]' },
+      ])
+      expect(content?.constraints).toEqual(['2 <= n', 'n <= 10000'])
+    },
+  )
+
+  it('preserves unlabeled main pre examples', async () => {
+    const content = await readContentForPath(
+      '<p>Return indices.</p><pre>Input: [2,7]\nOutput: [0,1]</pre><span>Follow-up:</span><p>Use expected linear time.</p>',
+      'dom',
+    )
+    expect(content?.examples).toMatchObject([
+      { label: 'Example 1', input: '[2,7]', output: '[0,1]' },
+    ])
+  })
+})
+
+async function readContentForPath(html: string, path: string) {
+  if (path === 'dom') {
+    document.body.innerHTML = `<section data-track-load="description_content">${html}</section>`
+    return readLeetCodeProblemContentFromDom(document, { location })
+  }
+  const result = await readLeetCodeProblemContent(location, {
+    document,
+    fetch: vi.fn(async () =>
+      Response.json({ data: { question: { content: html, hints: [] } } }),
+    ),
+  })
+  if (!result.ok) throw result.error
+  return result.content
+}

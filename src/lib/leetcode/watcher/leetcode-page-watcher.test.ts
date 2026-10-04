@@ -11,6 +11,7 @@ import {
   leetcodePendingSubmissionApiFixture,
 } from '../testing/submission-result-fixtures'
 import { createLeetCodeProblemContentFingerprint } from '../content/content-fingerprint'
+import { createLeetCodeFetchRemoteClient } from '../remote/leetcode-fetch-remote-client'
 import { createLeetCodePageWatcher } from './leetcode-page-watcher'
 
 type PageWatcherOptions = Parameters<typeof createLeetCodePageWatcher>[0]
@@ -342,6 +343,72 @@ describe('createLeetCodePageWatcher', () => {
       expect(filterEvents(events, 'submission-result-updated')).toHaveLength(0)
     },
   )
+
+  it('suppresses a delayed non-null result after a rapid new attempt', async () => {
+    vi.useFakeTimers()
+    renderProblemEditorPage()
+    const fetchedResponse = await createLeetCodeFetchRemoteClient({
+      fetch: createLeetCodeSubmissionApiFixtureFetcher(
+        leetcodeAcceptedSubmissionApiFixture,
+      ),
+      now: () => 6000,
+    }).readSubmissionResult({
+      location: problemLocation,
+      attemptId: 'old-attempt',
+      click: {
+        location: problemLocation,
+        clickedAt: 5000,
+        buttonText: 'Submit',
+      },
+      submittedCodeSnapshot: {
+        code: 'class Solution:\n    pass',
+        language: 'Python3',
+        source: 'monaco',
+        completeness: 'partial',
+        capturedAt: 5000,
+      },
+    })
+    if (!fetchedResponse.result)
+      throw new Error('Expected a terminal fixture result.')
+    let finishOldRead!: (
+      response: LeetCodeSubmissionResultRemoteResponse,
+    ) => void
+    const readSubmissionResult = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<LeetCodeSubmissionResultRemoteResponse>((resolve) => {
+            finishOldRead = resolve
+          }),
+      )
+      .mockResolvedValueOnce({
+        result: { ...fetchedResponse.result, submissionId: '1234567891' },
+        debugEvents: [],
+      })
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [0],
+      now: () => 5000,
+      remoteClient: {
+        readSubmissionResult,
+        readProblemMetadata: vi.fn(),
+        readProblemContent: vi.fn(),
+      },
+    })
+    watcher.start()
+    dispatchSubmitClick()
+    await vi.advanceTimersByTimeAsync(0)
+    dispatchSubmitClick()
+    finishOldRead(fetchedResponse)
+    await vi.advanceTimersByTimeAsync(0)
+    watcher.stop()
+    expect(filterEvents(events, 'submission-started')).toHaveLength(2)
+    expect(
+      filterEvents(events, 'submission-result-updated').map(
+        (event) => event.result.submissionId,
+      ),
+    ).toEqual(['1234567891'])
+  })
 
   it('emits submission-result-updated after LeetCode renders the result', async () => {
     vi.useFakeTimers()
