@@ -254,15 +254,7 @@ describe('FSRS baseline recovery', () => {
     }
     const values: Record<string, unknown> = { ...earlier }
     const storage = {
-      get: vi.fn((keys: string[]) =>
-        Promise.resolve(
-          Object.fromEntries(
-            keys
-              .filter((key) => Object.hasOwn(values, key))
-              .map((key) => [key, values[key]]),
-          ),
-        ),
-      ),
+      get: vi.fn().mockResolvedValue(values),
       set: vi.fn((next: Record<string, unknown>) => {
         Object.assign(values, next)
         return Promise.resolve()
