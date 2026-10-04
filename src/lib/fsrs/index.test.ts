@@ -6,6 +6,8 @@ describe('FSRS public API facade', () => {
   it('exports the stable feature-facing scheduler facade', () => {
     expect(Object.keys(fsrs).sort()).toEqual(
       [
+        'correctLegacyReview',
+        'correctReviewFromEvidence',
         'createFsrsSchedulerProfile',
         'createInitialFsrsCard',
         'defaultFsrsCardKind',
@@ -35,6 +37,7 @@ describe('FSRS public API facade', () => {
         'reviewRatingToScore',
         'reviewRatings',
         'scheduleReview',
+        'scheduleReviewWithProfile',
         'serializeFsrsReviewLogSnapshot',
         'serializeFsrsCardSnapshot',
         'serializeFsrsSchedulerProfile',
@@ -49,6 +52,7 @@ describe('FSRS public API facade', () => {
     expect('toFsrsRating' in fsrs).toBe(false)
     expect('toTsFsrsCard' in fsrs).toBe(false)
     expect('fromTsFsrsCard' in fsrs).toBe(false)
+    expect('rollbackCardReview' in fsrs).toBe(false)
     expect('resolveFsrsSchedulerProfile' in fsrs).toBe(false)
     expect('assertExactFsrsSchedulerProfile' in fsrs).toBe(false)
     expect('scheduleCardReviewWithProfile' in fsrs).toBe(false)

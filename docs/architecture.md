@@ -135,6 +135,17 @@ library's types, delegates scheduling and retrievability calculations, and
 maps the returned card back to the persisted snapshot. Features must not
 recalculate stability, difficulty, intervals, or due dates.
 
+The facade also provides validated immutable scheduler profiles and captured
+review-context calculations. Profiles record the effective weights, retention,
+maximum interval, scheduler mode, step arrays and supported library/model
+versions. Their canonical representation reconstructs exactly; imports that
+would change during native normalization reject. Correction calculations use
+the recorded pre-review card, event time and profile. The legacy compatibility
+operation requires an unambiguous complete history and labels its inferred
+evidence explicitly. Practice's existing Save/Update wiring remains the current
+consumer path; persisted evidence and guarded command integration have separate
+implementation phases.
+
 The persisted `ts-fsrs` `card.due` value is stored as `FsrsCardSnapshot.dueAt`
 and is the sole authority for a reviewed card's schedule. Read models derive
 overdue and due-today state from that date using the browser's local calendar;

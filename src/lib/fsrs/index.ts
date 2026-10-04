@@ -52,9 +52,16 @@ export {
   replayReviewHistory,
   replayReviewHistorySequence,
   scheduleReview,
+  scheduleReviewWithProfile,
   serializeFsrsSchedulerProfile,
   type FsrsProjectedReview,
   type FsrsReviewHistoryEntry,
   type FsrsReviewScheduleProjectionOptions,
   type FsrsScheduledReview,
 } from './scheduler/review-scheduler'
+export {
+  correctLegacyReview,
+  correctReviewFromEvidence,
+  type FsrsLegacyReviewEntry,
+  type FsrsReviewContext,
+} from './scheduler/review-correction'
