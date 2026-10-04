@@ -25,6 +25,9 @@ type ParsedGraphQlQuestionContent = {
   hints: string[]
 }
 
+const leetCodeConstraintsHeadingPattern =
+  /\bConstraints[^\S\r\n]*:|(?:^|\n)[^\S\r\n]*Constraints[^\S\r\n]*(?=\n|$)/i
+
 const leetCodeHintRootSelector =
   '[data-e2e-locator*="hint" i], [data-cy*="hint" i], [class*="hint" i], details'
 
@@ -172,7 +175,8 @@ export function readLeetCodeProblemContentFromDom(
   if (
     !contentParts.statement &&
     contentParts.examples.length === 0 &&
-    contentParts.constraints.length === 0
+    contentParts.constraints.length === 0 &&
+    contentParts.followUps.length === 0
   ) {
     return null
   }
@@ -269,8 +273,10 @@ function readContentPartsFromRoot(contentRoot: ParentNode) {
 
 function readContentPartsFromText(text: string) {
   const mainContentText = text.split(/\bFollow[\s-]*up\s*:/i)[0] ?? ''
+  const exampleContentText =
+    mainContentText.split(leetCodeConstraintsHeadingPattern)[0] ?? ''
   const namedExamples = Array.from(
-    mainContentText.matchAll(
+    exampleContentText.matchAll(
       /\bExample\s+(\d+)\s*:\s*([\s\S]*?)(?=\bExample\s+\d+\s*:|\bConstraints\s*:|\bHint\s*\d*\s*:|$)/gi,
     ),
   ).map((match) => readExampleFromText(match[0], Number(match[1]) - 1))
@@ -278,7 +284,7 @@ function readContentPartsFromText(text: string) {
     namedExamples.length > 0
       ? namedExamples
       : Array.from(
-          mainContentText.matchAll(
+          exampleContentText.matchAll(
             /\bInput\s*:\s*[\s\S]*?(?=\bInput\s*:|\bConstraints\s*:|\bHint\s*\d*\s*:|$)/gi,
           ),
         ).map((match, index) => readExampleFromText(match[0], index))
@@ -326,9 +332,9 @@ function readFollowUpsFromText(text: string) {
 
 function readStatementFromText(text: string) {
   return stripLeetCodeNoise(
-    text.split(
-      /\bExample\s+\d+\s*:|\bConstraints\s*:|\bFollow[\s-]*up\s*:/i,
-    )[0] ?? '',
+    text
+      .split(leetCodeConstraintsHeadingPattern)[0]
+      ?.split(/\bExample\s+\d+\s*:|\bFollow[\s-]*up\s*:/i)[0] ?? '',
   )
 }
 
@@ -381,9 +387,9 @@ function readExampleField(
 
 function readConstraintsFromText(text: string) {
   const mainContentText = text.split(/\bFollow[\s-]*up\s*:/i)[0] ?? ''
-  const constraintsText = mainContentText.match(
-    /\bConstraints\s*:?\s*([\s\S]*?)(?=\bFollow[\s-]*up\s*:|\bHint\s*\d*\s*:|$)/i,
-  )?.[1]
+  const constraintsText = mainContentText
+    .split(leetCodeConstraintsHeadingPattern)[1]
+    ?.split(/\bHint\s*\d*\s*:/i)[0]
 
   if (!constraintsText) {
     return []

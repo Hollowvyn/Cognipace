@@ -548,6 +548,74 @@ describe('follow-up element boundaries', () => {
   })
 })
 
+describe('constraints section headings', () => {
+  it.each(['dom', 'graphql'])(
+    'ignores prose mentioning constraints before the actual %s heading',
+    async (path) => {
+      const html =
+        '<p>Return an answer that satisfies the constraints below.</p><p>Example 1:</p><pre>Input: [1]\nOutput: 1</pre><p>Constraints:</p><ul><li>1 &lt;= n &lt;= 100</li></ul><p>Follow-up:</p><p>Use constant extra space.</p>'
+      const content = await readContentForPath(html, path)
+      expect(content?.constraints).toEqual(['1 <= n <= 100'])
+      expect(content?.statement).toBe(
+        'Return an answer that satisfies the constraints below.',
+      )
+      expect(content?.examples).toMatchObject([{ input: '[1]', output: '1' }])
+      expect(content?.followUps).toEqual(['Use constant extra space.'])
+    },
+  )
+
+  it.each([
+    { path: 'dom', withExample: false },
+    { path: 'graphql', withExample: false },
+    { path: 'dom', withExample: true },
+    { path: 'graphql', withExample: true },
+  ])(
+    'recognizes a standalone constraints heading without a colon: %j',
+    async ({ path, withExample }) => {
+      const html =
+        '<p>Return indices.</p>' +
+        (withExample
+          ? '<p>Example 1:</p><pre>Input: [2,7]\nOutput: [0,1]</pre>'
+          : '') +
+        '<p>Constraints</p><ul><li>2 &lt;= n</li></ul>'
+      const content = await readContentForPath(html, path)
+      expect(content?.statement).toBe('Return indices.')
+      expect(content?.constraints).toEqual(['2 <= n'])
+      if (withExample)
+        expect(content?.examples).toMatchObject([
+          { input: '[2,7]', output: '[0,1]' },
+        ])
+    },
+  )
+
+  it.each(['dom', 'graphql'])(
+    'preserves an inline colon-labeled constraints section in %s content',
+    async (path) => {
+      const content = await readContentForPath(
+        '<p>Return indices. Constraints: 2 &lt;= n</p>',
+        path,
+      )
+      expect(content?.statement).toBe('Return indices.')
+      expect(content?.constraints).toEqual(['2 <= n'])
+    },
+  )
+
+  it('retains follow-up-only DOM content as partial context', async () => {
+    const content = await readContentForPath(
+      '<p>Follow-up:</p><p>Use constant extra space.</p>',
+      'dom',
+    )
+    expect(content).toMatchObject({
+      statement: '',
+      examples: [],
+      constraints: [],
+      followUps: ['Use constant extra space.'],
+      completeness: 'partial',
+      source: 'dom',
+    })
+  })
+})
+
 async function readContentForPath(html: string, path: string) {
   if (path === 'dom') {
     document.body.innerHTML = `<section data-track-load="description_content">${html}</section>`
