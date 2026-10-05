@@ -142,9 +142,19 @@ versions. Their canonical representation reconstructs exactly; imports that
 would change during native normalization reject. Correction calculations use
 the recorded pre-review card, event time and profile. The legacy compatibility
 operation requires an unambiguous complete history and labels its inferred
-evidence explicitly. Practice's existing Save/Update wiring remains the current
-consumer path; persisted evidence and guarded command integration have separate
-implementation phases.
+evidence explicitly. Practice persists profiles, per-attempt evidence,
+application sequences/revisions, lifecycle generations and compact historical
+command receipts in four additive side tables. Existing history receives
+inferred sequence order and unknown scheduling provenance; preparation never
+infers a past profile, replays reviews or changes an existing card.
+
+Current Save appends unknown evidence; Update retains its original event time
+and sequence and increments its revision. Update still uses the existing full
+replay and rejects histories containing captured or legacy-derived scheduling
+evidence before writing. Recorded imports are preserved until the guarded
+correction path is integrated. Opaque stored card IDs are reused across Practice,
+Library and Queue; new cards avoid occupied IDs and upserts enforce ownership.
+Live captured evidence and persisted command deduplication remain future work.
 
 The persisted `ts-fsrs` `card.due` value is stored as `FsrsCardSnapshot.dueAt`
 and is the sole authority for a reviewed card's schedule. Read models derive
@@ -689,9 +699,13 @@ original snapshot and fingerprint in the baseline's recovery slot:
 `cognipace_db_recovery_fsrs_v1` for through-0009. Earlier copies survive later
 upgrades. An existing recovery record is not overwritten by a different
 original; an identical retry retains the first timestamp. Matching current
-snapshots skip preparation and publication. A through-0009 source that
+snapshots skip preparation and publication but run read-only Practice metadata
+validation. Missing or inconsistent current evidence/scopes reject without
+repairing the snapshot. A through-0009 source that
 is already current skips historical taxonomy reconciliation during future
-upgrades; fresh and older supported sources retain the existing mapping. These
+upgrades; all fresh and supported upgrades still prepare Practice evidence and
+active scopes transactionally. Fresh and older supported sources retain the
+existing taxonomy mapping. These
 recovery values are private local data. Never log or
 share their contents in an issue; use the scoped local export procedure in
 `docs/testing.md` if recovery is needed. Startup diagnostics must describe the
@@ -744,16 +758,61 @@ assignments after alias resolution. LeetCode capture writes use merge semantics:
 captured page topics are resolved and added to the existing direct topic set
 without clearing local or manual topics.
 
-Backup schema version 5 exports typed relations as
+Backup schema version 6 exports typed relations as
 `{ sourceTopicId, targetTopicId, kind, createdAt, updatedAt }` alongside
 `topics` and `topicAliases`, and requires `allowExternalProgress` on track rows.
-Import accepts backup versions 1 through 5 and normalizes v1-v4 tracks to false
+Import accepts backup versions 1 through 6 through frozen v1-v5 readers and
+explicit normalization. It normalizes v1-v4 tracks to false
 before current validation; v3's untyped parent/child
 edges become `broader` edges with child as source and parent as target. Unknown
 future versions are rejected. Sync keeps its envelope version
 and its existing dirty-local, overwrite-confirmation, and authorization rules,
-but a client that only understands backup v4 cannot read newly exported v5
-backups.
+but older clients cannot read newly exported v6 backups. The sync envelope
+remains version 1.
+
+The v6 Practice object adds `schedulerProfiles`, `reviewEvidence`, `generations`
+and `commandReceipts` alongside its original three arrays. Legacy normalization
+adds inferred sequences and unknown contexts without changing cards or replaying
+history. Current exports require complete initialized scopes; imported empty
+scopes remain explicit unknown. Full detached preflight validates native
+cards/logs/profiles, historical acknowledgements, ownership and catalog/track
+invariants before any restore transaction. The repository repeats the complete
+validation/reconciliation boundary even for typed prepared inputs. Replacement
+preserves base rows and metadata, discards imported active tokens and creates
+fresh local/applicable problem scopes atomically. Targeted reset rotates only
+its problem scope and removes its own receipts; sibling scopes and immutable
+profiles remain intact.
+
+Background owns one replacement coordinator behind the existing mutation queue.
+It retains only the committed summary and publication/metadata continuations.
+Failed snapshot publication returns persistence pending; Retry saving flushes
+the committed state without importing again or rotating generations. Successful
+publication invalidates data once. Failed sync bookkeeping then retains a
+separate metadata-pending state whose retry writes only the captured metadata.
+Pending replacement blocks later writes, imports, exports and sync applications;
+authenticated status reads are read-only and retry remains serialized.
+Replacement settlement refreshes pending and Sync status queries. Sync-tag
+invalidation also refreshes pending replacement so automatic pull failures
+reveal recovery in an already mounted Settings screen.
+
+Local restore/reset complete preflight and strictly persist the existing sync
+dirty marker before committing. This protects the replacement if the DB's
+automatic publication timer runs and the worker restarts before final sync
+bookkeeping. Failed marking prevents commit; transaction rollback may leave a
+conservative dirty flag without changing the original database. Post-publication
+dirty marking stays strict, followed by best-effort automatic push scheduling.
+Gist pull instead captures its complete remote metadata patch once. Explicitly
+confirmed manual overwrite can replace dirty local data; automatic or
+unconfirmed application still rejects it. Automatic sync bookkeeping uses the
+same queue admission so it cannot race the retained patch.
+
+Accepted replacement clears an obsolete pending content-import acknowledgement
+only after commit. An old import retry then requests a fresh preview rather than
+claiming discarded content was saved; rollback retains its genuine retry.
+Recovery state is worker-local. Settings reload can query it without flushing,
+but worker restart loses continuations and reopens the last durable snapshot.
+Already published data survives; local replacements retain the persisted dirty
+marker. C does not guarantee replacement deduplication across worker restart.
 
 Automatic database upgrade is a separate, deliberately narrow compatibility
 path: only the exact shipped 0000–0007, 0000–0008, and 0000–0009 migration SQL
@@ -775,12 +834,12 @@ original; a retry with the same original is supported. Failed upgrades retain th
 active stored snapshot and all recovery copies. Shipped migration SQL is never
 rewritten.
 
-The through-0009 fingerprint `1144ce07` is registered before FSRS metadata
-migrations. Compatibility registration adds no migration and changes no current
-FSRS card, review, due date, track credit, or user preference. Populated
-singleton tests use a test-only appended table to prove staging, independent
-recovery, and reopen behavior; an actual later schema migration requires its own
-preservation proof.
+The through-0009 fingerprint `1144ce07` supports the actual additive 0010 FSRS
+evidence migration. Populated singleton tests compare every original column in
+all 16 protected tables, 75% retention, daily/streak progress, opaque IDs,
+suspension and track credit. They verify six inferred evidence rows and active
+scopes across preparation, publication, retry and matching reopen; malformed
+staged logs and storage failures preserve the original and earlier recoveries.
 
 ### Effective Track Completion
 

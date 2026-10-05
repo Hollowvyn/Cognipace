@@ -104,21 +104,188 @@ The through-0009 upgrade suite in
 [`fsrs-preservation.integration.test.ts`](../src/platform/db/fsrs-preservation.integration.test.ts)
 compares every original column in a populated source, 75% retention, distinct
 daily and streak progress, staged-publication failure, retry, and reopen while
-checking both older recovery slots. Its appended table is test-only and does
-not prove preservation for a later real FSRS metadata migration.
+checking both older recovery slots. It runs the real 0010 evidence migration,
+verifies six inferred unknown evidence rows and active generation scopes, and
+checks exact metadata/token equality on matching reopen. A real staged
+preparation failure rejects a malformed log without changing the stored
+original or first recovery record.
 
-Before PR review or merge, a human must load this phase's built extension in a
-disposable profile with current history, opaque card IDs, suspension, track
-completion, an active session, and non-default settings. Compare history, raw due
-dates, Daily Goal and streaks, track credit, and Settings before and after
-reload; capture screenshots or a recording without private recovery contents.
-Confirm an ordinary review save persists across reload. Run older supported
-upgrade and recovery smoke when affected, and capture unsupported or corrupt
-failure proof without discarding the original bytes. A future actual metadata
-migration requires human through-0009 upgrade, failure, and retry proof. This
-phase adds no schema; its upgrade trigger is synthetic-test-only. Opaque-ID
-subsequent-save behavior remains for phases C/D; Phase A proves load
-preservation only.
+### FSRS Evidence And Recoverable Replacement
+
+Run these human happy-path and edge-case flows in a disposable installed
+extension profile. Export a pre-C backup before updating. Attach screenshots or
+a recording, with private history and recovery contents redacted, before PR
+review or merge. Automated tests do not replace this proof.
+
+1. Update to `dist/chrome-mv3` with populated history, opaque card IDs,
+   suspension, an active track/session and 75% retention. Compare history, raw due dates,
+   Daily Goal/streak progress, track credit and Settings before/after reload.
+   Save a genuine new review, correct an unknown event with Update, and reload.
+   Verify the same event time and one revision change, with no extra review.
+2. Restore a supported old backup, export v6 and restore that v6 file. Compare
+   all existing cards/logs/settings and earned progress; active local/problem
+   tokens must be fresh after each intentional restore. Verify an untouched
+   suspended problem and a valid New card with zero memory/null last review.
+3. Import valid v6 evidence with opaque IDs, recorded profiles and historical
+   correction receipts. A Good revision-1 acknowledgement must survive a
+   current Again revision-2 event. Verify subsequent Save reuses the card ID;
+   protected-history Update stays unavailable, including after a new unknown
+   Save. An occupied prospective card ID must leave its sibling unchanged.
+4. Try malformed logs, profiles, evidence ownership/sequences, generations and
+   historical acknowledgements. Validation must reject before replacement;
+   existing rows and generation tokens stay unchanged.
+5. In a test-only fault harness, fail snapshot publication after commit. Verify
+   pending text, no saved toast, disabled fresh file/restore/reset/export actions,
+   closed confirmation with retained draft, and an accessible Retry saving.
+   Reload Settings while the worker lives; status must not flush. Retry and
+   reload the persisted data without an extra restore or review. The runtime
+   and repository regressions additionally prove one replacement/rotation.
+6. Fail sync bookkeeping after a durable replacement. Text must say data is
+   already saved. Retry only metadata: no second Gist fetch, restore, flush,
+   rotation or data invalidation. Test failed error/status reads in the same
+   outage; the recovery message must remain useful and contain no secrets.
+   With Settings already mounted, trigger an automatic Gist pull failure and
+   verify Retry saving appears without remount/focus. After retry succeeds,
+   both the recovery panel and stale Sync retry-needed message must clear.
+7. Verify automatic/unconfirmed dirty Gist pull blocks and explicitly confirmed
+   manual overwrite succeeds. A pending replacement must block queued local
+   writes, content imports/retries, export and automatic/manual sync.
+8. Fail the local pre-commit dirty marker: restore/reset must not commit or
+   rotate. Reject malformed input before marking. Rollback after successful
+   marking preserves the old database and may conservatively leave dirty status.
+   Restart after durable data with failed final bookkeeping; automatic pull must
+   still block on the persisted dirty marker.
+9. Restart before publication and verify the last durable snapshot reopens.
+   Worker-local recovery callbacks are lost on restart; do not claim lifecycle
+   replacement deduplication. After publication, replacement data must survive.
+10. Fail content-import publication, then intentionally replace local data.
+    The old import Retry saving must request a new preview rather than report
+    erased content saved. A rejected replacement retains genuine import retry.
+
+Use the following temporary DevTools harness for installed-extension failure
+proof, alongside the coordinator/runtime/SQLite regressions. No production
+failure switch is added.
+
+#### Disposable-profile failure harness
+
+Build with `npm run build`, load `dist/chrome-mv3` unpacked into a disposable
+Chrome profile and open Settings > Data Management once so startup completes.
+Export its initial backup. For local restore/reset cases, disable automatic sync
+before arming a fault. In `chrome://extensions`, click CogniPace's service-worker
+Inspect link and paste this into that worker's Console, not the dashboard's
+Console. Keep it open during retry tests: [Chrome documents that inspection
+keeps the worker active](https://developer.chrome.com/docs/extensions/get-started/tutorial/service-worker-events).
+
+This replaces only that worker's storage methods until cleanup/restart. It
+never reads or prints tokens, backups or raw database bytes. The key names
+match `snapshot.ts` and `sync-metadata-store.ts`; ordinary storage calls still
+reach Chrome's [Promise-based storage API](https://developer.chrome.com/docs/extensions/reference/api/storage).
+
+```js
+;(() => {
+  if (globalThis.cpBackupSmoke) throw new Error('Harness already installed')
+  const local = chrome.storage.local
+  const originalSet = local.set
+  const originalGet = local.get
+  const snapshotKey = 'cognipace_db_snapshot_v1'
+  const syncKey = 'cognipace_sync_metadata_v1'
+  const state = {
+    failSnapshots: false,
+    failSyncFrom: Infinity,
+    failSyncReads: false,
+    snapshotAttempts: 0,
+    savedSnapshots: 0,
+    syncAttempts: 0,
+    savedSyncWrites: 0,
+  }
+  const set = async (values) => {
+    const snapshot = Object.hasOwn(values, snapshotKey)
+    const sync = Object.hasOwn(values, syncKey)
+    if (snapshot) state.snapshotAttempts += 1
+    if (sync) state.syncAttempts += 1
+    if (snapshot && state.failSnapshots)
+      throw new Error('Smoke snapshot failure')
+    if (sync && state.syncAttempts >= state.failSyncFrom)
+      throw new Error('Smoke sync metadata failure')
+    const result = await originalSet.call(local, values)
+    if (snapshot) state.savedSnapshots += 1
+    if (sync) state.savedSyncWrites += 1
+    return result
+  }
+  const get = async (keys) => {
+    if (state.failSyncReads && keys === syncKey)
+      throw new Error('Smoke sync metadata read failure')
+    return originalGet.call(local, keys)
+  }
+  local.set = set
+  local.get = get
+  if (local.set !== set || local.get !== get) {
+    local.set = originalSet
+    local.get = originalGet
+    throw new Error('Storage shim unavailable; do not claim fault proof')
+  }
+  globalThis.cpBackupSmoke = {
+    state,
+    clearFaults() {
+      state.failSnapshots = false
+      state.failSyncFrom = Infinity
+      state.failSyncReads = false
+    },
+    cleanup() {
+      local.set = originalSet
+      local.get = originalGet
+      delete globalThis.cpBackupSmoke
+    },
+  }
+})()
+```
+
+Run one fault at a time, then clear it and finish Retry saving before starting
+the next case. Inspect only `cpBackupSmoke.state` counters. An unhandled
+`Smoke snapshot failure` from the existing automatic publication timer is
+expected while snapshot writes are blocked; it must contain no study contents.
+
+- **Publication failure:** set `cpBackupSmoke.state.failSnapshots = true`, then
+  intentionally restore the exported backup or clear local data. Verify pending
+  recovery and disabled replacement/export actions. Reload only the dashboard;
+  `savedSnapshots` must stay unchanged. Run `cpBackupSmoke.clearFaults()`, click
+  Retry saving and confirm durable data after reload.
+- **Pre-commit marker failure:** set
+  `cpBackupSmoke.state.failSyncFrom = cpBackupSmoke.state.syncAttempts + 1`, then
+  restore/reset. It must report failure before replacing data and show no pending
+  replacement. Clear faults; export and compare the original history/due dates.
+- **Post-publication local metadata failure:** with automatic sync disabled, set
+  `cpBackupSmoke.state.failSyncFrom = cpBackupSmoke.state.syncAttempts + 2`, then
+  restore/reset. The first dirty marker succeeds, publication succeeds and the
+  second sync write fails. Verify the data-saved/sync-status-pending text. Record
+  `savedSnapshots`, clear faults and Retry saving; the count must not increase.
+- **Gist metadata failure:** use an already configured disposable test Gist and
+  an intentional manual pull. Arm `failSyncFrom` at `syncAttempts + 1` before
+  confirming the pull. Verify durable data with metadata pending. Clear faults
+  and retry; `savedSnapshots` must not increase and the Network panel must show
+  no second Gist request. Use the same case with publication failure, then enable
+  `failSyncReads` only after the pending result exists, to check status-read failure
+  does not hide Retry saving. Automated tests cover failure on the initial result
+  construction as well.
+- **Worker restart:** arm publication failure and restore. Use the extension's
+  Reload button in `chrome://extensions` without clearing storage; then reopen
+  Settings and inspect the new worker. The shim and pending callbacks must be
+  gone, and the last durable dataset must reopen. Repeat after the local
+  post-publication failure: restored data and the persisted dirty marker must
+  survive. With the configured test Gist, an unconfirmed/automatic pull must
+  still block until an intentional overwrite is confirmed.
+- **Obsolete import acknowledgement:** arm publication failure, import disposable
+  content and observe its pending acknowledgement. Clear faults, intentionally
+  restore/reset, then use the old content-import Retry saving. It must request a
+  fresh preview. Transaction rollback and metadata-only callback counts remain
+  covered by automated regressions; do not claim these were induced in Chrome.
+
+After every run, call `cpBackupSmoke.cleanup()` if the harness still exists,
+reload the extension and verify a normal export/save. Do not leave the shim in
+a regular profile or attach private Console/storage output. Capture the visible
+pending, disabled-action, retry and completed states with screenshots/recording.
+This recipe is prepared for the human engineer; no installed-Chrome execution
+is claimed by the agent.
 
 Startup diagnostics should report a safe, actionable error without logging raw
 snapshot bytes, topics, tokens, or settings. When the original snapshot pair is
@@ -163,9 +330,9 @@ shows only the relevant UI state and safe error text.
      "utf8",
    )
    const legacy = Array.from(upgrade.matchAll(
-     /legacy(?:Topic|Track)MigrationFingerprint = '([a-f0-9]{8})'/g,
+     /legacy(?:Topic|Track|Fsrs)MigrationFingerprint = '([a-f0-9]{8})'/g,
    ), (match) => match[1])
-   if (legacy.length !== 2) throw new Error("Could not read both allowlisted fingerprints")
+   if (legacy.length !== 3) throw new Error("Could not read all three allowlisted fingerprints")
    let candidate = 0
    const sentinel = () => candidate.toString(16).padStart(8, "0")
    while ([current, ...legacy].includes(sentinel())) candidate += 1
@@ -601,7 +768,7 @@ existing Library, capture, and backup flows:
    as `Tree / Graph` in a disposable problem. Save, reload, and edit again;
    confirm Unicode and slash text survive lookup and persistence.
 4. Export a backup and inspect only the disposable fixture's taxonomy rows.
-   Confirm it declares schema version 5 and typed relations have source,
+   Confirm it declares schema version 6 and typed relations have source,
    target, and kind fields. Import that file into another disposable profile
    and verify assignments, aliases, and both relation kinds round-trip.
 
@@ -785,11 +952,11 @@ restore, and correction cases.
    turns off, the count becomes zero, and practice history remains. Re-enable to
    restore historical credit. Reset global practice for a question and confirm
    its evidence disappears from every opted-in track.
-8. Export a v5 backup with an enabled track; restore into a disposable profile
+8. Export a v6 backup with an enabled track; restore into a disposable profile
    and confirm the flag and raw history survive. Restore v1-v4 fixtures and
    confirm flags default false. Re-import content v1 and confirm an existing
    enabled flag stays enabled while new imported tracks default off. Run the
-   existing authorized sync smoke with v5 data if testing configured sync.
+   existing authorized sync smoke with v6 data if testing configured sync.
 
 Bounded database upgrade proof is automated using frozen populated v7 and v8
 fixtures. Run `npm run test -- src/platform/db/instance.test.ts
@@ -1464,7 +1631,8 @@ Use Settings > Data Management > Clear local data for an in-app fresh-install
 clear/reset. Removing and reloading the extension remains useful when testing
 extension installation behavior.
 
-Schema and migration changes may reset local extension data during development.
+Supported schema upgrades preserve local data. An intentional fresh-install
+reset is a separate action; unsupported or corrupt snapshots require recovery.
 
 ## Troubleshooting
 
@@ -1494,7 +1662,8 @@ Schema and migration changes may reset local extension data during development.
 ### Database Or Migration Errors
 
 - Run `npm run db:check`.
-- Reset local extension data.
+- Preserve the original and follow [Local Database Recovery](#local-database-recovery).
+- Use reset only when deliberately discarding disposable local test data.
 - Rebuild and reload the extension.
 
 ## Useful Bug Reports
