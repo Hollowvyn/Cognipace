@@ -91,6 +91,12 @@ Screenshots are saved under
 - `active-ai-provider-switch.png`: OpenRouter stays active while browsing saved OpenAI; Make active is available.
 - `active-ai-provider-mobile.png`: separate actions and saved active summary at 375px.
 
+Copies are committed for the PR: [desktop](../handoffs/assets/2026-10-05-active-ai-provider/desktop.png),
+[switching providers](../handoffs/assets/2026-10-05-active-ai-provider/switch.png),
+and [mobile](../handoffs/assets/2026-10-05-active-ai-provider/mobile.png).
+These are supplemental mocked-runtime component screenshots; installed-extension
+human proof remains pending.
+
 Skipped command:
 
 ```sh
