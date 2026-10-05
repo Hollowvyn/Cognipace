@@ -1668,20 +1668,16 @@ beforeEach(() => {
   remote.readProblemMetadata
     .mockReset()
     .mockResolvedValue({ ok: true, metadata: makeCompleteCapture().metadata })
-  remote.readProblemContent
-    .mockReset()
-    .mockResolvedValue({
-      ok: true,
-      content: makeCompleteCapture().problemContent,
-    })
+  remote.readProblemContent.mockReset().mockResolvedValue({
+    ok: true,
+    content: makeCompleteCapture().problemContent,
+  })
   remote.readSubmissionResult.mockReset()
-  generate
-    .mockReset()
-    .mockImplementation(async (request) => ({
-      status: 'ready',
-      ...hintIdentity(request),
-      batch: { hints: ['Notice repeated lookup.', 'Consider a lookup table.'] },
-    }))
+  generate.mockReset().mockImplementation(async (request) => ({
+    status: 'ready',
+    ...hintIdentity(request),
+    batch: { hints: ['Notice repeated lookup.', 'Consider a lookup table.'] },
+  }))
   cancel
     .mockReset()
     .mockResolvedValue({ requestId: 'ignored', cancelled: true })
