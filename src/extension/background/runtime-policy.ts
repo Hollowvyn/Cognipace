@@ -11,6 +11,8 @@ const methodSurfaceAccess = {
   'backup.validateFullBackup': ['dashboard'],
   'backup.restoreFullBackup': ['dashboard'],
   'backup.resetLocalData': ['dashboard'],
+  'backup.getPendingReplacement': ['dashboard'],
+  'backup.retryPendingReplacement': ['dashboard'],
   'genai.getAiProviderSecretPresence': ['popup', 'dashboard'],
   'genai.setAiProviderSecret': ['popup', 'dashboard'],
   'genai.clearAiProviderSecret': ['popup', 'dashboard'],

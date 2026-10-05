@@ -7,6 +7,7 @@ import {
 } from '@/features/backup/api/backup-contracts'
 import type { GitHubGistSummary } from '@/lib/github/api/gist-contracts'
 import type { SecretStatus } from '@/platform/secrets'
+import { createBackupReplacementCoordinator } from '@/extension/background/backup-replacement'
 
 import { defaultSyncMetadata } from '../data/sync-metadata-store'
 import type { SyncMetadata } from '../data/sync-metadata-store'
@@ -1505,7 +1506,232 @@ describe('sync service', () => {
     expect(harness.flushDbSnapshot).toHaveBeenCalled()
     expect(harness.broadcastInvalidation).toHaveBeenCalled()
   })
+
+  it('uses the shared replacement coordinator to recover a failed snapshot without fetching or restoring again', async () => {
+    const harness = configuredPullHarness()
+    harness.flushDbSnapshot.mockRejectedValueOnce(new Error('disk unavailable'))
+    harness.broadcastInvalidation.mockRejectedValueOnce(new Error('transport'))
+    const result = await harness.service.pullLatest()
+    expect(result).toMatchObject({
+      outcome: 'error',
+      reason: 'unknown',
+      retryable: true,
+      message:
+        'Gist data was applied in memory but still needs saving. Open Settings > Data Management and choose Retry saving.',
+    })
+    expect(harness.replacement.getState()).toMatchObject({
+      status: 'persistence-pending',
+      kind: 'gist-pull',
+    })
+    expect(harness.broadcastInvalidation).not.toHaveBeenCalled()
+    expect(await harness.replacement.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    expect(harness.githubClient.getGist).toHaveBeenCalledTimes(1)
+    expect(harness.restoreBackup).toHaveBeenCalledTimes(1)
+    expect(harness.flushDbSnapshot).toHaveBeenCalledTimes(2)
+    expect(harness.broadcastInvalidation).toHaveBeenCalledTimes(1)
+    expect(harness.getMetadata()).toMatchObject({
+      dirtySinceLastSync: false,
+      lastRemoteVersion: 'remote_2',
+      localDataUpdatedAt: '2026-05-26T12:10:00.000Z',
+    })
+  })
+
+  it('freezes the complete automatic pull patch for metadata-only retry', async () => {
+    const harness = configuredPullHarness()
+    harness.setMetadata({
+      autoSyncRetryAttempt: 4,
+      lastAutoSyncAt: '2026-05-26T11:00:00.000Z',
+    })
+    harness.writeMetadata.mockRejectedValueOnce(
+      new Error('storage unavailable'),
+    )
+    expect(await harness.service.checkRemoteOnOpen()).toMatchObject({
+      outcome: 'error',
+      retryable: true,
+      message:
+        'Gist data is saved locally, but sync status still needs saving. Open Settings > Data Management and choose Retry saving.',
+    })
+    const frozenPatch = { ...harness.writeMetadata.mock.calls[0]![0] }
+    expect(frozenPatch).toEqual({
+      enabled: true,
+      gistId: 'gist_1',
+      lastSyncAt: currentTime,
+      lastSyncDirection: 'pull',
+      lastPullAt: currentTime,
+      lastRemoteVersion: 'remote_2',
+      lastRemoteUpdatedAt: '2026-05-26T12:10:00.000Z',
+      localDataUpdatedAt: '2026-05-26T12:10:00.000Z',
+      dirtySinceLastSync: false,
+      lastBlockingReason: null,
+      conflict: null,
+      lastError: null,
+      autoSyncRetryAttempt: 0,
+      lastAutoSyncAt: currentTime,
+    })
+    harness.now.mockReturnValue(new Date('2026-05-27T10:00:00.000Z'))
+    harness.githubClient.getGist.mockResolvedValue(
+      createGistSummary({ id: 'other', remoteVersion: 'newer' }),
+    )
+    expect(await harness.replacement.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    expect(harness.writeMetadata.mock.calls.at(-1)![0]).toEqual(frozenPatch)
+    expect(harness.restoreBackup).toHaveBeenCalledTimes(1)
+    expect(harness.flushDbSnapshot).toHaveBeenCalledTimes(1)
+    expect(harness.broadcastInvalidation).toHaveBeenCalledTimes(1)
+    expect(harness.githubClient.getGist).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['persistence', 'metadata', 'completed'] as const)(
+    'returns redacted last-known status when reads and error recording fail after %s application',
+    async (stage) => {
+      const harness = configuredPullHarness()
+      harness.restoreBackup.mockImplementationOnce(() => {
+        harness.readMetadata.mockRejectedValue(
+          new Error('status unavailable ghp_secret'),
+        )
+        harness.getTokenStatus.mockRejectedValue(
+          new Error('token status unavailable github_pat_secret'),
+        )
+        if (stage !== 'completed')
+          harness.writeMetadata.mockRejectedValue(
+            new Error('metadata unavailable'),
+          )
+        return Promise.resolve(backupSummary)
+      })
+      if (stage === 'persistence')
+        harness.flushDbSnapshot.mockRejectedValueOnce(new Error('disk'))
+      const result = await harness.service.pullLatest()
+      expect(syncActionResultSchema.parse(result)).toEqual(result)
+      expect(result.outcome).toBe(stage === 'completed' ? 'success' : 'error')
+      expect(result.status.tokenStatus).toEqual(tokenStatus)
+      expect(JSON.stringify(result)).not.toContain('ghp_secret')
+      expect(JSON.stringify(result)).not.toContain('github_pat_secret')
+      expect(harness.restoreBackup).toHaveBeenCalledTimes(1)
+      if (stage !== 'completed') {
+        harness.writeMetadata.mockImplementation((patch) =>
+          Promise.resolve({ ...defaultSyncMetadata, ...patch }),
+        )
+        expect(await harness.replacement.retry()).toMatchObject({
+          status: 'durable',
+          syncMetadataPending: false,
+        })
+        expect(harness.restoreBackup).toHaveBeenCalledTimes(1)
+        expect(harness.githubClient.getGist).toHaveBeenCalledTimes(1)
+      }
+    },
+  )
+
+  it.each([{ updatedAt: 'invalid' }, { id: 12 }, { remoteVersion: 12 }])(
+    'preflights complete remote metadata before destructive application: %j',
+    async (invalid) => {
+      const harness = configuredPullHarness()
+      harness.githubClient.getGist.mockResolvedValue({
+        ...pullGist(),
+        ...invalid,
+      } as unknown as GitHubGistSummary)
+      expect(await harness.service.pullLatest()).toMatchObject({
+        outcome: 'error',
+        reason: 'invalid-remote',
+      })
+      expect(harness.restoreBackup).not.toHaveBeenCalled()
+      expect(harness.flushDbSnapshot).not.toHaveBeenCalled()
+      expect(harness.replacement.getState()).toEqual({ status: 'idle' })
+    },
+  )
+
+  it('preflights complete backup identities before runner commit', async () => {
+    const harness = configuredPullHarness()
+    const invalid = {
+      ...backup,
+      data: {
+        ...backup.data,
+        companies: [
+          { id: 'same', label: 'One' },
+          { id: 'same', label: 'Two' },
+        ],
+      },
+    }
+    harness.githubClient.getGist.mockResolvedValue({
+      ...pullGist(),
+      content: JSON.stringify(
+        buildSyncEnvelope({ backup: invalid, dataUpdatedAt: currentTime }),
+      ),
+    })
+    expect(await harness.service.pullLatest()).toMatchObject({
+      outcome: 'error',
+      reason: 'invalid-remote',
+    })
+    expect(harness.restoreBackup).not.toHaveBeenCalled()
+    expect(harness.flushDbSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('propagates explicit manual overwrite confirmation to the runtime apply guard', async () => {
+    const guard = vi.fn()
+    const runRemoteRestore: NonNullable<
+      SyncServiceDependencies['runRemoteRestore']
+    > = (apply, context) => {
+      guard(apply, context)
+      return apply()
+    }
+    const harness = configuredPullHarness({ runRemoteRestore })
+    harness.setMetadata({ dirtySinceLastSync: true })
+    await harness.service.pullLatest({ confirmLocalOverwrite: true })
+    expect(guard).toHaveBeenCalledWith(expect.any(Function), {
+      confirmLocalOverwrite: true,
+    })
+    const automatic = configuredPullHarness({ runRemoteRestore })
+    await automatic.service.checkRemoteOnOpen()
+    expect(guard).toHaveBeenLastCalledWith(expect.any(Function), {
+      confirmLocalOverwrite: false,
+    })
+  })
+
+  it('protects an unsynced replacement after a worker restart loses pending callbacks', async () => {
+    // A strict local pre-marker survives independently of worker-owned recovery callbacks.
+    const harness = configuredPullHarness()
+    harness.setMetadata({
+      dirtySinceLastSync: true,
+      localDataUpdatedAt: currentTime,
+    })
+    const reopenedCoordinator = createBackupReplacementCoordinator()
+    expect(reopenedCoordinator.getState()).toEqual({ status: 'idle' })
+    expect(await harness.service.checkRemoteOnOpen()).toMatchObject({
+      outcome: 'no-change',
+      reason: 'local-dirty',
+    })
+    expect(harness.githubClient.getGist).not.toHaveBeenCalled()
+    expect(harness.restoreBackup).not.toHaveBeenCalled()
+  })
 })
+
+function pullGist() {
+  return createGistSummary({
+    id: 'gist_1',
+    updatedAt: '2026-05-26T12:10:00.000Z',
+    remoteVersion: 'remote_2',
+    content: JSON.stringify(
+      buildSyncEnvelope({ backup, dataUpdatedAt: '2026-05-26T12:10:00.000Z' }),
+    ),
+  })
+}
+
+function configuredPullHarness(
+  overrides: Parameters<typeof createHarness>[0] = {},
+) {
+  const harness = createHarness(overrides)
+  harness.setMetadata({
+    enabled: true,
+    gistId: 'gist_1',
+    lastRemoteVersion: 'remote_1',
+  })
+  harness.githubClient.getGist.mockResolvedValue(pullGist())
+  return harness
+}
 
 function createHarness(
   overrides: Partial<
@@ -1542,20 +1768,25 @@ function createHarness(
     return Promise.resolve(metadata)
   })
   const createGitHubClient = vi.fn(() => githubClient)
+  const readMetadata = vi.fn(() => Promise.resolve(metadata))
+  const getTokenStatus = vi.fn().mockResolvedValue(tokenStatus)
+  const replacement = createBackupReplacementCoordinator()
+  const now = vi.fn(() => new Date(currentTime))
 
   const service = createSyncService({
     readToken,
     saveToken,
     deleteToken: vi.fn().mockResolvedValue(undefined),
-    getTokenStatus: vi.fn().mockResolvedValue(tokenStatus),
+    getTokenStatus,
     createGitHubClient,
-    readMetadata: vi.fn(() => Promise.resolve(metadata)),
+    readMetadata,
     writeMetadata,
     exportFullBackup,
     restoreBackup,
     flushDbSnapshot,
     broadcastInvalidation,
-    now: () => new Date(currentTime),
+    runReplacement: replacement.run,
+    now,
     syncCoordinator:
       overrides.syncCoordinator ?? createSyncOperationCoordinator(),
     ...(overrides.runRemoteRestore
@@ -1578,6 +1809,10 @@ function createHarness(
     saveToken,
     writeMetadata,
     createGitHubClient,
+    replacement,
+    readMetadata,
+    getTokenStatus,
+    now,
   }
 }
 

@@ -1,16 +1,20 @@
 import {
   exportFullBackup,
   restoreValidatedBackupData,
+  prepareFullBackupRestore,
 } from '@/features/backup/server/backup-service'
 import type {
   BackupFile,
   BackupSummary,
+  BackupReplacementResult,
 } from '@/features/backup/api/backup-contracts'
+import type { BackupReplacementWork } from '@/features/backup/server/backup-replacement-work'
 import { createGitHubGistClient, type GitHubGistClient } from '@/lib/github'
 import type { GitHubGistSummary } from '@/lib/github/api/gist-contracts'
 import type { Db } from '@/platform/db'
 import { flushDbSnapshot } from '@/platform/db'
 import { HttpRequestError, isRetryableHttpStatus } from '@/platform/http'
+import { z } from 'zod'
 import {
   deleteSecret,
   getSecretStatus,
@@ -75,7 +79,12 @@ export type SyncServiceDependencies = {
   restoreBackup: (backup: BackupFile) => Promise<BackupSummary>
   flushDbSnapshot: () => Promise<unknown>
   broadcastInvalidation: () => MaybePromise<void>
-  runRemoteRestore?: (<T>(work: () => Promise<T>) => Promise<T>) | undefined
+  runReplacement: (
+    work: BackupReplacementWork,
+  ) => Promise<BackupReplacementResult>
+  runRemoteRestore?:
+    | (<T>(work: () => Promise<T>, context?: PullLatestOptions) => Promise<T>)
+    | undefined
   syncCoordinator?: SyncOperationCoordinator | undefined
   now: () => Date
 }
@@ -83,6 +92,23 @@ export type SyncServiceDependencies = {
 const sharedSyncOperationCoordinator = createSyncOperationCoordinator({
   queue: Promise.resolve(),
   running: false,
+})
+
+const remoteReplacementMetadataSchema = z.strictObject({
+  enabled: z.boolean(),
+  gistId: z.string().min(1),
+  lastSyncAt: z.iso.datetime(),
+  lastSyncDirection: z.literal('pull'),
+  lastPullAt: z.iso.datetime(),
+  lastRemoteVersion: z.string().nullable(),
+  lastRemoteUpdatedAt: z.iso.datetime(),
+  localDataUpdatedAt: z.iso.datetime(),
+  dirtySinceLastSync: z.literal(false),
+  lastBlockingReason: z.null(),
+  conflict: z.null(),
+  lastError: z.null(),
+  autoSyncRetryAttempt: z.literal(0).optional(),
+  lastAutoSyncAt: z.iso.datetime().optional(),
 })
 
 export function createSyncOperationCoordinator(
@@ -352,16 +378,13 @@ export function createSyncService(deps: SyncServiceDependencies) {
         })
       }
 
-      await pullRemote(remote)
-      await deps.writeMetadata({
-        autoSyncRetryAttempt: 0,
-        lastAutoSyncAt: deps.now().toISOString(),
-      })
-
-      return createActionResult({
+      return pullRemote(remote, {
+        enabled: metadata.enabled,
+        automatic: true,
         action: 'check-remote-on-open',
-        direction: 'pull',
         message: 'Latest Gist data pulled.',
+        metadata,
+        tokenStatus,
       })
     })
   }
@@ -426,11 +449,12 @@ export function createSyncService(deps: SyncServiceDependencies) {
         })
       }
 
-      await pullRemote(remote, { enabled: metadata.enabled })
-
-      return createActionResult({
+      return pullRemote(remote, {
+        enabled: metadata.enabled,
         action: 'pull-latest',
-        direction: 'pull',
+        confirmLocalOverwrite: options.confirmLocalOverwrite === true,
+        metadata,
+        tokenStatus,
         message: localIsDirty
           ? 'Latest Gist data pulled. Local changes were overwritten.'
           : 'Latest Gist data pulled.',
@@ -505,28 +529,107 @@ export function createSyncService(deps: SyncServiceDependencies) {
 
   async function pullRemote(
     gist: GitHubGistSummary,
-    options: { enabled?: boolean } = {},
+    options: {
+      enabled: boolean
+      automatic?: boolean
+      confirmLocalOverwrite?: boolean
+      action: SyncAction
+      message: string
+      metadata: SyncMetadata
+      tokenStatus: SecretStatus
+    },
   ) {
     const envelope = parseRemoteSyncEnvelope(gist)
-    await runRemoteRestore(async () => {
-      await deps.restoreBackup(envelope.backup)
-      await deps.flushDbSnapshot()
-      await Promise.resolve(deps.broadcastInvalidation())
-      await deps.writeMetadata({
-        enabled: options.enabled ?? true,
-        gistId: gist.id,
-        lastSyncAt: deps.now().toISOString(),
-        lastSyncDirection: 'pull',
-        lastPullAt: deps.now().toISOString(),
-        lastRemoteVersion: gist.remoteVersion,
-        lastRemoteUpdatedAt: gist.updatedAt,
-        localDataUpdatedAt: envelope.dataUpdatedAt,
-        dirtySinceLastSync: false,
-        lastBlockingReason: null,
-        conflict: null,
-        lastError: null,
-      })
-    })
+    prepareFullBackupRestore(envelope.backup)
+    const completedAt = deps.now().toISOString()
+    const patch: Partial<SyncMetadata> = {
+      enabled: options.enabled,
+      gistId: gist.id,
+      lastSyncAt: completedAt,
+      lastSyncDirection: 'pull',
+      lastPullAt: completedAt,
+      lastRemoteVersion: gist.remoteVersion,
+      lastRemoteUpdatedAt: gist.updatedAt,
+      localDataUpdatedAt: envelope.dataUpdatedAt,
+      dirtySinceLastSync: false,
+      lastBlockingReason: null,
+      conflict: null,
+      lastError: null,
+      ...(options.automatic
+        ? { autoSyncRetryAttempt: 0, lastAutoSyncAt: completedAt }
+        : {}),
+    }
+    remoteReplacementMetadataSchema.parse(patch)
+    const result = await runRemoteRestore(
+      () =>
+        deps.runReplacement({
+          kind: 'gist-pull',
+          commit: () => deps.restoreBackup(envelope.backup),
+          ...createRemoteReplacementContinuations(deps, patch),
+        }),
+      { confirmLocalOverwrite: options.confirmLocalOverwrite === true },
+    )
+    return createReplacementActionResult(result, options, patch)
+  }
+
+  async function createReplacementActionResult(
+    result: BackupReplacementResult,
+    options: {
+      action: SyncAction
+      message: string
+      metadata: SyncMetadata
+      tokenStatus: SecretStatus
+    },
+    patch: Partial<SyncMetadata>,
+  ): Promise<SyncActionResult> {
+    const pending =
+      result.status === 'persistence-pending' ||
+      (result.status === 'durable' && result.syncMetadataPending)
+    const message =
+      result.status === 'persistence-pending'
+        ? 'Gist data was applied in memory but still needs saving. Open Settings > Data Management and choose Retry saving.'
+        : pending
+          ? 'Gist data is saved locally, but sync status still needs saving. Open Settings > Data Management and choose Retry saving.'
+          : options.message
+    const error: SyncErrorSummary | null = pending
+      ? {
+          kind: 'unknown',
+          message,
+          occurredAt: deps.now().toISOString(),
+          retryable: true,
+        }
+      : null
+    if (error) {
+      try {
+        await deps.writeMetadata({ lastError: error })
+      } catch {
+        // Recovery belongs to the frozen replacement continuation even if status storage fails.
+      }
+    }
+    let status: SerializedSyncStatus
+    try {
+      status = await getStatus()
+    } catch {
+      const knownMetadata =
+        !pending && result.status === 'durable'
+          ? { ...options.metadata, ...patch }
+          : options.metadata
+      status = createStatus(
+        { ...knownMetadata, ...(error ? { lastError: error } : {}) },
+        options.tokenStatus,
+        syncCoordinator.isRunning(),
+      )
+    }
+    return {
+      action: options.action,
+      direction: 'pull',
+      outcome: pending ? 'error' : 'success',
+      reason: pending ? 'unknown' : null,
+      retryable: pending,
+      message,
+      status,
+      occurredAt: deps.now().toISOString(),
+    }
   }
 
   async function recordPush(
@@ -669,8 +772,11 @@ export function createSyncService(deps: SyncServiceDependencies) {
     })
   }
 
-  function runRemoteRestore<T>(work: () => Promise<T>) {
-    return deps.runRemoteRestore ? deps.runRemoteRestore(work) : work()
+  function runRemoteRestore<T>(
+    work: () => Promise<T>,
+    context: PullLatestOptions,
+  ) {
+    return deps.runRemoteRestore ? deps.runRemoteRestore(work, context) : work()
   }
 
   return {
@@ -692,9 +798,10 @@ export function createBackgroundSyncService(
   db: Db,
   broadcastInvalidation: () => MaybePromise<void>,
   options: {
+    runReplacement: SyncServiceDependencies['runReplacement']
     runRemoteRestore?: SyncServiceDependencies['runRemoteRestore']
     syncCoordinator?: SyncOperationCoordinator
-  } = {},
+  },
 ) {
   return createSyncService({
     readToken: () => readSecret('github:gist'),
@@ -708,12 +815,29 @@ export function createBackgroundSyncService(
     restoreBackup: (backup) => restoreValidatedBackupData(db, backup),
     flushDbSnapshot,
     broadcastInvalidation,
+    runReplacement: options.runReplacement,
     syncCoordinator: options.syncCoordinator ?? sharedSyncOperationCoordinator,
     ...(options.runRemoteRestore
       ? { runRemoteRestore: options.runRemoteRestore }
       : {}),
     now: () => new Date(),
   })
+}
+
+// Separate scope ensures retained continuations cannot capture the remote payload.
+function createRemoteReplacementContinuations(
+  deps: Pick<
+    SyncServiceDependencies,
+    'flushDbSnapshot' | 'broadcastInvalidation' | 'writeMetadata'
+  >,
+  patch: Partial<SyncMetadata>,
+) {
+  const frozenPatch = Object.freeze({ ...patch })
+  return {
+    flush: deps.flushDbSnapshot,
+    onDurable: async () => deps.broadcastInvalidation(),
+    finishSyncMetadata: () => deps.writeMetadata(frozenPatch),
+  }
 }
 
 export function markSyncLocalDataChanged(now = new Date()) {

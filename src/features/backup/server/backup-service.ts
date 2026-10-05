@@ -12,6 +12,7 @@ import {
   resetLocalDataToFreshInstall,
 } from '../data/backup-repository'
 import { prepareFullBackupRestore } from '../domain/backup-preflight'
+export { prepareFullBackupRestore } from '../domain/backup-preflight'
 
 type ExportFullBackupOptions = {
   exportedAt?: Date
@@ -51,6 +52,13 @@ export async function restoreFullBackup(
   input: unknown,
 ): Promise<BackupSummary> {
   const prepared = prepareFullBackupRestore(input)
+  return restorePreparedFullBackup(db, prepared)
+}
+
+export async function restorePreparedFullBackup(
+  db: Db,
+  prepared: ReturnType<typeof prepareFullBackupRestore>,
+): Promise<BackupSummary> {
   await clearAndRestoreBackupData(db, prepared)
   return prepared.summary
 }

@@ -109,6 +109,9 @@ export function useSyncAction<TVariables = void, TResult = unknown>(
     mutationFn,
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: syncQueryKeys.all })
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.backup.pendingReplacement(),
+      })
     },
     onSuccess: (result) => {
       if (options.shouldInvalidateData?.(result)) {

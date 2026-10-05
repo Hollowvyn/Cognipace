@@ -5,6 +5,8 @@ import {
   backupPayloadRequestSchema,
   backupRequestSchema,
   backupSummarySchema,
+  backupReplacementResultSchema,
+  backupReplacementStateSchema,
   clearAiProviderSecretRequestSchema,
   devSmokeReportSchema,
   devSmokeRequestSchema,
@@ -80,7 +82,8 @@ import { generateJson } from '@/lib/ai'
 import {
   exportFullBackup,
   resetLocalData,
-  restoreFullBackup,
+  prepareFullBackupRestore,
+  restorePreparedFullBackup,
   validateFullBackup,
 } from '@/features/backup/server/backup-service'
 import {
@@ -169,6 +172,7 @@ import {
   createDevSmokeService,
 } from './dev-smoke-service'
 import { registerImportHandlers } from './import-handlers'
+import { createBackupReplacementCoordinator } from './backup-replacement'
 import { assertCanSenderCallExtensionMethod } from './runtime-policy'
 import { getBackgroundDb as getAppDb } from './app-db'
 import { createAlarmScheduler } from './scheduler/alarm-scheduler'
@@ -180,12 +184,15 @@ import {
 } from './due-notification'
 
 const alarmScheduler = createAlarmScheduler()
+const backupReplacement = createBackupReplacementCoordinator()
+let clearPendingImportPersistence = () => {}
 const syncAutoSync = createSyncAutoSync({
   scheduler: alarmScheduler,
   hasPendingDirtyMarkRetry: () => hasPendingDirtyMarkRetry,
   now: () => new Date(),
   readMetadata: readSyncMetadata,
-  writeMetadata: writeSyncMetadata,
+  writeMetadata: (patch) =>
+    runGatedMutationQueue(() => writeSyncMetadata(patch)),
   runSafePush: async (input) => {
     const { db } = await getAppDb()
 
@@ -245,8 +252,8 @@ export function registerBackgroundHandlers() {
   dueNotification.registerJobs()
   void dueNotification.handleStartup()
 
-  registerImportHandlers({
-    runInMutationQueue,
+  const importHandlers = registerImportHandlers({
+    runInMutationQueue: runGatedMutationQueue,
     getDb: async () => (await getAppDb()).db,
     flush: flushDbSnapshot,
     markDirty: markSyncLocalDataChangedBestEffort,
@@ -258,6 +265,7 @@ export function registerBackgroundHandlers() {
       }),
     scheduleSync: scheduleAutoPushAfterMutationBestEffort,
   })
+  clearPendingImportPersistence = importHandlers.clearPendingPersistence
 
   onMessage('runtime.ping', ({ data, sender }) => {
     const request = pingRequestSchema.parse(data)
@@ -304,9 +312,10 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
-      backupFileSchema.parse(await exportFullBackup(db)),
-    )
+    return runGatedMutationQueue(async () => {
+      const { db } = await getAppDb()
+      return backupFileSchema.parse(await exportFullBackup(db))
+    })
   })
 
   onMessage('backup.validateFullBackup', ({ data, sender }) => {
@@ -490,6 +499,8 @@ export function registerBackgroundHandlers() {
       sender,
     )
 
+    backupReplacement.assertIdle()
+
     void syncAutoSync.requestOpenCheckAfterSurfaceOpen().catch(() => {
       // Opening a UI surface must not fail when automatic sync scheduling fails.
     })
@@ -555,11 +566,23 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) =>
-        backupSummarySchema.parse(await restoreFullBackup(db, request.backup)),
-      () => broadcastDataManagementInvalidation(request.surface),
-    )
+    return runGatedMutationQueue(async () => {
+      const prepared = prepareFullBackupRestore(request.backup)
+      const { db } = await getAppDb()
+      await markSyncLocalDataChanged()
+      hasPendingDirtyMarkRetry = false
+      return backupReplacementResultSchema.parse(
+        await backupReplacement.run({
+          kind: 'restore',
+          commit: async () => {
+            const summary = await restorePreparedFullBackup(db, prepared)
+            clearPendingImportPersistence()
+            return summary
+          },
+          ...createLocalReplacementContinuations(request.surface),
+        }),
+      )
+    })
   })
 
   onMessage('backup.resetLocalData', ({ data, sender }) => {
@@ -570,13 +593,43 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) => {
-        await resetLocalData(db)
+    return runGatedMutationQueue(async () => {
+      const { db } = await getAppDb()
+      await markSyncLocalDataChanged()
+      hasPendingDirtyMarkRetry = false
+      return backupReplacementResultSchema.parse(
+        await backupReplacement.run({
+          kind: 'reset',
+          commit: async () => {
+            await resetLocalData(db)
+            clearPendingImportPersistence()
+            return null
+          },
+          ...createLocalReplacementContinuations(request.surface),
+        }),
+      )
+    })
+  })
 
-        return null
-      },
-      () => broadcastDataManagementInvalidation(request.surface),
+  onMessage('backup.getPendingReplacement', ({ data, sender }) => {
+    const request = backupRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.getPendingReplacement',
+      request.surface,
+      sender,
+    )
+    return backupReplacementStateSchema.parse(backupReplacement.getState())
+  })
+
+  onMessage('backup.retryPendingReplacement', ({ data, sender }) => {
+    const request = backupRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.retryPendingReplacement',
+      request.surface,
+      sender,
+    )
+    return runInMutationQueue(async () =>
+      backupReplacementResultSchema.parse(await backupReplacement.retry()),
     )
   })
 
@@ -1444,8 +1497,17 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
       await broadcastDataManagementInvalidation('dashboard')
     },
     {
-      runRemoteRestore: (work) =>
-        runRemoteRestoreInMutationQueue(work, isInsideMutationQueue),
+      runRemoteRestore: (work, context) =>
+        runRemoteRestoreInMutationQueue(work, isInsideMutationQueue, context),
+      runReplacement: (work) =>
+        backupReplacement.run({
+          ...work,
+          commit: async () => {
+            const summary = await work.commit()
+            clearPendingImportPersistence()
+            return summary
+          },
+        }),
     },
   )
 }
@@ -1456,7 +1518,7 @@ function runQueuedSyncAction<T>(
   db: Db,
   action: (service: BackgroundSyncService) => Promise<T>,
 ) {
-  return runInMutationQueue(async () => {
+  return runGatedMutationQueue(async () => {
     const dirtyMarkReady = await retryPendingDirtyMark()
 
     if (!dirtyMarkReady) {
@@ -1485,7 +1547,7 @@ function runDbMutation<T>(
   options: { syncMode?: DbMutationSyncMode } = {},
 ) {
   const syncMode = options.syncMode ?? 'mark-dirty'
-  return runInMutationQueue(async () => {
+  return runGatedMutationQueue(async () => {
     const { db } = await getAppDb()
     const result = await write(db)
 
@@ -1520,6 +1582,25 @@ function runInMutationQueue<T>(work: () => Promise<T>) {
   )
 
   return queued
+}
+
+function runGatedMutationQueue<T>(work: () => Promise<T>) {
+  return runInMutationQueue(async () => {
+    backupReplacement.assertIdle()
+    return work()
+  })
+}
+
+function createLocalReplacementContinuations(surface: 'dashboard') {
+  return {
+    flush: flushDbSnapshot,
+    onDurable: () => broadcastDataManagementInvalidation(surface),
+    finishSyncMetadata: async () => {
+      await markSyncLocalDataChanged()
+      hasPendingDirtyMarkRetry = false
+      await scheduleAutoPushAfterMutationBestEffort()
+    },
+  }
 }
 
 async function scheduleAutoPushAfterMutationBestEffort() {
@@ -1565,11 +1646,13 @@ async function retryPendingDirtyMark() {
 function runRemoteRestoreInMutationQueue<T>(
   work: () => Promise<T>,
   isInsideMutationQueue: boolean,
+  context: { confirmLocalOverwrite?: boolean } = {},
 ) {
   const guardedWork = async () => {
+    backupReplacement.assertIdle()
     const metadata = await readSyncMetadata()
 
-    if (metadata.dirtySinceLastSync) {
+    if (metadata.dirtySinceLastSync && context.confirmLocalOverwrite !== true) {
       throw new Error(
         'Sync conflict detected. Local data changed before remote data could be applied.',
       )

@@ -101,6 +101,50 @@ export type BackupRequest = z.infer<typeof backupRequestSchema>
 export type BackupPayloadRequest = z.infer<typeof backupPayloadRequestSchema>
 export type BackupSummary = z.infer<typeof backupSummarySchema>
 
+export const backupReplacementKindSchema = z.enum([
+  'restore',
+  'reset',
+  'gist-pull',
+])
+const pendingReplacementShape = {
+  kind: backupReplacementKindSchema,
+  summary: backupSummarySchema.nullable(),
+}
+export const backupReplacementStateSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('idle') }),
+  z.strictObject({
+    status: z.literal('persistence-pending'),
+    ...pendingReplacementShape,
+  }),
+  z.strictObject({
+    status: z.literal('durable-sync-metadata-pending'),
+    ...pendingReplacementShape,
+  }),
+])
+export const backupReplacementResultSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('no-pending') }),
+  z.strictObject({
+    status: z.literal('persistence-pending'),
+    ...pendingReplacementShape,
+  }),
+  z.strictObject({
+    status: z.literal('durable'),
+    syncMetadataPending: z.boolean(),
+    ...pendingReplacementShape,
+  }),
+])
+export type BackupReplacementKind = z.infer<typeof backupReplacementKindSchema>
+export type BackupReplacementPending = {
+  kind: BackupReplacementKind
+  summary: BackupSummary | null
+}
+export type BackupReplacementState = z.infer<
+  typeof backupReplacementStateSchema
+>
+export type BackupReplacementResult = z.infer<
+  typeof backupReplacementResultSchema
+>
+
 const backupEnvelopePreflightSchema = z.object({
   schemaVersion: z.number().int(),
   app: z.string(),

@@ -547,4 +547,24 @@ describe('import background handlers', () => {
       }),
     ).resolves.toEqual({ status: 'repreview' })
   })
+
+  it('clears only the obsolete acknowledgement when accepted replacement owns the data', async () => {
+    const deps = createDependencies()
+    deps.flush.mockRejectedValueOnce(new Error('disk'))
+    const registered = registerImportHandlers(deps)
+    await handler('imports.apply')({
+      data: { ...request, fingerprint: preview.fingerprint },
+      sender: dashboardSender,
+    })
+    registered.clearPendingPersistence()
+    const count = deps.flush.mock.calls.length
+    await expect(
+      handler('imports.retryPersistence')({
+        data: { surface: 'dashboard' },
+        sender: dashboardSender,
+      }),
+    ).resolves.toEqual({ status: 'repreview' })
+    expect(deps.flush).toHaveBeenCalledTimes(count)
+    expect(mocks.applyContentImport).toHaveBeenCalledTimes(1)
+  })
 })

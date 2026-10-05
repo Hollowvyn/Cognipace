@@ -112,6 +112,12 @@ export function registerImportHandlers(deps: ImportHandlerDependencies) {
       return importRetryPersistenceResponseSchema.parse({ status: 'saved' })
     })
   })
+
+  return {
+    clearPendingPersistence: () => {
+      pendingPersistence = false
+    },
+  }
 }
 
 async function invalidateAndScheduleSync(deps: ImportHandlerDependencies) {

@@ -7,6 +7,7 @@ import { Surface } from '@/components/ui/surface'
 interface ResetLocalDataPanelProps {
   error: string | null
   isResetting: boolean
+  isReplacementPending: boolean
   onOpenResetDialog: () => void
   status: string | null
 }
@@ -14,6 +15,7 @@ interface ResetLocalDataPanelProps {
 export function ResetLocalDataPanel({
   error,
   isResetting,
+  isReplacementPending,
   onOpenResetDialog,
   status,
 }: ResetLocalDataPanelProps) {
@@ -40,7 +42,7 @@ export function ResetLocalDataPanel({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
-          disabled={isResetting}
+          disabled={isResetting || isReplacementPending}
           onClick={onOpenResetDialog}
           size="sm"
           variant="destructive"

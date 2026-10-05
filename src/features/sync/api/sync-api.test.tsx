@@ -137,6 +137,9 @@ describe('sync API', () => {
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: queryKeys.sync.all,
     })
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['backup', 'pending-replacement'],
+    })
   })
 
   it('broad-invalidates local data views when the resolved action matches the invalidation predicate', async () => {
