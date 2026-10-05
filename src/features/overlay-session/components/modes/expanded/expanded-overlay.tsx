@@ -7,6 +7,7 @@ import type { OverlayAppShellData } from '@/features/app-shell'
 import type { ThemeMode } from '@/features/settings'
 import type { ReviewRating } from '@/lib/fsrs'
 
+import type { OverlayHintState } from '../../../hooks/use-leetcode-code-hints'
 import type { CodeAnalysisState } from '../../../hooks/use-leetcode-code-analysis'
 
 import {
@@ -33,6 +34,7 @@ type ExpandedOverlayViewModel = {
   context: OverlayAppShellData['overlay'] | null
   elapsedSeconds: number
   helpSearchQuery: string | null
+  hints: OverlayHintState
   isOverTarget: boolean
   overlay: OverlaySessionState
   problemTitle: string
@@ -50,6 +52,9 @@ type ExpandedOverlayCommands = {
   onResetTimer: () => void
   onRestart: () => void
   onRetryAiAnalysis: () => void
+  onToggleHints: () => void
+  onRevealNextHint: () => void
+  onRetryHints: () => void
   onSelectExpandedTab: (tab: OverlayExpandedTab) => void
   onSelectRating: (rating: ReviewRating) => void
   onSettings: () => void
@@ -74,6 +79,7 @@ export function ExpandedOverlay({
     context,
     elapsedSeconds,
     helpSearchQuery,
+    hints,
     isOverTarget,
     overlay,
     problemTitle,
@@ -90,6 +96,9 @@ export function ExpandedOverlay({
     onResetTimer,
     onRestart,
     onRetryAiAnalysis,
+    onToggleHints,
+    onRevealNextHint,
+    onRetryHints,
     onSelectExpandedTab,
     onSelectRating,
     onSettings,
@@ -224,7 +233,14 @@ export function ExpandedOverlay({
                 </InlineStatus>
               ) : null}
 
-              <OverlayHelpSection searchQuery={helpSearchQuery} />
+              <OverlayHelpSection
+                searchQuery={helpSearchQuery}
+                hints={hints}
+                onToggleHints={onToggleHints}
+                onRevealNextHint={onRevealNextHint}
+                onRetryHints={onRetryHints}
+                onSettings={onSettings}
+              />
             </div>
           </div>
 

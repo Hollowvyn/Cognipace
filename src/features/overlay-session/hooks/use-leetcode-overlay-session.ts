@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 
+import { useAiHintConnection } from '@/features/genai'
 import { getLeetCodeSolveTimeTargetSeconds } from '@/features/assessment'
 import type {
   LeetCodeProblemLocation,
@@ -16,6 +17,10 @@ import {
   useLeetCodeCodeAnalysis,
   type CodeAnalysisState,
 } from './use-leetcode-code-analysis'
+import {
+  useLeetCodeCodeHints,
+  type OverlayHintState,
+} from './use-leetcode-code-hints'
 import {
   useLeetCodePageSync,
   type LeetCodeOverlayContext,
@@ -41,7 +46,12 @@ export type LeetCodeOverlaySession = {
     isOverTarget: boolean
     status: OverlayTimerStatus
   }
-  actions: OverlayReviewActions
+  actions: OverlayReviewActions & {
+    toggleHints: () => void
+    revealNextHint: () => void
+    retryHints: () => void
+  }
+  hints: OverlayHintState
   aiAnalysis: CodeAnalysisState
   retryAiAnalysis: () => void
 }
@@ -121,8 +131,10 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
   })
 
   const analysisResetRef = useRef<() => void>(() => undefined)
+  const hintResetRef = useRef<() => void>(() => undefined)
   const handleRestart = useCallback(() => {
     analysisResetRef.current()
+    hintResetRef.current()
   }, [])
 
   const actions = useOverlayReviewActions({
@@ -156,6 +168,23 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     available: pageSync.context?.aiAssessmentAvailable ?? false,
   })
 
+  const hintConnection = useAiHintConnection(Boolean(pageSync.location))
+  const hints = useLeetCodeCodeHints({
+    activeSlug: overlay.activeProblemSlug,
+    capture: pageSync.capture,
+    connection: hintConnection.status,
+    connectionError: hintConnection.isError,
+    readCapture: pageSync.readCapture,
+    readSyncToken: () => pageSync.syncTokenRef.current,
+    publishCapture: pageSync.publishHintCapture,
+    readConnection: hintConnection.readStatus,
+    refreshConnection: hintConnection.refresh,
+  })
+
+  useEffect(() => {
+    hintResetRef.current = hints.reset
+  }, [hints.reset])
+
   useEffect(() => {
     analysisResetRef.current = analysis.reset
   }, [analysis.reset])
@@ -173,7 +202,13 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
       isOverTarget: elapsedSeconds > targetSeconds,
       status: timer.status,
     },
-    actions,
+    actions: {
+      ...actions,
+      toggleHints: hints.toggle,
+      revealNextHint: hints.revealNext,
+      retryHints: hints.retry,
+    },
+    hints: hints.state,
     aiAnalysis: analysis.state,
     retryAiAnalysis: analysis.retry,
   }

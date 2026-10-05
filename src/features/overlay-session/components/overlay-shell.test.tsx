@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { OverlayHintState } from '../hooks/use-leetcode-code-hints'
 import type { CodeAnalysisState } from '../hooks/use-leetcode-code-analysis'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -29,9 +30,13 @@ vi.mock('./modes/expanded/expanded-overlay', () => ({
     view: {
       helpSearchQuery: string | null
       problemTitle: string
+      hints: OverlayHintState
       aiAnalysis: CodeAnalysisState
     }
     commands: {
+      onToggleHints: () => void
+      onRevealNextHint: () => void
+      onRetryHints: () => void
       onRetryAiAnalysis: () => void
       onSelectExpandedTab: (tab: 'solve' | 'ai' | 'notes') => void
       onSettings: () => void
@@ -42,6 +47,10 @@ vi.mock('./modes/expanded/expanded-overlay', () => ({
       data-problem-title={view.problemTitle}
       data-testid="expanded-overlay"
     >
+      <button onClick={commands.onToggleHints}>Toggle hints</button>
+      <button onClick={commands.onRevealNextHint}>Reveal hint</button>
+      <button onClick={commands.onRetryHints}>Retry hints</button>
+      <span>Hints: {view.hints?.status ?? 'missing'}</span>
       <button onClick={commands.onRetryAiAnalysis}>Retry AI</button>
       <button onClick={commands.onSettings}>AI Settings</button>
       <button onClick={() => commands.onSelectExpandedTab('ai')}>
@@ -57,6 +66,27 @@ vi.mock('./modes/expanded/expanded-overlay', () => ({
 }))
 
 describe('OverlayShell', () => {
+  it('passes session hints and their commands to expanded Help', async () => {
+    const user = userEvent.setup()
+    const session = createSession({
+      overlay: { ...initialOverlaySessionState, visualMode: 'expanded' },
+      hints: {
+        status: 'ready',
+        isOpen: true,
+        batch: { hints: ['Pointer'] },
+        revealedCount: 1,
+      },
+    })
+    render(<OverlayShell {...session} />)
+    expect(screen.getByText('Hints: ready')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Toggle hints' }))
+    await user.click(screen.getByRole('button', { name: 'Reveal hint' }))
+    await user.click(screen.getByRole('button', { name: 'Retry hints' }))
+    expect(session.actions.toggleHints).toHaveBeenCalledOnce()
+    expect(session.actions.revealNextHint).toHaveBeenCalledOnce()
+    expect(session.actions.retryHints).toHaveBeenCalledOnce()
+  })
+
   it('wires expanded-tab selection to the session action', async () => {
     const user = userEvent.setup()
     const session = createSession({
@@ -256,6 +286,9 @@ function createSession(
       startTimer: vi.fn(),
       submitReview: vi.fn(),
       updateReview: vi.fn(),
+      toggleHints: vi.fn(),
+      revealNextHint: vi.fn(),
+      retryHints: vi.fn(),
     },
     context: {
       appearance: {
@@ -295,6 +328,7 @@ function createSession(
       status: 'idle',
       targetSeconds: 20 * 60,
     },
+    hints: { status: 'idle', isOpen: false },
     aiAnalysis: { status: 'idle' },
     retryAiAnalysis: vi.fn(),
     ...overrides,
