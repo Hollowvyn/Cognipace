@@ -13,6 +13,7 @@ import {
 } from '../data/backup-repository'
 import { prepareFullBackupRestore } from '../domain/backup-preflight'
 export { prepareFullBackupRestore } from '../domain/backup-preflight'
+export type { BackupReplacementWork } from './backup-replacement-work'
 
 type ExportFullBackupOptions = {
   exportedAt?: Date

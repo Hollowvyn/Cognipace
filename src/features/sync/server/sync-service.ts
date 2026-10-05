@@ -2,13 +2,13 @@ import {
   exportFullBackup,
   restoreValidatedBackupData,
   prepareFullBackupRestore,
+  type BackupReplacementWork,
 } from '@/features/backup/server/backup-service'
 import type {
   BackupFile,
   BackupSummary,
   BackupReplacementResult,
 } from '@/features/backup/api/backup-contracts'
-import type { BackupReplacementWork } from '@/features/backup/server/backup-replacement-work'
 import { createGitHubGistClient, type GitHubGistClient } from '@/lib/github'
 import type { GitHubGistSummary } from '@/lib/github/api/gist-contracts'
 import type { Db } from '@/platform/db'
