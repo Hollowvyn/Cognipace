@@ -1,15 +1,95 @@
 # Progressive Overlay Hints Handoff — 2026-10-05
 
-Branch: `codex/overlay-tabs-design`. Validated source:
+Branch: `codex/overlay-tabs-design`. Initial locally validated source:
 `c69c00709d0aef78eadb606896b0a0cccd8d17df`.
+
+Latest PR-preparation source: `5eb6b30c587f43613a0ff1e9a80b47fa2da9a4fd`;
+see the updated validation record below.
 
 Source implementation, independent SPEC/QUALITY reviews of source Tasks 1–9,
 automated checks, and production-component fixture evidence are complete.
 **HUMAN INSTALLED-EXTENSION SMOKE PENDING** and **LIVE PROVIDER QUALITY
 EVALUATION PENDING**. This behavior-changing feature is **NOT PR REVIEW OR
 MERGE READY** until those gates have proof. Neither gate is N/A, and neither
-unit tests nor fixture screenshots complete them. No push, PR, merge, or release
-has been performed for this work.
+unit tests nor fixture screenshots complete them. The initial local closeout
+performed no push, PR, merge, or release. The user subsequently requested a PR;
+the preparation below keeps it draft until the outstanding gates are satisfied.
+
+## PR Preparation — 2026-10-05
+
+Updated the feature branch with current main
+`98d3633f` (OpenRouter, development dependency scanning, and explicit AI provider
+activation). The only merge conflict was the planning index; both sets of
+entries were preserved. A fresh integration review found one minor recovery
+omission: manual hints lacked inline Settings for the newly inherited `billing`
+error. The two-line controller/test fix was committed as the latest source SHA
+above and passed fresh SPEC then QUALITY review. Hint scope, persistence,
+permissions, and automatic assessment behavior remain unchanged relative to
+main. Two existing fixture images were copied into
+`assets/2026-10-04-overlay-ai-hints/` for GitHub-visible PR proof:
+
+![Dark fixture with three revealed hints](./assets/2026-10-04-overlay-ai-hints/overlay-hints-final-dark-392.jpg)
+
+![Light 320px fixture with first hint](./assets/2026-10-04-overlay-ai-hints/overlay-hints-first-light-320.jpg)
+
+Fresh exact preparation/validation commands:
+
+```sh
+rtk git fetch origin main
+rtk proxy git merge-tree --write-tree HEAD origin/main
+rtk git merge origin/main --no-commit
+rtk proxy zsh -c 'source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && rtk proxy npx prettier --ignore-path /dev/null --write docs/superpowers/README.md && rtk proxy npx prettier --ignore-path /dev/null --check docs/superpowers/README.md'
+rtk proxy zsh -c 'source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && rtk proxy npm ci'
+rtk proxy zsh -c 'source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && rtk proxy npm run check'
+rtk proxy zsh -c 'source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && rtk proxy npm run build'
+```
+
+Fetch passed. The initial sandboxed merge-tree check could not write temporary
+Git objects; its authorized retry and the actual merge identified the index
+conflict described above, resolved in `d022347`. The first check stopped at
+TS2307 because the inherited OpenRouter SDK was missing locally. Locked install
+passed (481 packages; npm reported existing audit/install-script warnings).
+The merged-source rerun passed 3,027 tests, then the billing-fix rerun passed
+**216 test files / 3,028 tests**, with **two files / nine opted-in live cases
+skipped**. Both production builds passed, latest Chrome MV3 output **4.82 MB**.
+Existing JSDOM `scrollTo` and Vite large-chunk warnings remain. The exact
+56-file changed-source Prettier command in Final Automated Validation was
+repeated on the latest source and passed.
+
+Billing recovery used these implementer-reported commands under the pinned
+toolchain:
+
+```sh
+rtk npm test -- src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx -t 'offers Settings recovery for billing'
+rtk npm test -- src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx
+rtk npm exec prettier -- --check src/features/overlay-session/hooks/use-leetcode-code-hints.ts src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx
+rtk npm exec eslint -- src/features/overlay-session/hooks/use-leetcode-code-hints.ts src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx
+rtk git diff --check
+```
+
+First focused command failed as expected (`showSettings` false); after the
+single production addition, all 35 controller tests and scoped format/lint
+checks passed. The fresh SPEC reviewer independently passed 35 tests with:
+
+```sh
+rtk proxy zsh -c 'source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && rtk npm run test -- src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx --maxWorkers=1'
+```
+
+Fresh QUALITY review approved the same two-file delta. No additional provider
+calls or application-key reads occurred. All previously named human/live,
+packaging, Store, and database-generation skips remain pending or inapplicable
+for the same reasons. A draft PR is requested; no remote review readiness,
+merge, or release is claimed.
+
+This documentation update was formatted and checked with:
+
+```sh
+rtk proxy zsh -c 'source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && rtk proxy npx prettier --ignore-path /dev/null --write docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md && rtk proxy npx prettier --ignore-path /dev/null --check docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md'
+rtk git diff --check
+rtk git diff --cached --check
+```
+
+Passed; only documentation changes follow the latest validated source.
 
 ## Final Independent Review And Local Closeout
 
