@@ -14,6 +14,7 @@ export const aiProviderSecretPresenceSchema = z.strictObject({
   openai: z.boolean(),
   anthropic: z.boolean(),
   gemini: z.boolean(),
+  openrouter: z.boolean(),
 })
 
 export type AiProviderSecretPresence = z.infer<

@@ -149,3 +149,20 @@ it.each(['read', 'status', 'save', 'delete'] as const)(
     expect(remove).not.toHaveBeenCalled()
   },
 )
+
+it('keeps the OpenRouter secret independent and exposes presence without its value', async () => {
+  await saveSecret('genai:openai', 'openai-private-key')
+  await saveSecret('genai:openrouter', 'openrouter-private-key')
+  await expect(readSecret('genai:openrouter')).resolves.toBe(
+    'openrouter-private-key',
+  )
+  const status = await getSecretStatus('genai:openrouter')
+  expect(status).toMatchObject({
+    provider: 'genai:openrouter',
+    configured: true,
+  })
+  expect(JSON.stringify(status)).not.toContain('openrouter-private-key')
+  await deleteSecret('genai:openrouter')
+  await expect(readSecret('genai:openrouter')).resolves.toBeNull()
+  await expect(readSecret('genai:openai')).resolves.toBe('openai-private-key')
+})

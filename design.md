@@ -166,13 +166,29 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 
 - Keep AI connection in its own Settings form with the existing compact row,
   input, status, and panel tokens. Ordinary preference saves do not submit it.
-- Selecting a provider fills an editable model value. Saved custom models stay
-  visible; a blank reset model stays blank rather than looking configured.
+- Selecting a provider fills an editable suggested model value; OpenRouter
+  suggests `openrouter/free`. Saved custom models stay visible exactly; a
+  blank reset model stays blank. Show **Use free models** only for OpenRouter,
+  beside the model field, as a draft-only action. It clears test feedback,
+  requires explicit saving/activation, and is disabled behind the shared operation
+  gate. Discard restores the saved model.
 - Mask entered keys and show availability only for the selected provider. Clear
-  the input after saving and when switching providers. Provide Remove key and a
-  Google AI Studio link for Gemini.
-- Use Save & test connection for edits and Test connection for an unchanged
-  connection. Name the current save/test step and disable conflicting controls.
+  the input after saving and when switching providers. Keep Remove key, the
+  Gemini Google AI Studio link, and an OpenRouter key-creation link. OpenRouter
+  shows compact free-routing/usage guidance and code/context-forwarding copy
+  with a provider-data-policy link. External links use the established new-tab
+  attributes. Keep the existing compact row/input/status/panel tokens.
+
+- Keep an Active provider row visible with the saved provider/model while the
+  editor browses other providers. Show empty/loading states and missing active
+  key availability separately. Returning to the active provider restores its
+  saved custom model; other providers use their editable suggestions.
+- Keep two separate buttons: Test connection and Save & make active. Use Make
+  active for another provider with a saved key and no replacement key entered.
+  Disable saving the unchanged active connection. Testing checks the saved
+  active connection without writes; saving/activation sends no provider request.
+  Disable testing unsaved edits with a hint to save or activate first. Name the
+  current save/test step and disable conflicting controls.
 - Show a compact inline success or actionable error. A failed test keeps saved
   configuration visible, and replacing configuration clears old verification.
 - Keep AI assessment enablement separate. Testing works while assessment is off,

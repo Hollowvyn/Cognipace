@@ -623,3 +623,23 @@ describe('aiAssessment settings', () => {
     ).toThrow()
   })
 })
+
+it('round-trips a saved custom OpenRouter model and toggles only enabled', () => {
+  const saved = {
+    ...defaultUserSettings,
+    aiAssessment: {
+      enabled: false,
+      provider: 'openrouter' as const,
+      model: 'vendor/custom-model:free',
+    },
+  }
+  expect(userSettingsSchema.parse(saved)).toEqual(saved)
+  expect(parseStoredUserSettings(saved)).toEqual(saved)
+  const patch = userSettingsPatchSchema.parse({
+    aiAssessment: { enabled: true },
+  })
+  expect(mergeUserSettings(saved, patch)).toEqual({
+    ...saved,
+    aiAssessment: { ...saved.aiAssessment, enabled: true },
+  })
+})

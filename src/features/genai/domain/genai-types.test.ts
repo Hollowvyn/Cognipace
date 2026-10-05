@@ -4,11 +4,16 @@ import { genAiErrorCodes, genAiProviderIds } from './genai-types'
 
 describe('genai domain surface', () => {
   it('locks the provider id order', () => {
-    expect(genAiProviderIds).toEqual(['openai', 'anthropic', 'gemini'])
+    expect(genAiProviderIds).toEqual([
+      'openai',
+      'anthropic',
+      'gemini',
+      'openrouter',
+    ])
   })
 
   it('includes every documented error code without duplicates', () => {
-    expect(genAiErrorCodes).toHaveLength(12)
+    expect(genAiErrorCodes).toHaveLength(13)
     expect(new Set(genAiErrorCodes)).toEqual(
       new Set([
         'not-configured',
@@ -16,6 +21,7 @@ describe('genai domain surface', () => {
         'permission',
         'bad-request',
         'model-unavailable',
+        'billing',
         'refused',
         'cancelled',
         'rate-limit',

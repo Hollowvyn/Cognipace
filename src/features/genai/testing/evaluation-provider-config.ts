@@ -1,9 +1,9 @@
 import { z } from 'zod'
 
-import type { AiProviderConfig } from '@/lib/ai/types'
+import { aiProviderIds, type AiProviderConfig } from '@/lib/ai/types'
 
 const evaluationConfigSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'gemini']),
+  provider: z.enum(aiProviderIds),
   model: z.string().trim().min(1),
   apiKey: z.string().trim().min(1),
 })

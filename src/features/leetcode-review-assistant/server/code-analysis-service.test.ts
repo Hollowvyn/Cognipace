@@ -25,39 +25,58 @@ const metadata = {
 beforeEach(() => vi.mocked(generateJson).mockReset())
 
 describe('analyzeCode', () => {
-  it('uses one bounded SDK generation and returns the consistent full report', async () => {
-    const report = makeValidAnalysis()
-    vi.mocked(generateJson).mockResolvedValue({
-      status: 'success',
-      data: report,
-      providerMetadata: metadata,
-    })
-    const request = makeAnalysisRequest()
-    const signal = new AbortController().signal
-    expect(await analyzeCode(request, config, signal, 12345)).toEqual({
-      status: 'success',
-      data: report,
-      providerMetadata: metadata,
-    })
-    expect(generateJson).toHaveBeenCalledTimes(1)
-    const call = vi.mocked(generateJson).mock.calls[0]?.[0]
-    if (!call) throw new Error('Expected one SDK generation.')
-    expect(call.prompt.system).toContain('leetcode-code-analysis-v1')
-    expect(call).toEqual({
-      ...config,
-      prompt: {
-        system: call.prompt.system,
-        user: JSON.stringify({
-          problem: request.problem,
-          submission: request.submission,
-        }),
+  it.each([
+    { config, metadata, timeoutMs: 12345 },
+    {
+      config: {
+        ...config,
+        provider: 'openrouter' as const,
+        model: 'openrouter/free',
       },
-      schema: codeAnalysisSchema,
-      signal,
-      timeoutMs: 12345,
-      maxOutputTokens: 8192,
-    })
-  })
+      metadata: {
+        ...metadata,
+        provider: 'openrouter' as const,
+        model: 'openrouter/free',
+        resolvedModel: 'test/served-model:free',
+      },
+      timeoutMs: 30000,
+    },
+  ])(
+    'uses one bounded SDK generation and returns the consistent $config.provider report',
+    async ({ config, metadata, timeoutMs }) => {
+      const report = makeValidAnalysis()
+      vi.mocked(generateJson).mockResolvedValue({
+        status: 'success',
+        data: report,
+        providerMetadata: metadata,
+      })
+      const request = makeAnalysisRequest()
+      const signal = new AbortController().signal
+      expect(await analyzeCode(request, config, signal, timeoutMs)).toEqual({
+        status: 'success',
+        data: report,
+        providerMetadata: metadata,
+      })
+      expect(generateJson).toHaveBeenCalledTimes(1)
+      const call = vi.mocked(generateJson).mock.calls[0]?.[0]
+      if (!call) throw new Error('Expected one SDK generation.')
+      expect(call.prompt.system).toContain('leetcode-code-analysis-v1')
+      expect(call).toEqual({
+        ...config,
+        prompt: {
+          system: call.prompt.system,
+          user: JSON.stringify({
+            problem: request.problem,
+            submission: request.submission,
+          }),
+        },
+        schema: codeAnalysisSchema,
+        signal,
+        timeoutMs,
+        maxOutputTokens: 8192,
+      })
+    },
+  )
 
   it.each(['strategy', 'language'] as const)(
     'rejects inconsistent %s without downgrading or another call',

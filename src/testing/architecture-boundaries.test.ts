@@ -21,6 +21,7 @@ const approvedAiProviderHostPermissions = [
   'https://api.openai.com/*',
   'https://api.anthropic.com/*',
   'https://generativelanguage.googleapis.com/*',
+  'https://openrouter.ai/*',
 ]
 
 describe('architecture boundaries', () => {
@@ -136,7 +137,7 @@ describe('architecture boundaries', () => {
     const offenders = productionSourceFiles()
       .filter((file) => !file.startsWith(libAiPath))
       .filter((file) =>
-        /(?:from\s+|import\s*\()\s*['"](?:ai|@ai-sdk\/[^'"]+)['"]/.test(
+        /(?:from\s+|import\s*\()\s*['"](?:ai|@ai-sdk\/[^'"]+|@openrouter\/ai-sdk-provider)['"]/.test(
           readFileSync(file, 'utf8'),
         ),
       )

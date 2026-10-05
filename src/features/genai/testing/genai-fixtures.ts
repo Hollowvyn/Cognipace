@@ -83,3 +83,26 @@ function jsonResponse(body: unknown, status: number): Response {
     headers: { 'Content-Type': 'application/json' },
   })
 }
+
+export function makeOpenRouterSuccessResponse<T>(
+  payload: T,
+  model = 'test/served-model:free',
+): Response {
+  return jsonResponse(
+    {
+      id: 'gen_test_1',
+      object: 'chat.completion',
+      created: 1,
+      model,
+      choices: [
+        {
+          index: 0,
+          message: { role: 'assistant', content: JSON.stringify(payload) },
+          finish_reason: 'stop',
+        },
+      ],
+      usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
+    },
+    200,
+  )
+}

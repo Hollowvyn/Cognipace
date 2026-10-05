@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  clearAiProviderSecretRequestSchema,
   setAiProviderSecretRequestSchema,
   testAiConnectionRequestSchema,
   testAiConnectionResponseSchema,
@@ -87,4 +88,39 @@ describe('connection test contracts', () => {
       )
     }
   })
+})
+
+it('accepts the fourth provider in strict secret and connection contracts', () => {
+  expect(
+    setAiProviderSecretRequestSchema.parse({
+      surface: 'dashboard',
+      provider: 'openrouter',
+      secret: { apiKey: 'local-key' },
+    }).provider,
+  ).toBe('openrouter')
+  expect(
+    clearAiProviderSecretRequestSchema.parse({
+      surface: 'dashboard',
+      provider: 'openrouter',
+    }).provider,
+  ).toBe('openrouter')
+  expect(
+    testAiConnectionRequestSchema.parse({
+      surface: 'dashboard',
+      provider: 'openrouter',
+      model: ' openrouter/free ',
+    }),
+  ).toEqual({
+    surface: 'dashboard',
+    provider: 'openrouter',
+    model: 'openrouter/free',
+  })
+  expect(
+    testAiConnectionResponseSchema.parse({
+      status: 'success',
+      provider: 'openrouter',
+      model: 'openrouter/free',
+      durationMs: 12,
+    }).provider,
+  ).toBe('openrouter')
 })

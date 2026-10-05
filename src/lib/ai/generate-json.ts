@@ -1,6 +1,7 @@
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import {
   APICallError,
   EmptyResponseBodyError,
@@ -30,10 +31,13 @@ const endpoints = {
   openai: 'https://api.openai.com/v1',
   anthropic: 'https://api.anthropic.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  openrouter: 'https://openrouter.ai/api/v1',
 } as const
 const messages: Record<AiErrorCode, string> = {
   'not-configured':
     'Save a provider, model, and API key before testing the connection.',
+  billing:
+    'Check your OpenRouter balance or key spending limit, or retry after pending paid requests finish.',
   auth: 'The provider rejected the API key. Replace it and try again.',
   permission:
     'The provider denied access. Check API key restrictions and model permissions.',
@@ -52,6 +56,9 @@ const messages: Record<AiErrorCode, string> = {
     'The provider did not return the required structured output. Try again.',
   unknown: 'The AI request failed. Try again.',
 }
+
+const openRouterModelUnavailableMessage =
+  'The selected OpenRouter model may be unavailable or excluded by required capabilities or account privacy/routing settings. Check the model and your OpenRouter settings.'
 
 class ControlledAiError extends Error {
   constructor(readonly code: AiErrorCode) {
@@ -136,10 +143,17 @@ export async function generateJson<T>(
           throw new ControlledAiError('refused')
         if (result.finishReason === 'length')
           throw new ControlledAiError('invalid-output')
+        const resolvedModel =
+          request.provider === 'openrouter'
+            ? validResolvedModel(result.response.modelId, request.model)
+            : undefined
         return {
           status: 'success' as const,
           data: result.output,
-          providerMetadata: metadata(),
+          providerMetadata: {
+            ...metadata(),
+            ...(resolvedModel === undefined ? {} : { resolvedModel }),
+          },
         }
       },
     )
@@ -151,7 +165,10 @@ export async function generateJson<T>(
     return {
       status: 'error',
       code,
-      message: messages[code],
+      message:
+        request.provider === 'openrouter' && code === 'model-unavailable'
+          ? openRouterModelUnavailableMessage
+          : messages[code],
       providerMetadata: metadata(),
     }
   }
@@ -181,7 +198,33 @@ function createModel(
         baseURL: endpoints.gemini,
         fetch: providerFetch,
       }).languageModel(request.model)
+    case 'openrouter':
+      return createOpenRouter({
+        apiKey: request.apiKey,
+        baseURL: endpoints.openrouter,
+        fetch: providerFetch,
+        compatibility: 'strict',
+      }).chat(request.model, {
+        structuredOutputs: { strict: true },
+        provider: { require_parameters: true },
+      })
   }
+}
+
+function validResolvedModel(
+  value: unknown,
+  requestedModel: string,
+): string | undefined {
+  if (
+    typeof value !== 'string' ||
+    !value.trim() ||
+    value.length > 120 ||
+    value.trim() === requestedModel ||
+    value.trim() === 'openrouter/free' ||
+    value.trim() === 'openrouter/auto'
+  )
+    return undefined
+  return value
 }
 
 function normalizeError(
@@ -197,7 +240,14 @@ function normalizeError(
       : 'invalid-output'
   if (NoSuchModelError.isInstance(error)) return 'model-unavailable'
   if (APICallError.isInstance(error)) {
-    const tags = providerErrorTags(error.data, provider)
+    const status = transportStatus ?? error.statusCode
+    if (provider === 'openrouter') {
+      const code = normalizeOpenRouterError(error.data, status)
+      if (code !== undefined) return code
+      if (status === 402) return 'billing'
+    }
+    const tags =
+      provider === 'openrouter' ? [] : providerErrorTags(error.data, provider)
     if (
       tags.includes('API_KEY_INVALID') ||
       tags.includes('invalid_api_key') ||
@@ -219,7 +269,6 @@ function normalizeError(
     )
       return 'rate-limit'
     if (isProviderRefusal(error.cause, provider)) return 'refused'
-    const status = transportStatus ?? error.statusCode
     if (status === 401) return 'auth'
     if (status === 403) return 'permission'
     if (status === 404) return 'model-unavailable'
@@ -254,6 +303,68 @@ function normalizeError(
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object'
     ? (value as Record<string, unknown>)
+    : undefined
+}
+
+const openRouterMachineErrorCodes = new Map<string, AiErrorCode>([
+  ['authentication', 'auth'],
+  ['permission_denied', 'permission'],
+  ['payment_required', 'billing'],
+  ['not_found', 'model-unavailable'],
+  ['rate_limit_exceeded', 'rate-limit'],
+  ['provider_overloaded', 'network'],
+  ['provider_unavailable', 'network'],
+  ['context_length_exceeded', 'bad-request'],
+  ['max_tokens_exceeded', 'invalid-output'],
+  ['token_limit_exceeded', 'bad-request'],
+  ['string_too_long', 'bad-request'],
+  ['invalid_request', 'bad-request'],
+  ['invalid_prompt', 'bad-request'],
+  ['precondition_failed', 'bad-request'],
+  ['payload_too_large', 'bad-request'],
+  ['unprocessable', 'bad-request'],
+  ['content_policy_violation', 'refused'],
+  ['refusal', 'refused'],
+  ['server', 'network'],
+  ['timeout', 'timeout'],
+])
+
+const openRouterEmbeddedStatusCodes = new Map<number, AiErrorCode>([
+  [400, 'bad-request'],
+  [401, 'auth'],
+  [402, 'billing'],
+  [403, 'permission'],
+  [404, 'model-unavailable'],
+  [408, 'network'],
+  [422, 'bad-request'],
+  [429, 'rate-limit'],
+  [500, 'network'],
+  [502, 'network'],
+  [503, 'network'],
+  [504, 'network'],
+])
+
+/** Read only numeric machine codes and allowlisted metadata; never raw text. */
+function normalizeOpenRouterError(
+  data: unknown,
+  transportStatus: number | undefined,
+): AiErrorCode | undefined {
+  const record = asRecord(data)
+  const error = asRecord(record?.error) ?? record
+  const tag = asRecord(error?.metadata)?.error_type
+  if (typeof tag === 'string') {
+    const code = openRouterMachineErrorCodes.get(tag)
+    if (code !== undefined) return code
+  }
+  if (
+    transportStatus === undefined ||
+    transportStatus < 200 ||
+    transportStatus >= 300
+  )
+    return undefined
+  const embeddedStatus = error?.code
+  return typeof embeddedStatus === 'number' && Number.isInteger(embeddedStatus)
+    ? openRouterEmbeddedStatusCodes.get(embeddedStatus)
     : undefined
 }
 

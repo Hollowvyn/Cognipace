@@ -372,18 +372,45 @@ user-facing setting: queue ordering follows the fixed waterfall, while the
 legacy stored `review.order` value is retained only for settings schema-v1
 compatibility. Changing target retention never rewrites existing schedules.
 
-Settings exposes an AI connection for OpenAI, Anthropic, or Google Gemini.
-Choosing a provider fills an editable default model; saved custom model ids
-survive reopening Settings. Save & test connection saves the selected provider,
-model, and any newly entered key, then makes a small request to the selected
-provider. Test connection checks an unchanged saved connection. A failed test
-keeps the saved connection and explains whether authentication, model access,
-quota, networking, or provider output needs attention. Saving other preferences
-does not commit or discard unfinished AI connection edits.
+Settings exposes an AI connection for OpenAI, Anthropic, Google Gemini, or
+OpenRouter using the user's own selected-provider API key. Choosing a provider
+fills an editable suggested model; OpenRouter suggests `openrouter/free`.
+Saved custom model IDs survive reopening Settings exactly. OpenRouter's
+**Use free models** action changes only the connection draft to `openrouter/free`,
+clears old verification, and requires **Save & make active** to persist.
+**Discard connection changes** restores the saved provider and model.
+
+**Active provider** always shows the saved provider and model, even while another
+provider is selected in the editor. Multiple provider keys can be saved; AI
+assessment uses only the active provider's key. A blank saved model shows no
+active provider, and a missing active key is identified separately.
+
+**Save & make active** saves the selected provider, model, and any newly entered
+key without making a provider request. For another provider with a saved key,
+**Make active** reuses that key and activates the displayed model. Other provider
+keys remain saved. Saving is disabled for an unchanged active connection.
+
+The separate **Test connection** button checks the saved active connection with
+a small structured request, without saving or activating anything. Unsaved
+connection edits must be saved or activated first. Testing works while
+assessment is disabled and does not enable it. A failed test keeps the saved
+connection and shows controlled authentication, permission, model access,
+billing, quota, network, timeout, refusal, or output guidance. Saving other
+preferences leaves unfinished AI connection edits alone.
+
+OpenRouter's free route chooses a free model automatically; quality, latency,
+availability, and usage limits can vary. Users can explicitly enter another free
+or paid model ID. CogniPace never configures paid fallback model IDs or switches
+a failed free request to a paid model. Connection testing checks basic access
+and structured output, not full report quality or every future routed model.
+OpenRouter forwards submission code and problem context to a model provider;
+OpenRouter and provider data policies apply, including account privacy routing
+settings.
 
 AI assessment has a separate enable control for automatic completed-submission
-code analysis. Testing a connection does not enable assessment, and assessment
-can be turned off even when its key or model is missing. Reset Defaults disables assessment and clears provider/model
+code analysis. Saving, activating, or testing a connection does not enable
+assessment, and assessment can be turned off even when its key or model is
+missing. Reset Defaults disables assessment and clears provider/model
 configuration while preserving saved provider keys. Removing a key refreshes
 its availability across extension surfaces; connection results become stale
 when the configuration or saved key changes.

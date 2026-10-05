@@ -102,7 +102,50 @@ describe('genai trusted secret storage', () => {
       openai: false,
       anthropic: true,
       gemini: false,
+      openrouter: false,
     })
     expect(JSON.stringify(presence)).not.toContain('sk-')
+  })
+
+  it('maps OpenRouter save, load, and removal to its own trusted secret ID', async () => {
+    await saveAiProviderSecretToTrustedStorage('openrouter', {
+      apiKey: ' local-key ',
+    })
+    expect(secretStoreMocks.saveSecret).toHaveBeenCalledWith(
+      'genai:openrouter',
+      JSON.stringify({ apiKey: 'local-key' }),
+    )
+    secretStoreMocks.readSecret.mockResolvedValue(
+      JSON.stringify({ apiKey: 'local-key' }),
+    )
+    await expect(
+      loadAiProviderSecretFromTrustedStorage('openrouter'),
+    ).resolves.toEqual({ apiKey: 'local-key' })
+    expect(secretStoreMocks.readSecret).toHaveBeenCalledWith('genai:openrouter')
+    await clearAiProviderSecretFromTrustedStorage('openrouter')
+    expect(secretStoreMocks.deleteSecret).toHaveBeenCalledWith(
+      'genai:openrouter',
+    )
+  })
+
+  it('includes the fourth provider in presence without reading secret values', async () => {
+    secretStoreMocks.getSecretStatus.mockImplementation((provider: string) =>
+      Promise.resolve({
+        provider,
+        configured: provider === 'genai:openrouter',
+        updatedAt: null,
+        fingerprint: null,
+      }),
+    )
+    expect(await getAiProviderSecretPresenceFromTrustedStorage()).toEqual({
+      openai: false,
+      anthropic: false,
+      gemini: false,
+      openrouter: true,
+    })
+    expect(secretStoreMocks.getSecretStatus).toHaveBeenCalledWith(
+      'genai:openrouter',
+    )
+    expect(secretStoreMocks.readSecret).not.toHaveBeenCalled()
   })
 })

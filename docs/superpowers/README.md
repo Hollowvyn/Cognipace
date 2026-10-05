@@ -12,6 +12,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
+
+- [`specs/2026-10-04-openrouter-provider-design.md`](./specs/2026-10-04-openrouter-provider-design.md): approved optional OpenRouter BYOK connection and host permission, suggested editable `openrouter/free`, explicit free preset, protected key storage, structured reports, and routed-model metadata; implemented with independent SPEC/QUALITY reviews, passing automated gates and production-component browser proof; live full-report/generated-code and human installed-extension proof remain pending.
+
 - [`specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md`](./specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md): design and written spec approved for focused Solve / AI / reserved Notes tabs and separate progressive, session-only hints; both phases implemented locally with independent task reviews, passing automated checks, and production-component fixture proof; human installed-extension smoke/proof and live hint-provider quality remain pending.
 
 - [`specs/2026-10-04-analytics-combined-outcomes-restoration.md`](./specs/2026-10-04-analytics-combined-outcomes-restoration.md): user-requested additive restoration of the pooled first-recorded outcome chart beside Recall, preserving every new difficulty/time/mix view.
@@ -68,6 +72,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
+
+- [`plans/2026-10-05-openrouter-provider.md`](./plans/2026-10-05-openrouter-provider.md): six-task implementation plan for shared contracts and trusted keys, the native OpenRouter adapter, runtime/permission boundaries, free/custom Settings flow, privacy/Store documentation, and automated/live/human validation. Implementation and automated gates are complete; the dated record keeps live/generated-code and human installed-extension proof pending.
 
 - [`plans/2026-10-04-overlay-focused-tabs.md`](./plans/2026-10-04-overlay-focused-tabs.md): Phase 1 selected-tab lifecycle, ShadowRoot keyboard navigation, mounted panels, Solve-only footer, and disabled AI explanation implemented and independently reviewed; automated checks and production-component fixture proof passed, human installed-extension smoke pending. See the [handoff](./handoffs/2026-10-04-overlay-focused-tabs.md).
 

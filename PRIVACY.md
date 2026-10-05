@@ -1,6 +1,6 @@
 # CogniPace Privacy Policy
 
-Effective date: September 13, 2026
+Effective date: October 5, 2026
 
 CogniPace is a local-first Chrome extension for planning and recording deliberate LeetCode practice. This policy explains what information the extension handles, why it handles it, and the optional third-party services a user can choose to connect.
 
@@ -28,8 +28,27 @@ If the user enables GitHub Gist sync, CogniPace stores the user-provided GitHub 
 
 ### Optional AI assessment data
 
-If the user enables an AI provider, CogniPace stores the user-provided API key locally and sends an assessment request directly to the selected provider: OpenAI, Anthropic, or Google Gemini. Depending on the assessment, that request may contain the problem slug, title, difficulty, topics, statement, submission status, language, runtime, memory result, test counts, solution code, failure diagnostics, timing, prior rating, and session context. The selected provider's terms and privacy policy govern its processing of that request.
-CogniPace does not control provider retention, which varies by provider policy and settings. CogniPace does not persist provider assessment payloads or raw provider results; the local workflow stores only the derived review information the user saves.
+CogniPace stores the user's selected-provider API key in trusted local extension
+storage. The user can choose OpenAI, Anthropic, Google Gemini, or OpenRouter.
+Saving and testing a connection sends a small structured verification request
+even while AI assessment is disabled. Connection testing does not send a
+submission's solution code or enable assessment.
+
+When the user enables AI assessment, completed-submission analysis sends the
+problem slug, title, difficulty, topics, statement, examples, constraints,
+follow-ups, submission status, language/version, runtime, memory result, test
+counts, solution code, and bounded failure diagnostics to the selected service.
+OpenRouter forwards code and problem context to a model provider. OpenRouter
+and the serving provider's terms, data policies, and account privacy settings
+govern that processing. The app does not override OpenRouter account privacy
+routing settings. See [OpenRouter provider data policies](https://openrouter.ai/docs/guides/privacy/provider-logging).
+
+Provider retention varies by provider policy and settings. CogniPace does not
+persist raw provider payloads or analysis reports in the app database, backups,
+or sync. Reports remain in the active analysis session. Analysis does not save
+a review automatically; the local workflow stores only review information the
+user separately chooses to save. API keys are excluded from backups, sync,
+logs, query caches, and returned runtime data.
 
 ## How Information Is Used
 
@@ -41,7 +60,9 @@ Core data is processed locally in the browser. Information leaves the browser on
 
 - LeetCode requests support the problem-page and submission workflow and may include browser credentials or session cookies through the authenticated user workflow; these requests are sent only to LeetCode.
 - GitHub requests validate a user-supplied token and perform optional Gist sync.
-- AI-provider requests perform optional assessments using the user's selected provider and API key.
+- AI-service requests perform user-requested connection tests or enabled code
+  analysis using the user's selected provider and API key. OpenRouter forwards
+  analysis input to the serving model provider under the applicable policies.
 
 CogniPace does not send this information to a CogniPace-operated server. It does not share information with independent advertisers or analytics providers.
 Raw GitHub tokens and AI-provider API keys are kept in local extension storage. They are excluded from CogniPace backup files, Gist sync envelopes, logs, and user-interface status payloads.

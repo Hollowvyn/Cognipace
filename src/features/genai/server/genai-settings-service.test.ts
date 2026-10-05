@@ -59,6 +59,7 @@ describe('getAiProviderSecretPresence', () => {
       openai: false,
       anthropic: false,
       gemini: false,
+      openrouter: false,
     })
   })
 
@@ -68,6 +69,7 @@ describe('getAiProviderSecretPresence', () => {
       openai: false,
       anthropic: true,
       gemini: false,
+      openrouter: false,
     })
   })
 })
@@ -84,7 +86,12 @@ describe('setAiProviderSecret / clearAiProviderSecret', () => {
     await setAiProviderSecret('openai', { apiKey: 'sk-o' })
     await setAiProviderSecret('gemini', { apiKey: 'g-x' })
     const presence = await clearAiProviderSecret('openai')
-    expect(presence).toEqual({ openai: false, anthropic: false, gemini: true })
+    expect(presence).toEqual({
+      openai: false,
+      anthropic: false,
+      gemini: true,
+      openrouter: false,
+    })
   })
 
   it('does not write GenAI API keys into settings_kv', async () => {
@@ -333,3 +340,61 @@ describe('trusted active configuration snapshot', () => {
     },
   )
 })
+
+it('uses an OpenRouter key only for its saved active connection and preserves other keys on removal', async () => {
+  const { db } = await createTestDb({ seed: false })
+  await setAiProviderSecret('openai', { apiKey: 'other-provider-key' })
+  await setAiProviderSecret('openrouter', { apiKey: 'private-openrouter-key' })
+  await updateSettings(db, {
+    aiAssessment: {
+      enabled: false,
+      provider: 'openrouter',
+      model: 'vendor/custom-model:free',
+    },
+  })
+  expect(await loadActiveProviderConfig(db)).toBeNull()
+  await updateSettings(db, { aiAssessment: { enabled: true } })
+  expect(await loadActiveProviderConfig(db)).toEqual({
+    provider: 'openrouter',
+    model: 'vendor/custom-model:free',
+    apiKey: 'private-openrouter-key',
+  })
+  const rows = await db.select().from(settingsKv)
+  expect(JSON.stringify(rows)).not.toContain('private-openrouter-key')
+  const presence = await clearAiProviderSecret('openrouter')
+  expect(presence).toEqual({
+    openai: true,
+    anthropic: false,
+    gemini: false,
+    openrouter: false,
+  })
+  expect(await loadActiveProviderConfig(db)).toBeNull()
+})
+
+it.each(['replacement-key', 'same-key'] as const)(
+  'changes the OpenRouter trusted configuration identity on a %s save',
+  async (kind) => {
+    const { db } = await createTestDb({ seed: false })
+    await updateSettings(db, {
+      aiAssessment: {
+        enabled: true,
+        provider: 'openrouter',
+        model: 'openrouter/free',
+      },
+    })
+    await setAiProviderSecret('openrouter', {
+      apiKey: 'private-openrouter-key',
+    })
+    const saved = await loadActiveProviderConfigSnapshot(db)
+    expect(saved).not.toBeNull()
+    await setAiProviderSecret('openrouter', {
+      apiKey:
+        kind === 'same-key'
+          ? 'private-openrouter-key'
+          : 'replacement-openrouter-key',
+    })
+    expect((await loadActiveProviderConfigSnapshot(db))?.identity).not.toBe(
+      saved?.identity,
+    )
+  },
+)
