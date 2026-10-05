@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md`](./specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md): approved focused Solve / AI / reserved Notes layout and separate progressive, session-only AI hint phase; written-spec review and phase-sized implementation plans pending.
+
 - [`specs/2026-10-04-analytics-combined-outcomes-restoration.md`](./specs/2026-10-04-analytics-combined-outcomes-restoration.md): user-requested additive restoration of the pooled first-recorded outcome chart beside Recall, preserving every new difficulty/time/mix view.
 
 - [`specs/2026-10-04-analytics-problem-solving-design.md`](./specs/2026-10-04-analytics-problem-solving-design.md): approved expansion of New Problem Success into one section for difficulty outcomes, recorded time, and difficulty mix; implemented as Problem Solving with passing automated checks and production-component browser proof; human installed-extension smoke remains pending.
