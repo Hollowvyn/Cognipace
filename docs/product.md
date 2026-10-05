@@ -94,7 +94,24 @@ Current behavior:
 - a reserved Notes placeholder without editing or persistence
 - settings access from the overlay
 - compact expanded-mode Help access that opens a YouTube search for the current problem in a new tab
+- an explicit AI hints action beside YouTube in Solve's Help row, using the
+  selected saved provider, model, and key independently of whether automatic
+  AI assessment is on or off
+- one requested batch of one to three progressively stronger short pointers:
+  the first appears immediately when ready, and Reveal next exposes the next
+  pointer locally without another provider request
+- session-only hints that retain their batch, revealed count, and disclosure
+  across folding/reopening Help, tab switches, collapse/dock/restore, accepted
+  or failed review saves, rating updates, and ordinary metadata refetches;
+  none of these actions generates another batch
+- hints reset on Restart, a different problem, page reload, overlay remount,
+  selected problem-input changes, a changed or removed saved connection, or
+  clear local data; toggling automatic AI assessment alone preserves them
 - page metadata and problem context sync through content-script/runtime messages
+
+Hints exist only in the current overlay session. They never write review/log
+fields, rating, solve time, FSRS, Analytics, backup, or sync data. Notes remains
+a reserved, deferred tab without editing or persistence.
 
 Submission notes stay in LeetCode. Existing saved CogniPace log fields remain
 preserved in local practice history, backups, and sync; overlay review saves and
