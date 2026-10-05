@@ -222,11 +222,13 @@ it('tests a saved free OpenRouter connection with its key while assessment is di
   })
   expect(fetchMock).toHaveBeenCalledOnce()
   const [url, init] = fetchMock.mock.calls[0]!
-  expect(String(url)).toBe('https://openrouter.ai/api/v1/chat/completions')
+  expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
   expect(new Headers(init?.headers).get('authorization')).toBe(
     'Bearer fake-private-key',
   )
-  expect(JSON.parse(String(init?.body))).toMatchObject({
+  const body = init?.body
+  if (typeof body !== 'string') throw new Error('Expected a JSON request body.')
+  expect(JSON.parse(body)).toMatchObject({
     model: 'openrouter/free',
     max_tokens: 512,
   })

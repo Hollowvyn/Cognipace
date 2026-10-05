@@ -251,7 +251,8 @@ it('persists an OpenRouter connection exactly without changing unrelated default
   })
   const rows = await handle.db.select().from(settingsKv)
   expect(rows).toHaveLength(1)
-  expect(JSON.parse(rows[0]!.value).aiAssessment).toEqual({
+  const stored: unknown = JSON.parse(rows[0]!.value)
+  expect(stored).toHaveProperty('aiAssessment', {
     ...aiAssessment,
     enabled: true,
   })
