@@ -72,7 +72,11 @@ export async function isAiAssessmentAvailable(db: Db): Promise<boolean> {
 
 let hintConnectionRevisions = new WeakMap<
   Db,
-  { identity: string; revision: string }
+  {
+    issuedRead: number
+    committedRead: number
+    observation: { identity: string; revision: string } | null
+  }
 >()
 
 export function resetAiHintConnectionRevisions(): void {
@@ -85,6 +89,13 @@ export async function readAiHintConnectionSnapshot(db: Db): Promise<{
   identity: string
   status: HintConnectionStatus
 }> {
+  const registry = hintConnectionRevisions
+  let state = registry.get(db)
+  if (!state) {
+    state = { issuedRead: 0, committedRead: 0, observation: null }
+    registry.set(db, state)
+  }
+  const readOrder = ++state.issuedRead
   const settings = await getSettings(db)
   const ai = settings.aiAssessment
   const model = ai.model.trim()
@@ -92,10 +103,14 @@ export async function readAiHintConnectionSnapshot(db: Db): Promise<{
     ai.provider,
   )
   const identity = JSON.stringify([ai.provider, model, saved?.identity ?? null])
-  let observed = hintConnectionRevisions.get(db)
-  if (!observed || observed.identity !== identity) {
-    observed = { identity, revision: crypto.randomUUID() }
-    hintConnectionRevisions.set(db, observed)
+  const observed = state.observation
+  const revision =
+    observed?.identity === identity ? observed.revision : crypto.randomUUID()
+  // Late reads retain their own snapshot without replacing newer observations.
+  // Reads begun before reset cannot write into the replacement registry.
+  if (registry === hintConnectionRevisions && readOrder > state.committedRead) {
+    state.committedRead = readOrder
+    state.observation = { identity, revision }
   }
   const config: GenAiProviderConfig | null =
     model && saved
@@ -104,7 +119,7 @@ export async function readAiHintConnectionSnapshot(db: Db): Promise<{
   const status: HintConnectionStatus = {
     available: config !== null,
     provider: ai.provider,
-    revision: observed.revision,
+    revision,
   }
 
   return { config, identity, status }

@@ -5,6 +5,7 @@ import { createTestDb } from '@/platform/db/test-db'
 import { updateSettings } from '@/features/settings/server/settings-service'
 import { saveSecret } from '@/platform/secrets'
 
+import * as secretStorage from './genai-secret-storage'
 import {
   clearAiProviderSecret,
   getAiProviderSecretPresence,
@@ -28,6 +29,28 @@ async function configuredDb() {
   })
   await setAiProviderSecret('openai', { apiKey: 'fake-private-key' })
   return db
+}
+
+function pauseNextSecretLoad() {
+  let entered = () => {}
+  let release = () => {}
+  const started = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  const paused = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const load = secretStorage.loadAiProviderSecretSnapshotFromTrustedStorage
+  vi.spyOn(
+    secretStorage,
+    'loadAiProviderSecretSnapshotFromTrustedStorage',
+  ).mockImplementationOnce(async (provider) => {
+    const saved = await load(provider)
+    entered()
+    await paused
+    return saved
+  })
+  return { started, release }
 }
 
 describe('getAiProviderSecretPresence', () => {
@@ -76,6 +99,42 @@ describe('setAiProviderSecret / clearAiProviderSecret', () => {
 })
 
 describe('active AI configuration entrypoints', () => {
+  it('does not let a suspended old-model read replace a newer connection revision', async () => {
+    const db = await configuredDb()
+    const paused = pauseNextSecretLoad()
+    const older = readAiHintConnectionSnapshot(db)
+    await paused.started
+
+    await updateSettings(db, { aiAssessment: { model: 'new-model' } })
+    const current = await readAiHintConnectionSnapshot(db)
+    expect(current.config?.model).toBe('new-model')
+    paused.release()
+    const resumed = await older
+
+    expect(resumed.config?.model).toBe('gpt-test')
+    expect(resumed.identity).not.toBe(current.identity)
+    expect(resumed.status.revision).not.toBe(current.status.revision)
+    expect(await getAiHintConnectionStatus(db)).toEqual(current.status)
+    expect(await getAiHintConnectionStatus(db)).toEqual(current.status)
+  })
+
+  it('does not let a pre-reset read populate the replacement revision registry', async () => {
+    const db = await configuredDb()
+    const initial = await getAiHintConnectionStatus(db)
+    const paused = pauseNextSecretLoad()
+    const older = readAiHintConnectionSnapshot(db)
+    await paused.started
+
+    resetAiHintConnectionRevisions()
+    paused.release()
+    const resumed = await older
+    const current = await getAiHintConnectionStatus(db)
+
+    expect(current.revision).not.toBe(initial.revision)
+    expect(current.revision).not.toBe(resumed.status.revision)
+    expect(await getAiHintConnectionStatus(db)).toEqual(current)
+  })
+
   it('keeps hint availability independent of automatic assessment enablement', async () => {
     const db = await configuredDb()
     const initial = await getAiHintConnectionStatus(db)
