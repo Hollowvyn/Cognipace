@@ -32,7 +32,8 @@ execution of every illustrative shell spelling or code sample. The handoff is
 the actual execution ledger. Tasks 9.5–9.6 and 10.7 remain pending: private live
 evaluation configuration is absent, and the human engineer has not supplied
 installed-extension happy-path/edge-case smoke and screenshot/recording proof.
-Task 10.8 awaits the final whole-implementation review. Task 10.9's evidence
+Task 10.8 passed the final whole-implementation source review without actionable
+findings (12 independently run suites, 369 tests). Task 10.9's evidence
 record has been written and reviewed, but its final phase-completion condition
 remains unchecked until the human/live gates are satisfied. This phase is
 implemented locally, not PR review or merge ready. Notes remains reserved.
@@ -3177,6 +3178,6 @@ rtk git diff --check
 ```
 
 - [ ] **Step 7: Complete the human smoke and live provider-quality gates above, and record actual evidence in the dedicated handoff.** Do not label those gates complete from unit tests, screenshots of mock data, or a provider success response alone. If human evidence or privately configured live evaluation is unavailable, report the exact pending gate, command and reason and keep the behavior change unready for review/merge.
-- [ ] **Step 8: Review the final diff for the approved scope.** Verify no hint writes to Practice/logs/rating/time/FSRS/Analytics/SQLite/backup/sync, no new permission/host/auth/backend behavior, no current-editor watcher, no official-hint input, and no automatic generation or ready-batch Regenerate action. Verify strict parsing, actual sender host/slug binding, separate ownership and redacted errors at the extension boundary. Report feature release impact; recovery is removing the manual Help action or saved connection, with no DB rollback required.
+- [x] **Step 8: Review the final diff for the approved scope.** Verify no hint writes to Practice/logs/rating/time/FSRS/Analytics/SQLite/backup/sync, no new permission/host/auth/backend behavior, no current-editor watcher, no official-hint input, and no automatic generation or ready-batch Regenerate action. Verify strict parsing, actual sender host/slug binding, separate ownership and redacted errors at the extension boundary. Report feature release impact; recovery is removing the manual Help action or saved connection, with no DB rollback required.
 - [ ] **Step 9: Replace the handoff's initial evidence state with the actual validation record.** List each exact focused/full command actually run with its outcome, each exact skipped command and reason, actual branch/source commit, live provider/model/date and quality findings, human proof paths, remaining risk, changed files and recovery notes. Re-run `rtk npx prettier --ignore-path /dev/null --write docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md` and `rtk npx prettier --ignore-path /dev/null --check docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md`, then `rtk git diff --check`. Mark this Phase 2 complete only after the approved behavior, required checks and evidence are complete; leave Notes reserved.
 - [x] **Step 10: Commit authority docs and evidence:** `rtk git add docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md`; `rtk git commit -m "docs: document session-only progressive overlay hints and proof"`.
