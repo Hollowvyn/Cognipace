@@ -18,7 +18,7 @@ Approved amendment, October 4, 2026: Phase E owns the 180-day maximum interval p
 
 This is the dependency and acceptance map for the whole remediation. The eight priority numbers retain their audit meanings; the letters below identify execution slices. A and B have detailed executable plans. Author each subsequent slice's code-level plan against its verified predecessor before executing it. Do not represent this map as eight completed implementations or as code-level plans for every slice.
 
-Execution status: A merged in [PR #190](https://github.com/Hollowvyn/Cognipace/pull/190) as `92ba67d5` on October 4, 2026. Its [handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) records exact automated validation, failures repaired, recovery limits and the historical human-proof status. [Phase B](./2026-10-04-fsrs-phase-b-scheduling-evidence.md) is implemented on its phase branch: complete profiles, detached codecs and pure correction helpers passed independent reviews and automated/build validation. Its [handoff](../handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md) records repaired findings, compatibility limits and required human smoke still pending before review/merge. C–H remain unimplemented.
+Execution status: A merged in [PR #190](https://github.com/Hollowvyn/Cognipace/pull/190) as `92ba67d5` on October 4, 2026. Its [handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) records exact automated validation, failures repaired, recovery limits and the historical human-proof status. [Phase B](./2026-10-04-fsrs-phase-b-scheduling-evidence.md) merged in [PR #196](https://github.com/Hollowvyn/Cognipace/pull/196) as `36d5ef70`; its [handoff](../handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md) retains automated/build validation and historical human-proof status. [Phase C](./2026-10-04-fsrs-phase-c-storage-restore.md) is being reviewed before implementation against the merged baseline. C–H remain unimplemented.
 
 Worktree: `/Users/tobiolutimehin/.codex/worktrees/46c1/cognipace-v2`. The original design/Phase A branch was `codex/fsrs-remediation-design`; B is planned on `codex/fsrs-phase-b-scheduling-evidence`, based on merged `origin/main` at `92ba67d5`. Preserve the newer Analytics and Tracks work already present. At execution start check the branch, migration list and pinned toolchain; if upstream changes affect the frozen baseline or planned interfaces, revise the affected plan before editing code.
 
@@ -142,7 +142,7 @@ Compare the candidate chronologically against defaults/incumbent on held-out his
 
 - [x] Execute A from its detailed plan and retain exact passing/failed command evidence. A merged in PR #190; its handoff retains the historical human-proof status.
 - [x] Produce B's complete code-level plan against A's merged, verified baseline.
-- [ ] Execute B and record its implementation validation and human compatibility proof.
+- [x] Execute B and record its automated implementation validation; B merged in PR #196. Its handoff retains the historical human-proof status.
 - [ ] Produce and execute C with the real appended migration and frozen supported backup readers.
 - [ ] Produce and execute D end to end, including durability, conflict and restart evidence.
 - [ ] Produce and execute E with historical compatibility, verified 180-day cap behavior, an approved existing-date policy and every current due consumer ready before profile activation.
