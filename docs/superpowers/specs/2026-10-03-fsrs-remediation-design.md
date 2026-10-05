@@ -4,6 +4,8 @@ Date: October 3, 2026.
 
 Status: the three design sections and consolidated written specification are approved. The user approved the written specification on October 3, 2026 ("This is cool beans"). Phase A merged in PR #190; its [handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) retains historical evidence and limits. Phase B is implemented on its phase branch with independent reviews and passing automated/build checks; [human compatibility smoke and visual proof](../handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md) remain pending before review or merge. C–H remain unimplemented.
 
+Approved amendment, October 4, 2026: add a 180-day maximum interval policy to Phase E for ongoing coding and interview readiness. This extends priority 4 within the existing eight-phase roadmap; it does not change Phase B's implementation or activate the cap now. Native cap-boundary behavior and the treatment of existing longer due dates must be resolved in E's detailed design and plan.
+
 Baseline: `codex/fsrs-remediation-design`, based on `origin/main` at `dc0fc6f2`. The original audit examined `7cccd2d7`; the newer Analytics and Tracks work is preserved. The lockfile currently resolves ts-fsrs 5.4.0, using FSRS 6.
 
 Phase A execution rebased the planning commits onto `origin/main` at `b2d9291f`, preserving the newer AI provider connection changes. The frozen through-0009 SQL fingerprint stayed `1144ce07`.
@@ -29,6 +31,7 @@ This is one master design covering eight audit priorities. Phase-sized plans mus
 
 - Days are the smallest automatic scheduling unit. Exact internal timestamps remain available.
 - Target retention remains the main user-facing FSRS setting. Preserve the supported 70–97% range, 90% fresh-install default, and every user's existing saved value.
+- Phase E adds a 180-day maximum interval policy, approximately six months. FSRS still determines shorter intervals from history and retention. This is a product coverage policy to evaluate, not a guarantee of interview performance or an established scientific optimum.
 - Preserve assessment locks, timing rules, AI recommendation policy, automatic submission, solve-time handling and the Easy gate. Existing locked assessments remain product decisions.
 - Preserve rating reselect followed by explicit Update. Reselecting changes the draft; Update corrects the identified saved event.
 - Automatic recommendations prioritize overdue, then due today, then new problems. Future reviewed problems belong to explicit Extra Practice.
@@ -119,7 +122,7 @@ The new daily profile uses:
 - `enable_short_term: false` to select the built-in long-term scheduler.
 - Empty learning and relearning arrays to express absence of a fixed step ladder.
 - The user's configured target retention and library-supported default weights initially.
-- `enable_fuzz: false` and the recorded effective maximum interval.
+- `enable_fuzz: false` and `maximum_interval: 180`, with the effective value recorded in the profile and the boundary behavior verified before activation.
 
 The library owns memory transitions and intervals. Empty arrays do not disable memory updates or lapse handling. Disabling short-term mode also changes the memory-update strategy and rating-interval ordering; this is a deliberately tested configuration choice, not merely rounding hours upward.
 
@@ -135,6 +138,14 @@ With 5.4.0 defaults and a new card, verified first-review intervals are:
 These are computed examples, not an application ladder. At 90%, initial stabilities round with a minimum one day to `1, 1, 2, 8`; the long-term scheduler's increasing-grade ordering yields `1, 2, 3, 8`. Later history, weights and retention can change outputs. Retention is a model target rather than a guaranteed coding success rate; daily rounding/minimums can prevent an exact target probability.
 
 Apply profile changes prospectively to genuine reviews. Changing retention, activating weights or opening the upgraded application must not alter existing cards. Keep corrections bound to original recorded context, with the explicit legacy policy above.
+
+### Phase E amendment: six-month maximum interval
+
+Use the library's maximum-interval configuration through the existing FSRS boundary. In pinned ts-fsrs 5.4.0, rating ordering can produce Good/Easy intervals above the configured maximum; resolve and test supported boundary behavior before promising a strict 180-day ceiling. A naked post-processing clamp of due dates or logs is not an approved solution. Saved results, Submit previews, projected future reviews and due consumers must agree on the actual policy. Update remains bound to its original event profile, including an older maximum, rather than applying today's cap to a correction.
+
+The detailed Phase E plan must settle how to treat existing problems already scheduled beyond 180 days. The current preservation rule remains in force: this amendment alone does not authorize bulk rescheduling, history replay or rewriting saved card/log values. Record the approved prospective or explicit catch-up policy before activation, with any schedule-changing catch-up separately designed and approved. Preserve history, earned progress and suspension in either case.
+
+Verify mature-card outputs at and above the maximum for all ratings and supported retention targets, profile round-trip, new Save versus original-profile Update, preview/save parity and cross-surface calendar behavior. Evaluate returned mature problems using existing recorded correctness, Again ratings, solve time and review workload; concept tracking and a new readiness subsystem are not required by this amendment.
 
 ### Local study-day eligibility
 
@@ -286,7 +297,7 @@ Not run in the original design pass: `rtk npm run lint`, `rtk npm run check`, `r
 
 ## Library capabilities and source references
 
-Keep `next()` and numeric `get_retrievability()` as existing strengths. Add `repeat()` previews and complete effective profile serialization. Use captured inputs for reliable new corrections and validated native rollback for legacy compatibility. Record `maximum_interval`; 5.4.0 grade ordering can exceed a configured cap, so this design does not promise an exposed strict cap. Bulk `reschedule()` and history-preserving `forget()` require separate administrative-event/product semantics and are not necessary to repair these findings.
+Keep `next()` and numeric `get_retrievability()` as existing strengths. Add `repeat()` previews and complete effective profile serialization. Use captured inputs for reliable new corrections and validated native rollback for legacy compatibility. Record `maximum_interval` in B/C; the October 4 amendment assigns the 180-day policy and resolution of 5.4.0's cap-boundary behavior to E, with matching previews in F. User configurability is not decided by this amendment. Bulk `reschedule()` and history-preserving `forget()` require separate administrative-event/product semantics; existing long-dated cards remain protected until an explicit catch-up policy is approved.
 
 - [ts-fsrs configuration](https://github.com/open-spaced-repetition/ts-fsrs/blob/main/_autodocs/04-configuration.md)
 - [Tagged 5.4.0 scheduler source](https://github.com/open-spaced-repetition/ts-fsrs/blob/v5.4.0/packages/fsrs/src/fsrs.ts)
