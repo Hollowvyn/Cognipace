@@ -12,12 +12,15 @@ import {
   leetcodeAcceptedSubmissionApiFixture,
 } from '@/lib/leetcode/testing/submission-result-fixtures'
 
+import { makeCompleteCapture } from '../testing/code-analysis-capture-fixtures'
+
 const remote = vi.hoisted(() => ({
   readProblemMetadata: vi.fn(),
   readProblemContent: vi.fn(),
   readSubmissionResult: vi.fn(),
 }))
-vi.mock('@/lib/leetcode', () => ({
+vi.mock('@/lib/leetcode', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/leetcode')>()),
   createLeetCodeFetchRemoteClient: () => remote,
 }))
 
@@ -278,6 +281,20 @@ describe('recoverable submission caches', () => {
 })
 
 describe('problem caches', () => {
+  it('bypasses cached metadata on explicit refresh', async () => {
+    const { location, metadata } = makeCompleteCapture()
+    remote.readProblemMetadata.mockResolvedValue({ ok: true, metadata })
+
+    await service.readLeetCodeProblemMetadataInBackground({ location })
+    await service.readLeetCodeProblemMetadataInBackground({ location })
+    await service.readLeetCodeProblemMetadataInBackground({
+      location,
+      refresh: true,
+    })
+
+    expect(remote.readProblemMetadata).toHaveBeenCalledTimes(2)
+  })
+
   it.each(['failed', 'partial', 'missing', 'empty-statement'] as const)(
     'retries %s content until complete and then reuses it',
     async (kind) => {

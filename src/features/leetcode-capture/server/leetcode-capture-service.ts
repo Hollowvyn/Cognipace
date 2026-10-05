@@ -41,7 +41,7 @@ export async function readLeetCodeProblemMetadataInBackground(
   const cacheKey = createProblemCacheKey(request)
   const cachedResult = metadataCache.get(cacheKey)
 
-  if (cachedResult) {
+  if (cachedResult && !request.refresh) {
     return cachedResult
   }
 
