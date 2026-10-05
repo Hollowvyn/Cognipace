@@ -8,9 +8,12 @@ import { saveSecret } from '@/platform/secrets'
 import {
   clearAiProviderSecret,
   getAiProviderSecretPresence,
+  getAiHintConnectionStatus,
   isAiAssessmentAvailable,
   loadActiveProviderConfig,
   loadActiveProviderConfigSnapshot,
+  readAiHintConnectionSnapshot,
+  resetAiHintConnectionRevisions,
   setAiProviderSecret,
 } from './genai-settings-service'
 
@@ -73,6 +76,113 @@ describe('setAiProviderSecret / clearAiProviderSecret', () => {
 })
 
 describe('active AI configuration entrypoints', () => {
+  it('keeps hint availability independent of automatic assessment enablement', async () => {
+    const db = await configuredDb()
+    const initial = await getAiHintConnectionStatus(db)
+    expect(initial.available).toBe(true)
+    expect(initial.provider).toBe('openai')
+    expect(Object.keys(initial).sort()).toEqual([
+      'available',
+      'provider',
+      'revision',
+    ])
+    expect(initial.revision).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
+    expect(JSON.stringify(initial)).not.toContain('fake-private-key')
+
+    await updateSettings(db, { aiAssessment: { enabled: false } })
+
+    expect(await getAiHintConnectionStatus(db)).toEqual(initial)
+    expect(await loadActiveProviderConfig(db)).toBeNull()
+    const snapshot = await readAiHintConnectionSnapshot(db)
+    expect(snapshot.status).toEqual(initial)
+    expect(snapshot.config).toEqual({
+      provider: 'openai',
+      model: 'gpt-test',
+      apiKey: 'fake-private-key',
+    })
+    expect(snapshot.identity).toEqual(expect.any(String))
+    expect(initial.revision).not.toBe(snapshot.identity)
+  })
+
+  it('rotates hint revisions for same-key and different-key replacements', async () => {
+    const db = await configuredDb()
+    const initial = await getAiHintConnectionStatus(db)
+    await setAiProviderSecret('openai', { apiKey: 'fake-private-key' })
+    const replaced = await getAiHintConnectionStatus(db)
+    expect(replaced.revision).not.toBe(initial.revision)
+    await setAiProviderSecret('openai', { apiKey: 'replacement-key' })
+    const changed = await getAiHintConnectionStatus(db)
+    expect(changed.revision).not.toBe(replaced.revision)
+    expect(changed.available).toBe(true)
+  })
+
+  it('ignores changes to an unselected provider key', async () => {
+    const db = await configuredDb()
+    const initial = await getAiHintConnectionStatus(db)
+    await setAiProviderSecret('anthropic', { apiKey: 'other-provider-key' })
+    expect(await getAiHintConnectionStatus(db)).toEqual(initial)
+  })
+
+  it('rotates hint revisions after reset even for an identical connection', async () => {
+    const db = await configuredDb()
+    const initial = await getAiHintConnectionStatus(db)
+    resetAiHintConnectionRevisions()
+    const current = await getAiHintConnectionStatus(db)
+    expect(current.available).toBe(initial.available)
+    expect(current.provider).toBe(initial.provider)
+    expect(current.revision).not.toBe(initial.revision)
+  })
+
+  it('ignores model whitespace but rotates revisions for another model', async () => {
+    const db = await configuredDb()
+    const initial = await getAiHintConnectionStatus(db)
+    await updateSettings(db, { aiAssessment: { model: 'gpt-test' } })
+    expect(await getAiHintConnectionStatus(db)).toEqual(initial)
+    await updateSettings(db, { aiAssessment: { model: 'other-model' } })
+    const changed = await getAiHintConnectionStatus(db)
+    expect(changed.revision).not.toBe(initial.revision)
+    expect(changed.available).toBe(true)
+  })
+
+  it.each(['blank-model', 'cleared-key', 'other-provider'] as const)(
+    'reports an unavailable hint connection after %s',
+    async (kind) => {
+      const db = await configuredDb()
+      const initial = await getAiHintConnectionStatus(db)
+      if (kind === 'blank-model')
+        await updateSettings(db, { aiAssessment: { model: '   ' } })
+      if (kind === 'cleared-key') await clearAiProviderSecret('openai')
+      if (kind === 'other-provider')
+        await updateSettings(db, { aiAssessment: { provider: 'anthropic' } })
+      const current = await getAiHintConnectionStatus(db)
+      expect(current.available).toBe(false)
+      expect(current.provider).toBe(
+        kind === 'other-provider' ? 'anthropic' : 'openai',
+      )
+      expect(current.revision).not.toBe(initial.revision)
+      expect(await getAiHintConnectionStatus(db)).toEqual(current)
+      expect((await readAiHintConnectionSnapshot(db)).config).toBeNull()
+    },
+  )
+
+  it('uses only the newly selected provider connection', async () => {
+    const db = await configuredDb()
+    const initial = await getAiHintConnectionStatus(db)
+    await setAiProviderSecret('anthropic', { apiKey: 'anthropic-key' })
+    await updateSettings(db, { aiAssessment: { provider: 'anthropic' } })
+    const snapshot = await readAiHintConnectionSnapshot(db)
+    expect(snapshot.config).toEqual({
+      provider: 'anthropic',
+      model: 'gpt-test',
+      apiKey: 'anthropic-key',
+    })
+    expect(snapshot.status.available).toBe(true)
+    expect(snapshot.status.provider).toBe('anthropic')
+    expect(snapshot.status.revision).not.toBe(initial.revision)
+  })
+
   it.each([
     'disabled',
     'empty-model',

@@ -93,6 +93,7 @@ export function invalidateTaggedQueries(
     // Cancel before refetch, and return only cancellation/scheduling completion.
     return Promise.all([
       queryClient.cancelQueries({ queryKey: queryKeys.genai.secretPresence() }),
+      queryClient.cancelQueries({ queryKey: queryKeys.genai.hintConnection() }),
       queryClient.cancelQueries({ queryKey: queryKeys.appShell.all }),
       ...(tags.includes('settings')
         ? [queryClient.cancelQueries({ queryKey: queryKeys.settings.all })]

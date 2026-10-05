@@ -1,6 +1,7 @@
 import { getSettings } from '@/features/settings/server/settings-service'
 import type { Db } from '@/platform/db'
 
+import type { HintConnectionStatus } from '../api/hint-connection-contracts'
 import type {
   AiProviderSecret,
   AiProviderSecretPresence,
@@ -67,4 +68,50 @@ export async function loadActiveProviderConfigSnapshot(
 
 export async function isAiAssessmentAvailable(db: Db): Promise<boolean> {
   return (await loadActiveProviderConfig(db)) !== null
+}
+
+let hintConnectionRevisions = new WeakMap<
+  Db,
+  { identity: string; revision: string }
+>()
+
+export function resetAiHintConnectionRevisions(): void {
+  hintConnectionRevisions = new WeakMap()
+}
+
+/** Trusted memory only: keep identity private; public revisions are unrelated UUIDs. */
+export async function readAiHintConnectionSnapshot(db: Db): Promise<{
+  config: GenAiProviderConfig | null
+  identity: string
+  status: HintConnectionStatus
+}> {
+  const settings = await getSettings(db)
+  const ai = settings.aiAssessment
+  const model = ai.model.trim()
+  const saved = await loadAiProviderSecretSnapshotFromTrustedStorage(
+    ai.provider,
+  )
+  const identity = JSON.stringify([ai.provider, model, saved?.identity ?? null])
+  let observed = hintConnectionRevisions.get(db)
+  if (!observed || observed.identity !== identity) {
+    observed = { identity, revision: crypto.randomUUID() }
+    hintConnectionRevisions.set(db, observed)
+  }
+  const config: GenAiProviderConfig | null =
+    model && saved
+      ? { provider: ai.provider, model, apiKey: saved.secret.apiKey }
+      : null
+  const status: HintConnectionStatus = {
+    available: config !== null,
+    provider: ai.provider,
+    revision: observed.revision,
+  }
+
+  return { config, identity, status }
+}
+
+export async function getAiHintConnectionStatus(
+  db: Db,
+): Promise<HintConnectionStatus> {
+  return (await readAiHintConnectionSnapshot(db)).status
 }
