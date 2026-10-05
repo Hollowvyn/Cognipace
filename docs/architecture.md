@@ -335,7 +335,7 @@ The owners in that flow are:
   numerators/denominators; time uses existing quantiles with four-observation
   quartile support. Future events are excluded at as-of. Current catalog
   difficulty and time allowances are not attempt-time policy snapshots.
-  Problem Solving supersedes the first-attempt presentation model; independent
+  Problem Solving supplies the canonical first-attempt counts; independent
   first-attempt readiness sums valid counts across all four difficulty groups.
 - `src/features/analytics/domain/chart-buckets.ts` and
   `src/features/analytics/domain/chart-data.ts` aggregate each metric only from
@@ -385,10 +385,14 @@ The owners in that flow are:
 - `new-problem-success-view.tsx` owns the expanded Difficulty And Recorded Time
   section's shared local cohort, Trend/Compare, outcome measure, difficulty
   visibility, time units/subset, and Mix controls. `analytics-screen.tsx` places
-  its paired Success/Time plots and full-width Mix in the former first-outcome
-  position, with Recall separate. Practice remains full width, followed by the
-  Memory/Topic pair, Retention Map, Memory Signals, and workload pair. No
-  superseded standalone first-outcome chart is rendered.
+  its paired Success/Time plots and full-width Mix below the combined New Problem
+  Success/Recall pair. `combined-problem-outcomes-view.tsx` pools the canonical
+  new-problem counts across Easy/Medium/Hard/Unknown for its two simultaneous
+  curves; it neither averages difficulty rates nor rebuilds raw cohorts. Its
+  fitted domain uses both pooled rates and both first-attempt goals, independently
+  of the known-difficulty plot scale and controls. No duplicate runtime view is
+  needed. Practice remains full width, followed by the Memory/Topic pair,
+  Retention Map, Memory Signals, and workload pair.
   The view transforms supplied values for presentation; it does not rebuild raw
   cohorts. New problems selects first-attempt goals; Follow-up practice selects
   Recall/Review Success aspirations while naming its different raw population.

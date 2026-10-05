@@ -115,6 +115,13 @@ describe('AnalyticsScreen', () => {
       29,
     ],
     ['targetFirstAttemptGoodEasy', 'Good + Easy', 'Problem Solving', 29],
+    [
+      'targetFirstAttemptSuccess',
+      'First-attempt Success',
+      'New Problem Success',
+      29,
+    ],
+    ['targetFirstAttemptGoodEasy', 'Good + Easy', 'New Problem Success', 29],
   ] as const)(
     'wires %s through empty Chart/Table views and saves only its key',
     async (field, name, panel, percent) => {
@@ -130,7 +137,7 @@ describe('AnalyticsScreen', () => {
       renderAnalyticsScreen()
       const region = await screen.findByRole('region', { name: panel })
       const label = `Target ${name}`
-      if (field === 'targetFirstAttemptGoodEasy')
+      if (field === 'targetFirstAttemptGoodEasy' && panel === 'Problem Solving')
         await user.click(
           within(region).getByRole('button', {
             name: 'Good + Easy',
@@ -318,8 +325,27 @@ describe('AnalyticsScreen', () => {
         name: 'Recall vs FSRS Estimate',
       }),
     ).toBeVisible()
-    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(9)
-    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(9)
+    for (const name of [
+      'New Problem Success',
+      'Problem Solving',
+      'Recall vs FSRS Estimate',
+      'Practice Rhythm',
+      'Memory Strength',
+      'Topic Performance',
+      'Retention Map',
+      'Memory Signals by Problem',
+      'Recent Overdue Backlog',
+      'Upcoming Review Load',
+    ])
+      expect(screen.getByRole('region', { name })).toBeVisible()
+    expect(
+      screen.getByRole('region', { name: 'New Problem Success' }),
+    ).toHaveAttribute('id', 'new-problem-success')
+    expect(
+      screen.getByRole('region', { name: 'Problem Solving' }),
+    ).toHaveAttribute('id', 'problem-solving')
+    expect(screen.getAllByRole('tab', { name: 'Chart' })).toHaveLength(10)
+    expect(screen.getAllByRole('tab', { name: 'Table' })).toHaveLength(10)
     expect(
       screen.queryByRole('region', { name: 'Ratings Mix' }),
     ).not.toBeInTheDocument()
@@ -617,32 +643,35 @@ describe('AnalyticsScreen', () => {
         /reconstructed FSRS retrievability immediately before those exact reviews/,
       ),
     ).toBeVisible()
-    const first = screen.getByRole('region', { name: 'Problem Solving' })
+    const first = screen.getByRole('region', { name: 'New Problem Success' })
+    const solving = screen.getByRole('region', { name: 'Problem Solving' })
     const recall = screen.getByRole('region', {
       name: 'Recall vs FSRS Estimate',
     })
     expect(first.parentElement).toBe(recall.parentElement)
-    expect(first.parentElement).not.toHaveClass('lg:grid-cols-2')
+    expect(first.parentElement).toHaveClass('lg:grid-cols-2')
+    expect(solving.parentElement).toBe(first.parentElement?.parentElement)
     expect(
-      within(first).getByRole('region', { name: 'Success by Difficulty' })
+      within(solving).getByRole('region', { name: 'Success by Difficulty' })
         .parentElement,
     ).toHaveClass('lg:grid-cols-2')
     expect(
-      within(first).getByText(
+      within(solving).getByText(
         'How are recorded outcomes, time and difficulty mix changing?',
       ),
     ).toBeVisible()
     expect(
       screen.getByRole('region', { name: 'Practice Rhythm' }).parentElement,
-    ).toBe(first.parentElement)
+    ).toBe(solving.parentElement)
     expect(
       screen.getByRole('region', { name: 'Memory Strength' }).parentElement,
     ).toBe(
       screen.getByRole('region', { name: 'Topic Performance' }).parentElement,
     )
     const chartRegionNames = [
-      'Problem Solving',
+      'New Problem Success',
       'Recall vs FSRS Estimate',
+      'Problem Solving',
       'Practice Rhythm',
       'Memory Strength',
       'Topic Performance',
@@ -695,6 +724,14 @@ describe('AnalyticsScreen', () => {
       expect(
         screen.queryByLabelText('Problem Solving readiness'),
       ).not.toBeInTheDocument()
+      expect(
+        screen.getByRole('region', { name: 'New Problem Success' }),
+      ).toBeVisible()
+      const firstWarning = screen.queryByLabelText(
+        'New Problem Success readiness',
+      )
+      if (key === 'firstAttemptOutcomes') expect(firstWarning).toBeVisible()
+      else expect(firstWarning).not.toBeInTheDocument()
       const recallWarning = screen.queryByLabelText(
         'Recall vs FSRS Estimate readiness',
       )

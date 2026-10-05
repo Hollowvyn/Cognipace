@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-04-analytics-combined-outcomes-restoration.md`](./specs/2026-10-04-analytics-combined-outcomes-restoration.md): user-requested additive restoration of the pooled first-recorded outcome chart beside Recall, preserving every new difficulty/time/mix view.
+
 - [`specs/2026-10-04-analytics-problem-solving-design.md`](./specs/2026-10-04-analytics-problem-solving-design.md): approved expansion of New Problem Success into one section for difficulty outcomes, recorded time, and difficulty mix; implemented as Problem Solving with passing automated checks and production-component browser proof; human installed-extension smoke remains pending.
 
 - [`specs/2026-10-03-leetcode-code-analysis-design.md`](./specs/2026-10-03-leetcode-code-analysis-design.md): approved Option A specification; all ten tasks implemented with independent SPEC/QUALITY passes and final automated validation on 2026-10-04; live provider, generated-code, and human installed-extension proof pending.
@@ -24,7 +26,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
-- [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): historical first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall foundation, with its preview preserved verbatim; the standalone two-rate renderer is superseded by Difficulty And Recorded Time. Required human installed-extension smoke remains pending.
+- [`specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md`](./specs/2026-10-03-analytics-first-attempts-and-repeat-recall-design.md): historical first-recorded outcomes, independent first-attempt goals, and repeat-only paired Recall foundation, with its preview preserved verbatim; the standalone two-rate renderer is restored alongside Difficulty And Recorded Time by the October 4 additive correction. Required human installed-extension smoke remains pending.
 - [`specs/2026-10-03-analytics-practice-ratings-merge-design.md`](./specs/2026-10-03-analytics-practice-ratings-merge-design.md): approved merged Practice Rhythm chart with exact stacked shares, independent completed-review line, saved Success target, and interval union; its three-card layout is historical context superseded by the first-attempt/repeat pair above.
 - [`specs/2026-10-02-analytics-chart-targets-design.md`](./specs/2026-10-02-analytics-chart-targets-design.md): approved independent saved Recall/Review Success goals, compact graph editors, Settings/backup/configured sync ownership, and unchanged FSRS behavior; implemented with automated/fixture proof; human extension smoke remains pending.
 - [`specs/2026-10-02-analytics-layout-polish-design.md`](./specs/2026-10-02-analytics-layout-polish-design.md): earlier four-chart historical treatment and exact design snapshots, retained as implementation history; its layout was superseded by first-attempt/repeat work and the current Difficulty And Recorded Time section.
@@ -64,6 +66,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-04-analytics-combined-outcomes-restoration.md`](./plans/2026-10-04-analytics-combined-outcomes-restoration.md): combined chart restoration, canonical pooled counts, dashboard integration and focused/visual validation.
 
 - [`plans/2026-10-04-analytics-problem-solving-inputs.md`](./plans/2026-10-04-analytics-problem-solving-inputs.md): first implementation phase exposing stored difficulty/timing metadata and complementary raw first/later cohorts without changing the visible page.
 

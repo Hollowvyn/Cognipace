@@ -381,11 +381,18 @@ inspection. Its calculations remain read-only and derived from local practice
 state. The narrowly editable chart goals are Settings-owned preferences; they
 do not introduce hosted reporting or account behavior.
 
-The Difficulty And Recorded Time section, shown as Problem Solving, is implemented
-on this branch, replacing the standalone New Problem Success chart. Automated
-checks and production-component browser validation passed. Required human
-installed-extension happy-path and edge-case smoke with screenshot or recording
-proof remains pending before review or merge. Existing repeat-only Recall,
+New Problem Success retains the combined first-recorded outcome chart beside
+Recall vs FSRS Estimate. Its simultaneous Hard + Good + Easy and Good + Easy
+curves include all difficulties, including Unknown, using pooled valid-rating
+counts. Both saved first-attempt goals remain editable above the chart. Its
+fitted scale includes both pooled curves and both goals; hiding a curve changes
+neither scale nor dates. Invalid-only outer buckets are trimmed, internal gaps
+remain, and measured zero is retained.
+
+The full-width Difficulty And Recorded Time section, shown as Problem Solving,
+adds the difficulty, time and mix plots below this pair. Its controls do not
+filter the combined chart. Human installed-extension happy-path and edge-case
+smoke with screenshot or recording proof remains required. Existing repeat-only Recall,
 chart targets, and merged Practice Rhythm retain their calculation rules.
 Target Recall and Target Review Success are independent saved goals, both
 defaulting to 90%, regardless of FSRS target retention. Each accepts whole
