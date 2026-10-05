@@ -189,14 +189,18 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
       const token = current.readSyncToken()
       const live = readScope()
       let connection = current.readConnection()
-      const unavailable = (message: string, showSettings: boolean) =>
+      const unavailable = (
+        message: string,
+        showSettings: boolean,
+        canRetry = true,
+      ) =>
         store({
           scope: readScope().scope,
           state: {
             status: 'unavailable',
             isOpen: true,
             message,
-            canRetry: true,
+            canRetry,
             showSettings,
           },
         })
@@ -213,11 +217,12 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
       if (!connection?.available && !refreshConnection) {
         unavailable(
           connection
-            ? 'Configure an AI connection in Settings, then Retry.'
+            ? 'Configure an AI connection in Settings to request hints.'
             : current.connectionError
               ? 'Could not load the AI connection. Retry.'
               : 'Loading the AI connection. Retry after it loads.',
           Boolean(connection),
+          !connection,
         )
         if (!connection) void current.refreshConnection().catch(() => {})
         return
@@ -271,8 +276,9 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
               publish({
                 status: 'unavailable',
                 isOpen: true,
-                message: 'Configure an AI connection in Settings, then Retry.',
-                canRetry: true,
+                message:
+                  'Configure an AI connection in Settings to request hints.',
+                canRetry: false,
                 showSettings: true,
               })
               return
@@ -432,7 +438,11 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
   }, [readScope])
   const retry = useCallback(() => {
     const current = storedRef.current.state
-    if (current.status !== 'error' && current.status !== 'unavailable') return
+    if (
+      (current.status !== 'error' && current.status !== 'unavailable') ||
+      !current.canRetry
+    )
+      return
     run(
       true,
       !latest.current.readConnection() ||

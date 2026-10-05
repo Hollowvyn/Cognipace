@@ -479,10 +479,63 @@ describe('explicit progressive hint sessions', () => {
     await settle()
     expect(hook.result.current.state).toMatchObject({
       status: 'unavailable',
+      canRetry: false,
       showSettings: true,
     })
     expect(mocks.generate).not.toHaveBeenCalled()
   })
+  it('offers only Settings for an initially saved unavailable connection', async () => {
+    const hook = mount(capture(), { ...connection, available: false })
+    act(() => hook.result.current.toggle())
+    await settle()
+    expect(hook.result.current.state).toMatchObject({
+      status: 'unavailable',
+      isOpen: true,
+      canRetry: false,
+      showSettings: true,
+    })
+    act(() => hook.result.current.retry())
+    await settle()
+    expect(hook.refreshConnection).not.toHaveBeenCalled()
+    expect(mocks.generate).not.toHaveBeenCalled()
+    expect(hook.remote.readProblemContent).not.toHaveBeenCalled()
+  })
+  it.each(['saved-unavailable', 'missing'] as const)(
+    'offers only Settings after explicit Retry refresh yields %s metadata',
+    async (status) => {
+      const hook = mount(capture(), null)
+      act(() => hook.result.current.toggle())
+      await settle()
+      expect(hook.result.current.state).toMatchObject({
+        status: 'unavailable',
+        canRetry: true,
+      })
+      const pending = deferred<HintConnectionStatus | null>()
+      hook.refreshConnection.mockReturnValue(pending.promise)
+      act(() => hook.result.current.retry())
+      await settle()
+      const unavailable =
+        status === 'missing' ? null : { ...nextConnection, available: false }
+      hook.changeConnection(unavailable)
+      await act(async () => {
+        pending.resolve(unavailable)
+        await Promise.resolve()
+      })
+      await settle()
+      expect(hook.result.current.state).toMatchObject({
+        status: 'unavailable',
+        isOpen: true,
+        canRetry: false,
+        showSettings: true,
+      })
+      const refreshCount = hook.refreshConnection.mock.calls.length
+      act(() => hook.result.current.retry())
+      await settle()
+      expect(hook.refreshConnection).toHaveBeenCalledTimes(refreshCount)
+      expect(mocks.generate).not.toHaveBeenCalled()
+      expect(hook.remote.readProblemContent).not.toHaveBeenCalled()
+    },
+  )
   it('adopts its own refreshed statement before effects and retains the new batch', async () => {
     mocks.generate.mockRejectedValueOnce(new Error('transport failed'))
     const hook = mount()
