@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.2.0](https://github.com/Hollowvyn/Cognipace/compare/v2.1.0...v2.2.0) (2026-10-05)
+
+
+### Features
+
+* **analytics:** add difficulty outcomes and recorded time ([#195](https://github.com/Hollowvyn/Cognipace/issues/195)) ([fb20a42](https://github.com/Hollowvyn/Cognipace/commit/fb20a423017e11a38c4ad3ea0f1a019edb4fcd52))
+* **analytics:** refine topic and workload views ([#187](https://github.com/Hollowvyn/Cognipace/issues/187)) ([dc0fc6f](https://github.com/Hollowvyn/Cognipace/commit/dc0fc6f2a8297c9bcdd7189336b99e0867740770))
+* **analytics:** show full retention landscape with box zoom ([#192](https://github.com/Hollowvyn/Cognipace/issues/192)) ([9ea4493](https://github.com/Hollowvyn/Cognipace/commit/9ea4493cb57031047272b3bb808028ed11df16b7))
+* **assessment:** add structured LeetCode submission analysis ([#194](https://github.com/Hollowvyn/Cognipace/issues/194)) ([bbb3b5d](https://github.com/Hollowvyn/Cognipace/commit/bbb3b5d820d81979e418b1b238a6d1491b039985))
+* **genai:** add optional OpenRouter connection ([#199](https://github.com/Hollowvyn/Cognipace/issues/199)) ([eb965f0](https://github.com/Hollowvyn/Cognipace/commit/eb965f0a8a9238ff194ca41d1d9c7f9d6de7a450))
+* **overview:** show daily recorded practice time ([#191](https://github.com/Hollowvyn/Cognipace/issues/191)) ([c618b77](https://github.com/Hollowvyn/Cognipace/commit/c618b770bbf73d53349db3b62aa457ee07833967))
+
+
+### Bug Fixes
+
+* **analytics:** restore combined new problem outcomes ([#197](https://github.com/Hollowvyn/Cognipace/issues/197)) ([d829a70](https://github.com/Hollowvyn/Cognipace/commit/d829a70592bfc17c0f52c14bdfd9784980dc5adb))
+* **build:** restrict dev dependency scans to source entrypoints ([#200](https://github.com/Hollowvyn/Cognipace/issues/200)) ([b304c36](https://github.com/Hollowvyn/Cognipace/commit/b304c36e89f1414c1f621a37412864ecfb14415b))
+* **db:** preserve shipped FSRS snapshots for future upgrades ([#190](https://github.com/Hollowvyn/Cognipace/issues/190)) ([92ba67d](https://github.com/Hollowvyn/Cognipace/commit/92ba67d5e8945e10e478e3f59578544408b7cd9e))
+* **fsrs:** capture reproducible scheduling evidence ([#196](https://github.com/Hollowvyn/Cognipace/issues/196)) ([36d5ef7](https://github.com/Hollowvyn/Cognipace/commit/36d5ef708cd2c68602da4e884aca610d062b6569))
+* **genai:** persist and test AI provider connections ([#188](https://github.com/Hollowvyn/Cognipace/issues/188)) ([b2d9291](https://github.com/Hollowvyn/Cognipace/commit/b2d9291f62bf358ef9a4204e6cf18c1f50dc3a0a))
+* **practice:** preserve streak until a local day fails ([#193](https://github.com/Hollowvyn/Cognipace/issues/193)) ([cb56d9a](https://github.com/Hollowvyn/Cognipace/commit/cb56d9a62d62727108550bbbac7a5786ec016438))
+
 ## [2.1.0](https://github.com/Hollowvyn/Cognipace/compare/v2.0.1...v2.1.0) (2026-10-03)
 
 
