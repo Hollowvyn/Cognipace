@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-04-openrouter-provider-design.md`](./specs/2026-10-04-openrouter-provider-design.md): approved optional OpenRouter BYOK connection and host permission, suggested editable `openrouter/free`, explicit free preset, protected key storage, structured reports, and routed-model metadata; written-spec review is complete and the implementation plan is recorded, with implementation and live/human proof pending.
+- [`specs/2026-10-04-openrouter-provider-design.md`](./specs/2026-10-04-openrouter-provider-design.md): approved optional OpenRouter BYOK connection and host permission, suggested editable `openrouter/free`, explicit free preset, protected key storage, structured reports, and routed-model metadata; implemented with independent SPEC/QUALITY reviews, passing automated gates and production-component browser proof; live full-report/generated-code and human installed-extension proof remain pending.
 
 - [`specs/2026-10-04-analytics-combined-outcomes-restoration.md`](./specs/2026-10-04-analytics-combined-outcomes-restoration.md): user-requested additive restoration of the pooled first-recorded outcome chart beside Recall, preserving every new difficulty/time/mix view.
 
@@ -69,7 +69,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
-- [`plans/2026-10-05-openrouter-provider.md`](./plans/2026-10-05-openrouter-provider.md): six-task implementation plan for shared contracts and trusted keys, the native OpenRouter adapter, runtime/permission boundaries, free/custom Settings flow, privacy/Store documentation, and automated/live/human validation. Implementation is pending.
+- [`plans/2026-10-05-openrouter-provider.md`](./plans/2026-10-05-openrouter-provider.md): six-task implementation plan for shared contracts and trusted keys, the native OpenRouter adapter, runtime/permission boundaries, free/custom Settings flow, privacy/Store documentation, and automated/live/human validation. Implementation and automated gates are complete; the dated record keeps live/generated-code and human installed-extension proof pending.
 
 - [`plans/2026-10-04-analytics-combined-outcomes-restoration.md`](./plans/2026-10-04-analytics-combined-outcomes-restoration.md): combined chart restoration, canonical pooled counts, dashboard integration and focused/visual validation.
 

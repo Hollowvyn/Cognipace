@@ -428,6 +428,47 @@ test uses the same reusable provider integration as assessment; settings and
 credentials persist independently of provider availability, and stale results
 cannot validate a replacement key or model.
 
+#### OpenRouter connection and analysis smoke
+
+1. Select OpenRouter with AI assessment off. Confirm editable `openrouter/free`,
+   masked empty key input, free-routing/usage copy, and key/data-policy links.
+   Enter your own key, Save & test, and confirm assessment remains off.
+2. Enter an accessible custom text-model ID and Save & test. Reopen Settings:
+   confirm the exact custom model, selected OpenRouter, saved-key presence,
+   empty masked input, and untested status. Test the saved connection.
+3. Click Use free models. Confirm draft `openrouter/free`, cleared verification,
+   and no automatic network request or save. Discard and confirm the saved
+   custom model returns. Choose the preset again and explicitly Save & test.
+4. Leave unfinished connection model/key edits while saving an unrelated
+   preference. Confirm only the preference persisted and draft edits survived.
+   During preference save, key save, and connection test, confirm the preset and
+   conflicting controls are disabled. Verify keyboard/Enter submission order.
+5. Enable assessment, refresh a supported LeetCode problem page, and complete an
+   authored submission. Confirm a full Approach/Efficiency/Code Style report;
+   record requested/served model when available and response time. Confirm report
+   arrival does not save a review. Save the manual review independently.
+6. Try invalid key and invalid model. Confirm safe actionable errors. Exercise
+   unavailable free capacity or quota when available; distinguish 402 balance/key
+   limit guidance from 429 quota guidance. Account privacy/capability restrictions
+   may make a model unavailable; do not loosen privacy settings automatically.
+   Confirm no automatic retries or app-configured paid fallback requests.
+7. Remove the OpenRouter key. Confirm unavailable analysis and that other saved
+   provider keys remain. Assessment can be disabled after removal. Reset Defaults
+   keeps saved keys, disables assessment, and restores the blank default model.
+8. Interrupt an in-flight test/analysis, navigate, change model/provider, replace
+   the key (including identical bytes), and remove the key. Confirm late replies
+   cannot restore stale connected/report state and timers clean up. Run the
+   existing fresh-identity Retry, reload, refresh-capture, cancellation, and
+   stale-worker flows from the code-analysis smoke instructions.
+9. Verify popup/dashboard/overlay configuration availability updates across
+   surfaces and direct-provider connection behavior still works. Inspect a backup
+   and runtime status for presence only, with no OpenRouter key or raw provider
+   response. Attach screenshots/recording with date, build, and observed outcomes.
+
+Human installed-extension OpenRouter happy-path and edge-case proof is pending;
+attach dated screenshots or recording before PR review or merge. Component
+fixtures and native wire tests supplement this proof.
+
 ### Dashboard Dev Smoke
 
 1. Open the dashboard.
@@ -1287,7 +1328,7 @@ JavaScript baseline inputs; that does not test generated suggestions.
 Normal checks leave `COGNIPACE_AI_EVAL` unset or set it to `0`. All six live
 cases skip before reading evaluation configuration. Only a human who intends
 a provider request should privately prepare `COGNIPACE_AI_EVAL=1`,
-`COGNIPACE_AI_EVAL_PROVIDER` (openai, anthropic, or gemini),
+`COGNIPACE_AI_EVAL_PROVIDER` (openai, anthropic, gemini, or openrouter),
 `COGNIPACE_AI_EVAL_MODEL`, and `COGNIPACE_AI_EVAL_KEY` in the process environment.
 Never paste a key into commands, reports, logs, screenshots, or Git. These
 test-only variables do not read or change the app's trusted provider keys.
@@ -1299,6 +1340,14 @@ npm 11.19.0 toolchain:
 ```sh
 rtk proxy zsh -c 'source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && rtk npm run test -- src/features/leetcode-review-assistant/server/code-analysis-provider-evaluation.test.ts --maxWorkers=1'
 ```
+
+For OpenRouter, privately select `openrouter/free` or an explicit accessible text
+model. Record the requested model and optional resolved model for each current
+artifact: free routing can select different serving models across requests.
+Inspect full rubric usefulness and suggested-code validity, not only connection
+success or schema validity. Mocked wire tests are separate evidence. Capacity,
+account privacy settings, billing, or schema-support failures remain controlled
+and do not trigger app-configured paid fallback requests.
 
 Each case calls the actual `analyzeCode` service with a 30-second deadline and
 35-second test timeout, using the existing single 8,192-token SDK path. A

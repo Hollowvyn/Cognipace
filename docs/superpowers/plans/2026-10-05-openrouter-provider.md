@@ -12,7 +12,7 @@
 
 ## Approval, Scope, And Execution Order
 
-The user approved the [design](../specs/2026-10-04-openrouter-provider-design.md), including only the new host permission `https://openrouter.ai/*`, and requested this implementation plan. Written October 5, 2026, this file is an execution artifact: unchecked steps and commands below describe future work, not work already performed.
+The user approved the [design](../specs/2026-10-04-openrouter-provider-design.md), including only the new host permission `https://openrouter.ai/*`, and requested this implementation plan. Written October 5, 2026, this file is an execution artifact. Implementation and required automated validation are complete; checked steps reflect execution, and the dated record below lists outcomes. Live evaluation and human installed-extension proof remain pending.
 
 Work in the existing clean branch `codex/openrouter-provider`. The design commit is `66212f37`, based on `origin/main` at `d829a705`. Inspect the current worktree before execution and preserve unrelated changes. This is one coherent provider feature; complete all six tasks before treating it as releasable. Task 1 temporarily expands exhaustive provider types before Task 2 supplies their adapter case and Task 3 extends the strict analysis response. Commit these three tasks together after their focused tests and typecheck; later tasks have independent commit checkpoints.
 
@@ -44,7 +44,7 @@ No new production file or general architecture layer is required. Task-specific 
 - Test `src/features/genai/testing/evaluation-provider-config.test.ts`.
 - Trusted-key and presence test files are listed in the subsection below.
 
-- [ ] Confirm baseline/toolchain and install existing locked dependencies before adding the provider package:
+- [x] Confirm baseline/toolchain and install existing locked dependencies before adding the provider package:
 
 ```sh
 rtk git status --short --branch
@@ -55,7 +55,7 @@ rtk npm ci
 
 Expected: task branch, no unrelated edits, Node `v24.20.0`, npm `11.19.0`, successful locked install. `npm ci` is needed because this managed worktree has no `node_modules`. Keep live-evaluation variables unset during automated checks.
 
-- [ ] Change the provider-order assertion to four providers, error length to 13, and add `'billing'` to the exact expected error set in `src/features/genai/domain/genai-types.test.ts`:
+- [x] Change the provider-order assertion to four providers, error length to 13, and add `'billing'` to the exact expected error set in `src/features/genai/domain/genai-types.test.ts`:
 
 ```ts
 expect(genAiProviderIds).toEqual([
@@ -105,7 +105,7 @@ it.each(['openai', 'anthropic', 'gemini', 'openrouter'])(
 )
 ```
 
-- [ ] Run focused RED before changing the shared implementation:
+- [x] Run focused RED before changing the shared implementation:
 
 ```sh
 rtk npm run test -- src/features/genai/domain/genai-types.test.ts src/features/genai/testing/evaluation-provider-config.test.ts
@@ -113,7 +113,7 @@ rtk npm run test -- src/features/genai/domain/genai-types.test.ts src/features/g
 
 Expected: provider order/error count and OpenRouter evaluation parsing fail. Evaluation remains mocked configuration parsing; this does not send inference requests.
 
-- [ ] Extend the shared definitions in `src/lib/ai/types.ts`:
+- [x] Extend the shared definitions in `src/lib/ai/types.ts`:
 
 ```ts
 export const aiProviderIds = [
@@ -149,7 +149,7 @@ export type AiProviderMetadata = {
 
 Keep existing derived types and error metadata `Pick<AiProviderMetadata, 'provider' | 'model' | 'durationMs'>`. Failed calls do not invent resolved metadata.
 
-- [ ] Replace the evaluation import and provider field with the shared list in `src/features/genai/testing/evaluation-provider-config.ts`:
+- [x] Replace the evaluation import and provider field with the shared list in `src/features/genai/testing/evaluation-provider-config.ts`:
 
 ```ts
 import { aiProviderIds, type AiProviderConfig } from '@/lib/ai/types'
@@ -163,7 +163,7 @@ const evaluationConfigSchema = z.object({
 
 Preserve opt-in-first environment reading, private error text, and the existing 30-second live analysis path.
 
-- [ ] Extend the exhaustive Settings maps now, so shared provider expansion does not leave them incomplete. In `src/features/settings/hooks/use-ai-connection-controller.ts` replace only these maps:
+- [x] Extend the exhaustive Settings maps now, so shared provider expansion does not leave them incomplete. In `src/features/settings/hooks/use-ai-connection-controller.ts` replace only these maps:
 
 ```ts
 export const aiProviderLabels: Record<GenAiProviderId, string> = {
@@ -182,7 +182,7 @@ export const aiProviderModelDefaults: Record<GenAiProviderId, string> = {
 
 Existing `setProvider`, `setModel`, `loaded`, `reset`, and write/gate transitions already implement the approved lifecycle; Task 4 verifies them for OpenRouter.
 
-- [ ] Run shared-contract GREEN:
+- [x] Run shared-contract GREEN:
 
 ```sh
 rtk npm run test -- src/features/genai/domain/genai-types.test.ts src/features/genai/testing/evaluation-provider-config.test.ts
@@ -209,7 +209,7 @@ Expected: PASS. Continue trusted-key work before Task 2; do not commit the expan
 
 This task depends on the shared `AiProviderId` including `openrouter`.
 
-- [ ] Add this platform secret-store lifecycle regression in
+- [x] Add this platform secret-store lifecycle regression in
       `src/platform/secrets/secret-store.test.ts`:
 
 ```ts
@@ -231,7 +231,7 @@ it('keeps the OpenRouter secret independent and exposes presence without its val
 })
 ```
 
-- [ ] Replace the presence test at the bottom of
+- [x] Replace the presence test at the bottom of
       `src/features/genai/domain/genai-secrets-types.test.ts` with:
 
 ```ts
@@ -265,7 +265,7 @@ it('requires exactly four provider-presence booleans without secret fields', () 
 The earlier `makeEmptyAiProviderSecretPresence` expectation also needs
 `openrouter: false`.
 
-- [ ] Add the trusted mapping regression in
+- [x] Add the trusted mapping regression in
       `src/features/genai/server/genai-secret-storage.test.ts`:
 
 ```ts
@@ -310,7 +310,7 @@ it('includes the fourth provider in presence without reading secret values', asy
 })
 ```
 
-- [ ] Add the saved-key and active-configuration regression in
+- [x] Add the saved-key and active-configuration regression in
       `src/features/genai/server/genai-settings-service.test.ts`:
 
 ```ts
@@ -373,7 +373,7 @@ it.each(['replacement-key', 'same-key'] as const)(
 )
 ```
 
-- [ ] Add OpenRouter runtime contract proof, importing
+- [x] Add OpenRouter runtime contract proof, importing
       `clearAiProviderSecretRequestSchema` alongside the existing contract
       imports in `src/features/genai/api/genai-settings-contracts.test.ts`:
 
@@ -414,7 +414,7 @@ it('accepts the fourth provider in strict secret and connection contracts', () =
 })
 ```
 
-- [ ] Add cache/privacy transport proof in
+- [x] Add cache/privacy transport proof in
       `src/features/genai/api/genai-settings-hooks.test.tsx`:
 
 ```ts
@@ -478,7 +478,7 @@ it('saves and removes the OpenRouter key with strict presence and no secret in c
 })
 ```
 
-- [ ] Add settings domain and repository persistence proof. In
+- [x] Add settings domain and repository persistence proof. In
       `src/features/settings/domain/settings.test.ts`:
 
 ```ts
@@ -526,11 +526,11 @@ it('persists an OpenRouter connection exactly without changing unrelated default
 })
 ```
 
-- [ ] Update every existing presence object listed in the fixture table below
+- [x] Update every existing presence object listed in the fixture table below
       with an explicit fourth boolean before the focused run. The unchanged
       direct-provider tests should retain their original true/false values.
 
-- [ ] Run focused RED:
+- [x] Run focused RED:
 
 ```sh
 rtk npm run test -- src/platform/secrets/secret-store.test.ts src/features/genai/domain/genai-secrets-types.test.ts src/features/genai/server/genai-secret-storage.test.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/api/genai-settings-contracts.test.ts src/features/genai/api/genai-settings-hooks.test.tsx src/features/settings/domain/settings.test.ts src/features/settings/data/settings-repository.test.ts src/extension/background/register-handlers.test.ts
@@ -540,7 +540,7 @@ Expected before implementation: OpenRouter lifecycle/strict contract tests fail
 because the platform ID, mapping, and presence schema exclude it. Existing
 direct-provider tests remain meaningful after the explicit fixture migration.
 
-- [ ] Append `'genai:openrouter'` to `secretProviderIdSchema` in
+- [x] Append `'genai:openrouter'` to `secretProviderIdSchema` in
       `src/platform/secrets/secret-contracts.ts`:
 
 ```ts
@@ -553,7 +553,7 @@ export const secretProviderIdSchema = z.enum([
 ])
 ```
 
-- [ ] Extend the presence schema in
+- [x] Extend the presence schema in
       `src/features/genai/domain/genai-secrets-types.ts`:
 
 ```ts
@@ -567,7 +567,7 @@ export const aiProviderSecretPresenceSchema = z.strictObject({
 
 Keep `makeEmptyAiProviderSecretPresence` derived from `genAiProviderIds`.
 
-- [ ] Extend the trusted mapping in
+- [x] Extend the trusted mapping in
       `src/features/genai/server/genai-secret-storage.ts`:
 
 ```ts
@@ -579,7 +579,7 @@ const secretProviderByGenAiProvider = {
 } as const satisfies Record<GenAiProviderId, SecretProviderId>
 ```
 
-- [ ] Run trusted-key GREEN:
+- [x] Run trusted-key GREEN:
 
 ```sh
 rtk npm run test -- src/platform/secrets/secret-store.test.ts src/features/genai/domain/genai-secrets-types.test.ts src/features/genai/server/genai-secret-storage.test.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/api/genai-settings-contracts.test.ts src/features/genai/api/genai-settings-hooks.test.tsx src/features/settings/domain/settings.test.ts src/features/settings/data/settings-repository.test.ts src/extension/background/register-handlers.test.ts
@@ -623,7 +623,7 @@ current isolated helpers and use schema parsing where they dispatch requests.
 - Modify/test: `src/lib/ai/operation.test.ts`
 - No production edit: `src/lib/ai/operation.ts`
 
-- [ ] Install the exact published provider version after Task 1's locked install. Preserve current AI SDK/Zod versions:
+- [x] Install the exact published provider version after Task 1's locked install. Preserve current AI SDK/Zod versions:
 
 ```sh
 rtk npm install --save-exact @openrouter/ai-sdk-provider@3.1.0
@@ -632,7 +632,7 @@ rtk npm ls ai zod @openrouter/ai-sdk-provider
 
 Expected: provider `3.1.0`, existing compatible AI SDK `7.0.127` and Zod `4.4.3`, no invalid peer dependency or unrelated version upgrade. This package's peer ranges were verified against the published registry during planning.
 
-- [ ] **Step 1: Extend native fixtures and shared regression suites**
+- [x] **Step 1: Extend native fixtures and shared regression suites**
 
 Add the value import alongside the existing type import in
 `src/lib/ai/generate-json.test.ts`:
@@ -732,7 +732,7 @@ assertion for every provider.
         })
 ```
 
-- [ ] **Step 2: Add Meaningful OpenRouter Tests**
+- [x] **Step 2: Add Meaningful OpenRouter Tests**
 
 Add these tests within the existing `generateJson actual SDK wire` describe.
 They keep the real `generateText` and adapter code; only `globalThis.fetch` is
@@ -770,7 +770,7 @@ it('keeps an explicit custom OpenRouter model and the full analysis token budget
 })
 ```
 
-- [ ] Add successful metadata omission/boundary tests:
+- [x] Add successful metadata omission/boundary tests:
 
 ```ts
 it.each([
@@ -845,7 +845,7 @@ it.each(['openai', 'anthropic', 'gemini'] as const)(
 )
 ```
 
-- [ ] Add HTTP and embedded-code normalization/redaction tests:
+- [x] Add HTTP and embedded-code normalization/redaction tests:
 
 ```ts
 it.each([
@@ -891,7 +891,7 @@ it.each([
 )
 ```
 
-- [ ] Add allowlisted machine-tag normalization tests:
+- [x] Add allowlisted machine-tag normalization tests:
 
 ```ts
 it.each([
@@ -933,7 +933,7 @@ it.each([
 )
 ```
 
-- [ ] Add unsafe-code, status-precedence, and direct-provider regression tests:
+- [x] Add unsafe-code, status-precedence, and direct-provider regression tests:
 
 ```ts
 it.each([undefined, '402', 402.5, 200, 499, 999, { code: 402 }])(
@@ -1012,7 +1012,7 @@ it.each(['openai', 'anthropic', 'gemini'] as const)(
 )
 ```
 
-- [ ] Add native refusal and truncation tests:
+- [x] Add native refusal and truncation tests:
 
 ```ts
 it.each([
@@ -1048,7 +1048,7 @@ the equality guard still omits it. Numeric/null native `model` fields fail the
 adapter schema before metadata handling and must remain controlled invalid
 output, rather than weakening the native schema.
 
-- [ ] **Step 3: Add Deadline And Cancellation Coverage Through OpenRouter**
+- [x] **Step 3: Add Deadline And Cancellation Coverage Through OpenRouter**
 
 In `generate-json.test.ts`, replace the existing stalled phase test with the
 following complete test, extending its existing Gemini regression cases:
@@ -1190,7 +1190,7 @@ it.each([
 )
 ```
 
-- [ ] **Step 4: Run The Failing Focused Tests**
+- [x] **Step 4: Run The Failing Focused Tests**
 
 With Task 1 complete and `@openrouter/ai-sdk-provider@3.1.0` installed at the start of this task, run:
 
@@ -1203,7 +1203,7 @@ and the new error/metadata behavior is absent. Existing direct-provider
 regressions and generic deadline tests should pass. Do not accept a failed
 import, syntax, or TypeScript error as the meaningful failing test.
 
-- [ ] **Step 5: Implement The Minimal Transport Changes**
+- [x] **Step 5: Implement The Minimal Transport Changes**
 
 Add in `generate-json.ts`:
 
@@ -1416,7 +1416,7 @@ validation and the existing token limit. It does not add `models`, automatic
 Retry, paid fallback IDs, plugins, routing privacy overrides, or a URL setting.
 OpenRouter's own routing within the one HTTP request remains account-owned.
 
-- [ ] **Step 6: Run Focused Tests And Formatting**
+- [x] **Step 6: Run Focused Tests And Formatting**
 
 ```sh
 rtk npm run test -- src/lib/ai/generate-json.test.ts src/lib/ai/operation.test.ts
@@ -1449,7 +1449,7 @@ Continue Task 3 before committing the provider core; the analysis response contr
 - Test `src/features/genai/server/genai-connection-service.test.ts`.
 - Test `src/features/overlay-session/hooks/use-leetcode-code-analysis.test.tsx`.
 
-- [ ] Add response-contract regressions to `src/features/leetcode-review-assistant/api/code-analysis-contracts.test.ts`, using its existing fixture imports:
+- [x] Add response-contract regressions to `src/features/leetcode-review-assistant/api/code-analysis-contracts.test.ts`, using its existing fixture imports:
 
 ```ts
 it('preserves requested and resolved OpenRouter model identities in a strict ready response', () => {
@@ -1512,7 +1512,7 @@ it('accepts a controlled billing failure without adding provider bodies', () => 
 })
 ```
 
-- [ ] Extend the existing overlay `it.each` Settings-recovery list with billing. Keep its current test callback that verifies `showSettings: true` and `canRetry: true`:
+- [x] Extend the existing overlay `it.each` Settings-recovery list with billing. Keep its current test callback that verifies `showSettings: true` and `canRetry: true`:
 
 ```ts
 it.each([
@@ -1544,7 +1544,7 @@ it.each([
 })
 ```
 
-- [ ] Add OpenRouter to the architecture test's exact approved list before changing the manifest. Expand only its SDK-package recognition regex:
+- [x] Add OpenRouter to the architecture test's exact approved list before changing the manifest. Expand only its SDK-package recognition regex:
 
 ```ts
 const approvedAiProviderHostPermissions = [
@@ -1563,7 +1563,7 @@ const approvedAiProviderHostPermissions = [
 
 Preserve the existing shared-library ownership assertion and exact non-AI hosts.
 
-- [ ] Run focused RED:
+- [x] Run focused RED:
 
 ```sh
 rtk npm run test -- src/features/leetcode-review-assistant/api/code-analysis-contracts.test.ts src/features/overlay-session/hooks/use-leetcode-code-analysis.test.tsx src/testing/architecture-boundaries.test.ts
@@ -1571,7 +1571,7 @@ rtk npm run test -- src/features/leetcode-review-assistant/api/code-analysis-con
 
 Expected: OpenRouter metadata, billing Settings action, and approved-host equality fail against the old schema, recovery set, and manifest. Existing sender authorization and direct-provider tests retain coverage.
 
-- [ ] Use the shared provider list and bounded optional metadata in `src/features/leetcode-review-assistant/api/code-analysis-contracts.ts`:
+- [x] Use the shared provider list and bounded optional metadata in `src/features/leetcode-review-assistant/api/code-analysis-contracts.ts`:
 
 ```ts
 import { aiErrorCodes, aiProviderIds } from '@/lib/ai/types'
@@ -1586,7 +1586,7 @@ const metadata = z.strictObject({
 
 `codeAnalysisErrorCodeSchema` already derives from `aiErrorCodes`. Keep all identity, strict request, output-report, and size-limit schemas intact. Requested `model` continues to own stale-configuration comparisons; `resolvedModel` never replaces it.
 
-- [ ] Add billing to the hook's existing recovery set:
+- [x] Add billing to the hook's existing recovery set:
 
 ```ts
 const settingsErrors: ReadonlySet<CodeAnalysisErrorCode> = new Set([
@@ -1600,7 +1600,7 @@ const settingsErrors: ReadonlySet<CodeAnalysisErrorCode> = new Set([
 ])
 ```
 
-- [ ] Extend the manifest with exactly the approved host:
+- [x] Extend the manifest with exactly the approved host:
 
 ```ts
 host_permissions: [
@@ -1616,7 +1616,7 @@ host_permissions: [
 
 Keep `permissions`, CSP, runtime sender policy, and upstream model-provider domains unchanged.
 
-- [ ] Add a reusable native test-only response to `src/features/genai/testing/genai-fixtures.ts`:
+- [x] Add a reusable native test-only response to `src/features/genai/testing/genai-fixtures.ts`:
 
 ```ts
 export function makeOpenRouterSuccessResponse<T>(
@@ -1643,7 +1643,7 @@ export function makeOpenRouterSuccessResponse<T>(
 }
 ```
 
-- [ ] Add this import and native connection regression to `src/features/genai/server/genai-connection-service.test.ts`. Its existing teardown and real DB/storage harness remain:
+- [x] Add this import and native connection regression to `src/features/genai/server/genai-connection-service.test.ts`. Its existing teardown and real DB/storage harness remain:
 
 ```ts
 import { makeOpenRouterSuccessResponse } from '../testing/genai-fixtures'
@@ -1737,7 +1737,7 @@ it.each(['key', 'same-key', 'model', 'provider', 'removed-key'] as const)(
 )
 ```
 
-- [ ] Add full-report metadata forwarding proof to `src/features/leetcode-review-assistant/server/code-analysis-service.test.ts`:
+- [x] Add full-report metadata forwarding proof to `src/features/leetcode-review-assistant/server/code-analysis-service.test.ts`:
 
 ```ts
 it('keeps a consistent OpenRouter report with requested and served model metadata', async () => {
@@ -1782,7 +1782,7 @@ it('keeps a consistent OpenRouter report with requested and served model metadat
 
 The existing `it.each(aiErrorCodes)` now also proves billing is forwarded by this service and the background runtime without exposing provider bodies.
 
-- [ ] Add successful/stale routed-model background proof to `src/features/leetcode-review-assistant/server/analysis-runtime-service.test.ts`:
+- [x] Add successful/stale routed-model background proof to `src/features/leetcode-review-assistant/server/analysis-runtime-service.test.ts`:
 
 ```ts
 it.each([
@@ -1858,7 +1858,7 @@ it.each([
 
 These tests use the requested `openrouter/free` in the configuration, even when generation serves another model. Existing generic background tests already cover configuration/startup/transport/recheck deadlines, cancellation, missing configuration, and strict identity redaction; run them unchanged.
 
-- [ ] Run integrated GREEN and typecheck after Tasks 1–3:
+- [x] Run integrated GREEN and typecheck after Tasks 1–3:
 
 ```sh
 rtk npm run test -- src/features/leetcode-review-assistant/api/code-analysis-contracts.test.ts src/features/leetcode-review-assistant/server/code-analysis-service.test.ts src/features/leetcode-review-assistant/server/analysis-runtime-service.test.ts src/features/genai/server/genai-connection-service.test.ts src/features/overlay-session/hooks/use-leetcode-code-analysis.test.tsx src/testing/architecture-boundaries.test.ts
@@ -1867,7 +1867,7 @@ rtk npm run typecheck
 
 Expected: all targeted tests and WXT/TypeScript pass. No production connection, analysis-service, runtime-policy, database, or report-storage edit should be needed. If typecheck reveals another exhaustive provider or strict presence site, extend that existing owner and include its focused test; do not bypass types.
 
-- [ ] Format and check every core source/package file before the core commit:
+- [x] Format and check every core source/package file before the core commit:
 
 ```sh
 openrouter_core_files=(
@@ -1893,7 +1893,7 @@ rtk npx prettier --check "${openrouter_core_files[@]}"
 
 Expected: formatter/check exit 0.
 
-- [ ] Commit the coherent provider core after formatting all touched core files and confirming the staged diff contains only task files:
+- [x] Commit the coherent provider core after formatting all touched core files and confirming the staged diff contains only task files:
 
 ```sh
 rtk git add package.json package-lock.json src/lib/ai/types.ts src/lib/ai/generate-json.ts src/lib/ai/generate-json.test.ts src/lib/ai/operation.test.ts src/platform/secrets/secret-contracts.ts src/platform/secrets/secret-store.test.ts src/features/genai/domain/genai-types.test.ts src/features/genai/domain/genai-secrets-types.ts src/features/genai/domain/genai-secrets-types.test.ts src/features/genai/server/genai-secret-storage.ts src/features/genai/server/genai-secret-storage.test.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/server/genai-connection-service.test.ts src/features/genai/api/genai-settings-contracts.test.ts src/features/genai/api/genai-settings-hooks.test.tsx src/features/genai/testing/evaluation-provider-config.ts src/features/genai/testing/evaluation-provider-config.test.ts src/features/genai/testing/genai-fixtures.ts src/features/settings/domain/settings.test.ts src/features/settings/data/settings-repository.test.ts src/features/settings/hooks/use-ai-connection-controller.ts src/features/settings/hooks/use-ai-connection-controller.test.tsx src/features/settings/components/sections/ai-assessment-section.test.tsx src/features/settings/components/settings-screen.test.tsx src/extension/background/register-handlers.test.ts src/features/leetcode-review-assistant/api/code-analysis-contracts.ts src/features/leetcode-review-assistant/api/code-analysis-contracts.test.ts src/features/leetcode-review-assistant/server/code-analysis-service.test.ts src/features/leetcode-review-assistant/server/analysis-runtime-service.test.ts src/features/overlay-session/hooks/use-leetcode-code-analysis.ts src/features/overlay-session/hooks/use-leetcode-code-analysis.test.tsx src/testing/architecture-boundaries.test.ts wxt.config.ts
@@ -1912,7 +1912,7 @@ The three Settings test files staged here contain only Task 1's necessary fourth
 - Modify `src/features/settings/hooks/use-ai-connection-controller.ts`.
 - Test `src/features/settings/hooks/use-ai-connection-controller.test.tsx`.
 
-- [ ] Add these test imports:
+- [x] Add these test imports:
 
 ```ts
 import type { AiProviderSecretPresence } from '@/features/genai'
@@ -1923,7 +1923,7 @@ import {
 } from '@/features/genai/api'
 ```
 
-- [ ] Add a second `createFixture` argument:
+- [x] Add a second `createFixture` argument:
 
 ```ts
   presenceOverrides: Partial<AiProviderSecretPresence> = {},
@@ -1961,7 +1961,7 @@ if (method === 'genai.testConnection') {
 }
 ```
 
-- [ ] Add these controller tests:
+- [x] Add these controller tests:
 
 ```ts
 it('selects the OpenRouter suggestion without enabling assessment and discards back to the saved connection', async () => {
@@ -2120,7 +2120,7 @@ it.each(['preferences', 'reset', 'ai'] as const)(
 )
 ```
 
-- [ ] Run controller regression proof after Task 1's provider-map extension:
+- [x] Run controller regression proof after Task 1's provider-map extension:
 
 ```sh
 rtk npm run test -- src/features/settings/hooks/use-ai-connection-controller.test.tsx
@@ -2136,7 +2136,7 @@ Expected: PASS. The existing transitions already own restoration, preset edits, 
 - Test `src/features/settings/components/sections/ai-assessment-section.test.tsx`.
 - Test `src/features/settings/components/settings-screen.test.tsx`.
 
-- [ ] Update the section test helper imports with:
+- [x] Update the section test helper imports with:
 
 ```ts
 import type { AiProviderSecretPresence } from '@/features/genai'
@@ -2197,7 +2197,7 @@ Extend the existing all-providers test with:
 expect(screen.getByRole('radio', { name: 'OpenRouter' })).toBeVisible()
 ```
 
-- [ ] Add these component regressions before implementing the JSX blocks:
+- [x] Add these component regressions before implementing the JSX blocks:
 
 ```ts
 it('suggests the free OpenRouter route, clears an unsaved key, and shows bounded model and routing guidance', async () => {
@@ -2315,7 +2315,7 @@ it('disables the free preset during key persistence and leaves the captured cust
 })
 ```
 
-- [ ] Run RED:
+- [x] Run RED:
 
 ```sh
 rtk npm run test -- src/features/settings/components/sections/ai-assessment-section.test.tsx
@@ -2323,9 +2323,9 @@ rtk npm run test -- src/features/settings/components/sections/ai-assessment-sect
 
 Expected before UI changes: OpenRouter radio/preset/link queries fail.
 
-- [ ] Add `{ label: 'OpenRouter', value: 'openrouter' }` to `providerOptions`.
+- [x] Add `{ label: 'OpenRouter', value: 'openrouter' }` to `providerOptions`.
 
-- [ ] Replace only the model row's inner `grid gap-1.5` contents with:
+- [x] Replace only the model row's inner `grid gap-1.5` contents with:
 
 ```tsx
 <div className="grid gap-1.5">
@@ -2367,7 +2367,7 @@ Expected before UI changes: OpenRouter radio/preset/link queries fail.
 </div>
 ```
 
-- [ ] Below the existing Gemini key link, add:
+- [x] Below the existing Gemini key link, add:
 
 ```tsx
 {
@@ -2403,7 +2403,7 @@ Keep the password input, local-storage hint, connection actions, and independent
 assessment switch intact. The links follow the existing `target="_blank"` and
 `rel="noreferrer"` pattern.
 
-- [ ] Run section GREEN after the option and JSX changes:
+- [x] Run section GREEN after the option and JSX changes:
 
 ```sh
 rtk npm run test -- src/features/settings/components/sections/ai-assessment-section.test.tsx
@@ -2411,7 +2411,7 @@ rtk npm run test -- src/features/settings/components/sections/ai-assessment-sect
 
 Expected: PASS.
 
-- [ ] Preserve the existing Gemini integration scenario in
+- [x] Preserve the existing Gemini integration scenario in
       `settings-screen.test.tsx` and run it for OpenRouter too. Replace the
       existing scenario's `it(...)` declaration with:
 
@@ -2478,7 +2478,7 @@ expect(screen.getByText('Saved key · not tested')).toBeVisible()
 expect(screen.queryByText(`Connected to ${label} · ${model}.`)).toBeNull()
 ```
 
-- [ ] Extend the existing general-Save gate test to cover OpenRouter without
+- [x] Extend the existing general-Save gate test to cover OpenRouter without
       removing direct-provider coverage: replace its declaration with
       `it.each(['openai', 'openrouter'] as const)`, pass `provider` into its
       saved AI configuration, set presence with
@@ -2497,7 +2497,7 @@ Use this complete parameterized declaration:
 it.each(['openai', 'openrouter'] as const)('freezes preference and %s AI fields during general Save and rejects overlapping AI submission', async (provider) => {
 ```
 
-- [ ] Run focused integrated GREEN:
+- [x] Run focused integrated GREEN:
 
 ```sh
 rtk npm run test -- src/features/settings/hooks/use-ai-connection-controller.test.tsx src/features/settings/components/sections/ai-assessment-section.test.tsx src/features/settings/components/settings-screen.test.tsx
@@ -2507,7 +2507,7 @@ Expected: PASS for OpenRouter free/custom setup, direct providers, independent
 assessment enablement, exact model restoration, preset/no-network behavior,
 discard, preference separation, and synchronous/UI operation gates.
 
-- [ ] Format/check the changed Settings implementation and three tests, then commit the UI slice:
+- [x] Format/check the changed Settings implementation and three tests, then commit the UI slice:
 
 ```sh
 rtk npx prettier --write src/features/settings/hooks/use-ai-connection-controller.test.tsx src/features/settings/components/sections/ai-assessment-section.tsx src/features/settings/components/sections/ai-assessment-section.test.tsx src/features/settings/components/settings-screen.test.tsx
@@ -2523,7 +2523,7 @@ Expected: formatting and staged checks pass; only the listed Settings files are 
 
 **Files:** `docs/product.md`, `docs/architecture.md`, `design.md`, `docs/testing.md`, `docs/chrome-web-store.md`, `PRIVACY.md`, approved spec, this plan, and `docs/superpowers/README.md`.
 
-- [ ] Replace the AI-connection paragraph under Settings in `docs/product.md` with:
+- [x] Replace the AI-connection paragraph under Settings in `docs/product.md` with:
 
 ```md
 Settings exposes an AI connection for OpenAI, Anthropic, Google Gemini, or
@@ -2554,7 +2554,7 @@ settings.
 
 Retain the following existing independent-enable, Reset Defaults, trusted storage, and invalidation paragraphs. Global defaults and saved-key preservation remain documented as before.
 
-- [ ] In `docs/architecture.md` under External APIs And Secrets, replace the AI integration bullet with:
+- [x] In `docs/architecture.md` under External APIs And Secrets, replace the AI integration bullet with:
 
 ```md
 - `src/lib/ai`: reusable structured generation through Vercel AI SDK, official
@@ -2610,7 +2610,7 @@ headers, body reading, and validation.
 
 Keep the existing 20/25-second connection deadlines, 30/50-second analysis deadlines, 8,192-token analysis limit, sender policy, cache revisions, and background listener lifecycle accurate.
 
-- [ ] Under AI Connection Settings Rules in `design.md`, replace the selecting-provider and mask/key bullets with:
+- [x] Under AI Connection Settings Rules in `design.md`, replace the selecting-provider and mask/key bullets with:
 
 ```md
 - Selecting a provider fills an editable suggested model value; OpenRouter
@@ -2627,7 +2627,7 @@ Keep the existing 20/25-second connection deadlines, 30/50-second analysis deadl
   attributes. Keep the existing compact row/input/status/panel tokens.
 ```
 
-- [ ] In `docs/chrome-web-store.md`, update both provider catalogs in the detailed description and reviewer instructions to “OpenAI, Anthropic, Google Gemini, or OpenRouter”. Replace the three existing AI host explanations and add the fourth with:
+- [x] In `docs/chrome-web-store.md`, update both provider catalogs in the detailed description and reviewer instructions to “OpenAI, Anthropic, Google Gemini, or OpenRouter”. Replace the three existing AI host explanations and add the fourth with:
 
 ```md
 ### `https://api.openai.com/*`
@@ -2672,7 +2672,7 @@ latency, and capacity. Do not include test keys in submitted evidence.
 
 Keep Store publication and release/version changes separate from this implementation task.
 
-- [ ] Replace only Optional AI Assessment Data in `PRIVACY.md` with the following accurate request/forwarding description, and set the policy's effective date to the actual implementation date before release:
+- [x] Replace only Optional AI Assessment Data in `PRIVACY.md` with the following accurate request/forwarding description, and set the policy's effective date to the actual implementation date before release:
 
 ```md
 ### Optional AI assessment data
@@ -2710,7 +2710,7 @@ In Storage, Transfer, And Sharing replace its AI bullet with:
 
 The implementation-date action is an operational release date, not an invented future publication date. Keep every unrelated local-data/Gist policy paragraph intact.
 
-- [ ] Add the OpenRouter human smoke section from Task 6 to `docs/testing.md` beside AI Connection And Assessment Settings. Replace the evaluation allowed-provider line with:
+- [x] Add the OpenRouter human smoke section from Task 6 to `docs/testing.md` beside AI Connection And Assessment Settings. Replace the evaluation allowed-provider line with:
 
 ```md
 `COGNIPACE_AI_EVAL_PROVIDER` (openai, anthropic, gemini, or openrouter),
@@ -2728,9 +2728,9 @@ account privacy settings, billing, or schema-support failures remain controlled
 and do not trigger app-configured paid fallback requests.
 ```
 
-- [ ] After implementation and actual validation, update this plan's checkboxes and evidence record, the spec's status, and the two planning-index entries with the observed automated/live/human status. Do not mark live or installed-extension proof passed without current dated evidence.
+- [x] After implementation and actual validation, update this plan's checkboxes and evidence record, the spec's status, and the two planning-index entries with the observed automated/live/human status. Do not mark live or installed-extension proof passed without current dated evidence.
 
-- [ ] Format/check touched Markdown explicitly, including ignored planning artifacts:
+- [x] Format/check touched Markdown explicitly, including ignored planning artifacts:
 
 ```sh
 rtk npx prettier --write --ignore-path /dev/null docs/product.md docs/architecture.md design.md docs/testing.md docs/chrome-web-store.md PRIVACY.md docs/superpowers/specs/2026-10-04-openrouter-provider-design.md docs/superpowers/plans/2026-10-05-openrouter-provider.md docs/superpowers/README.md
@@ -2750,7 +2750,7 @@ rtk git commit -m "docs(genai): document optional OpenRouter routing and validat
 
 **Files:** This plan's implementation evidence record; existing `src/features/leetcode-review-assistant/server/code-analysis-provider-evaluation.test.ts`; current manual flows in `docs/testing.md`. No new smoke framework or generated test credentials.
 
-- [ ] Check all feature source/package formatting after the task-specific writes:
+- [x] Check all feature source/package formatting after the task-specific writes:
 
 ```sh
 openrouter_feature_files=(
@@ -2776,7 +2776,7 @@ rtk npx prettier --check "${openrouter_feature_files[@]}"
 
 Expected: exit 0. Fix listed-file formatting before full gates; rerun focused tests if a functional edit is needed.
 
-- [ ] Run required gates in this order after focused task checks have passed:
+- [x] Run required gates in this order after focused task checks have passed:
 
 ```sh
 rtk npm run lint
@@ -2842,7 +2842,7 @@ Expected when service/account/model supports the report: six current full report
 
 Do not intentionally spend money or exhaust an account to fabricate a 402/429 case. Automated native fixtures cover those codes; label unavailable real-service cases unrun. Human installed-extension proof remains required, never N/A for this behavior change. Reuse the existing generated-code and submission smoke inputs rather than inventing a report-quality benchmark.
 
-- [ ] Review the complete diff against the approved spec and run required code review before any PR. Keep review saving, schedules, local data, permissions, and import ownership intact. Record exact passed/failed/skipped commands and evidence paths. Do not create a PR, merge, publish, alter release version, or mark full feature acceptance complete until the requested action and its required human proof are present.
+- [x] Review the complete diff against the approved spec and run required code review before any PR. Keep review saving, schedules, local data, permissions, and import ownership intact. Record exact passed/failed/skipped commands and evidence paths. Do not create a PR, merge, publish, alter release version, or mark full feature acceptance complete until the requested action and its required human proof are present.
 
 ## Acceptance And Recovery
 
@@ -2890,3 +2890,141 @@ rtk git diff --cached --check
 All four listed plan-writing commands passed with exit 0. Root self-review covered every approved spec section, checked the referenced repository files and type/method names, found no missing paths or placeholders, and confirmed all implementation steps remain unchecked. Future unchecked commands elsewhere in this plan are execution instructions, not passed checks.
 
 Skipped during docs-only planning: all focused application tests; `rtk npm ci`; `rtk npm install --save-exact @openrouter/ai-sdk-provider@3.1.0`; `rtk npm run typecheck`; `rtk npm run lint`; `rtk npm run check`; `rtk npm run build`; `rtk npm run zip`; `rtk npm run store:check`; live six-case evaluation; generated-suggestion execution; and human installed-extension smoke. They require the implementation or private/human environment and remain future work. No database migration command is needed for the approved design.
+
+## Implementation Validation Record — October 5, 2026
+
+The user authorized implementation. Tasks 1–5 are implemented and passed separate
+SPEC and QUALITY reviews; final integration review of `73a43ca..49bfad0` and the
+six authority-doc edits found no actionable issue. Task 6 automated gates and
+component proof passed. Full feature acceptance remains pending the three
+unchecked live/generated-code/human proof steps above.
+
+Implementation commits:
+
+- `2b7fbad`: optional provider contracts, isolated trusted key, native adapter,
+  bounded metadata/errors, runtime tests, and exactly one approved host.
+- `ff8f591`: OpenRouter Settings, draft-only free preset, disclosures, and
+  controller/component/integration regressions.
+- `49bfad0`: typed native request assertions and persisted-settings assertions
+  required by full lint; no production behavior change.
+
+### Dependencies, RED/GREEN, And Recovery
+
+`rtk npm ci` passed. The first focused run could not start without generated
+`.wxt/tsconfig.json`; `rtk npm exec -- wxt prepare` passed and resolved that
+prerequisite. `rtk npm install --save-exact @openrouter/ai-sdk-provider@3.1.0`
+first failed with registry DNS access in the default sandbox, then passed with
+approved network access. Only that pinned package was added; no AI SDK or Zod
+upgrade was made. `rtk npm ls ai zod @openrouter/ai-sdk-provider` passed with
+provider 3.1.0, AI SDK 7.0.127, and Zod 4.4.3.
+
+| Task             | Expected RED and recovery                                                                                                                                | Final focused GREEN                     |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| 1                | 30 expected failures; one intermediate mock-reset scope failure was fixed by keeping new cases inside the existing scoped setup                          | 14 suites, 259 tests                    |
+| 2                | 65 expected missing-transport failures; three additional whitespace-alias cases failed before the trim-only comparison fix                               | 2 suites, 130 tests                     |
+| 3                | Three expected metadata/billing/host failures                                                                                                            | 6 suites, 169 tests                     |
+| 4                | Four expected missing-control failures; controller coverage passed with existing production lifecycle                                                    | 3 suites, 47 tests                      |
+| Integration lint | First `rtk npm run lint` found three new test typing errors; direct URL equality, string-body narrowing, and an unknown parsed settings value fixed them | Focused 2 suites, 29 tests; lint passed |
+
+Exact focused validation commands run (repeat reviewer runs used the same
+bounded suites):
+
+```sh
+rtk npm run test -- src/features/genai/domain/genai-types.test.ts src/features/genai/testing/evaluation-provider-config.test.ts src/platform/secrets/secret-store.test.ts src/features/genai/domain/genai-secrets-types.test.ts src/features/genai/server/genai-secret-storage.test.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/api/genai-settings-contracts.test.ts src/features/genai/api/genai-settings-hooks.test.tsx src/features/settings/domain/settings.test.ts src/features/settings/data/settings-repository.test.ts src/extension/background/register-handlers.test.ts src/features/settings/hooks/use-ai-connection-controller.test.tsx src/features/settings/components/settings-screen.test.tsx src/features/settings/components/sections/ai-assessment-section.test.tsx
+rtk proxy npx vitest run src/features/genai/domain/genai-secrets-types.test.ts src/features/genai/server/genai-secret-storage.test.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/api/genai-settings-hooks.test.tsx src/features/settings/data/settings-repository.test.ts src/platform/secrets/secret-store.test.ts
+rtk npm run test -- src/lib/ai/generate-json.test.ts src/lib/ai/operation.test.ts
+rtk npm run test -- src/features/leetcode-review-assistant/api/code-analysis-contracts.test.ts src/features/overlay-session/hooks/use-leetcode-code-analysis.test.tsx src/testing/architecture-boundaries.test.ts
+rtk npm run test -- src/features/leetcode-review-assistant/api/code-analysis-contracts.test.ts src/features/leetcode-review-assistant/server/code-analysis-service.test.ts src/features/leetcode-review-assistant/server/analysis-runtime-service.test.ts src/features/genai/server/genai-connection-service.test.ts src/features/overlay-session/hooks/use-leetcode-code-analysis.test.tsx src/testing/architecture-boundaries.test.ts
+rtk npm run test -- src/features/settings/hooks/use-ai-connection-controller.test.tsx
+rtk npm run test -- src/features/settings/components/sections/ai-assessment-section.test.tsx
+rtk npm run test -- src/features/settings/hooks/use-ai-connection-controller.test.tsx src/features/settings/components/sections/ai-assessment-section.test.tsx src/features/settings/components/settings-screen.test.tsx
+rtk npm run test -- src/features/genai/server/genai-connection-service.test.ts src/features/settings/data/settings-repository.test.ts
+rtk npm run typecheck
+```
+
+### Final Automated Gates
+
+All of these commands passed:
+
+```sh
+rtk npm run lint
+rtk npm run check
+rtk npm run build
+rtk npm run zip
+rtk npm run store:check
+rtk git diff --check
+```
+
+`check` passed database consistency, WXT preparation, TypeScript, ESLint, and
+209 test files / 2,820 tests. One live-evaluation file / six tests skipped with
+the opt-in switch unset. Existing jsdom `scrollTo` diagnostics appeared without
+test failures; the actual component browser run had no console warnings/errors.
+Build and zip passed with the usual large-chunk advisory, producing
+`dist/chrome-mv3` and `dist/cognipace-2.1.0-chrome.zip`. Store validation passed.
+The generated manifest contains the exact existing hosts plus
+`https://openrouter.ai/*`, with unchanged storage/alarms/notifications permissions
+and CSP. No version bump, PR, merge, publication, or database migration was made.
+
+All touched source/package files passed the Task 6 explicit Prettier list.
+Task-specific files were formatted and checked; all touched Markdown passed:
+
+```sh
+rtk npx prettier --write --ignore-path /dev/null docs/product.md docs/architecture.md design.md docs/testing.md docs/chrome-web-store.md PRIVACY.md docs/superpowers/specs/2026-10-04-openrouter-provider-design.md docs/superpowers/plans/2026-10-05-openrouter-provider.md docs/superpowers/README.md
+rtk npx prettier --check --ignore-path /dev/null docs/product.md docs/architecture.md design.md docs/testing.md docs/chrome-web-store.md PRIVACY.md docs/superpowers/specs/2026-10-04-openrouter-provider-design.md docs/superpowers/plans/2026-10-05-openrouter-provider.md docs/superpowers/README.md
+```
+
+### Production Component Browser Proof
+
+Browser plugin not available; the frontend-testing-debugging skill's fallback
+used bundled Playwright and existing Google Chrome with fresh headless pages.
+No browser dependency was installed. At `http://127.0.0.1:4370/`, the actual
+`AiAssessmentSection`, connection controller, shared gate, query client, and
+production CSS ran against a temporary mocked runtime with a fake key.
+
+Passed page identity, meaningful render, no framework overlay, healthy console,
+masked/cleared key, custom Save & test with assessment off, exact custom-model
+remount, preset without RPC or persistence, cleared feedback, Discard restore,
+provider-specific links/controls, and mobile horizontal-overflow checks.
+Desktop 1280×1000 and mobile 375×850 evidence was inspected. The temporary
+fixture initially omitted Tailwind source scanning and dashboard surface tokens;
+both were corrected outside the repo. A resized-page capture artifact was
+resolved with a fresh mobile page and settled transitions. Final evidence:
+
+- [Desktop Settings screenshot](/Users/tobiolutimehin/.codex/visualizations/2026/10/05/01a109f8-51cf-75e3-a0bd-cee3d604fe3a/openrouter-settings-desktop.png)
+- [Mobile Settings screenshot](/Users/tobiolutimehin/.codex/visualizations/2026/10/05/01a109f8-51cf-75e3-a0bd-cee3d604fe3a/openrouter-settings-mobile.png)
+
+Commands:
+
+```sh
+rtk proxy node /private/tmp/cognipace-openrouter-ui/server.mjs
+rtk proxy node /private/tmp/cognipace-openrouter-ui/inspect.mjs
+rtk proxy node /private/tmp/cognipace-openrouter-ui/verify.mjs
+```
+
+The first server launch was denied permission to listen in the default sandbox;
+the approved launch passed. An initial fixture-only favicon 404 was fixed.
+Final browser proof is mocked component evidence, not live OpenRouter or an
+installed-extension result. Native SDK tests separately cover real adapter wire
+behavior through mocked fetch.
+
+### Skipped And Still Required
+
+Skipped this exact opt-in command because privately supplied test-only
+credentials were not available:
+
+```sh
+rtk npm run test -- src/features/leetcode-review-assistant/server/code-analysis-provider-evaluation.test.ts --maxWorkers=1
+```
+
+No live inference calls or current full-report artifacts were generated.
+Requested/served-model usefulness review and authored JavaScript/Kotlin
+generated-suggestion execution remain pending those artifacts. No old artifact
+is claimed as current. Human installed-extension happy-path and edge-case smoke
+and screenshot/recording proof in `docs/testing.md` remain pending before PR
+review or merge. Do not claim model quality, live capacity, or full feature
+acceptance from mock wire or a tiny connection test.
+
+`rtk npm run db:generate` was not run because no database schema changed;
+`rtk npm run check` ran the required database consistency check. The branch and
+managed worktree are preserved for the remaining proof and user-directed
+integration.

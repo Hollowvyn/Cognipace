@@ -8,10 +8,13 @@ OpenRouter connection, the user's own OpenRouter API key, an editable model
 field with `openrouter/free` suggested when selecting OpenRouter, and a
 **Use free models** action that restores that suggestion.
 
-The user approved proceeding from this written specification to implementation
-planning. The [implementation plan](../plans/2026-10-05-openrouter-provider.md)
-records concrete tasks and validation. Implementation, provider evaluation,
-and human installed-extension proof have not been performed.
+The user approved implementation on October 5, 2026. The
+[implementation plan](../plans/2026-10-05-openrouter-provider.md#implementation-validation-record--october-5-2026)
+records completed implementation, passing focused/full automated gates, separate
+SPEC/QUALITY reviews, and production-component browser proof with mocked runtime.
+Live full-report/generated-code evaluation and human installed-extension
+happy-path/edge-case proof remain pending before full acceptance and PR review
+or merge.
 
 ## Goal
 

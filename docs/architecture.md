@@ -538,11 +538,13 @@ Current integrations:
 - `src/lib/github/api`: GitHub Gist REST requests for sync.
 - `src/lib/leetcode/api`: LeetCode GraphQL and submission REST requests used by
   LeetCode capture readers.
-- `src/lib/ai`: reusable structured generation through Vercel AI SDK and its
-  official OpenAI, Anthropic, and Google adapters. The library accepts explicit
-  credentials, model, prompt, and Zod schema; it does not own Settings,
-  assessment, runtime messaging, or secret persistence. Feature services call
-  this library directly; GenAI owns configuration and trusted credential loading.
+- `src/lib/ai`: reusable structured generation through Vercel AI SDK, official
+  OpenAI/Anthropic/Google adapters, and OpenRouter's dedicated
+  `@openrouter/ai-sdk-provider`. The library accepts explicit credentials,
+  model, prompt, and Zod schema; GenAI owns configuration and trusted key
+  loading. SDK/provider imports are confined to this library. OpenRouter uses
+  the fixed `https://openrouter.ai/api/v1` endpoint, strict structured outputs,
+  and `provider.require_parameters: true`; there is no editable transport URL.
 
 BYOK secrets use `src/platform/secrets`, backed by `chrome.storage.local` with
 trusted-context access. UI surfaces may save or delete secrets through runtime
@@ -552,23 +554,39 @@ in TanStack Query cache payloads or mutation variables. Stored-token validation 
 dashboard-authorized runtime method so the UI can test the saved token without
 receiving or echoing the secret value.
 
-GenAI provider keys use `src/platform/secrets` with provider ids
-`genai:openai`, `genai:anthropic`, and `genai:google`. UI and runtime status
-payloads may expose provider key presence only. Raw keys must not be written to
-the app database, backup exports, sync envelopes, logs, or query cache. Approved
-provider host permissions are exactly:
+GenAI provider keys use `src/platform/secrets` with IDs `genai:openai`,
+`genai:anthropic`, `genai:google`, and `genai:openrouter`. UI/runtime status
+exposes exactly four key-presence booleans. Raw keys stay out of the app
+database, backups, sync envelopes, logs, query caches, mutation variables, and
+returned runtime data. Approved AI host permissions are exactly:
 
 - `https://api.openai.com/*`
 - `https://api.anthropic.com/*`
 - `https://generativelanguage.googleapis.com/*`
+- `https://openrouter.ai/*`
 
-Provider calls run from trusted background code after settings and BYOK secret
-checks. The SDK receives explicit direct-provider model objects and approved
-hosts, with retries disabled, bounded output, and telemetry disabled. The
-SDK validates structured output against the supplied Zod schema. The library
-returns controlled errors and provider/model/duration metadata; raw SDK errors
-and provider response bodies do not cross the runtime boundary. Its deadline
-covers request preparation, headers, body consumption, and output validation.
+Provider calls run in trusted background code after configuration and key
+checks. Explicit model objects use controlled fetch with redirects rejected,
+SDK retries disabled, bounded output, and telemetry disabled. Strict SDK/Zod
+and report-consistency validation remain required. OpenRouter requests specify
+only the selected model, without paid fallback IDs or privacy overrides;
+OpenRouter can perform internal routing within CogniPace's single request.
+
+Metadata keeps requested `model` as configuration identity and optionally adds
+bounded `resolvedModel` for a successful OpenRouter response that identifies a
+served model. Missing, blank, oversized, equal-to-request, or router-alias values
+are omitted. Runtime identity checks continue using requested provider/model
+and trusted key revision. Reports remain session-only; evaluation artifacts
+preserve metadata without expanding app persistence or sync.
+
+Controlled errors use actual HTTP status and allowlisted machine metadata.
+OpenRouter's HTTP-200 errors can contain embedded numeric error codes and the
+adapter may expose wrapped or flattened data. Billing (402) is distinct from
+request quotas (429). Unknown 503 stays a network failure; model-unavailable
+guidance can mention required capabilities and privacy/routing settings without
+claiming a diagnosed cause. Raw SDK messages, bodies, and metadata.raw never
+cross the runtime boundary. The complete deadline includes preparation,
+headers, body reading, and validation.
 
 Dashboard-only `genai.testConnection` accepts the saved provider and model
 identity. It loads credentials in the background, makes a fixed small
