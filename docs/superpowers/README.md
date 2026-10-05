@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md`](./specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md): approved focused Solve / AI / reserved Notes layout and separate progressive, session-only AI hint phase; written-spec review and phase-sized implementation plans pending.
+- [`specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md`](./specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md): design and written spec approved for focused Solve / AI / reserved Notes tabs and separate progressive, session-only hints; Phase 1 plan authored, Phase 2 planning in progress, application implementation pending.
 
 - [`specs/2026-10-04-analytics-combined-outcomes-restoration.md`](./specs/2026-10-04-analytics-combined-outcomes-restoration.md): user-requested additive restoration of the pooled first-recorded outcome chart beside Recall, preserving every new difficulty/time/mix view.
 
@@ -68,6 +68,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-04-overlay-focused-tabs.md`](./plans/2026-10-04-overlay-focused-tabs.md): Phase 1 plan for selected-tab lifecycle, ShadowRoot keyboard navigation, mounted panels, Solve-only footer, disabled AI explanation and required automated/human validation; execution pending.
 
 - [`plans/2026-10-04-analytics-combined-outcomes-restoration.md`](./plans/2026-10-04-analytics-combined-outcomes-restoration.md): combined chart restoration, canonical pooled counts, dashboard integration and focused/visual validation.
 
