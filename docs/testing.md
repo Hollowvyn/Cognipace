@@ -897,6 +897,17 @@ exact pending case.
    exposes the same exact bucket values as pointer/tap inspection; Escape and
    blur hide the tooltip. A quiet selected guide must not create a measured
    marker or value for unknown evidence.
+   In New Problem Success, verify both simultaneous outcome curves across all
+   difficulties, including Unknown. Compare pooled counts with the exact table
+   using unequal difficulty sample sizes; the overall rate must use summed
+   counts, not an average of difficulty rates. Inspect an internal gap, measured
+   zero, invalid-only outer buckets and an Unknown-only period. Both target
+   editors remain available in empty/Chart/Table states, equal goals share one
+   neutral reference and distinct goals show two. Save a goal and confirm both
+   the combined and difficulty views update. Toggle each outcome independently;
+   its tooltip value hides while dates, scale and goals remain fixed. Change
+   Problem Solving population, measure, view and difficulties; the combined
+   first-recorded chart must remain unchanged.
 6. Inspect the first and last measured values and extremes near axis bounds.
    Circle/diamond markers and low whiskers must remain visible with sufficient
    clearance. Missing-evidence bridges connect measured neighbors only; an
@@ -987,7 +998,8 @@ exact pending case.
 15. Repeat ready and sparse paths at wide and 320px dashboard widths in both
     light and dark themes. Check axis/key contrast, sparse ticks, control
     reachability, tap coordinates, keyboard focus, table scrolling, and
-    the paired Success/Time plots, separate Recall, full-width Practice, and
+    the combined New Problem Success/Recall pair, paired difficulty Success/Time
+    plots, full-width Practice, and
     Memory/Topic stacking. There must
     be no horizontal document overflow. Include neighboring panels with different
     readiness messages; plots and controls must retain usable alignment without

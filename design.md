@@ -219,10 +219,14 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 
 ## CogniPace Analytics Historical Chart Rules
 
-- Difficulty And Recorded Time replaces standalone New Problem Success with
-  one full-width section: paired Success/Time plots stack on narrow screens,
-  followed by full-width Difficulty Mix. Recall vs FSRS Estimate remains
-  separate, followed by Practice Rhythm; Memory Strength and Topic Performance
+- Keep New Problem Success and Recall vs FSRS Estimate as the opening pair.
+  New Problem Success shows both pooled first-outcome curves across all
+  difficulties, including Unknown, with mint circles, blue diamonds, and two
+  compact saved goal editors. Equal goals share one neutral reference; its
+  fitted scale includes both rates and goals independently of series visibility.
+  Difficulty And Recorded Time adds one full-width section below the pair:
+  paired Success/Time plots stack on narrow screens, followed by full-width
+  Difficulty Mix. Practice Rhythm follows; Memory Strength and Topic Performance
   share the next row. Retention Map, compact Memory Signals, and the responsive
   workload pair retain their placement. The section is implemented on this
   branch with passing automated checks and production-component browser proof;
