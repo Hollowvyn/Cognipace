@@ -674,6 +674,79 @@ report, provider metadata, criterion, and checked date in
 or read the application's trusted secret store. Normal tests skip all six live
 cases before reading any evaluation provider/model/key values.
 
+### Manual progressive hints
+
+`overlay-session` owns the transient hint batch, revealed count, disclosure,
+and in-flight operation above the collapsed, expanded, and docked modes. The
+Solve Help action starts a request explicitly; folding, reopening, tab or mode
+changes, review saves/updates, and ordinary refetches do not generate hints.
+Accepted and failed saves retain the batch. Restart, navigation, reload/remount,
+selected input changes, saved connection changes/removal, and local-data clear
+invalidate it. Automatic-assessment enable-only changes preserve it. Notes
+remains reserved without editing or persistence.
+
+`leetcode-capture` prepares complete matching problem context without requiring
+a submission: canonical title, statement, `examples[].rawText`, and
+constraints, with supported host and slug. The selected JSON identity contains
+only those inputs. Editor code, submissions, diagnostics, topics, official
+hints, follow-ups, and authentication data are excluded; enrichment of excluded
+fields preserves the batch, while any selected-input change invalidates it.
+Preparation and the strict problem-only runtime contract reject incomplete,
+mismatched, or oversized input rather than repairing or truncating it. Selected
+problem JSON is limited to 24,000 characters, 50 examples, and 100 constraints.
+Selected-input identity stays local to the controller. Runtime requests contain
+`surface`, `requestId`, problem and connection revision/provider; problem
+host/slug is not duplicated. Responses correlate by `requestId`, while the
+controller verifies its current operation, local input identity and connection.
+
+`leetcode-review-assistant` owns the hint request/response schemas, prompt, and
+service. A batch contains one to three distinct, trimmed, nonblank pointers of
+at most 200 characters each. The prompt requests increasingly specific
+conceptual nudges without code or a complete answer. Structural validation does
+not establish usefulness, progressive strength, or spoiler restraint; real
+provider quality requires separate evaluation.
+
+GenAI exposes only `{ available, provider, revision }` to the content script;
+`revision` is an opaque UUID, and availability uses the selected saved provider,
+model, and key independently of automatic-assessment enablement. The private
+key-bearing connection identity remains in background memory. Selected
+provider/model/key changes rotate the revision; unselected provider keys and
+enable-only changes do not. Per-database issued/committed read ordering and a
+captured registry reset epoch prevent late configuration reads from overwriting
+a newer observation or repopulating a reset registry.
+
+Broad GenAI invalidation refetches public connection metadata; the batch
+survives when revision and selected inputs remain the same. Full local-data
+reset/restore rotates the private in-memory registry before broadcast. The
+single existing application cache listener recognizes the existing full
+replacement signature and clears cached public hint metadata after cancelling
+reads and before refetch, so a failed or hung read cannot retain ready hints.
+Ordinary Settings/provider invalidation retains cached metadata while fetching.
+Queries contain only public metadata; pointers use session memory and plain
+runtime APIs, outside query/mutation caches and persistence.
+
+`src/extension` validates strict Zod envelopes and binds generation to the
+sender's actual supported HTTPS LeetCode host and problem slug. Hints and
+automatic reports have separate tab/frame/request operation maps and owning
+cancellation; the same-host owner may cancel after SPA navigation. Reports keep
+their existing automatic cancellation rules, including assessment disable;
+hints remain independent and survive enable-only toggles. Neither operation
+can cancel the other's request.
+
+Hint preparation has a 15-second deadline. The whole background operation,
+including startup/database/configuration/key loading, generation, and the final
+connection check, is bounded at 30 seconds. The complete client operation is
+bounded at 50 seconds. A request makes at most one provider attempt with
+`maxOutputTokens: 1024`. Public connection metadata has a 20-second whole
+background deadline and a 25-second client deadline. Explicit Retry creates a
+fresh request UUID; stale-configuration/not-configured recovery refreshes
+metadata within that same client deadline. A missing connection offers Settings
+without automatic generation.
+
+Hint completion has no review, rating, correctness, solve-time, FSRS, Analytics,
+backup, or sync effects. This adds no database shape, migration, Chrome
+permission, provider host, authentication, backend, or persisted log format.
+
 ## Database And Persistence
 
 Database files live under `src/platform/db`:
@@ -960,6 +1033,15 @@ When adding or changing data dependencies:
 6. Update popup tests and any affected feature tests.
 
 ### Change Overlay Behavior
+
+Selected expanded-tab state lives in the overlay session above the visual
+modes. `ExpandedOverlay` keeps Solve, AI, and Notes panels mounted and renders
+the full review footer only in Solve. Ordinary tab switches retain native AI
+disclosures, Copy feedback, and each panel's scroll position; hidden panels and
+their controls are inaccessible. A save completed while expanded preserves the
+current tab at completion; a save completed while collapsed or docked opens
+Solve. A new problem or Restart selects Solve. AI generation stays owned by the
+session controller, and tab navigation starts no provider call or Practice write.
 
 1. Start in `src/app/overlay/overlay-app.tsx` for composition changes.
 2. Use `src/features/overlay-session` for overlay UI state, timer, page

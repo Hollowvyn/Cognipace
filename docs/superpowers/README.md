@@ -16,6 +16,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-04-openrouter-provider-design.md`](./specs/2026-10-04-openrouter-provider-design.md): approved optional OpenRouter BYOK connection and host permission, suggested editable `openrouter/free`, explicit free preset, protected key storage, structured reports, and routed-model metadata; implemented with independent SPEC/QUALITY reviews, passing automated gates and production-component browser proof; live full-report/generated-code and human installed-extension proof remain pending.
 
+- [`specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md`](./specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md): design and written spec approved for focused Solve / AI / reserved Notes tabs and separate progressive, session-only hints; both phases implemented locally with independent task reviews, passing automated checks, and production-component fixture proof; human installed-extension smoke/proof and live hint-provider quality remain pending.
+
 - [`specs/2026-10-04-analytics-combined-outcomes-restoration.md`](./specs/2026-10-04-analytics-combined-outcomes-restoration.md): user-requested additive restoration of the pooled first-recorded outcome chart beside Recall, preserving every new difficulty/time/mix view.
 
 - [`specs/2026-10-04-analytics-problem-solving-design.md`](./specs/2026-10-04-analytics-problem-solving-design.md): approved expansion of New Problem Success into one section for difficulty outcomes, recorded time, and difficulty mix; implemented as Problem Solving with passing automated checks and production-component browser proof; human installed-extension smoke remains pending.
@@ -74,6 +76,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
 
 - [`plans/2026-10-05-openrouter-provider.md`](./plans/2026-10-05-openrouter-provider.md): six-task implementation plan for shared contracts and trusted keys, the native OpenRouter adapter, runtime/permission boundaries, free/custom Settings flow, privacy/Store documentation, and automated/live/human validation. Implementation and automated gates are complete; the dated record keeps live/generated-code and human installed-extension proof pending.
+
+- [`plans/2026-10-04-overlay-focused-tabs.md`](./plans/2026-10-04-overlay-focused-tabs.md): Phase 1 selected-tab lifecycle, ShadowRoot keyboard navigation, mounted panels, Solve-only footer, and disabled AI explanation implemented and independently reviewed; automated checks and production-component fixture proof passed, human installed-extension smoke pending. See the [handoff](./handoffs/2026-10-04-overlay-focused-tabs.md).
+
+- [`plans/2026-10-04-overlay-ai-hints.md`](./plans/2026-10-04-overlay-ai-hints.md): Phase 2 progressive session-only hints implemented and independently reviewed; final automated checks and production-component fixture proof passed. Human installed-extension smoke/proof and live provider quality remain pending; saved Notes remains deferred. See the [handoff](./handoffs/2026-10-04-overlay-ai-hints.md).
 
 - [`plans/2026-10-04-analytics-combined-outcomes-restoration.md`](./plans/2026-10-04-analytics-combined-outcomes-restoration.md): combined chart restoration, canonical pooled counts, dashboard integration and focused/visual validation.
 
@@ -144,6 +150,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-04-overlay-ai-hints.md`](./handoffs/2026-10-04-overlay-ai-hints.md): reviewed Phase 2 source, exact final/historical checks, progressive-hint fixture proof, pending human installed-extension smoke and live provider quality, and release/recovery notes.
+
+- [`handoffs/2026-10-04-overlay-focused-tabs.md`](./handoffs/2026-10-04-overlay-focused-tabs.md): Phase 1 reviewed source revision, exact automated results, production-component ShadowRoot fixture proof, pending human installed-extension smoke, and release/recovery notes; Phase 2 has since been implemented locally in its separate handoff.
 
 - [`handoffs/2026-10-03-leetcode-code-analysis.md`](./handoffs/2026-10-03-leetcode-code-analysis.md): final reviewed source, exact automated results and commands, parser/deadline fixes, supplemental fixtures, and pending live provider/generated-code/human proof; no PR review/merge readiness claimed.
 

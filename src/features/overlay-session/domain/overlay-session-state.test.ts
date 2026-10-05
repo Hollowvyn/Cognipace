@@ -11,6 +11,79 @@ import {
 } from './overlay-session-state'
 
 describe('overlaySessionReducer', () => {
+  it('preserves tab selection through modes and context refresh', () => {
+    let state = overlaySessionReducer(
+      { ...initialOverlaySessionState, activeProblemSlug: 'two-sum' },
+      { type: 'set-expanded-tab', tab: 'ai' },
+    )
+
+    for (const visualMode of [
+      'expanded',
+      'collapsed',
+      'docked',
+      'collapsed',
+      'expanded',
+    ] as const) {
+      state = overlaySessionReducer(state, {
+        type: 'set-visual-mode',
+        visualMode,
+      })
+      expect(state.expandedTab).toBe('ai')
+    }
+
+    state = overlaySessionReducer(state, {
+      type: 'problem-context-refreshed',
+      problemSlug: 'two-sum',
+      selectedRating: 'good',
+      submittedSession: null,
+    })
+    expect(state.expandedTab).toBe('ai')
+  })
+
+  it.each(['collapsed', 'docked', 'expanded'] as const)(
+    'uses the completion-time visual mode %s for successful save selection',
+    (visualMode) => {
+      const saving = {
+        ...initialOverlaySessionState,
+        visualMode,
+        expandedTab: 'notes' as const,
+        reviewStatus: 'saving' as const,
+      }
+      const state = overlaySessionReducer(saving, {
+        type: 'submit-succeeded',
+        snapshot: createSubmittedSession(),
+        nextStep: null,
+        feedback: null,
+      })
+
+      expect(state.visualMode).toBe('expanded')
+      expect(state.expandedTab).toBe(
+        visualMode === 'expanded' ? 'notes' : 'solve',
+      )
+    },
+  )
+
+  it('resets tab on restart, new problem and navigation', () => {
+    const state = { ...initialOverlaySessionState, expandedTab: 'ai' as const }
+
+    expect(
+      overlaySessionReducer(state, {
+        type: 'restart-local-session',
+        selectedRating: 'good',
+      }).expandedTab,
+    ).toBe('solve')
+    expect(
+      overlaySessionReducer(state, {
+        type: 'problem-loaded',
+        problemSlug: 'two-sum',
+        selectedRating: 'good',
+      }).expandedTab,
+    ).toBe('solve')
+    expect(
+      overlaySessionReducer(state, { type: 'page-changed' }).expandedTab,
+    ).toBe('solve')
+  })
+
   it('loads a problem with the selected rating', () => {
     const state = overlaySessionReducer(
       {

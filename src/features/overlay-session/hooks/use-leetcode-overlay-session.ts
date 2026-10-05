@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 
+import { useAiHintConnection } from '@/features/genai'
 import { getLeetCodeSolveTimeTargetSeconds } from '@/features/assessment'
 import type {
   LeetCodeProblemLocation,
@@ -16,6 +17,10 @@ import {
   useLeetCodeCodeAnalysis,
   type CodeAnalysisState,
 } from './use-leetcode-code-analysis'
+import {
+  useLeetCodeCodeHints,
+  type OverlayHintState,
+} from './use-leetcode-code-hints'
 import {
   useLeetCodePageSync,
   type LeetCodeOverlayContext,
@@ -41,7 +46,12 @@ export type LeetCodeOverlaySession = {
     isOverTarget: boolean
     status: OverlayTimerStatus
   }
-  actions: OverlayReviewActions
+  actions: OverlayReviewActions & {
+    toggleHints: () => void
+    revealNextHint: () => void
+    retryHints: () => void
+  }
+  hints: OverlayHintState
   aiAnalysis: CodeAnalysisState
   retryAiAnalysis: () => void
 }
@@ -120,10 +130,25 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     onProblemLoaded: handleProblemLoaded,
   })
 
-  const analysisResetRef = useRef<() => void>(() => undefined)
-  const handleRestart = useCallback(() => {
-    analysisResetRef.current()
-  }, [])
+  const analysis = useLeetCodeCodeAnalysis({
+    activeSlug: overlay.activeProblemSlug,
+    capture: pageSync.capture,
+    enabled: pageSync.context?.aiAssessmentEnabled ?? false,
+    available: pageSync.context?.aiAssessmentAvailable ?? false,
+  })
+
+  const hintConnection = useAiHintConnection(Boolean(pageSync.location))
+  const hints = useLeetCodeCodeHints({
+    activeSlug: overlay.activeProblemSlug,
+    capture: pageSync.capture,
+    connection: hintConnection.status,
+    connectionError: hintConnection.isError,
+    readCapture: pageSync.readCapture,
+    readSyncToken: () => pageSync.syncTokenRef.current,
+    publishCapture: pageSync.publishHintCapture,
+    readConnection: hintConnection.readStatus,
+    refreshConnection: hintConnection.refresh,
+  })
 
   const actions = useOverlayReviewActions({
     contextRef: pageSync.latestContextRef,
@@ -132,7 +157,10 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     refreshContext: pageSync.refreshContext,
     syncTokenRef: pageSync.syncTokenRef,
     timer,
-    onRestart: handleRestart,
+    onRestart: () => {
+      analysis.reset()
+      hints.reset()
+    },
   })
 
   useLeetCodeSubmissionAutomation({
@@ -149,17 +177,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
   const targetSeconds = getTargetSeconds(pageSync.context)
   const elapsedSeconds = timer.elapsedSeconds
 
-  const analysis = useLeetCodeCodeAnalysis({
-    activeSlug: overlay.activeProblemSlug,
-    capture: pageSync.capture,
-    enabled: pageSync.context?.aiAssessmentEnabled ?? false,
-    available: pageSync.context?.aiAssessmentAvailable ?? false,
-  })
-
-  useEffect(() => {
-    analysisResetRef.current = analysis.reset
-  }, [analysis.reset])
-
   return {
     location: pageSync.location,
     metadata: pageSync.metadata,
@@ -173,7 +190,13 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
       isOverTarget: elapsedSeconds > targetSeconds,
       status: timer.status,
     },
-    actions,
+    actions: {
+      ...actions,
+      toggleHints: hints.toggle,
+      revealNextHint: hints.revealNext,
+      retryHints: hints.retry,
+    },
+    hints: hints.state,
     aiAnalysis: analysis.state,
     retryAiAnalysis: analysis.retry,
   }

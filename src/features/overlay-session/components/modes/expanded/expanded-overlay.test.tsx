@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -9,6 +9,161 @@ import { initialOverlaySessionState } from '../../../domain'
 import { ExpandedOverlay } from './expanded-overlay'
 
 describe('ExpandedOverlay', () => {
+  it('presents hints in Solve Help and hands off reveal and toggle actions', async () => {
+    const props = createProps({
+      view: {
+        hints: {
+          status: 'ready',
+          isOpen: true,
+          batch: { hints: ['First pointer', 'Second pointer'] },
+          revealedCount: 1,
+        },
+      },
+    })
+    render(<ExpandedOverlay {...props} />)
+    const user = userEvent.setup()
+    expect(screen.getByRole('region', { name: 'AI hints' })).toBeInTheDocument()
+    expect(screen.getByText('First pointer')).toBeInTheDocument()
+    expect(screen.queryByText('Second pointer')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reveal next hint' }))
+    await user.click(screen.getByRole('button', { name: 'Show AI hints' }))
+    expect(props.commands.onRevealNextHint).toHaveBeenCalledOnce()
+    expect(props.commands.onToggleHints).toHaveBeenCalledOnce()
+  })
+
+  it('hands off hint retry and settings from Solve Help', async () => {
+    const props = createProps({
+      view: {
+        hints: {
+          status: 'error',
+          isOpen: true,
+          code: 'auth',
+          message: 'Check AI connection.',
+          canRetry: true,
+          showSettings: true,
+        },
+      },
+    })
+    render(<ExpandedOverlay {...props} />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Retry hints' }))
+    await user.click(screen.getByRole('button', { name: 'AI settings' }))
+    expect(props.commands.onRetryHints).toHaveBeenCalledOnce()
+    expect(props.commands.onSettings).toHaveBeenCalledOnce()
+  })
+
+  it('keeps review actions in Solve and shows focused AI and Notes panels', () => {
+    const props = createProps()
+    const { rerender } = render(<ExpandedOverlay {...props} />)
+
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeVisible()
+
+    rerender(
+      <ExpandedOverlay
+        {...props}
+        view={{
+          ...props.view,
+          overlay: { ...props.view.overlay, expandedTab: 'ai' },
+        }}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull()
+    expect(screen.getByRole('region', { name: 'AI assessment' })).toBeVisible()
+
+    rerender(
+      <ExpandedOverlay
+        {...props}
+        view={{
+          ...props.view,
+          overlay: { ...props.view.overlay, expandedTab: 'notes' },
+        }}
+      />,
+    )
+
+    expect(
+      screen.getByText(
+        'A dedicated space for your problem notes, coming in a later phase.',
+      ),
+    ).toBeVisible()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull()
+  })
+
+  it('retains AI disclosure identity and scroll position when switching panels', async () => {
+    const user = userEvent.setup()
+    const props = createProps({
+      view: {
+        aiAnalysis: {
+          status: 'ready',
+          requestId: 'request-1',
+          report: makeValidAnalysis(),
+        },
+        overlay: {
+          ...initialOverlaySessionState,
+          visualMode: 'expanded',
+          expandedTab: 'ai',
+        },
+      },
+    })
+    const { rerender } = render(<ExpandedOverlay {...props} />)
+    const approach = screen.getByText('Approach', { selector: 'summary' })
+    await user.click(approach)
+    const details = approach.closest('details')
+    const scrollContainer = screen.getByRole('tabpanel', { name: /^AI/ })
+      .firstElementChild as HTMLDivElement
+    scrollContainer.scrollTop = 137
+    fireEvent.scroll(scrollContainer)
+
+    rerender(
+      <ExpandedOverlay
+        {...props}
+        view={{
+          ...props.view,
+          overlay: { ...props.view.overlay, expandedTab: 'solve' },
+        }}
+      />,
+    )
+    scrollContainer.scrollTop = 0
+    fireEvent.scroll(scrollContainer)
+    rerender(<ExpandedOverlay {...props} />)
+
+    expect(
+      screen.getByText('Approach', { selector: 'summary' }).closest('details'),
+    ).toBe(details)
+    expect(details).toHaveAttribute('open')
+    expect(scrollContainer.scrollTop).toBe(137)
+  })
+
+  it('tabs from AI into its Settings action without visiting hidden Solve controls', async () => {
+    const user = userEvent.setup()
+    renderExpanded({
+      view: {
+        aiAnalysis: {
+          status: 'unavailable',
+          message: 'Connect AI in Settings.',
+          canRetry: false,
+          showSettings: true,
+        },
+        overlay: {
+          ...initialOverlaySessionState,
+          visualMode: 'expanded',
+          expandedTab: 'ai',
+        },
+      },
+    })
+
+    screen.getByRole('tab', { name: /^AI/ }).focus()
+    await user.tab()
+
+    expect(
+      within(screen.getByRole('region', { name: 'AI assessment' })).getByRole(
+        'button',
+        { name: 'Settings' },
+      ),
+    ).toHaveFocus()
+  })
+
   it('renders the pre-submit review console', () => {
     renderExpanded()
 
@@ -138,7 +293,9 @@ describe('ExpandedOverlay', () => {
       },
     })
 
-    expect(screen.queryByLabelText('Notes')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('textbox', { name: 'Notes' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Update' })).toBeDisabled()
   })
 
@@ -155,7 +312,11 @@ describe('ExpandedOverlay', () => {
           requestId: 'request-1',
           report: makeValidAnalysis(),
         },
-        overlay: { ...createFailedSubmittedOverlay(), reviewStatus: 'saving' },
+        overlay: {
+          ...createFailedSubmittedOverlay(),
+          reviewStatus: 'saving',
+          expandedTab: 'ai',
+        },
       },
     })
     expect(
@@ -179,6 +340,11 @@ describe('ExpandedOverlay', () => {
           canRetry: true,
           showSettings: true,
         },
+        overlay: {
+          ...initialOverlaySessionState,
+          visualMode: 'expanded',
+          expandedTab: 'ai',
+        },
       },
     })
     await user.click(screen.getByRole('button', { name: 'Retry' }))
@@ -199,10 +365,12 @@ describe('ExpandedOverlay', () => {
       'Time Complexity',
       'Space Complexity',
       'Languages',
-      'Notes',
     ]) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
     }
+    expect(
+      screen.queryByRole('textbox', { name: 'Notes' }),
+    ).not.toBeInTheDocument()
   })
 })
 
@@ -225,6 +393,10 @@ function createProps(
       onResetTimer: vi.fn(),
       onRestart: vi.fn(),
       onRetryAiAnalysis: vi.fn(),
+      onToggleHints: vi.fn(),
+      onRevealNextHint: vi.fn(),
+      onRetryHints: vi.fn(),
+      onSelectExpandedTab: vi.fn(),
       onSelectRating: vi.fn(),
       onSettings: vi.fn(),
       onStartTimer: vi.fn(),
@@ -234,6 +406,7 @@ function createProps(
     },
     themeMode: 'system',
     view: {
+      hints: { status: 'idle', isOpen: false },
       aiAnalysis: { status: 'idle' },
       context: createOverlayContext(),
       elapsedSeconds: 0,

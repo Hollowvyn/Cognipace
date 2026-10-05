@@ -23,7 +23,6 @@ export function OverlayCodeAnalysis({
   onSettings,
 }: OverlayCodeAnalysisProps) {
   const headingId = useId()
-  if (state.status === 'disabled') return null
 
   return (
     <section
@@ -37,6 +36,22 @@ export function OverlayCodeAnalysis({
       >
         AI assessment
       </h3>
+      {state.status === 'disabled' ? (
+        <div className="grid min-w-0 gap-2">
+          <p className={cn(text, 'text-muted-foreground')}>
+            Automatic AI assessment is off.
+          </p>
+          <div>
+            <button
+              className={cn(button, focus)}
+              onClick={onSettings}
+              type="button"
+            >
+              Settings
+            </button>
+          </div>
+        </div>
+      ) : null}
       {state.status === 'idle' ? (
         <p className={cn(text, 'text-muted-foreground')}>
           Submit on LeetCode to get an AI assessment.

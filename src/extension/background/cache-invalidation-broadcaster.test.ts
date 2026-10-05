@@ -2,8 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { broadcastCacheInvalidation } from './cache-invalidation-broadcaster'
 
-const analysisMocks = vi.hoisted(() => ({ abortLeetCodeAnalyses: vi.fn() }))
+const analysisMocks = vi.hoisted(() => ({
+  abortLeetCodeAnalyses: vi.fn(),
+  abortLeetCodeHints: vi.fn(),
+}))
 vi.mock('./leetcode-analysis-operations', () => analysisMocks)
+const hintConnectionMocks = vi.hoisted(() => ({
+  resetAiHintConnectionRevisions: vi.fn(),
+}))
+vi.mock(
+  '@/features/genai/server/genai-settings-service',
+  () => hintConnectionMocks,
+)
 
 type LeetCodeTab = { id?: number | undefined }
 
@@ -73,6 +83,63 @@ describe('cache invalidation broadcaster', () => {
       tags: ['settings'],
     })
     expect(analysisMocks.abortLeetCodeAnalyses).not.toHaveBeenCalled()
+  })
+
+  it('preserves hints for enabled-only changes while aborting reports', async () => {
+    await broadcastCacheInvalidation({
+      reason: 'settings-updated',
+      source: 'dashboard',
+      tags: ['genai'],
+      hintConnectionChanged: false,
+    })
+    expect(analysisMocks.abortLeetCodeAnalyses).toHaveBeenCalledTimes(1)
+    expect(analysisMocks.abortLeetCodeHints).not.toHaveBeenCalled()
+  })
+
+  it('aborts only the changed provider and omits background controls from the wire', async () => {
+    const event = await broadcastCacheInvalidation({
+      reason: 'genai-updated',
+      source: 'dashboard',
+      tags: ['genai'],
+      hintProvider: 'gemini',
+      hintConnectionChanged: true,
+    })
+    expect(analysisMocks.abortLeetCodeHints).toHaveBeenCalledExactlyOnceWith(
+      'gemini',
+    )
+    expect(event).not.toHaveProperty('hintProvider')
+    expect(event).not.toHaveProperty('hintConnectionChanged')
+    for (const call of messagingMocks.sendMessage.mock.calls) {
+      expect(call[1]).not.toHaveProperty('hintProvider')
+      expect(call[1]).not.toHaveProperty('hintConnectionChanged')
+    }
+  })
+
+  it('resets revisions and aborts both operations before reset broadcasts', async () => {
+    const event = await broadcastCacheInvalidation({
+      reason: 'problem-catalog-updated',
+      source: 'dashboard',
+      tags: ['genai'],
+      hintConnectionReset: true,
+    })
+    expect(
+      hintConnectionMocks.resetAiHintConnectionRevisions,
+    ).toHaveBeenCalledTimes(1)
+    expect(analysisMocks.abortLeetCodeAnalyses).toHaveBeenCalledTimes(1)
+    expect(analysisMocks.abortLeetCodeHints).toHaveBeenCalledExactlyOnceWith(
+      undefined,
+    )
+    for (const mock of [
+      hintConnectionMocks.resetAiHintConnectionRevisions,
+      analysisMocks.abortLeetCodeAnalyses,
+      analysisMocks.abortLeetCodeHints,
+    ])
+      expect(mock.mock.invocationCallOrder[0]).toBeLessThan(
+        messagingMocks.sendMessage.mock.invocationCallOrder[0]!,
+      )
+    expect(event).not.toHaveProperty('hintConnectionReset')
+    for (const call of messagingMocks.sendMessage.mock.calls)
+      expect(call[1]).not.toHaveProperty('hintConnectionReset')
   })
 
   it('rejects malformed events before cancelling work', async () => {

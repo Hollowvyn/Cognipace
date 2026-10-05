@@ -356,13 +356,17 @@ describe('OverlayCodeAnalysis', () => {
     )
   })
 
-  it('hides disabled analysis and shows the idle submission instruction', () => {
-    const { rerender } = mount({ status: 'disabled' })
-    expect(screen.queryByRole('region')).not.toBeInTheDocument()
+  it('explains disabled analysis, opens Settings, and shows the idle submission instruction', async () => {
+    const user = userEvent.setup()
+    const { onSettings, rerender } = mount({ status: 'disabled' })
+    expect(screen.getByRole('region', { name: 'AI assessment' })).toBeVisible()
+    expect(screen.getByText('Automatic AI assessment is off.')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(onSettings).toHaveBeenCalledOnce()
     rerender({ status: 'idle' })
     expect(
       screen.getByText('Submit on LeetCode to get an AI assessment.'),
-    ).toBeInTheDocument()
+    ).toBeVisible()
   })
 
   it.each([

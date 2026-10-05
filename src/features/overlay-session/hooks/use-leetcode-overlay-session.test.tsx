@@ -10,6 +10,8 @@ import {
 import {
   analyzeLeetCodeSubmissionViaRuntime,
   cancelLeetCodeAnalysisViaRuntime,
+  generateLeetCodeHintsViaRuntime,
+  cancelLeetCodeHintsViaRuntime,
   type AnalyzeLeetCodeSubmissionResponse,
 } from '@/features/leetcode-review-assistant'
 import { makeCompleteCapture } from '@/features/leetcode-capture/testing/code-analysis-capture-fixtures'
@@ -27,6 +29,7 @@ import type {
   LeetCodeProblemMetadata,
   LeetCodeSubmissionResult,
 } from '@/lib/leetcode'
+import { invalidateTaggedQueries } from '@/platform/query/cache-invalidation'
 import { queryKeys } from '@/platform/query/query-keys'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 
@@ -105,6 +108,8 @@ vi.mock('@/features/leetcode-review-assistant', async (importOriginal) => {
     ...actual,
     analyzeLeetCodeSubmissionViaRuntime: vi.fn(),
     cancelLeetCodeAnalysisViaRuntime: vi.fn(),
+    generateLeetCodeHintsViaRuntime: vi.fn(),
+    cancelLeetCodeHintsViaRuntime: vi.fn(),
   }
 })
 
@@ -186,6 +191,14 @@ const saveReview = vi.mocked(saveReviewResultViaRuntime)
 const overrideReview = vi.mocked(overrideLastReviewResultViaRuntime)
 const loadOverlayData = vi.mocked(getOverlayAppShellDataViaRuntime)
 
+const generateHints = vi.mocked(generateLeetCodeHintsViaRuntime)
+const hintConnection = {
+  available: true,
+  provider: 'gemini',
+  revision: '11111111-1111-4111-8111-111111111111',
+} as const
+const hintPointers = ['Notice repeated lookup.', 'Consider a lookup table.']
+
 const AI_PROBE_SUMMARY = '__AI_PROBE_summary__'
 describe('useLeetCodeOverlaySession', () => {
   beforeEach(() => {
@@ -219,7 +232,213 @@ describe('useLeetCodeOverlaySession', () => {
     vi.mocked(cancelLeetCodeAnalysisViaRuntime)
       .mockReset()
       .mockResolvedValue({ requestId: 'ignored', cancelled: true })
-    vi.mocked(sendMessage).mockResolvedValue(undefined)
+    generateHints.mockReset().mockImplementation((request) =>
+      Promise.resolve({
+        status: 'ready',
+        requestId: request.requestId,
+        batch: { hints: hintPointers },
+      }),
+    )
+    vi.mocked(cancelLeetCodeHintsViaRuntime)
+      .mockReset()
+      .mockResolvedValue({ requestId: 'ignored', cancelled: true })
+    vi.mocked(sendMessage)
+      .mockReset()
+      .mockImplementation((method) =>
+        Promise.resolve(
+          method === 'genai.getHintConnection' ? hintConnection : undefined,
+        ),
+      )
+  })
+
+  it('requests hints explicitly with assessment disabled and retains them through modes, refetch, save and update', async () => {
+    const { queryClient, result } = await renderReadySession({
+      aiAssessmentEnabled: false,
+    })
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(queryKeys.genai.hintConnection()),
+      ).toEqual(hintConnection),
+    )
+    expect(generateHints).not.toHaveBeenCalled()
+    emitCompleteProblemContent()
+    await flushEffects()
+    expect(generateHints).not.toHaveBeenCalled()
+    act(() => result.current.actions.toggleHints())
+    await waitFor(() => expect(result.current.hints.status).toBe('ready'))
+    act(() => result.current.actions.revealNextHint())
+    const expected = {
+      status: 'ready',
+      isOpen: true,
+      revealedCount: 2,
+      batch: { hints: hintPointers },
+    }
+    act(() => result.current.actions.selectExpandedTab('ai'))
+    for (const action of ['collapse', 'dock', 'restore', 'expand'] as const) {
+      act(() => result.current.actions[action]())
+      expect(result.current.hints).toEqual(expected)
+    }
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.appShell.all })
+    })
+    expect(result.current.hints).toEqual(expected)
+    await runOverlayAction(result.current.actions.submitReview)
+    act(() => result.current.actions.selectRating('hard'))
+    await runOverlayAction(result.current.actions.updateReview)
+    expect(result.current.hints).toEqual(expected)
+    expect(analyze).not.toHaveBeenCalled()
+    expect(generateHints).toHaveBeenCalledOnce()
+    expect(saveReview).toHaveBeenCalledOnce()
+    expect(overrideReview).toHaveBeenCalledOnce()
+    expect(JSON.stringify(saveReview.mock.calls)).not.toContain(hintPointers[0])
+    expect(JSON.stringify(overrideReview.mock.calls)).not.toContain(
+      hintPointers[1],
+    )
+    expect(queryClient.getMutationCache().getAll()).toHaveLength(0)
+  })
+
+  it('saves immediately while hints are pending and cancels on restart without generating on navigation', async () => {
+    generateHints.mockImplementation(() => new Promise(() => {}))
+    const { queryClient, result } = await renderReadySession()
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(queryKeys.genai.hintConnection()),
+      ).toEqual(hintConnection),
+    )
+    emitCompleteProblemContent()
+    act(() => result.current.actions.toggleHints())
+    await waitFor(() => expect(generateHints).toHaveBeenCalledOnce())
+    expect(result.current.hints).toMatchObject({
+      status: 'pending',
+      phase: 'generation',
+    })
+    await runOverlayAction(result.current.actions.submitReview)
+    expect(saveReview).toHaveBeenCalledOnce()
+    expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
+    expect(result.current.hints.status).toBe('pending')
+    act(() => result.current.actions.restartLocalSession())
+    expect(result.current.hints).toEqual({ status: 'idle', isOpen: false })
+    expect(cancelLeetCodeHintsViaRuntime).toHaveBeenCalledOnce()
+    emitNextPage()
+    await flushEffects()
+    expect(result.current.hints).toEqual({ status: 'idle', isOpen: false })
+    expect(generateHints).toHaveBeenCalledOnce()
+  })
+
+  it.each(['hang', 'fail'] as const)(
+    'discards a ready hint batch during full local data replacement when metadata recovery will %s',
+    async (recovery) => {
+      const { queryClient, result } = await renderReadySession()
+      await waitFor(() =>
+        expect(
+          queryClient.getQueryData(queryKeys.genai.hintConnection()),
+        ).toEqual(hintConnection),
+      )
+      emitCompleteProblemContent()
+      act(() => result.current.actions.toggleHints())
+      await waitFor(() => expect(result.current.hints.status).toBe('ready'))
+      vi.mocked(sendMessage).mockImplementation(async (method) => {
+        if (method !== 'genai.getHintConnection') return undefined
+        if (recovery === 'fail') throw new Error('Fresh metadata unavailable')
+        return new Promise(() => {})
+      })
+      await act(async () => {
+        await invalidateTaggedQueries(
+          queryClient,
+          [
+            'settings',
+            'genai',
+            'problems',
+            'practice',
+            'queue',
+            'tracks',
+            'app-shell',
+          ],
+          { resetHintConnection: true },
+        )
+      })
+      expect(
+        queryClient.getQueryData(queryKeys.genai.hintConnection()),
+      ).toBeUndefined()
+      expect(
+        vi
+          .mocked(sendMessage)
+          .mock.calls.filter(
+            ([method]) => method === 'genai.getHintConnection',
+          ),
+      ).toHaveLength(2)
+      // Query observers schedule their React notification after cache reset.
+      await waitFor(() =>
+        expect(result.current.hints).toEqual({ status: 'idle', isOpen: false }),
+      )
+      await flushEffects()
+      expect(result.current.hints).toEqual({ status: 'idle', isOpen: false })
+      expect(generateHints).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('preserves selected tab across mode changes without AI or review calls', async () => {
+    const startTime = Date.now()
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startTime)
+    const { result } = await renderReadySession()
+
+    act(() => result.current.actions.startTimer())
+    act(() => result.current.actions.selectExpandedTab('ai'))
+
+    for (const action of [
+      'expand',
+      'collapse',
+      'dock',
+      'restore',
+      'expand',
+    ] as const) {
+      act(() => result.current.actions[action]())
+      expect(result.current.overlay.expandedTab).toBe('ai')
+      expect(result.current.timer.status).toBe('running')
+    }
+
+    for (const tab of ['notes', 'solve', 'ai'] as const) {
+      act(() => result.current.actions.selectExpandedTab(tab))
+      expect(result.current.timer.status).toBe('running')
+    }
+
+    nowSpy.mockReturnValue(startTime + 17000)
+    act(() => result.current.actions.pauseTimer())
+    expect(result.current.timer.elapsedSeconds).toBe(17)
+    expect(analyze).not.toHaveBeenCalled()
+    expect(saveReview).not.toHaveBeenCalled()
+    expect(overrideReview).not.toHaveBeenCalled()
+
+    act(() => result.current.actions.restartLocalSession())
+    expect(result.current.overlay.expandedTab).toBe('solve')
+  })
+
+  it('preserves the tab selected while a review is saving', async () => {
+    const pending = createDeferred<SerializedPracticeDetails>()
+    saveReview.mockReturnValueOnce(pending.promise)
+    const { result } = await renderReadySession()
+
+    act(() => {
+      result.current.actions.expand()
+      result.current.actions.selectExpandedTab('ai')
+    })
+
+    let saving!: Promise<void>
+    act(() => {
+      saving = result.current.actions.submitReview()
+    })
+    await waitFor(() =>
+      expect(result.current.overlay.reviewStatus).toBe('saving'),
+    )
+    act(() => result.current.actions.selectExpandedTab('notes'))
+    await act(async () => {
+      pending.resolve(createSavedPracticeDetails())
+      await saving
+    })
+
+    expect(result.current.overlay.expandedTab).toBe('notes')
+    expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
+    expect(saveReview).toHaveBeenCalledOnce()
   })
 
   it.each([
@@ -494,7 +713,13 @@ describe('useLeetCodeOverlaySession', () => {
         result.current.actions[action]()
       })
       await flushEffects()
-      expect(sendMessage).not.toHaveBeenCalled()
+      expect(
+        vi
+          .mocked(sendMessage)
+          .mock.calls.filter(
+            ([method]) => method !== 'genai.getHintConnection',
+          ),
+      ).toHaveLength(0)
       expect(saveReview).not.toHaveBeenCalled()
       expect(result.current.context?.practice?.currentLog.notes).toBe(
         'Keep this saved note.',
@@ -595,13 +820,23 @@ describe('useLeetCodeOverlaySession', () => {
       problem: { followUps: capture.problemContent.followUps },
     })
     expect(result.current.overlay.selectedRating).toBe('easy')
-    expect(sendMessage).not.toHaveBeenCalled()
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.filter(([method]) => method !== 'genai.getHintConnection'),
+    ).toHaveLength(0)
     for (const action of ['expand', 'collapse', 'dock', 'restore'] as const) {
       act(() => result.current.actions[action]())
       await flushEffects()
       expect(result.current.aiAnalysis.status).toBe('ready')
     }
+    for (const tab of ['ai', 'notes', 'solve', 'ai'] as const) {
+      act(() => result.current.actions.selectExpandedTab(tab))
+      await flushEffects()
+      expect(result.current.aiAnalysis.status).toBe('ready')
+    }
     expect(analyze).toHaveBeenCalledOnce()
+    expect(result.current.overlay.selectedRating).toBe('easy')
   })
 
   it('exposes Retry for the same pinned attempt with a new request identity', async () => {
@@ -745,6 +980,16 @@ function flushEffects() {
 function latestSavedReviewRequest() {
   expect(saveReview).toHaveBeenCalled()
   return saveReview.mock.calls.at(-1)![0]
+}
+
+function emitCompleteProblemContent() {
+  act(() =>
+    leetcodeMockState.onEvent?.({
+      type: 'problem-content-updated',
+      location: problemLocation,
+      content: makeCompleteCapture().problemContent,
+    }),
+  )
 }
 
 function emitNextPage() {

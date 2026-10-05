@@ -3,6 +3,7 @@ import type { AssessmentLockReason } from '@/features/assessment'
 import type { ReviewRating } from '@/lib/fsrs'
 
 export type OverlayVisualMode = 'collapsed' | 'expanded' | 'docked'
+export type OverlayExpandedTab = 'solve' | 'ai' | 'notes'
 export type OverlayReviewStatus =
   | 'draft'
   | 'saving'
@@ -37,6 +38,7 @@ export type OverlayNextStepState = {
 export type OverlaySessionState = {
   activeProblemSlug: string | null
   visualMode: OverlayVisualMode
+  expandedTab: OverlayExpandedTab
   reviewStatus: OverlayReviewStatus
   selectedRating: ReviewRating
   ratingLockReason: AssessmentLockReason | null
@@ -59,6 +61,7 @@ export type OverlaySessionAction =
     }
   | { type: 'page-changed' }
   | { type: 'set-visual-mode'; visualMode: OverlayVisualMode }
+  | { type: 'set-expanded-tab'; tab: OverlayExpandedTab }
   | { type: 'set-selected-rating'; rating: ReviewRating }
   | { type: 'save-started' }
   | { type: 'update-started' }
@@ -87,6 +90,7 @@ export type OverlaySessionAction =
 export const initialOverlaySessionState: OverlaySessionState = {
   activeProblemSlug: null,
   visualMode: 'collapsed',
+  expandedTab: 'solve',
   reviewStatus: 'draft',
   selectedRating: 'good',
   ratingLockReason: null,
@@ -134,6 +138,11 @@ export function overlaySessionReducer(
         ...state,
         visualMode: action.visualMode,
       }
+    case 'set-expanded-tab':
+      return {
+        ...state,
+        expandedTab: action.tab,
+      }
     case 'set-selected-rating':
       if (state.ratingLockReason) {
         return state
@@ -159,6 +168,8 @@ export function overlaySessionReducer(
       return {
         ...state,
         visualMode: 'expanded',
+        expandedTab:
+          state.visualMode === 'expanded' ? state.expandedTab : 'solve',
         reviewStatus: 'submitted-clean',
         selectedRating: action.snapshot.rating,
         ratingLockReason: action.snapshot.lockReason,
@@ -211,6 +222,7 @@ export function overlaySessionReducer(
     case 'restart-local-session':
       return {
         ...state,
+        expandedTab: 'solve',
         reviewStatus: 'draft',
         selectedRating: action.selectedRating,
         ratingLockReason: null,
