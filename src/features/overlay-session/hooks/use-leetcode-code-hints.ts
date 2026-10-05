@@ -67,6 +67,7 @@ const settingsErrors: ReadonlySet<HintErrorCode> = new Set([
   'model-unavailable',
   'not-configured',
   'stale-configuration',
+  'billing',
 ])
 type Stored = {
   scope: string

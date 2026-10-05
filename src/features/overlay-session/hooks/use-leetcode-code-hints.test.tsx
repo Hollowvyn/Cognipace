@@ -620,6 +620,7 @@ describe('explicit progressive hint sessions', () => {
     'model-unavailable',
     'not-configured',
     'stale-configuration',
+    'billing',
   ] as const)('offers Settings recovery for %s', async (code) => {
     mocks.generate.mockImplementationOnce((request) =>
       Promise.resolve({
