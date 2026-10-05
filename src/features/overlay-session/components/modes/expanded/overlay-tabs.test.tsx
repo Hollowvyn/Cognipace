@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { OverlayExpandedTab } from '../../../domain'
 import { OverlayTabs } from './overlay-tabs'
@@ -21,6 +21,57 @@ function Harness() {
 }
 
 describe('OverlayTabs', () => {
+  it('preserves selection and focus when tab statuses update', () => {
+    const onSelectTab = vi.fn()
+    const { rerender } = render(
+      <OverlayTabs
+        activeTab="ai"
+        idPrefix="test-overlay"
+        onSelectTab={onSelectTab}
+        aiStatus={null}
+        solveStatus={null}
+      />,
+    )
+    const ai = screen.getByRole('tab', { name: 'AI' })
+    const solve = screen.getByRole('tab', { name: 'Solve' })
+    const notes = screen.getByRole('tab', { name: 'Notes' })
+    ai.focus()
+    expect(ai).toHaveTextContent(/^AI$/)
+    expect(solve).toHaveTextContent(/^Solve$/)
+
+    for (const [aiStatus, solveStatus] of [
+      ['Ready', 'Working'],
+      ['Working', 'Error'],
+      ['Error', null],
+    ] as const) {
+      rerender(
+        <OverlayTabs
+          activeTab="ai"
+          idPrefix="test-overlay"
+          onSelectTab={onSelectTab}
+          aiStatus={aiStatus}
+          solveStatus={solveStatus}
+        />,
+      )
+
+      expect(ai).toHaveFocus()
+      expect(ai).toHaveAttribute('aria-selected', 'true')
+      expect(ai).toHaveAttribute('tabindex', '0')
+      expect(solve).toHaveAttribute('aria-selected', 'false')
+      expect(solve).toHaveAttribute('tabindex', '-1')
+      expect(notes).toHaveAttribute('aria-selected', 'false')
+      expect(notes).toHaveAttribute('tabindex', '-1')
+      expect(ai).toHaveTextContent(new RegExp(`^AI${aiStatus}$`))
+      expect(solve).toHaveTextContent(new RegExp(`^Solve${solveStatus ?? ''}$`))
+      expect(within(ai).getByText(aiStatus)).toBeVisible()
+      if (solveStatus) {
+        expect(within(solve).getByText(solveStatus)).toBeVisible()
+      }
+      expect(notes).toHaveTextContent(/^Notes$/)
+      expect(onSelectTab).not.toHaveBeenCalled()
+    }
+  })
+
   it('selects tabs with keyboard navigation, wraps, and leaves one tab stop', async () => {
     const user = userEvent.setup()
     render(<Harness />)
