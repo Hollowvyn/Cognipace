@@ -222,6 +222,70 @@ describe('useLeetCodeOverlaySession', () => {
     vi.mocked(sendMessage).mockResolvedValue(undefined)
   })
 
+  it('preserves selected tab across mode changes without AI or review calls', async () => {
+    const startTime = Date.now()
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startTime)
+    const { result } = await renderReadySession()
+
+    act(() => result.current.actions.startTimer())
+    act(() => result.current.actions.selectExpandedTab('ai'))
+
+    for (const action of [
+      'expand',
+      'collapse',
+      'dock',
+      'restore',
+      'expand',
+    ] as const) {
+      act(() => result.current.actions[action]())
+      expect(result.current.overlay.expandedTab).toBe('ai')
+      expect(result.current.timer.status).toBe('running')
+    }
+
+    for (const tab of ['notes', 'solve', 'ai'] as const) {
+      act(() => result.current.actions.selectExpandedTab(tab))
+      expect(result.current.timer.status).toBe('running')
+    }
+
+    nowSpy.mockReturnValue(startTime + 17000)
+    act(() => result.current.actions.pauseTimer())
+    expect(result.current.timer.elapsedSeconds).toBe(17)
+    expect(analyze).not.toHaveBeenCalled()
+    expect(saveReview).not.toHaveBeenCalled()
+    expect(overrideReview).not.toHaveBeenCalled()
+
+    act(() => result.current.actions.restartLocalSession())
+    expect(result.current.overlay.expandedTab).toBe('solve')
+  })
+
+  it('preserves the tab selected while a review is saving', async () => {
+    const pending = createDeferred<SerializedPracticeDetails>()
+    saveReview.mockReturnValueOnce(pending.promise)
+    const { result } = await renderReadySession()
+
+    act(() => {
+      result.current.actions.expand()
+      result.current.actions.selectExpandedTab('ai')
+    })
+
+    let saving!: Promise<void>
+    act(() => {
+      saving = result.current.actions.submitReview()
+    })
+    await waitFor(() =>
+      expect(result.current.overlay.reviewStatus).toBe('saving'),
+    )
+    act(() => result.current.actions.selectExpandedTab('notes'))
+    await act(async () => {
+      pending.resolve(createSavedPracticeDetails())
+      await saving
+    })
+
+    expect(result.current.overlay.expandedTab).toBe('notes')
+    expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
+    expect(saveReview).toHaveBeenCalledOnce()
+  })
+
   it.each([
     ['quick submit', 'prepareQuickSubmit', null, 'good', null, {}],
     [

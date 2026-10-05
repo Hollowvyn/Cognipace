@@ -10,6 +10,7 @@ import type { CodeAnalysisState } from '../../../hooks/use-leetcode-code-analysi
 
 import {
   hasSubmittedSessionChanges,
+  type OverlayExpandedTab,
   type OverlaySessionState,
 } from '../../../domain'
 import type { OverlayTimerStatus } from '../../../hooks/use-overlay-timer'
@@ -47,6 +48,7 @@ type ExpandedOverlayCommands = {
   onResetTimer: () => void
   onRestart: () => void
   onRetryAiAnalysis: () => void
+  onSelectExpandedTab: (tab: OverlayExpandedTab) => void
   onSelectRating: (rating: ReviewRating) => void
   onSettings: () => void
   onStartTimer: () => void

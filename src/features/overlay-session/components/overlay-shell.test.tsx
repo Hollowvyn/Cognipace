@@ -31,7 +31,11 @@ vi.mock('./modes/expanded/expanded-overlay', () => ({
       problemTitle: string
       aiAnalysis: CodeAnalysisState
     }
-    commands: { onRetryAiAnalysis: () => void; onSettings: () => void }
+    commands: {
+      onRetryAiAnalysis: () => void
+      onSelectExpandedTab: (tab: 'solve' | 'ai' | 'notes') => void
+      onSettings: () => void
+    }
   }) => (
     <div
       data-help-search-query={view.helpSearchQuery ?? 'unavailable'}
@@ -40,6 +44,9 @@ vi.mock('./modes/expanded/expanded-overlay', () => ({
     >
       <button onClick={commands.onRetryAiAnalysis}>Retry AI</button>
       <button onClick={commands.onSettings}>AI Settings</button>
+      <button onClick={() => commands.onSelectExpandedTab('ai')}>
+        Select AI tab
+      </button>
       <span>Analysis: {view.aiAnalysis?.status ?? 'missing'}</span>
       <span>
         Expanded mode: {view.problemTitle}: {themeMode}; Help query:{' '}
@@ -50,6 +57,18 @@ vi.mock('./modes/expanded/expanded-overlay', () => ({
 }))
 
 describe('OverlayShell', () => {
+  it('wires expanded-tab selection to the session action', async () => {
+    const user = userEvent.setup()
+    const session = createSession({
+      overlay: { ...initialOverlaySessionState, visualMode: 'expanded' },
+    })
+
+    render(<OverlayShell {...session} />)
+    await user.click(screen.getByRole('button', { name: 'Select AI tab' }))
+
+    expect(session.actions.selectExpandedTab).toHaveBeenCalledWith('ai')
+  })
+
   it.each([
     ['collapsed', 'Collapsed mode: light'],
     ['expanded', 'Expanded mode: Two Sum: light; Help query: Two Sum'],
@@ -232,6 +251,7 @@ function createSession(
       restartLocalSession: vi.fn(),
       restore: vi.fn(),
       saveLeetCodeSubmissionResult: vi.fn(),
+      selectExpandedTab: vi.fn(),
       selectRating: vi.fn(),
       startTimer: vi.fn(),
       submitReview: vi.fn(),

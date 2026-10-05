@@ -225,6 +225,7 @@ function createProps(
       onResetTimer: vi.fn(),
       onRestart: vi.fn(),
       onRetryAiAnalysis: vi.fn(),
+      onSelectExpandedTab: vi.fn(),
       onSelectRating: vi.fn(),
       onSettings: vi.fn(),
       onStartTimer: vi.fn(),

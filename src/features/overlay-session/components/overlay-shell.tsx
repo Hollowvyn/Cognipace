@@ -48,6 +48,7 @@ export function OverlayShell({
           onResetTimer: actions.resetTimer,
           onRestart: actions.restartLocalSession,
           onRetryAiAnalysis: retryAiAnalysis,
+          onSelectExpandedTab: actions.selectExpandedTab,
           onSelectRating: actions.selectRating,
           onSettings: actions.openSettings,
           onStartTimer: actions.startTimer,
