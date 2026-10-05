@@ -182,6 +182,15 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 
 ## CogniPace LeetCode Analysis Rules
 
+- Place focused Solve / AI / Notes text tabs below the shared header and problem
+  context. Keep the full review footer only in Solve so AI has reading height.
+- Make the selected tab explicit and retain visible keyboard focus. Support
+  Left/Right wrapping and Home/End selection with paired tab panels and one tab
+  stop in the tab list; hidden panels must exclude their controls from focus.
+  Current-status cues are passive and do not navigate or start work.
+- Retain each panel's scroll position and open native AI disclosures across
+  ordinary tab switches. Keep Notes as a reserved future placeholder without
+  suggesting an editor or saved notes.
 - Use Option A inside the expanded overlay: a concise summary, Approach /5,
   Efficiency /5, and Code Style /5. Do not add an overall average or recall
   rating to the report.
@@ -205,7 +214,7 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   messages with Settings/Retry when useful. Report disclosure, collapse, and
   docking do not trigger more API calls. Clearing/resetting keeps a retained
   handled attempt idle until explicit Retry.
-- Keep manual review controls available while analysis is pending and preserve
+- Keep manual review controls available in Solve while analysis is pending and preserve
   deterministic ratings, locks, correctness, timing, FSRS, and track guidance.
   Reports remain session-only and never become saved review fields.
 

@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md`](./specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md): design and written spec approved for focused Solve / AI / reserved Notes tabs and separate progressive, session-only hints; both phase plans authored, focused tab implementation in progress, hint implementation follows Phase 1.
+- [`specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md`](./specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md): design and written spec approved for focused Solve / AI / reserved Notes tabs and separate progressive, session-only hints; both phase plans authored and reviewed; Phase 1 source, automated checks, and production-component fixture proof are complete, human installed-extension smoke is pending, and Phase 2 hint execution is next.
 
 - [`specs/2026-10-04-analytics-combined-outcomes-restoration.md`](./specs/2026-10-04-analytics-combined-outcomes-restoration.md): user-requested additive restoration of the pooled first-recorded outcome chart beside Recall, preserving every new difficulty/time/mix view.
 
@@ -69,7 +69,9 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
-- [`plans/2026-10-04-overlay-focused-tabs.md`](./plans/2026-10-04-overlay-focused-tabs.md): Phase 1 plan for selected-tab lifecycle, ShadowRoot keyboard navigation, mounted panels, Solve-only footer, disabled AI explanation and required automated/human validation; execution pending.
+- [`plans/2026-10-04-overlay-focused-tabs.md`](./plans/2026-10-04-overlay-focused-tabs.md): Phase 1 selected-tab lifecycle, ShadowRoot keyboard navigation, mounted panels, Solve-only footer, and disabled AI explanation implemented and independently reviewed; automated checks and production-component fixture proof passed, human installed-extension smoke pending. See the [handoff](./handoffs/2026-10-04-overlay-focused-tabs.md).
+
+- [`plans/2026-10-04-overlay-ai-hints.md`](./plans/2026-10-04-overlay-ai-hints.md): authored and reviewed Phase 2 plan for progressive session-only hints; execution pending after Phase 1. Hints and saved Notes are outside the current implementation.
 
 - [`plans/2026-10-04-analytics-combined-outcomes-restoration.md`](./plans/2026-10-04-analytics-combined-outcomes-restoration.md): combined chart restoration, canonical pooled counts, dashboard integration and focused/visual validation.
 
@@ -140,6 +142,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-04-overlay-focused-tabs.md`](./handoffs/2026-10-04-overlay-focused-tabs.md): Phase 1 reviewed source revision, exact automated results, production-component ShadowRoot fixture proof, pending human installed-extension smoke, and release/recovery notes; Phase 2 hint execution remains pending.
 
 - [`handoffs/2026-10-03-leetcode-code-analysis.md`](./handoffs/2026-10-03-leetcode-code-analysis.md): final reviewed source, exact automated results and commands, parser/deadline fixes, supplemental fixtures, and pending live provider/generated-code/human proof; no PR review/merge readiness claimed.
 

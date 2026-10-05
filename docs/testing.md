@@ -1221,7 +1221,8 @@ this checklist has passed.
 2. Confirm the CogniPace overlay appears after page context is read.
 3. Start, pause, and reset the timer.
 4. Expand the overlay. Confirm Structured Log, Interview Pattern, Time
-   Complexity, Space Complexity, Languages, and Notes controls are absent.
+   Complexity, Space Complexity, Languages, and Notes editing controls are absent.
+   The reserved Notes tab contains only a placeholder.
 5. Focus the Help shelf’s YouTube action, confirm its tooltip, activate it, and
    confirm a new tab opens with the current problem title.
 6. From `chrome://extensions`, reload the CogniPace extension to clear its
@@ -1252,6 +1253,44 @@ For this behavior-changing overlay update, a human engineer must run the title
 happy path, slug-fallback edge path, and structured-log removal/preservation
 flows above and attach screenshot or screen-recording proof before PR review or
 merge. Automated checks do not replace that proof.
+
+#### Focused overlay tabs
+
+Status: **HUMAN INSTALLED-EXTENSION SMOKE PENDING** until the human engineer
+attaches proof. Automated and production-component fixture evidence is recorded
+in [the Phase 1 handoff](superpowers/handoffs/2026-10-04-overlay-focused-tabs.md);
+it does not complete these installed-extension checks.
+
+- [ ] Open a problem and expand into Solve. Verify submission dates, timer,
+      assessment, Help, and review controls, then save and check feedback and
+      next-step guidance.
+- [ ] Select AI and Notes. Confirm the full review footer is absent, every AI
+      state has useful text and Settings/Retry where appropriate, and Notes has
+      a placeholder with no editor or save action.
+- [ ] Open AI disclosures, scroll, switch through Solve and Notes, and return to
+      AI. Verify open disclosures, Copy feedback, and panel scroll positions
+      remain. Replace the report and confirm its disclosures start closed.
+- [ ] In the actual content-script ShadowRoot, use Left/Right, Home/End, and Tab.
+      Verify wrapping, visible focus, paired panels, one tab-list stop, and no
+      hidden Solve/AI controls in the focus sequence.
+- [ ] Change tabs during a delayed save. Confirm completion preserves the tab
+      selected at completion while expanded. Complete saves while collapsed and
+      docked and confirm they open Solve.
+- [ ] Collapse and dock from AI and Notes, then restore. Verify the selected tab
+      and report remain. Navigate to a new problem and use Restart; both select
+      Solve.
+- [ ] Exercise accepted and failed autosaves, quick and manual untimed reviews,
+      rating updates, strict overtime, AI off/unavailable/pending/error, and
+      next-step errors. Verify rating locks, elapsed time, a single attempt,
+      historical-log fields, and review guidance remain correct. Also run the
+      existing historical-log preservation and real-submission analysis checks
+      in this document.
+- [ ] At 392px and 320px widths and a short viewport, inspect long literal code.
+      Verify vertical scrolling belongs to the selected panel, Solve's footer
+      remains reachable, and horizontal overflow belongs only to the code block.
+- [ ] Attach human-run happy-path and edge-case screenshots or a screen recording
+      before PR review or merge. Record the installed extension version and
+      exact tested flows with the proof.
 
 #### LeetCode Submission Capture
 

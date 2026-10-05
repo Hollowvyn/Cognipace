@@ -936,6 +936,15 @@ When adding or changing data dependencies:
 
 ### Change Overlay Behavior
 
+Selected expanded-tab state lives in the overlay session above the visual
+modes. `ExpandedOverlay` keeps Solve, AI, and Notes panels mounted and renders
+the full review footer only in Solve. Ordinary tab switches retain native AI
+disclosures, Copy feedback, and each panel's scroll position; hidden panels and
+their controls are inaccessible. A save completed while expanded preserves the
+current tab at completion; a save completed while collapsed or docked opens
+Solve. A new problem or Restart selects Solve. AI generation stays owned by the
+session controller, and tab navigation starts no provider call or Practice write.
+
 1. Start in `src/app/overlay/overlay-app.tsx` for composition changes.
 2. Use `src/features/overlay-session` for overlay UI state, timer, page
    sync, submission automation, and review actions.

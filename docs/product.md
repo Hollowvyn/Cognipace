@@ -86,7 +86,12 @@ Current behavior:
 - target-time awareness
 - quick submit preparation from the collapsed state
 - expanded submit, fail, update, restart, and rating controls
-- focused review controls without structured-log or notes editing
+- focused Solve, AI, and reserved Notes tabs in expanded mode
+- timer, assessment, submission dates, Help, review actions, feedback, and
+  next-step guidance in Solve; the full review footer appears only in Solve
+- existing completed-submission analysis in AI, with loading, error, unavailable,
+  and disabled explanations plus Settings and Retry where useful
+- a reserved Notes placeholder without editing or persistence
 - settings access from the overlay
 - compact expanded-mode Help access that opens a YouTube search for the current problem in a new tab
 - page metadata and problem context sync through content-script/runtime messages
