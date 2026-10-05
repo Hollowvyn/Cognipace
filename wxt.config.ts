@@ -71,6 +71,10 @@ export default defineConfig({
   },
   vite: () => ({
     plugins: [tailwindcss()],
+    optimizeDeps: {
+      // WXT recreates dist during startup; scan only source entrypoints.
+      entries: ['src/entrypoints/**/*.html'],
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
