@@ -601,6 +601,8 @@ it('changes revision for a new model but treats surrounding model whitespace as 
 })
 ```
 
+- [ ] **Ordering/reset regressions:** Add deferred tests proving an old-model read that resumes after a newer-model read cannot replace the newer public revision, and a read started before local reset cannot populate the replacement registry. Fresh reads must not wait for a suspended older read. Return late snapshots with their own matching configuration/identity and an uncached revision when needed.
+
 - [ ] **Step 2: Run `rtk npm test -- src/features/genai/server/genai-settings-service.test.ts --run`.** Expected: missing connection-only function failure.
 - [ ] **Step 3: Create the public metadata contract.**
 
@@ -625,24 +627,45 @@ export type HintConnectionStatus = z.infer<typeof hintConnectionStatusSchema>
 ```ts
 let hintConnectionRevisions = new WeakMap<
   Db,
-  { identity: string; revision: string }
+  {
+    issuedRead: number
+    committedRead: number
+    observation: { identity: string; revision: string } | null
+  }
 >()
+
 export function resetAiHintConnectionRevisions(): void {
   hintConnectionRevisions = new WeakMap()
 }
 
-/** Trusted identity is private. Public revision is unrelated random data. */
-export async function readAiHintConnectionSnapshot(db: Db) {
-  const { aiAssessment: ai } = await getSettings(db)
+/** Trusted memory only: keep identity private; public revisions are unrelated UUIDs. */
+export async function readAiHintConnectionSnapshot(db: Db): Promise<{
+  config: GenAiProviderConfig | null
+  identity: string
+  status: HintConnectionStatus
+}> {
+  const registry = hintConnectionRevisions
+  let state = registry.get(db)
+  if (!state) {
+    state = { issuedRead: 0, committedRead: 0, observation: null }
+    registry.set(db, state)
+  }
+  const readOrder = ++state.issuedRead
+  const settings = await getSettings(db)
+  const ai = settings.aiAssessment
   const model = ai.model.trim()
   const saved = await loadAiProviderSecretSnapshotFromTrustedStorage(
     ai.provider,
   )
   const identity = JSON.stringify([ai.provider, model, saved?.identity ?? null])
-  let observed = hintConnectionRevisions.get(db)
-  if (!observed || observed.identity !== identity) {
-    observed = { identity, revision: crypto.randomUUID() }
-    hintConnectionRevisions.set(db, observed)
+  const observed = state.observation
+  const revision =
+    observed?.identity === identity ? observed.revision : crypto.randomUUID()
+  // Late reads retain their own snapshot without replacing newer observations.
+  // Reads begun before reset cannot write into the replacement registry.
+  if (registry === hintConnectionRevisions && readOrder > state.committedRead) {
+    state.committedRead = readOrder
+    state.observation = { identity, revision }
   }
   const config: GenAiProviderConfig | null =
     model && saved
@@ -651,10 +674,12 @@ export async function readAiHintConnectionSnapshot(db: Db) {
   const status: HintConnectionStatus = {
     available: config !== null,
     provider: ai.provider,
-    revision: observed.revision,
+    revision,
   }
+
   return { config, identity, status }
 }
+
 export async function getAiHintConnectionStatus(
   db: Db,
 ): Promise<HintConnectionStatus> {
@@ -1172,7 +1197,7 @@ it('binds hint input to the actual HTTPS problem and permits owned cancellation 
 
 ## Task 6: protocol, handlers, and precise connection invalidation
 
-**Files:** Modify `src/extension/messaging.ts`, `background/register-handlers.ts`, `background/cache-invalidation-broadcaster.ts` and their existing tests. Create `src/features/leetcode-review-assistant/api/code-hint-api.ts`, `code-hint-api.test.ts`; append root feature exports. This task completes the runtime changes begun in Task 5.
+**Files:** Modify `src/extension/messaging.ts`, `background/register-handlers.ts`, `background/cache-invalidation-broadcaster.ts` and their existing tests. Create `src/features/leetcode-review-assistant/api/code-hint-api.ts`, `code-hint-api.test.ts`; append root feature exports. This task completes the runtime changes begun in Task 5. Also modify `src/app/providers/cache-invalidation-listener.tsx`, its test, `src/platform/query/cache-invalidation.ts`, and its test for the reviewed reset-recovery correction.
 
 - [ ] **Step 1: Add these typed imports, protocol entries and name-inventory entries.** In `messaging.ts`, add the imports below; add the method signatures inside `ProtocolMap` and the three exact method strings to `protocolMethodNames`.
 
@@ -1332,6 +1357,10 @@ Add `hintConnectionReset: true` to the existing `broadcastDataManagementInvalida
 // In broadcastDataManagementInvalidation's existing argument:
 hintConnectionReset: true,
 ```
+
+- [ ] **Step 3b: Clear public cached connection metadata on full local data replacement.** The sole app cache listener recognizes the existing event signature: dashboard source, `problem-catalog-updated` reason, and every tag in `settings`, `genai`, `problems`, `practice`, `queue`, `tracks`, `app-shell`. Pass `{ resetHintConnection: true }` as an optional third argument to `invalidateTaggedQueries` only for that signature. Normal events preserve the existing call and cache behavior. The platform helper accepts the local option without importing app or extension code. After existing GenAI query cancellations settle, invoke `void queryClient.resetQueries({ queryKey: queryKeys.genai.hintConnection(), exact: true })`, then schedule ordinary invalidations. Do not await replacement refetch: completion remains cancellation/scheduling only. No new wire fields, listener, hint cache, or persistence.
+
+Add real QueryObserver regressions: cached and active-observer metadata clear before a hanging/failed replacement read; the old signal aborts and its late response cannot resurrect data; invalidation completion does not await that read; exactly one replacement fetch starts. Ordinary GenAI invalidation retains cached metadata on failure. App listener tests recognize full replacement and reject normal/incomplete/wrong-source events. This closes a confirmed P2 gap where reset/restore ready batches otherwise survived indefinitely after metadata reload failure; trusted revision rotation alone could only clear them after a successful reload.
 
 - [ ] **Step 4: Extend existing broadcaster mock and add the exact independence tests.** Change `analysisMocks` to include `abortLeetCodeHints: vi.fn()` and append:
 
@@ -1570,8 +1599,8 @@ vi.mock('./runtime-policy', async (original) => ({
 }))
 ```
 
-- [ ] **Step 7: Run `rtk npm test -- src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/runtime-policy.test.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.test.ts src/features/genai/server/genai-settings-service.test.ts --run`, then `rtk npm run check`.** Expected: focused tests pass, protocol inventories match, complete runtime/controller prerequisites type-check. Investigate any existing mock import shape failure before proceeding; do not hide it as an unrelated test failure.
-- [ ] **Step 8: Commit Tasks 5–6 together:** `rtk git add src/extension/messaging.ts src/extension/background/runtime-policy.ts src/extension/background/runtime-policy.test.ts src/extension/background/leetcode-analysis-operations.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/cache-invalidation-broadcaster.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.ts src/extension/background/register-handlers.test.ts src/features/leetcode-review-assistant/api/code-hint-api.ts src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/features/leetcode-review-assistant/index.ts`; `rtk git commit -m "feat(runtime): authorize and isolate manual hint requests"`.
+- [ ] **Step 7: Run `rtk npm test -- src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/runtime-policy.test.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.test.ts src/features/genai/server/genai-settings-service.test.ts src/platform/query/cache-invalidation.test.ts src/app/providers/cache-invalidation-listener.test.tsx --run`, then `rtk npm run check`.** Expected: focused tests pass, protocol inventories match, complete runtime/controller prerequisites type-check. Investigate any existing mock import shape failure before proceeding; do not hide it as an unrelated test failure.
+- [ ] **Step 8: Commit Tasks 5–6 together:** `rtk git add src/extension/messaging.ts src/extension/background/runtime-policy.ts src/extension/background/runtime-policy.test.ts src/extension/background/leetcode-analysis-operations.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/cache-invalidation-broadcaster.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.ts src/extension/background/register-handlers.test.ts src/features/leetcode-review-assistant/api/code-hint-api.ts src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/features/leetcode-review-assistant/index.ts src/app/providers/cache-invalidation-listener.tsx src/app/providers/cache-invalidation-listener.test.tsx src/platform/query/cache-invalidation.ts src/platform/query/cache-invalidation.test.ts`; `rtk git commit -m "feat(runtime): authorize and isolate manual hint requests"`.
 
 ## Task 7: session-owned explicit hint controller
 
@@ -2595,6 +2624,8 @@ it('starts with a compact AI action, disables duplicate generation, and provides
 })
 ```
 
+- [ ] **Reset recovery integration regression:** With a real Query cache and a ready hint batch, invoke the full data replacement metadata-reset path, then hang/fail the new public metadata read. The session must immediately become idle, discard the old batch, and make no automatic generation request. This covers the reviewed Task 6 reset correction through the real session/controller integration.
+
 - [ ] **Step 2: Run `rtk npm test -- src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.test.tsx --run`.** Expected: missing hints/session actions and Help props failures.
 - [ ] **Step 3: Add the exact session integration regions.** Import `useAiHintConnection` from the GenAI root and `useLeetCodeCodeHints, type OverlayHintState` from `./use-leetcode-code-hints`. Replace the public `actions` field and add the `hints` field:
 
@@ -2966,6 +2997,10 @@ metadata. Background invalidation preserves hint operations on enable-only
 changes while keeping automatic report cancellation intact.
 Local reset/restore explicitly rotates the trusted in-memory revision registry
 before broadcasting, so ready batches clear even if connection values match.
+The sole app cache listener also clears cached public hint metadata for full
+data replacement before scheduling refetch, so failed or hanging reloads cannot
+retain ready batches. Ordinary settings/provider invalidation preserves cached
+metadata while refetching.
 
 The extension authorizes generation from the actual HTTPS LeetCode problem
 sender and binds host/slug. Hints have a separate tab/frame/request owner scope
@@ -3107,7 +3142,7 @@ this handoff.
 - [ ] **Step 6: Format the exact changed files, then run the required complete gates below.** Expected: all commands exit zero; ordinary tests skip opt-in provider evaluation. `npm run check` includes DB migration checks, WXT preparation, TypeScript, ESLint and the full test suite. There are no schema/migration changes, so do not run `db:generate` or modify a migration. The explicit ignore override includes plans and proof docs even when local ignore rules change.
 
 ```sh
-rtk npx prettier --ignore-path /dev/null --write src/features/leetcode-review-assistant/domain/code-hint-schema.ts src/features/leetcode-review-assistant/api/code-hint-contracts.ts src/features/leetcode-review-assistant/api/code-hint-contracts.test.ts src/features/leetcode-review-assistant/api/code-hint-api.ts src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/features/leetcode-review-assistant/index.ts src/features/leetcode-review-assistant/server/code-hint-service.ts src/features/leetcode-review-assistant/server/code-hint-service.test.ts src/features/leetcode-review-assistant/server/hint-runtime-service.ts src/features/leetcode-review-assistant/server/hint-runtime-service.test.ts src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts src/features/leetcode-review-assistant/testing/code-hint-evaluation-fixtures.ts src/features/leetcode-capture/api/prepare-code-hint-context.ts src/features/leetcode-capture/api/prepare-code-hint-context.test.ts src/features/leetcode-capture/index.ts src/features/leetcode-capture/server/leetcode-capture-service.ts src/features/leetcode-capture/server/leetcode-capture-service.cache.test.ts src/features/genai/api/hint-connection-contracts.ts src/features/genai/api/hint-connection-hooks.ts src/features/genai/server/genai-settings-service.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/index.ts src/platform/query/query-keys.ts src/platform/query/cache-invalidation.ts src/extension/messaging.ts src/extension/background/runtime-policy.ts src/extension/background/runtime-policy.test.ts src/extension/background/leetcode-analysis-operations.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/cache-invalidation-broadcaster.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.ts src/extension/background/register-handlers.test.ts src/features/overlay-session/hooks/use-leetcode-code-hints.ts src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx src/features/overlay-session/hooks/use-leetcode-page-sync.ts src/features/overlay-session/hooks/use-leetcode-overlay-session.ts src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/overlay-shell.tsx src/features/overlay-session/components/overlay-shell.test.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.test.tsx src/features/overlay-session/components/modes/expanded/overlay-hint-block.tsx docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/plans/2026-10-04-overlay-ai-hints.md docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md
+rtk npx prettier --ignore-path /dev/null --write src/app/providers/cache-invalidation-listener.tsx src/app/providers/cache-invalidation-listener.test.tsx src/platform/query/cache-invalidation.test.ts src/features/leetcode-review-assistant/domain/code-hint-schema.ts src/features/leetcode-review-assistant/api/code-hint-contracts.ts src/features/leetcode-review-assistant/api/code-hint-contracts.test.ts src/features/leetcode-review-assistant/api/code-hint-api.ts src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/features/leetcode-review-assistant/index.ts src/features/leetcode-review-assistant/server/code-hint-service.ts src/features/leetcode-review-assistant/server/code-hint-service.test.ts src/features/leetcode-review-assistant/server/hint-runtime-service.ts src/features/leetcode-review-assistant/server/hint-runtime-service.test.ts src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts src/features/leetcode-review-assistant/testing/code-hint-evaluation-fixtures.ts src/features/leetcode-capture/api/prepare-code-hint-context.ts src/features/leetcode-capture/api/prepare-code-hint-context.test.ts src/features/leetcode-capture/index.ts src/features/leetcode-capture/server/leetcode-capture-service.ts src/features/leetcode-capture/server/leetcode-capture-service.cache.test.ts src/features/genai/api/hint-connection-contracts.ts src/features/genai/api/hint-connection-hooks.ts src/features/genai/server/genai-settings-service.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/index.ts src/platform/query/query-keys.ts src/platform/query/cache-invalidation.ts src/extension/messaging.ts src/extension/background/runtime-policy.ts src/extension/background/runtime-policy.test.ts src/extension/background/leetcode-analysis-operations.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/cache-invalidation-broadcaster.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.ts src/extension/background/register-handlers.test.ts src/features/overlay-session/hooks/use-leetcode-code-hints.ts src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx src/features/overlay-session/hooks/use-leetcode-page-sync.ts src/features/overlay-session/hooks/use-leetcode-overlay-session.ts src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/overlay-shell.tsx src/features/overlay-session/components/overlay-shell.test.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.test.tsx src/features/overlay-session/components/modes/expanded/overlay-hint-block.tsx docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/plans/2026-10-04-overlay-ai-hints.md docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md
 ```
 
 ```sh
