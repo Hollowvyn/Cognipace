@@ -10,6 +10,7 @@ type TestAppDbOptions = {
     handle: TestDbHandle,
     context: TestPublishContext,
   ) => Promise<void>
+  validateCurrentData: (handle: TestDbHandle) => Promise<void>
 }
 type TestReconciliationOptions = {
   legacy: boolean
@@ -26,11 +27,17 @@ const appDbMocks = vi.hoisted(() => ({
         options: TestReconciliationOptions,
       ) => Promise<void>
     >(),
+  preparePracticeStorage: vi.fn<(db: TestDbHandle['db']) => Promise<void>>(),
+  validatePracticeStorage: vi.fn<(db: TestDbHandle['db']) => Promise<void>>(),
 }))
 
 vi.mock('@/platform/db', () => ({ getAppDb: appDbMocks.getAppDb }))
 vi.mock('@/features/problems/data/topic-reconciliation', () => ({
   reconcileTopicTaxonomy: appDbMocks.reconcileTopicTaxonomy,
+}))
+vi.mock('@/features/practice/server/practice-storage-service', () => ({
+  preparePracticeStorage: appDbMocks.preparePracticeStorage,
+  validatePracticeStorage: appDbMocks.validatePracticeStorage,
 }))
 
 import { getBackgroundDb } from './app-db'
@@ -47,6 +54,8 @@ describe('background app database bridge', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     appDbMocks.reconcileTopicTaxonomy.mockResolvedValue(undefined)
+    appDbMocks.preparePracticeStorage.mockResolvedValue(undefined)
+    appDbMocks.validatePracticeStorage.mockResolvedValue(undefined)
     appDbMocks.getAppDb.mockImplementation(async ({ beforePublish }) => {
       await beforePublish(handle, {
         kind: 'fresh',
@@ -105,5 +114,35 @@ describe('background app database bridge', () => {
 
     await expect(getBackgroundDb()).resolves.toBe(handle)
     expect(appDbMocks.reconcileTopicTaxonomy).not.toHaveBeenCalled()
+    expect(appDbMocks.preparePracticeStorage).toHaveBeenCalledWith(handle.db)
+  })
+
+  it('prepares Practice after taxonomy and supplies read-only current validation', async () => {
+    const order: string[] = []
+    appDbMocks.reconcileTopicTaxonomy.mockImplementation(() => {
+      order.push('taxonomy')
+      return Promise.resolve()
+    })
+    appDbMocks.preparePracticeStorage.mockImplementation(() => {
+      order.push('practice')
+      return Promise.resolve()
+    })
+    appDbMocks.validatePracticeStorage.mockImplementation(() => {
+      order.push('validate')
+      return Promise.resolve()
+    })
+    await getBackgroundDb()
+    const options = appDbMocks.getAppDb.mock.calls[0]![0]
+    await options.validateCurrentData(handle)
+    expect(order).toEqual(['taxonomy', 'practice', 'validate'])
+    const failure = new Error('invalid Practice metadata')
+    appDbMocks.validatePracticeStorage.mockRejectedValue(failure)
+    await expect(options.validateCurrentData(handle)).rejects.toBe(failure)
+  })
+
+  it('propagates preparation failure before publication', async () => {
+    const failure = new Error('partial Practice evidence')
+    appDbMocks.preparePracticeStorage.mockRejectedValue(failure)
+    await expect(getBackgroundDb()).rejects.toBe(failure)
   })
 })
