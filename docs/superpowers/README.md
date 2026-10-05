@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-04-openrouter-provider-design.md`](./specs/2026-10-04-openrouter-provider-design.md): approved optional OpenRouter BYOK connection and host permission, suggested editable `openrouter/free`, explicit free preset, protected key storage, structured reports, and routed-model metadata; written-spec review and implementation planning are next, with implementation and live/human proof pending.
+
 - [`specs/2026-10-04-analytics-combined-outcomes-restoration.md`](./specs/2026-10-04-analytics-combined-outcomes-restoration.md): user-requested additive restoration of the pooled first-recorded outcome chart beside Recall, preserving every new difficulty/time/mix view.
 
 - [`specs/2026-10-04-analytics-problem-solving-design.md`](./specs/2026-10-04-analytics-problem-solving-design.md): approved expansion of New Problem Success into one section for difficulty outcomes, recorded time, and difficulty mix; implemented as Problem Solving with passing automated checks and production-component browser proof; human installed-extension smoke remains pending.
