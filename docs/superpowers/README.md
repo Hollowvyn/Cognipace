@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md`](./specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md): design and written spec approved for focused Solve / AI / reserved Notes tabs and separate progressive, session-only hints; Phase 1 plan authored, Phase 2 planning in progress, application implementation pending.
+- [`specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md`](./specs/2026-10-04-tabbed-overlay-and-ai-hints-design.md): design and written spec approved for focused Solve / AI / reserved Notes tabs and separate progressive, session-only hints; both phase plans authored, focused tab implementation in progress, hint implementation follows Phase 1.
 
 - [`specs/2026-10-04-analytics-combined-outcomes-restoration.md`](./specs/2026-10-04-analytics-combined-outcomes-restoration.md): user-requested additive restoration of the pooled first-recorded outcome chart beside Recall, preserving every new difficulty/time/mix view.
 

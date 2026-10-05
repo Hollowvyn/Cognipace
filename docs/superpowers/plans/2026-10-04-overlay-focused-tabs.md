@@ -185,15 +185,15 @@ it('preserves selected tab across mode changes without AI or review calls', asyn
   ] as const) {
     act(() => result.current.actions[action]())
     expect(result.current.overlay.expandedTab).toBe('ai')
-    expect(result.current.timerStatus).toBe('running')
+    expect(result.current.timer.status).toBe('running')
   }
   for (const tab of ['notes', 'solve', 'ai'] as const) {
     act(() => result.current.actions.selectExpandedTab(tab))
-    expect(result.current.timerStatus).toBe('running')
+    expect(result.current.timer.status).toBe('running')
   }
   nowSpy.mockReturnValue(startTime + 17000)
   act(() => result.current.actions.pauseTimer())
-  expect(result.current.elapsedSeconds).toBe(17)
+  expect(result.current.timer.elapsedSeconds).toBe(17)
   expect(analyze).not.toHaveBeenCalled()
   expect(saveReview).not.toHaveBeenCalled()
   expect(overrideReview).not.toHaveBeenCalled()
@@ -263,19 +263,20 @@ onSelectExpandedTab: vi.fn(),
 
 - [ ] Extend the shell test's mocked ExpandedOverlay command type and markup with the following additions, then add its wiring assertion.
 
-```tsx
-// The mocked ExpandedOverlay commands type:
-onSelectExpandedTab: (tab: 'solve' | 'ai' | 'notes') =>
-  void (
-    (
-      // Inside the mock's existing <div>:
-      <button onClick={() => commands.onSelectExpandedTab('ai')}>
-        Select AI tab
-      </button>
-    )
-  )
+```text
+// Add this property inside the mocked ExpandedOverlay commands type:
+onSelectExpandedTab: (tab: 'solve' | 'ai' | 'notes') => void
+```
 
-// Inside the shell describe block:
+```tsx
+// Add inside the mock's existing <div>:
+<button onClick={() => commands.onSelectExpandedTab('ai')}>
+  Select AI tab
+</button>
+```
+
+```tsx
+// Add inside the shell describe block:
 it('wires expanded-tab selection to the session action', async () => {
   const user = userEvent.setup()
   const session = createSession({
