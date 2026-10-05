@@ -11,6 +11,10 @@ export {
   type BackupSummary,
 } from './api/backup-contracts'
 export {
+  prepareFullBackupRestore,
+  type PreparedBackupRestore,
+} from './domain/backup-preflight'
+export {
   downloadBackupFile,
   restoreFullBackupViaRuntime,
   useExportFullBackup,

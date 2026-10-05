@@ -167,6 +167,10 @@ const validBackup = {
       problemPractice: [],
       fsrsCards: [],
       reviewAttempts: [],
+      schedulerProfiles: [],
+      reviewEvidence: [],
+      generations: [],
+      commandReceipts: [],
     },
     tracks: {
       tracks: [],

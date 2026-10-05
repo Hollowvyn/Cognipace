@@ -355,6 +355,10 @@ const validBackup = {
     problemTopics: [{ problemSlug: 'two-sum', topicId: 'array' }],
     problemCompanies: [{ problemSlug: 'two-sum', companyId: 'meta' }],
     practice: {
+      schedulerProfiles: [],
+      reviewEvidence: [],
+      generations: [],
+      commandReceipts: [],
       problemPractice: [
         {
           problemSlug: 'two-sum',

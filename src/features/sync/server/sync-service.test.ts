@@ -37,6 +37,10 @@ const backup: BackupFile = {
       problemPractice: [],
       fsrsCards: [],
       reviewAttempts: [],
+      schedulerProfiles: [],
+      reviewEvidence: [],
+      generations: [],
+      commandReceipts: [],
     },
     tracks: {
       tracks: [],
@@ -466,6 +470,11 @@ describe('sync service', () => {
       schemaVersion: 3,
       data: {
         ...backup.data,
+        practice: {
+          problemPractice: backup.data.practice.problemPractice,
+          fsrsCards: backup.data.practice.fsrsCards,
+          reviewAttempts: backup.data.practice.reviewAttempts,
+        },
         topics: [
           {
             id: 'array',
@@ -522,7 +531,7 @@ describe('sync service', () => {
     )
   })
 
-  it('pullLatest preserves a v5 external-progress policy in envelope v1', async () => {
+  it('pullLatest preserves a current external-progress policy in envelope v1', async () => {
     const harness = createHarness()
     harness.setMetadata({
       enabled: true,
@@ -565,6 +574,11 @@ describe('sync service', () => {
       schemaVersion: 4,
       data: {
         ...current.data,
+        practice: {
+          problemPractice: current.data.practice.problemPractice,
+          fsrsCards: current.data.practice.fsrsCards,
+          reviewAttempts: current.data.practice.reviewAttempts,
+        },
         tracks: {
           ...current.data.tracks,
           tracks: current.data.tracks.tracks.map((track) =>
