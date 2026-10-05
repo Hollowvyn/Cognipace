@@ -98,6 +98,46 @@ function renderSection(
 beforeEach(() => vi.clearAllMocks())
 
 describe('AiAssessmentSection', () => {
+  it('keeps the active summary while browsing saved keys and makes activation independent of testing', async () => {
+    renderSection({ model: 'custom-openai' }, 'ready', {
+      openai: true,
+      openrouter: true,
+    })
+    await screen.findByText('OpenAI · custom-openai')
+    const user = userEvent.setup()
+    expect(
+      screen.getByRole('button', { name: 'Save & make active' }),
+    ).toBeDisabled()
+    await user.click(screen.getByRole('radio', { name: 'OpenRouter' }))
+    expect(screen.getByText('OpenAI · custom-openai')).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Test connection' }),
+    ).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Make active' }))
+    await screen.findByText('OpenRouter · openrouter/free')
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.testConnection',
+      expect.anything(),
+    )
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.setAiProviderSecret',
+      expect.anything(),
+    )
+    expect(
+      screen.getByRole('button', { name: 'Save & make active' }),
+    ).toBeDisabled()
+    vi.mocked(sendMessage).mockClear()
+    await user.click(screen.getByRole('button', { name: 'Test connection' }))
+    await screen.findByText('Connected to OpenRouter · openrouter/free.')
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'settings.updateSettings',
+      expect.anything(),
+    )
+    expect(
+      screen.getByRole('switch', { name: 'AI assessment' }),
+    ).not.toBeChecked()
+  })
+
   it('describes automatic code analysis independently of connection testing', async () => {
     renderSection()
     await screen.findByText('No saved key')
@@ -122,6 +162,7 @@ describe('AiAssessmentSection', () => {
     expect(screen.getByRole('radio', { name: 'Gemini' })).toBeVisible()
     expect(screen.getByRole('radio', { name: 'OpenRouter' })).toBeVisible()
     await screen.findByText('No saved key')
+    expect(screen.getByText('No active provider')).toBeVisible()
   })
 
   it('leaves the initial blank model blank and explains the unsaved suggestion', async () => {
@@ -134,7 +175,7 @@ describe('AiAssessmentSection', () => {
     )
     expect(
       screen.getByText(
-        'Enter a model to save and test the connection. The suggestion is not saved.',
+        'Enter a model to save the connection. The suggestion is not saved.',
       ),
     ).toBeVisible()
     expect(
@@ -146,6 +187,9 @@ describe('AiAssessmentSection', () => {
     renderSection({ model: 'custom-model' }, 'loading')
     expect(screen.getByText('Loading saved key…')).toBeVisible()
     expect(screen.queryByText('No saved key')).toBeNull()
+    expect(
+      screen.queryByText('The active provider has no saved key.'),
+    ).toBeNull()
     expect(
       screen.getByRole('button', { name: 'Test connection' }),
     ).toBeDisabled()
@@ -163,16 +207,20 @@ describe('AiAssessmentSection', () => {
     ).toBeDisabled()
   })
 
-  it('saves a masked key and model with one connection action then shows verified feedback', async () => {
+  it('saves a masked key and model, then verifies it with the separate test action', async () => {
     renderSection({ model: 'custom-model' })
     await screen.findByText('No saved key')
     const user = userEvent.setup()
     const input = screen.getByLabelText('OpenAI API key')
     expect(input).toHaveAttribute('type', 'password')
     await user.type(input, 'local-key')
-    await user.click(
-      screen.getByRole('button', { name: 'Save & test connection' }),
+    await user.click(screen.getByRole('button', { name: 'Save & make active' }))
+    await screen.findByText('Active provider: OpenAI · custom-model.')
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.testConnection',
+      expect.anything(),
     )
+    await user.click(screen.getByRole('button', { name: 'Test connection' }))
     await screen.findByText('Connected to OpenAI · custom-model.')
     expect(sendMessage).toHaveBeenCalledWith('genai.setAiProviderSecret', {
       surface: 'dashboard',
@@ -185,6 +233,10 @@ describe('AiAssessmentSection', () => {
     ).toBeEnabled()
     await user.click(screen.getByRole('button', { name: 'Remove key' }))
     await screen.findByText('OpenAI key removed.')
+    expect(screen.getByText('OpenAI · custom-model')).toBeVisible()
+    expect(
+      screen.getByText('The active provider has no saved key.'),
+    ).toBeVisible()
     expect(screen.queryByText('Connected to OpenAI · custom-model.')).toBeNull()
     expect(
       screen.getByRole('switch', { name: 'AI assessment' }),
@@ -217,9 +269,7 @@ describe('AiAssessmentSection', () => {
     vi.mocked(sendMessage).mockRejectedValueOnce(
       new Error('private provider details'),
     )
-    await user.click(
-      screen.getByRole('button', { name: 'Save & test connection' }),
-    )
+    await user.click(screen.getByRole('button', { name: 'Save & make active' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not save the connection. Your changes are ready to retry.',
     )
@@ -303,7 +353,7 @@ describe('AiAssessmentSection', () => {
       screen.queryByText('Connected to OpenRouter · vendor/custom-model:free.'),
     ).toBeNull()
     expect(
-      screen.getByRole('button', { name: 'Save & test connection' }),
+      screen.getByRole('button', { name: 'Save & make active' }),
     ).toBeEnabled()
     expect(
       screen.getByRole('switch', { name: 'AI assessment' }),
@@ -327,16 +377,11 @@ describe('AiAssessmentSection', () => {
       'private-openrouter-key',
     )
     let finish: (() => void) | undefined
+    const original = vi.mocked(sendMessage).getMockImplementation()!
     vi.mocked(sendMessage).mockImplementationOnce(
-      () =>
+      (method, payload) =>
         new Promise((resolve) => {
-          finish = () =>
-            resolve({
-              openai: false,
-              anthropic: false,
-              gemini: false,
-              openrouter: true,
-            })
+          finish = () => resolve(original(method, payload))
         }),
     )
     fireEvent.submit(screen.getByRole('form', { name: 'AI connection' }))
@@ -353,6 +398,14 @@ describe('AiAssessmentSection', () => {
     await user.click(screen.getByRole('button', { name: 'Use free models' }))
     expect(screen.getByLabelText('Model')).toHaveValue('vendor/custom-model')
     finish?.()
+    await screen.findByText(
+      'Active provider: OpenRouter · vendor/custom-model.',
+    )
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.testConnection',
+      expect.anything(),
+    )
+    await user.click(screen.getByRole('button', { name: 'Test connection' }))
     await screen.findByText('Connected to OpenRouter · vendor/custom-model.')
     expect(
       screen.getByRole('button', { name: 'Use free models' }),

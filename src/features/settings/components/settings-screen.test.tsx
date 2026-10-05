@@ -405,7 +405,7 @@ describe('SettingsScreen', () => {
       model: 'vendor/custom-openrouter-model:free',
     },
   ] as const)(
-    'saves and tests $label independently of dirty preferences and persists on remount',
+    'saves and explicitly tests $label independently of dirty preferences and persists on remount',
     async ({ provider, label, suggestion, model }) => {
       const user = userEvent.setup()
       let stored = defaultUserSettings
@@ -460,6 +460,10 @@ describe('SettingsScreen', () => {
         'local-test-key',
       )
       await user.keyboard('{Enter}')
+      await screen.findByText(`Active provider: ${label} · ${model}.`)
+      expect(calls).toEqual(['key', 'settings'])
+      expect(screen.getByText(`${label} · ${model}`)).toBeVisible()
+      await user.click(screen.getByRole('button', { name: 'Test connection' }))
       await screen.findByText(`Connected to ${label} · ${model}.`)
       expect(calls).toEqual(['key', 'settings', 'test'])
       expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
@@ -486,6 +490,7 @@ describe('SettingsScreen', () => {
         expect(screen.getByLabelText('Model')).toHaveValue(model),
       )
       expect(screen.getByRole('radio', { name: label })).toBeChecked()
+      expect(screen.getByText(`${label} · ${model}`)).toBeVisible()
       expect(screen.getByText('Saved key · not tested')).toBeVisible()
       expect(screen.queryByText(`Connected to ${label} · ${model}.`)).toBeNull()
     },

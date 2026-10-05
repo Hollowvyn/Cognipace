@@ -170,7 +170,7 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   suggests `openrouter/free`. Saved custom models stay visible exactly; a
   blank reset model stays blank. Show **Use free models** only for OpenRouter,
   beside the model field, as a draft-only action. It clears test feedback,
-  requires explicit saving/testing, and is disabled behind the shared operation
+  requires explicit saving/activation, and is disabled behind the shared operation
   gate. Discard restores the saved model.
 - Mask entered keys and show availability only for the selected provider. Clear
   the input after saving and when switching providers. Keep Remove key, the
@@ -179,8 +179,16 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   with a provider-data-policy link. External links use the established new-tab
   attributes. Keep the existing compact row/input/status/panel tokens.
 
-- Use Save & test connection for edits and Test connection for an unchanged
-  connection. Name the current save/test step and disable conflicting controls.
+- Keep an Active provider row visible with the saved provider/model while the
+  editor browses other providers. Show empty/loading states and missing active
+  key availability separately. Returning to the active provider restores its
+  saved custom model; other providers use their editable suggestions.
+- Keep two separate buttons: Test connection and Save & make active. Use Make
+  active for another provider with a saved key and no replacement key entered.
+  Disable saving the unchanged active connection. Testing checks the saved
+  active connection without writes; saving/activation sends no provider request.
+  Disable testing unsaved edits with a hint to save or activate first. Name the
+  current save/test step and disable conflicting controls.
 - Show a compact inline success or actionable error. A failed test keeps saved
   configuration visible, and replacing configuration clears old verification.
 - Keep AI assessment enablement separate. Testing works while assessment is off,
