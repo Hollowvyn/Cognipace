@@ -8,10 +8,10 @@ OpenRouter connection, the user's own OpenRouter API key, an editable model
 field with `openrouter/free` suggested when selecting OpenRouter, and a
 **Use free models** action that restores that suggestion.
 
-This document records the approved design. Implementation, provider evaluation,
-and human installed-extension proof have not been performed. The next workflow
-step is review of this written specification, followed by a phase-sized
-implementation plan.
+The user approved proceeding from this written specification to implementation
+planning. The [implementation plan](../plans/2026-10-05-openrouter-provider.md)
+records concrete tasks and validation. Implementation, provider evaluation,
+and human installed-extension proof have not been performed.
 
 ## Goal
 
@@ -281,7 +281,7 @@ revert; do not delete unrelated saved user data or keys.
 - [Current AI testing requirements](../../testing.md#ai-connection-and-assessment-settings)
 - [Validation authority](../../agent-governance.md#validation-selection)
 
-## Planning Validation Record
+## Design-Writing Validation Record
 
 Only this specification and its planning-index entry changed. Self-review
 confirmed the approved UX, permission, ownership, failure handling, and proof
