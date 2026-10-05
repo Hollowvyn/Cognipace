@@ -14,6 +14,25 @@
 **Execution branch:** `codex/overlay-tabs-design`, based on current main when brainstorming began.
 **Phase boundary:** This plan ships tabs and a reserved Notes placeholder. The AI hint action belongs to [Phase 2](./2026-10-04-overlay-ai-hints.md). Do not add hint runtime work or a Notes editor here.
 
+## Execution status — 2026-10-05
+
+All six local implementation tasks passed independent SPEC and QUALITY review.
+Automated checks and production-component fixture proof passed; see the
+[Phase 1 handoff](../handoffs/2026-10-04-overlay-focused-tabs.md). Phase 2 is now
+implemented locally; its [handoff](../handoffs/2026-10-04-overlay-ai-hints.md)
+records the final source validation. Required human installed-extension smoke
+and screenshot/recording proof remain pending, so neither phase is PR review or
+merge ready. The final whole-implementation review is being completed.
+
+Checked steps record implemented behavior and equivalent executed validation;
+the handoffs contain the exact commands, outcomes, and reviewed corrections.
+The original `npm ci` preflight is left unchecked because its historical result
+was not captured in the execution ledger. Existing dependencies were verified
+with the pinned Node 24.20.0/npm 11.19.0 toolchain and successful full checks;
+no reinstall was needed at final validation. The human evidence gate remains
+unchecked. The Phase 1 instruction to leave Phase 2 pending describes its
+historical handoff, before the separately approved Phase 2 execution.
+
 ## Preparation and file ownership
 
 Read the current authority docs and use `cognipace-agent-workflow` and `cognipace-bulletproof-react`. Prefix shell commands with `rtk`. Preserve unrelated work and recheck status before execution. Use the existing attached task worktree; creating another checkout is unnecessary.
@@ -29,9 +48,9 @@ Read the current authority docs and use `cognipace-agent-workflow` and `cognipac
 
 All paths in the task map below are relative to `src/features/overlay-session` unless written in full. No dependency, permission, database, runtime contract, or provider change is required.
 
-- [ ] Confirm a clean/task-owned checkout with `rtk git status --short --branch`.
+- [x] Confirm a clean/task-owned checkout with `rtk git status --short --branch`.
 - [ ] Install the pinned toolchain dependencies with `rtk proxy npm ci` before application checks. This worktree had no `node_modules` during design. Node/npm pins are in `.nvmrc` and `package.json`.
-- [ ] Keep the existing disclosure/report fixtures and saved-log preservation tests; do not replace them with snapshots.
+- [x] Keep the existing disclosure/report fixtures and saved-log preservation tests; do not replace them with snapshots.
 
 ## Task 1: Model selected tab and save completion rules
 
@@ -41,7 +60,7 @@ All paths in the task map below are relative to `src/features/overlay-session` u
 - Modify: `src/features/overlay-session/domain/index.ts`
 - Test: `src/features/overlay-session/domain/overlay-session-state.test.ts`
 
-- [ ] Add these tests inside the existing reducer describe block. Existing `createSubmittedSession` supplies its unchanged snapshot fixture.
+- [x] Add these tests inside the existing reducer describe block. Existing `createSubmittedSession` supplies its unchanged snapshot fixture.
 
 ```ts
 it('preserves tab selection through modes and context refresh', () => {
@@ -117,8 +136,8 @@ it('resets tab on restart, new problem and navigation', () => {
 })
 ```
 
-- [ ] Run `rtk proxy npm test -- src/features/overlay-session/domain/overlay-session-state.test.ts --run`. Expect failure because selected-tab state/action is absent.
-- [ ] Add the following declarations and reducer cases at the indicated existing locations. Existing page-changed/problem-loaded returns already use the initial state.
+- [x] Run `rtk proxy npm test -- src/features/overlay-session/domain/overlay-session-state.test.ts --run`. Expect failure because selected-tab state/action is absent.
+- [x] Add the following declarations and reducer cases at the indicated existing locations. Existing page-changed/problem-loaded returns already use the initial state.
 
 ```ts
 // Export beside OverlayVisualMode.
@@ -147,9 +166,9 @@ expandedTab: 'solve',
 type OverlayExpandedTab,
 ```
 
-- [ ] Leave rating, next-step, feedback, timer and saved-review fields intact. Existing spreads preserve selection for update/failure/context refresh.
-- [ ] Rerun the same focused command; expect all reducer tests to pass.
-- [ ] Stage and commit only these task files.
+- [x] Leave rating, next-step, feedback, timer and saved-review fields intact. Existing spreads preserve selection for update/failure/context refresh.
+- [x] Rerun the same focused command; expect all reducer tests to pass.
+- [x] Stage and commit only these task files.
 
 ```sh
 rtk git add src/features/overlay-session/domain/overlay-session-state.ts src/features/overlay-session/domain/index.ts src/features/overlay-session/domain/overlay-session-state.test.ts
@@ -167,7 +186,7 @@ rtk git commit -m "feat(overlay): retain selected tab across session transitions
 - Modify: `src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx` (command fixture)
 - Test: `src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx`
 
-- [ ] Add the following session tests inside its existing describe block. All shown mocks and helpers exist in that file.
+- [x] Add the following session tests inside its existing describe block. All shown mocks and helpers exist in that file.
 
 ```ts
 it('preserves selected tab across mode changes without AI or review calls', async () => {
@@ -229,8 +248,8 @@ it('preserves the tab selected while a review is saving', async () => {
 })
 ```
 
-- [ ] Run `rtk proxy npm test -- src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx --run`. Expect failure at the missing selection command.
-- [ ] Import `type OverlayExpandedTab` from `../domain` in review actions and add the complete selection interface/function/return member.
+- [x] Run `rtk proxy npm test -- src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx --run`. Expect failure at the missing selection command.
+- [x] Import `type OverlayExpandedTab` from `../domain` in review actions and add the complete selection interface/function/return member.
 
 ```ts
 // OverlayReviewActions:
@@ -245,7 +264,7 @@ function selectExpandedTab(tab: OverlayExpandedTab) {
 selectExpandedTab,
 ```
 
-- [ ] Wire the expanded command and update typed test fixtures. Add `type OverlayExpandedTab` to the expanded module's domain import.
+- [x] Wire the expanded command and update typed test fixtures. Add `type OverlayExpandedTab` to the expanded module's domain import.
 
 ```ts
 // ExpandedOverlayCommands:
@@ -261,7 +280,7 @@ selectExpandedTab: vi.fn(),
 onSelectExpandedTab: vi.fn(),
 ```
 
-- [ ] Extend the shell test's mocked ExpandedOverlay command type and markup with the following additions, then add its wiring assertion.
+- [x] Extend the shell test's mocked ExpandedOverlay command type and markup with the following additions, then add its wiring assertion.
 
 ```text
 // Add this property inside the mocked ExpandedOverlay commands type:
@@ -288,8 +307,8 @@ it('wires expanded-tab selection to the session action', async () => {
 })
 ```
 
-- [ ] Run `rtk proxy npm test -- src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/overlay-shell.test.tsx --run`; expect pass with no new AI/review requests.
-- [ ] Stage and commit only these task files.
+- [x] Run `rtk proxy npm test -- src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/overlay-shell.test.tsx --run`; expect pass with no new AI/review requests.
+- [x] Stage and commit only these task files.
 
 ```sh
 rtk git add src/features/overlay-session/hooks/use-overlay-review-actions.ts src/features/overlay-session/components/overlay-shell.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.tsx src/features/overlay-session/components/overlay-shell.test.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx
@@ -303,7 +322,7 @@ rtk git commit -m "feat(overlay): wire focused tab selection to session actions"
 - Create: `src/features/overlay-session/components/modes/expanded/overlay-tabs.tsx`
 - Create/Test: `src/features/overlay-session/components/modes/expanded/overlay-tabs.test.tsx`
 
-- [ ] Create the test file with this complete source.
+- [x] Create the test file with this complete source.
 
 ```tsx
 import { fireEvent, render, screen, within } from '@testing-library/react'
@@ -381,8 +400,8 @@ describe('OverlayTabs', () => {
 })
 ```
 
-- [ ] Run `rtk proxy npm test -- src/features/overlay-session/components/modes/expanded/overlay-tabs.test.tsx --run`; expect missing-module failure.
-- [ ] Create the component with this complete source. Use refs, not document-wide ID lookup, for keyboard focus.
+- [x] Run `rtk proxy npm test -- src/features/overlay-session/components/modes/expanded/overlay-tabs.test.tsx --run`; expect missing-module failure.
+- [x] Create the component with this complete source. Use refs, not document-wide ID lookup, for keyboard focus.
 
 ```tsx
 import { useRef, type KeyboardEvent } from 'react'
@@ -481,8 +500,8 @@ export function OverlayTabs({
 }
 ```
 
-- [ ] Rerun the same focused command; expect arrow wrapping, Home/End, roving tab stop, ID pairing and real ShadowRoot focus assertions to pass.
-- [ ] Stage and commit only these task files.
+- [x] Rerun the same focused command; expect arrow wrapping, Home/End, roving tab stop, ID pairing and real ShadowRoot focus assertions to pass.
+- [x] Stage and commit only these task files.
 
 ```sh
 rtk git add src/features/overlay-session/components/modes/expanded/overlay-tabs.tsx src/features/overlay-session/components/modes/expanded/overlay-tabs.test.tsx
@@ -496,7 +515,7 @@ rtk git commit -m "feat(overlay): add accessible focused tab navigation"
 - Modify: `src/features/overlay-session/components/modes/expanded/expanded-overlay.tsx`
 - Test: `src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx`
 
-- [ ] Add `fireEvent` and `within` to the existing Testing Library import and add these tests. They use the existing `createProps`, `makeValidAnalysis`, and initial state. Render directly because `renderExpanded` currently returns void.
+- [x] Add `fireEvent` and `within` to the existing Testing Library import and add these tests. They use the existing `createProps`, `makeValidAnalysis`, and initial state. Render directly because `renderExpanded` currently returns void.
 
 ```tsx
 it('keeps the full footer only on Solve and makes Notes a placeholder', () => {
@@ -607,8 +626,8 @@ it('moves Tab into the active AI panel while skipping hidden Solve controls', as
 })
 ```
 
-- [ ] Run `rtk proxy npm test -- src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx --run`. Expect missing tabs/panels and footer-visibility failures.
-- [ ] Replace expanded-overlay.tsx with this complete composition. Existing child components remain the behavior owners.
+- [x] Run `rtk proxy npm test -- src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx --run`. Expect missing tabs/panels and footer-visibility failures.
+- [x] Replace expanded-overlay.tsx with this complete composition. Existing child components remain the behavior owners.
 
 ```tsx
 import { AlertCircle, Info } from 'lucide-react'
@@ -909,7 +928,7 @@ export function ExpandedOverlay({
 }
 ```
 
-- [ ] Update the two existing AI report/recovery tests to select AI in their overlay fixture; the default is now Solve. Make their complete overlay overrides:
+- [x] Update the two existing AI report/recovery tests to select AI in their overlay fixture; the default is now Solve. Make their complete overlay overrides:
 
 ```ts
 // Scored report test:
@@ -927,7 +946,7 @@ overlay: {
 },
 ```
 
-- [ ] Change the failed-attempt test's Notes assertion to the following line. In the structured-log absence test, replace its field loop with the following complete loop and assertion. The reserved tab remains present; editable fields remain absent.
+- [x] Change the failed-attempt test's Notes assertion to the following line. In the structured-log absence test, replace its field loop with the following complete loop and assertion. The reserved tab remains present; editable fields remain absent.
 
 ```ts
 // Failed-attempt test:
@@ -945,9 +964,9 @@ for (const label of [
 expect(screen.queryByRole('textbox', { name: 'Notes' })).not.toBeInTheDocument()
 ```
 
-- [ ] Rerun the same focused command. Expect pass for existing Solve flows and new panel/disclosure/scroll/hidden-control keyboard behavior.
-- [ ] Confirm browser smoke will verify actual scroll restoration and hidden controls; JSDOM cannot prove physical layout. No width/anchor CSS change is part of this task.
-- [ ] Stage and commit only these task files.
+- [x] Rerun the same focused command. Expect pass for existing Solve flows and new panel/disclosure/scroll/hidden-control keyboard behavior.
+- [x] Confirm browser smoke will verify actual scroll restoration and hidden controls; JSDOM cannot prove physical layout. No width/anchor CSS change is part of this task.
+- [x] Stage and commit only these task files.
 
 ```sh
 rtk git add src/features/overlay-session/components/modes/expanded/expanded-overlay.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx
@@ -962,7 +981,7 @@ rtk git commit -m "feat(overlay): separate Solve footer from AI and Notes panels
 - Test: `src/features/overlay-session/components/modes/expanded/overlay-code-analysis.test.tsx`
 - Test: `src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx`
 
-- [ ] Replace the existing "hides disabled analysis" test with this complete test.
+- [x] Replace the existing "hides disabled analysis" test with this complete test.
 
 ```tsx
 it('explains disabled assessment and links to Settings', async () => {
@@ -979,8 +998,8 @@ it('explains disabled assessment and links to Settings', async () => {
 })
 ```
 
-- [ ] Run `rtk proxy npm test -- src/features/overlay-session/components/modes/expanded/overlay-code-analysis.test.tsx --run`; expect the new disabled region assertion to fail.
-- [ ] Remove the exact early return `if (state.status === 'disabled') return null`. Insert this complete branch after the existing AI assessment heading; use the module's existing `text`, `button`, `focus`, and `cn` constants.
+- [x] Run `rtk proxy npm test -- src/features/overlay-session/components/modes/expanded/overlay-code-analysis.test.tsx --run`; expect the new disabled region assertion to fail.
+- [x] Remove the exact early return `if (state.status === 'disabled') return null`. Insert this complete branch after the existing AI assessment heading; use the module's existing `text`, `button`, `focus`, and `cn` constants.
 
 ```tsx
 {
@@ -1003,7 +1022,7 @@ it('explains disabled assessment and links to Settings', async () => {
 }
 ```
 
-- [ ] In the existing session test "runs one scored report for a full matching attempt without preselecting a rating", add this loop after its existing mode loop.
+- [x] In the existing session test "runs one scored report for a full matching attempt without preselecting a rating", add this loop after its existing mode loop.
 
 ```ts
 for (const tab of ['ai', 'notes', 'solve', 'ai'] as const) {
@@ -1015,9 +1034,9 @@ expect(analyze).toHaveBeenCalledOnce()
 expect(result.current.overlay.selectedRating).toBe('easy')
 ```
 
-- [ ] Run `rtk proxy npm test -- src/features/overlay-session/components/modes/expanded/overlay-code-analysis.test.tsx src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx --run`; expect all existing report replacement/copy/cancellation and review preservation tests to remain green.
-- [ ] Keep passive cues generic: danger feedback can also mean Settings/context failure, so "Error" must not claim every danger is a failed save. Do not add unread state or automatic focus/tab changes.
-- [ ] Stage and commit only these task files.
+- [x] Run `rtk proxy npm test -- src/features/overlay-session/components/modes/expanded/overlay-code-analysis.test.tsx src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx --run`; expect all existing report replacement/copy/cancellation and review preservation tests to remain green.
+- [x] Keep passive cues generic: danger feedback can also mean Settings/context failure, so "Error" must not claim every danger is a failed save. Do not add unread state or automatic focus/tab changes.
+- [x] Stage and commit only these task files.
 
 ```sh
 rtk git add src/features/overlay-session/components/modes/expanded/overlay-code-analysis.tsx src/features/overlay-session/components/modes/expanded/overlay-code-analysis.test.tsx src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx
@@ -1035,7 +1054,7 @@ rtk git commit -m "feat(overlay): explain inactive AI feedback without changing 
 - Create: `docs/superpowers/handoffs/2026-10-04-overlay-focused-tabs.md`
 - Modify: `docs/superpowers/README.md` (phase status and handoff links)
 
-- [ ] In product.md's LeetCode Overlay behavior list, replace the focused-review bullet with this current Phase 1 description after implementation:
+- [x] In product.md's LeetCode Overlay behavior list, replace the focused-review bullet with this current Phase 1 description after implementation:
 
 ```md
 - focused Solve / AI / Notes tabs in expanded mode
@@ -1046,7 +1065,7 @@ rtk git commit -m "feat(overlay): explain inactive AI feedback without changing 
 - a reserved Notes placeholder without editing or persistence
 ```
 
-- [ ] Add this paragraph to architecture.md's Change Overlay Behavior recipe:
+- [x] Add this paragraph to architecture.md's Change Overlay Behavior recipe:
 
 ```md
 Expanded-tab selection belongs to overlay-session state above the visual modes.
@@ -1058,7 +1077,7 @@ AI generation stays in the session controller and tab navigation makes no
 provider or practice writes.
 ```
 
-- [ ] Add the following Phase 1 direction to design.md's LeetCode analysis rules:
+- [x] Add the following Phase 1 direction to design.md's LeetCode analysis rules:
 
 ```md
 - Use focused Solve / AI / Notes tabs below the shared overlay header/context.
@@ -1070,7 +1089,7 @@ provider or practice writes.
   or imply that the placeholder saves notes.
 ```
 
-- [ ] Extend docs/testing.md's overlay flow with this exact manual checklist, retaining existing historical-log preservation and real submission/AI tests:
+- [x] Extend docs/testing.md's overlay flow with this exact manual checklist, retaining existing historical-log preservation and real submission/AI tests:
 
 ```md
 #### Focused overlay tabs
@@ -1099,7 +1118,7 @@ Status: human installed-extension smoke pending until evidence is attached.
    and tested flows before PR review or merge.
 ```
 
-- [ ] Run the full focused Phase 1 set:
+- [x] Run the full focused Phase 1 set:
 
 ```sh
 rtk proxy npm test -- src/features/overlay-session/domain/overlay-session-state.test.ts src/features/overlay-session/components/modes/expanded/overlay-tabs.test.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx src/features/overlay-session/components/modes/expanded/overlay-code-analysis.test.tsx src/features/overlay-session/components/overlay-shell.test.tsx src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx --run
@@ -1114,7 +1133,7 @@ Expected: focused and full checks pass and Chrome MV3 build succeeds. Inspect th
 production components in a browser fixture if useful, then record required human
 installed-extension smoke separately. Fixture proof does not replace human proof.
 
-- [ ] Write the handoff with actual source status, exact commands/results,
+- [x] Write the handoff with actual source status, exact commands/results,
       exact skipped commands and reasons, pending human proof, risk/recovery, and
       feature release impact. Mark Phase 2 as pending. Use these sections:
 
@@ -1143,8 +1162,8 @@ selection. Rollback restores the former expanded composition without a migration
 Phase 2 hints and saved Notes remain outside this implementation.
 ```
 
-- [ ] Update README's phase/handoff links to reflect only verified status.
-- [ ] Stage and commit only these task docs.
+- [x] Update README's phase/handoff links to reflect only verified status.
+- [x] Stage and commit only these task docs.
 
 ```sh
 rtk git add docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/handoffs/2026-10-04-overlay-focused-tabs.md docs/superpowers/README.md

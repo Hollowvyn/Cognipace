@@ -4,8 +4,11 @@ Design and written specification approved in chat on 2026-10-04. This master
 design covers two implementation phases: focused overlay tabs first, then
 on-demand AI hints. Saved Notes is deferred. The phase-sized execution plans
 are [focused tabs](../plans/2026-10-04-overlay-focused-tabs.md) and
-[progressive hints](../plans/2026-10-04-overlay-ai-hints.md). Focused tab
-implementation is in progress; hint implementation follows the first phase.
+[progressive hints](../plans/2026-10-04-overlay-ai-hints.md). Both phases are
+implemented locally with independent task reviews, passing
+automated checks, and production-component fixture evidence. Human installed-
+extension smoke/proof and live hint-provider quality remain pending; see the
+[Phase 2 handoff](../handoffs/2026-10-04-overlay-ai-hints.md).
 
 ## Problem and outcome
 

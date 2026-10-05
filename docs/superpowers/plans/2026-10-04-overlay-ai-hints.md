@@ -14,6 +14,29 @@ This executes Phase 2 of [the approved master design](../specs/2026-10-04-tabbed
 
 Read current `docs/agent-governance.md`, `docs/architecture.md`, `docs/product.md`, `docs/testing.md`, `design.md` and the Phase 1 handoff before execution. Use `cognipace-agent-workflow`, `cognipace-bulletproof-react` and the execution skill named above. Run `rtk git status --short --branch` before editing; preserve unrelated work. Commands below are execution instructions, not validation already performed for this document.
 
+## Execution status — 2026-10-05
+
+All ten local implementation/documentation tasks passed independent SPEC and
+QUALITY review. Source implementation ends at
+`c69c00709d0aef78eadb606896b0a0cccd8d17df`; authority docs were committed as
+`67b56b0e2978e5897b3f34740ba54b4581a30627`. The
+[dedicated handoff](../handoffs/2026-10-04-overlay-ai-hints.md) records exact
+commands, reviewed corrections, and eight production-component fixture captures.
+Final lint, check (2,904 passing tests; nine opted-in live cases skipped), Chrome
+MV3 build, and formatting of all 56 changed source files passed. Task 10's
+formatting instruction was satisfied by scoped writes during implementation and
+a final scoped check, avoiding an unnecessary whole-repository write.
+
+Checkboxes describe implemented requirements/equivalent validation, not literal
+execution of every illustrative shell spelling or code sample. The handoff is
+the actual execution ledger. Tasks 9.5–9.6 and 10.7 remain pending: private live
+evaluation configuration is absent, and the human engineer has not supplied
+installed-extension happy-path/edge-case smoke and screenshot/recording proof.
+Task 10.8 awaits the final whole-implementation review. Task 10.9's evidence
+record has been written and reviewed, but its final phase-completion condition
+remains unchecked until the human/live gates are satisfied. This phase is
+implemented locally, not PR review or merge ready. Notes remains reserved.
+
 ## File ownership and interfaces
 
 | Owner            | Files                                                                                         | Responsibility                                                            |
@@ -35,7 +58,7 @@ Connection metadata is `{ available, provider, revision }`: `provider` is existi
 
 **Files:** Create `src/features/leetcode-review-assistant/domain/code-hint-schema.ts`, `api/code-hint-contracts.ts`, `api/code-hint-contracts.test.ts`. Modify `src/features/leetcode-review-assistant/index.ts` with the exact exports below.
 
-- [ ] **Step 1: Add the failing contract tests.**
+- [x] **Step 1: Add the failing contract tests.**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -115,8 +138,8 @@ describe('problem-only hint contracts', () => {
 })
 ```
 
-- [ ] **Step 2: Run `rtk npm test -- src/features/leetcode-review-assistant/api/code-hint-contracts.test.ts --run`.** Expected: failure resolving the new contract module.
-- [ ] **Step 3: Create the schema file with this complete content.**
+- [x] **Step 2: Run `rtk npm test -- src/features/leetcode-review-assistant/api/code-hint-contracts.test.ts --run`.** Expected: failure resolving the new contract module.
+- [x] **Step 3: Create the schema file with this complete content.**
 
 ```ts
 import { z } from 'zod'
@@ -135,7 +158,7 @@ export const hintBatchSchema = z
 export type HintBatch = z.infer<typeof hintBatchSchema>
 ```
 
-- [ ] **Step 4: Create the contracts file with this complete content.**
+- [x] **Step 4: Create the contracts file with this complete content.**
 
 ```ts
 import { z } from 'zod'
@@ -267,7 +290,7 @@ export function hintIdentity(
 }
 ```
 
-- [ ] **Step 5: Append these exact public exports to the feature root barrel.**
+- [x] **Step 5: Append these exact public exports to the feature root barrel.**
 
 ```ts
 export {
@@ -289,14 +312,14 @@ export {
 } from './api/code-hint-contracts'
 ```
 
-- [ ] **Step 6: Repeat the focused command.** Expected: all contract tests pass, including rejection without provider calls or output repair.
-- [ ] **Step 7: Commit the task:** `rtk git add src/features/leetcode-review-assistant/domain/code-hint-schema.ts src/features/leetcode-review-assistant/api/code-hint-contracts.ts src/features/leetcode-review-assistant/api/code-hint-contracts.test.ts src/features/leetcode-review-assistant/index.ts`; `rtk git commit -m "feat(assessment): define problem-only hint contracts"`.
+- [x] **Step 6: Repeat the focused command.** Expected: all contract tests pass, including rejection without provider calls or output repair.
+- [x] **Step 7: Commit the task:** `rtk git add src/features/leetcode-review-assistant/domain/code-hint-schema.ts src/features/leetcode-review-assistant/api/code-hint-contracts.ts src/features/leetcode-review-assistant/api/code-hint-contracts.test.ts src/features/leetcode-review-assistant/index.ts`; `rtk git commit -m "feat(assessment): define problem-only hint contracts"`.
 
 ## Task 2: prepare complete matching problem input before submission
 
 **Files:** Create `src/features/leetcode-capture/api/prepare-code-hint-context.ts`, `prepare-code-hint-context.test.ts`. Modify `src/features/leetcode-capture/index.ts` and `src/features/leetcode-capture/server/leetcode-capture-service.ts`; extend `leetcode-capture-service.cache.test.ts`.
 
-- [ ] **Step 1: Add this complete preparation test file.**
+- [x] **Step 1: Add this complete preparation test file.**
 
 ```ts
 import { describe, expect, it, vi } from 'vitest'
@@ -413,8 +436,8 @@ describe('problem-only hint preparation', () => {
 })
 ```
 
-- [ ] **Step 2: Run `rtk npm test -- src/features/leetcode-capture/api/prepare-code-hint-context.test.ts --run`.** Expected: missing module failure.
-- [ ] **Step 3: Create the preparation module.** It returns the refreshed capture for the controller/page-sync integration in Task 7, so refreshed complete input becomes the current selected input rather than competing with a stale partial snapshot.
+- [x] **Step 2: Run `rtk npm test -- src/features/leetcode-capture/api/prepare-code-hint-context.test.ts --run`.** Expected: missing module failure.
+- [x] **Step 3: Create the preparation module.** It returns the refreshed capture for the controller/page-sync integration in Task 7, so refreshed complete input becomes the current selected input rather than competing with a stale partial snapshot.
 
 ```ts
 import { withAiDeadline } from '@/lib/ai/operation'
@@ -511,7 +534,7 @@ export async function prepareLeetCodeHintContext(
 }
 ```
 
-- [ ] **Step 4: Append the public preparation exports.**
+- [x] **Step 4: Append the public preparation exports.**
 
 ```ts
 export {
@@ -521,7 +544,7 @@ export {
 } from './api/prepare-code-hint-context'
 ```
 
-- [ ] **Step 5: Honor explicit metadata refresh.** In `readLeetCodeProblemMetadataInBackground`, replace `if (cachedResult)` with the complete condition below; other cache behavior stays as it is. In the existing cache test file, append the test below inside its content/metadata describe where local `remote` and `service` are declared.
+- [x] **Step 5: Honor explicit metadata refresh.** In `readLeetCodeProblemMetadataInBackground`, replace `if (cachedResult)` with the complete condition below; other cache behavior stays as it is. In the existing cache test file, append the test below inside its content/metadata describe where local `remote` and `service` are declared.
 
 ```ts
 if (cachedResult && !request.refresh) {
@@ -546,14 +569,14 @@ it('bypasses metadata cache on explicit refresh', async () => {
 
 Add `import { makeCompleteCapture } from '../testing/code-analysis-capture-fixtures'` to that existing cache test. The `remote` and `service` names already exist there.
 
-- [ ] **Step 6: Run `rtk npm test -- src/features/leetcode-capture/api/prepare-code-hint-context.test.ts src/features/leetcode-capture/server/leetcode-capture-service.cache.test.ts --run`.** Expected: all preparation/cache tests pass; complete inputs do not read a submission or editor.
-- [ ] **Step 7: Commit:** `rtk git add src/features/leetcode-capture/api/prepare-code-hint-context.ts src/features/leetcode-capture/api/prepare-code-hint-context.test.ts src/features/leetcode-capture/index.ts src/features/leetcode-capture/server/leetcode-capture-service.ts src/features/leetcode-capture/server/leetcode-capture-service.cache.test.ts`; `rtk git commit -m "feat(capture): prepare complete problem-only hint input"`.
+- [x] **Step 6: Run `rtk npm test -- src/features/leetcode-capture/api/prepare-code-hint-context.test.ts src/features/leetcode-capture/server/leetcode-capture-service.cache.test.ts --run`.** Expected: all preparation/cache tests pass; complete inputs do not read a submission or editor.
+- [x] **Step 7: Commit:** `rtk git add src/features/leetcode-capture/api/prepare-code-hint-context.ts src/features/leetcode-capture/api/prepare-code-hint-context.test.ts src/features/leetcode-capture/index.ts src/features/leetcode-capture/server/leetcode-capture-service.ts src/features/leetcode-capture/server/leetcode-capture-service.cache.test.ts`; `rtk git commit -m "feat(capture): prepare complete problem-only hint input"`.
 
 ## Task 3: connection-only availability and opaque revision
 
 **Files:** Create `src/features/genai/api/hint-connection-contracts.ts`, `hint-connection-hooks.ts`. Modify `server/genai-settings-service.ts`, `server/genai-settings-service.test.ts`, `src/features/genai/index.ts`, `src/platform/query/query-keys.ts`, `cache-invalidation.ts`. Runtime registration arrives in Task 6; do not broaden existing automatic-analysis eligibility.
 
-- [ ] **Step 1: Add imports for the new functions to `genai-settings-service.test.ts` and append these tests inside the existing active-configuration describe.** Its `configuredDb`, `updateSettings`, `setAiProviderSecret`, and `loadActiveProviderConfig` helpers/imports already exist.
+- [x] **Step 1: Add imports for the new functions to `genai-settings-service.test.ts` and append these tests inside the existing active-configuration describe.** Its `configuredDb`, `updateSettings`, `setAiProviderSecret`, and `loadActiveProviderConfig` helpers/imports already exist.
 
 ```ts
 it('exposes connection availability while assessment is off and keeps an opaque revision on toggle-only saves', async () => {
@@ -601,10 +624,10 @@ it('changes revision for a new model but treats surrounding model whitespace as 
 })
 ```
 
-- [ ] **Ordering/reset regressions:** Add deferred tests proving an old-model read that resumes after a newer-model read cannot replace the newer public revision, and a read started before local reset cannot populate the replacement registry. Fresh reads must not wait for a suspended older read. Return late snapshots with their own matching configuration/identity and an uncached revision when needed.
+- [x] **Ordering/reset regressions:** Add deferred tests proving an old-model read that resumes after a newer-model read cannot replace the newer public revision, and a read started before local reset cannot populate the replacement registry. Fresh reads must not wait for a suspended older read. Return late snapshots with their own matching configuration/identity and an uncached revision when needed.
 
-- [ ] **Step 2: Run `rtk npm test -- src/features/genai/server/genai-settings-service.test.ts --run`.** Expected: missing connection-only function failure.
-- [ ] **Step 3: Create the public metadata contract.**
+- [x] **Step 2: Run `rtk npm test -- src/features/genai/server/genai-settings-service.test.ts --run`.** Expected: missing connection-only function failure.
+- [x] **Step 3: Create the public metadata contract.**
 
 ```ts
 import { z } from 'zod'
@@ -622,7 +645,7 @@ export type HintConnectionRequest = z.infer<typeof hintConnectionRequestSchema>
 export type HintConnectionStatus = z.infer<typeof hintConnectionStatusSchema>
 ```
 
-- [ ] **Step 4: Add these imports and functions to the trusted settings service.** Keep its existing automatic loader body, which checks `ai.enabled`, unchanged. Add `HintConnectionStatus` from `../api/hint-connection-contracts` to its imports.
+- [x] **Step 4: Add these imports and functions to the trusted settings service.** Keep its existing automatic loader body, which checks `ai.enabled`, unchanged. Add `HintConnectionStatus` from `../api/hint-connection-contracts` to its imports.
 
 ```ts
 let hintConnectionRevisions = new WeakMap<
@@ -687,7 +710,7 @@ export async function getAiHintConnectionStatus(
 }
 ```
 
-- [ ] **Step 5: Add a query key and create the public metadata hook.** Add this property to the existing `queryKeys.genai` object:
+- [x] **Step 5: Add a query key and create the public metadata hook.** Add this property to the existing `queryKeys.genai` object:
 
 ```ts
 hintConnection: () => [...queryKeys.genai.all, 'hint-connection'] as const,
@@ -758,14 +781,14 @@ In `invalidateTaggedQueries`, add this cancellation alongside `secretPresence` b
 queryClient.cancelQueries({ queryKey: queryKeys.genai.hintConnection() }),
 ```
 
-- [ ] **Step 6: Repeat the settings-service focused command.** Expected: enabled/disabled automatic loader expectations remain intact; connection revision changes for selected provider/model/key changes, including same-key storage replacement, but not enablement or unrelated-provider keys. Type checking of the hook is deferred until its protocol registration in Task 6.
-- [ ] **Step 7: Commit:** `rtk git add src/features/genai/api/hint-connection-contracts.ts src/features/genai/api/hint-connection-hooks.ts src/features/genai/server/genai-settings-service.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/index.ts src/platform/query/query-keys.ts src/platform/query/cache-invalidation.ts`; `rtk git commit -m "feat(genai): expose independent hint connection metadata"`.
+- [x] **Step 6: Repeat the settings-service focused command.** Expected: enabled/disabled automatic loader expectations remain intact; connection revision changes for selected provider/model/key changes, including same-key storage replacement, but not enablement or unrelated-provider keys. Type checking of the hook is deferred until its protocol registration in Task 6.
+- [x] **Step 7: Commit:** `rtk git add src/features/genai/api/hint-connection-contracts.ts src/features/genai/api/hint-connection-hooks.ts src/features/genai/server/genai-settings-service.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/index.ts src/platform/query/query-keys.ts src/platform/query/cache-invalidation.ts`; `rtk git commit -m "feat(genai): expose independent hint connection metadata"`.
 
 ## Task 4: one bounded generation and trusted background deadline
 
 **Files:** Create `src/features/leetcode-review-assistant/server/code-hint-service.ts`, `code-hint-service.test.ts`, `hint-runtime-service.ts`, `hint-runtime-service.test.ts`.
 
-- [ ] **Step 1: Create the failing service test.**
+- [x] **Step 1: Create the failing service test.**
 
 ```ts
 import { expect, it, vi } from 'vitest'
@@ -810,8 +833,8 @@ it('makes one bounded call with only selected problem input', async () => {
 })
 ```
 
-- [ ] **Step 2: Run `rtk npm test -- src/features/leetcode-review-assistant/server/code-hint-service.test.ts --run`.** Expected: missing service failure.
-- [ ] **Step 3: Create the generation service.**
+- [x] **Step 2: Run `rtk npm test -- src/features/leetcode-review-assistant/server/code-hint-service.test.ts --run`.** Expected: missing service failure.
+- [x] **Step 3: Create the generation service.**
 
 ```ts
 import { generateJson } from '@/lib/ai'
@@ -846,7 +869,7 @@ export async function generateCodeHints(
 }
 ```
 
-- [ ] **Step 4: Create the background runtime service.**
+- [x] **Step 4: Create the background runtime service.**
 
 ```ts
 import { readAiHintConnectionSnapshot } from '@/features/genai/server/genai-settings-service'
@@ -934,7 +957,7 @@ export async function generateLeetCodeHintsInBackground(
 }
 ```
 
-- [ ] **Step 5: Create these complete runtime tests.**
+- [x] **Step 5: Create these complete runtime tests.**
 
 ```ts
 import { afterEach, expect, it, vi } from 'vitest'
@@ -1027,14 +1050,14 @@ it('redacts unexpected trusted-storage exceptions', async () => {
 })
 ```
 
-- [ ] **Step 6: Run `rtk npm test -- src/features/leetcode-review-assistant/server/code-hint-service.test.ts src/features/leetcode-review-assistant/server/hint-runtime-service.test.ts --run`.** Expected: one call per request; no secret identity or raw provider errors in runtime output; DB preparation is bounded.
-- [ ] **Step 7: Commit:** `rtk git add src/features/leetcode-review-assistant/server/code-hint-service.ts src/features/leetcode-review-assistant/server/code-hint-service.test.ts src/features/leetcode-review-assistant/server/hint-runtime-service.ts src/features/leetcode-review-assistant/server/hint-runtime-service.test.ts`; `rtk git commit -m "feat(assessment): generate bounded conceptual hint batches"`.
+- [x] **Step 6: Run `rtk npm test -- src/features/leetcode-review-assistant/server/code-hint-service.test.ts src/features/leetcode-review-assistant/server/hint-runtime-service.test.ts --run`.** Expected: one call per request; no secret identity or raw provider errors in runtime output; DB preparation is bounded.
+- [x] **Step 7: Commit:** `rtk git add src/features/leetcode-review-assistant/server/code-hint-service.ts src/features/leetcode-review-assistant/server/code-hint-service.test.ts src/features/leetcode-review-assistant/server/hint-runtime-service.ts src/features/leetcode-review-assistant/server/hint-runtime-service.test.ts`; `rtk git commit -m "feat(assessment): generate bounded conceptual hint batches"`.
 
 ## Task 5: independent hint ownership and sender authorization
 
 **Files:** Modify `src/extension/background/leetcode-analysis-operations.ts`, its existing test, `src/extension/background/runtime-policy.ts`, its existing test. Existing report registry functions retain their current behavior.
 
-- [ ] **Step 1: Extend the operation-test imports with the new functions below and append this independent-scope test.** The existing local `deferred<T>()` helper is declared in this test file.
+- [x] **Step 1: Extend the operation-test imports with the new functions below and append this independent-scope test.** The existing local `deferred<T>()` helper is declared in this test file.
 
 ```ts
 it('runs hints and reports independently and restricts hint cancellation to its owner/provider', async () => {
@@ -1063,8 +1086,8 @@ it('runs hints and reports independently and restricts hint cancellation to its 
 })
 ```
 
-- [ ] **Step 2: Run `rtk npm test -- src/extension/background/leetcode-analysis-operations.test.ts --run`.** Expected: missing hint operation functions.
-- [ ] **Step 3: Add the complete hint registry to the existing operation module.** Add `import type { AiProviderId } from '@/lib/ai'` at its top.
+- [x] **Step 2: Run `rtk npm test -- src/extension/background/leetcode-analysis-operations.test.ts --run`.** Expected: missing hint operation functions.
+- [x] **Step 3: Add the complete hint registry to the existing operation module.** Add `import type { AiProviderId } from '@/lib/ai'` at its top.
 
 ```ts
 type ActiveHints = ActiveAnalysis & { provider: AiProviderId }
@@ -1101,7 +1124,7 @@ export function abortLeetCodeHints(provider?: AiProviderId): void {
 }
 ```
 
-- [ ] **Step 4: Add method policy entries and actual-problem binding.** Add these entries to `methodSurfaceAccess`:
+- [x] **Step 4: Add method policy entries and actual-problem binding.** Add these entries to `methodSurfaceAccess`:
 
 ```ts
 'genai.getHintConnection': ['content-script'],
@@ -1151,7 +1174,7 @@ export function assertHintProblemSender(
 }
 ```
 
-- [ ] **Step 5: Add the policy helper to test imports and append these tests.** The full protocol inventory test will pass once Task 6 adds typed method names.
+- [x] **Step 5: Add the policy helper to test imports and append these tests.** The full protocol inventory test will pass once Task 6 adds typed method names.
 
 ```ts
 it('binds hint input to the actual HTTPS problem and permits owned cancellation after navigation', () => {
@@ -1193,13 +1216,13 @@ it('binds hint input to the actual HTTPS problem and permits owned cancellation 
 })
 ```
 
-- [ ] **Step 6: Run `rtk npm test -- src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/runtime-policy.test.ts --run`.** Expected: operation tests and sender behavior pass; the existing protocol-name equality assertion is intentionally unresolved until the next task's complete registration. Record that exact expected intermediate failure, then rerun both files in Task 6 before committing runtime changes together.
+- [x] **Step 6: Run `rtk npm test -- src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/runtime-policy.test.ts --run`.** Expected: operation tests and sender behavior pass; the existing protocol-name equality assertion is intentionally unresolved until the next task's complete registration. Record that exact expected intermediate failure, then rerun both files in Task 6 before committing runtime changes together.
 
 ## Task 6: protocol, handlers, and precise connection invalidation
 
 **Files:** Modify `src/extension/messaging.ts`, `background/register-handlers.ts`, `background/cache-invalidation-broadcaster.ts` and their existing tests. Create `src/features/leetcode-review-assistant/api/code-hint-api.ts`, `code-hint-api.test.ts`; append root feature exports. This task completes the runtime changes begun in Task 5. Also modify `src/app/providers/cache-invalidation-listener.tsx`, its test, `src/platform/query/cache-invalidation.ts`, and its test for the reviewed reset-recovery correction.
 
-- [ ] **Step 1: Add these typed imports, protocol entries and name-inventory entries.** In `messaging.ts`, add the imports below; add the method signatures inside `ProtocolMap` and the three exact method strings to `protocolMethodNames`.
+- [x] **Step 1: Add these typed imports, protocol entries and name-inventory entries.** In `messaging.ts`, add the imports below; add the method signatures inside `ProtocolMap` and the three exact method strings to `protocolMethodNames`.
 
 ```ts
 import type {
@@ -1226,7 +1249,7 @@ import type {
 'genai.cancelLeetCodeHints',
 ```
 
-- [ ] **Step 2: Add these handler imports and exact registrations adjacent to the existing report handlers.** `getAppDb`, `onMessage`, `analysisOwner`, and `assertCanSenderCallExtensionMethod` already exist in this module. Replace the existing `generateJson` import from `@/lib/ai` with `import { generateJson, withAiDeadline } from '@/lib/ai'` and add the imports below.
+- [x] **Step 2: Add these handler imports and exact registrations adjacent to the existing report handlers.** `getAppDb`, `onMessage`, `analysisOwner`, and `assertCanSenderCallExtensionMethod` already exist in this module. Replace the existing `generateJson` import from `@/lib/ai` with `import { generateJson, withAiDeadline } from '@/lib/ai'` and add the imports below.
 
 ```ts
 import { getAiHintConnectionStatus } from '@/features/genai/server/genai-settings-service'
@@ -1299,7 +1322,7 @@ onMessage('genai.cancelLeetCodeHints', ({ data, sender }) => {
 })
 ```
 
-- [ ] **Step 3: Separate report and hint invalidation without loading SQLite during secret writes.** Add the imports/type fields below to `cache-invalidation-broadcaster.ts`. Construct its wire event from the four explicit existing event fields; the new internal fields must not be serialized.
+- [x] **Step 3: Separate report and hint invalidation without loading SQLite during secret writes.** Add the imports/type fields below to `cache-invalidation-broadcaster.ts`. Construct its wire event from the four explicit existing event fields; the new internal fields must not be serialized.
 
 ```ts
 import type { AiProviderId } from '@/lib/ai'
@@ -1358,11 +1381,11 @@ Add `hintConnectionReset: true` to the existing `broadcastDataManagementInvalida
 hintConnectionReset: true,
 ```
 
-- [ ] **Step 3b: Clear public cached connection metadata on full local data replacement.** The sole app cache listener recognizes the existing event signature: dashboard source, `problem-catalog-updated` reason, and every tag in `settings`, `genai`, `problems`, `practice`, `queue`, `tracks`, `app-shell`. Pass `{ resetHintConnection: true }` as an optional third argument to `invalidateTaggedQueries` only for that signature. Normal events preserve the existing call and cache behavior. The platform helper accepts the local option without importing app or extension code. After existing GenAI query cancellations settle, invoke `void queryClient.resetQueries({ queryKey: queryKeys.genai.hintConnection(), exact: true })`, then schedule ordinary invalidations. Do not await replacement refetch: completion remains cancellation/scheduling only. No new wire fields, listener, hint cache, or persistence.
+- [x] **Step 3b: Clear public cached connection metadata on full local data replacement.** The sole app cache listener recognizes the existing event signature: dashboard source, `problem-catalog-updated` reason, and every tag in `settings`, `genai`, `problems`, `practice`, `queue`, `tracks`, `app-shell`. Pass `{ resetHintConnection: true }` as an optional third argument to `invalidateTaggedQueries` only for that signature. Normal events preserve the existing call and cache behavior. The platform helper accepts the local option without importing app or extension code. After existing GenAI query cancellations settle, invoke `void queryClient.resetQueries({ queryKey: queryKeys.genai.hintConnection(), exact: true })`, then schedule ordinary invalidations. Do not await replacement refetch: completion remains cancellation/scheduling only. No new wire fields, listener, hint cache, or persistence.
 
 Add real QueryObserver regressions: cached and active-observer metadata clear before a hanging/failed replacement read; the old signal aborts and its late response cannot resurrect data; invalidation completion does not await that read; exactly one replacement fetch starts. Ordinary GenAI invalidation retains cached metadata on failure. App listener tests recognize full replacement and reject normal/incomplete/wrong-source events. This closes a confirmed P2 gap where reset/restore ready batches otherwise survived indefinitely after metadata reload failure; trusted revision rotation alone could only clear them after a successful reload.
 
-- [ ] **Step 4: Extend existing broadcaster mock and add the exact independence tests.** Change `analysisMocks` to include `abortLeetCodeHints: vi.fn()` and append:
+- [x] **Step 4: Extend existing broadcaster mock and add the exact independence tests.** Change `analysisMocks` to include `abortLeetCodeHints: vi.fn()` and append:
 
 ```ts
 it('preserves hints on automatic-toggle-only changes while retaining report cancellation', async () => {
@@ -1479,7 +1502,7 @@ expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
 })
 ```
 
-- [ ] **Step 5: Create the plain runtime API and its test.**
+- [x] **Step 5: Create the plain runtime API and its test.**
 
 ```ts
 import { sendMessage } from '@/extension/messaging'
@@ -1548,7 +1571,7 @@ export {
 } from './api/code-hint-api'
 ```
 
-- [ ] **Step 6: Add an end-to-end handler test to the existing handler test file.** Import `makeHintInputFingerprint` from the Review Assistant root barrel. The file already has actual `createTestDb`, background setup, and local `sendRuntimeMessage`/`readRegisteredHandler`; use the existing `beforeEach` registration context. Add the test inside that context after loading the actual policy, following its current analysis tests' policy-unmocking pattern. This complete test calls the registered methods without a provider because sender mismatch must reject first:
+- [x] **Step 6: Add an end-to-end handler test to the existing handler test file.** Import `makeHintInputFingerprint` from the Review Assistant root barrel. The file already has actual `createTestDb`, background setup, and local `sendRuntimeMessage`/`readRegisteredHandler`; use the existing `beforeEach` registration context. Add the test inside that context after loading the actual policy, following its current analysis tests' policy-unmocking pattern. This complete test calls the registered methods without a provider because sender mismatch must reject first:
 
 ```ts
 it('rejects a hint for another actual problem before DB or provider work', async () => {
@@ -1599,14 +1622,14 @@ vi.mock('./runtime-policy', async (original) => ({
 }))
 ```
 
-- [ ] **Step 7: Run `rtk npm test -- src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/runtime-policy.test.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.test.ts src/features/genai/server/genai-settings-service.test.ts src/platform/query/cache-invalidation.test.ts src/app/providers/cache-invalidation-listener.test.tsx --run`, then `rtk npm run check`.** Expected: focused tests pass, protocol inventories match, complete runtime/controller prerequisites type-check. Investigate any existing mock import shape failure before proceeding; do not hide it as an unrelated test failure.
-- [ ] **Step 8: Commit Tasks 5–6 together:** `rtk git add src/extension/messaging.ts src/extension/background/runtime-policy.ts src/extension/background/runtime-policy.test.ts src/extension/background/leetcode-analysis-operations.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/cache-invalidation-broadcaster.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.ts src/extension/background/register-handlers.test.ts src/features/leetcode-review-assistant/api/code-hint-api.ts src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/features/leetcode-review-assistant/index.ts src/app/providers/cache-invalidation-listener.tsx src/app/providers/cache-invalidation-listener.test.tsx src/platform/query/cache-invalidation.ts src/platform/query/cache-invalidation.test.ts`; `rtk git commit -m "feat(runtime): authorize and isolate manual hint requests"`.
+- [x] **Step 7: Run `rtk npm test -- src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/runtime-policy.test.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.test.ts src/features/genai/server/genai-settings-service.test.ts src/platform/query/cache-invalidation.test.ts src/app/providers/cache-invalidation-listener.test.tsx --run`, then `rtk npm run check`.** Expected: focused tests pass, protocol inventories match, complete runtime/controller prerequisites type-check. Investigate any existing mock import shape failure before proceeding; do not hide it as an unrelated test failure.
+- [x] **Step 8: Commit Tasks 5–6 together:** `rtk git add src/extension/messaging.ts src/extension/background/runtime-policy.ts src/extension/background/runtime-policy.test.ts src/extension/background/leetcode-analysis-operations.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/cache-invalidation-broadcaster.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.ts src/extension/background/register-handlers.test.ts src/features/leetcode-review-assistant/api/code-hint-api.ts src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/features/leetcode-review-assistant/index.ts src/app/providers/cache-invalidation-listener.tsx src/app/providers/cache-invalidation-listener.test.tsx src/platform/query/cache-invalidation.ts src/platform/query/cache-invalidation.test.ts`; `rtk git commit -m "feat(runtime): authorize and isolate manual hint requests"`.
 
 ## Task 7: session-owned explicit hint controller
 
 **Files:** Create `src/features/overlay-session/hooks/use-leetcode-code-hints.ts`, `use-leetcode-code-hints.test.tsx`. Modify `src/features/overlay-session/hooks/use-leetcode-page-sync.ts` to expose synchronous capture reads and a guarded memory-only preparation publish.
 
-- [ ] **Step 1: Add this complete controller test file.** These tests exercise the public hook without a Query cache or provider. The session integration tests in Task 8 cover review persistence, visual modes and the automatic assessment flag.
+- [x] **Step 1: Add this complete controller test file.** These tests exercise the public hook without a Query cache or provider. The session integration tests in Task 8 cover review persistence, visual modes and the automatic assessment flag.
 
 ```tsx
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
@@ -1945,8 +1968,8 @@ it('bounds connection refresh on stale Retry and cannot leave pending state afte
 })
 ```
 
-- [ ] **Step 2: Run `rtk npm test -- src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx --run`.** Expected: missing hook module failure.
-- [ ] **Step 3: Add `type LeetCodeCaptureState` to the existing `@/lib/leetcode` import in page sync and insert these regions.** Immediately after `captureState` initialization declare `captureRef`. Replace only the first capture update in `handlePageEvent` with the synchronous reducer region. Add the callback before the return and expose both `readCapture` and `publishHintCapture` in the returned object. This modifies no synchronization/upsert behavior and performs no DB work for hints.
+- [x] **Step 2: Run `rtk npm test -- src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx --run`.** Expected: missing hook module failure.
+- [x] **Step 3: Add `type LeetCodeCaptureState` to the existing `@/lib/leetcode` import in page sync and insert these regions.** Immediately after `captureState` initialization declare `captureRef`. Replace only the first capture update in `handlePageEvent` with the synchronous reducer region. Add the callback before the return and expose both `readCapture` and `publishHintCapture` in the returned object. This modifies no synchronization/upsert behavior and performs no DB work for hints.
 
 ```ts
 const captureRef = useRef(captureState)
@@ -1972,7 +1995,7 @@ readCapture,
 publishHintCapture,
 ```
 
-- [ ] **Step 4: Create the controller with this complete content.** Exact serialized selected-input equality is deliberate: no hash collision can retain hints for changed text. Incomplete input also has a deterministic selected-field identity, so changes during preparation cancel. Current submission/editor fields never participate.
+- [x] **Step 4: Create the controller with this complete content.** Exact serialized selected-input equality is deliberate: no hash collision can retain hints for changed text. Incomplete input also has a deterministic selected-field identity, so changes during preparation cancel. Current submission/editor fields never participate.
 
 ```ts
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -2374,14 +2397,14 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
 }
 ```
 
-- [ ] **Step 5: Run the focused controller command plus `rtk npm run check`.** Expected: controller tests pass; hooks and page-sync additions type-check. Verify the first request uses no submission read, a matching complete refresh is not immediately cancelled, and timeout leaves no timers. Add no automatic generation effect.
-- [ ] **Step 6: Commit:** `rtk git add src/features/overlay-session/hooks/use-leetcode-code-hints.ts src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx src/features/overlay-session/hooks/use-leetcode-page-sync.ts`; `rtk git commit -m "feat(overlay): own transient progressive hint sessions"`.
+- [x] **Step 5: Run the focused controller command plus `rtk npm run check`.** Expected: controller tests pass; hooks and page-sync additions type-check. Verify the first request uses no submission read, a matching complete refresh is not immediately cancelled, and timeout leaves no timers. Add no automatic generation effect.
+- [x] **Step 6: Commit:** `rtk git add src/features/overlay-session/hooks/use-leetcode-code-hints.ts src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx src/features/overlay-session/hooks/use-leetcode-page-sync.ts`; `rtk git commit -m "feat(overlay): own transient progressive hint sessions"`.
 
 ## Task 8: Solve Help presentation and session integration
 
 **Files:** Modify `src/features/overlay-session/hooks/use-leetcode-overlay-session.ts`, `use-leetcode-overlay-session.test.tsx`, `src/features/overlay-session/components/overlay-shell.tsx`, `components/modes/expanded/expanded-overlay.tsx`, `overlay-help-section.tsx`, `overlay-help-section.test.tsx`. Create `components/modes/expanded/overlay-hint-block.tsx`.
 
-- [ ] **Step 1: Extend the existing session test's Review Assistant mock with `generateLeetCodeHintsViaRuntime: vi.fn()` and `cancelLeetCodeHintsViaRuntime: vi.fn()` and import these functions plus `hintIdentity` from the feature root.** Add this configuration at the end of its current `beforeEach`, replacing its existing `sendMessage.mockResolvedValue(undefined)` statement. The metadata response is public and assessment remains disabled by default.
+- [x] **Step 1: Extend the existing session test's Review Assistant mock with `generateLeetCodeHintsViaRuntime: vi.fn()` and `cancelLeetCodeHintsViaRuntime: vi.fn()` and import these functions plus `hintIdentity` from the feature root.** Add this configuration at the end of its current `beforeEach`, replacing its existing `sendMessage.mockResolvedValue(undefined)` statement. The metadata response is public and assessment remains disabled by default.
 
 ```ts
 vi.mocked(generateLeetCodeHintsViaRuntime)
@@ -2624,10 +2647,10 @@ it('starts with a compact AI action, disables duplicate generation, and provides
 })
 ```
 
-- [ ] **Reset recovery integration regression:** With a real Query cache and a ready hint batch, invoke the full data replacement metadata-reset path, then hang/fail the new public metadata read. The session must immediately become idle, discard the old batch, and make no automatic generation request. This covers the reviewed Task 6 reset correction through the real session/controller integration.
+- [x] **Reset recovery integration regression:** With a real Query cache and a ready hint batch, invoke the full data replacement metadata-reset path, then hang/fail the new public metadata read. The session must immediately become idle, discard the old batch, and make no automatic generation request. This covers the reviewed Task 6 reset correction through the real session/controller integration.
 
-- [ ] **Step 2: Run `rtk npm test -- src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.test.tsx --run`.** Expected: missing hints/session actions and Help props failures.
-- [ ] **Step 3: Add the exact session integration regions.** Import `useAiHintConnection` from the GenAI root and `useLeetCodeCodeHints, type OverlayHintState` from `./use-leetcode-code-hints`. Replace the public `actions` field and add the `hints` field:
+- [x] **Step 2: Run `rtk npm test -- src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.test.tsx --run`.** Expected: missing hints/session actions and Help props failures.
+- [x] **Step 3: Add the exact session integration regions.** Import `useAiHintConnection` from the GenAI root and `useLeetCodeCodeHints, type OverlayHintState` from `./use-leetcode-code-hints`. Replace the public `actions` field and add the `hints` field:
 
 ```ts
 actions: OverlayReviewActions & {
@@ -2662,7 +2685,7 @@ actions: { ...actions, toggleHints: hints.toggle, revealNextHint: hints.revealNe
 hints: hints.state,
 ```
 
-- [ ] **Step 4: Wire the existing shell and expanded view.** In `OverlayShell`, destructure `hints`, add `hints` to its expanded `view`, and add these three expanded commands:
+- [x] **Step 4: Wire the existing shell and expanded view.** In `OverlayShell`, destructure `hints`, add `hints` to its expanded `view`, and add these three expanded commands:
 
 ```ts
 onToggleHints: actions.toggleHints,
@@ -2694,7 +2717,7 @@ onToggleHints: vi.fn(), onRevealNextHint: vi.fn(), onRetryHints: vi.fn(),
 toggleHints: vi.fn(), revealNextHint: vi.fn(), retryHints: vi.fn(),
 ```
 
-- [ ] **Step 5: Create the complete hint block component.** It renders pointers as text, retains previous pointers, and advertises one busy state. Existing tab focus/scroll management comes from Phase 1.
+- [x] **Step 5: Create the complete hint block component.** It renders pointers as text, retains previous pointers, and advertises one busy state. Existing tab focus/scroll management comes from Phase 1.
 
 ```tsx
 import { Button } from '@/components/ui/button'
@@ -2774,7 +2797,7 @@ export function OverlayHintBlock({
 }
 ```
 
-- [ ] **Step 6: Extend Help while preserving its current YouTube link.** Import `Lightbulb` from `lucide-react`, `OverlayHintState` from the hint hook, and `OverlayHintBlock` from `./overlay-hint-block`. Replace the Help props type and function parameter with these exact regions. Optional presentation inputs preserve the existing YouTube-only test and standalone usage; the production shell supplies all commands.
+- [x] **Step 6: Extend Help while preserving its current YouTube link.** Import `Lightbulb` from `lucide-react`, `OverlayHintState` from the hint hook, and `OverlayHintBlock` from `./overlay-hint-block`. Replace the Help props type and function parameter with these exact regions. Optional presentation inputs preserve the existing YouTube-only test and standalone usage; the production shell supplies all commands.
 
 ```ts
 export type OverlayHelpSectionProps = {
@@ -2820,14 +2843,14 @@ Wrap the existing YouTube conditional and its unavailable description in `<div c
 </div>
 ```
 
-- [ ] **Step 7: Run `rtk npm test -- src/features/overlay-session --run`, then `rtk npm run check`.** Expected: existing review/report/timer/YouTube behavior and new session/Help tests pass; all shell fixture contracts match. No hint request appears merely from rendering or switching a tab.
-- [ ] **Step 8: Commit:** `rtk git add src/features/overlay-session/hooks/use-leetcode-overlay-session.ts src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/overlay-shell.tsx src/features/overlay-session/components/overlay-shell.test.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.test.tsx src/features/overlay-session/components/modes/expanded/overlay-hint-block.tsx`; `rtk git commit -m "feat(overlay): present progressive hints in Solve Help"`.
+- [x] **Step 7: Run `rtk npm test -- src/features/overlay-session --run`, then `rtk npm run check`.** Expected: existing review/report/timer/YouTube behavior and new session/Help tests pass; all shell fixture contracts match. No hint request appears merely from rendering or switching a tab.
+- [x] **Step 8: Commit:** `rtk git add src/features/overlay-session/hooks/use-leetcode-overlay-session.ts src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/overlay-shell.tsx src/features/overlay-session/components/overlay-shell.test.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.test.tsx src/features/overlay-session/components/modes/expanded/overlay-hint-block.tsx`; `rtk git commit -m "feat(overlay): present progressive hints in Solve Help"`.
 
 ## Task 9: opt-in live provider quality evaluation
 
 **Files:** Create `src/features/leetcode-review-assistant/testing/code-hint-evaluation-fixtures.ts`, `server/code-hint-provider-evaluation.test.ts`. Use the existing GenAI test-only private environment configuration; never read application key storage from the evaluation test.
 
-- [ ] **Step 1: Create the evaluation test before its fixture module.** An ordinary run must skip every live case. An explicitly enabled run must call the real structured transport, validate the bounded batch and save redacted review evidence. Structural success alone does not approve hint quality.
+- [x] **Step 1: Create the evaluation test before its fixture module.** An ordinary run must skip every live case. An explicitly enabled run must call the real structured transport, validate the bounded batch and save redacted review evidence. Structural success alone does not approve hint quality.
 
 ```ts
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -2876,8 +2899,8 @@ describe.skipIf(config === null)('live progressive hint evaluation', () => {
 })
 ```
 
-- [ ] **Step 2: Run `rtk npm test -- src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts --run`.** Expected: missing fixture module failure, with no credentials read or provider call because `COGNIPACE_AI_EVAL` is unset.
-- [ ] **Step 3: Create these complete fixtures.** Criteria are test-side review guidance and are never included in a provider prompt.
+- [x] **Step 2: Run `rtk npm test -- src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts --run`.** Expected: missing fixture module failure, with no credentials read or provider call because `COGNIPACE_AI_EVAL` is unset.
+- [x] **Step 3: Create these complete fixtures.** Criteria are test-side review guidance and are never included in a provider prompt.
 
 ```ts
 import type { HintProblem } from '../api/code-hint-contracts'
@@ -2945,16 +2968,16 @@ export const codeHintEvaluationFixtures = [
 ] satisfies Array<{ id: string; problem: HintProblem; criterion: string }>
 ```
 
-- [ ] **Step 4: Repeat the ordinary focused command.** Expected: three skipped live cases, no provider access, no output files, no secret storage reads. This establishes opt-in behavior, not quality evidence.
+- [x] **Step 4: Repeat the ordinary focused command.** Expected: three skipped live cases, no provider access, no output files, no secret storage reads. This establishes opt-in behavior, not quality evidence.
 - [ ] **Step 5: In an execution session with privately configured `COGNIPACE_AI_EVAL_PROVIDER`, `COGNIPACE_AI_EVAL_MODEL` and `COGNIPACE_AI_EVAL_KEY`, run `rtk proxy env COGNIPACE_AI_EVAL=1 npm test -- src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts --run`.** Expected: all three real-provider cases pass and the three redacted JSON artifacts exist under `/private/tmp/cognipace-hint-evaluation`. Do not print environment values, raw provider failures or provider bodies. Record actual provider/model/date and observed latency from metadata. If private evaluation configuration is unavailable, record this exact command as skipped and leave provider-quality validation pending.
 - [ ] **Step 6: Review each actual artifact against its criterion and the master spec.** Record a pass/fail for progression, usefulness, length, duplicate avoidance and spoiler restraint for each fixture, plus the provider/model/date. A short structurally valid full solution fails this gate. A vague batch with no actionable progression also fails. If quality fails, revise only the bounded system prompt, rerun focused mocked transport tests and repeat the live evaluation; do not add a second provider repair call or silently trim output.
-- [ ] **Step 7: Commit the test harness:** `rtk git add src/features/leetcode-review-assistant/testing/code-hint-evaluation-fixtures.ts src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts`; `rtk git commit -m "test(ai): evaluate progressive hint quality with opt-in providers"`.
+- [x] **Step 7: Commit the test harness:** `rtk git add src/features/leetcode-review-assistant/testing/code-hint-evaluation-fixtures.ts src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts`; `rtk git commit -m "test(ai): evaluate progressive hint quality with opt-in providers"`.
 
 ## Task 10: authority docs, complete checks and human proof
 
 **Files:** Modify `docs/product.md`, `docs/architecture.md`, `docs/testing.md`, `design.md`. Create `docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md`. Do not change the approved spec's requirements or declare validation complete without its evidence. The execution owner updates the current plan checkboxes and planning index status after both phases are actually complete.
 
-- [ ] **Step 1: Append the following exact current-behavior paragraph to the Overlay section of `docs/product.md`, immediately after its YouTube Help behavior.**
+- [x] **Step 1: Append the following exact current-behavior paragraph to the Overlay section of `docs/product.md`, immediately after its YouTube Help behavior.**
 
 ```markdown
 Solve Help also offers explicitly requested AI hints using the selected saved
@@ -2970,7 +2993,7 @@ data discard them. Automatic assessment enablement alone preserves them.
 Saved Notes remains deferred.
 ```
 
-- [ ] **Step 2: Append the following architecture subsection immediately after the current automatic analysis description.** Keep the existing automatic enable-gated loader and report cancellation documentation.
+- [x] **Step 2: Append the following architecture subsection immediately after the current automatic analysis description.** Keep the existing automatic enable-gated loader and report cancellation documentation.
 
 ```markdown
 ### Manual progressive hints
@@ -3013,7 +3036,7 @@ connection metadata uses Query cache; pointers use session memory and plain
 runtime functions. Hint completion causes no persistence or sync effects.
 ```
 
-- [ ] **Step 3: Add the following human smoke checklist to the overlay/GenAI sections in `docs/testing.md`.** The human engineer must run happy-path and edge-case realtime installed-extension checks and attach screenshots or a screen recording before PR review/merge.
+- [x] **Step 3: Add the following human smoke checklist to the overlay/GenAI sections in `docs/testing.md`.** The human engineer must run happy-path and edge-case realtime installed-extension checks and attach screenshots or a screen recording before PR review/merge.
 
 ```markdown
 ### Manual hints in Solve Help
@@ -3054,7 +3077,7 @@ runtime functions. Hint completion causes no persistence or sync effects.
   structural tests. Neither human smoke nor provider quality may be marked N/A.
 ```
 
-- [ ] **Step 4: Append this exact rule to the overlay interaction guidance in `design.md`.**
+- [x] **Step 4: Append this exact rule to the overlay interaction guidance in `design.md`.**
 
 ```markdown
 Solve Help keeps YouTube and the AI hint action in one compact row. The initial
@@ -3067,7 +3090,7 @@ AI settings recovery for controlled errors. Hint state is owned above visual
 modes and remains available after review save. Notes is a reserved tab.
 ```
 
-- [ ] **Step 5: Create the dedicated handoff with the complete initial content below.** The following is an honest initial evidence state; replace each recorded command outcome with its actual result after the following steps. Extend the focused-test rows with the exact commands and results actually executed in Tasks 1–9. Record the actual branch/source commit from `rtk git status --short --branch` and `rtk git rev-parse HEAD`; do not fabricate a commit/date/provider/quality result.
+- [x] **Step 5: Create the dedicated handoff with the complete initial content below.** The following is an honest initial evidence state; replace each recorded command outcome with its actual result after the following steps. Extend the focused-test rows with the exact commands and results actually executed in Tasks 1–9. Record the actual branch/source commit from `rtk git status --short --branch` and `rtk git rev-parse HEAD`; do not fabricate a commit/date/provider/quality result.
 
 ```markdown
 # Progressive overlay hints implementation and proof handoff
@@ -3139,7 +3162,7 @@ their actual evidence is attached. No push, PR, merge or release is implied by
 this handoff.
 ```
 
-- [ ] **Step 6: Format the exact changed files, then run the required complete gates below.** Expected: all commands exit zero; ordinary tests skip opt-in provider evaluation. `npm run check` includes DB migration checks, WXT preparation, TypeScript, ESLint and the full test suite. There are no schema/migration changes, so do not run `db:generate` or modify a migration. The explicit ignore override includes plans and proof docs even when local ignore rules change.
+- [x] **Step 6: Format the exact changed files, then run the required complete gates below.** Expected: all commands exit zero; ordinary tests skip opt-in provider evaluation. `npm run check` includes DB migration checks, WXT preparation, TypeScript, ESLint and the full test suite. There are no schema/migration changes, so do not run `db:generate` or modify a migration. The explicit ignore override includes plans and proof docs even when local ignore rules change.
 
 ```sh
 rtk npx prettier --ignore-path /dev/null --write src/app/providers/cache-invalidation-listener.tsx src/app/providers/cache-invalidation-listener.test.tsx src/platform/query/cache-invalidation.test.ts src/features/leetcode-review-assistant/domain/code-hint-schema.ts src/features/leetcode-review-assistant/api/code-hint-contracts.ts src/features/leetcode-review-assistant/api/code-hint-contracts.test.ts src/features/leetcode-review-assistant/api/code-hint-api.ts src/features/leetcode-review-assistant/api/code-hint-api.test.ts src/features/leetcode-review-assistant/index.ts src/features/leetcode-review-assistant/server/code-hint-service.ts src/features/leetcode-review-assistant/server/code-hint-service.test.ts src/features/leetcode-review-assistant/server/hint-runtime-service.ts src/features/leetcode-review-assistant/server/hint-runtime-service.test.ts src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts src/features/leetcode-review-assistant/testing/code-hint-evaluation-fixtures.ts src/features/leetcode-capture/api/prepare-code-hint-context.ts src/features/leetcode-capture/api/prepare-code-hint-context.test.ts src/features/leetcode-capture/index.ts src/features/leetcode-capture/server/leetcode-capture-service.ts src/features/leetcode-capture/server/leetcode-capture-service.cache.test.ts src/features/genai/api/hint-connection-contracts.ts src/features/genai/api/hint-connection-hooks.ts src/features/genai/server/genai-settings-service.ts src/features/genai/server/genai-settings-service.test.ts src/features/genai/index.ts src/platform/query/query-keys.ts src/platform/query/cache-invalidation.ts src/extension/messaging.ts src/extension/background/runtime-policy.ts src/extension/background/runtime-policy.test.ts src/extension/background/leetcode-analysis-operations.ts src/extension/background/leetcode-analysis-operations.test.ts src/extension/background/cache-invalidation-broadcaster.ts src/extension/background/cache-invalidation-broadcaster.test.ts src/extension/background/register-handlers.ts src/extension/background/register-handlers.test.ts src/features/overlay-session/hooks/use-leetcode-code-hints.ts src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx src/features/overlay-session/hooks/use-leetcode-page-sync.ts src/features/overlay-session/hooks/use-leetcode-overlay-session.ts src/features/overlay-session/hooks/use-leetcode-overlay-session.test.tsx src/features/overlay-session/components/overlay-shell.tsx src/features/overlay-session/components/overlay-shell.test.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.tsx src/features/overlay-session/components/modes/expanded/expanded-overlay.test.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.tsx src/features/overlay-session/components/modes/expanded/overlay-help-section.test.tsx src/features/overlay-session/components/modes/expanded/overlay-hint-block.tsx docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/plans/2026-10-04-overlay-ai-hints.md docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md
@@ -3156,4 +3179,4 @@ rtk git diff --check
 - [ ] **Step 7: Complete the human smoke and live provider-quality gates above, and record actual evidence in the dedicated handoff.** Do not label those gates complete from unit tests, screenshots of mock data, or a provider success response alone. If human evidence or privately configured live evaluation is unavailable, report the exact pending gate, command and reason and keep the behavior change unready for review/merge.
 - [ ] **Step 8: Review the final diff for the approved scope.** Verify no hint writes to Practice/logs/rating/time/FSRS/Analytics/SQLite/backup/sync, no new permission/host/auth/backend behavior, no current-editor watcher, no official-hint input, and no automatic generation or ready-batch Regenerate action. Verify strict parsing, actual sender host/slug binding, separate ownership and redacted errors at the extension boundary. Report feature release impact; recovery is removing the manual Help action or saved connection, with no DB rollback required.
 - [ ] **Step 9: Replace the handoff's initial evidence state with the actual validation record.** List each exact focused/full command actually run with its outcome, each exact skipped command and reason, actual branch/source commit, live provider/model/date and quality findings, human proof paths, remaining risk, changed files and recovery notes. Re-run `rtk npx prettier --ignore-path /dev/null --write docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md` and `rtk npx prettier --ignore-path /dev/null --check docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md`, then `rtk git diff --check`. Mark this Phase 2 complete only after the approved behavior, required checks and evidence are complete; leave Notes reserved.
-- [ ] **Step 10: Commit authority docs and evidence:** `rtk git add docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md`; `rtk git commit -m "docs: document session-only progressive overlay hints and proof"`.
+- [x] **Step 10: Commit authority docs and evidence:** `rtk git add docs/product.md docs/architecture.md docs/testing.md design.md docs/superpowers/handoffs/2026-10-04-overlay-ai-hints.md`; `rtk git commit -m "docs: document session-only progressive overlay hints and proof"`.
