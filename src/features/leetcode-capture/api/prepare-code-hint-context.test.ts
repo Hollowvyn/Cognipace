@@ -66,7 +66,6 @@ describe('prepareLeetCodeHintContext', () => {
       examples: [],
       constraints: capture.problemContent!.constraints,
     })
-    expect(prepared.inputFingerprint).toBe(JSON.stringify(prepared.problem))
     expect(prepared.capture).toBe(capture)
     expect(remote.readProblemMetadata).not.toHaveBeenCalled()
     expect(remote.readProblemContent).not.toHaveBeenCalled()
@@ -115,7 +114,6 @@ describe('prepareLeetCodeHintContext', () => {
     if (prepared.status !== 'ready') throw new Error('Expected ready context')
     expect(prepared.problem.title).toBe(fresh.metadata.title)
     expect(prepared.problem.statement).toBe(fresh.problemContent.statement)
-    expect(prepared.inputFingerprint).toBe(JSON.stringify(prepared.problem))
     expect(prepared.capture).toEqual(fresh)
     expect(prepared.capture.submissionResult).toBe(capture.submissionResult)
     expect(prepared.capture).not.toBe(capture)

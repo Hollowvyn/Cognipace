@@ -40,31 +40,13 @@ export function makeHintInputFingerprint(problem: HintProblem): string {
   })
 }
 
-const identityFields = {
+export const generateLeetCodeHintsRequestSchema = z.strictObject({
+  surface: z.literal('content-script'),
   requestId: text(160),
-  problemSlug: problemSlugSchema,
-  inputFingerprint: text(24000),
   connectionRevision: z.uuid(),
   connectionProvider: z.enum(aiProviderIds),
-}
-
-export const generateLeetCodeHintsRequestSchema = z
-  .strictObject({
-    surface: z.literal('content-script'),
-    ...identityFields,
-    problem: hintProblemSchema,
-  })
-  .superRefine((request, ctx) => {
-    if (
-      request.problemSlug !== request.problem.slug ||
-      request.inputFingerprint !== makeHintInputFingerprint(request.problem)
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Hint input identity does not match.',
-      })
-    }
-  })
+  problem: hintProblemSchema,
+})
 
 export type GenerateLeetCodeHintsRequest = z.infer<
   typeof generateLeetCodeHintsRequestSchema
@@ -81,12 +63,12 @@ export const generateLeetCodeHintsResponseSchema = z.discriminatedUnion(
   [
     z.strictObject({
       status: z.literal('ready'),
-      ...identityFields,
+      requestId: text(160),
       batch: hintBatchSchema,
     }),
     z.strictObject({
       status: z.literal('error'),
-      ...identityFields,
+      requestId: text(160),
       code: hintErrorCodeSchema,
       message: z.string().max(400),
     }),
@@ -111,29 +93,3 @@ export type CancelLeetCodeHintsRequest = z.infer<
 export type CancelLeetCodeHintsResponse = z.infer<
   typeof cancelLeetCodeHintsResponseSchema
 >
-
-export function hintIdentity(
-  request: Pick<
-    GenerateLeetCodeHintsRequest,
-    | 'requestId'
-    | 'problemSlug'
-    | 'inputFingerprint'
-    | 'connectionRevision'
-    | 'connectionProvider'
-  >,
-) {
-  const {
-    requestId,
-    problemSlug,
-    inputFingerprint,
-    connectionRevision,
-    connectionProvider,
-  } = request
-  return {
-    requestId,
-    problemSlug,
-    inputFingerprint,
-    connectionRevision,
-    connectionProvider,
-  }
-}

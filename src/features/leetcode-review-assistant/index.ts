@@ -25,7 +25,6 @@ export {
   hintBatchSchema,
   hintProblemSchema,
   makeHintInputFingerprint,
-  hintIdentity,
   generateLeetCodeHintsRequestSchema,
   generateLeetCodeHintsResponseSchema,
   cancelLeetCodeHintsRequestSchema,

@@ -9,11 +9,7 @@ import {
   generateLeetCodeHintsViaRuntime,
   cancelLeetCodeHintsViaRuntime,
 } from './code-hint-api'
-import {
-  hintIdentity,
-  makeHintInputFingerprint,
-  type GenerateLeetCodeHintsRequest,
-} from './code-hint-contracts'
+import { type GenerateLeetCodeHintsRequest } from './code-hint-contracts'
 
 const problem = {
   host: 'leetcode.com' as const,
@@ -26,15 +22,13 @@ const problem = {
 const request: GenerateLeetCodeHintsRequest = {
   surface: 'content-script',
   requestId: 'hint-1',
-  problemSlug: problem.slug,
   problem,
-  inputFingerprint: makeHintInputFingerprint(problem),
   connectionRevision: '00000000-0000-4000-8000-000000000001',
   connectionProvider: 'gemini',
 }
 const response = {
   status: 'ready' as const,
-  ...hintIdentity(request),
+  requestId: request.requestId,
   batch: { hints: ['Think about lookup.'] },
 }
 

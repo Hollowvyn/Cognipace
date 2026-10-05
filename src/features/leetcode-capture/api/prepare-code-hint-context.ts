@@ -1,6 +1,5 @@
 import {
   hintProblemSchema,
-  makeHintInputFingerprint,
   type HintProblem,
 } from '@/features/leetcode-review-assistant'
 import { withAiDeadline } from '@/lib/ai/operation'
@@ -10,7 +9,6 @@ export type PreparedHintContext =
   | {
       status: 'ready'
       problem: HintProblem
-      inputFingerprint: string
       capture: LeetCodeCaptureState
     }
   | {
@@ -60,7 +58,6 @@ export async function prepareLeetCodeHintContext(
     return {
       status: 'ready',
       problem: existing,
-      inputFingerprint: makeHintInputFingerprint(existing),
       capture,
     }
   }
@@ -97,7 +94,6 @@ export async function prepareLeetCodeHintContext(
       return {
         status: 'ready',
         problem,
-        inputFingerprint: makeHintInputFingerprint(problem),
         capture: next,
       }
     },

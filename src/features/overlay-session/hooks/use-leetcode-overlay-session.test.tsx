@@ -12,7 +12,6 @@ import {
   cancelLeetCodeAnalysisViaRuntime,
   generateLeetCodeHintsViaRuntime,
   cancelLeetCodeHintsViaRuntime,
-  hintIdentity,
   type AnalyzeLeetCodeSubmissionResponse,
 } from '@/features/leetcode-review-assistant'
 import { makeCompleteCapture } from '@/features/leetcode-capture/testing/code-analysis-capture-fixtures'
@@ -236,7 +235,7 @@ describe('useLeetCodeOverlaySession', () => {
     generateHints.mockReset().mockImplementation((request) =>
       Promise.resolve({
         status: 'ready',
-        ...hintIdentity(request),
+        requestId: request.requestId,
         batch: { hints: hintPointers },
       }),
     )

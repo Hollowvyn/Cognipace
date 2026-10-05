@@ -40,9 +40,7 @@ describe('generateCodeHints', () => {
     vi.mocked(generateJson).mockResolvedValue(result)
     const signal = new AbortController().signal
 
-    expect(await generateCodeHints(problem, config, signal, 12345)).toEqual(
-      result,
-    )
+    expect(await generateCodeHints(problem, config, signal)).toEqual(result)
 
     expect(generateJson).toHaveBeenCalledTimes(1)
     const call = vi.mocked(generateJson).mock.calls[0]?.[0]
@@ -50,7 +48,6 @@ describe('generateCodeHints', () => {
     expect(call).toEqual({
       ...config,
       signal,
-      timeoutMs: 12345,
       maxOutputTokens: 1024,
       schema: hintBatchSchema,
       prompt: {

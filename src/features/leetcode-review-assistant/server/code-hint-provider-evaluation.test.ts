@@ -22,7 +22,6 @@ describe.skipIf(config === null)('live progressive hint evaluation', () => {
           fixture.problem,
           config,
           new AbortController().signal,
-          30000,
         )
         // Do not print configuration, raw provider bodies or private errors.
         expect(result.status).toBe('success')

@@ -6,8 +6,6 @@ import type { Db } from '@/platform/db'
 import {
   generateLeetCodeHintsRequestSchema,
   generateLeetCodeHintsResponseSchema,
-  hintIdentity,
-  makeHintInputFingerprint,
   type HintProblem,
 } from '../api/code-hint-contracts'
 import { generateCodeHints } from './code-hint-service'
@@ -43,8 +41,6 @@ const problem: HintProblem = {
 const request = generateLeetCodeHintsRequestSchema.parse({
   surface: 'content-script',
   requestId: 'hint-request-1',
-  problemSlug: problem.slug,
-  inputFingerprint: makeHintInputFingerprint(problem),
   connectionRevision: revision,
   connectionProvider: config.provider,
   problem,
@@ -69,7 +65,7 @@ function expectSafe(result: unknown) {
   expect(generateLeetCodeHintsResponseSchema.safeParse(result).success).toBe(
     true,
   )
-  expect(result).toMatchObject(hintIdentity(request))
+  expect(result).toMatchObject({ requestId: request.requestId })
   for (const value of ['private', 'apiKey', 'identity', 'providerMetadata'])
     expect(JSON.stringify(result)).not.toContain(value)
 }
@@ -95,16 +91,19 @@ afterEach(() => {
 })
 
 describe('trusted background hints', () => {
-  it('returns one ready batch with only the five public identity fields', async () => {
+  it('returns one ready batch correlated only by request id', async () => {
     const result = await runHints()
-    expect(result).toEqual({ status: 'ready', ...hintIdentity(request), batch })
+    expect(result).toEqual({
+      status: 'ready',
+      requestId: request.requestId,
+      batch,
+    })
     expectSafe(result)
     expect(generateHints).toHaveBeenCalledTimes(1)
     expect(generateHints).toHaveBeenCalledWith(
       request.problem,
       config,
       expect.any(AbortSignal),
-      30_000,
     )
     expect(readSnapshot).toHaveBeenCalledTimes(2)
     expect(readSnapshot).toHaveBeenNthCalledWith(1, db)
@@ -120,7 +119,7 @@ describe('trusted background hints', () => {
     const result = await runHints()
     expect(result).toEqual({
       status: 'error',
-      ...hintIdentity(request),
+      requestId: request.requestId,
       code: 'not-configured',
       message:
         'Save an AI provider, model, and key in Settings to request hints.',
@@ -145,7 +144,7 @@ describe('trusted background hints', () => {
       const result = await runHints()
       expect(result).toEqual({
         status: 'error',
-        ...hintIdentity(request),
+        requestId: request.requestId,
         code: 'stale-configuration',
         message:
           'The saved AI connection changed. Retry with the current connection.',
@@ -172,7 +171,7 @@ describe('trusted background hints', () => {
       const result = await runHints()
       expect(result).toEqual({
         status: 'error',
-        ...hintIdentity(request),
+        requestId: request.requestId,
         code: 'stale-configuration',
         message:
           'The saved AI connection changed. Retry with the current connection.',
@@ -192,7 +191,7 @@ describe('trusted background hints', () => {
     const result = await runHints()
     expect(result).toEqual({
       status: 'error',
-      ...hintIdentity(request),
+      requestId: request.requestId,
       code: 'invalid-output',
       message: 'Controlled SDK feedback.',
     })
@@ -200,23 +199,24 @@ describe('trusted background hints', () => {
     expect(generateHints).toHaveBeenCalledTimes(1)
   })
 
-  it('passes only the remaining budget after database and trusted preparation', async () => {
+  it('propagates the whole-operation deadline after database and trusted preparation', async () => {
     loadDb.mockImplementation(() => {
-      vi.setSystemTime(Date.now() + 2_000)
-      return Promise.resolve(db)
+      return new Promise((resolve) => setTimeout(() => resolve(db), 2_000))
     })
     readSnapshot.mockImplementation(() => {
-      vi.setSystemTime(Date.now() + 3_000)
-      return Promise.resolve(snapshot)
+      return new Promise((resolve) =>
+        setTimeout(() => resolve(snapshot), 3_000),
+      )
     })
-    await runHints()
+    generateHints.mockReturnValue(new Promise(() => {}))
+    const pending = runHints()
+    await vi.advanceTimersByTimeAsync(5_000)
     expect(generateHints).toHaveBeenCalledTimes(1)
-    expect(generateHints).toHaveBeenCalledWith(
-      request.problem,
-      config,
-      expect.any(AbortSignal),
-      25_000,
-    )
+    const signal = generateHints.mock.calls[0]![2]
+    expect(signal.aborted).toBe(false)
+    await vi.advanceTimersByTimeAsync(25_000)
+    expect(await pending).toMatchObject({ status: 'error', code: 'timeout' })
+    expect(signal.aborted).toBe(true)
   })
 
   it.each(['database', 'trusted-storage', 'generation', 'recheck'] as const)(
@@ -233,7 +233,7 @@ describe('trusted background hints', () => {
       const result = await runHints()
       expect(result).toEqual({
         status: 'error',
-        ...hintIdentity(request),
+        requestId: request.requestId,
         code: 'unknown',
         message: 'Hints could not finish. Retry this problem.',
       })
@@ -269,7 +269,7 @@ describe('trusted background hints', () => {
       const result = await pending
       expect(result).toEqual({
         status: 'error',
-        ...hintIdentity(request),
+        requestId: request.requestId,
         code,
         message:
           code === 'timeout'

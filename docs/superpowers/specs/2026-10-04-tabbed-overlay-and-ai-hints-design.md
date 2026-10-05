@@ -150,11 +150,15 @@ a submission; no editor watcher or submission identity is needed.
 
 Do not include submitted/current code, submission diagnostics, LeetCode auth,
 official LeetCode hints, follow-ups, or provider credentials in the hint payload.
-Bind the batch to a fingerprint of the fields actually used, so changes to
-excluded capture fields do not invalidate it.
+Bind the batch to a local controller identity of the fields actually used, so
+changes to excluded capture fields do not invalidate it. Keep that identity
+local; it is not duplicated in the runtime envelope.
 
-Use a strict problem-only envelope with request ID, problem identity, selected
-input fingerprint, and connection revision. Bound the serialized problem
+Use a strict problem-only envelope with `surface`, `requestId`, the problem,
+and selected connection revision/provider. The problem carries its host/slug;
+do not duplicate its slug or local selected-input identity on the wire. Responses
+correlate by `requestId` only, while the controller checks its local operation,
+input identity and connection. Bound the serialized problem
 payload to 24,000 characters, examples to 50, and constraints to 100. Reject
 missing, mismatched, incomplete, or oversized essentials without truncation.
 

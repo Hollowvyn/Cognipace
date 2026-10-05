@@ -6,12 +6,10 @@ export function generateCodeHints(
   problem: HintProblem,
   config: AiProviderConfig,
   signal: AbortSignal,
-  timeoutMs: number,
 ) {
   return generateJson({
     ...config,
     signal,
-    timeoutMs,
     maxOutputTokens: 1024,
     schema: hintBatchSchema,
     prompt: {

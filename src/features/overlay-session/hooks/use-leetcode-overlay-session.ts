@@ -130,37 +130,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     onProblemLoaded: handleProblemLoaded,
   })
 
-  const analysisResetRef = useRef<() => void>(() => undefined)
-  const hintResetRef = useRef<() => void>(() => undefined)
-  const handleRestart = useCallback(() => {
-    analysisResetRef.current()
-    hintResetRef.current()
-  }, [])
-
-  const actions = useOverlayReviewActions({
-    contextRef: pageSync.latestContextRef,
-    dispatch,
-    overlayRef: latestOverlayRef,
-    refreshContext: pageSync.refreshContext,
-    syncTokenRef: pageSync.syncTokenRef,
-    timer,
-    onRestart: handleRestart,
-  })
-
-  useLeetCodeSubmissionAutomation({
-    activeProblemSlug: overlay.activeProblemSlug,
-    autoDetectSolved: pageSync.context?.automation.autoDetectSolved ?? false,
-    problemSlug: pageSync.context?.problem?.problemSlug ?? null,
-    reviewStatus: overlay.reviewStatus,
-    saveLeetCodeSubmissionResult: actions.saveLeetCodeSubmissionResult,
-    startTimer: timer.start,
-    submittedSession: overlay.submittedSession,
-    submissionResult: pageSync.submission.result,
-  })
-
-  const targetSeconds = getTargetSeconds(pageSync.context)
-  const elapsedSeconds = timer.elapsedSeconds
-
   const analysis = useLeetCodeCodeAnalysis({
     activeSlug: overlay.activeProblemSlug,
     capture: pageSync.capture,
@@ -181,13 +150,32 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     refreshConnection: hintConnection.refresh,
   })
 
-  useEffect(() => {
-    hintResetRef.current = hints.reset
-  }, [hints.reset])
+  const actions = useOverlayReviewActions({
+    contextRef: pageSync.latestContextRef,
+    dispatch,
+    overlayRef: latestOverlayRef,
+    refreshContext: pageSync.refreshContext,
+    syncTokenRef: pageSync.syncTokenRef,
+    timer,
+    onRestart: () => {
+      analysis.reset()
+      hints.reset()
+    },
+  })
 
-  useEffect(() => {
-    analysisResetRef.current = analysis.reset
-  }, [analysis.reset])
+  useLeetCodeSubmissionAutomation({
+    activeProblemSlug: overlay.activeProblemSlug,
+    autoDetectSolved: pageSync.context?.automation.autoDetectSolved ?? false,
+    problemSlug: pageSync.context?.problem?.problemSlug ?? null,
+    reviewStatus: overlay.reviewStatus,
+    saveLeetCodeSubmissionResult: actions.saveLeetCodeSubmissionResult,
+    startTimer: timer.start,
+    submittedSession: overlay.submittedSession,
+    submissionResult: pageSync.submission.result,
+  })
+
+  const targetSeconds = getTargetSeconds(pageSync.context)
+  const elapsedSeconds = timer.elapsedSeconds
 
   return {
     location: pageSync.location,

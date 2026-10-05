@@ -9,7 +9,6 @@ import {
 import {
   cancelLeetCodeHintsViaRuntime,
   generateLeetCodeHintsViaRuntime,
-  hintIdentity,
   makeHintInputFingerprint,
   type HintBatch,
   type HintErrorCode,
@@ -327,8 +326,6 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
           const request = {
             surface: 'content-script' as const,
             requestId: operation.requestId,
-            problemSlug: prepared.problem.slug,
-            inputFingerprint: prepared.inputFingerprint,
             connectionRevision: connection.revision,
             connectionProvider: connection.provider,
             problem: prepared.problem,
@@ -343,10 +340,7 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
           operation.sent = true
           const response = await generateLeetCodeHintsViaRuntime(request)
           if (signal.aborted || !isCurrent()) return
-          if (
-            JSON.stringify(hintIdentity(response)) !==
-            JSON.stringify(hintIdentity(request))
-          )
+          if (response.requestId !== operation.requestId)
             throw new Error('Hint response identity mismatch.')
           if (response.status === 'ready')
             publish({

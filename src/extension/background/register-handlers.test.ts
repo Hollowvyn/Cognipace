@@ -34,11 +34,7 @@ import {
   abortLeetCodeAnalyses,
   abortLeetCodeHints,
 } from './leetcode-analysis-operations'
-import {
-  generateLeetCodeHintsRequestSchema,
-  makeHintInputFingerprint,
-  hintIdentity,
-} from '@/features/leetcode-review-assistant/api/code-hint-contracts'
+import { generateLeetCodeHintsRequestSchema } from '@/features/leetcode-review-assistant/api/code-hint-contracts'
 import type { PopupAppShellData } from '@/features/app-shell/api/app-shell-contracts'
 import {
   backupSchemaVersion,
@@ -721,15 +717,13 @@ describe('background handler registration', () => {
     const request = generateLeetCodeHintsRequestSchema.parse({
       surface: 'content-script',
       requestId: 'hint-1',
-      problemSlug: problem.slug,
       problem,
-      inputFingerprint: makeHintInputFingerprint(problem),
       connectionRevision: '00000000-0000-4000-8000-000000000001',
       connectionProvider: 'gemini',
     })
     const response = {
       status: 'ready',
-      ...hintIdentity(request),
+      requestId: request.requestId,
       batch: { hints: ['Consider lookup.'] },
     }
     beforeEach(async () => {
@@ -758,8 +752,6 @@ describe('background handler registration', () => {
       const mismatch = {
         ...request,
         problem: other,
-        problemSlug: other.slug,
-        inputFingerprint: makeHintInputFingerprint(other),
       }
       expect(() =>
         sendRuntimeMessage('genai.generateLeetCodeHints', mismatch, sender),

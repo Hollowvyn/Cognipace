@@ -6,7 +6,6 @@ import { makeCompleteCapture } from '@/features/leetcode-capture/testing/code-an
 import {
   generateLeetCodeHintsRequestSchema,
   generateLeetCodeHintsResponseSchema,
-  hintIdentity,
   type GenerateLeetCodeHintsRequest,
   type GenerateLeetCodeHintsResponse,
   type CancelLeetCodeHintsRequest,
@@ -77,7 +76,7 @@ function ready(
 ): GenerateLeetCodeHintsResponse {
   return generateLeetCodeHintsResponseSchema.parse({
     status: 'ready',
-    ...hintIdentity(request),
+    requestId: request.requestId,
     batch: { hints },
   })
 }
@@ -314,7 +313,7 @@ describe('explicit progressive hint sessions', () => {
     mocks.generate.mockImplementationOnce((request) =>
       Promise.resolve({
         status: 'error',
-        ...hintIdentity(request),
+        requestId: request.requestId,
         code: 'stale-configuration',
         message: 'Connection changed.',
       }),
@@ -625,7 +624,7 @@ describe('explicit progressive hint sessions', () => {
     mocks.generate.mockImplementationOnce((request) =>
       Promise.resolve({
         status: 'error',
-        ...hintIdentity(request),
+        requestId: request.requestId,
         code,
         message: 'Controlled provider error.',
       }),

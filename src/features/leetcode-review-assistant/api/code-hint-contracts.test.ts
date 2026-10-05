@@ -6,7 +6,6 @@ import {
   generateLeetCodeHintsRequestSchema,
   generateLeetCodeHintsResponseSchema,
   hintBatchSchema,
-  hintIdentity,
   hintProblemSchema,
   makeHintInputFingerprint,
 } from './code-hint-contracts'
@@ -23,8 +22,6 @@ const problem = {
 const request = {
   surface: 'content-script' as const,
   requestId: 'request-1',
-  problemSlug: 'two-sum',
-  inputFingerprint: makeHintInputFingerprint(problem),
   connectionRevision: '11111111-1111-4111-8111-111111111111',
   connectionProvider: 'gemini' as const,
   problem,
@@ -88,7 +85,6 @@ describe('code hint contracts', () => {
       generateLeetCodeHintsRequestSchema.safeParse({
         ...request,
         problem: oversizedProblem,
-        inputFingerprint: makeHintInputFingerprint(oversizedProblem),
       }).success,
     ).toBe(false)
   })
@@ -105,7 +101,6 @@ describe('code hint contracts', () => {
     const boundaryRequest = {
       ...request,
       problem: boundaryProblem,
-      inputFingerprint: makeHintInputFingerprint(boundaryProblem),
     }
     expect(generateLeetCodeHintsRequestSchema.parse(boundaryRequest)).toEqual(
       boundaryRequest,
@@ -147,18 +142,13 @@ describe('code hint contracts', () => {
       title: ' Two Sum ',
     }
     expect(hintProblemSchema.parse(changed)).toEqual(changed)
-    expect(makeHintInputFingerprint(changed)).not.toBe(request.inputFingerprint)
+    expect(makeHintInputFingerprint(changed)).not.toBe(
+      makeHintInputFingerprint(problem),
+    )
   })
 
-  it('parses strict ready and controlled-error envelopes with the same identity', () => {
-    const identity = hintIdentity(request)
-    expect(identity).toEqual({
-      requestId: request.requestId,
-      problemSlug: request.problemSlug,
-      inputFingerprint: request.inputFingerprint,
-      connectionRevision: request.connectionRevision,
-      connectionProvider: request.connectionProvider,
-    })
+  it('parses strict ready and controlled-error envelopes correlated by request id', () => {
+    const identity = { requestId: request.requestId }
     const responses = [
       { status: 'ready', ...identity, batch: { hints: ['Consider lookup.'] } },
       {
@@ -171,7 +161,7 @@ describe('code hint contracts', () => {
     for (const response of responses) {
       const parsed = generateLeetCodeHintsResponseSchema.parse(response)
       expect(parsed).toEqual(response)
-      expect(hintIdentity(parsed)).toEqual(identity)
+      expect(parsed.requestId).toBe(request.requestId)
       expect(
         generateLeetCodeHintsResponseSchema.safeParse({
           ...response,

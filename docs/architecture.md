@@ -694,6 +694,10 @@ fields preserves the batch, while any selected-input change invalidates it.
 Preparation and the strict problem-only runtime contract reject incomplete,
 mismatched, or oversized input rather than repairing or truncating it. Selected
 problem JSON is limited to 24,000 characters, 50 examples, and 100 constraints.
+Selected-input identity stays local to the controller. Runtime requests contain
+`surface`, `requestId`, problem and connection revision/provider; problem
+host/slug is not duplicated. Responses correlate by `requestId`, while the
+controller verifies its current operation, local input identity and connection.
 
 `leetcode-review-assistant` owns the hint request/response schemas, prompt, and
 service. A batch contains one to three distinct, trimmed, nonblank pointers of

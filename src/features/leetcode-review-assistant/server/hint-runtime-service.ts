@@ -3,7 +3,6 @@ import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
 import type { Db } from '@/platform/db'
 
 import {
-  hintIdentity,
   type GenerateLeetCodeHintsRequest,
   type GenerateLeetCodeHintsResponse,
 } from '../api/code-hint-contracts'
@@ -16,8 +15,7 @@ export async function generateLeetCodeHintsInBackground(
   loadDb: () => Promise<Db>,
   externalSignal: AbortSignal,
 ): Promise<GenerateLeetCodeHintsResponse> {
-  const identity = hintIdentity(request)
-  const startedAt = Date.now()
+  const identity = { requestId: request.requestId }
   const stale = (): GenerateLeetCodeHintsResponse => ({
     status: 'error',
     ...identity,
@@ -52,7 +50,6 @@ export async function generateLeetCodeHintsInBackground(
           request.problem,
           snapshot.config,
           signal,
-          Math.max(0, hintTimeoutMs - (Date.now() - startedAt)),
         )
         signal.throwIfAborted()
         const current = await readAiHintConnectionSnapshot(db)
