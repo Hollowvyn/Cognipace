@@ -1,0 +1,719 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600&amp;family=Nunito+Sans:wght@400;500;600;700&amp;display=swap">
+<div id="cp-performance-preview">
+  <p class="cp-preview-note">Concept preview · sample data · proposed scoring</p>
+  <div class="viz-carousel" aria-label="Analytics layouts">
+    <section data-variant="Value first" aria-label="Value first analytics design">
+      <div class="cp-preview-screen" data-design="trend">
+        <header class="cp-preview-header">
+          <div><span class="cp-preview-brand">CogniPace / Your learning</span><h1>Analytics</h1><p>Performance and recall, at a glance.</p></div>
+          <span class="cp-preview-scope">Last 30 days</span>
+        </header>
+        <div class="cp-preview-grid">
+          <article class="cp-preview-panel" data-kind="performance" aria-label="Performance score">
+            <header><div><h2>Performance</h2><p>First attempts · weighted by difficulty</p></div><button class="cp-preview-button cursor-interaction" type="button" data-breakdown aria-expanded="false">Breakdown <i data-lucide="arrow-up-right" aria-hidden="true"></i></button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong data-period-score>68</strong><span>/100</span></div><span class="cp-preview-context">100 assessments<br>Last update Oct 2</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="performance"></div><section class="cp-preview-breakdown" hidden aria-label="Performance score breakdown"></section></div>
+            <footer><span data-performance-foot>Period to date · Sep 6–Oct 5</span><button class="cp-preview-text-button cursor-interaction" type="button" data-breakdown aria-expanded="false">How it adds up</button></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="recall" aria-label="Recall compared with FSRS estimate">
+            <header><div><h2>Recall</h2><p>Repeat reviews · period to date</p></div><button class="cp-preview-button cursor-interaction" type="button" data-recall-details aria-expanded="false">Details <i data-lucide="arrow-up-right" aria-hidden="true"></i></button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>92</strong><span>%</span></div><span class="cp-preview-context">FSRS average <b>89%</b><br>52 paired reviews</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="recall"></div><section class="cp-preview-breakdown" data-recall-breakdown hidden aria-label="Recall comparison details"></section></div>
+            <footer><span class="cp-preview-legend"><button class="cp-preview-series cursor-interaction" type="button" data-recall-series="observed" aria-pressed="true"><i class="cp-preview-dot"></i>Recall</button><button class="cp-preview-series cursor-interaction" type="button" data-recall-series="estimate" aria-pressed="true"><i class="cp-preview-estimate"></i>FSRS avg</button></span><span>Last comparison Oct 2</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="time" aria-label="Recorded assessment time">
+            <header><div><h2>Assessment time</h2><p>Median time by difficulty</p></div><span class="cp-preview-chip">First attempts</span></header>
+            <div class="cp-preview-summary"><span class="cp-preview-small-label">Minutes</span><span class="cp-preview-context">94 timed assessments</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="time"></div></div>
+            <footer><span>Saved timers · pauses excluded</span><span>Minutes</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="memory" aria-label="Memory strength over time">
+            <header><div><h2>Memory strength</h2><p>FSRS stability after review</p></div></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>20</strong><span>days</span></div><span class="cp-preview-context">Last reviewed group<br>Median and middle 50%</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="memory"></div></div>
+            <footer><span>Median · middle 50%</span><span>Days</span></footer>
+          </article>
+        </div>
+      </div>
+    </section>
+    <section data-variant="Chart first" aria-label="Chart first analytics design" hidden>
+      <div class="cp-preview-screen" data-design="distribution">
+        <header class="cp-preview-header">
+          <div><span class="cp-preview-brand">CogniPace / Your learning</span><h1>Analytics</h1><p>Performance and recall, at a glance.</p></div>
+          <span class="cp-preview-scope">Last 30 days</span>
+        </header>
+        <div class="cp-preview-grid">
+          <article class="cp-preview-panel" data-kind="performance" aria-label="Performance score and trend">
+            <header><div><h2>Performance</h2><p>First attempts · weighted by difficulty</p></div><button class="cp-preview-button cursor-interaction" type="button" data-breakdown aria-expanded="false">Breakdown <i data-lucide="arrow-up-right" aria-hidden="true"></i></button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong data-period-score>68</strong><span>/100</span></div><span class="cp-preview-context">100 assessments<br>Last update Oct 2</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="performance"></div><section class="cp-preview-breakdown" hidden aria-label="Performance score breakdown"></section></div>
+            <footer><span data-performance-foot>Period to date · Sep 6–Oct 5</span><button class="cp-preview-text-button cursor-interaction" type="button" data-breakdown aria-expanded="false">How it adds up</button></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="recall" aria-label="Recall compared with FSRS estimate">
+            <header><div><h2>Recall</h2><p>Repeat reviews · period to date</p></div><button class="cp-preview-button cursor-interaction" type="button" data-recall-details aria-expanded="false">Details <i data-lucide="arrow-up-right" aria-hidden="true"></i></button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>92</strong><span>%</span></div><span class="cp-preview-context">FSRS average <b>89%</b><br>52 paired reviews</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="recall"></div><section class="cp-preview-breakdown" data-recall-breakdown hidden aria-label="Recall comparison details"></section></div>
+            <footer><span class="cp-preview-legend"><button class="cp-preview-series cursor-interaction" type="button" data-recall-series="observed" aria-pressed="true"><i class="cp-preview-dot"></i>Recall</button><button class="cp-preview-series cursor-interaction" type="button" data-recall-series="estimate" aria-pressed="true"><i class="cp-preview-estimate"></i>FSRS avg</button></span><span>Last comparison Oct 2</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="time" aria-label="Recorded assessment time">
+            <header><div><h2>Assessment time</h2><p>Median time by difficulty</p></div><span class="cp-preview-chip">First attempts</span></header>
+            <div class="cp-preview-summary"><span class="cp-preview-small-label">Minutes</span><span class="cp-preview-context">94 timed assessments</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="time"></div></div>
+            <footer><span>Saved timers · pauses excluded</span><span>Minutes</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="memory" aria-label="Memory strength over time">
+            <header><div><h2>Memory strength</h2><p>FSRS stability after review</p></div></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>20</strong><span>days</span></div><span class="cp-preview-context">Last reviewed group<br>Median and middle 50%</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="memory"></div></div>
+            <footer><span>Median · middle 50%</span><span>Days</span></footer>
+          </article>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<style>
+  #cp-performance-preview {
+    --cp-preview-bg: light-dark(#f3f6f2, #101713);
+    --cp-preview-card: light-dark(#ffffff, #19211d);
+    --cp-preview-ink: light-dark(#253d2f, #e4ece6);
+    --cp-preview-subtle: light-dark(#617568, #a4b5a9);
+    --cp-preview-border: light-dark(#dce5dc, #34463a);
+    --cp-preview-grid-line: light-dark(#e8eee7, #29392e);
+    --cp-preview-primary: light-dark(#2d5a43, #a1d1b4);
+    --cp-preview-on-primary: light-dark(#ffffff, #063824);
+    --cp-preview-strong: light-dark(#34865a, #8fdfa9);
+    --cp-preview-solid: light-dark(#258e86, #5bdcc9);
+    --cp-preview-effort: light-dark(#a87906, #ccb777);
+    --cp-preview-practice: light-dark(#bd6862, #cba5a2);
+    --cp-preview-medium: light-dark(#477cae, #83b7ea);
+    --cp-preview-hard: light-dark(#aa7a00, #ffd449);
+    --cp-preview-estimate: light-dark(#6f879a, #9db7c7);
+    --cp-preview-focus: light-dark(#2d5a43, #a1d1b4);
+    color: var(--cp-preview-ink);
+    font-family: 'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  #cp-performance-preview * { box-sizing: border-box; }
+  #cp-performance-preview [hidden] { display: none !important; }
+  #cp-performance-preview .cp-preview-note { margin: 0 0 12px; color: var(--cp-preview-subtle); font-size: 12px; }
+  #cp-performance-preview .cp-preview-screen { padding: 28px; min-height: 1170px; background: var(--cp-preview-bg); }
+  #cp-performance-preview .cp-preview-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-right: 80px; margin-bottom: 30px; }
+  #cp-performance-preview .cp-preview-brand { color: var(--cp-preview-subtle); font-size: 12px; }
+  #cp-performance-preview h1 { margin: 8px 0; font-family: Literata, Georgia, serif; font-size: 34px; font-weight: 500; line-height: 1.2; letter-spacing: -.03em; }
+  #cp-performance-preview .cp-preview-header p { margin: 0; color: var(--cp-preview-subtle); font-size: 14px; }
+  #cp-performance-preview .cp-preview-scope { color: var(--cp-preview-subtle); font-size: 12px; white-space: nowrap; }
+  #cp-performance-preview .cp-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  #cp-performance-preview .cp-preview-panel { height: 464px; min-width: 0; display: grid; grid-template-rows: 44px 62px minmax(0, 1fr) 26px; gap: 14px; padding: 22px; border: 1px solid var(--cp-preview-border); border-radius: 14px; background: var(--cp-preview-card); box-shadow: 0 3px 16px color-mix(in srgb, var(--cp-preview-ink) 3%, transparent); }
+  #cp-performance-preview .cp-preview-panel[data-expanded='true'] { grid-template-rows: 44px minmax(0, 1fr) 26px; }
+  #cp-performance-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) { grid-template-rows: 44px minmax(0, 1fr) 46px 26px; }
+  #cp-performance-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) > .cp-preview-body { grid-row: 2; }
+  #cp-performance-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) > .cp-preview-summary { grid-row: 3; border-top: 1px solid var(--cp-preview-grid-line); padding-top: 12px; }
+  #cp-performance-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) .cp-preview-number strong { font-size: 32px; }
+  #cp-performance-preview .cp-preview-panel > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; min-width: 0; }
+  #cp-performance-preview .cp-preview-panel h2 { margin: 0 0 4px; color: var(--cp-preview-ink); font-size: 18px; font-weight: 700; line-height: 1.3; letter-spacing: -.015em; }
+  #cp-performance-preview .cp-preview-panel header p { margin: 0; color: var(--cp-preview-subtle); font-size: 12px; line-height: 1.4; }
+  #cp-performance-preview .cp-preview-button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--cp-preview-border); border-radius: 8px; padding: 7px 9px; background: transparent; color: var(--cp-preview-ink); font: inherit; font-size: 12px; white-space: nowrap; }
+  #cp-performance-preview .cp-preview-button svg { width: 13px; height: 13px; }
+  #cp-performance-preview .cp-preview-button[aria-expanded='true'] { background: var(--cp-preview-primary); color: var(--cp-preview-on-primary); border-color: var(--cp-preview-primary); }
+  #cp-performance-preview button:focus-visible { outline: 2px solid var(--cp-preview-focus); outline-offset: 3px; }
+  #cp-performance-preview .cp-preview-chip { font-size: 11px; line-height: 1.4; color: var(--cp-preview-subtle); text-align: right; }
+  #cp-performance-preview .cp-preview-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  #cp-performance-preview .cp-preview-number { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  #cp-performance-preview .cp-preview-number strong { font-size: 50px; line-height: 1; font-weight: 600; letter-spacing: -.05em; color: var(--cp-preview-ink); }
+  #cp-performance-preview .cp-preview-number > span { font-size: 16px; color: var(--cp-preview-subtle); }
+  #cp-performance-preview .cp-preview-context { color: var(--cp-preview-subtle); font-size: 12px; text-align: right; }
+  #cp-performance-preview .cp-preview-small-label { font-size: 12px; color: var(--cp-preview-subtle); }
+  #cp-performance-preview .cp-preview-body, #cp-performance-preview .cp-preview-chart { min-width: 0; min-height: 0; height: 100%; }
+  #cp-performance-preview .cp-preview-chart { position: relative; }
+  #cp-performance-preview .cp-preview-inspector { position: absolute; inset: 18px 12px 28px 40px; border: 0; padding: 0; background: transparent; color: inherit; }
+  #cp-performance-preview .cp-preview-inspect-detail { position: absolute; left: 46px; right: 14px; top: 32px; padding: 8px 10px; color: var(--cp-preview-ink); background: var(--cp-preview-card); border: 1px solid var(--cp-preview-border); border-radius: 6px; font-size: 12px; pointer-events: none; }
+  #cp-performance-preview .cp-preview-inspect-detail strong, #cp-performance-preview .cp-preview-inspect-detail span { display: block; }
+  #cp-performance-preview .cp-preview-inspect-detail span { color: var(--cp-preview-subtle); font-size: 11px; }
+  #cp-performance-preview .cp-preview-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  #cp-performance-preview .cp-preview-plot-text { fill: var(--cp-preview-subtle); font-family: inherit; font-size: 11px; }
+  #cp-performance-preview .cp-preview-plot-value { fill: var(--cp-preview-ink); font-family: inherit; font-size: 12px; font-weight: 600; }
+  #cp-performance-preview .cp-preview-tooltip-mark { outline-offset: 3px; }
+  #cp-performance-preview .cp-preview-panel footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--cp-preview-subtle); font-size: 11px; min-width: 0; }
+  #cp-performance-preview .cp-preview-text-button { border: 0; background: transparent; color: var(--cp-preview-primary); font: inherit; font-size: 11px; padding: 5px 0; white-space: nowrap; }
+  #cp-performance-preview .cp-preview-legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  #cp-performance-preview .cp-preview-series { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 4px 0; background: transparent; color: var(--cp-preview-subtle); font: inherit; font-size: 11px; }
+  #cp-performance-preview .cp-preview-series[aria-pressed='false'] { text-decoration: line-through; opacity: .6; }
+  #cp-performance-preview .cp-preview-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cp-preview-strong); display: inline-block; }
+  #cp-performance-preview .cp-preview-estimate { width: 15px; border-top: 2px dashed var(--cp-preview-estimate); display: inline-block; margin-left: 4px; }
+  #cp-performance-preview .cp-preview-breakdown { height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+  #cp-performance-preview .cp-preview-detail-tabs { display: flex; gap: 8px; }
+  #cp-performance-preview .cp-preview-detail-tabs button { font-size: 11px; padding: 4px 8px; }
+  #cp-performance-preview .cp-preview-detail-tabs button[aria-pressed='true'] { color: var(--cp-preview-on-primary); background: var(--cp-preview-primary); border-color: var(--cp-preview-primary); }
+  #cp-performance-preview .cp-preview-breakdown table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+  #cp-performance-preview .cp-preview-breakdown th { font-weight: 400; color: var(--cp-preview-subtle); font-size: 11px; padding: 0 0 8px; text-align: right; }
+  #cp-performance-preview .cp-preview-breakdown td { padding: 5px 0; text-align: right; border-top: 1px solid var(--cp-preview-grid-line); color: var(--cp-preview-ink); }
+  #cp-performance-preview .cp-preview-breakdown th:first-child, #cp-performance-preview .cp-preview-breakdown td:first-child { text-align: left; }
+  #cp-performance-preview .cp-preview-breakdown small { display: block; color: var(--cp-preview-subtle); font-size: 11px; }
+  #cp-performance-preview .cp-preview-math-total { display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--cp-preview-border); font-size: 12px; }
+  #cp-performance-preview .cp-preview-breakdown-note { color: var(--cp-preview-subtle); font-size: 11px; margin: 0; }
+  #cp-performance-preview .cp-preview-distribution { display: grid; align-content: center; gap: 15px; height: 100%; }
+  #cp-performance-preview .cp-preview-dist-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+  #cp-performance-preview .cp-preview-track { height: 12px; background: var(--cp-preview-grid-line); overflow: hidden; }
+  #cp-performance-preview .cp-preview-track > span { display: block; height: 100%; }
+  @media (max-width: 690px) {
+    #cp-performance-preview .cp-preview-screen { padding: 16px; min-height: 2130px; }
+    #cp-performance-preview .cp-preview-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    #cp-performance-preview .cp-preview-header { padding-right: 0; flex-wrap: wrap; }
+    #cp-performance-preview h1 { font-size: 28px; }
+    #cp-performance-preview .cp-preview-panel { padding: 18px; grid-template-rows: 50px 62px minmax(0, 1fr) 26px; }
+  }
+  @media (max-width: 380px) {
+    #cp-performance-preview .cp-preview-screen { padding: 12px; }
+    #cp-performance-preview .cp-preview-panel { padding: 14px; grid-template-rows: 60px 62px minmax(0, 1fr) 34px; gap: 12px; }
+    #cp-performance-preview .cp-preview-panel[data-expanded='true'] { grid-template-rows: 60px minmax(0, 1fr) 34px; }
+    #cp-performance-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) { grid-template-rows: 60px minmax(0, 1fr) 48px 34px; }
+    #cp-performance-preview .cp-preview-context { font-size: 11px; }
+    #cp-performance-preview .cp-preview-button svg { display: none; }
+    #cp-performance-preview .cp-preview-panel footer { flex-wrap: wrap; gap: 2px 8px; }
+    #cp-performance-preview .cp-preview-breakdown td { padding: 7px 0; }
+  }
+  @media (pointer: coarse) {
+    #cp-performance-preview .cp-preview-button, #cp-performance-preview .cp-preview-text-button, #cp-performance-preview .cp-preview-series { min-height: 44px; }
+  }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('cp-performance-preview');
+  if (!root) return;
+  const weights = { again: 0, hard: 50, good: 80, easy: 100 };
+  const period = { easy: 20, good: 54, hard: 15, again: 11 };
+  const buckets = [
+    { date: '09/08', easy: 0, good: 3, hard: 3, again: 4 },
+    { date: '09/11', easy: 1, good: 5, hard: 2, again: 2 },
+    { date: '09/14', easy: 2, good: 5, hard: 2, again: 1 },
+    { date: '09/17', easy: 1, good: 4, hard: 3, again: 2 },
+    { date: '09/20', easy: 2, good: 6, hard: 1, again: 1 },
+    { date: '09/23', easy: 2, good: 6, hard: 2, again: 0 },
+    { date: '09/26', easy: 3, good: 6, hard: 1, again: 0 },
+    { date: '09/29', easy: 3, good: 6, hard: 1, again: 0 },
+    { date: '10/02', easy: 3, good: 6, hard: 0, again: 1 },
+    { date: '10/05', easy: 3, good: 7, hard: 0, again: 0 }
+  ];
+  const difficulties = [
+    { name: 'Easy', influence: 1, easy: 8, good: 15, hard: 1, again: 1, color: '--cp-preview-strong' },
+    { name: 'Medium', influence: 2, easy: 10, good: 30, hard: 10, again: 5, color: '--cp-preview-medium' },
+    { name: 'Hard', influence: 3, easy: 2, good: 9, hard: 4, again: 5, color: '--cp-preview-hard' }
+  ];
+  const ratingRows = [
+    { key: 'easy', name: 'Strong', rating: 'Easy', color: '--cp-preview-strong' },
+    { key: 'good', name: 'Solid', rating: 'Good', color: '--cp-preview-solid' },
+    { key: 'hard', name: 'Effortful', rating: 'Hard', color: '--cp-preview-effort' },
+    { key: 'again', name: 'Needs practice', rating: 'Again', color: '--cp-preview-practice' }
+  ];
+  const number = value => Number.isInteger(value) ? String(value) : value.toFixed(1);
+  const total = row => row.easy + row.good + row.hard + row.again;
+  const pointSum = row => Object.keys(weights).reduce((sum, key) => sum + row[key] * weights[key], 0);
+  const ratingScore = row => total(row) ? pointSum(row) / total(row) : null;
+  const weightedTotal = rows => rows.reduce((sum, row) => sum + row.influence * total(row), 0);
+  const weightedPoints = rows => rows.reduce((sum, row) => sum + row.influence * pointSum(row), 0);
+  const performance = () => weightedPoints(difficulties) / weightedTotal(difficulties);
+  const weightedRatingCounts = () => Object.fromEntries(Object.keys(weights).map(key => [key, difficulties.reduce((sum, row) => sum + row.influence * row[key], 0)]));
+  const remaining = difficulties.map(row => ({ ...row }));
+  buckets.forEach((bucket, bucketIndex) => {
+    bucket.difficulties = difficulties.map(row => ({ name: row.name, influence: row.influence, easy: 0, good: 0, hard: 0, again: 0 }));
+    Object.keys(weights).forEach((rating, ratingIndex) => {
+      for (let count = 0; count < bucket[rating]; count++) {
+        let index = (bucketIndex + ratingIndex + count) % 3;
+        while (remaining[index][rating] === 0) index = (index + 1) % 3;
+        remaining[index][rating] -= 1;
+        bucket.difficulties[index][rating] += 1;
+      }
+    });
+  });
+  const scoreGroups = [[], [0, 1], [2], [], [], [3, 4, 5], [6, 7], [], [8, 9], []];
+  const performanceBuckets = buckets.map((bucket, index) => {
+    const rows = difficulties.map(row => ({ name: row.name, influence: row.influence, easy: 0, good: 0, hard: 0, again: 0 }));
+    for (const sourceIndex of scoreGroups[index]) {
+      for (let difficultyIndex = 0; difficultyIndex < rows.length; difficultyIndex++) {
+        for (const key of Object.keys(weights)) rows[difficultyIndex][key] += buckets[sourceIndex].difficulties[difficultyIndex][key];
+      }
+    }
+    return { date: bucket.date, difficulties: rows };
+  });
+  function runningPerformancePoints() {
+    let points = 0, units = 0, sample = 0, lastUpdated = null;
+    return performanceBuckets.map(bucket => {
+      const added = bucket.difficulties.reduce((sum, row) => sum + total(row), 0);
+      points += weightedPoints(bucket.difficulties);
+      units += weightedTotal(bucket.difficulties);
+      sample += added;
+      if (added) lastUpdated = bucket.date;
+      return { date: bucket.date, value: units ? points / units : null, added, sample, lastUpdated };
+    });
+  }
+  const recallSamples = buckets.map((bucket, index) => {
+    const supplied = { 1: [10, 8, .82], 2: [12, 11, .86], 5: [14, 13, .90], 8: [16, 16, .94] }[index];
+    return { date: bucket.date, paired: supplied ? supplied[0] : 0, recalled: supplied ? supplied[1] : 0, estimate: supplied ? supplied[2] : null };
+  });
+  function runningRecallPoints() {
+    let paired = 0, recalled = 0, estimates = 0, lastUpdated = null;
+    return recallSamples.map(row => {
+      paired += row.paired;
+      recalled += row.recalled;
+      if (row.paired > 0) { estimates += row.paired * row.estimate; lastUpdated = row.date; }
+      return { date: row.date, added: row.paired, sample: paired, recalled, observed: paired ? 100 * recalled / paired : null, estimate: paired ? 100 * estimates / paired : null, lastUpdated };
+    });
+  }
+  const create = (tag, attrs = {}, text) => {
+    const element = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, String(value));
+    if (text !== undefined) element.textContent = text;
+    return element;
+  };
+  const svgElement = (tag, attrs = {}, text) => {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, String(value));
+    if (text !== undefined) element.textContent = text;
+    return element;
+  };
+  const state = { trendBreakdown: false, distributionBreakdown: false, trendDetail: 'ratings', distributionDetail: 'ratings', trendRecall: false, distributionRecall: false, recallObserved: true, recallEstimate: true };
+  function applyState(saved) {
+    const model = saved && saved.modelContent;
+    const privateState = saved && saved.privateContent;
+    if (model && model.rubric && Number.isFinite(model.rubric.hard) && Number.isFinite(model.rubric.good)) {
+      weights.hard = Math.min(70, Math.max(20, model.rubric.hard));
+      weights.good = Math.min(95, Math.max(70, model.rubric.good));
+    }
+    if (privateState) {
+      state.trendBreakdown = privateState.trendBreakdown === true;
+      state.distributionBreakdown = privateState.distributionBreakdown === true;
+      state.trendDetail = privateState.trendDetail === 'difficulty' ? 'difficulty' : 'ratings';
+      state.distributionDetail = privateState.distributionDetail === 'difficulty' ? 'difficulty' : 'ratings';
+      state.trendRecall = privateState.trendRecall === true;
+      state.distributionRecall = privateState.distributionRecall === true;
+      state.recallObserved = privateState.recallObserved !== false;
+      state.recallEstimate = privateState.recallEstimate !== false;
+    }
+  }
+  applyState(window.openai && window.openai.widgetState);
+  function saveState() {
+    if (window.openai && window.openai.setWidgetState) {
+      window.openai.setWidgetState({
+        modelContent: { rubric: { ...weights }, questionWeights: { Easy: 1, Medium: 2, Hard: 3 }, sampleScore: performance(), sampleCounts: { ...period }, trend: 'Performance and paired Recall are cumulative within the selected period; both use dashed horizontal holds during inactivity', recall: { paired: 52, recalled: 48, averageEstimate: runningRecallPoints().at(-1).estimate }, design: 'Polished analytics preview' },
+        privateContent: { ...state }
+      }).catch(() => {});
+    }
+  }
+  function makeBreakdown(container, screen) {
+    container.replaceChildren();
+    const stateKey = screen.dataset.design === 'trend' ? 'trendDetail' : 'distributionDetail';
+    const detail = state[stateKey];
+    const tabs = create('div', { class: 'cp-preview-detail-tabs', 'aria-label': 'Performance breakdown view' });
+    for (const [value, label] of [['ratings', 'Ratings'], ['difficulty', 'Question difficulty']]) {
+      const button = create('button', { type: 'button', class: 'cp-preview-button cursor-interaction', 'aria-pressed': String(detail === value) }, label);
+      button.addEventListener('click', () => { state[stateKey] = value; render(); screen.querySelector('.cp-preview-detail-tabs [aria-pressed="true"]').focus(); saveState(); });
+      tabs.append(button);
+    }
+    const table = create('table');
+    const thead = create('thead');
+    const headRow = create('tr');
+    const headings = detail === 'ratings' ? ['Recorded level', 'Count', 'Points', 'Influence'] : ['Difficulty', 'Count', 'Weight', 'Score'];
+    for (const label of headings) headRow.append(create('th', { scope: 'col' }, label));
+    thead.append(headRow);
+    table.append(thead);
+    const tbody = create('tbody');
+    if (detail === 'ratings') {
+      const weightedCounts = weightedRatingCounts();
+      for (const row of ratingRows) {
+        const tr = create('tr');
+        const label = create('td', {}, row.name);
+        label.append(create('small', {}, row.rating));
+        tr.append(label, create('td', {}, period[row.key]), create('td', {}, weights[row.key]), create('td', {}, (100 * weightedCounts[row.key] / weightedTotal(difficulties)).toFixed(1) + '%'));
+        tbody.append(tr);
+      }
+    } else {
+      for (const row of difficulties) {
+        const tr = create('tr');
+        tr.append(create('td', {}, row.name), create('td', {}, total(row)), create('td', {}, row.influence + '×'), create('td', {}, number(ratingScore(row))));
+        tbody.append(tr);
+      }
+    }
+    table.append(tbody);
+    const result = create('div', { class: 'cp-preview-math-total' });
+    result.append(create('span', {}, number(weightedPoints(difficulties)) + ' points ÷ ' + weightedTotal(difficulties) + ' weighted units'), create('strong', {}, number(performance()) + ' /100'));
+    const note = detail === 'ratings' ? 'Influence includes question difficulty. All Good = ' + weights.good + ' points.' : 'Hard questions have 3× influence. Actual sample: 100 assessments.';
+    container.append(tabs, table, result, create('p', { class: 'cp-preview-breakdown-note' }, note));
+  }
+  function makeDistribution(container) {
+    container.replaceChildren();
+    for (const row of ratingRows) {
+      const section = create('div');
+      const label = create('div', { class: 'cp-preview-dist-label' });
+      label.append(create('span', {}, row.name), create('span', {}, period[row.key] + '%'));
+      const track = create('div', { class: 'cp-preview-track', role: 'img', 'aria-label': row.name + ': ' + period[row.key] + ' of 100 recorded assessments' });
+      const fill = create('span');
+      fill.style.width = period[row.key] + '%';
+      fill.style.background = 'var(' + row.color + ')';
+      track.append(fill);
+      section.append(label, track);
+      container.append(section);
+    }
+  }
+  function makeRecallDetails(container) {
+    const last = runningRecallPoints().at(-1);
+    container.replaceChildren();
+    const heading = create('p', { class: 'cp-preview-breakdown-note' }, 'Same 52 paired repeat reviews · Sep 6–Oct 5');
+    const table = create('table');
+    const head = create('thead'), header = create('tr');
+    for (const label of ['Measure', 'Value', 'Evidence']) header.append(create('th', { scope: 'col' }, label));
+    head.append(header); table.append(head);
+    const body = create('tbody');
+    const rows = [
+      ['Recalled', number(last.observed) + '%', last.recalled + ' of ' + last.sample],
+      ['FSRS average', number(last.estimate) + '%', 'Same ' + last.sample + ' reviews'],
+      ['Difference', number(last.observed - last.estimate) + ' pts', 'Observed − FSRS'],
+      ['Last update', 'Oct 2', '3 days ago']
+    ];
+    for (const row of rows) { const tr = create('tr'); for (const value of row) tr.append(create('td', {}, value)); body.append(tr); }
+    table.append(body);
+    container.append(heading, table, create('p', { class: 'cp-preview-breakdown-note' }, 'FSRS averages the estimates immediately before these reviews. Dashed spans hold the last recorded comparison.'), create('p', { class: 'cp-preview-breakdown-note' }, 'Recall goal 90% · zero new paired reviews in held intervals'));
+  }
+  function chartFrame(host, title, minimum, maximum, ticks, unit) {
+    const rect = host.getBoundingClientRect();
+    if (rect.width < 30 || rect.height < 30) return null;
+    const width = rect.width;
+    const height = rect.height;
+    const left = 40, right = 12, top = 28, bottom = 30;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    if (plotWidth < 60 || plotHeight < 50) return null;
+    const svg = svgElement('svg', { viewBox: '0 0 ' + width + ' ' + height, role: 'img', 'aria-label': title, class: 'cp-preview-plot' });
+    svg.append(svgElement('title', {}, title));
+    const y = value => top + plotHeight * (maximum - value) / (maximum - minimum);
+    for (const tick of ticks) {
+      svg.append(svgElement('line', { x1: left, x2: width - right, y1: y(tick), y2: y(tick), stroke: 'var(--cp-preview-grid-line)', 'stroke-width': 1 }));
+      svg.append(svgElement('text', { x: left - 8, y: y(tick) + 4, 'text-anchor': 'end', class: 'cp-preview-plot-text' }, tick + unit));
+    }
+    host.replaceChildren(svg);
+    return { svg, width, height, left, right, top, bottom, plotWidth, plotHeight, y };
+  }
+  function naturalTangent(rows, index, key, x, y, dayWidth) {
+    const row = rows[index], before = rows[index - 1], after = rows[index + 1];
+    if (!row || row[key] === null || row.added === 0 || !after || after.added === 0 || after[key] === null) return 0;
+    const pointX = x(row.date), pointY = y(row[key]);
+    const nextWidth = x(after.date) - pointX;
+    const nextSlope = (y(after[key]) - pointY) / nextWidth;
+    if (!before || before[key] === null) return nextSlope;
+    const previousX = before.added === 0 ? Math.max(x(before.date), pointX - 2 * dayWidth) : x(before.date);
+    const previousWidth = pointX - previousX;
+    const previousSlope = (pointY - y(before[key])) / previousWidth;
+    if (previousSlope === 0 || nextSlope === 0 || Math.sign(previousSlope) !== Math.sign(nextSlope)) return 0;
+    const firstWeight = 2 * nextWidth + previousWidth;
+    const secondWeight = nextWidth + 2 * previousWidth;
+    return (firstWeight + secondWeight) / (firstWeight / previousSlope + secondWeight / nextSlope);
+  }
+  function naturalConnection(rows, index, key, x, y, dayWidth) {
+    const previous = rows[index - 1], current = rows[index];
+    if (previous[key] === null || current[key] === null) return [];
+    const fromX = x(previous.date), toX = x(current.date);
+    const fromY = y(previous[key]), toY = y(current[key]);
+    const curve = (startX, startY, endX, endY, startSlope, endSlope) => {
+      const width = endX - startX;
+      const secant = (endY - startY) / width;
+      const bounded = slope => Math.sign(slope) === Math.sign(secant) ? Math.sign(secant) * Math.min(Math.abs(slope), 3 * Math.abs(secant)) : 0;
+      const firstY = startY + bounded(startSlope) * width / 3;
+      const secondY = endY - bounded(endSlope) * width / 3;
+      const command = endY === startY ? 'H ' + endX : 'C ' + (startX + width / 3) + ' ' + firstY + ' ' + (endX - width / 3) + ' ' + secondY + ' ' + endX + ' ' + endY;
+      return { kind: 'updated', command, path: 'M ' + startX + ' ' + startY + ' ' + command };
+    };
+    const hold = (startX, endX) => ({ kind: 'held', command: 'H ' + endX, path: 'M ' + startX + ' ' + fromY + ' H ' + endX });
+    if (current.added === 0) return [hold(fromX, toX)];
+    if (previous.added === 0) {
+      // Sample labels mark interval ends. Re-enter gently within the next
+      // supported three-day interval; leave the preceding inactive days flat.
+      const activeStartX = Math.max(fromX, toX - 2 * dayWidth);
+      const segments = [];
+      if (activeStartX > fromX) segments.push(hold(fromX, activeStartX));
+      segments.push(curve(activeStartX, fromY, toX, toY, 0, naturalTangent(rows, index, key, x, y, dayWidth)));
+      return segments;
+    }
+    return [curve(fromX, fromY, toX, toY, naturalTangent(rows, index - 1, key, x, y, dayWidth), naturalTangent(rows, index, key, x, y, dayWidth))];
+  }
+  function performanceChart(host) {
+    const frame = chartFrame(host, 'Sample cumulative difficulty-weighted Performance, zero to one hundred points. Empty intervals hold the last score with a dashed horizontal line and no new observation. Last update October 2; 100 assessments.', 0, 100, [0, 25, 50, 75, 100], '');
+    if (!frame) return;
+    const { svg, left, right, width, height, plotWidth, y } = frame;
+    const dateOrdinal = date => { const [month, day] = date.split('/').map(Number); return Date.UTC(2026, month - 1, day) / 86400000; };
+    const start = dateOrdinal(buckets[0].date), end = dateOrdinal(buckets.at(-1).date);
+    const x = date => left + 5 + (plotWidth - 10) * (dateOrdinal(date) - start) / (end - start);
+    const rows = runningPerformancePoints();
+    const dayWidth = (plotWidth - 10) / (end - start);
+    const updates = rows.filter(row => row.added > 0);
+    const firstUpdate = updates[0], lastUpdate = updates.at(-1);
+    const stroke = 'var(--cp-preview-strong)';
+    const gradientId = 'cp-area-' + host.closest('.cp-preview-screen').dataset.design;
+    const defs = svgElement('defs'), gradient = svgElement('linearGradient', { id: gradientId, x1: 0, x2: 0, y1: 0, y2: 1 });
+    gradient.append(svgElement('stop', { offset: '0%', 'stop-color': stroke, 'stop-opacity': .17 }), svgElement('stop', { offset: '100%', 'stop-color': stroke, 'stop-opacity': .01 }));
+    defs.append(gradient); svg.append(defs);
+    let areaPath = 'M ' + x(firstUpdate.date) + ' ' + y(firstUpdate.value);
+    for (let index = rows.indexOf(firstUpdate) + 1; index < rows.length; index++) {
+      const previous = rows[index - 1], current = rows[index];
+      for (const segment of naturalConnection(rows, index, 'value', x, y, dayWidth)) areaPath += ' ' + segment.command;
+    }
+    areaPath += ' L ' + x(rows.at(-1).date) + ' ' + y(0) + ' H ' + x(firstUpdate.date) + ' Z';
+    svg.append(svgElement('path', { d: areaPath, fill: 'url(#' + gradientId + ')', stroke: 'none', 'aria-hidden': true }));
+    for (let index = 1; index < rows.length; index++) {
+      const previous = rows[index - 1], current = rows[index];
+      if (previous.value === null || current.value === null) continue;
+      for (const segment of naturalConnection(rows, index, 'value', x, y, dayWidth)) {
+        const attrs = { d: segment.path, fill: 'none', stroke, 'stroke-width': 2.3, 'stroke-linecap': 'round', 'data-transition-kind': segment.kind };
+        if (segment.kind === 'held') Object.assign(attrs, { 'stroke-dasharray': '9 7', 'data-held-value': previous.value, 'data-new-assessments': 0 });
+        else Object.assign(attrs, { 'data-score-update': current.value, 'data-bounded-curve': true });
+        svg.append(svgElement('path', attrs));
+      }
+    }
+    for (const row of [firstUpdate, lastUpdate].filter(Boolean)) {
+      svg.append(svgElement('circle', { cx: x(row.date), cy: y(row.value), r: 3.5, fill: 'var(--cp-preview-card)', stroke, 'stroke-width': 2, 'data-measured-marker': row.date, 'data-tooltip': row.date + ' · ' + number(row.value) + '/100 · ' + row.sample + ' cumulative assessments · ' + row.added + ' new' }));
+    }
+    for (const index of [0, 3, 6, 9]) svg.append(svgElement('text', { x: x(rows[index].date), y: height - 6, 'text-anchor': index === 0 ? 'start' : index === 9 ? 'end' : 'middle', class: 'cp-preview-plot-text' }, rows[index].date));
+    const legendY = 9;
+    svg.append(svgElement('line', { x1: left, x2: left + 15, y1: legendY - 3, y2: legendY - 3, stroke, 'stroke-width': 2 }));
+    svg.append(svgElement('text', { x: left + 20, y: legendY, class: 'cp-preview-plot-text' }, 'Updated'));
+    svg.append(svgElement('line', { x1: left + 94, x2: left + 114, y1: legendY - 3, y2: legendY - 3, stroke, 'stroke-width': 2, 'stroke-dasharray': '7 5' }));
+    svg.append(svgElement('text', { x: left + 119, y: legendY, class: 'cp-preview-plot-text' }, 'No new ratings'));
+    const last = rows.at(-1);
+    svg.append(svgElement('text', { x: width - right, y: y(last.value) - 11, 'text-anchor': 'end', class: 'cp-preview-plot-value' }, Math.round(last.value)));
+    const inspector = create('button', { type: 'button', class: 'cp-preview-inspector cursor-interaction', 'aria-label': 'Inspect running Performance. Use Left and Right arrows for dates, Escape to close.' });
+    const detailId = 'cp-performance-inspection-' + host.closest('.cp-preview-screen').dataset.design;
+    const detail = create('div', { class: 'cp-preview-inspect-detail', id: detailId, role: 'tooltip', hidden: '' });
+    let selected = rows.length - 1, pinned = false;
+    function show(index) {
+      selected = Math.max(0, Math.min(rows.length - 1, index));
+      const row = rows[selected];
+      const status = row.value === null ? 'No score yet' : row.added ? 'Updated · ' + row.added + ' new assessments' : 'Held · no new valid ratings';
+      const heading = row.date + ' · ' + (row.value === null ? 'Unavailable' : number(row.value) + '/100');
+      detail.replaceChildren(create('strong', {}, heading), create('span', {}, status), create('span', {}, row.value === null ? 'Awaiting the first valid assessment' : row.sample + ' cumulative assessments · last update ' + row.lastUpdated));
+      detail.hidden = false;
+      inspector.setAttribute('aria-describedby', detailId);
+      inspector.setAttribute('aria-label', heading + '. ' + status + '. ' + row.sample + ' cumulative assessments. Use Left and Right arrows for dates.');
+    }
+    function hide() { detail.hidden = true; inspector.removeAttribute('aria-describedby'); }
+    function pointerIndex(event) {
+      const rect = host.getBoundingClientRect();
+      const ordinal = start + Math.max(0, Math.min(1, (event.clientX - rect.left - left - 5) / (plotWidth - 10))) * (end - start);
+      return rows.reduce((nearest, row, index) => Math.abs(dateOrdinal(row.date) - ordinal) < Math.abs(dateOrdinal(rows[nearest].date) - ordinal) ? index : nearest, 0);
+    }
+    inspector.addEventListener('pointermove', event => { if (!pinned && event.pointerType !== 'touch') show(pointerIndex(event)); });
+    inspector.addEventListener('pointerleave', () => { if (!pinned && document.activeElement !== inspector) hide(); });
+    inspector.addEventListener('focus', () => show(selected));
+    inspector.addEventListener('blur', () => { pinned = false; hide(); });
+    inspector.addEventListener('click', event => { pinned = !pinned; show(event.detail ? pointerIndex(event) : selected); });
+    inspector.addEventListener('keydown', event => {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); show(selected + (event.key === 'ArrowRight' ? 1 : -1)); }
+      if (event.key === 'Home' || event.key === 'End') { event.preventDefault(); show(event.key === 'Home' ? 0 : rows.length - 1); }
+      if (event.key === 'Escape') { event.preventDefault(); pinned = false; hide(); }
+    });
+    host.append(inspector, detail);
+  }
+  function recallChart(host) {
+    const visible = [];
+    if (state.recallObserved) visible.push('Observed recall 48 of 52, 92.3 percent');
+    if (state.recallEstimate) visible.push('FSRS average 88.8 percent');
+    const chartDescription = visible.length ? visible.join('; ') + '. Same paired repeat-review cohort, accumulated within the selected period. Held spans are the last recorded comparison; last update October 2.' : 'No series selected. Select Recall or FSRS average below the chart.';
+    const frame = chartFrame(host, chartDescription, 65, 100, [70, 80, 90, 100], '%');
+    if (!frame) return;
+    const { svg, left, right, width, height, plotWidth, y } = frame;
+    const day = date => { const [month, dateNumber] = date.split('/').map(Number); return Date.UTC(2026, month - 1, dateNumber) / 86400000; };
+    const rows = runningRecallPoints(), start = day(rows[0].date), end = day(rows.at(-1).date);
+    const x = date => left + 5 + (plotWidth - 10) * (day(date) - start) / (end - start);
+    const dayWidth = (plotWidth - 10) / (end - start);
+    const targetY = y(90);
+    svg.append(svgElement('line', { x1: left, x2: width - right, y1: targetY, y2: targetY, stroke: 'var(--cp-preview-hard)', 'stroke-width': 1, 'stroke-dasharray': '2 6', opacity: .55 }));
+    svg.append(svgElement('text', { x: left + 3, y: targetY - 7, class: 'cp-preview-plot-text' }, 'Goal 90%'));
+    const updates = rows.filter(row => row.added > 0);
+    for (const [key, visible, color, dash] of [['estimate', state.recallEstimate, '--cp-preview-estimate', '3 5'], ['observed', state.recallObserved, '--cp-preview-strong', '']]) {
+      if (!visible) continue;
+      for (let index = 1; index < rows.length; index++) {
+        const previous = rows[index - 1], current = rows[index];
+        if (previous[key] === null || current[key] === null) continue;
+        const attrs = { fill: 'none', stroke: 'var(' + color + ')', 'stroke-width': key === 'observed' ? 2.5 : 1.8, 'stroke-linecap': 'round', 'data-recall-series': key };
+        for (const segment of naturalConnection(rows, index, key, x, y, dayWidth)) {
+          const pathAttrs = { ...attrs, d: segment.path, 'data-transition-kind': segment.kind };
+          if (segment.kind === 'held') Object.assign(pathAttrs, { 'stroke-dasharray': '9 7', 'data-held-recall': key, 'data-new-pairs': 0 });
+          else Object.assign(pathAttrs, { 'stroke-dasharray': dash, 'data-bounded-curve': true });
+          svg.append(svgElement('path', pathAttrs));
+        }
+      }
+      for (const row of [updates[0], updates.at(-1)]) {
+        if (key === 'observed') svg.append(svgElement('circle', { cx: x(row.date), cy: y(row[key]), r: 3.5, fill: 'var(--cp-preview-card)', stroke: 'var(' + color + ')', 'stroke-width': 2, 'data-paired-marker': row.date }));
+        else svg.append(svgElement('path', { d: 'M ' + x(row.date) + ' ' + (y(row[key]) - 3.5) + ' L ' + (x(row.date) + 3.5) + ' ' + y(row[key]) + ' L ' + x(row.date) + ' ' + (y(row[key]) + 3.5) + ' L ' + (x(row.date) - 3.5) + ' ' + y(row[key]) + ' Z', fill: 'var(--cp-preview-card)', stroke: 'var(' + color + ')', 'stroke-width': 1.5, 'data-paired-marker': row.date }));
+      }
+      const last = rows.at(-1);
+      const labelOffset = key === 'observed' ? -10 : 16;
+      svg.append(svgElement('text', { x: width - right, y: y(last[key]) + labelOffset, 'text-anchor': 'end', class: 'cp-preview-plot-value' }, Math.round(last[key]) + '%'));
+    }
+    for (const index of [0, 3, 6, 9]) svg.append(svgElement('text', { x: x(rows[index].date), y: height - 6, 'text-anchor': index === 0 ? 'start' : index === 9 ? 'end' : 'middle', class: 'cp-preview-plot-text' }, rows[index].date));
+    svg.append(svgElement('line', { x1: left, x2: left + 22, y1: 8, y2: 8, stroke: 'var(--cp-preview-subtle)', 'stroke-width': 1.8, 'stroke-dasharray': '9 7' }));
+    svg.append(svgElement('text', { x: left + 29, y: 12, class: 'cp-preview-plot-text' }, 'Last recorded comparison'));
+    const inspector = create('button', { type: 'button', class: 'cp-preview-inspector cursor-interaction', 'aria-label': 'Inspect Recall and FSRS comparison. Use Left and Right arrows for dates.' });
+    const detailId = 'cp-recall-inspection-' + host.closest('.cp-preview-screen').dataset.design;
+    const detail = create('div', { class: 'cp-preview-inspect-detail', id: detailId, role: 'tooltip', hidden: '' });
+    let selected = rows.length - 1, pinned = false;
+    function show(index) {
+      selected = Math.max(0, Math.min(rows.length - 1, index));
+      const row = rows[selected];
+      const values = [];
+      if (state.recallObserved) values.push(row.observed === null ? 'Recall unavailable' : number(row.observed) + '% recall');
+      if (state.recallEstimate) values.push(row.estimate === null ? 'FSRS unavailable' : number(row.estimate) + '% FSRS average');
+      const heading = row.date + ' · ' + (values.join(' / ') || 'No series selected');
+      const status = row.sample === 0 ? 'Awaiting the first paired repeat review' : row.added ? row.added + ' new pairs · ' + row.sample + ' cumulative pairs' : 'Held comparison · 0 new pairs';
+      detail.replaceChildren(create('strong', {}, heading), create('span', {}, status), create('span', {}, row.sample ? row.recalled + ' recalled / ' + row.sample + ' same pairs · last update ' + row.lastUpdated : 'No carried or invented observations'));
+      detail.hidden = false;
+      inspector.setAttribute('aria-describedby', detailId);
+      inspector.setAttribute('aria-label', heading + '. ' + status + '. Use Left and Right arrows for dates.');
+    }
+    function hide() { detail.hidden = true; inspector.removeAttribute('aria-describedby'); }
+    function nearest(event) {
+      const rect = host.getBoundingClientRect();
+      const ordinal = start + Math.max(0, Math.min(1, (event.clientX - rect.left - left - 5) / (plotWidth - 10))) * (end - start);
+      return rows.reduce((best, row, index) => Math.abs(day(row.date) - ordinal) < Math.abs(day(rows[best].date) - ordinal) ? index : best, 0);
+    }
+    inspector.addEventListener('focus', () => show(selected));
+    inspector.addEventListener('blur', () => { pinned = false; hide(); });
+    inspector.addEventListener('pointermove', event => { if (!pinned && event.pointerType !== 'touch') show(nearest(event)); });
+    inspector.addEventListener('pointerleave', () => { if (!pinned && document.activeElement !== inspector) hide(); });
+    inspector.addEventListener('click', event => { pinned = !pinned; show(event.detail ? nearest(event) : selected); });
+    inspector.addEventListener('keydown', event => {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); show(selected + (event.key === 'ArrowRight' ? 1 : -1)); }
+      if (event.key === 'Home' || event.key === 'End') { event.preventDefault(); show(event.key === 'Home' ? 0 : rows.length - 1); }
+      if (event.key === 'Escape') { event.preventDefault(); pinned = false; hide(); }
+    });
+    host.append(inspector, detail);
+  }
+  function lineChart(host, recall = false) {
+    const description = recall ? 'Sample repeat-review rated recall and FSRS estimates, percentages' : 'Sample performance rating score by three-day bucket, zero to one hundred points';
+    const frame = recall ? chartFrame(host, description, 65, 100, [70, 80, 90, 100], '%') : chartFrame(host, description, 0, 100, [0, 25, 50, 75, 100], '');
+    if (!frame) return;
+    const { svg, left, right, width, height, plotWidth, y } = frame;
+    const x = index => left + 5 + (plotWidth - 10) * index / (buckets.length - 1);
+    const values = [84, 87, 78, 94, 89, 88, 93, 94, 95, 92];
+    if (recall) {
+      const targetY = y(90);
+      svg.append(svgElement('line', { x1: left, x2: width - right, y1: targetY, y2: targetY, stroke: 'var(--cp-preview-hard)', 'stroke-width': 1, 'stroke-dasharray': '5 5' }));
+      const estimates = [88, 89, 87, 89, 91, 90, 89, 91, 90, 89];
+      const estimatePath = estimates.map((value, index) => (index ? 'L ' : 'M ') + x(index) + ' ' + y(value)).join(' ');
+      svg.append(svgElement('path', { d: estimatePath, fill: 'none', stroke: 'var(--cp-preview-estimate)', 'stroke-width': 1.6, 'stroke-dasharray': '4 4' }));
+    }
+    const path = values.map((value, index) => (index ? 'L ' : 'M ') + x(index) + ' ' + y(value)).join(' ');
+    svg.append(svgElement('path', { d: path, fill: 'none', stroke: 'var(--cp-preview-strong)', 'stroke-width': 2.3, 'stroke-linejoin': 'round' }));
+    for (let index = 0; index < values.length; index++) {
+      const value = values[index];
+      const dot = svgElement('circle', { cx: x(index), cy: y(value), r: 3.5, fill: 'var(--cp-preview-card)', stroke: 'var(--cp-preview-strong)', 'stroke-width': 2, 'data-tooltip': buckets[index].date + ' · ' + number(value) + (recall ? '% rated recall' : ' rating points /100') });
+      svg.append(dot);
+    }
+    const tickIndices = width < 300 ? [0, 5, 9] : [0, 3, 6, 9];
+    for (const index of tickIndices) svg.append(svgElement('text', { x: x(index), y: height - 6, 'text-anchor': index === 0 ? 'start' : index === 9 ? 'end' : 'middle', class: 'cp-preview-plot-text' }, buckets[index].date));
+  }
+  function barChart(host, time = false) {
+    const description = time ? 'Sample median assessment time: Easy ten minutes, Medium nineteen, Hard thirty one' : 'Sample weighted performance by difficulty: Easy eighty two, Medium seventy one, Hard fifty six points';
+    const frame = time ? chartFrame(host, description, 0, 40, [0, 10, 20, 30, 40], '') : chartFrame(host, description, 0, 100, [0, 25, 50, 75, 100], '');
+    if (!frame) return;
+    const { svg, height, left, plotWidth, y } = frame;
+    const slot = plotWidth / 3;
+    const barWidth = slot - Math.max(12, slot * .18);
+    for (let index = 0; index < difficulties.length; index++) {
+      const difficulty = difficulties[index];
+      const value = time ? [10, 19, 31][index] : ratingScore(difficulty);
+      const center = left + slot * (index + .5);
+      svg.append(svgElement('rect', { x: center - barWidth / 2, y: y(value), width: barWidth, height: y(0) - y(value), fill: 'var(' + difficulty.color + ')', opacity: .82, 'data-tooltip': difficulty.name + ' · ' + number(value) + (time ? ' minutes' : ' points /100') }));
+      svg.append(svgElement('text', { x: center, y: y(value) - 7, 'text-anchor': 'middle', class: 'cp-preview-plot-value' }, Math.round(value) + (time ? 'm' : '')));
+      svg.append(svgElement('text', { x: center, y: height - 6, 'text-anchor': 'middle', class: 'cp-preview-plot-text' }, difficulty.name));
+    }
+  }
+  function memoryChart(host) {
+    const frame = chartFrame(host, 'Sample median reconstructed memory stability with middle fifty percent whiskers, in days', 0, 30, [0, 10, 20, 30], 'd');
+    if (!frame) return;
+    const { svg, left, height, plotWidth, y } = frame;
+    const medians = [4, 6, 8, 7, 11, 13, 12, 16, 18, 20];
+    const lows = [2, 3, 5, 4, 7, 9, 8, 12, 13, 15];
+    const highs = [7, 10, 13, 12, 17, 20, 18, 24, 25, 28];
+    const x = index => left + 5 + (plotWidth - 10) * index / 9;
+    for (let index = 0; index < medians.length; index++) {
+      svg.append(svgElement('line', { x1: x(index), x2: x(index), y1: y(lows[index]), y2: y(highs[index]), stroke: 'var(--cp-preview-estimate)', 'stroke-width': 1.2, opacity: .65 }));
+      for (const edge of [lows[index], highs[index]]) svg.append(svgElement('line', { x1: x(index) - 4, x2: x(index) + 4, y1: y(edge), y2: y(edge), stroke: 'var(--cp-preview-estimate)', 'stroke-width': 1.2, opacity: .65 }));
+    }
+    svg.append(svgElement('path', { d: medians.map((value, index) => (index ? 'L ' : 'M ') + x(index) + ' ' + y(value)).join(' '), fill: 'none', stroke: 'var(--cp-preview-strong)', 'stroke-width': 2.3 }));
+    for (let index = 0; index < medians.length; index++) svg.append(svgElement('circle', { cx: x(index), cy: y(medians[index]), r: 3, fill: 'var(--cp-preview-strong)', 'data-tooltip': buckets[index].date + ' · Median ' + medians[index] + ' days · Middle 50% ' + lows[index] + '–' + highs[index] + ' days' }));
+    for (const index of [0, 5, 9]) svg.append(svgElement('text', { x: x(index), y: height - 6, 'text-anchor': index === 0 ? 'start' : index === 9 ? 'end' : 'middle', class: 'cp-preview-plot-text' }, buckets[index].date));
+  }
+  function render() {
+    for (const element of root.querySelectorAll('[data-period-score]')) { element.textContent = Math.round(performance()); element.setAttribute('aria-live', 'polite'); }
+    for (const element of root.querySelectorAll('[data-kind="performance"] .cp-preview-breakdown')) makeBreakdown(element, element.closest('.cp-preview-screen'));
+    for (const element of root.querySelectorAll('[data-recall-breakdown]')) makeRecallDetails(element);
+    for (const element of root.querySelectorAll('.cp-preview-distribution')) makeDistribution(element);
+    for (const screen of root.querySelectorAll('.cp-preview-screen')) {
+      const expanded = screen.dataset.design === 'trend' ? state.trendBreakdown : state.distributionBreakdown;
+      const card = screen.querySelector('[data-kind="performance"]');
+      card.dataset.expanded = String(expanded);
+      card.querySelector('.cp-preview-summary').hidden = expanded;
+      card.querySelector('.cp-preview-breakdown').hidden = !expanded;
+      const collapsedBody = card.querySelector('.cp-preview-chart, .cp-preview-distribution');
+      collapsedBody.hidden = expanded;
+      for (const button of card.querySelectorAll('[data-breakdown]')) {
+        button.setAttribute('aria-expanded', String(expanded));
+        if (button.classList.contains('cp-preview-button')) button.textContent = expanded ? 'Close' : 'Breakdown';
+        else button.textContent = expanded ? 'Back to overview' : 'How it adds up';
+      }
+      const recallCard = screen.querySelector('[data-kind="recall"]');
+      const recallExpanded = screen.dataset.design === 'trend' ? state.trendRecall : state.distributionRecall;
+      recallCard.dataset.expanded = String(recallExpanded);
+      recallCard.querySelector('.cp-preview-summary').hidden = recallExpanded;
+      recallCard.querySelector('[data-recall-breakdown]').hidden = !recallExpanded;
+      recallCard.querySelector('[data-chart="recall"]').hidden = recallExpanded;
+      recallCard.querySelector('[data-recall-details]').setAttribute('aria-expanded', String(recallExpanded));
+      recallCard.querySelector('[data-recall-details]').textContent = recallExpanded ? 'Close' : 'Details';
+      for (const button of recallCard.querySelectorAll('[data-recall-series]')) {
+        button.setAttribute('aria-pressed', String(button.dataset.recallSeries === 'observed' ? state.recallObserved : state.recallEstimate));
+      }
+    }
+    for (const chart of root.querySelectorAll('[data-chart]')) {
+      const kind = chart.dataset.chart;
+      if (kind === 'performance') performanceChart(chart);
+      if (kind === 'recall') recallChart(chart);
+      if (kind === 'difficulty') barChart(chart);
+      if (kind === 'time') barChart(chart, true);
+      if (kind === 'memory') memoryChart(chart);
+    }
+  }
+  for (const button of root.querySelectorAll('[data-breakdown]')) {
+    button.addEventListener('click', () => {
+      const screen = button.closest('.cp-preview-screen');
+      const key = screen.dataset.design === 'trend' ? 'trendBreakdown' : 'distributionBreakdown';
+      state[key] = !state[key];
+      render();
+      saveState();
+    });
+  }
+  for (const button of root.querySelectorAll('[data-recall-details]')) {
+    button.addEventListener('click', () => {
+      const key = button.closest('.cp-preview-screen').dataset.design === 'trend' ? 'trendRecall' : 'distributionRecall';
+      state[key] = !state[key]; render(); saveState();
+    });
+  }
+  for (const button of root.querySelectorAll('[data-recall-series]')) {
+    button.addEventListener('click', () => {
+      const key = button.dataset.recallSeries === 'observed' ? 'recallObserved' : 'recallEstimate';
+      state[key] = !state[key]; render(); saveState();
+    });
+  }
+  render();
+  const resizeObserver = new ResizeObserver(() => render());
+  for (const chart of root.querySelectorAll('[data-chart]')) resizeObserver.observe(chart);
+  window.addEventListener('openai:set_globals', event => {
+    const globals = event.detail && event.detail.globals;
+    if (globals && globals.widgetState) { applyState(globals.widgetState); render(); }
+  });
+  if (globalThis.Tweak) {
+    const tweak = new Tweak({ container: root, onChange: () => { render(); saveState(); } });
+    tweak.addSlider(weights, 'hard', { label: 'Hard points', min: 20, max: 70, step: 5, reference: 'rubric.hard' });
+    tweak.addSlider(weights, 'good', { label: 'Good points', min: 70, max: 95, step: 5, reference: 'rubric.good' });
+  }
+})();
+</script>

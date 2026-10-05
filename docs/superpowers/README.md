@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): user-approved Value first visual direction, weighted Performance and cumulative paired Recall with natural held trends; consolidated ten-card organization and control contract awaits written-spec review before phase-sized planning. No application implementation yet.
+
 - [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
 
 - [`specs/2026-10-04-openrouter-provider-design.md`](./specs/2026-10-04-openrouter-provider-design.md): approved optional OpenRouter BYOK connection and host permission, suggested editable `openrouter/free`, explicit free preset, protected key storage, structured reports, and routed-model metadata; implemented with independent SPEC/QUALITY reviews, passing automated gates and production-component browser proof; live full-report/generated-code and human installed-extension proof remain pending.
