@@ -75,6 +75,7 @@ export function readQueryKeysForInvalidation(
 export function invalidateTaggedQueries(
   queryClient: QueryClient,
   tags: readonly CacheInvalidationTag[],
+  options: { resetHintConnection?: boolean } = {},
 ): Promise<void> {
   const scheduleInvalidation = () => {
     for (const queryKey of readQueryKeysForInvalidation(tags)) {
@@ -98,7 +99,17 @@ export function invalidateTaggedQueries(
       ...(tags.includes('settings')
         ? [queryClient.cancelQueries({ queryKey: queryKeys.settings.all })]
         : []),
-    ]).then(scheduleInvalidation)
+    ]).then(() => {
+      if (options.resetHintConnection) {
+        // Clear cached and observed metadata immediately; a replacement read
+        // may hang, so completion only waits for cancellation and scheduling.
+        void queryClient.resetQueries({
+          queryKey: queryKeys.genai.hintConnection(),
+          exact: true,
+        })
+      }
+      scheduleInvalidation()
+    })
   }
   scheduleInvalidation()
   return Promise.resolve()

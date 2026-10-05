@@ -6,8 +6,13 @@ import {
   type CacheInvalidationEvent,
 } from '@/extension/messaging'
 import type { CacheInvalidationTag } from '@/platform/query/cache-invalidation'
+import type { AiProviderId } from '@/lib/ai/types'
+import { resetAiHintConnectionRevisions } from '@/features/genai/server/genai-settings-service'
 
-import { abortLeetCodeAnalyses } from './leetcode-analysis-operations'
+import {
+  abortLeetCodeAnalyses,
+  abortLeetCodeHints,
+} from './leetcode-analysis-operations'
 
 type CacheInvalidationReason = CacheInvalidationEvent['reason']
 
@@ -16,6 +21,9 @@ type BroadcastCacheInvalidationInput = {
   reason: CacheInvalidationReason
   source: CacheInvalidationEvent['source']
   tags: readonly CacheInvalidationTag[]
+  hintConnectionChanged?: boolean
+  hintProvider?: AiProviderId
+  hintConnectionReset?: boolean
 }
 
 const leetcodeProblemUrlMatches = [
@@ -27,11 +35,19 @@ export async function broadcastCacheInvalidation(
   input: BroadcastCacheInvalidationInput,
 ) {
   const event = cacheInvalidationEventSchema.parse({
-    ...input,
+    problemSlug: input.problemSlug,
+    reason: input.reason,
+    source: input.source,
+    tags: input.tags,
     emittedAt: new Date().toISOString(),
   })
 
-  if (event.tags.includes('genai')) abortLeetCodeAnalyses()
+  if (event.tags.includes('genai')) {
+    abortLeetCodeAnalyses()
+    if (input.hintConnectionReset) resetAiHintConnectionRevisions()
+    if (input.hintConnectionChanged !== false)
+      abortLeetCodeHints(input.hintProvider)
+  }
 
   await Promise.all([
     sendRuntimeCacheInvalidation(event),

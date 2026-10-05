@@ -38,3 +38,8 @@ export {
   type CancelLeetCodeHintsRequest,
   type CancelLeetCodeHintsResponse,
 } from './api/code-hint-contracts'
+
+export {
+  generateLeetCodeHintsViaRuntime,
+  cancelLeetCodeHintsViaRuntime,
+} from './api/code-hint-api'

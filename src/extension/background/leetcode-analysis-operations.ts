@@ -1,3 +1,5 @@
+import type { AiProviderId } from '@/lib/ai/types'
+
 type ActiveAnalysis = {
   requestId: string
   controller: AbortController
@@ -5,6 +7,43 @@ type ActiveAnalysis = {
 }
 
 const activeAnalyses = new Map<string, ActiveAnalysis>()
+type ActiveHints = ActiveAnalysis & { provider: AiProviderId }
+const activeHints = new Map<string, ActiveHints>()
+
+/** Hints and reports retain independent volatile ownership. */
+export function runOwnedHints<T>(
+  owner: string,
+  requestId: string,
+  provider: AiProviderId,
+  work: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const active = activeHints.get(owner)
+  if (active?.requestId === requestId) return active.promise as Promise<T>
+  active?.controller.abort()
+  const controller = new AbortController()
+  const promise = Promise.resolve()
+    .then(() => work(controller.signal))
+    .finally(() => {
+      if (activeHints.get(owner) === operation) activeHints.delete(owner)
+    })
+  const operation = { requestId, provider, controller, promise }
+  activeHints.set(owner, operation)
+  return promise
+}
+
+export function cancelOwnedHints(owner: string, requestId: string): boolean {
+  const active = activeHints.get(owner)
+  if (!active || active.requestId !== requestId) return false
+  active.controller.abort()
+  return true
+}
+
+export function abortLeetCodeHints(provider?: AiProviderId): void {
+  for (const active of activeHints.values()) {
+    if (provider === undefined || active.provider === provider)
+      active.controller.abort()
+  }
+}
 
 export function analysisOwner(sender: unknown): string {
   const tab = isRecord(sender) && isRecord(sender.tab) ? sender.tab : null

@@ -56,6 +56,16 @@ export {
   testAiConnectionResponseSchema,
 } from '@/features/genai/api'
 import type { AiProviderSecretPresence } from '@/features/genai'
+import type {
+  HintConnectionRequest,
+  HintConnectionStatus,
+} from '@/features/genai/api/hint-connection-contracts'
+import type {
+  GenerateLeetCodeHintsRequest,
+  GenerateLeetCodeHintsResponse,
+  CancelLeetCodeHintsRequest,
+  CancelLeetCodeHintsResponse,
+} from '@/features/leetcode-review-assistant/api/code-hint-contracts'
 import type { DevSmokeReport, DevSmokeRequest } from '@/features/dev-smoke'
 export {
   devSmokeReportSchema,
@@ -342,6 +352,15 @@ export interface ProtocolMap {
   'genai.cancelLeetCodeAnalysis'(
     request: CancelLeetCodeAnalysisRequest,
   ): CancelLeetCodeAnalysisResponse
+  'genai.getHintConnection'(
+    request: HintConnectionRequest,
+  ): HintConnectionStatus
+  'genai.generateLeetCodeHints'(
+    request: GenerateLeetCodeHintsRequest,
+  ): GenerateLeetCodeHintsResponse
+  'genai.cancelLeetCodeHints'(
+    request: CancelLeetCodeHintsRequest,
+  ): CancelLeetCodeHintsResponse
   'imports.preview'(request: ImportPreviewRequest): ImportPreviewResponse
   'imports.apply'(request: ImportApplyRequest): ImportApplyResponse
   'imports.retryPersistence'(
@@ -447,6 +466,9 @@ export const protocolMethodNames = [
   'genai.testConnection',
   'genai.analyzeLeetCodeSubmission',
   'genai.cancelLeetCodeAnalysis',
+  'genai.getHintConnection',
+  'genai.generateLeetCodeHints',
+  'genai.cancelLeetCodeHints',
   'imports.preview',
   'imports.apply',
   'imports.retryPersistence',
