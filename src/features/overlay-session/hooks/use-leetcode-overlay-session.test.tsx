@@ -665,7 +665,13 @@ describe('useLeetCodeOverlaySession', () => {
       await flushEffects()
       expect(result.current.aiAnalysis.status).toBe('ready')
     }
+    for (const tab of ['ai', 'notes', 'solve', 'ai'] as const) {
+      act(() => result.current.actions.selectExpandedTab(tab))
+      await flushEffects()
+      expect(result.current.aiAnalysis.status).toBe('ready')
+    }
     expect(analyze).toHaveBeenCalledOnce()
+    expect(result.current.overlay.selectedRating).toBe('easy')
   })
 
   it('exposes Retry for the same pinned attempt with a new request identity', async () => {
