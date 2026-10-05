@@ -89,11 +89,50 @@ function createFixture(
 }
 
 async function ready(fixture: ReturnType<typeof createFixture>) {
-  await waitFor(() => expect(fixture.result.current.ai.canSubmit).toBe(true))
+  await waitFor(() =>
+    expect(fixture.result.current.ai.canTestConnection).toBe(true),
+  )
 }
 
 describe('useAiConnectionController', () => {
   beforeEach(() => vi.clearAllMocks())
+
+  it('reactivates another saved key without replacing either key or testing', async () => {
+    const fixture = createFixture(undefined, { openrouter: true })
+    await ready(fixture)
+    act(() => fixture.result.current.ai.actions.setProvider('openrouter'))
+    await act(async () => fixture.result.current.ai.actions.submit())
+    expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+      surface: 'dashboard',
+      patch: {
+        aiAssessment: { provider: 'openrouter', model: 'openrouter/free' },
+      },
+    })
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.setAiProviderSecret',
+      expect.anything(),
+    )
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.clearAiProviderSecret',
+      expect.anything(),
+    )
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.testConnection',
+      expect.anything(),
+    )
+    act(() => fixture.result.current.ai.actions.setProvider('openai'))
+    expect(fixture.result.current.ai.hasKey).toBe(true)
+  })
+
+  it('disables unchanged saves and restores the active custom model when returning to its provider', async () => {
+    const fixture = createFixture(undefined, { openrouter: true })
+    await waitFor(() => expect(fixture.result.current.ai.hasKey).toBe(true))
+    expect(fixture.result.current.ai.canSubmit).toBe(false)
+    act(() => fixture.result.current.ai.actions.setProvider('openrouter'))
+    act(() => fixture.result.current.ai.actions.setProvider('openai'))
+    expect(fixture.result.current.ai.model).toBe('saved-model')
+    expect(fixture.result.current.ai.canSubmit).toBe(false)
+  })
 
   it('preserves saved custom models, changes to real provider defaults, and clears unsaved secrets', async () => {
     const fixture = createFixture()
@@ -112,8 +151,34 @@ describe('useAiConnectionController', () => {
   it('tests unchanged saved configuration while assessment is off and never writes Settings', async () => {
     const fixture = createFixture()
     await ready(fixture)
-    await act(async () => fixture.result.current.ai.actions.submit())
+    await act(async () => fixture.result.current.ai.actions.testConnection())
     expect(fixture.result.current.ai.connectionStatus).toBe('Connected')
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'settings.updateSettings',
+      expect.anything(),
+    )
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.setAiProviderSecret',
+      expect.anything(),
+    )
+  })
+
+  it('requires activation before testing unsaved model or key changes', async () => {
+    const fixture = createFixture()
+    await ready(fixture)
+    act(() => fixture.result.current.ai.actions.setModel('different-model'))
+    expect(fixture.result.current.ai.canTestConnection).toBe(false)
+    await act(async () => fixture.result.current.ai.actions.testConnection())
+    act(() => {
+      fixture.result.current.ai.actions.discard()
+      fixture.result.current.ai.actions.setKeyInput('replacement-key')
+    })
+    expect(fixture.result.current.ai.canTestConnection).toBe(false)
+    await act(async () => fixture.result.current.ai.actions.testConnection())
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.testConnection',
+      expect.anything(),
+    )
     expect(sendMessage).not.toHaveBeenCalledWith(
       'settings.updateSettings',
       expect.anything(),
@@ -140,7 +205,7 @@ describe('useAiConnectionController', () => {
       }
       let completion: Promise<void> | undefined
       await act(async () => {
-        completion = fixture.result.current.ai.actions.submit()
+        completion = fixture.result.current.ai.actions.testConnection()
         if (when === 'connected') await completion
       })
       act(() => {
@@ -172,6 +237,10 @@ describe('useAiConnectionController', () => {
     expect(fixture.result.current.ai.keyInput).toBe('')
     expect(fixture.result.current.ai.provider).toBe('gemini')
     expect(fixture.result.current.ai.hasChanges).toBe(true)
+    expect(fixture.result.current.ai.activeConnection).toEqual({
+      provider: 'openai',
+      model: 'saved-model',
+    })
     expect(fixture.result.current.ai.feedback?.message).toMatch(
       /Key saved; provider and model could not be saved/,
     )
@@ -196,7 +265,7 @@ describe('useAiConnectionController', () => {
     expect(fixture.result.current.gate.isBusy()).toBe(false)
   })
 
-  it('shows configuration saved when testing fails and keeps it ready for Test connection', async () => {
+  it('shows failed testing without changing the saved configuration', async () => {
     const fixture = createFixture()
     await ready(fixture)
     vi.mocked(sendMessage).mockResolvedValueOnce({
@@ -205,12 +274,12 @@ describe('useAiConnectionController', () => {
       code: 'auth',
       message: 'The saved key was rejected.',
     })
-    await act(async () => fixture.result.current.ai.actions.submit())
+    await act(async () => fixture.result.current.ai.actions.testConnection())
     expect(fixture.result.current.ai.feedback?.message).toBe(
-      'Configuration saved; connection test failed. The saved key was rejected.',
+      'Connection test failed. The saved key was rejected.',
     )
     expect(fixture.result.current.ai.hasChanges).toBe(false)
-    expect(fixture.result.current.ai.canSubmit).toBe(true)
+    expect(fixture.result.current.ai.canTestConnection).toBe(true)
   })
 
   it('blocks duplicate tests and general persistence synchronously while allowing local preference edits', async () => {
@@ -225,8 +294,8 @@ describe('useAiConnectionController', () => {
     )
     let completion: Promise<void> | undefined
     act(() => {
-      completion = fixture.result.current.ai.actions.submit()
-      void fixture.result.current.ai.actions.submit()
+      completion = fixture.result.current.ai.actions.testConnection()
+      void fixture.result.current.ai.actions.testConnection()
       void fixture.result.current.preferences.actions.resetDefaults()
     })
     await waitFor(() =>
@@ -290,7 +359,7 @@ describe('useAiConnectionController', () => {
   it('reset clears AI draft and test feedback, restores a blank model, and leaves secrets saved', async () => {
     const fixture = createFixture()
     await ready(fixture)
-    await act(async () => fixture.result.current.ai.actions.submit())
+    await act(async () => fixture.result.current.ai.actions.testConnection())
     act(() => fixture.result.current.ai.actions.setKeyInput('discarded-key'))
     await act(async () =>
       fixture.result.current.preferences.actions.resetDefaults(),
@@ -323,7 +392,7 @@ describe('useAiConnectionController', () => {
     )
     let completion: Promise<void> | undefined
     await act(async () => {
-      completion = fixture.result.current.ai.actions.submit()
+      completion = fixture.result.current.ai.actions.testConnection()
       await Promise.resolve()
     })
     expect(fixture.result.current.preferences.canDiscard).toBe(true)
@@ -341,7 +410,7 @@ describe('useAiConnectionController', () => {
     const fixture = createFixture()
     await ready(fixture)
     act(() => fixture.result.current.ai.actions.setModel(' saved-model '))
-    await act(async () => fixture.result.current.ai.actions.submit())
+    await act(async () => fixture.result.current.ai.actions.testConnection())
     expect(fixture.result.current.ai.model).toBe('saved-model')
     expect(fixture.result.current.ai.hasChanges).toBe(false)
   })
@@ -358,7 +427,7 @@ describe('useAiConnectionController', () => {
     )
     let completion: Promise<void> | undefined
     await act(async () => {
-      completion = fixture.result.current.ai.actions.submit()
+      completion = fixture.result.current.ai.actions.testConnection()
       await Promise.resolve()
     })
     const isBusy = fixture.result.current.gate.isBusy
@@ -409,7 +478,7 @@ describe('useAiConnectionController', () => {
     )
     await ready(fixture)
     expect(fixture.result.current.ai.model).toBe('vendor/custom-model:free')
-    await act(async () => fixture.result.current.ai.actions.submit())
+    await act(async () => fixture.result.current.ai.actions.testConnection())
     expect(fixture.result.current.ai.connectionStatus).toBe('Connected')
     vi.mocked(sendMessage).mockClear()
     act(() => fixture.result.current.ai.actions.setModel('openrouter/free'))
@@ -428,7 +497,7 @@ describe('useAiConnectionController', () => {
     expect(fixture.result.current.ai.model).toBe('vendor/custom-model:free')
   })
 
-  it('saves a free OpenRouter connection without changing assessment enablement', async () => {
+  it('saves and activates a free OpenRouter connection without testing or enabling assessment', async () => {
     const fixture = createFixture()
     await ready(fixture)
     act(() => fixture.result.current.ai.actions.setProvider('openrouter'))
@@ -447,18 +516,19 @@ describe('useAiConnectionController', () => {
         aiAssessment: { provider: 'openrouter', model: 'openrouter/free' },
       },
     })
-    expect(sendMessage).toHaveBeenCalledWith('genai.testConnection', {
-      surface: 'dashboard',
-      provider: 'openrouter',
-      model: 'openrouter/free',
-    })
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'genai.testConnection',
+      expect.anything(),
+    )
     expect(fixture.getStored().aiAssessment).toEqual({
       enabled: false,
       provider: 'openrouter',
       model: 'openrouter/free',
     })
     expect(fixture.result.current.ai.keyInput).toBe('')
-    expect(fixture.result.current.ai.connectionStatus).toBe('Connected')
+    expect(fixture.result.current.ai.connectionStatus).toBe(
+      'Saved key · not tested',
+    )
   })
 
   it('preserves an unfinished OpenRouter model and key while unrelated preferences save', async () => {

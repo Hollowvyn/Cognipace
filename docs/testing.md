@@ -386,8 +386,10 @@ count as completed browser proof.
 2. Navigate to Settings.
 3. Select Gemini in the AI connection section. Confirm a default model appears,
    then enter a custom model id and your own provider key.
-4. Choose Save & test connection. Confirm it saves the provider/model/key,
-   reports success for an accessible model, and leaves AI assessment disabled.
+4. Choose Save & make active. Confirm it saves the provider/model/key, updates
+   Active provider, makes no provider request, and leaves AI assessment disabled.
+   Choose the separate Test connection button and confirm success for an
+   accessible model without settings or key writes.
 5. Leave Settings and reopen it. Confirm Gemini and the exact custom model
    remain selected, the key input is empty, and the saved-key status is present.
 6. Choose Test connection without re-entering the key. Enable AI assessment and
@@ -397,6 +399,11 @@ count as completed browser proof.
    Confirm those edits remain available and are not persisted by Save Settings.
 8. Repeat connection testing with OpenAI and Anthropic if you have their keys;
    confirm each provider uses its own saved key and editable model.
+9. With two provider keys saved, select the inactive provider. Confirm Active
+   provider still names the saved connection and Test connection is disabled.
+   Choose Make active and confirm the summary updates without replacing either
+   key or testing. Test connection separately. Reopen Settings and confirm the
+   active provider/model persist and unchanged Save & make active is disabled.
 
 Edge cases to run in the installed extension:
 
@@ -409,9 +416,10 @@ Edge cases to run in the installed extension:
 - Replace or remove the selected provider key in another Settings window during
   a test. Confirm the original window does not show a valid result for the old
   key, even when both old and new keys have a presence value of true.
-- Enter a key and press Enter. Confirm the AI action runs once and does not
-  submit unrelated preferences. While saving/testing, confirm conflicting
-  saves, provider/model edits, and Reset Defaults cannot run.
+- Enter a key and press Enter. Confirm saving/activation runs once without
+  testing or submitting unrelated preferences. Click Test connection and confirm
+  one request with no settings/key writes. While saving/testing, confirm
+  conflicting saves, provider/model edits, and Reset Defaults cannot run.
 - Remove the selected key, then turn AI assessment off. Confirm turning it off
   succeeds without credentials. Reset Defaults and confirm assessment is off,
   the model is blank, and the remaining saved provider keys are preserved.
@@ -423,22 +431,25 @@ Attach human-run happy-path and edge-case screenshots or a recording before PR
 review or merge. Automated provider-wire tests and component fixtures do not
 prove live credential access or installed service-worker behavior.
 
-Expected: provider keys stay in trusted local extension secret storage. Save &
-test uses the same reusable provider integration as assessment; settings and
-credentials persist independently of provider availability, and stale results
+Expected: provider keys stay in trusted local extension secret storage. Test
+connection uses the same reusable provider integration as assessment. Saving or
+activating makes no provider request; settings and credentials persist
+independently of provider availability, and stale results
 cannot validate a replacement key or model.
 
 #### OpenRouter connection and analysis smoke
 
 1. Select OpenRouter with AI assessment off. Confirm editable `openrouter/free`,
    masked empty key input, free-routing/usage copy, and key/data-policy links.
-   Enter your own key, Save & test, and confirm assessment remains off.
-2. Enter an accessible custom text-model ID and Save & test. Reopen Settings:
-   confirm the exact custom model, selected OpenRouter, saved-key presence,
+   Enter your own key, Save & make active, then Test connection, and confirm
+   assessment remains off.
+2. Enter an accessible custom text-model ID and Save & make active. Reopen
+   Settings: confirm the exact custom model, selected OpenRouter, saved-key presence,
    empty masked input, and untested status. Test the saved connection.
 3. Click Use free models. Confirm draft `openrouter/free`, cleared verification,
    and no automatic network request or save. Discard and confirm the saved
-   custom model returns. Choose the preset again and explicitly Save & test.
+   custom model returns. Choose the preset again, explicitly Save & make active,
+   then Test connection.
 4. Leave unfinished connection model/key edits while saving an unrelated
    preference. Confirm only the preference persisted and draft edits survived.
    During preference save, key save, and connection test, confirm the preset and

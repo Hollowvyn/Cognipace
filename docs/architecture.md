@@ -597,8 +597,15 @@ operations await retryable trusted-storage readiness without waiting for the
 database. Background runtime listeners register synchronously during startup.
 
 Settings owns a separate AI connection draft and serializes its writes with
-ordinary preference saves and Reset Defaults. AI configuration writes and
-secret changes broadcast GenAI invalidation; a volatile query-cache revision
+ordinary preference saves and Reset Defaults. Its Active provider summary reads
+saved configuration independently of the editor. Save & make active persists
+the provider/model and any entered key; Make active reuses another provider's
+saved key. Neither action calls the provider. The separate Test connection
+action calls the existing saved-configuration endpoint without writing settings
+or secrets. Unchanged saving and testing unsaved edits are disabled. Only one
+provider/model pair is active, while provider keys remain stored independently.
+AI configuration writes and secret changes broadcast GenAI invalidation; a
+volatile query-cache revision
 invalidates connection results even when key-presence booleans stay the same.
 Pending presence/availability reads are cancelled before refetch; combined
 Settings/GenAI events also cancel the initial Settings read so it cannot restore
