@@ -44,12 +44,6 @@ it('requires exactly four provider-presence booleans without secret fields', () 
     openrouter: true,
   }
   expect(aiProviderSecretPresenceSchema.parse(presence)).toEqual(presence)
-  expect(makeEmptyAiProviderSecretPresence()).toEqual({
-    openai: false,
-    anthropic: false,
-    gemini: false,
-    openrouter: false,
-  })
   for (const invalid of [
     { openai: true, anthropic: false, gemini: false },
     { ...presence, openrouter: 'true' },

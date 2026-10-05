@@ -6,7 +6,10 @@ vi.mock('@/extension/messaging', () => ({
   sendMessage: vi.fn(),
 }))
 
-import type { AiProviderSecretPresence } from '../domain/genai-secrets-types'
+import {
+  makeEmptyAiProviderSecretPresence,
+  type AiProviderSecretPresence,
+} from '../domain/genai-secrets-types'
 import type { TestAiConnectionResponse } from './genai-settings-contracts'
 
 import { sendMessage } from '@/extension/messaging'
@@ -42,10 +45,8 @@ afterEach(() => {
 describe('useGenAiSecretPresenceQuery', () => {
   it('fetches presence via sendMessage with dashboard surface', async () => {
     vi.mocked(sendMessage).mockResolvedValue({
+      ...makeEmptyAiProviderSecretPresence(),
       openai: true,
-      anthropic: false,
-      gemini: false,
-      openrouter: false,
     })
 
     const { result } = renderHook(() => useGenAiSecretPresenceQuery(), {
@@ -69,10 +70,8 @@ describe('useGenAiSecretPresenceQuery', () => {
 describe('useSetAiProviderSecretMutation', () => {
   it('translates the hook input key to apiKey at the runtime boundary', async () => {
     vi.mocked(sendMessage).mockResolvedValue({
+      ...makeEmptyAiProviderSecretPresence(),
       openai: true,
-      anthropic: false,
-      gemini: false,
-      openrouter: false,
     })
 
     const { result } = renderHook(() => useSetAiProviderSecretMutation(), {
@@ -95,10 +94,8 @@ describe('useSetAiProviderSecretMutation', () => {
 
   it('omits baseUrl from the runtime payload when provided', async () => {
     vi.mocked(sendMessage).mockResolvedValue({
+      ...makeEmptyAiProviderSecretPresence(),
       openai: true,
-      anthropic: false,
-      gemini: false,
-      openrouter: false,
     })
 
     const { result } = renderHook(() => useSetAiProviderSecretMutation(), {
@@ -123,12 +120,7 @@ describe('useSetAiProviderSecretMutation', () => {
   })
 
   it('updates the presence cache on success', async () => {
-    const presence = {
-      openai: false,
-      anthropic: true,
-      gemini: false,
-      openrouter: false,
-    }
+    const presence = { ...makeEmptyAiProviderSecretPresence(), anthropic: true }
     vi.mocked(sendMessage).mockResolvedValue(presence)
 
     const { result } = renderHook(() => useSetAiProviderSecretMutation(), {
@@ -150,12 +142,7 @@ describe('useSetAiProviderSecretMutation', () => {
 
 describe('useClearAiProviderSecretMutation', () => {
   it('calls clearAiProviderSecret via sendMessage and updates the cache', async () => {
-    const presence = {
-      openai: false,
-      anthropic: false,
-      gemini: false,
-      openrouter: false,
-    }
+    const presence = makeEmptyAiProviderSecretPresence()
     vi.mocked(sendMessage).mockResolvedValue(presence)
 
     const { result } = renderHook(() => useClearAiProviderSecretMutation(), {
@@ -182,10 +169,8 @@ describe('secret cache coherence and privacy', () => {
     onlineManager.setOnline(false)
     try {
       vi.mocked(sendMessage).mockResolvedValue({
+        ...makeEmptyAiProviderSecretPresence(),
         openai: true,
-        anthropic: false,
-        gemini: false,
-        openrouter: false,
       })
       const { result } = renderHook(() => useSetAiProviderSecretMutation(), {
         wrapper,
@@ -219,10 +204,8 @@ describe('secret cache coherence and privacy', () => {
           }),
       )
       .mockResolvedValue({
+        ...makeEmptyAiProviderSecretPresence(),
         openai: true,
-        anthropic: false,
-        gemini: false,
-        openrouter: false,
       })
     const { result } = renderHook(
       () => ({
@@ -239,12 +222,7 @@ describe('secret cache coherence and privacy', () => {
       })
     })
     await act(async () => {
-      finishRead({
-        openai: false,
-        anthropic: false,
-        gemini: false,
-        openrouter: false,
-      })
+      finishRead(makeEmptyAiProviderSecretPresence())
       await Promise.resolve()
     })
     expect(queryClient.getQueryData(['genai', 'secret-presence'])).toEqual({
@@ -303,12 +281,7 @@ describe('secret cache coherence and privacy', () => {
       await expect(
         result.current.mutateAsync({ provider: 'openai', key: 'second-key' }),
       ).rejects.toThrow(/progress/)
-      finish({
-        openai: true,
-        anthropic: false,
-        gemini: false,
-        openrouter: false,
-      })
+      finish({ ...makeEmptyAiProviderSecretPresence(), openai: true })
       await first
     })
     expect(sendMessage).toHaveBeenCalledTimes(1)
@@ -422,9 +395,7 @@ it('bounds a lost worker response at 25 seconds and cleans the client timer', as
 
 it('saves and removes the OpenRouter key with strict presence and no secret in caches', async () => {
   const savedPresence = {
-    openai: false,
-    anthropic: false,
-    gemini: false,
+    ...makeEmptyAiProviderSecretPresence(),
     openrouter: true,
   }
   vi.mocked(sendMessage).mockResolvedValue(savedPresence)

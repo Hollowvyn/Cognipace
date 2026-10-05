@@ -147,6 +147,8 @@ describe('generateJson actual SDK wire', () => {
         },
       })
       expectSafe(result)
+      if (provider !== 'openrouter')
+        expect(result.providerMetadata).not.toHaveProperty('resolvedModel')
       expect(fetchMock).toHaveBeenCalledOnce()
       const [url, init] = fetchMock.mock.calls[0]!
       const headers = new Headers(init?.headers)
@@ -404,19 +406,6 @@ describe('generateJson actual SDK wire', () => {
       providerMetadata: { model: 'openrouter/free', resolvedModel: model },
     })
   })
-
-  it.each(['openai', 'anthropic', 'gemini'] as const)(
-    'keeps %s metadata unchanged by OpenRouter model resolution',
-    async (provider) => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        jsonResponse(successBody(provider)),
-      )
-      const result = await generateJson(request(provider))
-      expect(result.status).toBe('success')
-      if (result.status === 'success')
-        expect(result.providerMetadata).not.toHaveProperty('resolvedModel')
-    },
-  )
 
   it.each([
     [400, 'bad-request'],

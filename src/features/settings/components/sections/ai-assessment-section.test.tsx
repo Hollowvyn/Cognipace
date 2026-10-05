@@ -226,36 +226,6 @@ describe('AiAssessmentSection', () => {
     expect(screen.getByLabelText('OpenAI API key')).toHaveValue('local-key')
   })
 
-  it('freezes every AI control during key persistence', async () => {
-    renderSection({ model: 'custom-model' })
-    await screen.findByText('No saved key')
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('OpenAI API key'), 'local-key')
-    let finish: (() => void) | undefined
-    vi.mocked(sendMessage).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = () =>
-            resolve({
-              openai: true,
-              anthropic: false,
-              gemini: false,
-              openrouter: false,
-            })
-        }),
-    )
-    fireEvent.submit(screen.getByRole('form', { name: 'AI connection' }))
-    await screen.findByRole('button', { name: 'Saving key…' })
-    expect(screen.getByLabelText('Model')).toBeDisabled()
-    expect(screen.getByLabelText('OpenAI API key')).toBeDisabled()
-    expect(screen.getByRole('radio', { name: 'Gemini' })).toBeDisabled()
-    expect(
-      screen.getByRole('button', { name: 'Discard connection changes' }),
-    ).toBeDisabled()
-    finish?.()
-    await screen.findByText('Connected to OpenAI · custom-model.')
-  })
-
   it('suggests the free OpenRouter route, clears an unsaved key, and shows bounded model and routing guidance', async () => {
     renderSection({ model: 'custom-model' })
     await screen.findByText('No saved key')
@@ -348,7 +318,7 @@ describe('AiAssessmentSection', () => {
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it('disables the free preset during key persistence and leaves the captured custom model intact', async () => {
+  it('freezes every AI control during key persistence and leaves the captured custom model intact', async () => {
     renderSection({ provider: 'openrouter', model: 'vendor/custom-model' })
     await screen.findByText('No saved key')
     const user = userEvent.setup()
@@ -371,6 +341,12 @@ describe('AiAssessmentSection', () => {
     )
     fireEvent.submit(screen.getByRole('form', { name: 'AI connection' }))
     await screen.findByRole('button', { name: 'Saving key…' })
+    expect(screen.getByLabelText('Model')).toBeDisabled()
+    expect(screen.getByLabelText('OpenRouter API key')).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'Gemini' })).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Discard connection changes' }),
+    ).toBeDisabled()
     expect(
       screen.getByRole('button', { name: 'Use free models' }),
     ).toBeDisabled()
