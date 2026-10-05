@@ -5,6 +5,8 @@ Date: 2026-10-05
 Status: the user approved the Value first visual direction, weighted Performance,
 cumulative Recall, and natural trend connections. This consolidated written
 specification awaits the user's review before phase-sized implementation plans.
+The user also approved the complete ten-card page direction and requested a
+target-relative timing refinement; that refined card is proposed below.
 
 ## Problem And Outcome
 
@@ -45,7 +47,7 @@ order forms consecutive 2×2 groups, with the final workload pair:
 
 | Row | Left            | Right             |
 | --- | --------------- | ----------------- |
-| 1   | Performance     | Assessment time   |
+| 1   | Performance     | Time vs target    |
 | 2   | Practice        | Topic performance |
 | 3   | Recall          | Memory strength   |
 | 4   | Retention map   | Memory signals    |
@@ -87,7 +89,7 @@ Suggested primary descriptions are:
 | Card              | Description                             |
 | ----------------- | --------------------------------------- |
 | Performance       | First attempts · weighted by difficulty |
-| Assessment time   | Median time by difficulty               |
+| Time vs target    | Median time by difficulty               |
 | Practice          | Rating mix and review volume            |
 | Topic performance | Weighted scores across all assessments  |
 | Recall            | Repeat reviews · period to date         |
@@ -301,12 +303,41 @@ Good/Easy sum must equal `goodEasy`, and `reviewSuccess` must equal
 `goodEasy / validRatings`. Validate these reconciliations with Zod;
 no new database query per chart, table, or persisted review field is needed.
 
-Assessment time retains the existing raw first/follow-up controls, Trend/Compare,
-Minutes/current-target-percentage, timing subset, difficulty identity, and
-median/quartile rules. Its local cohort is independent of the Performance
-card's control; its selected cohort remains visibly labeled. Current targets are
-references, not speed grades or historical policy snapshots. No timing estimate
-is inferred from the weighted score.
+Time vs target shows one horizontal selected-period median bar for each known
+difficulty, normalized against that difficulty's current Settings target. A
+shared 100% reference makes the allowances comparable. Bars start at zero,
+remain uncapped above 100%, fill their row, and use a restrained accent on only
+the portion above the target. A muted remaining allowance may extend an
+under-target bar to 100%; it is reference space rather than recorded time.
+Difficulty is always named. Direct labels show median minutes, target minutes,
+and the relative difference as Under, Over, or On target. Do not describe this
+as a speed grade, acceptance rate, or percentage of assessments meeting target.
+
+For a difficulty with a positive saved target and supported median:
+
+- Percent of target = `100 * medianSeconds / (targetMinutes * 60)`.
+- Difference minutes = `medianSeconds / 60 - targetMinutes`.
+- Difference percent = `percentOfTarget - 100`.
+
+Show timed/eligible coverage and the selected first/follow-up and timing cohort
+explicitly. Use coverage as the leading overview value rather than a pooled
+minute median inferred from three difficulty medians. One timed observation
+supports a median; missing timed data stays unavailable. Unknown difficulty has
+no comparable saved allowance and must not receive Easy's target through its
+Performance baseline weight. Fit the percentage axis to the median ratios and
+100% reference with padding, independent of series visibility.
+
+The overview uses period medians. Details retains historical Trend, current/prior
+Compare, Minutes/current-target-percentage, all/successful timing subsets,
+original difficulty identities, exact coverage, and median/quartile rules.
+All timed assessments remains the default; it can include Again and invalid
+ratings with positive recorded duration. Its local cohort is independent of the
+Performance card's control. Current targets are references rather than historical
+policy snapshots, and changing them changes the comparison without changing
+recorded seconds. Saved time excludes pauses and may include running idle time;
+unsaved earlier work is unknown. No timing estimate or penalty is inferred from
+the weighted score. Existing totals and Settings targets are sufficient; this
+refinement adds no runtime fields, database queries, or persisted values.
 
 Practice retains exact interval rating shares and independent completed-review
 counts, missing-composition hatching, its saved Review Success reference,
@@ -413,6 +444,12 @@ equal/boundary values, active runs, long gaps, singleton and shortened/partial
 buckets, bounded curves, actual midpoint endpoints, and no activity invented in
 holds. Runtime tests reject inconsistent pairs and topic count matrices.
 
+Timing regressions cover below/at/above-target medians, exact minute and percent
+deltas, uncapped ratios above 100%, missing durations, Unknown without an
+allowance, per-difficulty timed/eligible coverage, unchanged recorded seconds
+after target edits, and preservation of all/successful timing subsets. Do not
+reconstruct a pooled median from per-difficulty aggregates.
+
 Recall contract refinements require `recalledCount <= pairedReviews`; zero pairs
 means both rates/difference unavailable and evidence unmeasured; positive pairs
 means both rates/difference finite, observed equals recalled/paired, and the
@@ -481,3 +518,21 @@ installed-extension smoke were not run because no app behavior, persisted shape,
 or release artifact changed. All implementation validation remains pending under
 the phase requirements above. This `docs(analytics)` commit has no release-trigger
 impact; reverting it removes planning/reference files without changing user data.
+
+For the target-relative timing refinement, the existing timing aggregation,
+normalization, and Settings targets were reviewed independently without app
+edits. The revised concept keeps 464px desktop cards and a 246px chart slot;
+its target labels and expanded evidence were inspected at desktop and 320px.
+These illustrative checks do not count as installed-extension proof.
+
+Commands run for that specification refinement:
+
+```sh
+rtk proxy node /Users/tobiolutimehin/WebstormProjects/cognipace-v2/node_modules/prettier/bin/prettier.cjs --ignore-path /dev/null --write docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md
+rtk proxy node /Users/tobiolutimehin/WebstormProjects/cognipace-v2/node_modules/prettier/bin/prettier.cjs --ignore-path /dev/null --check docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md
+rtk git diff --check
+```
+
+`rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` remain skipped
+because this refinement changes planning Markdown and the conversation concept,
+with no application code or runtime behavior changed.
