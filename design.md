@@ -166,11 +166,19 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 
 - Keep AI connection in its own Settings form with the existing compact row,
   input, status, and panel tokens. Ordinary preference saves do not submit it.
-- Selecting a provider fills an editable model value. Saved custom models stay
-  visible; a blank reset model stays blank rather than looking configured.
+- Selecting a provider fills an editable suggested model value; OpenRouter
+  suggests `openrouter/free`. Saved custom models stay visible exactly; a
+  blank reset model stays blank. Show **Use free models** only for OpenRouter,
+  beside the model field, as a draft-only action. It clears test feedback,
+  requires explicit saving/testing, and is disabled behind the shared operation
+  gate. Discard restores the saved model.
 - Mask entered keys and show availability only for the selected provider. Clear
-  the input after saving and when switching providers. Provide Remove key and a
-  Google AI Studio link for Gemini.
+  the input after saving and when switching providers. Keep Remove key, the
+  Gemini Google AI Studio link, and an OpenRouter key-creation link. OpenRouter
+  shows compact free-routing/usage guidance and code/context-forwarding copy
+  with a provider-data-policy link. External links use the established new-tab
+  attributes. Keep the existing compact row/input/status/panel tokens.
+
 - Use Save & test connection for edits and Test connection for an unchanged
   connection. Name the current save/test step and disable conflicting controls.
 - Show a compact inline success or actionable error. A failed test keeps saved

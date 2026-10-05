@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { updateSettings } from '@/features/settings/server/settings-service'
 import { createTestDb } from '@/platform/db/test-db'
+import type { TestAiConnectionRequest } from '../api/genai-settings-contracts'
+import { makeOpenRouterSuccessResponse } from '../testing/genai-fixtures'
 import { testAiConnection } from './genai-connection-service'
 import {
   clearAiProviderSecret,
@@ -12,6 +14,11 @@ const request = {
   surface: 'dashboard',
   provider: 'gemini',
   model: 'gemini-test',
+} as const
+const openRouterRequest = {
+  ...request,
+  provider: 'openrouter',
+  model: 'openrouter/free',
 } as const
 const providerBody = {
   candidates: [
@@ -31,12 +38,13 @@ const response = () =>
   new Response(JSON.stringify(providerBody), {
     headers: { 'content-type': 'application/json' },
   })
-async function configuredDb() {
+async function configuredDb(connection: TestAiConnectionRequest = request) {
+  const { provider, model } = connection
   const { db } = await createTestDb({ seed: false })
   await updateSettings(db, {
-    aiAssessment: { provider: 'gemini', model: 'gemini-test', enabled: false },
+    aiAssessment: { provider, model, enabled: false },
   })
-  await setAiProviderSecret('gemini', { apiKey: 'fake-private-key' })
+  await setAiProviderSecret(provider, { apiKey: 'fake-private-key' })
   return db
 }
 afterEach(() => {
@@ -191,3 +199,67 @@ it('returns missing-key feedback before making a network call', async () => {
   })
   expect(fetch).not.toHaveBeenCalled()
 })
+
+it('tests a saved free OpenRouter connection with its key while assessment is disabled', async () => {
+  const db = await configuredDb(openRouterRequest)
+  const fetchMock = vi.fn<typeof fetch>(() =>
+    Promise.resolve(makeOpenRouterSuccessResponse({ ok: true })),
+  )
+  vi.stubGlobal('fetch', fetchMock)
+  const result = await testAiConnection(openRouterRequest, () =>
+    Promise.resolve(db),
+  )
+  expect(result).toMatchObject({
+    status: 'success',
+    provider: 'openrouter',
+    model: 'openrouter/free',
+  })
+  expect(fetchMock).toHaveBeenCalledOnce()
+  const [url, init] = fetchMock.mock.calls[0]!
+  expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
+  expect(new Headers(init?.headers).get('authorization')).toBe(
+    'Bearer fake-private-key',
+  )
+  const body = init?.body
+  if (typeof body !== 'string') throw new Error('Expected a JSON request body.')
+  expect(JSON.parse(body)).toMatchObject({
+    model: 'openrouter/free',
+    max_tokens: 512,
+  })
+  expect(JSON.stringify(result)).not.toContain('fake-private-key')
+  expect(result).not.toHaveProperty('resolvedModel')
+})
+
+it.each(['key', 'same-key', 'model', 'provider', 'removed-key'] as const)(
+  'rejects a completed OpenRouter test after its saved %s changes',
+  async (kind) => {
+    const db = await configuredDb(openRouterRequest)
+    let finish: (response: Response) => void = () => {}
+    const fetchMock = vi.fn<typeof fetch>(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const pending = testAiConnection(openRouterRequest, () =>
+      Promise.resolve(db),
+    )
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce())
+    if (kind === 'model')
+      await updateSettings(db, { aiAssessment: { model: 'test/custom-model' } })
+    else if (kind === 'provider')
+      await updateSettings(db, { aiAssessment: { provider: 'openai' } })
+    else if (kind === 'removed-key') await clearAiProviderSecret('openrouter')
+    else
+      await setAiProviderSecret('openrouter', {
+        apiKey: kind === 'same-key' ? 'fake-private-key' : 'replacement-key',
+      })
+    finish(makeOpenRouterSuccessResponse({ ok: true }))
+    expect(await pending).toMatchObject({
+      status: 'error',
+      code: 'stale-configuration',
+    })
+    expect(fetchMock).toHaveBeenCalledOnce()
+  },
+)

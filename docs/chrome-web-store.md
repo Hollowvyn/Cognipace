@@ -30,7 +30,7 @@ Core study data stays in the local Chrome profile. Backup export and restore
 are built in. Users may optionally connect GitHub Gist sync: new Gists created
 by CogniPace are private, while an existing connected Gist may be public or
 private according to its GitHub visibility. Users may also optionally configure
-their own OpenAI, Anthropic, or Google Gemini API key for AI-assisted
+their own OpenAI, Anthropic, Google Gemini, or OpenRouter API key for AI-assisted
 assessment.
 
 CogniPace has no developer-operated analytics, advertising, hosted account, or
@@ -74,20 +74,33 @@ actions initiated or enabled by the user. New Gists created by CogniPace are
 private; users manage visibility and deletion of connected Gists through
 GitHub.
 
-### https://api.openai.com/*
+### `https://api.openai.com/*`
 
-Sends optional assessment requests to OpenAI only after the user enables the
-feature and supplies an OpenAI API key.
+Sends a small user-requested connection test with the user's saved OpenAI key,
+or completed-submission code analysis when AI assessment is enabled and OpenAI
+is selected.
 
-### https://api.anthropic.com/*
+### `https://api.anthropic.com/*`
 
-Sends optional assessment requests to Anthropic only after the user enables the
-feature and supplies an Anthropic API key.
+Sends a small user-requested connection test with the user's saved Anthropic
+key, or completed-submission code analysis when AI assessment is enabled and
+Anthropic is selected.
 
-### https://generativelanguage.googleapis.com/*
+### `https://generativelanguage.googleapis.com/*`
 
-Sends optional assessment requests to Google Gemini only after the user enables
-the feature and supplies a Gemini API key.
+Sends a small user-requested connection test with the user's saved Gemini key,
+or completed-submission code analysis when AI assessment is enabled and Gemini
+is selected.
+
+### `https://openrouter.ai/*`
+
+Sends a small user-requested connection test with the user's saved OpenRouter
+key, or completed-submission code analysis when AI assessment is enabled and
+OpenRouter is selected. OpenRouter routes code and problem context to a model
+provider under OpenRouter and provider data policies and account privacy
+settings. No developer key is bundled. `openrouter/free` is an editable
+suggestion; the app does not configure paid fallback model IDs. Model-provider
+domains behind OpenRouter do not receive additional extension host access.
 
 ## Remote Code
 
@@ -138,9 +151,16 @@ manage Gist visibility and deletion through GitHub.
    token with Gist access; no developer account is required. Visibility and
    deletion of connected Gists are handled on GitHub.
 7. AI assessment is optional. Testing it requires a reviewer-supplied API key
-   for OpenAI, Anthropic, or Google Gemini; no developer key is bundled.
+   for OpenAI, Anthropic, Google Gemini, or OpenRouter; no developer key is bundled.
 8. The hidden `/dev/smoke` dashboard route is for development validation and
    is not required for the primary user flow.
+
+For OpenRouter, use a privately supplied test account/key in Settings. Selecting
+OpenRouter suggests `openrouter/free`; a custom model remains editable. Save and
+test while assessment is off, reopen the exact saved model, then use the
+explicit free preset and save/test again. Only enable assessment when ready
+to send submission code and problem context. Free routing can vary in quality,
+latency, and capacity. Do not include test keys in submitted evidence.
 
 ## Private Distribution
 

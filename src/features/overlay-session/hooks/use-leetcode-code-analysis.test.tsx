@@ -653,6 +653,7 @@ describe('useLeetCodeCodeAnalysis', () => {
     'permission',
     'bad-request',
     'model-unavailable',
+    'billing',
     'not-configured',
     'stale-configuration',
   ] as const)('offers Settings for %s', async (code) => {

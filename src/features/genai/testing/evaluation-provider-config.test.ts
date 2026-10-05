@@ -30,7 +30,7 @@ describe('readEvaluationProviderConfig', () => {
     },
   )
 
-  it.each(['openai', 'anthropic', 'gemini'])(
+  it.each(['openai', 'anthropic', 'gemini', 'openrouter'])(
     'accepts an opted-in %s configuration and trims private values',
     (provider) => {
       expect(

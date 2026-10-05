@@ -31,31 +31,27 @@ describe('genai secrets domain', () => {
       openai: false,
       anthropic: false,
       gemini: false,
+      openrouter: false,
     })
   })
 })
 
-it('strictly parses only provider-presence booleans', () => {
-  expect(
-    aiProviderSecretPresenceSchema.parse({
-      openai: true,
-      anthropic: false,
-      gemini: false,
-    }),
-  ).toEqual({ openai: true, anthropic: false, gemini: false })
-  expect(
-    aiProviderSecretPresenceSchema.safeParse({
-      openai: 'true',
-      anthropic: false,
-      gemini: false,
-    }).success,
-  ).toBe(false)
-  expect(
-    aiProviderSecretPresenceSchema.safeParse({
-      openai: true,
-      anthropic: false,
-      gemini: false,
-      apiKey: 'fake-key',
-    }).success,
-  ).toBe(false)
+it('requires exactly four provider-presence booleans without secret fields', () => {
+  const presence = {
+    openai: true,
+    anthropic: false,
+    gemini: false,
+    openrouter: true,
+  }
+  expect(aiProviderSecretPresenceSchema.parse(presence)).toEqual(presence)
+  for (const invalid of [
+    { openai: true, anthropic: false, gemini: false },
+    { ...presence, openrouter: 'true' },
+    { ...presence, apiKey: 'fake-private-key' },
+    { ...presence, other: false },
+  ]) {
+    expect(aiProviderSecretPresenceSchema.safeParse(invalid).success).toBe(
+      false,
+    )
+  }
 })

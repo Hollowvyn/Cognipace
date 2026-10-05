@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { generateJson } from './generate-json'
+import { aiProviderIds } from './types'
 import type { AiGenerateJsonRequest, AiProviderId } from './types'
 
 const API_KEY = 'fake-provider-key-do-not-use'
@@ -11,6 +12,7 @@ const models = {
   openai: 'gpt-4.1-mini',
   anthropic: 'claude-sonnet-4-5-20250929',
   gemini: 'gemini-3.5-flash-lite',
+  openrouter: 'openrouter/free',
 }
 
 function request(
@@ -68,6 +70,19 @@ function successBody(provider: AiProviderId, text = '{"ok":true}') {
         stop_sequence: null,
         usage: { input_tokens: 20, output_tokens: 10 },
       }
+    case 'openrouter':
+      return {
+        id: 'gen_test',
+        model: 'test/resolved-text-model:free',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: text },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+      }
     case 'gemini':
       return {
         candidates: [
@@ -88,6 +103,15 @@ function successBody(provider: AiProviderId, text = '{"ok":true}') {
 
 function errorBody(provider: AiProviderId, status: number, tag = 'generic') {
   const message = `private provider diagnostic ${API_KEY}`
+  if (provider === 'openrouter')
+    return {
+      error: {
+        code: status,
+        message,
+        metadata: { error_type: tag, raw: message },
+      },
+    }
+
   if (provider === 'gemini')
     return { error: { code: status, status: tag, message } }
   if (provider === 'anthropic')
@@ -107,7 +131,7 @@ afterEach(() => {
 })
 
 describe('generateJson actual SDK wire', () => {
-  it.each(['openai', 'anthropic', 'gemini'] as const)(
+  it.each(aiProviderIds)(
     'uses %s native structured wire with explicit credentials and bounded output',
     async (provider) => {
       const fetchMock = vi
@@ -123,12 +147,15 @@ describe('generateJson actual SDK wire', () => {
         },
       })
       expectSafe(result)
+      if (provider !== 'openrouter')
+        expect(result.providerMetadata).not.toHaveProperty('resolvedModel')
       expect(fetchMock).toHaveBeenCalledOnce()
       const [url, init] = fetchMock.mock.calls[0]!
       const headers = new Headers(init?.headers)
       const body: unknown = JSON.parse(requestBodyText(init?.body))
       expect(body).not.toHaveProperty('temperature')
       expect(init?.signal).toBeDefined()
+      expect(init?.redirect).toBe('error')
       if (provider === 'openai') {
         expect(url).toBe('https://api.openai.com/v1/responses')
         expect(headers.get('authorization')).toBe(`Bearer ${API_KEY}`)
@@ -150,6 +177,36 @@ describe('generateJson actual SDK wire', () => {
         expect(body).toMatchObject({
           output_config: { format: { type: 'json_schema' } },
         })
+      } else if (provider === 'openrouter') {
+        expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
+        expect(headers.get('authorization')).toBe(`Bearer ${API_KEY}`)
+        expect(body).toMatchObject({
+          model: 'openrouter/free',
+          max_tokens: 2048,
+          response_format: {
+            type: 'json_schema',
+            json_schema: {
+              strict: true,
+              schema: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['ok'],
+                properties: { ok: { const: true, type: 'boolean' } },
+              },
+            },
+          },
+          provider: { require_parameters: true },
+        })
+        expect(body).toHaveProperty('provider', { require_parameters: true })
+        expect(body).not.toHaveProperty('models')
+        expect(body).not.toHaveProperty('route')
+        expect(body).not.toHaveProperty('plugins')
+        expect(result).toMatchObject({
+          providerMetadata: {
+            model: 'openrouter/free',
+            resolvedModel: 'test/resolved-text-model:free',
+          },
+        })
       } else {
         expect(url).toBe(
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',
@@ -166,7 +223,7 @@ describe('generateJson actual SDK wire', () => {
     },
   )
 
-  it.each(['openai', 'anthropic', 'gemini'] as const)(
+  it.each(aiProviderIds)(
     'keeps original literals, nullable fields and constraints for %s',
     async (provider) => {
       const refinement = vi.fn(() => Promise.resolve(true))
@@ -191,7 +248,7 @@ describe('generateJson actual SDK wire', () => {
     },
   )
 
-  it.each(['openai', 'anthropic', 'gemini'] as const)(
+  it.each(aiProviderIds)(
     'rejects invalid JSON and output schema for %s',
     async (provider) => {
       const fetchMock = vi.spyOn(globalThis, 'fetch')
@@ -211,7 +268,7 @@ describe('generateJson actual SDK wire', () => {
     },
   )
 
-  it.each(['openai', 'anthropic', 'gemini'] as const)(
+  it.each(aiProviderIds)(
     'does not retry or log %s provider failures',
     async (provider) => {
       const logs = [
@@ -253,6 +310,290 @@ describe('generateJson actual SDK wire', () => {
         jsonResponse(errorBody(provider, status, tag), status),
       )
       const result = await generateJson(request(provider))
+      expect(result).toMatchObject({ status: 'error', code })
+      expectSafe(result)
+    },
+  )
+
+  it('keeps an explicit custom OpenRouter model and the full analysis token budget', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(successBody('openrouter')))
+    const result = await generateJson(
+      request('openrouter', {
+        model: 'test/custom-model',
+        maxOutputTokens: 8192,
+      }),
+    )
+    expect(result).toMatchObject({
+      status: 'success',
+      providerMetadata: {
+        model: 'test/custom-model',
+        resolvedModel: 'test/resolved-text-model:free',
+      },
+    })
+    const body: unknown = JSON.parse(
+      requestBodyText(fetchMock.mock.calls[0]![1]?.body),
+    )
+    expect(body).toMatchObject({
+      model: 'test/custom-model',
+      max_tokens: 8192,
+      provider: { require_parameters: true },
+    })
+    expect(body).not.toHaveProperty('models')
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    undefined,
+    '',
+    '   ',
+    'openrouter/free',
+    'openrouter/auto',
+    ' openrouter/free ',
+    ' openrouter/auto ',
+    'x'.repeat(121),
+  ])('omits unusable OpenRouter served-model identity %j', async (model) => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ ...successBody('openrouter'), model }),
+    )
+    const result = await generateJson(request('openrouter'))
+    expect(result).toMatchObject({
+      status: 'success',
+      providerMetadata: { provider: 'openrouter', model: 'openrouter/free' },
+    })
+    if (result.status === 'success')
+      expect(result.providerMetadata).not.toHaveProperty('resolvedModel')
+  })
+
+  it.each(['test/custom-model', ' test/custom-model '])(
+    'omits a served-model identity equal to the requested custom model %s',
+    async (model) => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ ...successBody('openrouter'), model }),
+      )
+      const result = await generateJson(
+        request('openrouter', { model: 'test/custom-model' }),
+      )
+      expect(result).toMatchObject({
+        status: 'success',
+        providerMetadata: { model: 'test/custom-model' },
+      })
+      if (result.status === 'success')
+        expect(result.providerMetadata).not.toHaveProperty('resolvedModel')
+    },
+  )
+
+  it.each([42, null])(
+    'rejects invalid native OpenRouter model %j',
+    async (model) => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ ...successBody('openrouter'), model }),
+      )
+      const result = await generateJson(request('openrouter'))
+      expect(result).toMatchObject({ status: 'error', code: 'invalid-output' })
+      expectSafe(result)
+    },
+  )
+
+  it('preserves a valid 120-character resolved ID without truncation', async () => {
+    const model = `test/${'x'.repeat(115)}`
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ ...successBody('openrouter'), model }),
+    )
+    expect(await generateJson(request('openrouter'))).toMatchObject({
+      status: 'success',
+      providerMetadata: { model: 'openrouter/free', resolvedModel: model },
+    })
+  })
+
+  it.each([
+    [400, 'bad-request'],
+    [401, 'auth'],
+    [402, 'billing'],
+    [403, 'permission'],
+    [404, 'model-unavailable'],
+    [408, 'network'],
+    [422, 'bad-request'],
+    [429, 'rate-limit'],
+    [500, 'network'],
+    [502, 'network'],
+    [503, 'network'],
+    [504, 'network'],
+  ] as const)(
+    'normalizes OpenRouter HTTP and embedded numeric %s to %s',
+    async (code, expected) => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch')
+      for (const transportStatus of [code, 200]) {
+        fetchMock.mockClear()
+        fetchMock.mockResolvedValue(
+          jsonResponse(errorBody('openrouter', code), transportStatus),
+        )
+        const result = await generateJson(request('openrouter'))
+        expect(result).toMatchObject({ status: 'error', code: expected })
+        expectSafe(result)
+        expect(fetchMock).toHaveBeenCalledOnce()
+        if (result.status === 'error') {
+          expect(result.providerMetadata).not.toHaveProperty('resolvedModel')
+          if (expected === 'billing') {
+            expect(result.message).toContain('OpenRouter balance')
+            expect(result.message).toContain('key spending limit')
+            expect(result.message).toContain('pending paid requests')
+          }
+          if (expected === 'model-unavailable') {
+            expect(result.message).toContain('capabilities')
+            expect(result.message).toContain('privacy')
+          }
+        }
+      }
+    },
+  )
+
+  it.each([
+    ['authentication', 'auth'],
+    ['permission_denied', 'permission'],
+    ['payment_required', 'billing'],
+    ['not_found', 'model-unavailable'],
+    ['rate_limit_exceeded', 'rate-limit'],
+    ['provider_overloaded', 'network'],
+    ['provider_unavailable', 'network'],
+    ['context_length_exceeded', 'bad-request'],
+    ['max_tokens_exceeded', 'invalid-output'],
+    ['token_limit_exceeded', 'bad-request'],
+    ['string_too_long', 'bad-request'],
+    ['invalid_request', 'bad-request'],
+    ['invalid_prompt', 'bad-request'],
+    ['precondition_failed', 'bad-request'],
+    ['payload_too_large', 'bad-request'],
+    ['unprocessable', 'bad-request'],
+    ['content_policy_violation', 'refused'],
+    ['refusal', 'refused'],
+    ['server', 'network'],
+    ['timeout', 'timeout'],
+  ] as const)(
+    'normalizes allowlisted OpenRouter metadata.error_type %s to %s',
+    async (tag, code) => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch')
+      for (const transportStatus of [400, 200]) {
+        fetchMock.mockClear()
+        fetchMock.mockResolvedValue(
+          jsonResponse(errorBody('openrouter', 400, tag), transportStatus),
+        )
+        const result = await generateJson(request('openrouter'))
+        expect(result).toMatchObject({ status: 'error', code })
+        expectSafe(result)
+        expect(fetchMock).toHaveBeenCalledOnce()
+      }
+    },
+  )
+
+  it.each([undefined, '402', 402.5, 200, 499, 999, { code: 402 }])(
+    'ignores unknown or unsafe embedded OpenRouter code %j',
+    async (code) => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({
+          error: {
+            code,
+            type: 'authentication_error',
+            message: `private provider diagnostic ${API_KEY} billing auth no endpoints`,
+            metadata: {
+              error_type: 'unrecognized_tag',
+              raw: { code: 402, error_type: 'payment_required', key: API_KEY },
+            },
+          },
+        }),
+      )
+      const result = await generateJson(request('openrouter'))
+      expect(result).toMatchObject({ status: 'error', code: 'invalid-output' })
+      expectSafe(result)
+    },
+  )
+
+  it.each([402, 499])(
+    'does not let embedded code %s override failing HTTP status',
+    async (code) => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse(errorBody('openrouter', code), 401),
+      )
+      expect(await generateJson(request('openrouter'))).toMatchObject({
+        status: 'error',
+        code: 'auth',
+      })
+    },
+  )
+
+  it('keeps unknown OpenRouter 503 as network without inferring a privacy cause', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(
+        {
+          error: {
+            code: 503,
+            message: `private provider diagnostic ${API_KEY} no endpoints match privacy`,
+          },
+        },
+        503,
+      ),
+    )
+    const result = await generateJson(request('openrouter'))
+    expect(result).toMatchObject({ status: 'error', code: 'network' })
+    expectSafe(result)
+    if (result.status === 'error')
+      expect(result.message).not.toContain('privacy')
+  })
+
+  it.each(['Payment_required', 'PAYMENT_REQUIRED', 'authentication_error'])(
+    'ignores non-allowlisted OpenRouter metadata tag %s',
+    async (tag) => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse(errorBody('openrouter', 400, tag)),
+      )
+      const result = await generateJson(request('openrouter'))
+      expect(result).toMatchObject({ status: 'error', code: 'bad-request' })
+      expectSafe(result)
+    },
+  )
+
+  it.each(['openai', 'anthropic', 'gemini'] as const)(
+    'ignores OpenRouter billing tags for direct provider %s',
+    async (provider) => {
+      const body = errorBody(provider, 402)
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse(
+          {
+            ...body,
+            error: {
+              ...body.error,
+              metadata: { error_type: 'payment_required', raw: API_KEY },
+            },
+          },
+          402,
+        ),
+      )
+      const result = await generateJson(request(provider))
+      expect(result).toMatchObject({ status: 'error', code: 'unknown' })
+      expectSafe(result)
+    },
+  )
+
+  it.each([
+    ['content_filter', 'refused'],
+    ['length', 'invalid-output'],
+  ] as const)(
+    'rejects native OpenRouter %s even when the response JSON is valid',
+    async (finishReason, code) => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({
+          ...successBody('openrouter'),
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: '{"ok":true}' },
+              finish_reason: finishReason,
+            },
+          ],
+        }),
+      )
+      const result = await generateJson(request('openrouter'))
       expect(result).toMatchObject({ status: 'error', code })
       expectSafe(result)
     },
@@ -344,9 +685,16 @@ describe('generateJson actual SDK wire', () => {
     },
   )
 
-  it.each(['headers', 'success body', 'error body'] as const)(
-    'bounds stalled %s even when the transport ignores abort',
-    async (phase) => {
+  it.each([
+    ['gemini', 'headers'],
+    ['gemini', 'success body'],
+    ['gemini', 'error body'],
+    ['openrouter', 'headers'],
+    ['openrouter', 'success body'],
+    ['openrouter', 'error body'],
+  ] as const)(
+    'bounds stalled %s %s even when the transport ignores abort',
+    async (provider, phase) => {
       vi.useFakeTimers()
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
         phase === 'headers'
@@ -365,52 +713,63 @@ describe('generateJson actual SDK wire', () => {
               ),
             ),
       )
-      const pending = generateJson(request('gemini', { timeoutMs: 40 }))
+      const pending = generateJson(request(provider, { timeoutMs: 40 }))
       await vi.advanceTimersByTimeAsync(41)
       const result = await pending
       expect(result).toMatchObject({ status: 'error', code: 'timeout' })
+      expectSafe(result)
+      expect(fetchMock).toHaveBeenCalledOnce()
       expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
       expect(vi.getTimerCount()).toBe(0)
     },
   )
 
-  it('returns cancellation promptly and prevents an already cancelled request from fetching', async () => {
-    vi.useFakeTimers()
-    const controller = new AbortController()
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockImplementation(() => new Promise(() => {}))
-    const pending = generateJson(
-      request('gemini', { signal: controller.signal }),
-    )
-    await vi.advanceTimersByTimeAsync(1)
-    controller.abort(new Error(`private provider diagnostic ${API_KEY}`))
-    expect(await pending).toMatchObject({ status: 'error', code: 'cancelled' })
-    expect(vi.getTimerCount()).toBe(0)
-    fetchMock.mockClear()
-    expect(
-      await generateJson(request('gemini', { signal: controller.signal })),
-    ).toMatchObject({ status: 'error', code: 'cancelled' })
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
+  it.each(['gemini', 'openrouter'] as const)(
+    'cancels %s promptly and prevents an already cancelled request from fetching',
+    async (provider) => {
+      vi.useFakeTimers()
+      const controller = new AbortController()
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(() => new Promise(() => {}))
+      const pending = generateJson(
+        request(provider, { signal: controller.signal }),
+      )
+      await vi.advanceTimersByTimeAsync(1)
+      controller.abort(new Error(`private provider diagnostic ${API_KEY}`))
+      const result = await pending
+      expect(result).toMatchObject({ status: 'error', code: 'cancelled' })
+      expectSafe(result)
+      expect(fetchMock).toHaveBeenCalledOnce()
+      expect(vi.getTimerCount()).toBe(0)
+      fetchMock.mockClear()
+      expect(
+        await generateJson(request(provider, { signal: controller.signal })),
+      ).toMatchObject({ status: 'error', code: 'cancelled' })
+      expect(fetchMock).not.toHaveBeenCalled()
+    },
+  )
 
-  it('keeps the deadline active during asynchronous schema validation', async () => {
-    vi.useFakeTimers()
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(successBody('gemini')),
-    )
-    const stalledSchema = schema.refine(
-      async () => new Promise<boolean>(() => {}),
-    )
-    const pending = generateJson({
-      ...request('gemini'),
-      schema: stalledSchema,
-      timeoutMs: 40,
-    })
-    await vi.advanceTimersByTimeAsync(41)
-    expect(await pending).toMatchObject({ status: 'error', code: 'timeout' })
-    expect(vi.getTimerCount()).toBe(0)
-  })
+  it.each(['gemini', 'openrouter'] as const)(
+    'keeps the %s deadline active during asynchronous schema validation',
+    async (provider) => {
+      vi.useFakeTimers()
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse(successBody(provider)),
+      )
+      const stalledSchema = schema.refine(
+        async () => new Promise<boolean>(() => {}),
+      )
+      const pending = generateJson({
+        ...request(provider),
+        schema: stalledSchema,
+        timeoutMs: 40,
+      })
+      await vi.advanceTimersByTimeAsync(41)
+      expect(await pending).toMatchObject({ status: 'error', code: 'timeout' })
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
 
   it('supports the SDK JSON-tool compatibility path for older Anthropic models', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -445,7 +804,7 @@ describe('generateJson actual SDK wire', () => {
     })
   })
 
-  it.each(['openai', 'anthropic', 'gemini'] as const)(
+  it.each(aiProviderIds)(
     'rejects malformed native %s envelopes and fetch failures safely',
     async (provider) => {
       const fetchMock = vi.spyOn(globalThis, 'fetch')

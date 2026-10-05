@@ -20,6 +20,7 @@ const secretProviderByGenAiProvider = {
   openai: 'genai:openai',
   anthropic: 'genai:anthropic',
   gemini: 'genai:google',
+  openrouter: 'genai:openrouter',
 } as const satisfies Record<GenAiProviderId, SecretProviderId>
 
 export async function getAiProviderSecretPresenceFromTrustedStorage(): Promise<AiProviderSecretPresence> {

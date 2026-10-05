@@ -19,6 +19,7 @@ const providerOptions: ReadonlyArray<{
   { label: 'OpenAI', value: 'openai' },
   { label: 'Anthropic', value: 'anthropic' },
   { label: 'Gemini', value: 'gemini' },
+  { label: 'OpenRouter', value: 'openrouter' },
 ]
 
 const inputClassName =
@@ -60,20 +61,40 @@ export function AiAssessmentSection({
         labelFor="ai-model"
       >
         <div className="grid gap-1.5">
-          <input
-            className={inputClassName}
-            id="ai-model"
-            maxLength={120}
-            onChange={(event) => actions.setModel(event.currentTarget.value)}
-            placeholder={aiProviderModelDefaults[provider]}
-            spellCheck={false}
-            type="text"
-            value={model}
-          />
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <input
+              className={`${inputClassName} flex-1 basis-48`}
+              id="ai-model"
+              maxLength={120}
+              onChange={(event) => actions.setModel(event.currentTarget.value)}
+              placeholder={aiProviderModelDefaults[provider]}
+              spellCheck={false}
+              type="text"
+              value={model}
+            />
+            {provider === 'openrouter' ? (
+              <Button
+                disabled={controller.isBusy}
+                onClick={() => actions.setModel('openrouter/free')}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Use free models
+              </Button>
+            ) : null}
+          </div>
           {model.trim() === '' ? (
             <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
               Enter a model to save and test the connection. The suggestion is
               not saved.
+            </p>
+          ) : null}
+          {provider === 'openrouter' ? (
+            <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
+              Free models are chosen automatically; quality and response time
+              may vary. Usage limits apply. You can enter a specific free or
+              paid model instead.
             </p>
           ) : null}
         </div>
@@ -109,6 +130,31 @@ export function AiAssessmentSection({
             >
               Get a key in Google AI Studio
             </a>
+          ) : null}
+          {provider === 'openrouter' ? (
+            <>
+              <a
+                className="w-fit text-[length:var(--cp-copy-font-size)] text-primary underline underline-offset-4"
+                href="https://openrouter.ai/settings/keys"
+                rel="noreferrer"
+                target="_blank"
+              >
+                Get an OpenRouter API key
+              </a>
+              <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
+                OpenRouter forwards your submission code and problem context to
+                a model provider. OpenRouter and provider{' '}
+                <a
+                  className="text-primary underline underline-offset-4"
+                  href="https://openrouter.ai/docs/guides/privacy/provider-logging"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  data policies
+                </a>{' '}
+                apply.
+              </p>
+            </>
           ) : null}
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Badge>{controller.connectionStatus}</Badge>

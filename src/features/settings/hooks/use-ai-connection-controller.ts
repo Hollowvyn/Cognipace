@@ -17,12 +17,14 @@ export const aiProviderLabels: Record<GenAiProviderId, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   gemini: 'Gemini',
+  openrouter: 'OpenRouter',
 }
 
 export const aiProviderModelDefaults: Record<GenAiProviderId, string> = {
   openai: 'gpt-5.4-mini',
   anthropic: 'claude-haiku-4-5',
   gemini: 'gemini-3.5-flash-lite',
+  openrouter: 'openrouter/free',
 }
 
 type ConnectionStep =
