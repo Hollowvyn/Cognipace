@@ -20,7 +20,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-03-overview-daily-time-design.md`](./specs/2026-10-03-overview-daily-time-design.md): approved fourth Overview card for saved elapsed time from today's local-date assessments, including repeats and failures.
 
-- [`specs/2026-10-03-fsrs-remediation-design.md`](./specs/2026-10-03-fsrs-remediation-design.md): approved eight-priority FSRS remediation design covering reliable saves/corrections, recorded profiles, daily scheduling, queue and preview behavior, preserving upgrades, measured local scaling and an evaluated personalization pilot; Phase A preservation implemented with required automated checks passing and human installed-extension proof pending before PR review or merge. B–H remain unimplemented.
+- [`specs/2026-10-03-fsrs-remediation-design.md`](./specs/2026-10-03-fsrs-remediation-design.md): approved eight-priority FSRS remediation design covering reliable saves/corrections, recorded profiles, daily scheduling, queue and preview behavior, preserving upgrades, measured local scaling and an evaluated personalization pilot; October 4 amendment assigns the 180-day maximum interval policy, native boundary verification and existing-date decision to Phase E. Phase A merged in PR #190. B is implemented with reviewed pure helpers and passing automated/build checks; its human smoke proof remains pending. C–H remain unimplemented.
 
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
@@ -77,8 +77,9 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`plans/2026-10-03-overview-daily-time.md`](./plans/2026-10-03-overview-daily-time.md): Practice read-model total, Overview contract/presentation, validation, and required human smoke proof.
 
-- [`plans/2026-10-03-fsrs-remediation.md`](./plans/2026-10-03-fsrs-remediation.md): dependency and acceptance map for all eight FSRS findings; foundation precedes daily experience, measured local growth and the optimizer pilot. Later slices require their own code-level plans against verified predecessors.
-- [`plans/2026-10-03-fsrs-phase-a-preserving-baseline.md`](./plans/2026-10-03-fsrs-phase-a-preserving-baseline.md): executed preservation plan for the frozen through-0009 baseline, independent recovery, populated singleton upgrade/reopen and background preparation guard; required automated checks pass, with human installed-extension proof pending before PR review or merge.
+- [`plans/2026-10-04-fsrs-phase-b-scheduling-evidence.md`](./plans/2026-10-04-fsrs-phase-b-scheduling-evidence.md): executed plan for complete immutable profiles, detached codecs, captured-context correction and guarded legacy estimates; five tasks reviewed, sparse-history repair verified, automated/build checks passed and human compatibility proof pending. No schema or daily activation.
+- [`plans/2026-10-03-fsrs-remediation.md`](./plans/2026-10-03-fsrs-remediation.md): dependency and acceptance map for all eight FSRS findings; foundation precedes daily experience, including Phase E's approved 180-day interval policy, measured local growth and the optimizer pilot. A and B have detailed plans; later slices require their own code-level plans against verified predecessors.
+- [`plans/2026-10-03-fsrs-phase-a-preserving-baseline.md`](./plans/2026-10-03-fsrs-phase-a-preserving-baseline.md): executed preservation plan merged in PR #190 for the frozen through-0009 baseline, independent recovery, populated singleton upgrade/reopen and background preparation guard; the handoff retains exact validation and historical proof status.
 
 - [`plans/2026-10-03-next-question-group.md`](./plans/2026-10-03-next-question-group.md): focused service and workspace regression plan for membership-derived chapter guidance, local tabs, and required human extension smoke.
 
@@ -139,6 +140,8 @@ Use these files to understand why work was shaped a certain way. Before changing
 - [`handoffs/2026-10-04-analytics-retention-landscape.md`](./handoffs/2026-10-04-analytics-retention-landscape.md): full-cohort Retention Map with box zoom, complete inspection, validation/browser proof and pending human extension smoke.
 
 - [`handoffs/2026-10-03-overview-daily-time.md`](./handoffs/2026-10-03-overview-daily-time.md): daily recorded time implementation, validation evidence, and pending human installed-extension smoke.
+
+- [`handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md`](./handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md): reviewed scheduling-evidence/correction foundation, sparse-history repair, exact validation and compatibility limits; human installed-extension smoke pending before review/merge.
 
 - [`handoffs/2026-10-03-fsrs-phase-a-preservation.md`](./handoffs/2026-10-03-fsrs-phase-a-preservation.md): shipped through-0009 preservation and independent recovery, populated upgrade/failure/retry/reopen evidence, required automated checks and human installed-extension smoke pending; priorities 1–7 and the rest of 8 remain future work.
 

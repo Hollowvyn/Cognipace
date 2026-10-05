@@ -6,6 +6,9 @@ describe('FSRS public API facade', () => {
   it('exports the stable feature-facing scheduler facade', () => {
     expect(Object.keys(fsrs).sort()).toEqual(
       [
+        'correctLegacyReview',
+        'correctReviewFromEvidence',
+        'createFsrsSchedulerProfile',
         'createInitialFsrsCard',
         'defaultFsrsCardKind',
         'defaultFsrsSchedulingOptions',
@@ -19,9 +22,13 @@ describe('FSRS public API facade', () => {
         'isReviewRating',
         'normalizeFsrsSchedulingOptions',
         'parseFsrsCardKind',
+        'parseFsrsCardSnapshot',
         'parseFsrsReviewLogSnapshot',
         'parseFsrsCardState',
+        'parseFsrsSchedulerProfile',
         'parseSerializedFsrsReviewLogSnapshot',
+        'parseSerializedFsrsCardSnapshot',
+        'parseSerializedFsrsSchedulerProfile',
         'parseFsrsStepUnit',
         'parseReviewRating',
         'projectReviewSchedule',
@@ -30,7 +37,11 @@ describe('FSRS public API facade', () => {
         'reviewRatingToScore',
         'reviewRatings',
         'scheduleReview',
+        'scheduleReviewWithProfile',
         'serializeFsrsReviewLogSnapshot',
+        'serializeFsrsCardSnapshot',
+        'serializeFsrsSchedulerProfile',
+        'toSerializableFsrsCardSnapshot',
       ].sort(),
     )
   })
@@ -41,5 +52,15 @@ describe('FSRS public API facade', () => {
     expect('toFsrsRating' in fsrs).toBe(false)
     expect('toTsFsrsCard' in fsrs).toBe(false)
     expect('fromTsFsrsCard' in fsrs).toBe(false)
+    expect('rollbackCardReview' in fsrs).toBe(false)
+    expect('resolveFsrsSchedulerProfile' in fsrs).toBe(false)
+    expect('assertExactFsrsSchedulerProfile' in fsrs).toBe(false)
+    expect('scheduleCardReviewWithProfile' in fsrs).toBe(false)
+    expect('readFsrsSchedulerProfile' in fsrs).toBe(false)
+    expect('assertValidFsrsCardSnapshot' in fsrs).toBe(false)
+    expect('isCanonicalIsoDateString' in fsrs).toBe(false)
+    expect('isNonNegativeInteger' in fsrs).toBe(false)
+    expect('isNonNegativeNumber' in fsrs).toBe(false)
+    expect('isRecord' in fsrs).toBe(false)
   })
 })

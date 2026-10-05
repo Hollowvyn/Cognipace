@@ -1,21 +1,37 @@
 import {
+  checkParameters,
   createEmptyCard,
   fsrs,
+  FSRSVersion,
+  generatorParameters,
   Rating,
   State,
   type Card,
   type CardInput,
+  type FSRSParameters,
   type Grade,
   type ReviewLog,
 } from 'ts-fsrs'
 
-import type { FsrsCardSnapshot, FsrsCardState } from '../domain/card-snapshot'
+import {
+  assertValidFsrsCardSnapshot,
+  type FsrsCardSnapshot,
+  type FsrsCardState,
+} from '../domain/card-snapshot'
 import {
   normalizeFsrsSchedulingOptions,
   type FsrsSchedulingOptions,
 } from '../domain/scheduling-options'
-import type { FsrsReviewLogSnapshot } from '../domain/review-log-snapshot'
+import {
+  parseFsrsReviewLogSnapshot,
+  type FsrsReviewLogSnapshot,
+} from '../domain/review-log-snapshot'
 import type { ReviewRating } from '../domain/review-rating'
+import {
+  readFsrsSchedulerProfile,
+  type FsrsEffectiveParameters,
+  type FsrsSchedulerProfile,
+} from '../domain/scheduler-profile'
 
 interface TsFsrsScheduledReview {
   card: FsrsCardSnapshot
@@ -43,6 +59,113 @@ export function scheduleCardReview(
     card: fromTsFsrsCard(result.card),
     log: fromTsFsrsReviewLog(result.log),
   }
+}
+
+export function resolveFsrsSchedulerProfile(
+  options: FsrsSchedulingOptions = {},
+): FsrsSchedulerProfile {
+  if (FSRSVersion !== 'v5.4.0 using FSRS-6.0') {
+    throw new Error('Unsupported installed FSRS engine.')
+  }
+
+  // New profiles capture a reconstructible final normalization. Existing
+  // scheduling deliberately retains direct construction in createScheduler.
+  const p = fsrs(
+    generatorParameters(nativeSchedulerOptions(options)),
+  ).parameters
+
+  return readFsrsSchedulerProfile({
+    schemaVersion: 1,
+    libraryVersion: '5.4.0',
+    modelVersion: 'FSRS-6.0',
+    source: options.weights === undefined ? 'default' : 'custom',
+    parameters: {
+      targetRetention: p.request_retention,
+      maximumInterval: p.maximum_interval,
+      weights: [...p.w],
+      enableFuzz: p.enable_fuzz,
+      enableShortTerm: p.enable_short_term,
+      learningSteps: [...p.learning_steps],
+      relearningSteps: [...p.relearning_steps],
+    },
+  })
+}
+
+export function assertExactFsrsSchedulerProfile(
+  profile: FsrsSchedulerProfile,
+): void {
+  const canonical = readFsrsSchedulerProfile(profile)
+  const p = canonical.parameters
+  const reconstructed = resolveFsrsSchedulerProfile(p).parameters
+
+  if (
+    !Object.is(p.targetRetention, reconstructed.targetRetention) ||
+    !Object.is(p.maximumInterval, reconstructed.maximumInterval) ||
+    !sameValues(p.weights, reconstructed.weights) ||
+    !Object.is(p.enableFuzz, reconstructed.enableFuzz) ||
+    !Object.is(p.enableShortTerm, reconstructed.enableShortTerm) ||
+    !sameValues(p.learningSteps, reconstructed.learningSteps) ||
+    !sameValues(p.relearningSteps, reconstructed.relearningSteps)
+  ) {
+    throw new Error('FSRS profile does not reconstruct exactly.')
+  }
+
+  if (canonical.source === 'default') {
+    const defaults = resolveFsrsSchedulerProfile({
+      targetRetention: p.targetRetention,
+      maximumInterval: p.maximumInterval,
+      enableFuzz: p.enableFuzz,
+      enableShortTerm: p.enableShortTerm,
+      learningSteps: p.learningSteps,
+      relearningSteps: p.relearningSteps,
+    })
+
+    if (!sameValues(p.weights, defaults.parameters.weights)) {
+      throw new Error('FSRS default profile has custom model weights.')
+    }
+  }
+}
+
+export function scheduleCardReviewWithProfile(
+  card: FsrsCardSnapshot,
+  rating: ReviewRating,
+  reviewedAt: Date,
+  profile: FsrsSchedulerProfile,
+): TsFsrsScheduledReview {
+  const canonical = readFsrsSchedulerProfile(profile)
+  assertExactFsrsSchedulerProfile(canonical)
+  const result = fsrs(nativeProfileParameters(canonical.parameters)).next(
+    toTsFsrsCard(card),
+    reviewedAt,
+    toTsFsrsRating(rating),
+  )
+
+  return {
+    card: fromTsFsrsCard(result.card),
+    log: fromTsFsrsReviewLog(result.log),
+  }
+}
+
+export function rollbackCardReview(
+  card: FsrsCardSnapshot,
+  log: FsrsReviewLogSnapshot,
+): FsrsCardSnapshot {
+  const parsed = parseFsrsReviewLogSnapshot(log)
+
+  return fromTsFsrsCard(
+    fsrs().rollback(toTsFsrsCard(card), {
+      rating: toTsFsrsRating(parsed.rating),
+      state: toTsFsrsState(parsed.state),
+      due: new Date(parsed.dueAt),
+      stability: parsed.stability,
+      difficulty: parsed.difficulty,
+      elapsed_days: parsed.elapsedDays,
+      last_elapsed_days: parsed.lastElapsedDays,
+      scheduled_days: parsed.scheduledDays,
+      learning_steps: parsed.learningSteps,
+      review: new Date(parsed.reviewedAt),
+    }),
+  )
 }
 
 export function calculateCardRetrievability(
@@ -73,7 +196,7 @@ export function calculateCardTargetRetentionDuration(
     return null
   }
 
-  validateCardSnapshot(card)
+  assertValidFsrsCardSnapshot(card)
   const scheduler = createScheduler(options)
   let lowerDays = 0
   let upperDays = 1
@@ -105,22 +228,56 @@ export function calculateCardTargetRetentionDuration(
 }
 
 function createScheduler(options: FsrsSchedulingOptions) {
+  return fsrs(nativeSchedulerOptions(options))
+}
+
+function nativeSchedulerOptions(
+  options: FsrsSchedulingOptions,
+): Partial<FSRSParameters> {
   const normalized = normalizeFsrsSchedulingOptions(options)
 
-  return fsrs({
+  return {
     request_retention: normalized.targetRetention,
     enable_fuzz: normalized.enableFuzz,
     enable_short_term: normalized.enableShortTerm,
     learning_steps: normalized.learningSteps,
     relearning_steps: normalized.relearningSteps,
-  })
+    ...(normalized.weights === undefined
+      ? {}
+      : { w: checkParameters(normalized.weights) }),
+    ...(normalized.maximumInterval === undefined
+      ? {}
+      : { maximum_interval: normalized.maximumInterval }),
+  }
+}
+
+function nativeProfileParameters(p: FsrsEffectiveParameters): FSRSParameters {
+  return {
+    request_retention: p.targetRetention,
+    maximum_interval: p.maximumInterval,
+    w: [...p.weights],
+    enable_fuzz: p.enableFuzz,
+    enable_short_term: p.enableShortTerm,
+    learning_steps: [...p.learningSteps],
+    relearning_steps: [...p.relearningSteps],
+  }
+}
+
+function sameValues(
+  left: readonly unknown[],
+  right: readonly unknown[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => Object.is(value, right[index]))
+  )
 }
 
 const maximumTargetDurationDays = 365_000
 const targetDurationIterations = 48
 
 function toTsFsrsCard(snapshot: FsrsCardSnapshot): CardInput {
-  validateCardSnapshot(snapshot)
+  assertValidFsrsCardSnapshot(snapshot)
 
   const card: CardInput = {
     due: snapshot.dueAt,
@@ -139,51 +296,6 @@ function toTsFsrsCard(snapshot: FsrsCardSnapshot): CardInput {
   }
 
   return card
-}
-
-function validateCardSnapshot(snapshot: FsrsCardSnapshot): void {
-  assertValidDate(snapshot.dueAt, 'dueAt')
-  assertFiniteNonNegativeNumber(snapshot.stability, 'stability')
-  assertFiniteNonNegativeNumber(snapshot.difficulty, 'difficulty')
-  assertNonNegativeInteger(snapshot.elapsedDays, 'elapsedDays')
-  assertNonNegativeInteger(snapshot.scheduledDays, 'scheduledDays')
-  assertNonNegativeInteger(snapshot.learningSteps, 'learningSteps')
-  assertNonNegativeInteger(snapshot.reps, 'reps')
-  assertNonNegativeInteger(snapshot.lapses, 'lapses')
-
-  if (snapshot.lastReviewAt !== null) {
-    assertValidDate(snapshot.lastReviewAt, 'lastReviewAt')
-  }
-
-  if (snapshot.state !== 'new' && !snapshot.lastReviewAt) {
-    throw new Error(
-      `Invalid FSRS card snapshot: "${snapshot.state}" cards require lastReviewAt.`,
-    )
-  }
-}
-
-function assertValidDate(value: Date, fieldName: string): void {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
-    throw new Error(
-      `Invalid FSRS card snapshot: "${fieldName}" must be a valid Date.`,
-    )
-  }
-}
-
-function assertFiniteNonNegativeNumber(value: number, fieldName: string): void {
-  if (!Number.isFinite(value) || value < 0) {
-    throw new Error(
-      `Invalid FSRS card snapshot: "${fieldName}" must be a finite non-negative number.`,
-    )
-  }
-}
-
-function assertNonNegativeInteger(value: number, fieldName: string): void {
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error(
-      `Invalid FSRS card snapshot: "${fieldName}" must be a non-negative integer.`,
-    )
-  }
 }
 
 function fromTsFsrsCard(card: Card): FsrsCardSnapshot {

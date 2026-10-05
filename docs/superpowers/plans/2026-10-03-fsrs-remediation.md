@@ -14,11 +14,13 @@
 
 Source: [approved design](../specs/2026-10-03-fsrs-remediation-design.md). The written specification was approved on October 3, 2026.
 
-This is the dependency and acceptance map for the whole remediation. The eight priority numbers retain their audit meanings; the letters below identify execution slices. Only slice A currently has a detailed executable plan. Author each subsequent slice's code-level plan against its verified predecessor before executing it. Do not represent this map as eight completed implementations or as code-level plans for every slice.
+Approved amendment, October 4, 2026: Phase E owns the 180-day maximum interval policy for ongoing coding readiness, including native boundary verification and an explicit decision for existing longer due dates. Phase F reflects it in Submit previews while preserving original-profile Update. This stays within priority 4 and the eight A–H slices; Phase B's implementation scope is unchanged.
 
-Execution status: A is implemented with required automated checks passing; human installed-extension proof remains pending before PR review or merge. B–H remain unimplemented. The [Phase A handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) records exact validation, failures repaired, recovery limits and the smoke checklist. Execution rebased onto `origin/main` at `b2d9291f` without changing the frozen SQL prefix.
+This is the dependency and acceptance map for the whole remediation. The eight priority numbers retain their audit meanings; the letters below identify execution slices. A and B have detailed executable plans. Author each subsequent slice's code-level plan against its verified predecessor before executing it. Do not represent this map as eight completed implementations or as code-level plans for every slice.
 
-Worktree: `/Users/tobiolutimehin/.codex/worktrees/46c1/cognipace-v2`. Branch: `codex/fsrs-remediation-design`, based on `origin/main` at `dc0fc6f2`. Preserve the newer Analytics and Tracks work already present. At execution start check the branch, migration list and pinned toolchain; if upstream changes affect the frozen baseline or planned interfaces, revise the affected plan before editing code.
+Execution status: A merged in [PR #190](https://github.com/Hollowvyn/Cognipace/pull/190) as `92ba67d5` on October 4, 2026. Its [handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) records exact automated validation, failures repaired, recovery limits and the historical human-proof status. [Phase B](./2026-10-04-fsrs-phase-b-scheduling-evidence.md) is implemented on its phase branch: complete profiles, detached codecs and pure correction helpers passed independent reviews and automated/build validation. Its [handoff](../handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md) records repaired findings, compatibility limits and required human smoke still pending before review/merge. C–H remain unimplemented.
+
+Worktree: `/Users/tobiolutimehin/.codex/worktrees/46c1/cognipace-v2`. The original design/Phase A branch was `codex/fsrs-remediation-design`; B is planned on `codex/fsrs-phase-b-scheduling-evidence`, based on merged `origin/main` at `92ba67d5`. Preserve the newer Analytics and Tracks work already present. At execution start check the branch, migration list and pinned toolchain; if upstream changes affect the frozen baseline or planned interfaces, revise the affected plan before editing code.
 
 ## File ownership map
 
@@ -36,16 +38,16 @@ Worktree: `/Users/tobiolutimehin/.codex/worktrees/46c1/cognipace-v2`. Branch: `c
 
 ## Ordered slices
 
-| Slice                                    | Audit priorities                                | Outcome and execution prerequisite                                                                                                                                                                                                        |
-| ---------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A. Protect the shipped snapshot baseline | Preservation portion of 8; prerequisite for 1–3 | [Detailed plan](./2026-10-03-fsrs-phase-a-preserving-baseline.md): freeze through-0009, retain a separate recovery copy and prove populated data equality after staged upgrade/reopen. No new schema or cadence change.                   |
-| B. Complete scheduling evidence          | 2; internal weights support from 7              | Effective immutable profile/card/log codecs and single-event correction operations under the existing legacy defaults. Library-normalized effective parameters are round-trippable; imported evidence is validated exactly. Depends on A. |
-| C. Preserve evidence storage and restore | 2–3 and preservation portion of 8               | Additive schema, inferred legacy sequences, unknown legacy provenance, durable card identities, generation storage and backup compatibility land together. Depends on A/B.                                                                |
-| D. Reliable commands and guarded Update  | 1–3                                             | Frozen accepted commands, transaction receipts, durable acknowledgement and exact attempt/revision correction work end to end through runtime and overlay. Depends on C.                                                                  |
-| E. Daily scheduling and rating meaning   | 4–5, current reminder consistency from 8        | Prospective long-term profile, shared calendar eligibility, overdue/due/new automatic queue, explicit Extra Practice, preserved assessment policy and accurate Analytics evidence. Depends on D.                                          |
-| F. Interval previews                     | 6                                               | Pure `repeat()` previews for both Submit and Update, using the correct authoritative contexts. Depends on D/E.                                                                                                                            |
-| G. Measure and improve local growth      | Performance portion of 8                        | Packaged, end-to-end measurements and justified optimizations with reference-output parity. Record baseline measurements during foundation; optimization follows E/F.                                                                     |
-| H. Evaluate personalization              | Remaining optimizer portion of 7                | A user-started local official-binding pilot, packaged-runtime proof, chronological evaluation and guarded prospective activation. Depends on trustworthy D evidence and measured G budgets.                                               |
+| Slice                                    | Audit priorities                                | Outcome and execution prerequisite                                                                                                                                                                                                                                    |
+| ---------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Protect the shipped snapshot baseline | Preservation portion of 8; prerequisite for 1–3 | [Detailed plan](./2026-10-03-fsrs-phase-a-preserving-baseline.md): freeze through-0009, retain a separate recovery copy and prove populated data equality after staged upgrade/reopen. No new schema or cadence change.                                               |
+| B. Complete scheduling evidence          | 2; internal weights support from 7              | [Detailed plan](./2026-10-04-fsrs-phase-b-scheduling-evidence.md): immutable profile/card/log codecs and single-event correction operations under existing legacy defaults; effective parameters round-trip exactly. Depends on A.                                    |
+| C. Preserve evidence storage and restore | 2–3 and preservation portion of 8               | Additive schema, inferred legacy sequences, unknown legacy provenance, durable card identities, generation storage and backup compatibility land together. Depends on A/B.                                                                                            |
+| D. Reliable commands and guarded Update  | 1–3                                             | Frozen accepted commands, transaction receipts, durable acknowledgement and exact attempt/revision correction work end to end through runtime and overlay. Depends on C.                                                                                              |
+| E. Daily scheduling and rating meaning   | 4–5, current reminder consistency from 8        | Prospective long-term profile with the approved 180-day maximum policy, verified cap boundaries, resolved existing-date policy, shared calendar eligibility, overdue/due/new queue, explicit Extra Practice and preserved assessment/Analytics meaning. Depends on D. |
+| F. Interval previews                     | 6                                               | Pure `repeat()` previews for both Submit and Update, using the correct authoritative contexts. Depends on D/E.                                                                                                                                                        |
+| G. Measure and improve local growth      | Performance portion of 8                        | Packaged, end-to-end measurements and justified optimizations with reference-output parity. Record baseline measurements during foundation; optimization follows E/F.                                                                                                 |
+| H. Evaluate personalization              | Remaining optimizer portion of 7                | A user-started local official-binding pilot, packaged-runtime proof, chronological evaluation and guarded prospective activation. Depends on trustworthy D evidence and measured G budgets.                                                                           |
 
 ### B: scheduling evidence acceptance
 
@@ -83,6 +85,10 @@ Tests: Practice contracts/API/core integration, overlay reducer/session hooks, b
 
 Activate `enable_short_term: false`, `learning_steps: []`, `relearning_steps: []`, fuzz off and the saved user retention prospectively. Intervals come from the library. Existing raw due/card/log data stays intact until a genuine review; Update remains bound to its original profile.
 
+Add the approved `maximum_interval: 180` policy through the library configuration and record it in the active effective profile. Resolve pinned 5.4.0's rating-ordering overflow before making a strict ceiling promise; prove mature-card outputs for every rating at and above the cap, including the supported retention extremes. Do not silently clamp native due/log output. Keep saved schedules, Submit previews, future projections and current due consumers consistent; corrections retain their original profile, which may have a larger maximum.
+
+Before activation, record the explicit policy for existing cards already scheduled beyond 180 days. The amendment authorizes the new policy for future genuine reviews, not automatic bulk rescheduling or history replay. Any schedule-changing catch-up requires its own approved design and preserving validation. Retain history, earned progress and suspension. User configurability is not decided here; concept tracking and a new readiness subsystem are not prerequisites.
+
 Practice owns the shared date policy: automatic eligibility is the later of the raw due's local calendar date and the next local calendar date after the actual review. Use calendar arithmetic and the actual event time, never correction `updatedAt`. Add a derived eligibility date to read contracts while retaining raw `dueAt`. Apply this policy to current due labels, Queue, current Analytics signals/forecast and local-day reminder deduplication.
 
 Automatic Queue is overdue, due today, then new, capped at the full configured Daily Goal. Future reviewed cards require explicit Extra Practice intent; adding a label while automatic reinforcement still runs is insufficient. Preserve suspension/premium filtering and distinct practiced-problem daily/streak progress, including Again. Valid legacy mastered cards can be normalized for presentation without altering track credit.
@@ -93,9 +99,13 @@ Assessment owns existing grade outputs. Carry its known source/reason/policy int
 
 Tests: existing FSRS/Practice schedule, Queue, Analytics repository/service/cohort/presentation, app-shell, Assessment and reminder suites. Add spring/autumn DST/local-midnight cases, legacy Learning/Relearning transitions, all four outputs at 90% and 75%, cross-surface equality, future low-retention visibility, full rolling cap and same-day Update behavior. Vitest currently pins `TZ: 'UTC'`; use explicit timezone setup/probes when authoring the date tests rather than assuming shell `TZ` alone overrides test configuration.
 
+Cap acceptance also requires active-profile round-trip, all-rating boundary cases, new Save versus original-profile Update, preservation of existing longer dates under the chosen policy and parity with F's previews. Evaluate the six-month policy with existing mature-review correctness, Again ratings, solve time and workload; no scientific optimum or readiness guarantee is claimed.
+
 ### F: preview acceptance
 
 Practice exposes a validated read-only preview backed by facade `repeat()`. Submit previews current pre-state/active profile/preview time; authoritative Save uses final effective rating and actual accepted event time. Update previews original pre-card/time/profile and exact attempt/revision. A resulting past due date is displayed honestly; legacy compatibility is labeled.
+
+Submit previews reflect E's 180-day active profile and its verified cap semantics. Update previews may retain an older larger maximum because they must reproduce the original event rather than apply the current cap.
 
 Add a focused preview hook within Overlay if async race handling needs its own owner. Existing rating controls show concise next-study-date/day-count estimates and accessible text. Refresh after invalidation, ignore superseded responses and preserve draft selection on refetch/conflict. Selection and preview perform no write. Ordinary time passage and AI selection add no confirmation modal or reservation.
 
@@ -117,24 +127,25 @@ Compare the candidate chronologically against defaults/incumbent on held-out his
 
 ## Capability traceability
 
-| Library capability                             | Execution use                                                                                                                              |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `next()`                                       | Keep the authoritative single-review save/correction path in B/D/E.                                                                        |
-| `get_retrievability()`                         | Retain numeric model estimates for display/ranking; distinguish them from calendar eligibility in E.                                       |
-| `repeat()`                                     | Pure four-rating previews in F.                                                                                                            |
-| `rollback()`                                   | Guarded legacy compatibility in B/D; captured pre-card is preferred for new evidence.                                                      |
-| `generatorParameters()` / effective parameters | Complete reproducible profiles in B/C.                                                                                                     |
-| `w`                                            | Validated internal profile support in B/C; evaluated training in H.                                                                        |
-| `maximum_interval`                             | Record in B/C; no exposed strict-cap promise or expert editor.                                                                             |
-| `reschedule()` / `forget()`                    | Separate administrative/product semantics; bulk reconstruction and a history-preserving reset action are outside the approved remediation. |
+| Library capability                             | Execution use                                                                                                                                                                     |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `next()`                                       | Keep the authoritative single-review save/correction path in B/D/E.                                                                                                               |
+| `get_retrievability()`                         | Retain numeric model estimates for display/ranking; distinguish them from calendar eligibility in E.                                                                              |
+| `repeat()`                                     | Pure four-rating previews in F.                                                                                                                                                   |
+| `rollback()`                                   | Guarded legacy compatibility in B/D; captured pre-card is preferred for new evidence.                                                                                             |
+| `generatorParameters()` / effective parameters | Complete reproducible profiles in B/C.                                                                                                                                            |
+| `w`                                            | Validated internal profile support in B/C; evaluated training in H.                                                                                                               |
+| `maximum_interval`                             | Record in B/C; activate the approved 180-day policy in E after resolving native cap boundaries and existing-date policy; reflect it in F. User configurability remains undecided. |
+| `reschedule()` / `forget()`                    | Separate administrative/product semantics; bulk reconstruction and a history-preserving reset action are outside the approved remediation.                                        |
 
 ## Completion and validation
 
-- [x] Execute A from its detailed plan and retain exact passing/failed command evidence. Human installed-extension proof remains pending before PR review/merge.
-- [ ] Produce B's complete code-level plan against A's verified baseline, then execute B.
+- [x] Execute A from its detailed plan and retain exact passing/failed command evidence. A merged in PR #190; its handoff retains the historical human-proof status.
+- [x] Produce B's complete code-level plan against A's merged, verified baseline.
+- [ ] Execute B and record its implementation validation and human compatibility proof.
 - [ ] Produce and execute C with the real appended migration and frozen supported backup readers.
 - [ ] Produce and execute D end to end, including durability, conflict and restart evidence.
-- [ ] Produce and execute E with historical compatibility and every current due consumer ready before profile activation.
+- [ ] Produce and execute E with historical compatibility, verified 180-day cap behavior, an approved existing-date policy and every current due consumer ready before profile activation.
 - [ ] Produce and execute F with both preview contexts and packaged interaction proof.
 - [ ] Produce and execute G with measured budgets and output-equality evidence.
 - [ ] Produce and execute H with packaged feasibility/evaluation evidence before exposing activation.
@@ -153,3 +164,15 @@ rtk git diff --cached --check
 ```
 
 Skipped in the original planning pass: `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run db:check`, and the focused test commands in A because application code was unchanged and dependencies were absent. Phase A has since run those checks successfully. `rtk npm run db:generate` remains skipped because no schema changes are implemented; `rtk npm run zip` remains skipped because artifact behavior is unchanged. Human smoke and performance/optimizer measurements remain unrun implementation work.
+
+### October 4 maximum-interval amendment validation
+
+The amendment changes planning Markdown only. Independent scope review passed: E owns the cap, F reflects it, B remains unchanged, and existing schedules and original-profile corrections stay protected.
+
+```sh
+rtk npx prettier --ignore-path /dev/null --write docs/superpowers/specs/2026-10-03-fsrs-remediation-design.md docs/superpowers/plans/2026-10-03-fsrs-remediation.md docs/superpowers/README.md
+rtk npx prettier --ignore-path /dev/null --check docs/superpowers/specs/2026-10-03-fsrs-remediation-design.md docs/superpowers/plans/2026-10-03-fsrs-remediation.md docs/superpowers/README.md
+rtk git diff --check
+```
+
+Skipped for this amendment: `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run db:generate`, `rtk npm run db:check` and `rtk npm run zip`, because application code, schema, dependencies and packaging are unchanged. Cap behavior and installed-extension smoke remain required Phase E implementation validation; this documentation update does not establish them.

@@ -3,6 +3,8 @@ export type FsrsStepUnit = `${number}${'m' | 'h' | 'd'}`
 /** Optional scheduler knobs passed to the pure FSRS wrapper. */
 export interface FsrsSchedulingOptions {
   targetRetention?: number | undefined
+  maximumInterval?: number | undefined
+  weights?: readonly number[] | undefined
   enableFuzz?: boolean | undefined
   enableShortTerm?: boolean | undefined
   learningSteps?: readonly FsrsStepUnit[] | undefined
@@ -11,6 +13,8 @@ export interface FsrsSchedulingOptions {
 
 export interface NormalizedFsrsSchedulingOptions {
   targetRetention: number
+  maximumInterval?: number | undefined
+  weights?: readonly number[] | undefined
   enableFuzz: boolean
   enableShortTerm: boolean
   learningSteps: FsrsStepUnit[]
@@ -24,7 +28,9 @@ export const defaultFsrsSchedulingOptions = {
   enableShortTerm: true,
   learningSteps: ['12h', '23h'],
   relearningSteps: ['23h'],
-} as const satisfies Required<FsrsSchedulingOptions>
+} as const satisfies Required<
+  Omit<FsrsSchedulingOptions, 'weights' | 'maximumInterval'>
+>
 
 /** Checks whether a persisted string is a valid ts-fsrs step unit. */
 export function isFsrsStepUnit(value: string): value is FsrsStepUnit {
@@ -58,7 +64,38 @@ export function normalizeFsrsSchedulingOptions(
       options.relearningSteps,
       defaultFsrsSchedulingOptions.relearningSteps,
     ),
+    ...(options.weights === undefined
+      ? {}
+      : { weights: normalizeWeights(options.weights) }),
+    ...(options.maximumInterval === undefined
+      ? {}
+      : { maximumInterval: normalizeMaximumInterval(options.maximumInterval) }),
   }
+}
+
+function normalizeWeights(values: readonly number[]): number[] {
+  const weights = Array.from(values)
+  if (
+    !weights.every(
+      (value) => typeof value === 'number' && Number.isFinite(value),
+    )
+  ) {
+    throw new Error(
+      'Invalid FSRS model weights: all values must be finite numbers.',
+    )
+  }
+
+  return weights
+}
+
+function normalizeMaximumInterval(value: number): number {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(
+      'Invalid FSRS maximum interval: use a positive safe integer.',
+    )
+  }
+
+  return value
 }
 
 function normalizeTargetRetention(value: number | undefined) {

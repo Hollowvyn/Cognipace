@@ -1,13 +1,25 @@
-import type { FsrsCardSnapshot } from '../domain/card-snapshot'
+import {
+  parseFsrsCardSnapshot,
+  toSerializableFsrsCardSnapshot,
+  type FsrsCardSnapshot,
+} from '../domain/card-snapshot'
 import type { FsrsSchedulingOptions } from '../domain/scheduling-options'
 import type { FsrsReviewLogSnapshot } from '../domain/review-log-snapshot'
 import type { ReviewRating } from '../domain/review-rating'
 import {
+  readFsrsSchedulerProfile,
+  type FsrsSchedulerProfile,
+} from '../domain/scheduler-profile'
+import {
+  assertExactFsrsSchedulerProfile,
   calculateCardRetrievability,
   calculateCardTargetRetentionDuration,
   createEmptyCardSnapshot,
+  resolveFsrsSchedulerProfile,
   scheduleCardReview,
+  scheduleCardReviewWithProfile,
 } from '../adapter/ts-fsrs-adapter'
+import type { FsrsReviewContext } from './review-correction'
 
 /** Result of applying one review rating to a card snapshot. */
 export interface FsrsScheduledReview {
@@ -34,6 +46,36 @@ export interface FsrsReviewScheduleProjectionOptions extends FsrsSchedulingOptio
 /** One simulated future review and the resulting card/log state. */
 export type FsrsProjectedReview = FsrsScheduledReview
 
+/** Captures the complete effective configuration of the supported FSRS engine. */
+export function createFsrsSchedulerProfile(
+  options: FsrsSchedulingOptions = {},
+): FsrsSchedulerProfile {
+  return resolveFsrsSchedulerProfile(options)
+}
+
+/** Decodes a detached profile and requires exact native reconstruction. */
+export function parseFsrsSchedulerProfile(
+  value: unknown,
+): FsrsSchedulerProfile {
+  const profile = readFsrsSchedulerProfile(value)
+  assertExactFsrsSchedulerProfile(profile)
+  return profile
+}
+
+/** Serializes a validated profile in canonical field order. */
+export function serializeFsrsSchedulerProfile(
+  profile: FsrsSchedulerProfile,
+): string {
+  return JSON.stringify(parseFsrsSchedulerProfile(profile))
+}
+
+/** Decodes a serialized profile without changing its effective parameters. */
+export function parseSerializedFsrsSchedulerProfile(
+  value: string,
+): FsrsSchedulerProfile {
+  return parseFsrsSchedulerProfile(JSON.parse(value))
+}
+
 /** Creates a new dependency-free FSRS card snapshot. */
 export function createInitialFsrsCard(now = new Date()): FsrsCardSnapshot {
   return createEmptyCardSnapshot(now)
@@ -53,6 +95,44 @@ export function scheduleReview(
     log: scheduledReview.log,
     reviewedAt,
     rating,
+  }
+}
+
+/** Applies one review while capturing its immutable original scheduling inputs. */
+export function scheduleReviewWithProfile(
+  card: FsrsCardSnapshot,
+  rating: ReviewRating,
+  reviewedAt: Date,
+  inputProfile: FsrsSchedulerProfile,
+): FsrsScheduledReview & { readonly context: FsrsReviewContext } {
+  const preCard = toSerializableFsrsCardSnapshot(card)
+
+  if (!(reviewedAt instanceof Date) || !Number.isFinite(reviewedAt.getTime())) {
+    throw new Error('Invalid FSRS review time.')
+  }
+
+  if (card.lastReviewAt && reviewedAt.getTime() < card.lastReviewAt.getTime()) {
+    throw new Error('FSRS review time precedes the captured last review.')
+  }
+
+  const profile = parseFsrsSchedulerProfile(inputProfile)
+  const context: FsrsReviewContext = Object.freeze({
+    preCard,
+    reviewedAt: reviewedAt.toISOString(),
+    profile,
+  })
+  const scheduled = scheduleCardReviewWithProfile(
+    parseFsrsCardSnapshot(preCard),
+    rating,
+    new Date(context.reviewedAt),
+    profile,
+  )
+
+  return {
+    ...scheduled,
+    rating,
+    reviewedAt: new Date(context.reviewedAt),
+    context,
   }
 }
 
@@ -131,7 +211,6 @@ export function projectReviewSchedule(
   } = options
   const horizonDays = normalizeProjectionHorizonDays(rawHorizonDays)
   const maxReviews = normalizeProjectionMaxReviews(rawMaxReviews)
-  const schedulingOptions = readSchedulingOptions(options)
   const horizonAt = new Date(startAt.getTime() + horizonDays * dayMs)
   const projections: FsrsProjectedReview[] = []
   let currentCard = card
@@ -146,7 +225,7 @@ export function projectReviewSchedule(
       currentCard,
       assumedRating,
       reviewAt,
-      schedulingOptions,
+      options,
     )
     projections.push(projected)
 
@@ -159,18 +238,6 @@ export function projectReviewSchedule(
   }
 
   return projections
-}
-
-function readSchedulingOptions(
-  options: FsrsReviewScheduleProjectionOptions,
-): FsrsSchedulingOptions {
-  return {
-    targetRetention: options.targetRetention,
-    enableFuzz: options.enableFuzz,
-    enableShortTerm: options.enableShortTerm,
-    learningSteps: options.learningSteps,
-    relearningSteps: options.relearningSteps,
-  }
 }
 
 function normalizeProjectionHorizonDays(value: number): number {

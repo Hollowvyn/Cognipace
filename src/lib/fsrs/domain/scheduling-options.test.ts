@@ -6,6 +6,7 @@ import {
   normalizeFsrsSchedulingOptions,
   parseFsrsStepUnit,
 } from './scheduling-options'
+import { createFsrsSchedulerProfile } from '../scheduler/review-scheduler'
 
 describe('FSRS scheduling options', () => {
   it('parses positive whole-number step units', () => {
@@ -52,5 +53,23 @@ describe('FSRS scheduling options', () => {
     expect(() =>
       normalizeFsrsSchedulingOptions({ learningSteps: ['1.5h'] }),
     ).toThrow('Invalid FSRS step unit "1.5h".')
+  })
+
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, Infinity])(
+    'rejects maximum interval %s',
+    (maximumInterval) => {
+      expect(() =>
+        normalizeFsrsSchedulingOptions({ maximumInterval }),
+      ).toThrow()
+    },
+  )
+
+  it.each([
+    { weights: [1] },
+    { weights: Array.from({ length: 21 }, () => NaN) },
+    { weights: Array.from({ length: 21 }, () => Infinity) },
+    { weights: new Array<number>(21) },
+  ])('rejects invalid model weights', ({ weights }) => {
+    expect(() => createFsrsSchedulerProfile({ weights })).toThrow()
   })
 })
