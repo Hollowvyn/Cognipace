@@ -259,3 +259,73 @@ describe('trusted background submission analysis', () => {
     expect(loadDb).not.toHaveBeenCalled()
   })
 })
+
+it.each([
+  'stable',
+  'key',
+  'same-key',
+  'model',
+  'provider',
+  'removed-key',
+  'disabled',
+] as const)(
+  'preserves requested OpenRouter identity and handles %s saved state after generation',
+  async (kind) => {
+    const routedConfig = {
+      ...config,
+      provider: 'openrouter' as const,
+      model: 'openrouter/free',
+    }
+    const routedSnapshot = {
+      config: routedConfig,
+      identity: 'trusted-openrouter-snapshot',
+    }
+    const providerMetadata = {
+      provider: 'openrouter' as const,
+      model: 'openrouter/free',
+      resolvedModel: 'test/served-model:free',
+      durationMs: 7,
+    }
+    const current =
+      kind === 'removed-key' || kind === 'disabled'
+        ? null
+        : {
+            config:
+              kind === 'model'
+                ? { ...routedConfig, model: 'test/custom-model' }
+                : kind === 'provider'
+                  ? { ...routedConfig, provider: 'openai' as const }
+                  : kind === 'key'
+                    ? { ...routedConfig, apiKey: 'replacement-key' }
+                    : routedConfig,
+            identity:
+              kind === 'stable' ? routedSnapshot.identity : `changed-${kind}`,
+          }
+    loadConfig
+      .mockResolvedValueOnce(routedSnapshot)
+      .mockResolvedValueOnce(current)
+    analyzeMock.mockResolvedValue({
+      status: 'success',
+      data: makeValidAnalysis(),
+      providerMetadata,
+    })
+    const result = await runAnalysis()
+    expectSafe(result)
+    expect(JSON.stringify(result)).not.toContain(routedSnapshot.identity)
+    expect(analyzeMock).toHaveBeenCalledOnce()
+    expect(loadConfig).toHaveBeenCalledTimes(2)
+    if (kind === 'stable')
+      expect(result).toEqual({
+        status: 'ready',
+        ...analysisIdentity(request),
+        report: makeValidAnalysis(),
+        providerMetadata,
+      })
+    else
+      expect(result).toMatchObject({
+        status: 'error',
+        code: 'stale-configuration',
+      })
+    expect(vi.getTimerCount()).toBe(0)
+  },
+)

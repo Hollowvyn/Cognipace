@@ -486,6 +486,7 @@ describe('background handler registration', () => {
       openai: false,
       anthropic: false,
       gemini: false,
+      openrouter: false,
     })
     backgroundMocks.setAiProviderSecret.mockImplementation(
       async (
@@ -494,13 +495,23 @@ describe('background handler registration', () => {
         afterPersist?: () => Promise<void>,
       ) => {
         await afterPersist?.()
-        return { openai: true, anthropic: false, gemini: false }
+        return {
+          openai: true,
+          anthropic: false,
+          gemini: false,
+          openrouter: false,
+        }
       },
     )
     backgroundMocks.clearAiProviderSecret.mockImplementation(
       async (_provider: unknown, afterPersist?: () => Promise<void>) => {
         await afterPersist?.()
-        return { openai: false, anthropic: false, gemini: false }
+        return {
+          openai: false,
+          anthropic: false,
+          gemini: false,
+          openrouter: false,
+        }
       },
     )
     backgroundMocks.loadActiveProviderConfig.mockResolvedValue(null)
@@ -1195,6 +1206,7 @@ describe('background handler registration', () => {
       openai: false,
       anthropic: false,
       gemini: false,
+      openrouter: false,
     })
 
     const response = await sendRuntimeMessage('devSmoke.run', {
@@ -1225,6 +1237,7 @@ describe('background handler registration', () => {
       openai: true,
       anthropic: false,
       gemini: false,
+      openrouter: false,
     })
     backgroundMocks.loadActiveProviderConfig.mockResolvedValue({
       provider: 'openai',

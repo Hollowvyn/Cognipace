@@ -25,7 +25,12 @@ function renderSection(
     ...defaultUserSettings,
     aiAssessment: { ...defaultUserSettings.aiAssessment, ...overrides },
   }
-  let presence = { openai: false, anthropic: false, gemini: false }
+  let presence = {
+    openai: false,
+    anthropic: false,
+    gemini: false,
+    openrouter: false,
+  }
   vi.mocked(sendMessage).mockImplementation((method, payload) => {
     if (method === 'settings.getSettings') return Promise.resolve(stored)
     if (method === 'genai.getAiProviderSecretPresence') {
@@ -218,7 +223,12 @@ describe('AiAssessmentSection', () => {
       () =>
         new Promise((resolve) => {
           finish = () =>
-            resolve({ openai: true, anthropic: false, gemini: false })
+            resolve({
+              openai: true,
+              anthropic: false,
+              gemini: false,
+              openrouter: false,
+            })
         }),
     )
     fireEvent.submit(screen.getByRole('form', { name: 'AI connection' }))

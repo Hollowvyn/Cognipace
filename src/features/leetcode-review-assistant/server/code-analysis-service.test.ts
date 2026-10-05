@@ -109,3 +109,42 @@ describe('analyzeCode', () => {
     },
   )
 })
+
+it('keeps a consistent OpenRouter report with requested and served model metadata', async () => {
+  const report = makeValidAnalysis()
+  const openRouterConfig: AiProviderConfig = {
+    provider: 'openrouter',
+    model: 'openrouter/free',
+    apiKey: 'fixture-secret',
+  }
+  const providerMetadata = {
+    provider: 'openrouter' as const,
+    model: 'openrouter/free',
+    resolvedModel: 'test/served-model:free',
+    durationMs: 10,
+  }
+  vi.mocked(generateJson).mockResolvedValue({
+    status: 'success',
+    data: report,
+    providerMetadata,
+  })
+  expect(
+    await analyzeCode(
+      makeAnalysisRequest(),
+      openRouterConfig,
+      new AbortController().signal,
+      30000,
+    ),
+  ).toEqual({
+    status: 'success',
+    data: report,
+    providerMetadata,
+  })
+  expect(generateJson).toHaveBeenCalledOnce()
+  expect(vi.mocked(generateJson).mock.calls[0]?.[0]).toMatchObject({
+    ...openRouterConfig,
+    schema: codeAnalysisSchema,
+    timeoutMs: 30000,
+    maxOutputTokens: 8192,
+  })
+})

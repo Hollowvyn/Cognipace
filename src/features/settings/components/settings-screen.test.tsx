@@ -390,7 +390,12 @@ describe('SettingsScreen', () => {
   it('saves and tests Gemini independently of dirty preferences and persists on remount', async () => {
     const user = userEvent.setup()
     let stored = defaultUserSettings
-    let presence = { openai: false, anthropic: false, gemini: false }
+    let presence = {
+      openai: false,
+      anthropic: false,
+      gemini: false,
+      openrouter: false,
+    }
     const calls: string[] = []
     vi.mocked(sendMessage).mockImplementation((method, payload) => {
       if (method === 'settings.getSettings') return Promise.resolve(stored)
@@ -479,6 +484,7 @@ describe('SettingsScreen', () => {
           openai: true,
           anthropic: false,
           gemini: false,
+          openrouter: false,
         })
       if (method === 'settings.updateSettings')
         return new Promise((resolve) => {
@@ -536,6 +542,7 @@ describe('SettingsScreen', () => {
           openai: false,
           anthropic: false,
           gemini: false,
+          openrouter: false,
         })
       return Promise.reject(new Error(`Unexpected method ${method}`))
     })

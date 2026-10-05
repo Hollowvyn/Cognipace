@@ -31,7 +31,12 @@ function createFixture(
   },
 ) {
   let stored = initial
-  let presence = { openai: true, anthropic: false, gemini: false }
+  let presence = {
+    openai: true,
+    anthropic: false,
+    gemini: false,
+    openrouter: false,
+  }
   vi.mocked(sendMessage).mockImplementation((method, payload) => {
     if (method === 'settings.getSettings') return Promise.resolve(stored)
     if (method === 'genai.getAiProviderSecretPresence')

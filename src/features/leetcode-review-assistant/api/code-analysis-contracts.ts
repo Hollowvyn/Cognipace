@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { problemSlugSchema } from '@/features/problems/api/problems-contracts'
-import { aiErrorCodes } from '@/lib/ai/types'
+import { aiErrorCodes, aiProviderIds } from '@/lib/ai/types'
 
 import { codeAnalysisSchema } from '../domain/code-analysis-schema'
 
@@ -82,8 +82,9 @@ export type AnalyzeLeetCodeSubmissionRequest = z.infer<
 >
 
 const metadata = z.strictObject({
-  provider: z.enum(['openai', 'anthropic', 'gemini']),
+  provider: z.enum(aiProviderIds),
   model: z.string().max(120),
+  resolvedModel: nonBlankString(120).optional(),
   durationMs: z.number().nonnegative(),
 })
 export const codeAnalysisErrorCodeSchema = z.enum([

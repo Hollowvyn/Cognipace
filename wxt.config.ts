@@ -54,6 +54,7 @@ export default defineConfig({
         'https://api.openai.com/*',
         'https://api.anthropic.com/*',
         'https://generativelanguage.googleapis.com/*',
+        'https://openrouter.ai/*',
       ],
       content_security_policy: {
         extension_pages:
