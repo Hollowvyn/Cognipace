@@ -140,7 +140,7 @@ export type HintBatch = z.infer<typeof hintBatchSchema>
 ```ts
 import { z } from 'zod'
 import { problemSlugSchema } from '@/features/problems/api/problems-contracts'
-import { aiErrorCodes, aiProviderIds } from '@/lib/ai'
+import { aiErrorCodes, aiProviderIds } from '@/lib/ai/types'
 import { hintBatchSchema } from '../domain/code-hint-schema'
 
 export { hintBatchSchema } from '../domain/code-hint-schema'
@@ -417,7 +417,7 @@ describe('problem-only hint preparation', () => {
 - [ ] **Step 3: Create the preparation module.** It returns the refreshed capture for the controller/page-sync integration in Task 7, so refreshed complete input becomes the current selected input rather than competing with a stale partial snapshot.
 
 ```ts
-import { withAiDeadline } from '@/lib/ai'
+import { withAiDeadline } from '@/lib/ai/operation'
 import type { LeetCodeCaptureState, LeetCodeRemoteClient } from '@/lib/leetcode'
 import {
   hintProblemSchema,
@@ -606,7 +606,7 @@ it('changes revision for a new model but treats surrounding model whitespace as 
 
 ```ts
 import { z } from 'zod'
-import { aiProviderIds } from '@/lib/ai'
+import { aiProviderIds } from '@/lib/ai/types'
 
 export const hintConnectionRequestSchema = z.strictObject({
   surface: z.literal('content-script'),
@@ -672,7 +672,7 @@ hintConnection: () => [...queryKeys.genai.all, 'hint-connection'] as const,
 import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { sendMessage } from '@/extension/messaging'
-import { withAiDeadline } from '@/lib/ai'
+import { withAiDeadline } from '@/lib/ai/operation'
 import { queryKeys } from '@/platform/query/query-keys'
 import {
   hintConnectionStatusSchema,
@@ -825,7 +825,7 @@ export async function generateCodeHints(
 
 ```ts
 import { readAiHintConnectionSnapshot } from '@/features/genai/server/genai-settings-service'
-import { AiDeadlineError, withAiDeadline } from '@/lib/ai'
+import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
 import type { Db } from '@/platform/db'
 import {
   hintIdentity,
@@ -1962,7 +1962,7 @@ import {
   type HintErrorCode,
   type GenerateLeetCodeHintsRequest,
 } from '@/features/leetcode-review-assistant'
-import { AiDeadlineError, withAiDeadline } from '@/lib/ai'
+import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
 import type { LeetCodeCaptureState } from '@/lib/leetcode'
 
 export type OverlayHintState =
