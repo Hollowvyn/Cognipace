@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TOOLTIP_EXIT_ANIMATION_MS } from '@/components/ui/tooltip'
 import { sendMessage } from '@/extension/messaging'
+import {
+  setAiProviderSecretRequestSchema,
+  testAiConnectionRequestSchema,
+} from '@/features/genai/api'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 
 import {
@@ -387,147 +391,176 @@ describe('SettingsScreen', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('saves and tests Gemini independently of dirty preferences and persists on remount', async () => {
-    const user = userEvent.setup()
-    let stored = defaultUserSettings
-    let presence = {
-      openai: false,
-      anthropic: false,
-      gemini: false,
-      openrouter: false,
-    }
-    const calls: string[] = []
-    vi.mocked(sendMessage).mockImplementation((method, payload) => {
-      if (method === 'settings.getSettings') return Promise.resolve(stored)
-      if (method === 'genai.getAiProviderSecretPresence')
-        return Promise.resolve(presence)
-      if (method === 'genai.setAiProviderSecret') {
-        calls.push('key')
-        presence = { ...presence, gemini: true }
-        return Promise.resolve(presence)
-      }
-      if (method === 'settings.updateSettings') {
-        calls.push('settings')
-        stored = mergeUserSettings(
-          stored,
-          settingsUpdateRequestSchema.parse(payload).patch,
-        )
-        return Promise.resolve(stored)
-      }
-      if (method === 'genai.testConnection') {
-        calls.push('test')
-        return Promise.resolve({
-          status: 'success',
-          provider: 'gemini',
-          model: 'my-gemini-model',
-          durationMs: 42,
-        })
-      }
-      return Promise.reject(new Error(`Unexpected method ${method}`))
-    })
-    const { wrapper } = createQueryTestHarness()
-    const view = render(<SettingsScreen />, { wrapper })
-    await screen.findByRole('heading', { name: 'AI connection' })
-    await user.clear(screen.getByLabelText('Daily goal'))
-    await user.type(screen.getByLabelText('Daily goal'), '9')
-    await user.click(screen.getByRole('radio', { name: 'Gemini' }))
-    expect(screen.getByLabelText('Model')).toHaveValue('gemini-3.5-flash-lite')
-    await user.clear(screen.getByLabelText('Model'))
-    await user.type(screen.getByLabelText('Model'), 'my-gemini-model')
-    await user.type(screen.getByLabelText('Gemini API key'), 'local-test-key')
-    await user.keyboard('{Enter}')
-    await screen.findByText('Connected to Gemini · my-gemini-model.')
-    expect(calls).toEqual(['key', 'settings', 'test'])
-    expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
-      surface: 'dashboard',
-      patch: { aiAssessment: { provider: 'gemini', model: 'my-gemini-model' } },
-    })
-    expect(sendMessage).toHaveBeenCalledWith('genai.testConnection', {
-      surface: 'dashboard',
+  it.each([
+    {
       provider: 'gemini',
+      label: 'Gemini',
+      suggestion: 'gemini-3.5-flash-lite',
       model: 'my-gemini-model',
-    })
-    expect(stored.practice.dailyGoal).toBe(4)
-    expect(screen.getByLabelText('Daily goal')).toHaveValue(9)
-    expect(screen.getByRole('button', { name: 'Save Settings' })).toBeEnabled()
-    expect(screen.getByLabelText('Gemini API key')).toHaveValue('')
-    expect(
-      screen.getByRole('switch', { name: 'AI assessment' }),
-    ).toHaveAttribute('aria-checked', 'false')
-    view.unmount()
-    render(<SettingsScreen />, { wrapper })
-    await waitFor(() =>
-      expect(screen.getByLabelText('Model')).toHaveValue('my-gemini-model'),
-    )
-    expect(screen.getByRole('radio', { name: 'Gemini' })).toBeChecked()
-    expect(screen.getByText('Saved key · not tested')).toBeVisible()
-    expect(
-      screen.queryByText('Connected to Gemini · my-gemini-model.'),
-    ).toBeNull()
-  })
+    },
+    {
+      provider: 'openrouter',
+      label: 'OpenRouter',
+      suggestion: 'openrouter/free',
+      model: 'vendor/custom-openrouter-model:free',
+    },
+  ] as const)(
+    'saves and tests $label independently of dirty preferences and persists on remount',
+    async ({ provider, label, suggestion, model }) => {
+      const user = userEvent.setup()
+      let stored = defaultUserSettings
+      let presence = {
+        openai: false,
+        anthropic: false,
+        gemini: false,
+        openrouter: false,
+      }
+      const calls: string[] = []
+      vi.mocked(sendMessage).mockImplementation((method, payload) => {
+        if (method === 'settings.getSettings') return Promise.resolve(stored)
+        if (method === 'genai.getAiProviderSecretPresence')
+          return Promise.resolve(presence)
+        if (method === 'genai.setAiProviderSecret') {
+          calls.push('key')
+          const request = setAiProviderSecretRequestSchema.parse(payload)
+          presence = { ...presence, [request.provider]: true }
+          return Promise.resolve(presence)
+        }
+        if (method === 'settings.updateSettings') {
+          calls.push('settings')
+          stored = mergeUserSettings(
+            stored,
+            settingsUpdateRequestSchema.parse(payload).patch,
+          )
+          return Promise.resolve(stored)
+        }
+        if (method === 'genai.testConnection') {
+          calls.push('test')
+          const request = testAiConnectionRequestSchema.parse(payload)
+          return Promise.resolve({
+            status: 'success',
+            provider: request.provider,
+            model: request.model,
+            durationMs: 42,
+          })
+        }
+        return Promise.reject(new Error(`Unexpected method ${method}`))
+      })
+      const { wrapper } = createQueryTestHarness()
+      const view = render(<SettingsScreen />, { wrapper })
+      await screen.findByRole('heading', { name: 'AI connection' })
+      await user.clear(screen.getByLabelText('Daily goal'))
+      await user.type(screen.getByLabelText('Daily goal'), '9')
+      await user.click(screen.getByRole('radio', { name: label }))
+      expect(screen.getByLabelText('Model')).toHaveValue(suggestion)
+      await user.clear(screen.getByLabelText('Model'))
+      await user.type(screen.getByLabelText('Model'), model)
+      await user.type(
+        screen.getByLabelText(`${label} API key`),
+        'local-test-key',
+      )
+      await user.keyboard('{Enter}')
+      await screen.findByText(`Connected to ${label} · ${model}.`)
+      expect(calls).toEqual(['key', 'settings', 'test'])
+      expect(sendMessage).toHaveBeenCalledWith('settings.updateSettings', {
+        surface: 'dashboard',
+        patch: { aiAssessment: { provider, model } },
+      })
+      expect(sendMessage).toHaveBeenCalledWith('genai.testConnection', {
+        surface: 'dashboard',
+        provider,
+        model,
+      })
+      expect(stored.practice.dailyGoal).toBe(4)
+      expect(screen.getByLabelText('Daily goal')).toHaveValue(9)
+      expect(
+        screen.getByRole('button', { name: 'Save Settings' }),
+      ).toBeEnabled()
+      expect(screen.getByLabelText(`${label} API key`)).toHaveValue('')
+      expect(
+        screen.getByRole('switch', { name: 'AI assessment' }),
+      ).toHaveAttribute('aria-checked', 'false')
+      view.unmount()
+      render(<SettingsScreen />, { wrapper })
+      await waitFor(() =>
+        expect(screen.getByLabelText('Model')).toHaveValue(model),
+      )
+      expect(screen.getByRole('radio', { name: label })).toBeChecked()
+      expect(screen.getByText('Saved key · not tested')).toBeVisible()
+      expect(screen.queryByText(`Connected to ${label} · ${model}.`)).toBeNull()
+    },
+  )
 
-  it('freezes preference and AI fields during general Save and rejects overlapping AI submission', async () => {
-    const user = userEvent.setup()
-    let stored: UserSettings = {
-      ...defaultUserSettings,
-      aiAssessment: {
-        enabled: false,
-        provider: 'openai' as const,
-        model: 'saved-model',
-      },
-    }
-    let finish: (() => void) | undefined
-    vi.mocked(sendMessage).mockImplementation((method, payload) => {
-      if (method === 'settings.getSettings') return Promise.resolve(stored)
-      if (method === 'genai.getAiProviderSecretPresence')
-        return Promise.resolve({
-          openai: true,
-          anthropic: false,
-          gemini: false,
-          openrouter: false,
-        })
-      if (method === 'settings.updateSettings')
-        return new Promise((resolve) => {
-          finish = () => {
-            stored = mergeUserSettings(
-              stored,
-              settingsUpdateRequestSchema.parse(payload).patch,
-            )
-            resolve(stored)
-          }
-        })
-      return Promise.reject(new Error(`Unexpected method ${method}`))
-    })
-    const { wrapper } = createQueryTestHarness()
-    render(<SettingsScreen />, { wrapper })
-    await screen.findByRole('heading', { name: 'AI connection' })
-    await waitFor(() =>
+  it.each(['openai', 'openrouter'] as const)(
+    'freezes preference and %s AI fields during general Save and rejects overlapping AI submission',
+    async (provider) => {
+      const user = userEvent.setup()
+      let stored: UserSettings = {
+        ...defaultUserSettings,
+        aiAssessment: {
+          enabled: false,
+          provider,
+          model: 'saved-model',
+        },
+      }
+      let finish: (() => void) | undefined
+      vi.mocked(sendMessage).mockImplementation((method, payload) => {
+        if (method === 'settings.getSettings') return Promise.resolve(stored)
+        if (method === 'genai.getAiProviderSecretPresence')
+          return Promise.resolve({
+            openai: provider === 'openai',
+            anthropic: false,
+            gemini: false,
+            openrouter: provider === 'openrouter',
+          })
+        if (method === 'settings.updateSettings')
+          return new Promise((resolve) => {
+            finish = () => {
+              stored = mergeUserSettings(
+                stored,
+                settingsUpdateRequestSchema.parse(payload).patch,
+              )
+              resolve(stored)
+            }
+          })
+        return Promise.reject(new Error(`Unexpected method ${method}`))
+      })
+      const { wrapper } = createQueryTestHarness()
+      render(<SettingsScreen />, { wrapper })
+      await screen.findByRole('heading', { name: 'AI connection' })
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Test connection' }),
+        ).toBeEnabled(),
+      )
+      await user.click(screen.getByRole('radio', { name: 'Light' }))
+      await user.click(screen.getByRole('button', { name: 'Save Settings' }))
+      expect(screen.getByLabelText('Daily goal')).toBeDisabled()
+      expect(screen.getByRole('radio', { name: 'Dark' })).toBeDisabled()
+      expect(screen.getByLabelText('Model')).toBeDisabled()
+      expect(screen.getByRole('radio', { name: 'Gemini' })).toBeDisabled()
+      if (provider === 'openrouter') {
+        expect(
+          screen.getByRole('button', { name: 'Use free models' }),
+        ).toBeDisabled()
+      }
       expect(
         screen.getByRole('button', { name: 'Test connection' }),
-      ).toBeEnabled(),
-    )
-    await user.click(screen.getByRole('radio', { name: 'Light' }))
-    await user.click(screen.getByRole('button', { name: 'Save Settings' }))
-    expect(screen.getByLabelText('Daily goal')).toBeDisabled()
-    expect(screen.getByRole('radio', { name: 'Dark' })).toBeDisabled()
-    expect(screen.getByLabelText('Model')).toBeDisabled()
-    expect(screen.getByRole('radio', { name: 'Gemini' })).toBeDisabled()
-    expect(
-      screen.getByRole('button', { name: 'Test connection' }),
-    ).toBeDisabled()
-    fireEvent.submit(screen.getByRole('form', { name: 'AI connection' }))
-    expect(sendMessage).not.toHaveBeenCalledWith(
-      'genai.testConnection',
-      expect.anything(),
-    )
-    act(() => finish?.())
-    await waitFor(() =>
-      expect(screen.getByLabelText('Daily goal')).toBeEnabled(),
-    )
-    expect(
-      screen.getByRole('button', { name: 'Test connection' }),
-    ).toBeEnabled()
-  })
+      ).toBeDisabled()
+      fireEvent.submit(screen.getByRole('form', { name: 'AI connection' }))
+      expect(sendMessage).not.toHaveBeenCalledWith(
+        'genai.testConnection',
+        expect.anything(),
+      )
+      act(() => finish?.())
+      await waitFor(() =>
+        expect(screen.getByLabelText('Daily goal')).toBeEnabled(),
+      )
+      expect(
+        screen.getByRole('button', { name: 'Test connection' }),
+      ).toBeEnabled()
+    },
+  )
 
   it('can reset unsaved AI changes when persisted preferences already use defaults', async () => {
     const user = userEvent.setup()
