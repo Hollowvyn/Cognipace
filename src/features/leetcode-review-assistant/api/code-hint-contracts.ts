@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { problemSlugSchema } from '@/features/problems/api/problems-contracts'
-import { aiErrorCodes, aiProviderIds } from '@/lib/ai'
+import { aiErrorCodes, aiProviderIds } from '@/lib/ai/types'
 
 import { hintBatchSchema } from '../domain/code-hint-schema'
 
