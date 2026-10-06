@@ -314,6 +314,13 @@ review and FSRS inputs
 
 The owners in that flow are:
 
+- `src/features/analytics/domain/analytics-history-window.ts` prepares the
+  approved 30 / 90 / All time migration as a pure date foundation. It separates
+  raw retained-history origin from nominal, displayed, and prior-period bounds;
+  groups the available calendar span into at most 60 intervals; and supplies an
+  independent last-30-day daily backlog frame. It is not yet wired into the
+  runtime or page. The following integration phase replaces the finite range
+  contract and consumes these bounds rather than duplicating date policy.
 - `src/features/analytics/domain/analytics-range-policy.ts` selects and builds
   local-date bucket boundaries. The current contract supports 14-day daily,
   30-day three-day, and 90-day weekly presentation buckets.

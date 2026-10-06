@@ -1,6 +1,6 @@
 # Analytics History Window Foundation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build the tested, feature-local date foundation for 30 days / 90 days / All time, available young history, bounded calendar grouping, and independent daily backlog bounds.
 
@@ -10,7 +10,7 @@
 
 ---
 
-Status: ready for phase execution after the approved range amendment. No steps have been executed. The user has already requested subagent execution; do not ask them to select an execution mode again.
+Status: implemented and independently reviewed. The pure foundation remains unwired; runtime integration follows immediately under the already authorized implementation scope.
 
 Design: [Analytics Performance And Layout](../specs/2026-10-05-analytics-performance-layout-design.md#historical-range-and-available-history).
 
@@ -33,7 +33,7 @@ The new module accepts the existing four-digit Gregorian date-key domain and reu
 
 **Files:** Create `src/features/analytics/domain/analytics-history-window.ts` and `src/features/analytics/domain/analytics-history-window.test.ts`.
 
-- [ ] **Step 1: Write the failing bounds tests.** Create the test file with this content:
+- [x] **Step 1: Write the failing bounds tests.** Create the test file with this content:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -158,9 +158,9 @@ describe('analytics history bounds', () => {
 })
 ```
 
-- [ ] **Step 2: Verify the tests fail because the new module is absent.** Run `rtk npm run test -- src/features/analytics/domain/analytics-history-window.test.ts`. Expected: module resolution failure for `./analytics-history-window`, not an unrelated setup or dependency failure. If dependencies are absent, follow the repository's pinned Node/npm and lockfile install procedure before execution; record installation/network failures honestly.
+- [x] **Step 2: Verify the tests fail because the new module is absent.** Run `rtk npm run test -- src/features/analytics/domain/analytics-history-window.test.ts`. Expected: module resolution failure for `./analytics-history-window`, not an unrelated setup or dependency failure. If dependencies are absent, follow the repository's pinned Node/npm and lockfile install procedure before execution; record installation/network failures honestly.
 
-- [ ] **Step 3: Create the complete bounds implementation.** Write:
+- [x] **Step 3: Create the complete bounds implementation.** Write:
 
 ```ts
 import {
@@ -288,15 +288,15 @@ function calendarOrdinal(key: string): number {
 }
 ```
 
-- [ ] **Step 4: Run the focused command again.** Expected: all bounds tests pass. Confirm no test substitutes a valid metric's first bucket for the raw origin.
+- [x] **Step 4: Run the focused command again.** Expected: all bounds tests pass. Confirm no test substitutes a valid metric's first bucket for the raw origin.
 
-- [ ] **Step 5: Commit only the two new files.** Run `rtk git add src/features/analytics/domain/analytics-history-window.ts src/features/analytics/domain/analytics-history-window.test.ts`, then `rtk git commit -m "feat(analytics): add available history window bounds"`.
+- [x] **Step 5: Commit only the two new files.** Run `rtk git add src/features/analytics/domain/analytics-history-window.ts src/features/analytics/domain/analytics-history-window.test.ts`, then `rtk git commit -m "feat(analytics): add available history window bounds"`.
 
 ## Task 2: Bounded Calendar Buckets And Daily Backlog
 
 **Files:** Modify both new files from Task 1; reuse the `AnalyticsTimeBucket` type from `analytics-time.ts`.
 
-- [ ] **Step 1: Add these imports and tests to the test file.** Replace its named import from the new module with:
+- [x] **Step 1: Add these imports and tests to the test file.** Replace its named import from the new module with:
 
 ```ts
 import {
@@ -470,9 +470,9 @@ describe('analytics calendar bucket plans', () => {
 })
 ```
 
-- [ ] **Step 2: Run `rtk npm run test -- src/features/analytics/domain/analytics-history-window.test.ts`.** Expected: new tests fail because bucket/backlog exports do not exist. The Task 1 bounds tests must remain green.
+- [x] **Step 2: Run `rtk npm run test -- src/features/analytics/domain/analytics-history-window.test.ts`.** Expected: new tests fail because bucket/backlog exports do not exist. The Task 1 bounds tests must remain green.
 
-- [ ] **Step 3: Add the complete bucket implementation.** Replace the module's import from `./analytics-time` with:
+- [x] **Step 3: Add the complete bucket implementation.** Replace the module's import from `./analytics-time` with:
 
 ```ts
 import {
@@ -669,15 +669,15 @@ function monthKey(index: number): string {
 }
 ```
 
-- [ ] **Step 4: Run the new tests and existing calendar/forecast regressions.** Run `rtk npm run test -- src/features/analytics/domain/analytics-history-window.test.ts src/features/analytics/domain/analytics-time.test.ts src/features/analytics/domain/analytics-range-policy.test.ts`. Expected: all pass; the old supported selector and fourteen-date forecast behavior remain unchanged.
+- [x] **Step 4: Run the new tests and existing calendar/forecast regressions.** Run `rtk npm run test -- src/features/analytics/domain/analytics-history-window.test.ts src/features/analytics/domain/analytics-time.test.ts src/features/analytics/domain/analytics-range-policy.test.ts`. Expected: all pass; the old supported selector and fourteen-date forecast behavior remain unchanged.
 
-- [ ] **Step 5: Commit only this task's changes.** Run `rtk git add src/features/analytics/domain/analytics-history-window.ts src/features/analytics/domain/analytics-history-window.test.ts`, then `rtk git commit -m "feat(analytics): add bounded calendar history buckets"`.
+- [x] **Step 5: Commit only this task's changes.** Run `rtk git add src/features/analytics/domain/analytics-history-window.ts src/features/analytics/domain/analytics-history-window.test.ts`, then `rtk git commit -m "feat(analytics): add bounded calendar history buckets"`.
 
 ## Task 3: Documentation And Phase Validation
 
 **Files:** Modify `docs/architecture.md` and `docs/superpowers/README.md`; update this plan's execution status only after the named checks actually pass.
 
-- [ ] **Step 1: Add this paragraph after the current Analytics owner list in `docs/architecture.md`.** Leave its existing 14/30/90 current-behavior statement intact until runtime integration ships:
+- [x] **Step 1: Add this paragraph after the current Analytics owner list in `docs/architecture.md`.** Leave its existing 14/30/90 current-behavior statement intact until runtime integration ships:
 
 ```markdown
 The tested `src/features/analytics/domain/analytics-history-window.ts` foundation
@@ -688,13 +688,13 @@ It is not yet wired into the runtime summary or visible selector; the current
 14/30/90 behavior above remains active until the integration phase lands.
 ```
 
-- [ ] **Step 2: Update this plan's index entry with the actual implementation/check status.** Use the following wording only when both tasks and the automated gates have passed:
+- [x] **Step 2: Update this plan's index entry with the actual implementation/check status.** Use the following wording only when both tasks and the automated gates have passed:
 
 ```markdown
 - [`plans/2026-10-05-analytics-history-window-foundation.md`](./plans/2026-10-05-analytics-history-window-foundation.md): tested pure selection, available-history bounds, bounded calendar intervals, and fixed daily backlog foundation; current runtime/UI remain unchanged. Range integration and production/human proof are separate pending phases.
 ```
 
-- [ ] **Step 3: Format the changed files and run the required automated gates.** Execute these commands sequentially and record every result:
+- [x] **Step 3: Format the changed files and run the required automated gates.** Execute these commands sequentially and record every result:
 
 ```sh
 rtk proxy npx prettier --ignore-path /dev/null --write src/features/analytics/domain/analytics-history-window.ts src/features/analytics/domain/analytics-history-window.test.ts docs/architecture.md docs/superpowers/README.md docs/superpowers/plans/2026-10-05-analytics-history-window-foundation.md
@@ -706,9 +706,9 @@ rtk git diff --check
 
 Expected: focused suite, lint, full check, formatting, and whitespace checks pass. `rtk npm run check` includes database checks, WXT type generation, TypeScript, lint, and the full test suite. Do not expand testing after a clean final run unless a new change or unresolved concern warrants it.
 
-- [ ] **Step 4: Verify the phase boundary.** Confirm only the pure module/tests and honest docs changed, no runtime schema/selector/database writes changed, and no chart or tooltip design was altered. `rtk npm run build` and installed-extension visual smoke may be skipped for this unwired foundation, with that exact reason recorded. The following runtime/dashboard integration phase must run build and prepare required human happy-path/edge-case screenshot or recording proof before PR review/merge; this phase cannot claim that proof is complete or N/A for the final feature.
+- [x] **Step 4: Verify the phase boundary.** Confirm only the pure module/tests and honest docs changed, no runtime schema/selector/database writes changed, and no chart or tooltip design was altered. `rtk npm run build` and installed-extension visual smoke may be skipped for this unwired foundation, with that exact reason recorded. The following runtime/dashboard integration phase must run build and prepare required human happy-path/edge-case screenshot or recording proof before PR review/merge; this phase cannot claim that proof is complete or N/A for the final feature.
 
-- [ ] **Step 5: Commit the documentation.** Run `rtk git add docs/architecture.md docs/superpowers/README.md docs/superpowers/plans/2026-10-05-analytics-history-window-foundation.md`, then `rtk git commit -m "docs(analytics): record history window foundation"`.
+- [x] **Step 5: Commit the documentation.** Run `rtk git add docs/architecture.md docs/superpowers/README.md docs/superpowers/plans/2026-10-05-analytics-history-window-foundation.md`, then `rtk git commit -m "docs(analytics): record history window foundation"`.
 
 ## Done-When And Integration Handoff
 
@@ -718,6 +718,29 @@ The next phase must migrate the runtime selection to `30 | 90 | 'all'`, add the 
 
 Inline plan self-review completed against the linked range section: selection/default/legacy values are Task 1; raw origin/young-versus-sparse/prior cutoffs are Task 1; grouping/DST/leap/year boundaries/record coverage/backlog independence are Task 2; honest scope and validation are Task 3. Imports and signatures match the implementation blocks, and every code-edit step includes concrete content. Weighted models, visual layout, runtime readiness, and tooltip cleanup are outside this phase. The bounded output does not cap retained-review scanning or future FSRS replay work.
 
-## Planning Validation Record
+## Original Planning Validation Record
 
-This document is an unexecuted plan. Its code blocks have not been installed in application files or run as application tests. Planning validation consists of Prettier and `rtk git diff --check`, recorded with the accompanying design amendment. `rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` are skipped for this Markdown-only planning pass. All implementation test results and remaining proof must be recorded during execution.
+Before implementation, this document was an unexecuted plan. Its code blocks have not been installed in application files or run as application tests. Planning validation consists of Prettier and `rtk git diff --check`, recorded with the accompanying design amendment. `rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` are skipped for this Markdown-only planning pass. All implementation test results and remaining proof must be recorded during execution.
+
+## Foundation Execution Record
+
+Tasks 1 and 2 were executed with bounds RED/GREEN followed by bucket/backlog RED/GREEN. The missing generated `.wxt/tsconfig.json` was a setup failure, repaired with the pinned `prepare:wxt` command before accepting RED evidence. The code preserves the existing calendar-helper domain. A regression showed that nominal bin arithmetic could unnecessarily generate a year-10000 key for a supported year-9999 report; clipping arithmetic before conversion repaired it without expanding date infrastructure. Exact 60/61-bin transitions, spring/fall prior wall-clock/millisecond preservation, and complete displayed-date coverage were added.
+
+Independent specification review approved the implementation after two persisted coverage additions. Independent quality review found no blocking issue. Its optional near-UTC-midnight origin fixture remains planned in the following service integration's local-boundary scenarios. Root verified the actual source and required automated output. Tasks 1/2 are recorded as one reviewed foundation commit rather than separate intermediate commits to the same two files.
+
+Commands run successfully with Node 24.20.0/npm 11.19.0:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm ci
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run prepare:wxt
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/analytics-history-window.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/analytics-history-window.test.ts src/features/analytics/domain/analytics-time.test.ts src/features/analytics/domain/analytics-range-policy.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run lint
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run check
+rtk proxy node node_modules/prettier/bin/prettier.cjs --ignore-path /dev/null --check src/features/analytics/domain/analytics-history-window.ts src/features/analytics/domain/analytics-history-window.test.ts docs/architecture.md docs/superpowers/README.md docs/superpowers/plans/2026-10-05-analytics-history-window-foundation.md
+rtk git diff --check
+```
+
+Focused final result: 69 passed, including 50 new history-window tests. Final full check: database check, WXT preparation, TypeScript and lint passed; 217 test files passed, 2 skipped, 3,078 tests passed and 9 skipped under existing test conditions. The initial full check before the final coverage-only addition passed 3,077 tests; the final check above supersedes it.
+
+Skipped `rtk npm run build` for this unwired pure-domain foundation, as this plan permits. Skipped installed-extension visual smoke for the same phase boundary; the final behavior-changing runtime/dashboard work must run build and prepare human happy-path/edge-case proof before PR review or merge. No database generation was run because no persisted schema changed. The date foundation does not complete the full Analytics refactor.

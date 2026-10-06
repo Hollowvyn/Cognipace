@@ -8,8 +8,13 @@ connections, the ten-card page, and target-relative timing. The final review
 also explicitly preserves green backlog lines strictly below the watch threshold,
 with amber at the threshold and above it. The user subsequently approved the
 researched 30 days / 90 days / All time policy, available-history display for
-new users, independent workload scopes, and deferred tooltip cleanup. No
-application implementation has started.
+new users, independent workload scopes, and deferred tooltip cleanup.
+Implementation is in progress through the reviewed date-foundation and runtime
+integration phases. The subsequent approved refinement makes
+Overview and Details equally sized, gives Recall an explicit paired-history
+display frame, replaces page-moving data notices with fixed card states, and
+adds four selected-period headline cards. The user approved the final prototype
+and authorized continuing implementation.
 
 ## Problem And Outcome
 
@@ -28,7 +33,10 @@ inactivity. Charts use the space allocated by consistently sized cards.
 ## Approved Visual Reference
 
 Preserve the [approved source](./assets/2026-10-05-analytics-value-first-approved.html)
-verbatim. Value first is the chosen
+verbatim as the earlier exploration. The final approved page reference is
+[the range and summary prototype](./assets/2026-10-05-analytics-range-summary-approved.html).
+It includes the final card heights, paired Recall frame, and four headline cards.
+Value first is the chosen
 variant. The other variant and editable design controls are exploration tools,
 not product requirements. The source uses illustrative data, not the user's
 production history. Its four cards establish appearance, not the final card count.
@@ -56,7 +64,7 @@ order forms consecutive 2×2 groups, with the final workload pair:
 | 4   | Retention map   | Memory signals    |
 | 5   | Overdue backlog | Upcoming reviews  |
 
-All ten overview cards share the same width and collapsed desktop height of
+All ten cards share the same width and fixed desktop height of
 464px. The two-column rule applies to the analytics widgets rather than requiring
 an extra decorative four-card wrapper. There are no full-width chart exceptions
 in the normal overview, including Practice and Retention map.
@@ -73,12 +81,37 @@ as-of context. Historical evidence guidance remains metric-specific and never
 hides an available value. Repeated evidence explanations belong in each card's
 Details rather than permanent paragraphs.
 
-Replace the three large summary tiles with a compact activity line containing
-the existing all-time review count and all-time active-day count. Label both
-scopes honestly. Remove the duplicate Observed correctness hero; its current
-Good + Easy calculation remains available in rating details. Do not relabel that
-calculation as independent correctness or change an all-time count into a
-selected-period count by changing only its caption.
+Show four equal headline cards above the chart grid. They all use the selected
+30 days / 90 days / All time window, the resolved report timezone, and the same
+as-of cutoff. Four columns fit a wide desktop; use two columns and then one as
+space narrows. These compact summary cards are separate from the ten chart
+cards and have equal heights within every state. Show the selected dates once.
+
+| Card                 | Definition                                                                                                                                 | Compact evidence caption                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| Review days          | Distinct report-local dates with at least one retained recorded assessment in the period.                                                  | Days with recorded practice                      |
+| Questions solved     | Distinct problems with at least one persisted `isCorrect === true` assessment in the period. Repeated successes count once.                | Unique questions marked correct                  |
+| Observed correctness | Persisted true results divided by persisted true plus false results in the period. Null correctness is excluded without a rating fallback. | Correct count of assessed count                  |
+| Recorded solve time  | Sum finite positive persisted elapsed seconds on successful assessments in the period, including repeated successful assessments.          | Timed successful attempts of successful attempts |
+
+Derive these from the same deduplicated raw selected events, before narrowing
+historical chart eligibility. They include first and repeat assessments, all
+current difficulties, and untimed records as appropriate. Questions solved is
+not a count of review attempts, newly encountered problems, current practice
+status, or the latest-solved timestamp. Correctness means the saved assessment
+result; it does not claim independent judge acceptance, unaided solving, or
+first-try correctness. Existing assessment policy may mark an accepted overtime
+solution unsuccessful. Do not change that policy in this refactor.
+
+Display solve time in hours and minutes, preserving exact seconds in the read
+model. Missing durations do not become zero; show the timed-success coverage.
+A successful cohort with no recorded timing is unavailable. A genuine empty
+activity cohort or known zero successful assessments can show zero solved and
+zero successful time; a wholly unknown correctness cohort cannot imply a known
+success count. The older Good + Easy fraction remains a raw rating measure in
+advanced details and must not supply the Observed correctness card. Review days
+must never exceed the displayed available calendar days. No headline card mixes
+in all-time totals while a finite range is selected.
 
 ## Historical Range And Available History
 
@@ -141,7 +174,8 @@ adaptive calendar grouping, with grouping metadata supplied alongside intervals
 rather than inferred from the selector.
 
 Choose grouping from the available global calendar span, before metric-specific
-evidence filters. Up to fourteen local dates uses daily buckets; fifteen through
+evidence filters, except for the explicitly labelled paired Recall display frame
+described below. Up to fourteen local dates uses daily buckets; fifteen through
 thirty uses three-day buckets; longer 90-day views use Monday-start calendar
 weeks. Three-day groups remain anchored at the nominal selected start, or the
 history-origin day for All time, and intersect with the displayed domain.
@@ -237,31 +271,56 @@ inspection access, keyboard/pointer/tap parity, and truthful values required by
 the changed metrics and dates. Do not redesign tooltip appearance, introduce a
 new tooltip framework, or expand tooltip interaction behavior in this refactor.
 
-On desktop, the plot slot grows to use the card's remaining definite height;
-the plot must not determine its parent's height through an aspect ratio or
-fixed nested minimum. Use at least 220px of plot height, reserving sufficient
-space for controls, axes, reference captions, and wrapping legends. At narrow
-widths, use natural outer height and a minimum 240px plot slot so wrapped copy,
-controls, validation errors, and long names remain available.
+Every chart card retains the same outer height in Overview, Details, Chart,
+Table, loading, no-data, partial-data, and error states: 464px on desktop and
+512px when stacked on narrow screens. The plot slot uses the remaining definite
+height; neither an aspect ratio nor a nested fixed minimum controls the shell.
+The prototype's fixed header/body/footer tracks are the reference. Do not shrink
+text, clip content, or introduce internal vertical scrolling to obtain uniformity.
 
-Chart and Table are peers within the overview. Retain seven-row historical and
-Retention tables and their exact pagination; use compact rows and reserve space
-for pagination. If a table or detail cannot fit without clipping, its expanded
-mode may grow naturally. Equal height is the collapsed overview contract, not a
-reason to hide rows or create a vertically scrolling card.
+Breakdown and Details replace the plot area and reclaim the hero slot. The header
+action becomes Overview and restores the prior filters, series, and selections.
+Use compact subsection tabs and bounded pages rather than stacking several tables
+and notes. Keep every underlying measurement, linked problem, calculation,
+provenance note, goal editor, and validation error reachable in a fitting
+subsection. Performance starts with Ratings / Difficulty / Mix / Intervals;
+Recall uses Summary / Intervals / Method and retains its separate Goals surface.
+Advanced raw-outcome, timing trend/comparison, and other existing controls stay
+accessible through appropriate fitting Details sections. Preserve focus and
+restore it to the originating action on close.
 
-Breakdown and Details replace the card's plot area with their selected content;
-Back to overview restores the prior chart/table, filters, and selection. Expanded
-content can grow naturally without stretching the adjacent card's plot. Long
-calculation notes, target editors, validation errors, and Retention pinned details
-must be fully accessible; they may extend an expanded card. Closing returns the
-overview to its common height. Expanding/collapsing retains focus appropriately.
+Use four single-line data rows in wider cards and three in very narrow cards as
+the initial table budgets; long-title problem lists use three rows in wider cards
+and two when narrow. Refine page lengths from measured usable width/height.
+Pagination preserves every row, clamps on range/width changes, and recalculates
+even while plots are hidden. Keep the actual qualifying/returned counts and the
+returned-top-25 versus qualifying-total distinction for Signals. No evidence or
+reason is discarded. Retention selection and pinned problem details use a fitting
+card view rather than enlarging the outer card.
 
-Memory signals uses a compact three-item preview per overview page to fit the
-shared desktop height. Show linked titles and wrapping reasons, the actual
-qualifying/returned counts, and pagination. Its Details mode retains the full
-existing five-row pagination, all typed flags/severity, and the returned-top-25
-versus qualifying-total distinction. No problem or reason is discarded.
+### Stable Data And Action States
+
+Routine evidence limitations occupy neutral metadata in existing header/footer
+slots. Keep short sample, update-count, timed coverage, known backlog coverage,
+and in-progress labels visible beside the affected metric; full reasons remain
+available in Details. Distinct Practice rating/count limitations remain distinct.
+Normal shortened history does not create a warning banner above the grid.
+
+Initial loading keeps the complete headline and chart shells with appropriately
+sized skeletons. Changing range clears incompatible old values immediately.
+A same-key background refresh may retain the previous chart with Updating;
+failed refresh retains the original as-of context and an explicit failed-refresh
+status with Retry. It cannot imply successful new-range data or a current snapshot.
+No eligible evidence replaces the plot within the existing card and shows an
+unavailable hero. Genuine zero activity, zero due work, and no flagged problems
+remain measured outcomes; unknown Recall or Backlog never becomes zero.
+
+Load failures use a compact persistent message and Retry in the affected fixed
+shell. Save/validation errors preserve the draft and stay beside their goal field,
+with accessible error association. Floating feedback may supplement an action
+confirmation but is never the only indication that a save failed. Use one polite
+range/refresh announcement, not ten simultaneous readiness announcements.
+Tooltip styling and interaction cleanup remain deferred.
 
 ## Weighted Performance
 
@@ -403,12 +462,20 @@ Updated during Sep 10–16. Do not invent an event timestamp from its bucket end
 The current contract is sufficient; adding raw-event payloads or new timestamps
 solely to smooth the plot is unnecessary.
 
-Keep the full available-history calendar domain and original rows for these two
-views, including leading unavailable evidence within that shared tracking span
-and trailing held intervals. Clip only days before global history began as
-specified above, never dates before a particular cohort's first update. Date positions,
-midpoints, sparse ticks, cross-year labels, and shortened edge buckets remain
-real. Fitted Recall scales include both cumulative series and the saved Recall
+Performance retains the full available global-history calendar domain, leading
+unavailable rows, and trailing holds. Paired Recall retains the selected-period
+cohort and totals, but uses an explicit display frame from the earliest eligible
+paired review inside that selection through the same report as-of boundary.
+Choose its calendar grouping from that visible span with the same shared grouping
+helper, keeping both series and interval details in the same frame. Label the
+actual paired-history dates and grouping in the card. This is a display-only
+exception; it never changes the page selection, eligible pair set, aggregate,
+or underlying readiness. An All time span of 612 days whose first pair is Sep 9,
+2026 shows Recall Sep 9–Oct 5, with the same 52 pairs and 48 recalled outcomes.
+Retain internal inactivity and trailing holds. Never crop genuinely long sparse
+paired history to recent activity, or invent leading values before its first pair.
+Date positions, midpoints, sparse ticks, cross-year labels, and shortened edge
+buckets remain real. Fitted Recall scales include both cumulative series and the saved Recall
 goal independently of series visibility. Performance uses the fixed 0–100 point
 axis. One genuine update remains insufficient for a trend; held rows do not
 increase readiness, active-bucket counts, samples, or confidence.
@@ -630,8 +697,9 @@ No migration or artifact-packaging command is required unless scope changes.
 Record exact commands run and exact skipped commands/reasons in each handoff.
 
 Production-component browser proof must cover both themes at desktop/320px,
-equal collapsed card heights, plot growth, bar spacing, long labels, natural
-holds, actual midpoint geometry, expanded content, and keyboard/touch controls.
+equal Overview/Details/state card heights, four correctly scoped headlines,
+plot growth, bar spacing, long labels, natural holds, actual midpoint geometry,
+paginated expanded content, and keyboard/touch controls.
 The concept preview is separate design evidence, not production-component proof.
 
 Before PR review or merge, the human engineer must rebuild/reload the installed
@@ -740,3 +808,13 @@ Commands skipped: `rtk npm run lint`, `rtk npm run check`, and
 `rtk npm run test -- src/features/analytics/domain/analytics-history-window.test.ts src/features/analytics/domain/analytics-time.test.ts src/features/analytics/domain/analytics-range-policy.test.ts`
 is also unrun: the new application module/tests are plan content, not implemented
 files. The phase plan and all production/human verification remain unexecuted.
+
+## Final Prototype Approval Amendment
+
+The user approved the four-headline interactive prototype and then authorized
+continuing the refactor. This amendment records the intervening approved changes
+to fixed Details/mobile geometry, paired Recall display scope, quiet states, and
+selected-period headline definitions. The approved rubric remains Again 0 /
+Hard 50 / Good 80 / Easy 100; older exploration-state events showing Hard 35 do
+not change it. Application implementation and required installed-extension human
+proof are separate from this prototype approval.

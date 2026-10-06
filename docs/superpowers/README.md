@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall, ten-card organization, target-relative timing, strict backlog color boundary, and 30/90/All time with available young history. Backlog stays Last 30 days, Upcoming Next 14 days, and tooltip cleanup is deferred. The pure history-window foundation plan is written; no application implementation yet.
+- [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall, ten equal cards in Overview and Details, target-relative timing, strict backlog color boundary, and 30/90/All time with available young history. The final prototype adds four selected-period activity totals and quiet fixed card states. Backlog stays Last 30 days, Upcoming Next 14 days, and tooltip cleanup is deferred. Implementation is progressing through date foundation, runtime integration, weighted presentation, and compact production UI phases.
 
 - [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
 
@@ -75,7 +75,12 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
-- [`plans/2026-10-05-analytics-history-window-foundation.md`](./plans/2026-10-05-analytics-history-window-foundation.md): unexecuted first phase for explicit selection, shared raw-history origin, nominal/display/prior bounds, bounded calendar intervals, and independent daily backlog dates. Runtime/service/route/readiness integration follows as a separate phase.
+- [`plans/2026-10-05-analytics-history-window-foundation.md`](./plans/2026-10-05-analytics-history-window-foundation.md): implemented and independently reviewed pure selection, raw-history bounds, bounded calendar intervals and fixed daily backlog foundation; 69 focused tests and the required full check pass. Runtime/service/route/readiness integration follows as a separate phase.
+- [`plans/2026-10-05-analytics-history-runtime-integration.md`](./plans/2026-10-05-analytics-history-runtime-integration.md): next phase wiring public selections, explicit report frames, paired Recall dates, nominal comparisons, independent workload frames, and truthful selected activity through validated runtime messages.
+- [`plans/2026-10-05-analytics-weighted-presentation.md`](./plans/2026-10-05-analytics-weighted-presentation.md): shared weighted Performance, cumulative paired Recall, normalized Time, sixteen-cell topic evidence, and natural cumulative trend geometry before compact production composition.
+- [`plans/2026-10-05-analytics-compact-card-foundation.md`](./plans/2026-10-05-analytics-compact-card-foundation.md): fixed card geometry, measured plots, bounded exact paging, and persistent fitting goal surfaces.
+- [`plans/2026-10-05-analytics-compact-card-adapters.md`](./plans/2026-10-05-analytics-compact-card-adapters.md): all ten production adapters, retaining advanced outcomes/time/Mix, paired Recall, exact evidence, complete Retention interactions and independent workload scopes.
+- [`plans/2026-10-05-analytics-page-assembly-proof.md`](./plans/2026-10-05-analytics-page-assembly-proof.md): four period headlines, ordered ten-card grid, stable query/action states, production responsive proof, authority-doc alignment and required human extension smoke checklist.
 
 - [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
 
