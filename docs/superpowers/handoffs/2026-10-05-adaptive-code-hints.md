@@ -98,12 +98,13 @@ medium/heavy progression, retained earlier hints while pending and after error,
 disabled pending action, retry preserving count, three-success cap, progressing
 light hints, no hint horizontal overflow, no page/console errors, expected page
 identity/content and no framework error overlay. Agent inspected the final
-screenshots. Ten screenshots and `checks.json` are in that temporary directory.
+screenshots. Ten screenshots remain in that temporary directory. Four selected screenshots and
+`checks.json` are committed under `docs/superpowers/proof/2026-10-05-adaptive-code-hints`.
 
-- [392px dark final fixture](/private/tmp/cognipace-adaptive-hints-proof/final-dark-392.png)
-- [320px light final fixture](/private/tmp/cognipace-adaptive-hints-proof/final-light-320.png)
-- [320px retained hints during error](/private/tmp/cognipace-adaptive-hints-proof/error-light-320.png)
-- [392px retained hints while pending](/private/tmp/cognipace-adaptive-hints-proof/pending-dark-392.png)
+- [392px dark final fixture](../proof/2026-10-05-adaptive-code-hints/final-dark-392.png)
+- [320px light final fixture](../proof/2026-10-05-adaptive-code-hints/final-light-320.png)
+- [320px retained hints during error](../proof/2026-10-05-adaptive-code-hints/error-light-320.png)
+- [392px retained hints while pending](../proof/2026-10-05-adaptive-code-hints/pending-dark-392.png)
 
 ## Skipped commands and remaining human/provider gates
 
@@ -132,8 +133,8 @@ into this handoff, shell commands, logs or screenshots.
 ## Release and recovery
 
 Release intent: `feat(overlay): adapt AI hints to current code and progress`.
-Source is kept reviewable in this worktree; no push, PR, merge or release is
-requested. Avoid requesting hints to recover from provider/capture issues.
+The user subsequently requested a PR. Publish this branch as a draft while the
+human/provider gates remain pending; merge and release are not requested. Avoid requesting hints to recover from provider/capture issues.
 Review saving and completed-submission analysis keep their existing owners.
 Permission/host access, database shape and backup/sync format do not expand.
 Privacy and Store copy disclose the newly transmitted current code and prior
