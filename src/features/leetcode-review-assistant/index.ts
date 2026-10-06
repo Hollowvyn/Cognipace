@@ -22,14 +22,19 @@ export {
 } from './api'
 
 export {
-  hintBatchSchema,
+  codeHintSchema,
+  codeHintTurnSchema,
+  codeHintInputSchema,
+  isCodeHintConsistent,
   hintProblemSchema,
   makeHintInputFingerprint,
   generateLeetCodeHintsRequestSchema,
   generateLeetCodeHintsResponseSchema,
   cancelLeetCodeHintsRequestSchema,
   cancelLeetCodeHintsResponseSchema,
-  type HintBatch,
+  type CodeHint,
+  type CodeHintTurn,
+  type CodeHintInput,
   type HintProblem,
   type HintErrorCode,
   type GenerateLeetCodeHintsRequest,

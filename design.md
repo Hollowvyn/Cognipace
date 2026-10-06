@@ -209,18 +209,22 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   suggesting an editor or saved notes.
 - Keep Solve's Help shelf as one compact YouTube and Lightbulb AI action row.
   Show no empty hint card while idle. AI hints start only on explicit activation,
-  show a busy state, then show the first pointer when the batch is ready.
-- Reveal one additional pointer at a time while keeping earlier pointers
-  visible. Show the actual revealed/total count and an honest final state using
-  the actual batch size, even when it contains fewer than three pointers.
+  show a busy state, then show the first code-aware hint when ready.
+- Get next hint reads the complete current editor again and requests one new
+  hint, keeping earlier hints visible during preparation, generation and errors.
+  Show successful hints used out of three and label each Light, Medium or Heavy.
+  Strength adapts to progress independently of the count. Show an honest final
+  state after three successful hints; failures do not consume a slot. Explain
+  that hints use the code snapshot at request time.
   Folding and reopening the hint block does not regenerate it.
 - Render pointers as plain inert text that wraps at narrow widths. Keep busy,
   controlled error, Retry, and Settings states compact, readable, and keyboard
   accessible with visible focus. Retry is explicit; a missing connection leads
   to Settings without starting generation.
-- Own the hint session above visual modes. Preserve its batch, reveal count,
+- Own the hint session above visual modes. Preserve its history, count,
   and disclosure through tab switches, collapse/dock/restore, accepted or failed
-  saves, and rating updates. Keep review controls immediate during generation.
+  saves, rating updates and ordinary code edits. Keep review controls immediate
+  during generation.
 - Use Option A inside the expanded overlay: a concise summary, Approach /5,
   Efficiency /5, and Code Style /5. Do not add an overall average or recall
   rating to the report.

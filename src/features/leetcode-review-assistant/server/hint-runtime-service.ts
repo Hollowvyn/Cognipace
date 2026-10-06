@@ -3,6 +3,7 @@ import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
 import type { Db } from '@/platform/db'
 
 import {
+  generateLeetCodeHintsRequestSchema,
   type GenerateLeetCodeHintsRequest,
   type GenerateLeetCodeHintsResponse,
 } from '../api/code-hint-contracts'
@@ -25,6 +26,16 @@ export async function generateLeetCodeHintsInBackground(
   })
 
   try {
+    const parsed = generateLeetCodeHintsRequestSchema.safeParse(request)
+    if (!parsed.success)
+      return {
+        status: 'error',
+        ...identity,
+        code: 'bad-request',
+        message:
+          'Hint input is incomplete or inconsistent. Retry this problem.',
+      }
+    request = parsed.data
     return await withAiDeadline(
       { timeoutMs: hintTimeoutMs, signal: externalSignal },
       async (signal): Promise<GenerateLeetCodeHintsResponse> => {
@@ -47,7 +58,11 @@ export async function generateLeetCodeHintsInBackground(
           return stale()
 
         const result = await generateCodeHints(
-          request.problem,
+          {
+            problem: request.problem,
+            snapshot: request.snapshot,
+            history: request.history,
+          },
           snapshot.config,
           signal,
         )
@@ -63,7 +78,7 @@ export async function generateLeetCodeHintsInBackground(
             message: result.message,
           }
 
-        return { status: 'ready', ...identity, batch: result.data }
+        return { status: 'ready', ...identity, hint: result.data }
       },
     )
   } catch (error) {

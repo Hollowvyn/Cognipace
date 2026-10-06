@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-05-adaptive-code-hints-design.md`](./specs/2026-10-05-adaptive-code-hints-design.md): approved replacement of problem-only hint batches with complete editor snapshots, one hint per request, adaptive strength and three successful turns; implementation and human/provider proof tracked in its plan and handoff.
+
 - [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
 
 - [`specs/2026-10-04-openrouter-provider-design.md`](./specs/2026-10-04-openrouter-provider-design.md): approved optional OpenRouter BYOK connection and host permission, suggested editable `openrouter/free`, explicit free preset, protected key storage, structured reports, and routed-model metadata; implemented with independent SPEC/QUALITY reviews, passing automated gates and production-component browser proof; live full-report/generated-code and human installed-extension proof remain pending.
@@ -72,6 +74,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-05-adaptive-code-hints.md`](./plans/2026-10-05-adaptive-code-hints.md): complete editor bridge, single-turn contracts and adaptive generation, overlay history and per-click requests, documentation and validation.
 
 - [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
 
@@ -150,6 +154,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-05-adaptive-code-hints.md`](./handoffs/2026-10-05-adaptive-code-hints.md): reviewed snapshot-bound adaptive hints, exact automated results, mocked production-component proof, and pending human editor/provider gates.
 
 - [`handoffs/2026-10-04-overlay-ai-hints.md`](./handoffs/2026-10-04-overlay-ai-hints.md): reviewed Phase 2 source, exact final/historical checks, progressive-hint fixture proof, pending human installed-extension smoke and live provider quality, and release/recovery notes.
 

@@ -5,7 +5,8 @@ import {
   cancelLeetCodeHintsResponseSchema,
   generateLeetCodeHintsRequestSchema,
   generateLeetCodeHintsResponseSchema,
-  hintBatchSchema,
+  codeHintSchema,
+  codeHintInputSchema,
   hintProblemSchema,
   makeHintInputFingerprint,
 } from './code-hint-contracts'
@@ -25,30 +26,131 @@ const request = {
   connectionRevision: '11111111-1111-4111-8111-111111111111',
   connectionProvider: 'gemini' as const,
   problem,
+  snapshot: { code: '', language: 'javascript', capturedAt: 0 },
+  history: [],
 }
 
 describe('code hint contracts', () => {
-  it('accepts a problem-only request and a single pointer', () => {
+  it('requires a complete snapshot and prior history, preserving empty code', () => {
     expect(generateLeetCodeHintsRequestSchema.parse(request)).toEqual(request)
-    const batch = { hints: ['Think about repeated lookup.'] }
-    expect(hintBatchSchema.parse(batch)).toEqual(batch)
-  })
-
-  it('trims pointers and accepts three distinct pointers up to 200 characters', () => {
+    const missing = { ...request }
+    Reflect.deleteProperty(missing, 'snapshot')
+    expect(generateLeetCodeHintsRequestSchema.safeParse(missing).success).toBe(
+      false,
+    )
     expect(
-      hintBatchSchema.parse({ hints: [' first ', 'second', 'x'.repeat(200)] }),
-    ).toEqual({ hints: ['first', 'second', 'x'.repeat(200)] })
+      codeHintSchema.parse({
+        text: ' idea ',
+        strength: 'light',
+        progress: 'initial',
+      }),
+    ).toEqual({ text: 'idea', strength: 'light', progress: 'initial' })
   })
 
   it.each([
-    { hints: [] },
-    { hints: ['a', 'b', 'c', 'd'] },
-    { hints: ['   '] },
-    { hints: ['x'.repeat(201)] },
-    { hints: [' Try a lookup. ', 'Try a lookup.'] },
-    { hints: ['a'], code: 'return answer' },
-  ])('rejects invalid pointer batches %j', (batch) => {
-    expect(hintBatchSchema.safeParse(batch).success).toBe(false)
+    { text: ' ' },
+    { text: 'x'.repeat(601) },
+    { strength: 'strong' },
+    { progress: 'done' },
+    { code: 'return answer' },
+  ])('rejects malformed single hints %j', (change) => {
+    expect(
+      codeHintSchema.safeParse({
+        text: 'idea',
+        strength: 'light',
+        progress: 'initial',
+        ...change,
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each([
+    { code: 'x'.repeat(32001) },
+    { language: ' ' },
+    { language: 'x'.repeat(81) },
+    { capturedAt: -1 },
+    { capturedAt: Infinity },
+    { extra: true },
+  ])('rejects malformed snapshots %j', (change) => {
+    expect(
+      generateLeetCodeHintsRequestSchema.safeParse({
+        ...request,
+        snapshot: { ...request.snapshot, ...change },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('accepts snapshot and hint text boundaries', () => {
+    expect(
+      codeHintInputSchema.safeParse({
+        problem,
+        snapshot: {
+          code: 'x'.repeat(32000),
+          language: 'x'.repeat(80),
+          capturedAt: 0,
+        },
+        history: [],
+      }).success,
+    ).toBe(true)
+    expect(
+      codeHintSchema.safeParse({
+        text: 'x'.repeat(600),
+        strength: 'heavy',
+        progress: 'stuck',
+      }).success,
+    ).toBe(true)
+  })
+
+  it('validates prior order, first light, unchanged escalation and duplicate hints', () => {
+    const first = {
+      snapshot: request.snapshot,
+      hint: { text: 'idea', strength: 'light', progress: 'initial' },
+    }
+    const second = {
+      snapshot: { ...request.snapshot, capturedAt: 1 },
+      hint: { text: 'targeted change', strength: 'medium', progress: 'stuck' },
+    }
+    const parse = (history: unknown[]) =>
+      codeHintInputSchema.safeParse({
+        problem,
+        snapshot: request.snapshot,
+        history,
+      }).success
+    expect(parse([first, second])).toBe(true)
+    expect(parse([first, second, second])).toBe(false)
+    expect(parse([second, first])).toBe(false)
+    expect(
+      parse([{ ...first, hint: { ...first.hint, strength: 'medium' } }]),
+    ).toBe(false)
+    expect(
+      parse([
+        first,
+        { ...second, hint: { ...second.hint, progress: 'initial' } },
+      ]),
+    ).toBe(false)
+    expect(
+      parse([
+        first,
+        {
+          ...second,
+          hint: { ...second.hint, progress: 'improved', strength: 'light' },
+        },
+      ]),
+    ).toBe(false)
+    expect(
+      parse([first, { ...second, hint: { ...second.hint, text: ' idea ' } }]),
+    ).toBe(false)
+    expect(parse([{ ...first, private: true }])).toBe(false)
+    expect(
+      parse([
+        first,
+        {
+          ...second,
+          snapshot: { ...second.snapshot, code: 'changed' },
+          hint: { ...second.hint, strength: 'light', progress: 'improved' },
+        },
+      ]),
+    ).toBe(true)
   })
 
   it.each(['code', 'diagnostics', 'auth', 'hints', 'followUps'])(
@@ -150,7 +252,15 @@ describe('code hint contracts', () => {
   it('parses strict ready and controlled-error envelopes correlated by request id', () => {
     const identity = { requestId: request.requestId }
     const responses = [
-      { status: 'ready', ...identity, batch: { hints: ['Consider lookup.'] } },
+      {
+        status: 'ready',
+        ...identity,
+        hint: {
+          text: 'Consider lookup.',
+          strength: 'light',
+          progress: 'initial',
+        },
+      },
       {
         status: 'error',
         ...identity,

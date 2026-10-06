@@ -28,7 +28,12 @@ const mocks = vi.hoisted(() => ({
         request: CancelLeetCodeHintsRequest,
       ) => Promise<CancelLeetCodeHintsResponse>
     >(),
+  snapshot: vi.fn(),
   remote: vi.fn<() => LeetCodeRemoteClient>(),
+}))
+vi.mock('@/lib/leetcode', async (original) => ({
+  ...(await original<object>()),
+  readCompleteLeetCodeEditorSnapshot: mocks.snapshot,
 }))
 vi.mock('@/features/leetcode-capture', async (original) => ({
   ...(await original<object>()),
@@ -68,18 +73,19 @@ const nextConnection: HintConnectionStatus = {
 }
 function ready(
   request: GenerateLeetCodeHintsRequest,
-  hints = [
-    'Check the pair relationship.',
-    'Consider what you need to remember.',
-    'Avoid repeating searches.',
-  ],
+  text = `Pointer ${request.history.length + 1}`,
 ): GenerateLeetCodeHintsResponse {
   return generateLeetCodeHintsResponseSchema.parse({
     status: 'ready',
     requestId: request.requestId,
-    batch: { hints },
+    hint: {
+      text,
+      strength: ['light', 'medium', 'heavy'][request.history.length],
+      progress: request.history.length ? 'stuck' : 'initial',
+    },
   })
 }
+
 function mount(
   initial = capture(),
   initialConnection: HintConnectionStatus | null = connection,
@@ -167,6 +173,11 @@ async function requestHints(hook: ReturnType<typeof mount>) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.snapshot.mockResolvedValue({
+    code: 'function solution() {}',
+    language: 'typescript',
+    capturedAt: 1,
+  })
   mocks.generate.mockImplementation((request: GenerateLeetCodeHintsRequest) =>
     Promise.resolve(ready(generateLeetCodeHintsRequestSchema.parse(request))),
   )
@@ -193,7 +204,7 @@ describe('explicit progressive hint sessions', () => {
     await waitFor(() => expect(hook.result.current.state.status).toBe('ready'))
     expect(hook.result.current.state).toMatchObject({
       isOpen: true,
-      revealedCount: 1,
+      history: [expect.anything()],
     })
     expect(mocks.generate).toHaveBeenCalledOnce()
     expect(
@@ -201,52 +212,252 @@ describe('explicit progressive hint sessions', () => {
     ).toEqual(['constraints', 'examples', 'host', 'slug', 'statement', 'title'])
     expect(hook.remote.readSubmissionResult).not.toHaveBeenCalled()
   })
-  it('reveals locally and preserves ready counts through reopen and excluded enrichment', async () => {
+  it('requests three fresh snapshots with adaptive strengths and caps extra clicks', async () => {
     const hook = mount()
     await requestHints(hook)
-    act(() => {
-      hook.result.current.revealNext()
-      hook.result.current.revealNext()
-      hook.result.current.revealNext()
-    })
-    expect(hook.result.current.state).toMatchObject({ revealedCount: 3 })
-    act(() => hook.result.current.toggle())
-    expect(hook.result.current.state.isOpen).toBe(false)
-    hook.changeCapture({
-      ...makeCompleteCapture(),
-      metadata: {
-        ...makeCompleteCapture().metadata,
-        topics: [],
-        capturedAt: 9999,
-      },
-      problemContent: {
-        ...makeCompleteCapture().problemContent,
-        hints: ['official'],
-        followUps: ['extra'],
-        contentFingerprint: 'new',
-      },
-    })
-    act(() => hook.result.current.toggle())
+    for (const count of [2, 3]) {
+      act(() => {
+        hook.result.current.revealNext()
+        hook.result.current.revealNext()
+      })
+      await waitFor(() => {
+        const state = hook.result.current.state
+        expect(state.status).toBe('ready')
+        if (state.status === 'ready') expect(state.history).toHaveLength(count)
+      })
+    }
+    act(() => hook.result.current.revealNext())
+    expect(mocks.snapshot).toHaveBeenCalledTimes(3)
+    expect(mocks.generate).toHaveBeenCalledTimes(3)
     expect(hook.result.current.state).toMatchObject({
-      status: 'ready',
-      isOpen: true,
-      revealedCount: 3,
+      history: [
+        { hint: { strength: 'light' } },
+        { hint: { strength: 'medium' } },
+        { hint: { strength: 'heavy' } },
+      ],
     })
-    expect(mocks.generate).toHaveBeenCalledOnce()
+    act(() => hook.result.current.toggle())
+    act(() => hook.result.current.toggle())
+    expect(mocks.generate).toHaveBeenCalledTimes(3)
   })
-  it('bounds extra reveals to the actual one-pointer batch', async () => {
-    mocks.generate.mockImplementation((request) =>
-      Promise.resolve(ready(request, ['One useful pointer.'])),
+  it('pins pending results to original code and captures changed code for an improved light next turn', async () => {
+    const pending = deferred<GenerateLeetCodeHintsResponse>()
+    mocks.generate.mockReturnValueOnce(pending.promise)
+    const hook = mount()
+    act(() => hook.result.current.toggle())
+    await waitFor(() => expect(mocks.generate).toHaveBeenCalledOnce())
+    const original = mocks.generate.mock.calls[0]![0]
+    mocks.snapshot.mockResolvedValue({
+      code: 'return correctAnswer',
+      language: 'python',
+      capturedAt: 2,
+    })
+    await act(async () => {
+      pending.resolve(ready(original))
+      await Promise.resolve()
+    })
+    expect(hook.result.current.state).toMatchObject({
+      history: [{ snapshot: original.snapshot }],
+    })
+    mocks.generate.mockImplementationOnce((request) =>
+      Promise.resolve({
+        status: 'ready',
+        requestId: request.requestId,
+        hint: {
+          text: 'Finish the last gap.',
+          strength: 'light',
+          progress: 'improved',
+        },
+      }),
     )
+    act(() => hook.result.current.revealNext())
+    await waitFor(() =>
+      expect(hook.result.current.state).toMatchObject({
+        status: 'ready',
+        history: [
+          expect.anything(),
+          {
+            snapshot: { code: 'return correctAnswer' },
+            hint: { strength: 'light', progress: 'improved' },
+          },
+        ],
+      }),
+    )
+    expect(mocks.generate.mock.calls[1]![0].history[0]!.snapshot).toEqual(
+      original.snapshot,
+    )
+  })
+
+  it('keeps the first hint after second-turn failure and retries with fresh capture without consuming a slot', async () => {
     const hook = mount()
     await requestHints(hook)
-    act(() => {
-      hook.result.current.revealNext()
-      hook.result.current.revealNext()
-    })
-    expect(hook.result.current.state).toMatchObject({ revealedCount: 1 })
+    mocks.snapshot.mockRejectedValueOnce(new Error('editor missing'))
+    act(() => hook.result.current.revealNext())
+    await waitFor(() =>
+      expect(hook.result.current.state).toMatchObject({
+        status: 'unavailable',
+        history: [expect.anything()],
+      }),
+    )
     expect(mocks.generate).toHaveBeenCalledOnce()
+    mocks.generate.mockRejectedValueOnce(new Error('provider failed'))
+    act(() => hook.result.current.retry())
+    await waitFor(() =>
+      expect(hook.result.current.state).toMatchObject({
+        status: 'error',
+        history: [expect.anything()],
+      }),
+    )
+    act(() => hook.result.current.retry())
+    await waitFor(() =>
+      expect(hook.result.current.state).toMatchObject({
+        status: 'ready',
+        history: [expect.anything(), expect.anything()],
+      }),
+    )
+    expect(mocks.snapshot).toHaveBeenCalledTimes(4)
+    expect(mocks.generate.mock.calls[2]![0].history).toHaveLength(1)
   })
+
+  it.each([
+    null,
+    { code: 'x'.repeat(32001), language: 'python', capturedAt: 1 },
+    { code: '', language: '', capturedAt: 1 },
+  ])(
+    'never generates without a complete valid snapshot: %j',
+    async (snapshot) => {
+      mocks.snapshot.mockResolvedValueOnce(snapshot)
+      const hook = mount()
+      act(() => hook.result.current.toggle())
+      await waitFor(() =>
+        expect(hook.result.current.state).toMatchObject({
+          status: 'unavailable',
+          history: [],
+          canRetry: true,
+        }),
+      )
+      expect(mocks.generate).not.toHaveBeenCalled()
+    },
+  )
+
+  it('rejects inconsistent provider hints without consuming the next turn', async () => {
+    const hook = mount()
+    await requestHints(hook)
+    mocks.generate.mockImplementationOnce((request) =>
+      Promise.resolve({
+        status: 'ready',
+        requestId: request.requestId,
+        hint: {
+          text: 'False improvement',
+          strength: 'light',
+          progress: 'improved',
+        },
+      }),
+    )
+    act(() => hook.result.current.revealNext())
+    await waitFor(() =>
+      expect(hook.result.current.state).toMatchObject({
+        status: 'error',
+        history: [expect.anything()],
+      }),
+    )
+    act(() => hook.result.current.retry())
+    await waitFor(() =>
+      expect(hook.result.current.state).toMatchObject({
+        status: 'ready',
+        history: [expect.anything(), expect.anything()],
+      }),
+    )
+  })
+
+  it('clears earlier revision history on stale-configuration Retry and captures before refresh resolves', async () => {
+    const hook = mount()
+    await requestHints(hook)
+    mocks.generate.mockImplementationOnce((request) =>
+      Promise.resolve({
+        status: 'error',
+        requestId: request.requestId,
+        code: 'stale-configuration',
+        message: 'Changed connection',
+      }),
+    )
+    act(() => hook.result.current.revealNext())
+    await waitFor(() => expect(hook.result.current.state.status).toBe('error'))
+    const refreshed = deferred<HintConnectionStatus | null>()
+    hook.refreshConnection.mockReturnValueOnce(refreshed.promise)
+    act(() => hook.result.current.retry())
+    await settle()
+    expect(mocks.snapshot).toHaveBeenCalledTimes(3)
+    hook.changeConnection(nextConnection)
+    expect(hook.result.current.state).toMatchObject({
+      status: 'pending',
+      history: [],
+    })
+    await act(async () => {
+      refreshed.resolve(nextConnection)
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(hook.result.current.state).toMatchObject({
+        status: 'ready',
+        history: [{ hint: { strength: 'light', progress: 'initial' } }],
+      }),
+    )
+    expect(mocks.generate.mock.calls[2]![0].history).toEqual([])
+  })
+
+  it('preserves history through ordinary editor and excluded enrichment changes without generating', async () => {
+    const hook = mount()
+    await requestHints(hook)
+    const before = hook.result.current.state
+    const previous = hook.readCapture()
+    hook.changeCapture({
+      ...previous,
+      codeSnapshot: makeCompleteCapture().codeSnapshot,
+      metadata: { ...previous.metadata!, topics: [], capturedAt: 9999 },
+      problemContent: {
+        ...previous.problemContent!,
+        hints: ['official'],
+        contentFingerprint: 'different',
+      },
+    })
+    expect(hook.result.current.state).toEqual(before)
+    expect(mocks.generate).toHaveBeenCalledOnce()
+    expect(mocks.snapshot).toHaveBeenCalledOnce()
+  })
+
+  it.each(['navigation', 'revision', 'reset'] as const)(
+    'rejects late second-turn output after %s',
+    async (change) => {
+      const hook = mount()
+      await requestHints(hook)
+      const pending = deferred<GenerateLeetCodeHintsResponse>()
+      mocks.generate.mockReturnValueOnce(pending.promise)
+      act(() => hook.result.current.revealNext())
+      await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2))
+      const request = mocks.generate.mock.calls[1]![0]
+      if (change === 'navigation')
+        hook.changeCapture({
+          ...capture(),
+          location: { ...capture().location!, slug: 'three-sum' },
+        })
+      if (change === 'revision') hook.changeConnection(nextConnection)
+      if (change === 'reset') act(() => hook.result.current.reset())
+      await act(async () => {
+        pending.resolve(ready(request))
+        await Promise.resolve()
+      })
+      expect(hook.result.current.state).toEqual({
+        status: 'idle',
+        isOpen: false,
+      })
+      expect(mocks.cancel).toHaveBeenCalledWith({
+        surface: 'content-script',
+        requestId: request.requestId,
+      })
+    },
+  )
+
   it.each(['statement', 'constraints', 'revision'] as const)(
     'clears ready on selected %s change until another explicit request',
     async (change) => {

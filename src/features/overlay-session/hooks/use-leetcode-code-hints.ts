@@ -10,15 +10,22 @@ import {
   cancelLeetCodeHintsViaRuntime,
   generateLeetCodeHintsViaRuntime,
   makeHintInputFingerprint,
-  type HintBatch,
+  codeHintSchema,
+  isCodeHintConsistent,
+  type CodeHintTurn,
   type HintErrorCode,
 } from '@/features/leetcode-review-assistant'
 import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
-import type { LeetCodeCaptureState } from '@/lib/leetcode'
+import {
+  completeCodeSnapshotSchema,
+  readCompleteLeetCodeEditorSnapshot,
+  type LeetCodeCaptureState,
+} from '@/lib/leetcode'
 
 export type OverlayHintState =
   | { status: 'idle'; isOpen: boolean }
   | {
+      history: CodeHintTurn[]
       status: 'pending'
       isOpen: boolean
       requestId: string
@@ -27,10 +34,10 @@ export type OverlayHintState =
   | {
       status: 'ready'
       isOpen: boolean
-      batch: HintBatch
-      revealedCount: number
+      history: CodeHintTurn[]
     }
   | {
+      history: CodeHintTurn[]
       status: 'unavailable'
       isOpen: boolean
       message: string
@@ -38,6 +45,7 @@ export type OverlayHintState =
       showSettings: boolean
     }
   | {
+      history: CodeHintTurn[]
       status: 'error'
       isOpen: boolean
       code: HintErrorCode
@@ -122,7 +130,7 @@ function operationScope(
   return JSON.stringify([capture, connection?.revision ?? null])
 }
 
-/** Transient, explicit problem-only hints owned by the overlay session. */
+/** Transient, explicit snapshot-bound hints owned by the overlay session. */
 export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
   const renderedCaptureScope = captureScope(options.activeSlug, options.capture)
   const scope = operationScope(renderedCaptureScope, options.connection)
@@ -171,6 +179,19 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
     const current = storedRef.current
     if (
       current.scope !== live.scope &&
+      operation?.revisingConnection &&
+      current.refreshCaptureScope === live.capture &&
+      current.state.status !== 'idle'
+    ) {
+      store({
+        ...current,
+        scope: live.scope,
+        state: { ...current.state, history: [] },
+      })
+      return
+    }
+    if (
+      current.scope !== live.scope &&
       !(
         operation?.revisingConnection &&
         current.refreshCaptureScope === live.capture
@@ -189,6 +210,12 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
       const token = current.readSyncToken()
       const live = readScope()
       let connection = current.readConnection()
+      let history: CodeHintTurn[] =
+        storedRef.current.scope === live.scope &&
+        storedRef.current.state.status !== 'idle'
+          ? storedRef.current.state.history
+          : []
+      if (history.length >= 3) return
       const unavailable = (
         message: string,
         showSettings: boolean,
@@ -197,6 +224,7 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
         store({
           scope: readScope().scope,
           state: {
+            history,
             status: 'unavailable',
             isOpen: true,
             message,
@@ -248,6 +276,14 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
       }
       const publish = (state: OverlayHintState) => {
         if (!isCurrent()) return
+        if (
+          operation.revisingConnection &&
+          connection?.revision !== current.readConnection()?.revision &&
+          state.status !== 'idle'
+        ) {
+          history = []
+          state = { ...state, history }
+        }
         store({
           scope: readScope().scope,
           state,
@@ -257,6 +293,7 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
         })
       }
       publish({
+        history,
         status: 'pending',
         isOpen: true,
         requestId: operation.requestId,
@@ -265,15 +302,29 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
       void withAiDeadline(
         { timeoutMs: 50_000, signal: operation.controller.signal },
         async (signal) => {
+          // Capture at activation, before a metadata refresh can wait on background work.
+          const snapshotRead = withAiDeadline(
+            { timeoutMs: 15_000, signal },
+            (captureSignal) =>
+              readCompleteLeetCodeEditorSnapshot(
+                initialCapture.location!,
+                captureSignal,
+              ),
+          )
+            .then((value) => completeCodeSnapshotSchema.safeParse(value))
+            .catch(() => null)
           if (refreshConnection) {
             await current.refreshConnection()
             signal.throwIfAborted()
             if (!isCurrent()) return
+            const previousRevision = connection?.revision
             connection = current.readConnection()
+            if (previousRevision !== connection?.revision) history = []
             operation.revisingConnection = false
             operation.scope = readScope().scope
             if (!connection?.available) {
               publish({
+                history,
                 status: 'unavailable',
                 isOpen: true,
                 message:
@@ -284,21 +335,43 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
               return
             }
             publish({
+              history,
               status: 'pending',
               isOpen: true,
               requestId: operation.requestId,
               phase: 'preparation',
             })
           }
-          const prepared = await prepareLeetCodeHintContext(
-            initialCapture,
-            createLeetCodeCaptureRemoteClient(),
-            signal,
-            refreshCapture,
+          const [prepared, snapshotResult] = await withAiDeadline(
+            { timeoutMs: 15_000, signal },
+            async (preparationSignal) =>
+              Promise.all([
+                prepareLeetCodeHintContext(
+                  initialCapture,
+                  createLeetCodeCaptureRemoteClient(),
+                  preparationSignal,
+                  refreshCapture,
+                ),
+                snapshotRead,
+              ]),
           )
+          if (!snapshotResult?.success) {
+            publish({
+              history,
+              status: 'unavailable',
+              isOpen: true,
+              message:
+                'Could not read the complete editor code and language. Retry.',
+              canRetry: true,
+              showSettings: false,
+            })
+            return
+          }
+          const snapshot = snapshotResult.data
           if (signal.aborted || !isCurrent()) return
           if (prepared.status === 'unavailable') {
             publish({
+              history,
               status: 'unavailable',
               isOpen: true,
               message: prepared.message,
@@ -313,6 +386,11 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
           )
             return
           if (!current.publishCapture(prepared.capture, token)) return
+          if (
+            selectedIdentity(prepared.capture) !==
+            selectedIdentity(initialCapture)
+          )
+            history = []
           // Adopt our accepted publication synchronously before a React effect sees fresh public input.
           const published = readScope()
           operation.captureScope = published.capture
@@ -329,8 +407,11 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
             connectionRevision: connection.revision,
             connectionProvider: connection.provider,
             problem: prepared.problem,
+            snapshot,
+            history,
           }
           publish({
+            history,
             status: 'pending',
             isOpen: true,
             requestId: operation.requestId,
@@ -342,15 +423,18 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
           if (signal.aborted || !isCurrent()) return
           if (response.requestId !== operation.requestId)
             throw new Error('Hint response identity mismatch.')
-          if (response.status === 'ready')
+          if (response.status === 'ready') {
+            const hint = codeHintSchema.parse(response.hint)
+            if (!isCodeHintConsistent(request, hint))
+              throw new Error('Inconsistent hint response.')
             publish({
               status: 'ready',
               isOpen: true,
-              batch: response.batch,
-              revealedCount: 1,
+              history: [...history, { snapshot, hint }],
             })
-          else
+          } else
             publish({
+              history,
               status: 'error',
               isOpen: true,
               code: response.code,
@@ -364,6 +448,7 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
           if (!isCurrent()) return
           const code = error instanceof AiDeadlineError ? error.code : 'unknown'
           publish({
+            history,
             status: 'error',
             isOpen: true,
             code,
@@ -411,26 +496,15 @@ export function useLeetCodeCodeHints(options: UseLeetCodeCodeHintsOptions) {
     })
   }, [readScope, run, store])
   const revealNext = useCallback(() => {
-    setStored((previous) => {
-      if (
-        previous.scope !== readScope().scope ||
-        previous.state.status !== 'ready'
-      )
-        return previous
-      const next = {
-        ...previous,
-        state: {
-          ...previous.state,
-          revealedCount: Math.min(
-            previous.state.revealedCount + 1,
-            previous.state.batch.hints.length,
-          ),
-        },
-      }
-      storedRef.current = next
-      return next
-    })
-  }, [readScope])
+    const current = storedRef.current
+    if (
+      current.scope !== readScope().scope ||
+      current.state.status !== 'ready' ||
+      current.state.history.length >= 3
+    )
+      return
+    run(false)
+  }, [readScope, run])
   const retry = useCallback(() => {
     const current = storedRef.current.state
     if (
