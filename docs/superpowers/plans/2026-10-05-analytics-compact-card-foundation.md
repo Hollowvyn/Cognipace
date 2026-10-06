@@ -10,7 +10,7 @@
 
 ---
 
-Status: written for execution after the date/runtime and presentation phases. Root owns commits and independent reviews. Approved reference: `docs/superpowers/specs/assets/2026-10-05-analytics-range-summary-approved.html`.
+Status: Task 1 implemented and independently reviewed; Task 2 follows directly. Root owns commits and independent reviews. Approved reference: `docs/superpowers/specs/assets/2026-10-05-analytics-range-summary-approved.html`.
 
 ## Task 1: Fixed Panel Geometry And Feature Paging
 
@@ -24,7 +24,7 @@ Status: written for execution after the date/runtime and presentation phases. Ro
 - Create: `src/features/analytics/components/analytics-exact-table.test.tsx`
 - Modify: `src/styles/analytics.css`
 
-- [ ] **Step 1: Add failing shell and paging tests.**
+- [x] **Step 1: Add failing shell and paging tests.**
 
 Compact panel receives mode (`overview`, `details`, `goals`, `selection`), header action, optional hero, body and footer. Test stable shell identity and semantic heading/description across mode changes, measured body callback after ResizeObserver notifications, and unavailable/skeleton content within the same tracks. Preserve old panel semantics while old consumers remain.
 
@@ -44,7 +44,7 @@ interface AnalyticsExactField<Row> {
 }
 ```
 
-- [ ] **Step 2: Run RED and implement the shell.**
+- [x] **Step 2: Run RED and implement the shell.**
 
 Run `rtk npm run test -- src/features/analytics/components/analytics-chart-panel.test.tsx src/features/analytics/components/analytics-card-controls.test.tsx src/features/analytics/components/analytics-exact-table.test.tsx`. Expected: new exports/compact assertions fail before implementation.
 
@@ -75,11 +75,11 @@ Apply stacked `512px` geometry with `72px / 64px / flex / 64px` tracks when the 
 
 Observe the always-mounted body element. Return real remaining width/height to child render callbacks, with deterministic initial dimensions for tests/SSR. Disconnect observers on unmount. Width observation remains active while plots are hidden. Keep the header Details/Overview button and footer actions in reserved tracks. Use semantic tabs/pressed buttons with independent accessible names; restore focus after closing a goal/selection surface.
 
-- [ ] **Step 3: Implement controlled exact field groups and pagination.**
+- [x] **Step 3: Implement controlled exact field groups and pagination.**
 
 Each field group shows only the columns that fit alongside the full row label. All source fields must appear in at least one group; do not discard evidence to reduce columns. Pager lives in the shell footer, not inside table body. Use `Math.max(0, Math.min(page, Math.ceil(rows.length / pageSize) - 1))` for the rendered page and an explicit reset/clamp when inputs change. Empty arrays use a compact unavailable state. Native Previous/Next buttons expose count and disabled state.
 
-- [ ] **Step 4: Run GREEN, format, review, and commit.**
+- [x] **Step 4: Run GREEN, format, review, and commit.**
 
 Run the three new/focused suites, then `rtk npm run typecheck`. Expected: all pass with legacy screen still rendering. Fresh specification then quality review. Root commits `feat: add fixed analytics card geometry and paging`.
 
@@ -118,3 +118,22 @@ Run focused chart/model/target/editor suites and typecheck. Expected: all pass. 
 - [ ] Format touched files and run focused tests before required full `rtk npm run lint`, `rtk npm run check`, `rtk npm run build` at page integration.
 - [ ] Record exact commands and remaining human extension proof. A fixed shell without migrated cards is not the finished Analytics page.
 - [ ] Continue directly to card adapters and assembly already authorized by the user.
+
+## Task 1 Execution Record
+
+The compact panel retains the legacy API and adds `compact`, `mode`, `headerAction`, `hero`, and geometry-rendered body/footer content. The body remains mounted and observed in every mode. Feature controls expose native pressed buttons, a footer pager, and focus return after the mode-change commit. Exact tables use wrapping field navigation rather than a clipped select label; all supplied fields remain reachable. Paging resets on row identity/order, width, size, or an explicit `resetKey`; equivalent newly derived row arrays retain their page. Adapters must lower the geometry's maximum page size for long content and supply the same size to the table and footer pager.
+
+RED failed on missing exports/compact assertions, then on the wrapping field navigation and equivalent-row regressions. GREEN passed 40 tests across the three focused suites and the existing screen suite. Pinned typecheck, touched ESLint, Prettier, and whitespace checks passed. Independent specification and quality reviews passed; quality validation included architecture boundaries with 56 tests passed.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/analytics-chart-panel.test.tsx src/features/analytics/components/analytics-card-controls.test.tsx src/features/analytics/components/analytics-exact-table.test.tsx src/features/analytics/components/analytics-screen.test.tsx
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/analytics-chart-panel.test.tsx src/features/analytics/components/analytics-card-controls.test.tsx src/features/analytics/components/analytics-exact-table.test.tsx src/features/analytics/components/analytics-screen.test.tsx src/testing/architecture-boundaries.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx eslint src/features/analytics/components/analytics-chart-panel.tsx src/features/analytics/components/analytics-chart-panel.test.tsx src/features/analytics/components/analytics-card-controls.tsx src/features/analytics/components/analytics-card-controls.test.tsx src/features/analytics/components/analytics-exact-table.tsx src/features/analytics/components/analytics-exact-table.test.tsx
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --check src/features/analytics/components/analytics-chart-panel.tsx src/features/analytics/components/analytics-chart-panel.test.tsx src/features/analytics/components/analytics-card-controls.tsx src/features/analytics/components/analytics-card-controls.test.tsx src/features/analytics/components/analytics-exact-table.tsx src/features/analytics/components/analytics-exact-table.test.tsx src/styles/analytics.css
+rtk git diff --check
+```
+
+Root's outside-repository Vite preview imports the actual panel, controls, exact table, production styles, and dashboard typography. CUA verified 464px Overview/Details shells at a 1,232px page and the exact 736px two-column boundary; a 735px page stacks into 512px cards. At a 320px viewport the 296px card and 256px body retain full labels, three bounded rows, reachable field groups, distinct zero/unavailable values, and a separate footer pager without horizontal overflow. Goals retains the same 512px height and Close restores header-action focus. This foundation proof does not claim all-card or installed-extension validation.
+
+Full `npm run lint`, `npm run check`, and `npm run build` are deferred to page integration as planned; their preceding presentation-phase checkpoint already passed. Full production card proof and human installed-extension happy-path/edge-case smoke remain pending. `npm run db:generate` and `npm run zip` are not applicable to this shell phase because it changes neither persistence nor packaging.
