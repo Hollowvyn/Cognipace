@@ -1,4 +1,7 @@
-import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
+import {
+  createSerializedAnalyticsSummary,
+  createTopicRatingCountMatrix,
+} from '@/testing/analytics-fixtures'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -142,6 +145,12 @@ describe('Phase 2 historical analytics views', () => {
       goodEasy: index === 0 ? 0 : index === 1 ? 179 : 200,
       validRatings: 200,
       distinctProblems: 3,
+      ratingCountsByDifficulty: createTopicRatingCountMatrix({
+        unknown: {
+          again: index === 0 ? 200 : index === 1 ? 21 : 0,
+          good: index === 0 ? 0 : index === 1 ? 179 : 200,
+        },
+      }),
       evidence: 'Measured' as const,
     }))
     const { rerender } = render(
@@ -281,6 +290,9 @@ describe('Phase 2 historical analytics views', () => {
                 goodEasy: value * 10,
                 validRatings: 10,
                 distinctProblems: 3,
+                ratingCountsByDifficulty: createTopicRatingCountMatrix({
+                  unknown: { again: (1 - value) * 10, good: value * 10 },
+                }),
                 evidence: 'Measured',
               },
             ],

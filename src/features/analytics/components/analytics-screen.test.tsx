@@ -9,7 +9,10 @@ import type {
   ReadinessFailure,
   SerializedAnalyticsSummary,
 } from '@/features/analytics/api/analytics-contracts'
-import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
+import {
+  createSerializedAnalyticsSummary,
+  createTopicRatingCountMatrix,
+} from '@/testing/analytics-fixtures'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 import { metricDefinitions } from '../domain/metric-definitions'
 import { buildAnalyticsTimeFrame } from '../domain/analytics-time'
@@ -425,6 +428,9 @@ describe('AnalyticsScreen', () => {
               goodEasy: 6,
               validRatings: 10,
               distinctProblems: 3,
+              ratingCountsByDifficulty: createTopicRatingCountMatrix({
+                unknown: { again: 4, good: 6 },
+              }),
               evidence: 'Measured',
             },
           ],

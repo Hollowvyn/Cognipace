@@ -6,6 +6,22 @@ import {
 import { buildAnalyticsBucketsFromTimeFrame } from '@/features/analytics/domain/analytics-range-policy'
 import { buildAnalyticsBacklogTimeFrame } from '@/features/analytics/domain/analytics-history-window'
 import { normalizeFsrsSchedulingOptions } from '@/lib/fsrs'
+import type { PerformanceCountMatrix } from '@/features/analytics/domain/performance-presentation'
+
+export function createTopicRatingCountMatrix(
+  counts: Partial<{
+    [Difficulty in keyof PerformanceCountMatrix]: Partial<
+      PerformanceCountMatrix[Difficulty]
+    >
+  }> = {},
+): PerformanceCountMatrix {
+  return {
+    easy: { again: 0, hard: 0, good: 0, easy: 0, ...counts.easy },
+    medium: { again: 0, hard: 0, good: 0, easy: 0, ...counts.medium },
+    hard: { again: 0, hard: 0, good: 0, easy: 0, ...counts.hard },
+    unknown: { again: 0, hard: 0, good: 0, easy: 0, ...counts.unknown },
+  }
+}
 
 export const analyticsChartPointFixtures = {
   practiceRhythm: [

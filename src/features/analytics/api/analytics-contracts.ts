@@ -683,15 +683,68 @@ export const ratingsMixRowSchema = historicalRowBaseSchema.extend({
   evidence: z.enum(['measured', 'not-measured']),
 })
 
-export const topicPerformanceRowSchema = z.object({
-  id: z.string().min(1),
-  topic: z.string().min(1),
-  reviewSuccess: percentageSchema,
-  goodEasy: countSchema,
-  validRatings: countSchema,
-  distinctProblems: countSchema,
-  evidence: z.literal('Measured'),
-})
+const topicRatingCountsSchema = z
+  .object({
+    again: countSchema,
+    hard: countSchema,
+    good: countSchema,
+    easy: countSchema,
+  })
+  .strict()
+
+export const topicPerformanceRowSchema = z
+  .object({
+    id: z.string().min(1),
+    topic: z.string().min(1),
+    reviewSuccess: percentageSchema,
+    goodEasy: countSchema,
+    validRatings: countSchema,
+    distinctProblems: countSchema,
+    ratingCountsByDifficulty: z
+      .object({
+        easy: topicRatingCountsSchema,
+        medium: topicRatingCountsSchema,
+        hard: topicRatingCountsSchema,
+        unknown: topicRatingCountsSchema,
+      })
+      .strict(),
+    evidence: z.literal('Measured'),
+  })
+  .superRefine((row, context) => {
+    const counts = Object.values(row.ratingCountsByDifficulty)
+    const validRatings = counts.reduce(
+      (total, difficulty) =>
+        total +
+        difficulty.again +
+        difficulty.hard +
+        difficulty.good +
+        difficulty.easy,
+      0,
+    )
+    const goodEasy = counts.reduce(
+      (total, difficulty) => total + difficulty.good + difficulty.easy,
+      0,
+    )
+    if (validRatings !== row.validRatings)
+      context.addIssue({
+        code: 'custom',
+        message: 'Joint rating counts must equal valid ratings.',
+        path: ['validRatings'],
+      })
+    if (goodEasy !== row.goodEasy)
+      context.addIssue({
+        code: 'custom',
+        message: 'Joint Good and Easy counts must equal Good + Easy.',
+        path: ['goodEasy'],
+      })
+    if (row.reviewSuccess !== row.goodEasy / row.validRatings)
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Review Success must equal Good + Easy divided by valid ratings.',
+        path: ['reviewSuccess'],
+      })
+  })
 
 export const lowEvidenceTopicRowSchema = z.object({
   topic: z.string().min(1),

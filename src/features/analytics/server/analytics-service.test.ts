@@ -23,6 +23,7 @@ import {
 
 import { updateSettings } from '@/features/settings/server/settings-service'
 import { analyticsSummarySchema } from '../api/analytics-contracts'
+import { createTopicRatingCountMatrix } from '@/testing/analytics-fixtures'
 import { calculateAnalyticsReadiness } from '../domain/analytics-readiness'
 import { getAnalyticsSummary } from './analytics-service'
 
@@ -837,6 +838,10 @@ describe('getAnalyticsSummary dashboard views', () => {
     }
 
     const postAsOf = new Date('2026-01-31T13:00:00.000Z')
+    await handle.db
+      .update(problems)
+      .set({ difficulty: 'hard' })
+      .where(eq(problems.slug, 'post-as-of-graphs-1'))
     await handle.db.insert(reviewAttempts).values({
       id: 'post-as-of-ratings-mix-review',
       problemSlug: 'post-as-of-graphs-1',
@@ -868,8 +873,22 @@ describe('getAnalyticsSummary dashboard views', () => {
         goodEasy: 72,
         validRatings: 72,
         distinctProblems: 3,
+        ratingCountsByDifficulty: createTopicRatingCountMatrix({
+          medium: { good: 48 },
+          hard: { good: 24 },
+        }),
       }),
     ])
+    expect(
+      analyticsSummarySchema.parse({
+        ...summary,
+        observedRatingQuality: {
+          value: summary.observedRatingQuality,
+          sampleSize: summary.observedRatingSampleSize,
+          lowSample: summary.lowSample,
+        },
+      }).views.topicPerformance.rows,
+    ).toEqual(summary.views.topicPerformance.rows)
   })
 
   it('keeps never-reviewed cards in tracked and workload metrics, not fragile knowledge', async () => {

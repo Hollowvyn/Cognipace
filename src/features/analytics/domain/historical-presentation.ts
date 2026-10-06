@@ -44,6 +44,10 @@ import type { CurrentStateAnalyticsViews } from './current-state-presentation'
 import type { WorkloadAnalyticsViews } from './workload-presentation'
 import { buildAnalyticsHistoryTimeFrame } from './analytics-history-frame'
 import {
+  aggregatePerformance,
+  type PerformanceCountMatrix,
+} from './performance-presentation'
+import {
   buildRepeatReviewPairs,
   selectFirstRecordedAttempts,
   selectLaterRecordedAttempts,
@@ -220,6 +224,7 @@ export interface TopicPerformanceRow {
   goodEasy: number
   validRatings: number
   distinctProblems: number
+  ratingCountsByDifficulty: PerformanceCountMatrix
   evidence: 'Measured'
 }
 
@@ -675,6 +680,10 @@ function buildTopicPerformance(
       normalizedTopic: string
       goodEasy: number
       validRatings: number
+      ratingCountsByDifficulty: Record<
+        ProblemDifficulty,
+        Record<ReviewRating, number>
+      >
       problems: Set<string>
     }
   >()
@@ -693,9 +702,18 @@ function buildTopicPerformance(
         normalizedTopic: label.normalizedTopic,
         goodEasy: 0,
         validRatings: 0,
+        ratingCountsByDifficulty: {
+          easy: { again: 0, hard: 0, good: 0, easy: 0 },
+          medium: { again: 0, hard: 0, good: 0, easy: 0 },
+          hard: { again: 0, hard: 0, good: 0, easy: 0 },
+          unknown: { again: 0, hard: 0, good: 0, easy: 0 },
+        },
         problems: new Set<string>(),
       }
       entry.validRatings += 1
+      entry.ratingCountsByDifficulty[event.problemDifficulty ?? 'unknown'][
+        event.rating
+      ] += 1
       if (event.rating === 'good' || event.rating === 'easy')
         entry.goodEasy += 1
       entry.problems.add(event.problemSlug)
@@ -707,12 +725,13 @@ function buildTopicPerformance(
     ...entry,
     distinctProblems: entry.problems.size,
     reviewSuccess: entry.goodEasy / entry.validRatings,
+    weightedScore: aggregatePerformance(entry.ratingCountsByDifficulty).score!,
   }))
   const qualifying = entries
     .filter((entry) => entry.validRatings >= 10 && entry.distinctProblems >= 3)
     .sort(
       (left, right) =>
-        left.reviewSuccess - right.reviewSuccess ||
+        left.weightedScore - right.weightedScore ||
         right.validRatings - left.validRatings ||
         left.normalizedTopic.localeCompare(right.normalizedTopic),
     )
@@ -730,6 +749,7 @@ function buildTopicPerformance(
       goodEasy: entry.goodEasy,
       validRatings: entry.validRatings,
       distinctProblems: entry.distinctProblems,
+      ratingCountsByDifficulty: entry.ratingCountsByDifficulty,
       evidence: 'Measured',
     })),
     strongerQualifyingTopics: 0,

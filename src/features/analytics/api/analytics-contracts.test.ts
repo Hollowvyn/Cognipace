@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   analyticsChartPointFixtures,
   createSerializedAnalyticsSummary,
+  createTopicRatingCountMatrix,
 } from '@/testing/analytics-fixtures'
 
 import {
@@ -15,6 +16,7 @@ import {
   hardAgainSummarySchema,
   practiceRhythmPointSchema,
   ratingsMixPointSchema,
+  topicPerformanceRowSchema,
   type AnalyticsReadiness,
   type SerializedAnalyticsSummary,
 } from './analytics-contracts'
@@ -528,6 +530,9 @@ it('accepts all qualifying topics while keeping low-evidence diagnostics bounded
     goodEasy: 0,
     validRatings: 10,
     distinctProblems: 3,
+    ratingCountsByDifficulty: createTopicRatingCountMatrix({
+      unknown: { again: 10 },
+    }),
     evidence: 'Measured' as const,
   }
   const topicPerformance = {
@@ -554,6 +559,157 @@ it('accepts all qualifying topics while keeping low-evidence diagnostics bounded
       views: { ...validSummary.views, topicPerformance },
     }).success,
   ).toBe(false)
+})
+
+describe('topic joint rating evidence contract', () => {
+  const difficulties = ['easy', 'medium', 'hard', 'unknown'] as const
+  const ratings = ['again', 'hard', 'good', 'easy'] as const
+  const cells = difficulties.flatMap((difficulty) =>
+    ratings.map((rating) => ({ difficulty, rating })),
+  )
+  const topicRow = () => ({
+    id: 'graphs',
+    topic: 'Graphs',
+    reviewSuccess: 0.5,
+    goodEasy: 8,
+    validRatings: 16,
+    distinctProblems: 4,
+    evidence: 'Measured',
+    ratingCountsByDifficulty: createTopicRatingCountMatrix(
+      Object.fromEntries(
+        difficulties.map((difficulty) => [
+          difficulty,
+          { again: 1, hard: 1, good: 1, easy: 1 },
+        ]),
+      ),
+    ),
+  })
+
+  it('preserves all sixteen joint counts and the reconciled raw fields', () => {
+    expect(topicPerformanceRowSchema.parse(topicRow())).toEqual(topicRow())
+  })
+
+  it('requires the joint matrix', () => {
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...topicRow(),
+        ratingCountsByDifficulty: undefined,
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each(cells)('rejects negative $difficulty/$rating counts', (cell) => {
+    const row = topicRow()
+    row.ratingCountsByDifficulty = {
+      ...row.ratingCountsByDifficulty,
+      [cell.difficulty]: {
+        ...row.ratingCountsByDifficulty[cell.difficulty],
+        [cell.rating]: -1,
+      },
+    }
+    expect(topicPerformanceRowSchema.safeParse(row).success).toBe(false)
+  })
+
+  it.each(cells)('rejects fractional $difficulty/$rating counts', (cell) => {
+    const row = topicRow()
+    row.ratingCountsByDifficulty = {
+      ...row.ratingCountsByDifficulty,
+      [cell.difficulty]: {
+        ...row.ratingCountsByDifficulty[cell.difficulty],
+        [cell.rating]: 1.5,
+      },
+    }
+    expect(topicPerformanceRowSchema.safeParse(row).success).toBe(false)
+  })
+
+  it.each(cells)('requires the $difficulty/$rating cell', (cell) => {
+    const row = topicRow()
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...row,
+        ratingCountsByDifficulty: {
+          ...row.ratingCountsByDifficulty,
+          [cell.difficulty]: {
+            ...row.ratingCountsByDifficulty[cell.difficulty],
+            [cell.rating]: undefined,
+          },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each(difficulties)('requires the %s difficulty', (difficulty) => {
+    const row = topicRow()
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...row,
+        ratingCountsByDifficulty: {
+          ...row.ratingCountsByDifficulty,
+          [difficulty]: undefined,
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each(difficulties)('rejects additional %s rating cells', (difficulty) => {
+    const row = topicRow()
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...row,
+        ratingCountsByDifficulty: {
+          ...row.ratingCountsByDifficulty,
+          [difficulty]: {
+            ...row.ratingCountsByDifficulty[difficulty],
+            other: 0,
+          },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects additional difficulty cells', () => {
+    const row = topicRow()
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...row,
+        ratingCountsByDifficulty: {
+          ...row.ratingCountsByDifficulty,
+          other: { again: 0, hard: 0, good: 0, easy: 0 },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each([
+    {
+      overrides: { validRatings: 17, reviewSuccess: 8 / 17 },
+      path: 'validRatings',
+    },
+    {
+      overrides: { goodEasy: 9, reviewSuccess: 9 / 16 },
+      path: 'goodEasy',
+    },
+    { overrides: { reviewSuccess: 0.49 }, path: 'reviewSuccess' },
+  ])('rejects an inconsistent $path independently', ({ overrides, path }) => {
+    const result = topicPerformanceRowSchema.safeParse({
+      ...topicRow(),
+      ...overrides,
+    })
+    expect(result.success).toBe(false)
+    if (!result.success)
+      expect(result.error.issues.map((issue) => issue.path)).toEqual([[path]])
+  })
+
+  it('rejects zero raw counts paired with populated joint evidence', () => {
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...topicRow(),
+        validRatings: 0,
+        goodEasy: 0,
+        reviewSuccess: 0,
+      }).success,
+    ).toBe(false)
+  })
 })
 
 describe('analyticsSummaryRequestSchema', () => {

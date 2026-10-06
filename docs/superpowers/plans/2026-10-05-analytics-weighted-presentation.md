@@ -10,7 +10,7 @@
 
 ---
 
-Status: Task 1 implemented and independently reviewed; Tasks 2 and 3 follow. The approved design is `docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md`; the final source is `assets/2026-10-05-analytics-range-summary-approved.html`. Root owns commits and independent reviews.
+Status: Tasks 1 and 2 implemented and independently reviewed; Task 3 follows. The approved design is `docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md`; the final source is `assets/2026-10-05-analytics-range-summary-approved.html`. Root owns commits and independent reviews.
 
 ## Task 1: Shared Weighted And Cumulative Models
 
@@ -107,17 +107,17 @@ Run all three new test files together. Expected: all pass. Format only those fil
 - Modify: `src/features/analytics/api/analytics-contracts.test.ts`
 - Modify: `src/testing/analytics-fixtures.ts` and impacted topic fixtures.
 
-- [ ] **Step 1: Write failing joint-count, ordering, and conservation tests.**
+- [x] **Step 1: Write failing joint-count, ordering, and conservation tests.**
 
 Add `ratingCountsByDifficulty` to `TopicPerformanceRow`, exactly four difficulty keys × four rating keys, each a nonnegative integer. Existing `reviewSuccess`, `goodEasy`, valid count and direct membership fields remain. Tests cover direct topic deduplication/normalization, overlapping memberships, Unknown influence, current difficulty, invalid exclusion, >=10 valid ratings and >=3 distinct problems eligibility, and sorting by unrounded weighted score, then count descending, then name. Do not roll up ancestors or truncate qualifying rows.
 
 Add schema tests that reject negative/fractional/missing cells, sum not equal to valid ratings, Good/Easy cells not equal to goodEasy, and `reviewSuccess !== goodEasy/validRatings`. Accepted matrices conserve all counts.
 
-- [ ] **Step 2: Run RED, populate the matrix and sort through the shared helper.**
+- [x] **Step 2: Run RED, populate the matrix and sort through the shared helper.**
 
 Run `rtk npm run test -- src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/api/analytics-contracts.test.ts`. Expected: new matrix/order assertions fail. Increment the current difficulty/rating cell in the existing direct-topic producer after validity and selected-window filtering. Use `aggregatePerformance(row.ratingCountsByDifficulty).score` to sort; preserve existing raw rating success fields and eligibility.
 
-- [ ] **Step 3: Run GREEN, review, and commit.**
+- [x] **Step 3: Run GREEN, review, and commit.**
 
 Run the same suites plus service tests to prove validated message production. Expected: all pass. Fresh specification then quality review. Root commits `feat: weight topic performance by question difficulty`.
 
@@ -175,3 +175,22 @@ rtk git diff --check
 ```
 
 Full `npm run lint`, `npm run check` and `npm run build` are deferred to the integration checkpoint; this task adds unwired pure models. Required human extension smoke and production responsive proof remain pending until the compact composition is implemented. No database generation is needed because persisted schema is unchanged. Continue directly to topic joint evidence and trend geometry.
+
+## Task 2 Execution Record
+
+The producer now supplies the strict sixteen-cell difficulty/rating matrix for every qualifying direct topic. Ordering uses the shared unrounded Performance score, with the existing count/name tie breakers. Original raw rates, membership normalization, overlapping topics, eligibility and complete qualifying lists remain available. The transport validates cell presence/type and reconciles both counts and the raw rate. Narrow existing fixtures were updated; the compact Topic UI follows in the adapter phase.
+
+RED recorded 63 contract and five historical assertion failures before implementation. Final focused GREEN passed 279 tests across five suites. The specification review passed; independent quality review passed 295 tests including architecture. Quality review identified masked conservation-test failures; the corrected cases recompute the raw rate and require a single issue at the relevant count path. The patched contract suite passed 177 tests independently for root and quality review. Typecheck, eight-file ESLint, Prettier and whitespace checks passed.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/api/analytics-contracts.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/server/analytics-service.test.ts src/features/analytics/components/historical-views.test.tsx src/features/analytics/components/analytics-screen.test.tsx
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/server/analytics-service.test.ts src/testing/architecture-boundaries.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/api/analytics-contracts.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec -- prettier --check src/features/analytics/domain/historical-presentation.ts src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/api/analytics-contracts.ts src/features/analytics/api/analytics-contracts.test.ts src/testing/analytics-fixtures.ts src/features/analytics/components/historical-views.test.tsx src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/server/analytics-service.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec -- eslint src/features/analytics/domain/historical-presentation.ts src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/api/analytics-contracts.ts src/features/analytics/api/analytics-contracts.test.ts src/testing/analytics-fixtures.ts src/features/analytics/components/historical-views.test.tsx src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/server/analytics-service.test.ts
+rtk git diff --check
+```
+
+Full `npm run lint`, `npm run check`, `npm run build` and repository-wide `npm run format` are deferred to page integration; focused touched-file formatting ran. No `npm run db:generate` is needed because persistence is unchanged. Actual-production fixtures were regenerated successfully with the new runtime matrix. Production UI proof and human installed-extension happy-path/edge-case smoke remain pending. Continue to natural cumulative geometry.
