@@ -201,9 +201,9 @@ return runGatedMutationQueue(async () => {
 
 ## Task 4: Freeze accepted commands in the overlay and expose safe retry
 
-- [ ] Add accepted Save/Update payload state and an explicit pending/error retry state to the existing overlay reducer. Freeze command ID/event time/effective rating after assessment resolution, capture generation and original attempt/revision, and synchronously guard double-click/watcher overlap before awaiting transport.
-- [ ] Keep accepted payload through network error or persistence pending. Retrying calls the same existing method with the exact same command. Disable rating/session restart changes while an accepted result is unresolved; show accessible retry and plain pending feedback, without Saved or next-step success feedback. After durable acknowledgement, clear pending command and retain acknowledged identity for Update.
-- [ ] Update submitted snapshots to include original attempt ID/revision/event time and generation. Do not replace that target on unrelated current-context refetch; fresh current data may show a later event and the resulting Update should conflict. Keep the draft and explicit reselect flow on stale correction. A rejected conflict can end the unresolved attempt without erasing the selected draft, enabling a deliberate refresh/new session.
+- [x] Add accepted Save/Update payload state and an explicit pending/error retry state to the existing overlay reducer. Freeze command ID/event time/effective rating after assessment resolution, capture generation and original attempt/revision, and synchronously guard double-click/watcher overlap before awaiting transport.
+- [x] Keep accepted payload through network error or persistence pending. Retrying calls the same existing method with the exact same command. Disable rating/session restart changes while an accepted result is unresolved; show accessible retry and plain pending feedback, without Saved or next-step success feedback. After durable acknowledgement, clear pending command and retain acknowledged identity for Update.
+- [x] Update submitted snapshots to include original attempt ID/revision/event time and generation. Do not replace that target on unrelated current-context refetch; fresh current data may show a later event and the resulting Update should conflict. Keep the draft and explicit reselect flow on stale correction. A rejected conflict can end the unresolved attempt without erasing the selected draft, enabling a deliberate refresh/new session.
 
 ```ts
 const accepted = {
@@ -221,9 +221,9 @@ if (result.status === 'persistence-pending') {
 // Snapshot uses result.acknowledgement identity/rating and accepted timing fields.
 ```
 
-- [ ] Preserve assessment rating locks and AI hint/session behavior. Automatic code analysis remains independent of rating policy. Build v1 accepted assessment evidence from existing decision source/intent/reason/lock values; do not add new policy outcomes.
-- [ ] Write reducer/hook/component regressions for lost acknowledgement retry, pending flush retry, double-click protection, changed Settings between attempts, exact two-tab target, pending refetch protection, stale Update preserving selected draft, and navigation/reset generation rejection. Adapt existing session fixtures to new runtime result shapes.
-- [ ] Run overlay reducer/session/action/assessment rail tests and typecheck. Obtain SPEC then QUALITY review; commit `feat(overlay): retry frozen reviews and retain exact update targets`.
+- [x] Preserve assessment rating locks and AI hint/session behavior. Automatic code analysis remains independent of rating policy. Build v1 accepted assessment evidence from existing decision source/intent/reason/lock values; do not add new policy outcomes.
+- [x] Write reducer/hook/component regressions for lost acknowledgement retry, pending flush retry, double-click protection, changed Settings between attempts, exact two-tab target, pending refetch protection, stale Update preserving selected draft, and navigation/reset generation rejection. Adapt existing session fixtures to new runtime result shapes.
+- [x] Run overlay reducer/session/action/assessment rail tests and typecheck. Obtain SPEC then QUALITY review; commit `feat(overlay): retry frozen reviews and retain exact update targets`.
 
 ## Task 5: Verify restart, compatibility and whole-phase behavior
 

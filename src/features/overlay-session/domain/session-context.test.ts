@@ -65,6 +65,8 @@ function makePractice(
       notes: null,
     },
     canOverrideLatestReview: false,
+    generation: null,
+    latestReview: null,
     ...overrides,
   }
 }

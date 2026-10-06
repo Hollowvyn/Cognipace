@@ -1,5 +1,10 @@
 import type { OverlayNextStep } from '@/features/app-shell'
 import type { AssessmentLockReason } from '@/features/assessment'
+import type {
+  PracticeSaveReviewResultRequest,
+  PracticeOverrideLastReviewResultRequest,
+  SerializedPracticeDetails,
+} from '@/features/practice'
 import type { ReviewRating } from '@/lib/fsrs'
 
 export type OverlayVisualMode = 'collapsed' | 'expanded' | 'docked'
@@ -22,7 +27,21 @@ export type OverlayFeedback = {
   message: string
 }
 
+export type OverlayAcceptedCommand = (
+  | { operation: 'save'; request: PracticeSaveReviewResultRequest }
+  | { operation: 'update'; request: PracticeOverrideLastReviewResultRequest }
+) & {
+  syncToken: number
+  lockReason: AssessmentLockReason | null
+  feedback: OverlayFeedback
+}
+
 export type OverlaySubmittedSession = {
+  reviewAttemptId: string
+  revision: number
+  reviewedAt: string
+  generation: NonNullable<SerializedPracticeDetails['generation']>
+
   rating: ReviewRating
   elapsedSeconds: number | null
   isCorrect: boolean
@@ -43,6 +62,8 @@ export type OverlaySessionState = {
   selectedRating: ReviewRating
   ratingLockReason: AssessmentLockReason | null
   submittedSession: OverlaySubmittedSession | null
+  acceptedCommand: OverlayAcceptedCommand | null
+  commandStatus: 'in-flight' | 'persistence-pending' | 'error' | null
   nextStep: OverlayNextStepState
   feedback: OverlayFeedback | null
 }
@@ -63,8 +84,9 @@ export type OverlaySessionAction =
   | { type: 'set-visual-mode'; visualMode: OverlayVisualMode }
   | { type: 'set-expanded-tab'; tab: OverlayExpandedTab }
   | { type: 'set-selected-rating'; rating: ReviewRating }
-  | { type: 'save-started' }
-  | { type: 'update-started' }
+  | { type: 'command-started'; command: OverlayAcceptedCommand }
+  | { type: 'command-pending' }
+  | { type: 'command-conflicted'; message: string }
   | {
       type: 'submit-succeeded'
       snapshot: OverlaySubmittedSession
@@ -95,6 +117,8 @@ export const initialOverlaySessionState: OverlaySessionState = {
   selectedRating: 'good',
   ratingLockReason: null,
   submittedSession: null,
+  acceptedCommand: null,
+  commandStatus: null,
   nextStep: createHiddenNextStepState(),
   feedback: null,
 }
@@ -111,26 +135,9 @@ export function overlaySessionReducer(
         selectedRating: action.selectedRating,
       }
     case 'problem-context-refreshed':
-      if (
-        state.activeProblemSlug !== action.problemSlug ||
-        state.reviewStatus === 'saving' ||
-        state.reviewStatus === 'updating' ||
-        hasSubmittedSessionChanges(state)
-      ) {
-        return state
-      }
-
-      return {
-        ...state,
-        selectedRating:
-          action.submittedSession?.rating ?? action.selectedRating,
-        submittedSession:
-          state.submittedSession && action.submittedSession
-            ? action.submittedSession
-            : state.submittedSession,
-        ratingLockReason:
-          action.submittedSession?.lockReason ?? state.ratingLockReason,
-      }
+      // Fresh Practice context belongs to the page-sync controller. It cannot
+      // retarget this session's draft or acknowledged review.
+      return state
     case 'page-changed':
       return initialOverlaySessionState
     case 'set-visual-mode':
@@ -144,7 +151,7 @@ export function overlaySessionReducer(
         expandedTab: action.tab,
       }
     case 'set-selected-rating':
-      if (state.ratingLockReason) {
+      if (state.ratingLockReason || state.acceptedCommand) {
         return state
       }
 
@@ -152,17 +159,34 @@ export function overlaySessionReducer(
         ...state,
         selectedRating: action.rating,
       })
-    case 'save-started':
+    case 'command-started':
       return {
         ...state,
-        reviewStatus: 'saving',
-        feedback: null,
+        reviewStatus:
+          action.command.operation === 'save' ? 'saving' : 'updating',
+        acceptedCommand: action.command,
+        commandStatus: 'in-flight',
+        nextStep: createHiddenNextStepState(),
+        feedback: { tone: 'neutral', message: 'Saving review...' },
       }
-    case 'update-started':
+    case 'command-pending':
       return {
         ...state,
-        reviewStatus: 'updating',
-        feedback: null,
+        visualMode: 'expanded',
+        commandStatus: 'persistence-pending',
+        feedback: {
+          tone: 'neutral',
+          message:
+            'Review persistence is pending. Retry to confirm it is saved.',
+        },
+      }
+    case 'command-conflicted':
+      return {
+        ...state,
+        acceptedCommand: null,
+        commandStatus: null,
+        reviewStatus: state.submittedSession ? 'submitted-dirty' : 'draft',
+        feedback: { tone: 'warning', message: action.message },
       }
     case 'submit-succeeded':
       return {
@@ -174,6 +198,8 @@ export function overlaySessionReducer(
         selectedRating: action.snapshot.rating,
         ratingLockReason: action.snapshot.lockReason,
         submittedSession: action.snapshot,
+        acceptedCommand: null,
+        commandStatus: null,
         nextStep: nextStepStateFromValue(action.nextStep),
         feedback: action.feedback,
       }
@@ -184,13 +210,16 @@ export function overlaySessionReducer(
         selectedRating: action.snapshot.rating,
         ratingLockReason: action.snapshot.lockReason,
         submittedSession: action.snapshot,
+        acceptedCommand: null,
+        commandStatus: null,
         nextStep: nextStepStateFromValue(action.nextStep),
         feedback: action.feedback,
       }
     case 'mutation-failed':
       return {
         ...state,
-        reviewStatus: state.submittedSession ? 'submitted-dirty' : 'draft',
+        visualMode: 'expanded',
+        commandStatus: 'error',
         feedback: {
           tone: 'danger',
           message: action.message,
@@ -220,6 +249,7 @@ export function overlaySessionReducer(
         },
       }
     case 'restart-local-session':
+      if (state.acceptedCommand) return state
       return {
         ...state,
         expandedTab: 'solve',

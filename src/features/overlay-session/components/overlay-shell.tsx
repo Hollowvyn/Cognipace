@@ -58,6 +58,7 @@ export function OverlayShell({
           onStartTimer: actions.startTimer,
           onSubmit: () => void actions.submitReview(),
           onUpdate: () => void actions.updateReview(),
+          onRetryReview: () => void actions.retryReview(),
         }}
         view={{
           aiAnalysis,

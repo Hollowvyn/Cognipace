@@ -36,6 +36,20 @@ describe('CollapsedOverlay', () => {
     expect(onExpand).not.toHaveBeenCalled()
   })
 
+  it('disables session reset while an accepted review remains unresolved', () => {
+    renderCollapsed({
+      view: {
+        elapsedSeconds: 30,
+        overlay: {
+          ...initialOverlaySessionState,
+          reviewStatus: 'saving',
+          commandStatus: 'error',
+        },
+      },
+    })
+    expect(screen.getByRole('button', { name: 'Reset Timer' })).toBeDisabled()
+  })
+
   it('expands when the collapsed surface is clicked', async () => {
     const user = userEvent.setup()
     const onExpand = vi.fn()

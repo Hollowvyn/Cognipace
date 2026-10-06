@@ -61,6 +61,7 @@ type ExpandedOverlayCommands = {
   onStartTimer: () => void
   onSubmit: () => void
   onUpdate: () => void
+  onRetryReview: () => void
 }
 
 type ExpandedOverlayProps = {
@@ -105,6 +106,7 @@ export function ExpandedOverlay({
     onStartTimer,
     onSubmit,
     onUpdate,
+    onRetryReview,
   } = commands
   const tabId = useId()
   const scrollContainers = useRef<
@@ -134,7 +136,9 @@ export function ExpandedOverlay({
 
   const submitted = Boolean(overlay.submittedSession)
   const isMutating =
-    overlay.reviewStatus === 'saving' || overlay.reviewStatus === 'updating'
+    Boolean(overlay.acceptedCommand) ||
+    overlay.reviewStatus === 'saving' ||
+    overlay.reviewStatus === 'updating'
   const aiStatus =
     aiAnalysis.status === 'ready'
       ? 'Ready'
@@ -254,6 +258,8 @@ export function ExpandedOverlay({
               onSubmit={onSubmit}
               onUpdate={onUpdate}
               reviewStatus={overlay.reviewStatus}
+              commandStatus={overlay.commandStatus}
+              onRetry={onRetryReview}
             />
             <OverlayNextCard nextStep={overlay.nextStep} />
           </div>
