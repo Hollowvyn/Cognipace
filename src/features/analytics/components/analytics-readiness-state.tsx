@@ -25,7 +25,7 @@ const readinessMessages: Record<
 
 export interface AnalyticsReadinessStateProps {
   readiness: AnalyticsReadiness
-  recommendedRange: AnalyticsRange | null
+  recommendedRange: Extract<AnalyticsRange, number> | null
   compact?: boolean
   title?: string
 }
@@ -42,7 +42,7 @@ export function AnalyticsReadinessState({
   }))
   const accessibleName = title
     ? `${title} readiness`
-    : `${readiness.requestedDays}-day analytics readiness`
+    : `${readiness.requestedDays === null ? 'All time' : `${readiness.requestedDays}-day`} analytics readiness`
 
   return (
     <InlineStatus
@@ -94,12 +94,22 @@ function EffectiveWindowCopy({ readiness }: { readiness: AnalyticsReadiness }) {
   return (
     <p className="m-0">
       Showing {readiness.effectiveBuckets} {bucketNoun(readiness)} of usable
-      history from your selected {readiness.requestedDays}-day range.
+      history from your selected{' '}
+      {readiness.requestedDays === null
+        ? 'All time range'
+        : `${readiness.requestedDays}-day range`}
+      .
     </p>
   )
 }
 
 function bucketNoun(readiness: AnalyticsReadiness): string {
+  if (readiness.grouping?.unit === 'month')
+    return readiness.grouping.step === 3 ? 'quarters' : 'months'
+  if (readiness.grouping?.unit === 'year')
+    return readiness.grouping.step === 1
+      ? 'years'
+      : `${readiness.grouping.step}-year intervals`
   if (readiness.bucketDays === 1) {
     return readiness.effectiveBuckets === 1 ? 'day' : 'days'
   }

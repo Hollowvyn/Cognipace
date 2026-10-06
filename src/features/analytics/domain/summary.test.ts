@@ -20,6 +20,18 @@ const recentDate = new Date(2026, 0, 14, 12, 0, 0)
 const oldDate = new Date(2025, 11, 14, 12, 0, 0) // > 30 days before now
 
 describe('buildObservedRatingQuality', () => {
+  it('includes retained pre-epoch ratings in All time when no explicit period is supplied', () => {
+    const attempts = Array.from({ length: 10 }, () => ({
+      rating: 'good',
+      reviewedAt: new Date('1960-01-01T12:00:00Z'),
+    }))
+    expect(buildObservedRatingQuality(attempts, now, 'all')).toMatchObject({
+      sampleSize: 10,
+      value: 1,
+      lowSample: false,
+    })
+  })
+
   it('returns lowSample when fewer than 10 ratings in the 30-day window', () => {
     const attempts = Array.from({ length: 9 }, () => ({
       rating: 'good',

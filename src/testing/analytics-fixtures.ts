@@ -4,6 +4,7 @@ import {
   buildHistoricalAnalyticsViews,
 } from '@/features/analytics/domain/historical-presentation'
 import { buildAnalyticsBucketsFromTimeFrame } from '@/features/analytics/domain/analytics-range-policy'
+import { buildAnalyticsBacklogTimeFrame } from '@/features/analytics/domain/analytics-history-window'
 import { normalizeFsrsSchedulingOptions } from '@/lib/fsrs'
 
 export const analyticsChartPointFixtures = {
@@ -116,6 +117,7 @@ export function createSerializedAnalyticsSummary(
         fsrsOptions: normalizeFsrsSchedulingOptions(),
       }).problemSolving,
       observedRecallVsFsrs: {
+        timeFrame,
         rows: [],
         scale: { domain: [0, 1], ticks: [0, 1] },
         targetRecall: 0.9,
@@ -157,6 +159,15 @@ export function createSerializedAnalyticsSummary(
       },
       memorySignals: { rows: [], totalQualifying: 0 },
       overdueBacklog: {
+        timeFrame: {
+          ...buildAnalyticsBacklogTimeFrame({
+            asOf: new Date(timeFrame.asOf),
+            timeZone: timeFrame.timeZone,
+          }),
+          requestedDays: 30,
+          grouping: { unit: 'day', step: 1 },
+          timeZoneFallback: timeFrame.timeZoneFallback,
+        },
         rows: [],
         knownDays: 0,
         withinWatchDays: 0,

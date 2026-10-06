@@ -12,6 +12,7 @@ import type {
 import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 import { metricDefinitions } from '../domain/metric-definitions'
+import { buildAnalyticsTimeFrame } from '../domain/analytics-time'
 
 import { AnalyticsScreen } from './analytics-screen'
 
@@ -87,7 +88,11 @@ function baseAnalyticsSummary(): SerializedAnalyticsSummary {
 function createAnalyticsSummary(
   overrides: Partial<SerializedAnalyticsSummary> = {},
 ) {
-  return { ...baseAnalyticsSummary(), ...overrides }
+  const base = baseAnalyticsSummary()
+  const defaults = createSerializedAnalyticsSummary({
+    timeFrame: overrides.timeFrame ?? base.timeFrame,
+  })
+  return { ...base, ...overrides, views: overrides.views ?? defaults.views }
 }
 
 function readyAnalyticsSummary(
@@ -265,13 +270,16 @@ describe('AnalyticsScreen', () => {
   })
 
   it('formats the scope start as a local date and ends it at the final bucket key', async () => {
+    const timeFrame = buildAnalyticsTimeFrame({
+      asOf: new Date('2026-01-15T16:00:00Z'),
+      requestedDays: 30,
+      timeZone: 'Asia/Tokyo',
+    })
     vi.mocked(sendMessage).mockResolvedValueOnce(
       createAnalyticsSummary({
         timeFrame: {
-          ...baseAnalyticsSummary().timeFrame,
-          asOf: '2026-01-15T16:00:00.000Z',
-          periodStart: '2025-12-16T15:00:00.000Z',
-          timeZone: 'Asia/Tokyo',
+          ...timeFrame,
+          buckets: timeFrame.buckets.slice(0, 1),
         },
       }),
     )
@@ -282,7 +290,7 @@ describe('AnalyticsScreen', () => {
       await screen.findByText(
         (_, element) =>
           element?.tagName === 'P' &&
-          element.textContent?.includes('Period: 12/17/25–12/19/25') === true,
+          element.textContent?.includes('Period: 12/18/25–12/20/25') === true,
       ),
     ).toBeVisible()
     expect(screen.getByText(/As of:/)).toHaveTextContent(
@@ -296,6 +304,7 @@ describe('AnalyticsScreen', () => {
         views: {
           ...baseAnalyticsSummary().views,
           observedRecallVsFsrs: {
+            timeFrame: baseAnalyticsSummary().timeFrame,
             rows: [
               {
                 id: '2026-01-14',
@@ -306,7 +315,7 @@ describe('AnalyticsScreen', () => {
                 pairedReviews: 4,
                 observedRecall: 0.75,
                 fsrsEstimate: 0.8,
-                difference: -0.05,
+                difference: 0.75 - 0.8,
                 provenance: 'reconstructed',
                 evidence: 'measured',
               },
@@ -482,10 +491,11 @@ describe('AnalyticsScreen', () => {
     vi.mocked(sendMessage).mockResolvedValueOnce(
       readyAnalyticsSummary({
         range: 90,
-        timeFrame: {
-          ...baseAnalyticsSummary().timeFrame,
+        timeFrame: buildAnalyticsTimeFrame({
+          asOf: new Date(baseAnalyticsSummary().timeFrame.asOf),
           requestedDays: 90,
-        },
+          timeZone: 'UTC',
+        }),
         historicalReadiness: {
           requested: readiness,
           recallQuality: readiness,
@@ -541,10 +551,11 @@ describe('AnalyticsScreen', () => {
     vi.mocked(sendMessage).mockResolvedValueOnce(
       readyAnalyticsSummary({
         range: 90,
-        timeFrame: {
-          ...baseAnalyticsSummary().timeFrame,
+        timeFrame: buildAnalyticsTimeFrame({
+          asOf: new Date(baseAnalyticsSummary().timeFrame.asOf),
           requestedDays: 90,
-        },
+          timeZone: 'UTC',
+        }),
         historicalReadiness: {
           requested: readiness,
           recallQuality: readiness,
@@ -757,7 +768,7 @@ describe('AnalyticsScreen', () => {
   })
 })
 
-function renderAnalyticsScreen(range?: 14 | 30 | 90) {
+function renderAnalyticsScreen(range?: 30 | 90 | 'all') {
   const harness = createQueryTestHarness()
   render(<AnalyticsScreen range={range} />, { wrapper: harness.wrapper })
   return harness

@@ -6,6 +6,7 @@ import {
   formatHistoricalDate,
   historicalDayOrdinal,
   historicalIntervalContext,
+  historicalGroupingLabel,
   nearestHistoricalRowIndex,
   sparseHistoricalYTicks,
   trimHistoricalEmptyEdges,
@@ -16,6 +17,33 @@ const timeFrame = {
   timeZone: 'America/New_York',
   requestedDays: 30,
 }
+
+it('labels explicit calendar grouping and does not mislabel February as a shortened month', () => {
+  expect(
+    historicalGroupingLabel({
+      ...timeFrame,
+      requestedDays: null,
+      grouping: { unit: 'month', step: 3 },
+    }),
+  ).toBe('Quarterly summaries')
+  expect(
+    historicalGroupingLabel({
+      ...timeFrame,
+      requestedDays: null,
+      grouping: { unit: 'year', step: 5 },
+    }),
+  ).toBe('5-year summaries')
+  expect(
+    historicalIntervalContext(
+      { bucketStart: '2026-02-01', bucketEnd: '2026-02-28', isPartial: false },
+      {
+        ...timeFrame,
+        requestedDays: null,
+        grouping: { unit: 'month', step: 1 },
+      },
+    ),
+  ).toBe('Monthly summaries · Complete interval')
+})
 
 function row(start: string, end = start, value: number | null = null) {
   return { id: start, bucketStart: start, bucketEnd: end, value }

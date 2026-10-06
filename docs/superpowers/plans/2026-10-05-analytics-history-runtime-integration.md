@@ -10,7 +10,7 @@
 
 ---
 
-Status: written for execution following the history-window foundation. User approved the final prototype and continuation; execution mode is already authorized. Root owns commits, authority-doc alignment, and final full validation.
+Status: Task 1 implemented and independently reviewed; Task 2 is next. User approved the final prototype and continuation; execution mode is already authorized. Root owns commits, authority-doc alignment, and final full validation.
 
 ## Contract Decisions
 
@@ -36,7 +36,7 @@ const frame: AnalyticsTimeFrame = {
 
 `periodStart = periodEnd` represents an empty internal frame; `history.displayStart = null` is the truthful public display origin. Consumers guard empty buckets. Historical calculations use the display start because it contains every selected retained record; comparisons use `history.previous`, never shift this clipped display start.
 
-The Recall view receives its own `timeFrame`: find the earliest eligible pair in the selected period from complete prehistory replay, replace only the display start/key and available-day span, then rebuild its bins through the same as-of. Do not derive the new start by slicing a globally grouped interval. No pairs gives empty Recall rows with an unavailable value. Retain selected-period pair counts and eligible-pair readiness semantics; the card's exact dates/grouping come from its supplied frame.
+The Recall view receives its own `timeFrame`: find the earliest eligible pair in the selected period from complete prehistory replay, replace only the display start/key and available-day span, then rebuild its bins through the same as-of. Do not derive the new start by slicing a globally grouped interval. No pairs gives empty Recall rows with an unavailable value. This is a display-only exception: retain selected-period pair counts and compute underlying readiness from those same eligible pairs on the shared selected-history calendar, grouping, and available span. Regrouping the plot must not improve confidence guidance. Compute the pairs once and pass them internally to the presentation producer when the service also needs them. The card's exact plotted dates/grouping come from its supplied display frame; readiness retains its explicitly identified selected-history frame.
 
 Backlog reconstruction and presentation receive the independent foundation 30-day daily frame. Upcoming remains next 14 local dates. Current snapshots retain the report as-of. Add `timeFrame` to the backlog view if needed so chart/table/inspection cannot accidentally use the selected historical grouping.
 
@@ -62,7 +62,7 @@ Backlog reconstruction and presentation receive the independent foundation 30-da
 - Test: adjacent domain, contract, service, route, range-control, query and fixture tests impacted by these changes.
 - Modify: `src/testing/analytics-fixtures.ts` only for compatible complete response fixtures.
 
-- [ ] **Step 1: Add focused failing contract/service/route tests.**
+- [x] **Step 1: Add focused failing contract/service/route tests.**
 
 Use existing test database factories `insertAnalyticsProblem` and `insertAnalyticsHistory` in `analytics-service.test.ts`; explicit existing fixture helpers remain the source of persistence syntax. Add these assertions around fixtures with earliest raw record Sep 24 and as-of Oct 5, 2026:
 
@@ -93,11 +93,11 @@ expect(parseAnalyticsHistorySelection('garbage')).toBe(30)
 
 Verify navigation preserves the existing `context` search value, request schema accepts literal All time, query keys distinguish all/30/90 and timezone, and malformed runtime frames fail validation.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 Run `rtk npm run test -- src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/server/analytics-service.test.ts src/app/dashboard/routes.test.tsx`. Expected: new semantic assertions fail before changes. Record the actual failure, not a setup error.
 
-- [ ] **Step 3: Implement the frame integration.**
+- [x] **Step 3: Implement the frame integration.**
 
 Read history/settings/current cards concurrently before constructing the selected bounds. Remove dependence on `buckets[0]!`; use the supplied frame start even when empty. Use foundation APIs directly and a small feature-local adapter for the frame shape above. For comparisons, use:
 
@@ -114,17 +114,17 @@ const previousEvents = prior
 
 Legacy finite pure-helper callers without metadata retain equivalent nominal finite logic. A null requested duration always yields no prior comparison. Update all prior arithmetic in problem-solving, rating mix, and legacy Hard/Again summaries; do not use numeric negation on nullable duration. Preserve cohort ordering before window filters and complete FSRS replay.
 
-Readiness accepts empty arrays as truthful no-evidence, retains actual observations rather than carried values, and receives explicit grouping rather than inferring it from the string selector. For finite selections keep existing formula and minimums (24 for 30, 45 for 90); for All time cap policy days at 90 and apply the same formula. Never multiply evidence by available days or the number of held rows. Shorter recommendations are only 30 or 90 as appropriate; there is no automatic range substitution. `requestedBuckets` permits zero while minimum observation policy remains positive.
+Readiness accepts empty arrays as truthful no-evidence, retains actual observations rather than carried values, and receives explicit grouping rather than inferring it from the string selector. For finite selections keep existing formula and minimums (24 for 30, 45 for 90). For All time use `policyDays = max(1, min(availableDays, 90))` in `ceil(max(12, policyDays * 0.5, min(policyDays, 30) * 0.8))`, as specified in the approved design: young 12-day All time needs 12 observations, 30-day All time needs 24, and established history never exceeds 45 solely because it is older. Empty All time uses policy day 1 and minimum 12. Never multiply evidence by available days or the number of held rows. Shorter recommendations are only 30 or 90 as appropriate; there is no automatic range substitution. `requestedBuckets` permits zero while minimum observation policy remains positive. Explicit calendar grouping owns month/year labels; the legacy numeric bucket-width field must not invent a calendar month or year length.
 
-Use the Recall-specific rebuilt frame for pair rows, chart scope, inspector labels, and bucket-aligned readiness keys. Retain full selected pair count; choosing different display bins cannot create additional evidence. Preserve raw reconstructed paired rates in the transport. Tighten pair contract invariants: recalled count cannot exceed pair count; zero pairs have null rates/difference and unmeasured evidence; positive pairs have measured rates, observed `recalledCount / pairedReviews`, and exact unrounded difference.
+Use the Recall-specific rebuilt frame for pair rows, chart scope, and inspector labels. Underlying Recall readiness uses actual pair evidence counts and aligned keys from the shared selected-history buckets, with the shared grouping and available days. Retain full selected pair count; choosing different display bins cannot create additional evidence or improve readiness. Preserve raw reconstructed paired rates in the transport. Tighten pair contract invariants: recalled count cannot exceed pair count; zero pairs have null rates/difference and unmeasured evidence; positive pairs have measured rates, observed `recalledCount / pairedReviews`, and exact unrounded difference.
 
 `historicalGroupingLabel` consumes explicit grouping metadata (daily, 3-day, weekly, monthly, quarterly, yearly, stride years) with legacy finite fallback only. Scope says All time rather than `all days` or `null days`; empty metadata has no invented date range. Backlog inspector must say daily/Last 30 days regardless of historical selection.
 
-- [ ] **Step 4: Run focused GREEN and inspect the diff.**
+- [x] **Step 4: Run focused GREEN and inspect the diff.**
 
 Run `rtk npm run test -- src/features/analytics/domain/analytics-time.test.ts src/features/analytics/domain/analytics-readiness.test.ts src/features/analytics/domain/analytics-range-policy.test.ts src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/domain/chart-data.test.ts src/features/analytics/domain/workload-presentation.test.ts src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/server/analytics-service.test.ts src/features/analytics/api/analytics-api.test.tsx src/app/dashboard/routes.test.tsx`. Expected: all selected suites pass. Resolve relevant failures; do not loosen tests or validators simply to accept an incoherent response. Run typecheck to catch all nullable-duration consumers before review.
 
-- [ ] **Step 5: Specification review, then quality review and commit.**
+- [x] **Step 5: Specification review, then quality review and commit.**
 
 Root dispatches fresh read-only reviewers and routes fixes back to the implementer. After both pass, root commits the focused integration with `feat: integrate analytics history selections`. Do not stage unrelated work.
 
@@ -177,3 +177,19 @@ Run `rtk npm run test -- src/features/analytics/domain/summary.test.ts src/featu
 - [ ] Record exact run/skipped commands and reasons. No database generation: no persisted-schema change. Do not mark required human extension smoke as N/A.
 - [ ] Update current authority docs to describe the implemented selection/frames/activity while preserving honest old-layout status until the compact UI phase lands.
 - [ ] Continue directly to the weighted presentation and compact UI phases already authorized by the user. This phase alone does not complete the Analytics refactor.
+
+## Task 1 Execution Record
+
+Runtime selection, frames, comparisons, own Recall display, shared-calendar Recall readiness, fixed daily backlog, route/cache/control integration and metadata validation are implemented. Verified RED regressions covered young and long history, All time, malformed legacy frames, unchanged Recall guidance after regrouping and timezone fallback provenance. Specification and quality reviews passed after repairs. Legacy MetricRow All time captions are explicitly carried into the already planned headline replacement.
+
+Final implementer focused run: 20 files, 433 tests passed. Root independently ran the service/contract suites: 2 files, 101 tests passed. Pinned typecheck and root lint passed. Touched source formatting and whitespace checks passed.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm test -- src/features/analytics/domain/analytics-time.test.ts src/features/analytics/domain/analytics-readiness.test.ts src/features/analytics/domain/analytics-range-policy.test.ts src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/domain/chart-data.test.ts src/features/analytics/domain/workload-presentation.test.ts src/features/analytics/domain/summary.test.ts src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/server/analytics-service.test.ts src/features/analytics/api/analytics-api.test.tsx src/app/dashboard/routes.test.tsx src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/components/analytics-readiness-state.test.tsx src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/recall-ratings-views.test.tsx src/features/analytics/components/historical-views.test.tsx src/features/analytics/components/workload-views.test.tsx src/features/analytics/components/new-problem-success-view.test.tsx src/extension/background/register-handlers.test.ts src/features/analytics/domain/review-cohorts.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/server/analytics-service.test.ts src/features/analytics/api/analytics-contracts.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run lint
+rtk git diff --check
+```
+
+`npm run check` and `npm run build` are deferred to this phase's checkpoint after Task 2, as planned. `npm run format` is replaced by touched-file Prettier checks; no repository-wide formatting changes are needed. `npm run db:generate` is skipped because persisted schema is unchanged. Required human installed-extension Analytics/Chart Targets happy-path and edge-case smoke with screenshot/recording proof remains pending before PR review or merge. This task does not finish the full page implementation.

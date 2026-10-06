@@ -45,6 +45,7 @@ import { defaultUserSettings } from '@/features/settings/domain'
 import type { ActiveTrack } from '@/features/tracks/domain'
 import { createSerializedPracticeDetails } from '@/testing/practice-fixtures'
 import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
+import { buildAnalyticsTimeFrame } from '@/features/analytics/domain/analytics-time'
 import {
   createProblemForEditResponse,
   createProblemLibraryResponse,
@@ -434,14 +435,15 @@ describe('background handler registration', () => {
       },
     })
     backgroundMocks.getAnalyticsSummary.mockResolvedValue({
-      ...createSerializedAnalyticsSummary(),
+      ...createSerializedAnalyticsSummary({
+        timeFrame: buildAnalyticsTimeFrame({
+          asOf: new Date('2026-01-15T12:00:00Z'),
+          requestedDays: 30,
+          timeZone: 'UTC',
+        }),
+      }),
       range: 30,
       generatedAt: '2026-01-15T12:00:00.000Z',
-      timeFrame: {
-        ...createSerializedAnalyticsSummary().timeFrame,
-        asOf: '2026-01-15T12:00:00.000Z',
-        requestedDays: 30,
-      },
       reviewDays: 3,
       totalReviews: 12,
       currentStreak: 2,
@@ -1185,22 +1187,22 @@ describe('background handler registration', () => {
   it('passes range without an undefined now option when at is absent', async () => {
     await sendRuntimeMessage('analytics.getSummary', {
       surface: 'dashboard',
-      range: 14,
+      range: 30,
       timeZone: 'UTC',
     })
 
     expect(backgroundMocks.getAnalyticsSummary).toHaveBeenCalledWith(
       backgroundMocks.db,
-      { range: 14, timeZone: 'UTC' },
+      { range: 30, timeZone: 'UTC' },
     )
   })
 
   it('preserves requested timezone grouping across a DST boundary', async () => {
     const fixture = createSerializedAnalyticsSummary({
-      range: 14,
+      range: 30,
       timeFrame: {
         ...createSerializedAnalyticsSummary().timeFrame,
-        requestedDays: 14,
+        requestedDays: 30,
       },
       historicalReadiness: createReadyHistoricalReadiness(),
       views: {
@@ -1226,7 +1228,7 @@ describe('background handler registration', () => {
 
     const response = await sendRuntimeMessage('analytics.getSummary', {
       surface: 'dashboard',
-      range: 14,
+      range: 30,
       timeZone: 'America/New_York',
       at: '2026-03-08T05:30:00.000Z',
     })
@@ -1234,14 +1236,14 @@ describe('background handler registration', () => {
     expect(backgroundMocks.getAnalyticsSummary).toHaveBeenCalledWith(
       backgroundMocks.db,
       {
-        range: 14,
+        range: 30,
         now: new Date('2026-03-08T05:30:00.000Z'),
         timeZone: 'America/New_York',
       },
     )
     const parsed = analyticsSummarySchema.parse(response)
 
-    expect(parsed.range).toBe(14)
+    expect(parsed.range).toBe(30)
     expect(parsed.views.upcomingReviewLoad.rows[0]).toMatchObject({
       date: '2026-03-08',
       dueCount: 1,
@@ -1251,14 +1253,16 @@ describe('background handler registration', () => {
 
   it('does not expose low-sample observed rating quality as 0%', async () => {
     backgroundMocks.getAnalyticsSummary.mockResolvedValueOnce({
-      ...createSerializedAnalyticsSummary(),
+      ...createSerializedAnalyticsSummary({
+        range: 90,
+        timeFrame: buildAnalyticsTimeFrame({
+          asOf: new Date('2026-01-15T12:00:00Z'),
+          requestedDays: 90,
+          timeZone: 'UTC',
+        }),
+      }),
       range: 90,
       generatedAt: '2026-01-15T12:00:00.000Z',
-      timeFrame: {
-        ...createSerializedAnalyticsSummary().timeFrame,
-        asOf: '2026-01-15T12:00:00.000Z',
-        requestedDays: 90,
-      },
       reviewDays: 3,
       totalReviews: 4,
       currentStreak: 1,
@@ -1301,10 +1305,11 @@ describe('background handler registration', () => {
   it('serializes current and forecast analytics when the selected historical range is unready', async () => {
     const fixture = createSerializedAnalyticsSummary({
       range: 90,
-      timeFrame: {
-        ...createSerializedAnalyticsSummary().timeFrame,
+      timeFrame: buildAnalyticsTimeFrame({
+        asOf: new Date('2026-05-30T00:00:00Z'),
         requestedDays: 90,
-      },
+        timeZone: 'UTC',
+      }),
       historicalReadiness: {
         ...createSerializedAnalyticsSummary().historicalReadiness,
         requested: {

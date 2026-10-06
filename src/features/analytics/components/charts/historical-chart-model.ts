@@ -1,7 +1,10 @@
+import type { AnalyticsHistoryGrouping } from '../../domain/analytics-history-window'
+
 export interface HistoricalChartTimeFrame {
   asOf: string
   timeZone: string
-  requestedDays: number
+  requestedDays: number | null
+  grouping?: AnalyticsHistoryGrouping | null | undefined
 }
 
 export interface HistoricalChartRow {
@@ -50,6 +53,18 @@ export function formatHistoricalBucket(
 }
 
 export function historicalGroupingLabel(timeFrame?: HistoricalChartTimeFrame) {
+  if (timeFrame?.grouping !== undefined) {
+    const grouping = timeFrame.grouping
+    if (grouping === null) return 'No historical intervals'
+    if (grouping.unit === 'day')
+      return grouping.step === 1 ? 'Daily summaries' : '3-day summaries'
+    if (grouping.unit === 'week') return 'Weekly summaries'
+    if (grouping.unit === 'month')
+      return grouping.step === 1 ? 'Monthly summaries' : 'Quarterly summaries'
+    return grouping.step === 1
+      ? 'Yearly summaries'
+      : `${grouping.step}-year summaries`
+  }
   return timeFrame?.requestedDays === 14
     ? 'Daily summaries'
     : timeFrame?.requestedDays === 90
@@ -67,15 +82,22 @@ export function historicalIntervalContext(
     historicalDayOrdinal(row.bucketEnd) -
     historicalDayOrdinal(row.bucketStart) +
     1
+  const grouping = timeFrame?.grouping
   const expectedDays =
-    timeFrame?.requestedDays === 14
-      ? 1
-      : timeFrame?.requestedDays === 90
-        ? 7
-        : 3
+    grouping !== undefined
+      ? grouping?.unit === 'day'
+        ? grouping.step
+        : grouping?.unit === 'week'
+          ? 7
+          : null
+      : timeFrame?.requestedDays === 14
+        ? 1
+        : timeFrame?.requestedDays === 90
+          ? 7
+          : 3
   return [
     historicalGroupingLabel(timeFrame),
-    !row.isPartial && intervalDays < expectedDays
+    !row.isPartial && expectedDays !== null && intervalDays < expectedDays
       ? `${intervalDays}-day shortened interval`
       : null,
     row.isPartial ? 'In progress' : 'Complete interval',

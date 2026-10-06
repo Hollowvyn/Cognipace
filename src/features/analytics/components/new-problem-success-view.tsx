@@ -583,6 +583,7 @@ function formatPriorPeriod(
   view: ProblemView,
   timeFrame?: HistoricalChartTimeFrame,
 ) {
+  if (view.previousPeriod === null) return 'No previous period for All time'
   const formatter = new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',
     timeZone: timeFrame?.timeZone ?? 'UTC',

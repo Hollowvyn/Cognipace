@@ -40,7 +40,7 @@ type UpcomingRow = AnalyticsViews['upcomingReviewLoad']['rows'][number]
 
 export function RecentOverdueBacklogView({
   view,
-  timeFrame,
+  timeFrame = view.timeFrame,
 }: {
   view: AnalyticsViews['overdueBacklog']
   timeFrame?: ReportTimeFrame | undefined
@@ -147,14 +147,14 @@ function OverdueBacklogChart({
     <div className="grid gap-2">
       <p className="sr-only" id={summaryId}>
         Active non-suspended overdue backlog reconstructed from persisted FSRS
-        review logs and current card state. Daily local rows span the selected
-        period; unknown days are not measured and break the line. The y-axis is
+        review logs and current card state. Daily local rows span the last 30
+        days; unknown days are not measured and break the line. The y-axis is
         overdue problems from zero to {formatCount(view.scale.domain[1])}. Five
         problems is the CogniPace watch zone. Today is measured through as of
         time and is in progress.
       </p>
       <ChartContainer
-        accessibleDescription="Daily reconstructed overdue backlog; unknown days break the line."
+        accessibleDescription="Daily summaries over the last 30 days. Reconstructed overdue backlog; unknown days break the line."
         accessibleName="Recent Overdue Backlog chart"
         aria-describedby={summaryId}
         aria-label="Recent Overdue Backlog chart"
@@ -904,7 +904,7 @@ function BacklogTooltip({
             : 'Above watch zone (>5)'}
       </p>
       <p className="m-0 text-muted-foreground">
-        Reconstructed{' '}
+        Daily summaries · Last 30 days · Reconstructed{' '}
         {row.inProgress ? 'through as of · In progress' : 'at local day end'}
       </p>
       <ReportContext timeFrame={timeFrame} />
@@ -942,7 +942,7 @@ function OverdueBacklogTable({
   const page = usePage(rows, 7)
   return (
     <PaginatedTable
-      caption="Recent Overdue Backlog data table"
+      caption="Recent Overdue Backlog data table · Daily summaries · Last 30 days"
       columns={['Date', 'Overdue problems']}
       page={page}
       rows={page.visibleRows.map((row) => (

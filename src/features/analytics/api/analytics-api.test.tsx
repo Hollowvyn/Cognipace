@@ -10,6 +10,7 @@ import {
   buildHistoricalAnalyticsViews,
 } from '../domain/historical-presentation'
 import { buildAnalyticsBucketsFromTimeFrame } from '../domain/analytics-range-policy'
+import { buildAnalyticsTimeFrame } from '../domain/analytics-time'
 import { normalizeFsrsSchedulingOptions } from '@/lib/fsrs'
 import type { SerializedAnalyticsSummary } from './analytics-contracts'
 
@@ -118,7 +119,7 @@ describe('analytics runtime API', () => {
     async (field) => {
       const { queryClient, wrapper } = createQueryTestHarness()
       const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
-      const summaries = ([14, 30, 90] as const).map((range) => {
+      const summaries = ([30, 90] as const).map((range) => {
         const summary = summaryWithMeasuredRows(range)
         queryClient.setQueryData(
           analyticsQueryKeys.summary(range, 'UTC'),
@@ -240,12 +241,18 @@ describe('analytics runtime API', () => {
   })
 
   it('uses the correct analytics summary query key', () => {
-    expect(analyticsQueryKeys.summary(14, 'America/New_York')).toEqual([
+    expect(analyticsQueryKeys.summary('all', 'America/New_York')).toEqual([
       'analytics',
       'summary',
-      14,
+      'all',
       'America/New_York',
     ])
+    const keys = ([30, 90, 'all'] as const).flatMap((range) =>
+      ['UTC', 'America/New_York'].map((zone) =>
+        JSON.stringify(analyticsQueryKeys.summary(range, zone)),
+      ),
+    )
+    expect(new Set(keys).size).toBe(6)
   })
 
   it('calls sendMessage with analytics.getSummary and a dashboard surface request', async () => {
@@ -287,11 +294,15 @@ describe('analytics runtime API', () => {
   })
 })
 
-function summaryWithMeasuredRows(
-  range: 14 | 30 | 90,
-): SerializedAnalyticsSummary {
-  const summary = createSerializedAnalyticsSummary({ range })
-  summary.timeFrame.requestedDays = range
+function summaryWithMeasuredRows(range: 30 | 90): SerializedAnalyticsSummary {
+  const summary = createSerializedAnalyticsSummary({
+    range,
+    timeFrame: buildAnalyticsTimeFrame({
+      requestedDays: range,
+      asOf: new Date('2026-05-30T00:00:00Z'),
+      timeZone: 'UTC',
+    }),
+  })
   const { timeFrame } = summary
   summary.views.problemSolving = buildHistoricalAnalyticsViews(
     Array.from({ length: 4 }, (_, index) => ({
@@ -331,7 +342,7 @@ function summaryWithMeasuredRows(
       pairedReviews: 2,
       observedRecall: 0.5,
       fsrsEstimate: 0.6,
-      difference: -0.1,
+      difference: 0.5 - 0.6,
       provenance: 'reconstructed',
       evidence: 'measured',
     },

@@ -52,7 +52,7 @@ For every card test Details/Overview reachability and no extra full-width Proble
 
 Run `rtk npm run test -- src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/components/analytics-metric-row.test.tsx src/app/dashboard/routes.test.tsx`; omit a nonexistent separate metric file only if these assertions live in screen tests and record the actual command. Expected: old three-metric/nine-panel layout fails new expectations.
 
-Headline cards have equal 148px outer height in all data states, four columns on wide desktop, two then one on narrower containers. Use supplied counts, not legacy `reviewDays`, all-time `totalReviews`, or rating-derived quality. Captions are short: days practiced, unique correct questions, correct/assessed, timed/total successful attempts.
+Headline cards have equal 148px outer height in all data states, four columns on wide desktop, two then one on narrower containers. Use supplied counts, not legacy `reviewDays`, all-time `totalReviews`, or rating-derived quality. Captions are short: days practiced, unique correct questions, correct/assessed, timed/total successful attempts. Replace all legacy range interpolation in the metric row: All time must never render as "all-day period." Positive recorded durations below one minute must remain distinguishable from measured zero, with exact seconds retained in evidence.
 
 Use one page-width ten-card grid with two columns whenever usable container width supports two360px cards plus its gap. All card modes stay464px there and512px stacked, including error/skeleton/unavailable. The chart consumes measured remaining height. Retain Terra Compact tokens, Nunito Sans text/Literata page title, short approved descriptions and light/dark support.
 

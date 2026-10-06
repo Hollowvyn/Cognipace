@@ -1,4 +1,10 @@
+import type {
+  AnalyticsHistoryBounds,
+  AnalyticsHistoryGrouping,
+} from './analytics-history-window'
+
 export type AnalyticsHistoricalRange = 14 | 30 | 90
+export type PublicAnalyticsRange = 30 | 90 | 'all'
 
 export interface AnalyticsTimeBucket {
   key: string
@@ -13,10 +19,38 @@ export interface AnalyticsTimeFrame {
   asOf: string
   timeZone: string
   timeZoneFallback: boolean
-  requestedDays: AnalyticsHistoricalRange
+  requestedDays: AnalyticsHistoricalRange | null
   periodStart: string
   periodEnd: string
   buckets: AnalyticsTimeBucket[]
+  history?: AnalyticsHistoryBounds | undefined
+  grouping?: AnalyticsHistoryGrouping | null | undefined
+}
+
+/** Prior comparisons use nominal bounds even when display history is clipped. */
+export function getAnalyticsPreviousPeriod(
+  frame: AnalyticsTimeFrame,
+): { start: Date; asOf: Date } | null {
+  if (frame.history !== undefined)
+    return frame.history.previous === null
+      ? null
+      : {
+          start: new Date(frame.history.previous.start),
+          asOf: new Date(frame.history.previous.asOf),
+        }
+  if (frame.requestedDays === null) return null
+  return {
+    start: shiftAnalyticsCalendarDays(
+      new Date(frame.periodStart),
+      -frame.requestedDays,
+      frame.timeZone,
+    ),
+    asOf: shiftAnalyticsCalendarDays(
+      new Date(frame.asOf),
+      -frame.requestedDays,
+      frame.timeZone,
+    ),
+  }
 }
 
 interface TimeZoneResolution {

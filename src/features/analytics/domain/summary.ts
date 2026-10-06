@@ -2,7 +2,7 @@ import { isReviewRating } from '@/lib/fsrs'
 
 import type { AnalyticsReadiness } from './analytics-readiness'
 import type { HistoricalAnalyticsViews } from './historical-presentation'
-import type { AnalyticsTimeFrame } from './analytics-time'
+import type { PublicAnalyticsRange, AnalyticsTimeFrame } from './analytics-time'
 
 export interface ObservedRatingQualityResult {
   value: number | null
@@ -29,7 +29,7 @@ export interface AnalyticsSummaryInput {
   totalReviews: number
   currentStreak: number
   observedRatingQuality: ObservedRatingQualityResult
-  range: 14 | 30 | 90
+  range: PublicAnalyticsRange
   targetRetention: number
   views: HistoricalAnalyticsViews
   historicalReadiness: HistoricalReadiness
@@ -51,7 +51,7 @@ export interface HistoricalReadiness {
   topics: AnalyticsReadiness
   stability: AnalyticsReadiness
   overdueBacklog: AnalyticsReadiness
-  recommendedRange: 14 | 30 | 90 | null
+  recommendedRange: 30 | 90 | null
 }
 
 export interface AnalyticsSummary {
@@ -62,7 +62,7 @@ export interface AnalyticsSummary {
   currentStreak: number
   observedRatingQuality: number | null
   observedRatingQualityLabel: string
-  range: 14 | 30 | 90
+  range: PublicAnalyticsRange
   observedRatingSampleSize: number
   lowSample: boolean
   targetRetention: number
@@ -80,14 +80,15 @@ export interface AnalyticsSummary {
 export function buildObservedRatingQuality(
   attempts: Array<{ rating: string; reviewedAt: Date }>,
   now: Date,
-  range: 14 | 30 | 90,
+  range: PublicAnalyticsRange | 14,
   period?: ObservedRatingPeriod,
 ): ObservedRatingQualityResult {
-  const since = period?.periodStart ?? subtractDays(now, range)
+  const since =
+    period?.periodStart ?? (range === 'all' ? null : subtractDays(now, range))
   const periodEnd = period?.periodEnd ?? now
   const recent = attempts.filter(
     (a) =>
-      a.reviewedAt >= since &&
+      (since === null || a.reviewedAt >= since) &&
       a.reviewedAt <= periodEnd &&
       a.reviewedAt <= now &&
       isReviewRating(a.rating),

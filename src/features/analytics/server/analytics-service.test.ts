@@ -23,9 +23,406 @@ import {
 
 import { updateSettings } from '@/features/settings/server/settings-service'
 import { analyticsSummarySchema } from '../api/analytics-contracts'
+import { calculateAnalyticsReadiness } from '../domain/analytics-readiness'
 import { getAnalyticsSummary } from './analytics-service'
 
 describe('getAnalyticsSummary dashboard views', () => {
+  it('preserves invalid-zone fallback provenance on the report and independent Recall and backlog frames', async () => {
+    const handle = await createTestDb({ seed: false })
+    await insertAnalyticsProblem(
+      handle.db,
+      'fallback-pair',
+      'Fallback pair',
+      [],
+    )
+    await insertAnalyticsHistory(handle.db, 'fallback-pair', {
+      id: 'fallback-pair',
+      dates: [
+        new Date('2026-09-24T12:00:00Z'),
+        new Date('2026-10-02T12:00:00Z'),
+      ],
+      ratings: ['good', 'hard'],
+      correct: [true, true],
+      dueAt: new Date('2026-10-06T12:00:00Z'),
+      stability: 4,
+      difficulty: 4,
+    })
+    const options = {
+      range: 30 as const,
+      now: new Date('2026-10-05T12:00:00Z'),
+    }
+    const summary = await getAnalyticsSummary(handle.db, {
+      ...options,
+      timeZone: 'Invalid/Zone',
+    })
+    expect(summary.timeFrame).toMatchObject({
+      timeZone: 'UTC',
+      timeZoneFallback: true,
+      history: { timeZone: 'UTC', timeZoneFallback: true },
+    })
+    expect(summary.views.overdueBacklog.timeFrame).toMatchObject({
+      timeZone: 'UTC',
+      timeZoneFallback: true,
+    })
+    expect(summary.views.observedRecallVsFsrs.timeFrame).toMatchObject({
+      timeZone: 'UTC',
+      timeZoneFallback: true,
+      history: { timeZone: 'UTC', timeZoneFallback: true },
+    })
+    const utc = await getAnalyticsSummary(handle.db, {
+      ...options,
+      timeZone: 'UTC',
+    })
+    expect(summary.views.observedRecallVsFsrs.rows).toEqual(
+      utc.views.observedRecallVsFsrs.rows,
+    )
+    expect(summary.views.observedRecallVsFsrs.timeFrame.buckets).toEqual(
+      utc.views.observedRecallVsFsrs.timeFrame.buckets,
+    )
+    expect(
+      summary.views.observedRecallVsFsrs.rows.reduce(
+        (sum, row) => sum + row.pairedReviews,
+        0,
+      ),
+    ).toBe(1)
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...summary,
+        observedRatingQuality: {
+          value: summary.observedRatingQuality,
+          sampleSize: summary.observedRatingSampleSize,
+          lowSample: summary.lowSample,
+        },
+      }).success,
+    ).toBe(true)
+  })
+
+  it('keeps Recall readiness on the selected evidence calendar while regrouping its recent pair display', async () => {
+    const handle = await createTestDb({ seed: false })
+    await insertAnalyticsProblem(
+      handle.db,
+      'global-origin',
+      'Global origin',
+      [],
+    )
+    await insertAnalyticsHistory(handle.db, 'global-origin', {
+      id: 'global-origin',
+      dates: [new Date('2025-02-01T12:00:00Z')],
+      ratings: ['good'],
+      correct: [true],
+      dueAt: new Date('2026-10-06T12:00:00Z'),
+      stability: 4,
+      difficulty: 4,
+    })
+    await insertAnalyticsProblem(handle.db, 'recent-pairs', 'Recent pairs', [])
+    const dates = [
+      new Date('2026-09-08T12:00:00Z'),
+      ...Array.from(
+        { length: 52 },
+        (_, index) =>
+          new Date(
+            Date.UTC(2026, 8, 9 + Math.floor(index / 2), 10 + (index % 2) * 4),
+          ),
+      ),
+    ]
+    await insertAnalyticsHistory(handle.db, 'recent-pairs', {
+      id: 'recent-pairs',
+      dates,
+      ratings: dates.map(() => 'good'),
+      correct: dates.map(() => true),
+      dueAt: new Date('2026-10-06T12:00:00Z'),
+      stability: 4,
+      difficulty: 4,
+    })
+    const summary = await getAnalyticsSummary(handle.db, {
+      range: 'all',
+      now: new Date('2026-10-05T12:00:00Z'),
+    })
+    const selected = summary.timeFrame
+    const recall = summary.views.observedRecallVsFsrs
+    expect(selected.history?.availableDays).toBe(612)
+    expect(selected.grouping).toEqual({ unit: 'month', step: 1 })
+    expect(selected.buckets).toHaveLength(21)
+    expect(recall.timeFrame.history?.availableDays).toBe(27)
+    expect(recall.timeFrame.grouping).toEqual({ unit: 'day', step: 3 })
+    expect(recall.rows).toHaveLength(9)
+    expect(recall.rows.reduce((sum, row) => sum + row.pairedReviews, 0)).toBe(
+      52,
+    )
+    const expectedReadiness = calculateAnalyticsReadiness({
+      requestedDays: null,
+      grouping: selected.grouping,
+      availableDays: 612,
+      evidenceCounts: [...Array<number>(19).fill(0), 44, 8],
+      bucketKeys: selected.buckets.map((bucket) => bucket.key),
+    })
+    expect(summary.historicalReadiness.recallQuality).toEqual(expectedReadiness)
+    expect(summary.historicalReadiness.recallQuality).toMatchObject({
+      ready: false,
+      policyDays: 90,
+      minimumAssessments: 45,
+      requestedBuckets: 21,
+      assessments: 52,
+      failingReasons: ['insufficient-span'],
+    })
+  })
+
+  it.each([
+    [12, 12],
+    [30, 24],
+    [120, 45],
+  ] as const)(
+    'uses the selected All time %s-day history span for its %s-assessment policy',
+    async (availableDays, minimumAssessments) => {
+      const handle = await createTestDb({ seed: false })
+      await insertAnalyticsProblem(handle.db, 'policy-span', 'Policy span', [])
+      await insertAnalyticsHistory(handle.db, 'policy-span', {
+        id: 'policy-span',
+        dates: [
+          new Date(Date.UTC(2026, 9, 5, 12) - (availableDays - 1) * 86_400_000),
+        ],
+        ratings: ['good'],
+        correct: [true],
+        dueAt: new Date('2026-10-06T12:00:00Z'),
+        stability: 4,
+        difficulty: 4,
+      })
+      const summary = await getAnalyticsSummary(handle.db, {
+        range: 'all',
+        now: new Date('2026-10-05T12:00:00Z'),
+      })
+      expect(summary.timeFrame.history?.availableDays).toBe(availableDays)
+      expect(summary.historicalReadiness.requested).toMatchObject({
+        requestedDays: null,
+        availableDays,
+        policyDays: Math.min(availableDays, 90),
+        minimumAssessments,
+      })
+    },
+  )
+  it('retains the complete genuinely sparse paired All time span without inflating pair counts', async () => {
+    const handle = await createTestDb({ seed: false })
+    await insertAnalyticsProblem(handle.db, 'sparse-pairs', 'Sparse pairs', [])
+    await insertAnalyticsHistory(handle.db, 'sparse-pairs', {
+      id: 'sparse-pairs',
+      dates: [
+        new Date('2010-01-01T12:00:00Z'),
+        new Date('2015-01-02T12:00:00Z'),
+        new Date('2026-10-02T12:00:00Z'),
+      ],
+      ratings: ['good', 'good', 'hard'],
+      correct: [true, true, true],
+      dueAt: new Date('2026-10-06T12:00:00Z'),
+      stability: 4,
+      difficulty: 4,
+    })
+    const summary = await getAnalyticsSummary(handle.db, {
+      range: 'all',
+      now: new Date('2026-10-05T12:00:00Z'),
+    })
+    const recall = summary.views.observedRecallVsFsrs
+    expect(recall.timeFrame.history?.displayStartKey).toBe('2015-01-02')
+    expect(recall.timeFrame.grouping).toEqual({ unit: 'month', step: 3 })
+    expect(recall.rows).toHaveLength(48)
+    expect(recall.rows[0]?.bucketStart).toBe('2015-01-02')
+    expect(recall.rows.at(-1)?.bucketEnd).toBe('2026-10-05')
+    expect(recall.rows.reduce((sum, row) => sum + row.pairedReviews, 0)).toBe(2)
+    expect(
+      recall.rows.filter((row) => row.evidence === 'measured'),
+    ).toHaveLength(2)
+    expect(summary.historicalReadiness.recallQuality.assessments).toBe(2)
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...summary,
+        observedRatingQuality: {
+          value: summary.observedRatingQuality,
+          sampleSize: summary.observedRatingSampleSize,
+          lowSample: summary.lowSample,
+        },
+      }).success,
+    ).toBe(true)
+  })
+
+  it('keeps an invalid raw origin on selected history while Recall starts at the first eligible pair', async () => {
+    const handle = await createTestDb({ seed: false })
+    await insertAnalyticsProblem(
+      handle.db,
+      'invalid-origin',
+      'Invalid origin',
+      [],
+    )
+    await insertAnalyticsHistory(handle.db, 'invalid-origin', {
+      id: 'invalid-origin',
+      dates: [
+        new Date('2026-09-24T02:00:00Z'),
+        new Date('2026-09-27T12:00:00Z'),
+        new Date('2026-10-02T12:00:00Z'),
+      ],
+      ratings: ['good', 'good', 'hard'],
+      correct: [true, true, true],
+      dueAt: new Date('2026-10-06T12:00:00Z'),
+      stability: 4,
+      difficulty: 4,
+    })
+    await handle.db
+      .update(reviewAttempts)
+      .set({ rating: 'invalid' })
+      .where(eq(reviewAttempts.id, 'invalid-origin:0'))
+    const summary = await getAnalyticsSummary(handle.db, {
+      range: 30,
+      now: new Date('2026-10-05T12:00:00Z'),
+      timeZone: 'America/New_York',
+    })
+    expect(summary.timeFrame.history).toMatchObject({
+      historyStart: '2026-09-24T02:00:00.000Z',
+      displayStartKey: '2026-09-23',
+      availableDays: 13,
+    })
+    expect(
+      summary.views.observedRecallVsFsrs.timeFrame.history?.displayStartKey,
+    ).toBe('2026-10-02')
+    expect(summary.views.observedRecallVsFsrs.rows[0]?.pairedReviews).toBe(1)
+    expect(summary.historicalReadiness.recallQuality.assessments).toBe(1)
+    expect(summary.ratingsMix[0]?.bucketStart).toBe('2026-09-23')
+    expect(summary.practiceRhythm[0]?.bucketStart).toBe('2026-09-23')
+    expect(summary.stability[0]?.bucketStart).toBe('2026-09-23')
+  })
+
+  it('clips young selected history while retaining nominal comparisons and fixed workload horizons', async () => {
+    const handle = await createTestDb({ seed: false })
+    await insertAnalyticsProblem(handle.db, 'young', 'Young', [])
+    await insertAnalyticsHistory(handle.db, 'young', {
+      id: 'young',
+      dates: [
+        new Date('2026-09-24T12:00:00Z'),
+        new Date('2026-10-02T12:00:00Z'),
+      ],
+      ratings: ['good', 'hard'],
+      correct: [true, true],
+      dueAt: new Date('2026-10-06T12:00:00Z'),
+      stability: 4,
+      difficulty: 4,
+    })
+    const summary = await getAnalyticsSummary(handle.db, {
+      range: 30,
+      now: new Date('2026-10-05T12:00:00Z'),
+      timeZone: 'UTC',
+    })
+    expect(summary.timeFrame).toMatchObject({
+      periodStart: '2026-09-24T00:00:00.000Z',
+      grouping: { unit: 'day', step: 1 },
+      history: {
+        nominalStartKey: '2026-09-06',
+        displayStartKey: '2026-09-24',
+        availableDays: 12,
+        previous: { start: '2026-08-07T00:00:00.000Z' },
+      },
+    })
+    expect(summary.timeFrame.buckets).toHaveLength(12)
+    expect(summary.views.problemSolving.previousPeriod?.start).toBe(
+      '2026-08-07T00:00:00.000Z',
+    )
+    expect(summary.views.observedRecallVsFsrs.timeFrame).toMatchObject({
+      history: { displayStartKey: '2026-10-02', availableDays: 4 },
+      grouping: { unit: 'day', step: 1 },
+    })
+    expect(summary.views.observedRecallVsFsrs.rows).toHaveLength(4)
+    expect(summary.views.overdueBacklog.rows).toHaveLength(30)
+    expect(summary.views.overdueBacklog.timeFrame.buckets).toHaveLength(30)
+    expect(summary.views.upcomingReviewLoad.rows).toHaveLength(14)
+  })
+
+  it('returns no fabricated historical intervals or previous period for empty All time', async () => {
+    const handle = await createTestDb({ seed: false })
+    const summary = await getAnalyticsSummary(handle.db, {
+      range: 'all',
+      now: new Date('2026-10-05T12:00:00Z'),
+    })
+    expect(summary.timeFrame).toMatchObject({
+      requestedDays: null,
+      buckets: [],
+      grouping: null,
+      history: {
+        historyStart: null,
+        displayStart: null,
+        availableDays: 0,
+        previous: null,
+      },
+    })
+    expect(summary.views.problemSolving.previousPeriod).toBeNull()
+    expect(
+      summary.views.problemSolving.cohorts.newProblems.previous
+        .recordedAssessments,
+    ).toBe(0)
+    expect(summary.views.observedRecallVsFsrs.rows).toEqual([])
+    expect(summary.historicalReadiness.requested).toMatchObject({
+      requestedBuckets: 0,
+      ready: false,
+      assessments: 0,
+      policyDays: 1,
+      minimumAssessments: 12,
+    })
+    expect(summary.hardAgain).toMatchObject({
+      previousSampleSize: 0,
+      previousShare: null,
+      delta: null,
+      direction: null,
+    })
+    expect(summary.views.overdueBacklog.rows).toHaveLength(30)
+  })
+
+  it('regroups recent eligible pairs independently from old All time raw history', async () => {
+    const handle = await createTestDb({ seed: false })
+    await insertAnalyticsProblem(handle.db, 'old', 'Old', [])
+    await insertAnalyticsHistory(handle.db, 'old', {
+      id: 'old',
+      dates: [new Date('2010-01-01T12:00:00Z')],
+      ratings: ['good'],
+      correct: [true],
+      dueAt: new Date('2026-10-06T12:00:00Z'),
+      stability: 4,
+      difficulty: 4,
+    })
+    await insertAnalyticsProblem(handle.db, 'recent', 'Recent', [])
+    await insertAnalyticsHistory(handle.db, 'recent', {
+      id: 'recent',
+      dates: [
+        new Date('2026-09-24T12:00:00Z'),
+        new Date('2026-10-02T12:00:00Z'),
+      ],
+      ratings: ['good', 'good'],
+      correct: [true, true],
+      dueAt: new Date('2026-10-06T12:00:00Z'),
+      stability: 4,
+      difficulty: 4,
+    })
+    const summary = await getAnalyticsSummary(handle.db, {
+      range: 'all',
+      now: new Date('2026-10-05T12:00:00Z'),
+    })
+    expect(summary.timeFrame.grouping).toEqual({ unit: 'year', step: 1 })
+    expect(summary.views.observedRecallVsFsrs.timeFrame.grouping).toEqual({
+      unit: 'day',
+      step: 1,
+    })
+    expect(summary.views.observedRecallVsFsrs.rows).toHaveLength(4)
+    expect(summary.views.observedRecallVsFsrs.rows[0]).toMatchObject({
+      bucketStart: '2026-10-02',
+      pairedReviews: 1,
+    })
+    expect(summary.historicalReadiness.recallQuality.assessments).toBe(1)
+    expect(summary.historicalReadiness.requested).toMatchObject({
+      policyDays: 90,
+      minimumAssessments: 45,
+    })
+    expect(summary.historicalReadiness.recallQuality).toMatchObject({
+      policyDays: 90,
+      minimumAssessments: 45,
+      grouping: { unit: 'year', step: 1 },
+      requestedBuckets: summary.timeFrame.buckets.length,
+    })
+  })
+
   it('reads saved difficulty time targets and durations through the existing summary', async () => {
     const handle = await createTestDb({ seed: false })
     await insertAnalyticsProblem(handle.db, 'timed', 'Timed', [])
@@ -45,7 +442,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     const timeTargetsMinutes = { easy: 10, medium: 20, hard: 30 }
     await updateSettings(handle.db, { assessment: { timeTargetsMinutes } })
     const summary = await getAnalyticsSummary(handle.db, {
-      range: 14,
+      range: 30,
       now: new Date('2026-08-02T12:00:00Z'),
     })
     expect(summary.views.problemSolving.timeTargetsMinutes).toEqual(
@@ -100,9 +497,14 @@ describe('getAnalyticsSummary dashboard views', () => {
       })
     }
     await updateSettings(handle.db, { review: { targetRetention: 0.85 } })
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
     expect(summary.historicalReadiness).toMatchObject({
-      firstAttemptOutcomes: { ready: true, assessments: 14, activeBuckets: 14 },
+      firstAttemptOutcomes: {
+        ready: false,
+        assessments: 14,
+        activeBuckets: 14,
+        minimumAssessments: 24,
+      },
       recallQuality: { ready: false, assessments: 0, activeBuckets: 0 },
     })
     expect(summary.recallQuality).toEqual([])
@@ -126,7 +528,7 @@ describe('getAnalyticsSummary dashboard views', () => {
         targetFirstAttemptGoodEasy: 1,
       },
     })
-    const after = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const after = await getAnalyticsSummary(handle.db, { range: 30, now })
 
     expect(after.views).toMatchObject({
       retentionMap: summary.views.retentionMap,
@@ -155,7 +557,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     expect(await handle.db.select().from(fsrsCards)).toEqual(cardsBefore)
   })
 
-  it.each([14, 30, 90] as const)(
+  it.each([30, 90] as const)(
     'retains the selected %s-day range in the readiness contract',
     async (range) => {
       const handle = await createTestDb()
@@ -221,7 +623,7 @@ describe('getAnalyticsSummary dashboard views', () => {
       difficulty: 5,
     })
 
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
     const day = summary.recallQuality.find(
       (point) => point.bucketStart === '2026-08-02',
     )
@@ -271,7 +673,7 @@ describe('getAnalyticsSummary dashboard views', () => {
       updatedAt: futureTimestamp,
     })
 
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
 
     expect(summary.observedRatingQuality).toBe(1)
     expect(summary.observedRatingSampleSize).toBe(10)
@@ -281,12 +683,12 @@ describe('getAnalyticsSummary dashboard views', () => {
     const handle = await createTestDb({ seed: false })
     const now = new Date('2026-01-31T12:00:00.000Z')
     const previousDates = Array.from(
-      { length: 14 },
-      (_, index) => new Date(Date.UTC(2026, 0, 4 + index, 12)),
+      { length: 24 },
+      (_, index) => new Date(Date.UTC(2025, 11, 9 + index, 12)),
     )
     const selectedDates = Array.from(
-      { length: 14 },
-      (_, index) => new Date(Date.UTC(2026, 0, 18 + index, 12)),
+      { length: 24 },
+      (_, index) => new Date(Date.UTC(2026, 0, 8 + index, 12)),
     )
     const dates = [...previousDates, ...selectedDates]
 
@@ -308,8 +710,8 @@ describe('getAnalyticsSummary dashboard views', () => {
         id: `${slug}-card:default`,
         dates,
         ratings: [
-          ...Array<ReviewRating>(14).fill('again'),
-          ...Array<ReviewRating>(14).fill('good'),
+          ...Array<ReviewRating>(24).fill('again'),
+          ...Array<ReviewRating>(24).fill('good'),
         ],
         correct: Array<boolean>(dates.length).fill(true),
         dueAt: new Date('2026-02-01T12:00:00.000Z'),
@@ -332,23 +734,23 @@ describe('getAnalyticsSummary dashboard views', () => {
       updatedAt: postAsOf.getTime(),
     })
 
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
 
     expect(summary.views.ratingsMix).toMatchObject({
       selectedHardAgain: 0,
-      selectedValidRatings: 42,
+      selectedValidRatings: 72,
       comparison: {
         direction: 'down',
         previousHardAgainShare: 1,
-        previousValidRatings: 42,
+        previousValidRatings: 72,
       },
     })
     expect(summary.views.topicPerformance.rows).toEqual([
       expect.objectContaining({
         topic: 'Graphs',
         reviewSuccess: 1,
-        goodEasy: 42,
-        validRatings: 42,
+        goodEasy: 72,
+        validRatings: 72,
         distinctProblems: 3,
       }),
     ])
@@ -365,7 +767,7 @@ describe('getAnalyticsSummary dashboard views', () => {
       dueAt: new Date('2026-02-01T12:00:00.000Z'),
     })
 
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
 
     expect(
       summary.views.upcomingReviewLoad.rows.reduce(
@@ -400,7 +802,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     )
     await insertAnalyticsHistory(handle.db, 'graphs-problem', {
       id: 'graphs-card:default',
-      dates: [new Date('2026-01-10T12:00:00.000Z'), ...selectedDates],
+      dates: [new Date('2025-12-20T12:00:00.000Z'), ...selectedDates],
       ratings: ['again', 'again', ...Array<ReviewRating>(9).fill('good')],
       correct: [false, ...Array<boolean>(10).fill(true)],
       dueAt: new Date('2026-02-01T12:00:00.000Z'),
@@ -418,7 +820,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
     await updateSettings(handle.db, { review: { targetRetention: 0.85 } })
 
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
     const graphsPoint = summary.topics.find((topic) => topic.topic === 'Graphs')
     const recallPoint = summary.recallQuality.find(
       (point) => point.bucketStart === '2026-01-20',
@@ -453,7 +855,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     expect(summary.views.upcomingReviewLoad.rows[0]?.overdueCount).toBe(0)
     expect(summary.views.upcomingReviewLoad.rows[1]?.dueCount).toBe(1)
     expect(summary.views.retentionMap.rows).toHaveLength(2)
-    expect(summary.views.overdueBacklog.rows).toHaveLength(14)
+    expect(summary.views.overdueBacklog.rows).toHaveLength(30)
   })
 
   it.each([30, 90] as const)(
@@ -487,11 +889,11 @@ describe('getAnalyticsSummary dashboard views', () => {
 
       expect(summary.historicalReadiness.overdueBacklog).toMatchObject({
         ready: true,
-        assessments: range,
+        assessments: 30,
         activeBuckets:
           summary.historicalReadiness.overdueBacklog.requestedBuckets,
       })
-      expect(summary.views.overdueBacklog.knownDays).toBe(range)
+      expect(summary.views.overdueBacklog.knownDays).toBe(30)
     },
   )
 
@@ -674,10 +1076,36 @@ describe('getAnalyticsSummary dashboard views', () => {
       })
     }
     expect(summary.recallQuality).toEqual([])
-    expect(summary.practiceRhythm).toEqual([])
-    expect(summary.ratingsMix).toEqual([])
+    expect(summary.practiceRhythm).toHaveLength(
+      summary.timeFrame.buckets.length,
+    )
+    expect(summary.views.observedRecallVsFsrs.rows).toEqual([])
+    expect(summary.views.observedRecallVsFsrs.timeFrame).toMatchObject({
+      buckets: [],
+      grouping: null,
+      history: { historyStart: null, displayStart: null, availableDays: 0 },
+    })
+    expect(
+      summary.practiceRhythm.every(
+        (row) =>
+          row.reviewCount === 0 &&
+          row.sampleSize === 0 &&
+          row.observedCorrectness === null,
+      ),
+    ).toBe(true)
+    expect(summary.ratingsMix).toHaveLength(summary.timeFrame.buckets.length)
+    expect(
+      summary.ratingsMix.every(
+        (row) => row.total === 0 && row.hardAgainShare === null,
+      ),
+    ).toBe(true)
     expect(summary.topics).toEqual([])
-    expect(summary.stability).toEqual([])
+    expect(summary.stability).toHaveLength(summary.timeFrame.buckets.length)
+    expect(
+      summary.stability.every(
+        (row) => row.sampleSize === 0 && row.medianStabilityDays === null,
+      ),
+    ).toBe(true)
   })
 
   it('uses only valid persisted ratings for mixed historical readiness evidence', async () => {
@@ -711,7 +1139,7 @@ describe('getAnalyticsSummary dashboard views', () => {
         .where(eq(reviewAttempts.id, `mixed-rating-evidence:default:${index}`))
     }
 
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
 
     for (const readiness of [
       summary.historicalReadiness.requested,
@@ -780,10 +1208,11 @@ describe('getAnalyticsSummary dashboard views', () => {
       difficulty: 5,
     })
 
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
 
     expect(summary.historicalReadiness.practiceRhythm).toMatchObject({
-      ready: true,
+      ready: false,
+      minimumAssessments: 24,
       assessments: 12,
       activeBuckets: 12,
     })
@@ -816,15 +1245,17 @@ describe('getAnalyticsSummary dashboard views', () => {
       difficulty: 5,
     })
 
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
 
     expect(summary.historicalReadiness.requested).toMatchObject({
-      ready: true,
+      ready: false,
+      minimumAssessments: 24,
       assessments: 14,
       activeBuckets: 14,
     })
     expect(summary.historicalReadiness.recallQuality).toMatchObject({
-      ready: true,
+      ready: false,
+      minimumAssessments: 24,
       assessments: 13,
       activeBuckets: 13,
     })
@@ -845,7 +1276,7 @@ describe('getAnalyticsSummary dashboard views', () => {
       difficulty: 5,
     })
 
-    const summary = await getAnalyticsSummary(handle.db, { range: 14, now })
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
     const parsed = analyticsSummarySchema.parse({
       ...summary,
       observedRatingQuality: {
@@ -894,21 +1325,15 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
 
     const summary = await getAnalyticsSummary(handle.db, { range: 90, now })
-    const readiness = summary as typeof summary & {
-      historicalReadiness: {
-        requested: { requestedDays: number; bucketDays: number; ready: boolean }
-        recallQuality: { effectiveBuckets: number }
-        recommendedRange: number | null
-      }
-    }
+    const readiness = summary
 
     expect(readiness.range).toBe(90)
     expect(readiness.historicalReadiness.requested.ready).toBe(false)
     expect(readiness.historicalReadiness.requested).toMatchObject({
       requestedDays: 90,
-      bucketDays: 7,
+      bucketDays: 3,
       ready: false,
-      effectiveStart: '2026-07-20',
+      effectiveStart: '2026-07-21',
     })
     expect(readiness.historicalReadiness.recommendedRange).toBe(30)
     expect(readiness.recallQuality).toHaveLength(
@@ -918,7 +1343,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     expect(readiness.views.retentionMap.rows.length).toBeGreaterThan(0)
   })
 
-  it('recommends only a shorter ready range than the selected range', async () => {
+  it('never recommends the removed 14-day choice for short evidence', async () => {
     const handle = await createTestDb({ seed: false })
     const now = new Date('2026-08-13T12:00:00.000Z')
     const dates = Array.from({ length: 14 }, (_, index) => {
@@ -951,17 +1376,22 @@ describe('getAnalyticsSummary dashboard views', () => {
       range: 90,
       now,
     })
-    const selected14 = await getAnalyticsSummary(handle.db, {
-      range: 14,
+    const selectedAll = await getAnalyticsSummary(handle.db, {
+      range: 'all',
       now,
     })
 
     expect(selected30.historicalReadiness.requested.ready).toBe(false)
-    expect(selected30.historicalReadiness.recommendedRange).toBe(14)
+    expect(selected30.historicalReadiness.recommendedRange).toBeNull()
     expect(selected90.historicalReadiness.requested.ready).toBe(false)
-    expect(selected90.historicalReadiness.recommendedRange).toBe(14)
-    expect(selected14.historicalReadiness.requested.ready).toBe(true)
-    expect(selected14.historicalReadiness.recommendedRange).toBeNull()
+    expect(selected90.historicalReadiness.recommendedRange).toBeNull()
+    expect(selectedAll.historicalReadiness.requested).toMatchObject({
+      ready: true,
+      requestedDays: null,
+      policyDays: 14,
+      minimumAssessments: 12,
+    })
+    expect(selectedAll.historicalReadiness.recommendedRange).toBeNull()
   })
 
   it('never recommends a ready longer range for an unready selected range', async () => {
@@ -1006,7 +1436,7 @@ describe('getAnalyticsSummary dashboard views', () => {
 
     expect(selected30.historicalReadiness.requested.ready).toBe(false)
     expect(selected90.historicalReadiness.requested.ready).toBe(true)
-    expect(selected30.historicalReadiness.recommendedRange).toBe(14)
+    expect(selected30.historicalReadiness.recommendedRange).toBeNull()
   })
 
   it('calculates readiness from each metric’s eligible evidence, not a copied range status', async () => {
@@ -1053,7 +1483,6 @@ describe('getAnalyticsSummary dashboard views', () => {
   })
 
   it.each([
-    [14, 1],
     [30, 3],
     [90, 7],
   ] as const)(
@@ -1106,7 +1535,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
 
     const summary = await getAnalyticsSummary(handle.db, {
-      range: 14,
+      range: 30,
       now,
       timeZone: 'America/New_York',
     })
@@ -1133,9 +1562,9 @@ describe('getAnalyticsSummary dashboard views', () => {
     const now = new Date('2026-03-08T05:30:00.000Z')
     const previous = Array.from(
       { length: 10 },
-      (_, index) => new Date(Date.UTC(2026, 1, 22, 5, index)),
+      (_, index) => new Date(Date.UTC(2026, 1, 6, 5, index)),
     )
-    const previousPartialBoundary = new Date('2026-02-22T06:00:00.000Z')
+    const previousPartialBoundary = new Date('2026-02-06T06:00:00.000Z')
     const selected = Array.from(
       { length: 10 },
       (_, index) => new Date(Date.UTC(2026, 2, 7, 12, index)),
@@ -1163,7 +1592,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     })
 
     const summary = await getAnalyticsSummary(handle.db, {
-      range: 14,
+      range: 30,
       now,
       timeZone: 'America/New_York',
     })

@@ -22,7 +22,7 @@ type RecallRow = AnalyticsViews['observedRecallVsFsrs']['rows'][number]
 
 export function ObservedRecallVsFsrsView({
   view,
-  timeFrame,
+  timeFrame = view.timeFrame,
   targetControl,
 }: {
   view: AnalyticsViews['observedRecallVsFsrs']
@@ -30,10 +30,12 @@ export function ObservedRecallVsFsrsView({
   targetControl?: ReactNode
 }) {
   const [series, setSeries] = useState({ observed: true, estimate: true })
-  const rows = trimHistoricalEmptyEdges(
-    view.rows,
-    (row) => row.observedRecall !== null || row.fsrsEstimate !== null,
-  )
+  const rows = view.timeFrame.history
+    ? view.rows
+    : trimHistoricalEmptyEdges(
+        view.rows,
+        (row) => row.observedRecall !== null || row.fsrsEstimate !== null,
+      )
   const hasValues = rows.length > 0
   const visibleDescription =
     [

@@ -111,7 +111,7 @@ function AnalyticsWorkloadStory({
         title="Recent Overdue Backlog"
       >
         <RecentOverdueBacklogView
-          timeFrame={data.timeFrame}
+          timeFrame={data.views.overdueBacklog.timeFrame}
           view={data.views.overdueBacklog}
         />
       </AnalyticsChartPanel>
@@ -170,7 +170,7 @@ function AnalyticsScopeMetadata({
   const finalBucketEndKey = data.timeFrame.buckets.at(-1)?.endKey
   return (
     <p className="m-0 text-sm text-muted-foreground">
-      Range: {data.range} days
+      Range: {data.range === 'all' ? 'All time' : `${data.range} days`}
       {finalBucketEndKey
         ? ` · Period: ${formatScopeDateTime(data.timeFrame.periodStart, data.timeFrame.timeZone)}–${formatScopeDateKey(finalBucketEndKey)}`
         : ''}{' '}
@@ -256,7 +256,7 @@ function AnalyticsHistoricalStory({
                 onSave={updateTargets.mutateAsync}
               />
             }
-            timeFrame={data.timeFrame}
+            timeFrame={data.views.observedRecallVsFsrs.timeFrame}
             view={data.views.observedRecallVsFsrs}
           />
         </PhaseTwoPanel>
@@ -359,7 +359,11 @@ function AnalyticsHistoricalStory({
               />
             }
             targetReviewSuccess={data.views.practiceRhythm.targetReviewSuccess}
-            selectedPeriod={`${data.range}-day selected period`}
+            selectedPeriod={
+              data.range === 'all'
+                ? 'All time selected period'
+                : `${data.range}-day selected period`
+            }
             view={data.views.topicPerformance}
           />
         </PhaseTwoPanel>
