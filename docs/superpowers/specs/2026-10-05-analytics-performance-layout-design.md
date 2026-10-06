@@ -6,8 +6,10 @@ Status: approved for phase-sized implementation planning. The user approved the
 Value first direction, weighted Performance, cumulative Recall, natural trend
 connections, the ten-card page, and target-relative timing. The final review
 also explicitly preserves green backlog lines strictly below the watch threshold,
-with amber at the threshold and above it. No application implementation has
-started.
+with amber at the threshold and above it. The user subsequently approved the
+researched 30 days / 90 days / All time policy, available-history display for
+new users, independent workload scopes, and deferred tooltip cleanup. No
+application implementation has started.
 
 ## Problem And Outcome
 
@@ -64,11 +66,12 @@ Performance Breakdown. They remain available as explanations, not additional
 overview cards. Assessment time moves out of that nested section into its own
 peer card. Preserve each underlying measurement and all qualifying items.
 
-Keep the existing explicit 14/30/90-day selector in the page header. Show one
-concise scope line with actual selected dates, timezone, and report as-of context.
-Retain page-level historical readiness guidance and its explicit shorter-range
-action; do not change the range automatically. Repeated evidence explanations
-belong in each card's Details rather than permanent paragraphs.
+Use the explicit 30 days / 90 days / All time selector in the page header, with
+30 days as the default. The range remains selected until the user changes it.
+Show one concise scope line with actual displayed dates, timezone, and report
+as-of context. Historical evidence guidance remains metric-specific and never
+hides an available value. Repeated evidence explanations belong in each card's
+Details rather than permanent paragraphs.
 
 Replace the three large summary tiles with a compact activity line containing
 the existing all-time review count and all-time active-day count. Label both
@@ -76,6 +79,130 @@ scopes honestly. Remove the duplicate Observed correctness hero; its current
 Good + Easy calculation remains available in rating details. Do not relabel that
 calculation as independent correctness or change an all-time count into a
 selected-period count by changing only its caption.
+
+## Historical Range And Available History
+
+The approved choices serve three different questions:
+
+| Selection | Purpose                       | Calculation scope                                    |
+| --------- | ----------------------------- | ---------------------------------------------------- |
+| 30 days   | Recent practice; default      | Today and the preceding 29 local dates               |
+| 90 days   | Broader progress              | Today and the preceding 89 local dates               |
+| All time  | The retained learning history | Earliest retained nonfuture raw review through as-of |
+
+This is a product choice informed by established analytics practice, not a claim
+that research establishes one optimal pair of durations.
+[Anki's statistics manual](https://docs.ankiweb.net/stats.html) explains why
+single-day retention can be noisy and recommends a monthly view; it also supports
+all-history statistics and changes grouping with the selected span. Its current
+default is twelve months, and its retention cohort is different from CogniPace's.
+[Amplitude's dashboard documentation](https://www.amplitude.com/docs/analytics/dashboard-filter)
+provides precedent for 30- and 90-day presets.
+[NIST's sample-size guidance](https://www.itl.nist.gov/div898/handbook/prc/section2/prc242.htm)
+supports distinguishing observation count from elapsed days. This is statistical
+context, not a confidence model for dependent reviews or the weighted score.
+
+Derive one shared nullable history origin from the earliest retained raw review
+with a finite timestamp at or before as-of. Find it before rating validity,
+first/follow-up classification, timing, topic, or FSRS-pair eligibility filters.
+Use the report's resolved timezone. Account creation and a metric's first eligible
+bucket are not substitutes for this origin. Keep the complete-history read for
+cohort selection and FSRS replay; adding All time requires no extra per-card query.
+
+For 30/90 days, preserve nominal calculation/comparison bounds separately from
+display bounds. The display starts at the later of the nominal local-date start
+and the shared history-origin local day. All time starts at the history-origin
+local day. It ends at as-of; nominal period ends remain next local midnight,
+exclusive. Do not use 24-hour millisecond subtraction for local dates.
+
+Someone with twelve days of global history keeps 30 days selected and sees
+"Showing your first 12 days · Sep 24–Oct 5." Values are available immediately
+when their own evidence exists. Never manufacture zeros for days before tracking
+started or require thirty elapsed days before showing a score. A long-time user
+with twelve recent active days is a different case: preserve the whole selected
+calendar window, including genuine inactive dates. Sparse cohorts likewise do
+not move the shared page origin. Empty, invalid-date-only, or future-only raw
+history produces an empty historical state while current-state cards remain
+usable.
+
+Preserve each clipped interval's actual bounds and its midpoint within the
+visible domain. An origin inside an existing nominal bucket shortens that bucket;
+it does not move its counts to a fake endpoint or leave a marker outside the
+plot. Keep internal inactivity and trailing cumulative holds. Grouping is a
+presentation choice: every eligible assessment stays in the selected totals;
+sum raw numerators, denominators, and timing observations rather than averaging
+bucket percentages, weighted scores, or medians.
+
+All time is explicitly "All retained history." Use the approved cumulative
+Performance and paired Recall formulas, without new recency weights or a second
+recent score. Show actual eligible samples and the last updated interval. Held
+rows never become evidence or active buckets. Long retained histories use bounded
+adaptive calendar grouping, with grouping metadata supplied alongside intervals
+rather than inferred from the selector.
+
+Choose grouping from the available global calendar span, before metric-specific
+evidence filters. Up to fourteen local dates uses daily buckets; fifteen through
+thirty uses three-day buckets; longer 90-day views use Monday-start calendar
+weeks. Three-day groups remain anchored at the nominal selected start, or the
+history-origin day for All time, and intersect with the displayed domain.
+All time uses Monday-start weeks through 365 available local dates. Beyond that,
+choose the first calendar-month, calendar-quarter, or calendar-year grouping
+whose intersecting interval count is at most sixty, including both clipped edges.
+If annual intervals exceed sixty, use the smallest year stride from
+1, 2, 5, 10, 20, 50, and so on that fits. Year groups begin on January 1 at a
+multiple of the stride. Count intervals before constructing them. Preserve
+Monday boundaries, real month lengths, leap dates, resolved-zone local midnights,
+and the as-of cap. Show the actual grouping. A resolution change may change
+intermediate plotted updates; the final pooled values and eligible counts must
+stay identical. Empty history has no historical buckets or grouping.
+The sixty-bucket bound limits chart output, not the complete-history read or
+FSRS replay work; do not claim that it bounds all computation independently of
+the number of retained reviews.
+
+Readiness remains descriptive sample/cadence guidance, not a display gate or a
+formal confidence guarantee. Keep the existing finite-range sample guidance:
+24 eligible observations for 30 days and 45 for 90 days. For All time, use
+`policyDays = max(1, min(availableDays, 90))` in the existing sample formula,
+`ceil(max(12, policyDays * 0.5, min(policyDays, 30) * 0.8))`; the minimum never
+grows beyond 45 solely because the history is older. These inherited product
+thresholds do not certify weighted scores or dependent-review precision.
+
+Compute span, active buckets, and gaps from raw new-evidence counts for each
+metric within the resolved available-history domain. Pretracking dates are
+absent, genuine inactive dates remain, and cumulative holds count as zero new
+evidence. Preserve the existing effective-window coverage and gap rules, using
+the finite selected duration or capped All time policy duration for coverage;
+the allowed longest gap remains two real supplied intervals. Consume explicit
+grouping rather than encoding months/quarters/years as approximate day widths.
+Allow empty evidence arrays to return no-evidence guidance instead of throwing.
+Guidance names sparse samples, limited updates, or actual inactive spans; it must
+not claim a recorded hold cannot be drawn. One genuine update is still not a
+trend, regardless of the sample volume. Explicit shorter-ready suggestions can
+offer 30/90 only, with no automatic range changes and no 14-day recommendation.
+
+For 30/90-day comparisons, the previous period is the immediately preceding
+equal nominal local-calendar window with the same cohort. Young-history display
+clipping must not shorten or shift that comparison. Retain sparse-comparison
+rules and the existing matched as-of cutoff: shift the current as-of wall-clock
+timestamp back by the nominal selection's calendar days, preserving milliseconds.
+The prior nominal end is still exclusive next local midnight; records after the
+shifted prior as-of are not compared. All time has no previous-lifetime comparison; omit that delta rather than
+inventing an equally long earlier period.
+
+The selected historical range applies to Performance, Time vs target, Practice,
+Topic performance, Recall, and Memory strength. Retention map and Memory signals
+remain current-state snapshots. Overdue backlog always shows the last 30 local
+dates with exact daily known counts, explicit dates, and a "Last 30 days" caption.
+Upcoming reviews always shows the next 14 local dates. Neither workload card
+claims to follow All time. Backlog reconstructs the current retained active-card
+cohort; daily lifetime reconstruction adds cost without supplying a complete
+historical census. Weekly averages would change the daily watch-zone meaning.
+
+Remove 14 days from the primary selector and recommendations. Legacy `range=14`
+links resolve to the default 30-day selection; unsupported route values also
+default to 30. Parse `all` explicitly and keep it distinct in requests and cache
+keys; do not coerce it with `Number()`. Runtime contracts accept exactly 30, 90,
+or `all`. Do not retain a hidden fourth primary choice.
 
 ## Card And Interaction Contract
 
@@ -97,13 +224,18 @@ Suggested primary descriptions are:
 | Memory strength   | FSRS stability after review             |
 | Retention map     | Estimated recall and memory durability  |
 | Memory signals    | Problems that need attention            |
-| Overdue backlog   | Daily overdue reviews                   |
+| Overdue backlog   | Daily overdue reviews · last 30 days    |
 | Upcoming reviews  | Scheduled reviews · next 14 days        |
 
 Performance's header action is Breakdown. Other charts use Details for secondary
 explanation. Chart/Table uses one consistent compact two-state control in the
 card's local control row. Memory signals remains a linked list with pagination,
 not a chart with a meaningless Chart/Table switch. Do not add inert controls.
+
+Tooltip cleanup is explicitly deferred to a separate project. Preserve existing
+inspection access, keyboard/pointer/tap parity, and truthful values required by
+the changed metrics and dates. Do not redesign tooltip appearance, introduce a
+new tooltip framework, or expand tooltip interaction behavior in this refactor.
 
 On desktop, the plot slot grows to use the card's remaining definite height;
 the plot must not determine its parent's height through an aspect ratio or
@@ -203,7 +335,9 @@ weighted `/100` axis.
 Weighted period comparisons use score-point differences, not percentage-point
 changes or differences between rounded heroes. Either period below ten valid
 assessments shows Sparse comparison rather than a directional claim. Legacy
-raw-rate comparisons retain their existing percentage-point meaning.
+raw-rate comparisons retain their existing percentage-point meaning. These
+comparisons exist only for 30/90 days, using nominal preceding windows; All time
+omits them.
 
 ## Recall And Natural Continuity
 
@@ -269,8 +403,10 @@ Updated during Sep 10–16. Do not invent an event timestamp from its bucket end
 The current contract is sufficient; adding raw-event payloads or new timestamps
 solely to smooth the plot is unnecessary.
 
-Keep the full selected calendar domain and original rows for these two views,
-including leading unavailable and trailing held intervals. Date positions,
+Keep the full available-history calendar domain and original rows for these two
+views, including leading unavailable evidence within that shared tracking span
+and trailing held intervals. Clip only days before global history began as
+specified above, never dates before a particular cohort's first update. Date positions,
 midpoints, sparse ticks, cross-year labels, and shortened edge buckets remain
 real. Fitted Recall scales include both cumulative series and the saved Recall
 goal independently of series visibility. Performance uses the fixed 0–100 point
@@ -351,7 +487,8 @@ Retention map retains every eligible question, stable full-cohort domains,
 All/Below target, exact status marks/counts, overlap chooser, pointer/touch/
 keyboard inspection, box/gesture/button zoom, reset, and pinned linked details.
 Current estimated recall and durability are not carried historical Recall.
-Backlog keeps straight known-day connections and unknown breaks. Both its line
+Backlog uses its independent last-30-day daily domain and keeps straight known-day
+connections and unknown breaks. Both its line
 and measured markers are green strictly below the configured watch threshold and
 amber at or above it. Split a crossing line at the exact threshold without adding a
 new observation or changing its geometry; a flat line and every measured marker
@@ -411,9 +548,11 @@ dependencies, or a generic chart framework.
 Primary ownership remains:
 
 - `src/features/analytics/domain`: pure weighted score, cumulative presentation,
-  existing eligibility/range/readiness, and topic joint aggregation.
-- `src/features/analytics/api/analytics-contracts.ts`: topic joint-count transport
-  and shared pair invariants, including paired count/value availability.
+  existing eligibility/readiness, available-history bounds and calendar grouping,
+  and topic joint aggregation.
+- `src/features/analytics/api/analytics-contracts.ts`: explicit 30/90/all selection,
+  range/grouping context, topic joint-count transport, and shared pair invariants,
+  including paired count/value availability.
 - `src/features/analytics/server/analytics-service.ts`: compose the existing
   validated read model, without chart-specific database calls.
 - `src/features/analytics/components`: common panel slots/control placement,
@@ -422,11 +561,16 @@ Primary ownership remains:
 - `src/app/dashboard/screens/analytics-page.tsx`: existing route/header composition
   only where needed; domain calculations stay inside Analytics.
 
-Separate execution into three phase-sized plans after written-spec approval:
+Separate execution into phase-sized plans after written-spec approval:
 
-1. Pure weighted/cumulative models and topic runtime contract.
-2. Performance/Recall UI, breakdowns, goals, and exact inspection/Table parity.
-3. Ten-card organization, shared plot sizing, bar density, copy, all remaining
+1. [Pure history-window/calendar-grouping foundation](../plans/2026-10-05-analytics-history-window-foundation.md), with explicit selection,
+   shared raw-history origin, nominal/display separation, bounded All time
+   intervals, and independent daily backlog bounds.
+2. Range runtime/service/route integration, sample guidance, explicit card scopes,
+   and legacy 14-day link normalization.
+3. Pure weighted/cumulative models and topic runtime contract.
+4. Performance/Recall UI, breakdowns, goals, and exact inspection/Table parity.
+5. Ten-card organization, shared plot sizing, bar density, copy, all remaining
    views, authority-doc updates, and complete verification.
 
 Update `docs/product.md`, `docs/architecture.md`, `docs/testing.md`, and
@@ -448,6 +592,14 @@ and unchanged readiness under held rows. Geometry tests cover rising/falling/
 equal/boundary values, active runs, long gaps, singleton and shortened/partial
 buckets, bounded curves, actual midpoint endpoints, and no activity invented in
 holds. Runtime tests reject inconsistent pairs and topic count matrices.
+
+Range regressions cover 30/90/all, same-day and twelve-day global histories,
+first-only Recall emptiness, old history with sparse recent activity, empty and
+future-only history, an origin inside an edge bucket, DST and year boundaries,
+long lifetimes with a bounded number of real intervals, every record counted,
+nominal prior comparisons independent of display clipping, and no All time
+prior delta. Test exact fixed-30-day backlog scope under every primary selection,
+unchanged fourteen-date forecasts, explicit cache keys, and legacy 14-day links.
 
 Backlog regressions cover green below the configured threshold, amber at and
 above it, flat threshold spans, both crossing directions, unknown-day breaks,
@@ -484,10 +636,11 @@ The concept preview is separate design evidence, not production-component proof.
 
 Before PR review or merge, the human engineer must rebuild/reload the installed
 extension and complete happy-path and edge-case Analytics smoke with screenshots
-or recording. Include 14/30/90 days, ready/sparse/empty history, a genuine zero,
+or recording. Include 30/90 days and All time, young/sparse/empty/long history, a genuine zero,
 leading/internal/trailing gaps, one update, an in-progress bucket, cross-year
 context when available, goal saves/failures, topic coverage, and all current-state
-and workload interactions. Record unexercised cases as pending; do not mark
+and workload interactions. Confirm Last 30 days backlog and Next 14 days upcoming
+remain independent of historical selection. Record unexercised cases as pending; do not mark
 behavior-changing manual proof as N/A.
 
 Completion means the new overview is glanceable and consistent, all existing
@@ -565,3 +718,25 @@ rtk git diff --check
 `rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` are skipped
 for this design-only refinement. Application implementation, production-component
 proof, and human installed-extension smoke remain pending.
+
+For the approved range amendment, two independent read-only reviews checked
+calendar grouping, raw-history origin, nominal comparison bounds, workload cost,
+readiness counts, and route/cache compatibility. The source rationale above
+supports the product decision without claiming scientifically optimal durations.
+The first pure-foundation plan was checked inline for scope coverage, complete
+code steps, matching signatures, and placeholder-free instructions. No application
+files or visual reference were changed.
+
+Commands run for this Markdown-only amendment and phase plan:
+
+```sh
+rtk proxy node /Users/tobiolutimehin/WebstormProjects/cognipace-v2/node_modules/prettier/bin/prettier.cjs --ignore-path /dev/null --write docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md docs/superpowers/plans/2026-10-05-analytics-history-window-foundation.md docs/superpowers/README.md
+rtk proxy node /Users/tobiolutimehin/WebstormProjects/cognipace-v2/node_modules/prettier/bin/prettier.cjs --ignore-path /dev/null --check docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md docs/superpowers/plans/2026-10-05-analytics-history-window-foundation.md docs/superpowers/README.md
+rtk git diff --check
+```
+
+Commands skipped: `rtk npm run lint`, `rtk npm run check`, and
+`rtk npm run build`, because this change contains planning Markdown only.
+`rtk npm run test -- src/features/analytics/domain/analytics-history-window.test.ts src/features/analytics/domain/analytics-time.test.ts src/features/analytics/domain/analytics-range-policy.test.ts`
+is also unrun: the new application module/tests are plan content, not implemented
+files. The phase plan and all production/human verification remain unexecuted.

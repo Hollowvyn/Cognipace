@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall with natural held trends, ten-card organization, target-relative timing, and green backlog lines strictly below the watch threshold. Phase-sized planning is next; no application implementation yet.
+- [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall, ten-card organization, target-relative timing, strict backlog color boundary, and 30/90/All time with available young history. Backlog stays Last 30 days, Upcoming Next 14 days, and tooltip cleanup is deferred. The pure history-window foundation plan is written; no application implementation yet.
 
 - [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
 
@@ -74,6 +74,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-05-analytics-history-window-foundation.md`](./plans/2026-10-05-analytics-history-window-foundation.md): unexecuted first phase for explicit selection, shared raw-history origin, nominal/display/prior bounds, bounded calendar intervals, and independent daily backlog dates. Runtime/service/route/readiness integration follows as a separate phase.
 
 - [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
 
