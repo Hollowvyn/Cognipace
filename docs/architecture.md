@@ -674,37 +674,55 @@ report, provider metadata, criterion, and checked date in
 or read the application's trusted secret store. Normal tests skip all six live
 cases before reading any evaluation provider/model/key values.
 
-### Manual progressive hints
+### Manual adaptive hints
 
-`overlay-session` owns the transient hint batch, revealed count, disclosure,
-and in-flight operation above the collapsed, expanded, and docked modes. The
-Solve Help action starts a request explicitly; folding, reopening, tab or mode
-changes, review saves/updates, and ordinary refetches do not generate hints.
-Accepted and failed saves retain the batch. Restart, navigation, reload/remount,
-selected input changes, saved connection changes/removal, and local-data clear
-invalidate it. Automatic-assessment enable-only changes preserve it. Notes
-remains reserved without editing or persistence.
+`overlay-session` owns transient hint history, disclosure and the in-flight
+operation above visual modes. Solve Help explicitly requests one new hint at a
+time, up to three successful hints per session. Folding/reopening, mode/tab
+changes, review saves/updates and ordinary editor edits preserve history without
+requesting generation. Restart, navigation, reload/remount, selected problem
+input changes, saved connection changes/removal and local-data clear invalidate
+history and reject late output. Assessment enable-only toggles preserve it.
 
 `leetcode-capture` prepares complete matching problem context without requiring
-a submission: canonical title, statement, `examples[].rawText`, and
-constraints, with supported host and slug. The selected JSON identity contains
-only those inputs. Editor code, submissions, diagnostics, topics, official
-hints, follow-ups, and authentication data are excluded; enrichment of excluded
-fields preserves the batch, while any selected-input change invalidates it.
-Preparation and the strict problem-only runtime contract reject incomplete,
-mismatched, or oversized input rather than repairing or truncating it. Selected
-problem JSON is limited to 24,000 characters, 50 examples, and 100 constraints.
-Selected-input identity stays local to the controller. Runtime requests contain
-`surface`, `requestId`, problem and connection revision/provider; problem
-host/slug is not duplicated. Responses correlate by `requestId`, while the
-controller verifies its current operation, local input identity and connection.
+a submission: canonical title, statement, `examples[].rawText`, constraints,
+host and slug. Problem identity contains these inputs; diagnostics, topics,
+official hints, follow-ups and authentication data remain excluded. Incomplete,
+mismatched or oversized problem input is rejected without truncation. Serialized
+problem JSON is limited to 24,000 characters, 50 examples and 100 constraints.
 
-`leetcode-review-assistant` owns the hint request/response schemas, prompt, and
-service. A batch contains one to three distinct, trimmed, nonblank pointers of
-at most 200 characters each. The prompt requests increasingly specific
-conceptual nudges without code or a complete answer. Structural validation does
-not establish usefulness, progressive strength, or spoiler restraint; real
-provider quality requires separate evaluation.
+`src/lib/leetcode/editor` owns a read-only complete editor snapshot bridge.
+A static MAIN-world content script reads the live solution Monaco model on each
+explicit hint request. It identifies the editor attached to the solution root
+and rejects missing or ambiguous models; virtualized visible lines and Monaco's
+input textarea cannot establish completeness. Strict bounded page envelopes
+bind request UUID, host and slug, validate source/origin/location, and clean up
+on completion, abort and timeout. Page data remains untrusted and grants no
+extension authority. Complete code is bounded to 32,000 characters per snapshot;
+empty text is valid. Capture failure offers Retry, never problem-only fallback.
+This adds no Chrome permission, provider host or extension API in the page world.
+
+`leetcode-review-assistant` owns strict single-turn contracts and generation.
+Each request carries the current `{ code, language, capturedAt }` snapshot and
+at most two previous `{ snapshot, hint }` turns alongside problem and connection
+revision/provider. One response contains `{ text, strength, progress }`. A hint
+is trimmed, nonblank, at most 600 characters and rendered as inert text.
+The first turn is light/initial. Identical code/language (normalizing only line
+endings) forces stuck and escalates light to medium to heavy. Changed code lets
+the model assess semantic progress: improved returns to light; cosmetic edits,
+irrelevant changes and regressions strengthen guidance. Heavy remains heavy if
+still stuck. Validation rejects inconsistent transitions and duplicate hints.
+The prompt preserves valid strategies, targets the smallest remaining gap and
+avoids complete implementations or invented defects. A model progress judgment
+is not proof of correctness; live provider quality requires separate evaluation.
+
+Every Get next hint and Retry captures fresh code and makes one new provider
+request. A failure does not consume a slot; previous hints remain visible during
+pending/error states. A completed hint remains bound to its request-time code,
+even if the learner types while generation is pending. Editor changes do not
+invalidate historical guidance. Problem/connection identity and request-owner
+checks still reject obsolete output. History and snapshots remain session-only,
+outside database, query/mutation caches, backup and sync.
 
 GenAI exposes only `{ available, provider, revision }` to the content script;
 `revision` is an opaque UUID, and availability uses the selected saved provider,
@@ -715,8 +733,8 @@ enable-only changes do not. Per-database issued/committed read ordering and a
 captured registry reset epoch prevent late configuration reads from overwriting
 a newer observation or repopulating a reset registry.
 
-Broad GenAI invalidation refetches public connection metadata; the batch
-survives when revision and selected inputs remain the same. Full local-data
+Broad GenAI invalidation refetches public connection metadata; the history
+survives when revision and selected problem inputs remain the same. Full local-data
 reset/restore rotates the private in-memory registry before broadcast. The
 single existing application cache listener recognizes the existing full
 replacement signature and clears cached public hint metadata after cancelling

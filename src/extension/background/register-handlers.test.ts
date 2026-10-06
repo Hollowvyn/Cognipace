@@ -718,13 +718,19 @@ describe('background handler registration', () => {
       surface: 'content-script',
       requestId: 'hint-1',
       problem,
+      snapshot: { code: '', language: 'javascript', capturedAt: 0 },
+      history: [],
       connectionRevision: '00000000-0000-4000-8000-000000000001',
       connectionProvider: 'gemini',
     })
     const response = {
       status: 'ready',
       requestId: request.requestId,
-      batch: { hints: ['Consider lookup.'] },
+      hint: {
+        text: 'Consider lookup.',
+        strength: 'light',
+        progress: 'initial',
+      },
     }
     beforeEach(async () => {
       const actual =

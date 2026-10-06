@@ -97,13 +97,20 @@ Current behavior:
 - an explicit AI hints action beside YouTube in Solve's Help row, using the
   selected saved provider, model, and key independently of whether automatic
   AI assessment is on or off
-- one requested batch of one to three progressively stronger short pointers:
-  the first appears immediately when ready, and Reveal next exposes the next
-  pointer locally without another provider request
-- session-only hints that retain their batch, revealed count, and disclosure
+- one new code-aware hint per explicit request, with at most three successful
+  hints per session; each request captures the complete current editor code and
+  language and includes earlier hints with their code snapshots
+- a light first hint; unchanged code escalates to medium then heavy, while
+  meaningful progress gets a light nudge at the next gap; cosmetic edits,
+  irrelevant changes and regressions receive stronger guidance
+- Light, Medium and Heavy describe specificity independently of the hint count;
+  hints respect the learner's valid approach and focus on remaining logic or
+  edge cases, rather than forcing a single reference solution
+- session-only hints that retain their history and disclosure
   across folding/reopening Help, tab switches, collapse/dock/restore, accepted
   or failed review saves, rating updates, and ordinary metadata refetches;
-  none of these actions generates another batch
+  none of these actions generates another hint; ordinary code edits preserve
+  earlier hints, and Get next hint captures the editor again
 - hints reset on Restart, a different problem, page reload, overlay remount,
   selected problem-input changes, a changed or removed saved connection, or
   clear local data; toggling automatic AI assessment alone preserves them
@@ -112,6 +119,14 @@ Current behavior:
 Hints exist only in the current overlay session. They never write review/log
 fields, rating, solve time, FSRS, Analytics, backup, or sync data. Notes remains
 a reserved, deferred tab without editing or persistence.
+
+Missing, ambiguous or oversized editor capture shows a retryable unavailable
+state rather than using visible lines or generating generic problem-only advice.
+Empty editor text is a valid starting point. Each hint remains attached to the
+snapshot read when requested, even if the user edits while generation is pending.
+Earlier hints remain visible during a later request or error; failures do not
+consume a hint slot. Real provider quality and human installed-extension smoke
+remain pending until their proof is recorded.
 
 Submission notes stay in LeetCode. Existing saved CogniPace log fields remain
 preserved in local practice history, backups, and sync; overlay review saves and
@@ -403,7 +418,8 @@ availability, and usage limits can vary. Users can explicitly enter another free
 or paid model ID. CogniPace never configures paid fallback model IDs or switches
 a failed free request to a paid model. Connection testing checks basic access
 and structured output, not full report quality or every future routed model.
-OpenRouter forwards submission code and problem context to a model provider;
+OpenRouter forwards submission analysis and explicitly requested hint code,
+problem context and previous hint snapshots to a model provider;
 OpenRouter and provider data policies apply, including account privacy routing
 settings.
 

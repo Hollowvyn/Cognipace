@@ -10,7 +10,7 @@ CogniPace is a local-first Chrome extension for planning and recording deliberat
 - Core problem, practice, review, track, settings, and analytics data stays in the user's Chrome browser profile.
 - CogniPace does not contain developer-operated analytics, advertising, or tracking.
 - CogniPace does not sell personal information.
-- GitHub Gist sync and AI assessments are optional and use credentials supplied by the user.
+- GitHub Gist sync, AI assessments, and requested AI hints are optional and use credentials supplied by the user.
 
 ## Information CogniPace Handles
 
@@ -30,9 +30,19 @@ If the user enables GitHub Gist sync, CogniPace stores the user-provided GitHub 
 
 CogniPace stores the user's selected-provider API key in trusted local extension
 storage. The user can choose OpenAI, Anthropic, Google Gemini, or OpenRouter.
-Saving and testing a connection sends a small structured verification request
-even while AI assessment is disabled. Connection testing does not send a
+Saving or activating a connection does not send a provider request. Explicit
+connection testing sends a small structured verification request even while
+AI assessment is disabled. Connection testing does not send a
 submission's solution code or enable assessment.
+
+When the user explicitly requests an AI hint, CogniPace sends the current
+complete editor code and language, problem title, slug, statement, examples and
+constraints, and up to two previous hint texts with their code snapshots to the
+selected service. Each next hint captures the editor again; hint requests work
+independently of automatic assessment enablement. Code snapshots and hints stay
+only in the active overlay session and are excluded from the database, backups
+and sync. OpenRouter forwards hint input to its serving model provider under
+the same provider policies and account privacy settings described below.
 
 When the user enables AI assessment, completed-submission analysis sends the
 problem slug, title, difficulty, topics, statement, examples, constraints,
@@ -61,8 +71,9 @@ Core data is processed locally in the browser. Information leaves the browser on
 - LeetCode requests support the problem-page and submission workflow and may include browser credentials or session cookies through the authenticated user workflow; these requests are sent only to LeetCode.
 - GitHub requests validate a user-supplied token and perform optional Gist sync.
 - AI-service requests perform user-requested connection tests or enabled code
-  analysis using the user's selected provider and API key. OpenRouter forwards
-  analysis input to the serving model provider under the applicable policies.
+  analysis or explicitly requested code-aware hints using the user's selected
+  provider and API key. OpenRouter forwards analysis and hint input to the
+  serving model provider under the applicable policies.
 
 CogniPace does not send this information to a CogniPace-operated server. It does not share information with independent advertisers or analytics providers.
 Raw GitHub tokens and AI-provider API keys are kept in local extension storage. They are excluded from CogniPace backup files, Gist sync envelopes, logs, and user-interface status payloads.

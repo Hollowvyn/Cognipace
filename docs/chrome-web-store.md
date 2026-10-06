@@ -80,17 +80,29 @@ Sends a small user-requested connection test with the user's saved OpenAI key,
 or completed-submission code analysis when AI assessment is enabled and OpenAI
 is selected.
 
+Explicit AI hint requests also send current editor code, language, problem
+context and up to two earlier hint/code snapshots using the saved active
+connection, independently of automatic assessment enablement.
+
 ### `https://api.anthropic.com/*`
 
 Sends a small user-requested connection test with the user's saved Anthropic
 key, or completed-submission code analysis when AI assessment is enabled and
 Anthropic is selected.
 
+Explicit AI hint requests also send current editor code, language, problem
+context and up to two earlier hint/code snapshots using the saved active
+connection, independently of automatic assessment enablement.
+
 ### `https://generativelanguage.googleapis.com/*`
 
 Sends a small user-requested connection test with the user's saved Gemini key,
 or completed-submission code analysis when AI assessment is enabled and Gemini
 is selected.
+
+Explicit AI hint requests also send current editor code, language, problem
+context and up to two earlier hint/code snapshots using the saved active
+connection, independently of automatic assessment enablement.
 
 ### `https://openrouter.ai/*`
 
@@ -101,6 +113,11 @@ provider under OpenRouter and provider data policies and account privacy
 settings. No developer key is bundled. `openrouter/free` is an editable
 suggestion; the app does not configure paid fallback model IDs. Model-provider
 domains behind OpenRouter do not receive additional extension host access.
+
+Explicit AI hint requests also send current editor code, language, problem
+context and up to two earlier hint/code snapshots using the saved active
+connection, independently of automatic assessment enablement. OpenRouter
+forwards hint input to the serving model provider under the same policies.
 
 ## Remote Code
 
@@ -161,6 +178,10 @@ test while assessment is off, reopen the exact saved model, then use the
 explicit free preset and save/test again. Only enable assessment when ready
 to send submission code and problem context. Free routing can vary in quality,
 latency, and capacity. Do not include test keys in submitted evidence.
+
+The Solve Help AI action separately requests hints and sends current editor
+code even while automatic assessment is off. Each next hint reads the editor
+again, up to three successful hints per overlay session.
 
 ## Private Distribution
 

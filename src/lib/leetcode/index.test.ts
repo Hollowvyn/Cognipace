@@ -6,6 +6,7 @@ describe('LeetCode public API facade', () => {
   it('exports the stable feature-facing runtime facade', () => {
     expect(Object.keys(leetcode).sort()).toEqual(
       [
+        'completeCodeSnapshotSchema',
         'createEmptyLeetCodeCaptureState',
         'createLeetCodeFetchRemoteClient',
         'createLeetCodePageWatcher',
@@ -18,6 +19,7 @@ describe('LeetCode public API facade', () => {
         'normalizeLeetCodeSlug',
         'parseLeetCodeProblemInput',
         'parseLeetCodeProblemLocation',
+        'readCompleteLeetCodeEditorSnapshot',
         'readLeetCodeLanguageLabelFromText',
         'readLeetCodeRemoteAuthFromDocument',
         'reduceLeetCodeCaptureState',

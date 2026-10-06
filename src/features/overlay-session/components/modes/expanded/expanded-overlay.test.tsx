@@ -15,8 +15,16 @@ describe('ExpandedOverlay', () => {
         hints: {
           status: 'ready',
           isOpen: true,
-          batch: { hints: ['First pointer', 'Second pointer'] },
-          revealedCount: 1,
+          history: [
+            {
+              snapshot: { code: '', language: 'typescript', capturedAt: 1 },
+              hint: {
+                text: 'First pointer',
+                strength: 'light',
+                progress: 'initial',
+              },
+            },
+          ],
         },
       },
     })
@@ -25,7 +33,7 @@ describe('ExpandedOverlay', () => {
     expect(screen.getByRole('region', { name: 'AI hints' })).toBeInTheDocument()
     expect(screen.getByText('First pointer')).toBeInTheDocument()
     expect(screen.queryByText('Second pointer')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Reveal next hint' }))
+    await user.click(screen.getByRole('button', { name: 'Get next hint' }))
     await user.click(screen.getByRole('button', { name: 'Show AI hints' }))
     expect(props.commands.onRevealNextHint).toHaveBeenCalledOnce()
     expect(props.commands.onToggleHints).toHaveBeenCalledOnce()
@@ -35,6 +43,7 @@ describe('ExpandedOverlay', () => {
     const props = createProps({
       view: {
         hints: {
+          history: [],
           status: 'error',
           isOpen: true,
           code: 'auth',

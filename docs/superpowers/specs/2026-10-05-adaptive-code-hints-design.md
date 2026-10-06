@@ -1,7 +1,9 @@
 # Adaptive code hints
 
-Status: design approved by the user in chat on 2026-10-05. Implementation and
-validation pending. This replaces the problem-only batch behavior for hints.
+Status: design approved by the user in chat on 2026-10-05. Implemented locally
+with independent reviews and passing automated validation. Human installed-extension
+smoke, live editor compatibility and live provider quality remain pending; see
+the linked plan and handoff. This replaces the problem-only batch behavior for hints.
 
 ## Behavior
 

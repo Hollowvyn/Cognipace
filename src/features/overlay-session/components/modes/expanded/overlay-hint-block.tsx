@@ -24,37 +24,46 @@ export function OverlayHintBlock({
       className="mt-3 grid gap-3 rounded-lg border border-border p-3"
     >
       <h3 id="overlay-ai-hints-heading" className="text-sm font-semibold">
-        {state.status === 'ready'
-          ? `Hints · ${state.revealedCount} of ${state.batch.hints.length}`
-          : 'AI hints'}
+        {`Hints · ${state.history.length} of 3`}
       </h3>
+      <p className="text-xs text-muted-foreground">
+        Based on code when requested
+      </p>
+      {state.history.length ? (
+        <ol className="list-decimal space-y-2 pl-5 text-sm">
+          {state.history.map(({ hint }, index) => (
+            <li key={index} className="break-words whitespace-pre-wrap">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                {hint.strength[0]!.toUpperCase() + hint.strength.slice(1)}
+              </span>
+              {hint.text}
+            </li>
+          ))}
+        </ol>
+      ) : null}
       {state.status === 'pending' ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {state.phase === 'preparation'
-            ? 'Reading problem details…'
-            : 'Generating hints…'}
-        </p>
-      ) : state.status === 'ready' ? (
         <>
-          <ol className="list-decimal space-y-2 pl-5 text-sm">
-            {state.batch.hints
-              .slice(0, state.revealedCount)
-              .map((hint, index) => (
-                <li key={index} className="break-words whitespace-pre-wrap">
-                  {hint}
-                </li>
-              ))}
-          </ol>
-          {state.revealedCount < state.batch.hints.length ? (
-            <Button variant="outline" size="sm" onClick={onRevealNext}>
-              Reveal next hint
+          <p role="status" className="text-sm text-muted-foreground">
+            {state.phase === 'preparation'
+              ? 'Reading code and problem details…'
+              : 'Generating hint…'}
+          </p>
+          {state.history.length ? (
+            <Button variant="outline" size="sm" disabled>
+              Get next hint
             </Button>
-          ) : (
-            <p role="status" className="text-xs text-muted-foreground">
-              All {state.batch.hints.length} hints revealed
-            </p>
-          )}
+          ) : null}
         </>
+      ) : state.status === 'ready' ? (
+        state.history.length < 3 ? (
+          <Button variant="outline" size="sm" onClick={onRevealNext}>
+            Get next hint
+          </Button>
+        ) : (
+          <p role="status" className="text-xs text-muted-foreground">
+            All 3 hints requested
+          </p>
+        )
       ) : (
         <>
           <p role="status" className="text-sm text-muted-foreground">

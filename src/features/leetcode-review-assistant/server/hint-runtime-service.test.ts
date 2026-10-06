@@ -44,8 +44,14 @@ const request = generateLeetCodeHintsRequestSchema.parse({
   connectionRevision: revision,
   connectionProvider: config.provider,
   problem,
+  snapshot: { code: '', language: 'javascript', capturedAt: 0 },
+  history: [],
 })
-const batch = { hints: ['Think about the complement of each value.'] }
+const hint = {
+  text: 'Think about the complement of each value.',
+  strength: 'light' as const,
+  progress: 'initial' as const,
+}
 const metadata = {
   provider: config.provider,
   model: config.model,
@@ -53,7 +59,7 @@ const metadata = {
 }
 const success = {
   status: 'success' as const,
-  data: batch,
+  data: hint,
   providerMetadata: metadata,
 }
 const db = { kind: 'test-db' } as unknown as Db
@@ -91,23 +97,71 @@ afterEach(() => {
 })
 
 describe('trusted background hints', () => {
-  it('returns one ready batch correlated only by request id', async () => {
+  it('returns one ready hint correlated only by request id', async () => {
     const result = await runHints()
     expect(result).toEqual({
       status: 'ready',
       requestId: request.requestId,
-      batch,
+      hint,
     })
     expectSafe(result)
     expect(generateHints).toHaveBeenCalledTimes(1)
     expect(generateHints).toHaveBeenCalledWith(
-      request.problem,
+      {
+        problem: request.problem,
+        snapshot: request.snapshot,
+        history: request.history,
+      },
       config,
       expect.any(AbortSignal),
     )
     expect(readSnapshot).toHaveBeenCalledTimes(2)
     expect(readSnapshot).toHaveBeenNthCalledWith(1, db)
     expect(readSnapshot).toHaveBeenNthCalledWith(2, db)
+  })
+
+  it('rejects malformed snapshot history before trusted preparation', async () => {
+    const malformed = {
+      ...request,
+      snapshot: { ...request.snapshot, code: 'x'.repeat(32001) },
+    }
+    const result = await generateLeetCodeHintsInBackground(
+      malformed,
+      loadDb,
+      new AbortController().signal,
+    )
+    expect(result).toMatchObject({ status: 'error', code: 'bad-request' })
+    expectSafe(result)
+    expect(loadDb).not.toHaveBeenCalled()
+    expect(generateHints).not.toHaveBeenCalled()
+  })
+
+  it('forwards the entire validated snapshot and prior hint to generation', async () => {
+    const history = [{ snapshot: request.snapshot, hint }]
+    const nextRequest = {
+      ...request,
+      snapshot: { ...request.snapshot, code: 'updated' },
+      history,
+    }
+    generateHints.mockResolvedValue({
+      ...success,
+      data: { text: 'Next gap.', strength: 'light', progress: 'improved' },
+    })
+    const result = await generateLeetCodeHintsInBackground(
+      nextRequest,
+      loadDb,
+      new AbortController().signal,
+    )
+    expect(result).toMatchObject({
+      status: 'ready',
+      hint: { strength: 'light', progress: 'improved' },
+    })
+    expect(generateHints).toHaveBeenCalledWith(
+      { problem: request.problem, snapshot: nextRequest.snapshot, history },
+      config,
+      expect.any(AbortSignal),
+    )
+    expectSafe(result)
   })
 
   it('returns a controlled missing-connection error without generation', async () => {
