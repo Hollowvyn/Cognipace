@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): user-approved Value first visual direction, weighted Performance and cumulative paired Recall with natural held trends; consolidated ten-card organization and control contract awaits written-spec review before phase-sized planning. No application implementation yet.
+- [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall with natural held trends, ten-card organization, target-relative timing, and green backlog lines strictly below the watch threshold. Phase-sized planning is next; no application implementation yet.
 
 - [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
 

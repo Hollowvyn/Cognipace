@@ -2,11 +2,12 @@
 
 Date: 2026-10-05
 
-Status: the user approved the Value first visual direction, weighted Performance,
-cumulative Recall, and natural trend connections. This consolidated written
-specification awaits the user's review before phase-sized implementation plans.
-The user also approved the complete ten-card page direction and requested a
-target-relative timing refinement; that refined card is proposed below.
+Status: approved for phase-sized implementation planning. The user approved the
+Value first direction, weighted Performance, cumulative Recall, natural trend
+connections, the ten-card page, and target-relative timing. The final review
+also explicitly preserves green backlog lines strictly below the watch threshold,
+with amber at the threshold and above it. No application implementation has
+started.
 
 ## Problem And Outcome
 
@@ -350,10 +351,14 @@ Retention map retains every eligible question, stable full-cohort domains,
 All/Below target, exact status marks/counts, overlap chooser, pointer/touch/
 keyboard inspection, box/gesture/button zoom, reset, and pinned linked details.
 Current estimated recall and durability are not carried historical Recall.
-Backlog keeps straight known-day connections and unknown breaks. Upcoming
-keeps all fourteen date slots and separate exact Due/Overdue stacks. Do not apply
-cumulative holding or smoothing to counts, forecasts, stability, or current
-model estimates. Those quantities have different meanings.
+Backlog keeps straight known-day connections and unknown breaks. Both its line
+and measured markers are green strictly below the configured watch threshold and
+amber at or above it. Split a crossing line at the exact threshold without adding a
+new observation or changing its geometry; a flat line and every measured marker
+at the threshold are amber. Upcoming keeps all fourteen date slots and separate
+exact Due/Overdue stacks. Do not apply cumulative holding or smoothing to counts,
+forecasts, stability, or current model estimates. Those quantities have different
+meanings.
 
 Saved goals retain existing Settings fields, units, defaults, atomic one-key
 updates, backup compatibility, and configured sync behavior. Performance has
@@ -443,6 +448,10 @@ and unchanged readiness under held rows. Geometry tests cover rising/falling/
 equal/boundary values, active runs, long gaps, singleton and shortened/partial
 buckets, bounded curves, actual midpoint endpoints, and no activity invented in
 holds. Runtime tests reject inconsistent pairs and topic count matrices.
+
+Backlog regressions cover green below the configured threshold, amber at and
+above it, flat threshold spans, both crossing directions, unknown-day breaks,
+unchanged straight-line geometry, and no extra observation markers.
 
 Timing regressions cover below/at/above-target medians, exact minute and percent
 deltas, uncapped ratios above 100%, missing durations, Unknown without an
@@ -536,3 +545,23 @@ rtk git diff --check
 `rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` remain skipped
 because this refinement changes planning Markdown and the conversation concept,
 with no application code or runtime behavior changed.
+
+For the final backlog refinement, green applies strictly below the configured
+watch threshold; measured points and flat spans at the threshold are amber.
+The concept was visually inspected after the change. Its 30 measured days and
+straight-line geometry are unchanged, with 5 green measured points and all
+4 threshold points amber. Boundary crossings, a flat threshold span, and
+unknown-day breaks passed the focused geometry audit.
+
+Commands run for this refinement:
+
+```sh
+rtk proxy node /private/tmp/analytics-backlog-boundary-audit.mjs
+rtk proxy node /Users/tobiolutimehin/WebstormProjects/cognipace-v2/node_modules/prettier/bin/prettier.cjs --ignore-path /dev/null --write docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md docs/superpowers/README.md
+rtk proxy node /Users/tobiolutimehin/WebstormProjects/cognipace-v2/node_modules/prettier/bin/prettier.cjs --ignore-path /dev/null --check docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md docs/superpowers/README.md
+rtk git diff --check
+```
+
+`rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` are skipped
+for this design-only refinement. Application implementation, production-component
+proof, and human installed-extension smoke remain pending.
