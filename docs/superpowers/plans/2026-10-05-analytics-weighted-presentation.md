@@ -10,7 +10,7 @@
 
 ---
 
-Status: written for execution after runtime integration. The approved design is `docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md`; the final source is `assets/2026-10-05-analytics-range-summary-approved.html`. Root owns commits and independent reviews.
+Status: Task 1 implemented and independently reviewed; Tasks 2 and 3 follow. The approved design is `docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md`; the final source is `assets/2026-10-05-analytics-range-summary-approved.html`. Root owns commits and independent reviews.
 
 ## Task 1: Shared Weighted And Cumulative Models
 
@@ -23,7 +23,7 @@ Status: written for execution after runtime integration. The approved design is 
 - Create: `src/features/analytics/domain/time-target-presentation.ts`
 - Create: `src/features/analytics/domain/time-target-presentation.test.ts`
 
-- [ ] **Step 1: Write failing weighted-score tests using existing difficulty-stat fixtures.**
+- [x] **Step 1: Write failing weighted-score tests using existing difficulty-stat fixtures.**
 
 Use this fixed rubric:
 
@@ -56,7 +56,7 @@ expect(aggregatePerformance(allAgainCounts).score).toBe(0)
 expect(aggregatePerformance(emptyCounts).score).toBeNull()
 ```
 
-- [ ] **Step 2: Run RED and implement exact aggregation.**
+- [x] **Step 2: Run RED and implement exact aggregation.**
 
 Run `rtk npm run test -- src/features/analytics/domain/performance-presentation.test.ts`. Expected: missing exports or new score assertions fail. Export `aggregatePerformance` accepting four difficulty rating-count records, and `buildPerformancePresentation(cohort)` accepting existing `ProblemSolvingCohortView`. Keep a reusable count-only matrix type so Topics does not invent timing or outcome fields.
 
@@ -74,13 +74,13 @@ The implementation iterates difficulty keys and rating keys, adds `count * ratin
 
 Each cumulative row preserves original raw interval fields and adds `interval`, `cumulative`, `state: 'unavailable' | 'updated' | 'held'`, and `lastUpdatedInterval` with original ID/start/end. Unavailable rows precede the first valid rating; updated rows add actual points/units; empty rows after evidence carry the previous total without adding observations. Final cumulative totals must equal aggregate cohort totals. Do not average interval scores. Keep a prior comparison only when both current and prior actual valid counts are at least ten and a real prior period exists; All time has no comparison.
 
-- [ ] **Step 3: Add paired Recall RED tests and implement the cumulative model.**
+- [x] **Step 3: Add paired Recall RED tests and implement the cumulative model.**
 
 Run `rtk npm run test -- src/features/analytics/domain/cumulative-recall-presentation.test.ts`. Fixtures include 48 recalled of 52 eligible pairs with estimate sum 46.16, giving observed `48/52` and predicted `46.16/52`, unequal interval pair counts, measured zero, invalid/no pairs, leading unavailable, internal/trailing holds, and unchanged source rows. Pair estimates are pooled using each unrounded `pairedReviews * fsrsEstimate`.
 
 Export `buildCumulativeRecallPresentation(rows)` with original raw `ObservedRecallVsFsrsRow` fields and cumulative pair count, recalled count, estimate sum, observed/predicted rates, difference, state and last-updated interval. The service owns the earliest-pair frame from the preceding phase; never independently crop the end or choose a new recent date range. A leading no-pair row remains unavailable, not zero. An inactive interval has zero new pairs and identical cumulative numerator/denominator to its predecessor. The endpoint and hero use the same unrounded pooled rates.
 
-- [ ] **Step 4: Add Time RED tests and implement target-normalized rows.**
+- [x] **Step 4: Add Time RED tests and implement target-normalized rows.**
 
 Export `buildTimeTargetPresentation(cohort, targets, subset = 'all')`. Consume each known difficulty's selected-period `time[subset]` median and timing counts; Unknown contributes coverage/details but has no target bar. Each row includes difficulty, timed/eligible assessments, median seconds, target minutes, percent of target, difference minutes and difference percentage. Null median stays unavailable; do not fabricate zero-time bars.
 
@@ -93,7 +93,7 @@ const differenceMinutes =
 
 Test 10-minute median against a 20-minute target (50%, -10 minutes), 45 against 30 (150%, +15 minutes), exactly 100%, missing durations, successful subset independently from all, Unknown coverage, and asymmetric counts. Keep ratios above 100 uncapped; domain includes 100 and largest available ratio. The hero is timed coverage, never an average of the three medians. Timing subset meaning remains rating-derived Hard/Good/Easy, distinct from the persisted-correct headline time.
 
-- [ ] **Step 5: Run model GREEN, format, review, and commit.**
+- [x] **Step 5: Run model GREEN, format, review, and commit.**
 
 Run all three new test files together. Expected: all pass. Format only those files. Fresh specification review then quality review; root commits `feat: add weighted analytics presentation models`.
 
@@ -157,3 +157,21 @@ Run new geometry tests and the Performance/Recall tests. Expected: all pass. Fre
 - [ ] Run focused tests before full `rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` after integration.
 - [ ] Record exact commands and skipped commands. Human installed-extension Analytics/Chart Targets happy-path and edge-case smoke remains pending until the full UI is available.
 - [ ] Continue to compact production composition and browser proof. Pure models alone do not satisfy the approved Analytics page.
+
+## Task 1 Execution Record
+
+Six pure model/test files are implemented. Performance preserves raw totals/rows alongside exact weighted evidence, cumulative states and explicitly gated prior comparison. Recall pools the same eligible pairs without rounding or changing its supplied frame. Time exposes period medians, exact target differences, unclassified coverage and an uncapped padded domain. Specification and quality reviews passed without findings; the quality reviewer also verified architecture boundaries.
+
+Verified RED: absent modules first, then 26 semantic failures against empty exports. Final GREEN: 26 tests (Performance 15, Recall 5, Time 6); independent quality validation including architecture: 42 tests. Root independently reran the three model suites with 26 passes. Pinned typecheck, six-file ESLint, Prettier write/check and whitespace checks passed.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/performance-presentation.test.ts src/features/analytics/domain/cumulative-recall-presentation.test.ts src/features/analytics/domain/time-target-presentation.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/performance-presentation.test.ts src/features/analytics/domain/cumulative-recall-presentation.test.ts src/features/analytics/domain/time-target-presentation.test.ts src/testing/architecture-boundaries.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec eslint -- src/features/analytics/domain/performance-presentation.ts src/features/analytics/domain/performance-presentation.test.ts src/features/analytics/domain/cumulative-recall-presentation.ts src/features/analytics/domain/cumulative-recall-presentation.test.ts src/features/analytics/domain/time-target-presentation.ts src/features/analytics/domain/time-target-presentation.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec prettier -- --write src/features/analytics/domain/performance-presentation.ts src/features/analytics/domain/performance-presentation.test.ts src/features/analytics/domain/cumulative-recall-presentation.ts src/features/analytics/domain/cumulative-recall-presentation.test.ts src/features/analytics/domain/time-target-presentation.ts src/features/analytics/domain/time-target-presentation.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec prettier -- --check src/features/analytics/domain/performance-presentation.ts src/features/analytics/domain/performance-presentation.test.ts src/features/analytics/domain/cumulative-recall-presentation.ts src/features/analytics/domain/cumulative-recall-presentation.test.ts src/features/analytics/domain/time-target-presentation.ts src/features/analytics/domain/time-target-presentation.test.ts
+rtk git diff --check
+```
+
+Full `npm run lint`, `npm run check` and `npm run build` are deferred to the integration checkpoint; this task adds unwired pure models. Required human extension smoke and production responsive proof remain pending until the compact composition is implemented. No database generation is needed because persisted schema is unchanged. Continue directly to topic joint evidence and trend geometry.
