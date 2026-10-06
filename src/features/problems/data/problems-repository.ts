@@ -369,7 +369,7 @@ export class ProblemsRepository {
       const directTopics = topicsBySlug.get(problem.slug) ?? []
       const state = deriveNormalizedPracticeState({
         problemSlug: problem.slug,
-        cardId: `${problem.slug}:${defaultFsrsCardKind}`,
+        cardId: row.card?.id ?? `${problem.slug}:${defaultFsrsCardKind}`,
         practice,
         card,
         attempts: [],

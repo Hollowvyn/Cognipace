@@ -1,12 +1,17 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { sendMessage } from '@/extension/messaging'
 import {
   invalidateTaggedQueries,
   type CacheInvalidationTag,
 } from '@/platform/query/cache-invalidation'
+import { queryKeys } from '@/platform/query/query-keys'
 
-import type { BackupFile } from './backup-contracts'
+import type {
+  BackupFile,
+  BackupReplacementResult,
+  BackupReplacementState,
+} from './backup-contracts'
 
 const broadBackupInvalidationTags = [
   'settings',
@@ -32,24 +37,61 @@ export function useValidateFullBackup() {
 }
 
 export function useRestoreFullBackup() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: restoreFullBackupViaRuntime,
-    onSuccess: () => {
-      void invalidateTaggedQueries(queryClient, broadBackupInvalidationTags)
-    },
-  })
+  return useBackupReplacementAction(restoreFullBackupViaRuntime)
 }
 
 export function useResetLocalData() {
+  return useBackupReplacementAction(() =>
+    sendMessage('backup.resetLocalData', { surface: 'dashboard' }),
+  )
+}
+
+export function usePendingBackupReplacement() {
+  return useQuery({
+    queryKey: queryKeys.backup.pendingReplacement(),
+    queryFn: () =>
+      sendMessage('backup.getPendingReplacement', { surface: 'dashboard' }),
+  })
+}
+
+export function useRetryPendingBackupReplacement() {
+  return useBackupReplacementAction(() =>
+    sendMessage('backup.retryPendingReplacement', { surface: 'dashboard' }),
+  )
+}
+
+function useBackupReplacementAction<TVariables = void>(
+  mutationFn: (variables: TVariables) => Promise<BackupReplacementResult>,
+) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: () =>
-      sendMessage('backup.resetLocalData', { surface: 'dashboard' }),
-    onSuccess: () => {
-      void invalidateTaggedQueries(queryClient, broadBackupInvalidationTags)
+    mutationFn,
+    onSuccess: (result) => {
+      const pendingState: BackupReplacementState =
+        result.status === 'persistence-pending'
+          ? result
+          : result.status === 'durable' && result.syncMetadataPending
+            ? {
+                status: 'durable-sync-metadata-pending',
+                kind: result.kind,
+                summary: result.summary,
+              }
+            : { status: 'idle' }
+
+      queryClient.setQueryData(
+        queryKeys.backup.pendingReplacement(),
+        pendingState,
+      )
+      if (result.status === 'durable') {
+        void invalidateTaggedQueries(queryClient, broadBackupInvalidationTags)
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.backup.pendingReplacement(),
+      })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sync.all })
     },
   })
 }

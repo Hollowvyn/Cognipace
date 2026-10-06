@@ -1,5 +1,14 @@
-import { isFsrsCardState, type FsrsCardState } from './card-snapshot'
+import {
+  assertValidFsrsCardSnapshot,
+  isFsrsCardState,
+  type FsrsCardSnapshot,
+  type FsrsCardState,
+} from './card-snapshot'
 import { isReviewRating, type ReviewRating } from './review-rating'
+import {
+  readFsrsSchedulerProfile,
+  type FsrsSchedulerProfile,
+} from './scheduler-profile'
 import {
   isCanonicalIsoDateString,
   isNonNegativeInteger,
@@ -67,6 +76,36 @@ export function parseFsrsReviewLogSnapshot(
     learningSteps: value.learningSteps,
     reviewedAt: value.reviewedAt,
   })
+}
+
+/**
+ * Requires the pinned native prior-state log fields to match captured evidence.
+ * Callers validate exact native profile reconstruction before this association.
+ */
+export function assertFsrsReviewLogMatchesPreCard(
+  value: FsrsReviewLogSnapshot,
+  preCard: FsrsCardSnapshot,
+  inputProfile: FsrsSchedulerProfile,
+): void {
+  const log = parseFsrsReviewLogSnapshot(value)
+  assertValidFsrsCardSnapshot(preCard)
+  const profile = readFsrsSchedulerProfile(inputProfile)
+  const expectedScheduledDays =
+    preCard.state === 'new' && !profile.parameters.enableShortTerm
+      ? 0
+      : preCard.scheduledDays
+
+  if (
+    log.state !== preCard.state ||
+    log.stability !== preCard.stability ||
+    log.difficulty !== preCard.difficulty ||
+    log.lastElapsedDays !== preCard.elapsedDays ||
+    log.learningSteps !== preCard.learningSteps ||
+    log.scheduledDays !== expectedScheduledDays ||
+    log.dueAt !== (preCard.lastReviewAt ?? preCard.dueAt).toISOString()
+  ) {
+    throw new Error('FSRS review log does not match its recorded pre-card.')
+  }
 }
 
 /** Serializes an FSRS review log snapshot for persistence. */

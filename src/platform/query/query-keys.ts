@@ -11,6 +11,11 @@ export const queryKeys = {
     overlay: (problemSlug?: string | null) =>
       [...queryKeys.appShell.all, 'overlay', problemSlug ?? null] as const,
   },
+  backup: {
+    all: ['backup'] as const,
+    pendingReplacement: () =>
+      [...queryKeys.backup.all, 'pending-replacement'] as const,
+  },
   genai: {
     all: ['genai'] as const,
     configurationRevision: () =>

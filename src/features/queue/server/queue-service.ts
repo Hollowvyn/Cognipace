@@ -74,6 +74,7 @@ const queueCandidateSelection = {
     notes: problemPractice.notes,
   },
   card: {
+    id: fsrsCards.id,
     dueAt: fsrsCards.dueAt,
     stability: fsrsCards.stability,
     difficulty: fsrsCards.difficulty,
@@ -96,7 +97,7 @@ function mapQueueCandidate(
   now: Date,
 ): QueueCandidate {
   const problemSlug = row.problem.slug
-  const cardId = `${problemSlug}:${defaultFsrsCardKind}`
+  const cardId = row.card?.id ?? `${problemSlug}:${defaultFsrsCardKind}`
   const practice = mapPractice(row.practice)
   const card = mapCard(row.card)
 
@@ -139,6 +140,7 @@ interface QueuePracticeRow {
 }
 
 interface QueueCardRow {
+  id: string | null
   dueAt: number | null
   stability: number | null
   difficulty: number | null

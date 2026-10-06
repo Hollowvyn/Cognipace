@@ -1,4 +1,9 @@
 import type { Db } from '@/platform/db'
+import {
+  clearPracticeStorageDataInTransaction,
+  readPracticeStorageData,
+  replacePracticeStorageDataInTransaction,
+} from '@/features/practice/server/practice-storage-service'
 import { seedInitialCatalog } from '@/platform/db/seed'
 import {
   companies,
@@ -19,7 +24,12 @@ import {
   tracks,
 } from '@/platform/db/schema'
 
-import { backupDataSchema, type BackupData } from '../api/backup-contracts'
+import { backupSummarySchema, type BackupData } from '../api/backup-contracts'
+import {
+  prepareCurrentBackupData,
+  validateCurrentBackupData,
+  type PreparedBackupRestore,
+} from '../domain/backup-preflight'
 import { buildTopicGraph } from '@/features/problems/domain/topic-graph'
 import { buildTopicLookup } from '@/features/problems/domain/topic-taxonomy'
 
@@ -48,6 +58,7 @@ export class BackupRepository {
       progressRows,
       sessionRows,
       settingsRows,
+      practiceStorage,
     ] = await Promise.all([
       this.db.select().from(problems),
       this.db.select().from(topics),
@@ -65,104 +76,110 @@ export class BackupRepository {
       this.db.select().from(trackProblemProgress),
       this.db.select().from(trackSession),
       this.db.select().from(settingsKv),
+      readPracticeStorageData(this.db),
     ])
 
-    return backupDataSchema.parse({
-      problems: problemRows.map((row) => ({
-        ...row,
-        createdAt: toIso(row.createdAt),
-        updatedAt: toIso(row.updatedAt),
-      })),
-      topics: topicRows.map((row) => ({
-        ...row,
-        createdAt: toIso(row.createdAt),
-        updatedAt: toIso(row.updatedAt),
-      })),
-      topicAliases: topicAliasRows.map((row) => ({
-        ...row,
-        createdAt: toIso(row.createdAt),
-        updatedAt: toIso(row.updatedAt),
-      })),
-      topicRelations: topicRelationRows.map((row) => ({
-        ...row,
-        createdAt: toIso(row.createdAt),
-        updatedAt: toIso(row.updatedAt),
-      })),
-      companies: companyRows,
-      problemTopics: problemTopicRows,
-      problemCompanies: problemCompanyRows,
-      practice: {
-        problemPractice: practiceRows.map((row) => ({
+    return validateCurrentBackupData(
+      {
+        problems: problemRows.map((row) => ({
           ...row,
-          firstSeenAt: toIso(row.firstSeenAt),
-          lastSeenAt: toIsoOrNull(row.lastSeenAt),
-          lastReviewedAt: toIsoOrNull(row.lastReviewedAt),
           createdAt: toIso(row.createdAt),
           updatedAt: toIso(row.updatedAt),
         })),
-        fsrsCards: cardRows.map((row) => ({
+        topics: topicRows.map((row) => ({
           ...row,
-          dueAt: toIso(row.dueAt),
-          lastReviewAt: toIsoOrNull(row.lastReviewAt),
           createdAt: toIso(row.createdAt),
           updatedAt: toIso(row.updatedAt),
         })),
-        reviewAttempts: attemptRows.map((row) => ({
+        topicAliases: topicAliasRows.map((row) => ({
           ...row,
-          reviewedAt: toIso(row.reviewedAt),
           createdAt: toIso(row.createdAt),
           updatedAt: toIso(row.updatedAt),
         })),
+        topicRelations: topicRelationRows.map((row) => ({
+          ...row,
+          createdAt: toIso(row.createdAt),
+          updatedAt: toIso(row.updatedAt),
+        })),
+        companies: companyRows,
+        problemTopics: problemTopicRows,
+        problemCompanies: problemCompanyRows,
+        practice: {
+          ...practiceStorage,
+          problemPractice: practiceRows.map((row) => ({
+            ...row,
+            firstSeenAt: toIso(row.firstSeenAt),
+            lastSeenAt: toIsoOrNull(row.lastSeenAt),
+            lastReviewedAt: toIsoOrNull(row.lastReviewedAt),
+            createdAt: toIso(row.createdAt),
+            updatedAt: toIso(row.updatedAt),
+          })),
+          fsrsCards: cardRows.map((row) => ({
+            ...row,
+            dueAt: toIso(row.dueAt),
+            lastReviewAt: toIsoOrNull(row.lastReviewAt),
+            createdAt: toIso(row.createdAt),
+            updatedAt: toIso(row.updatedAt),
+          })),
+          reviewAttempts: attemptRows.map((row) => ({
+            ...row,
+            reviewedAt: toIso(row.reviewedAt),
+            createdAt: toIso(row.createdAt),
+            updatedAt: toIso(row.updatedAt),
+          })),
+        },
+        tracks: {
+          tracks: trackRows.map((row) => ({
+            ...row,
+            dueAt: toIsoOrNull(row.dueAt),
+            createdAt: toIso(row.createdAt),
+            updatedAt: toIso(row.updatedAt),
+          })),
+          groups: groupRows.map((row) => ({
+            ...row,
+            createdAt: toIso(row.createdAt),
+            updatedAt: toIso(row.updatedAt),
+          })),
+          memberships: membershipRows.map((row) => ({
+            trackGroupId: row.trackGroupId,
+            problemSlug: row.problemSlug,
+            position: row.position,
+          })),
+          progress: progressRows.map((row) => ({
+            trackId: row.trackId,
+            problemSlug: row.problemSlug,
+            reviewAttemptId: row.reviewAttemptId,
+            completedAt: toIsoOrNull(row.completedAt),
+            completedRating: row.completedRating,
+            createdAt: toIso(row.createdAt),
+            updatedAt: toIso(row.updatedAt),
+          })),
+          session: sessionRows.map((row) => ({
+            ...row,
+            startedAt: toIso(row.startedAt),
+            updatedAt: toIso(row.updatedAt),
+          })),
+        },
+        // Filter to only the user-settings row; never include genai-secrets in backups
+        settings: settingsRows
+          .filter((row) => row.key === 'user-settings')
+          .map((row) => ({
+            ...row,
+            updatedAt: toIso(row.updatedAt),
+          })),
       },
-      tracks: {
-        tracks: trackRows.map((row) => ({
-          ...row,
-          dueAt: toIsoOrNull(row.dueAt),
-          createdAt: toIso(row.createdAt),
-          updatedAt: toIso(row.updatedAt),
-        })),
-        groups: groupRows.map((row) => ({
-          ...row,
-          createdAt: toIso(row.createdAt),
-          updatedAt: toIso(row.updatedAt),
-        })),
-        memberships: membershipRows.map((row) => ({
-          trackGroupId: row.trackGroupId,
-          problemSlug: row.problemSlug,
-          position: row.position,
-        })),
-        progress: progressRows.map((row) => ({
-          trackId: row.trackId,
-          problemSlug: row.problemSlug,
-          reviewAttemptId: row.reviewAttemptId,
-          completedAt: toIsoOrNull(row.completedAt),
-          completedRating: row.completedRating,
-          createdAt: toIso(row.createdAt),
-          updatedAt: toIso(row.updatedAt),
-        })),
-        session: sessionRows.map((row) => ({
-          ...row,
-          startedAt: toIso(row.startedAt),
-          updatedAt: toIso(row.updatedAt),
-        })),
-      },
-      // Filter to only the user-settings row; never include genai-secrets in backups
-      settings: settingsRows
-        .filter((row) => row.key === 'user-settings')
-        .map((row) => ({
-          ...row,
-          updatedAt: toIso(row.updatedAt),
-        })),
-    })
+      { requireActiveGenerations: true },
+    )
   }
 }
 
 export async function clearAndRestoreBackupData(
   db: Db,
-  data: BackupData,
+  prepared: PreparedBackupRestore,
   now = new Date(),
 ) {
-  const backupData = backupDataSchema.parse(data)
+  const summary = backupSummarySchema.parse(prepared.summary)
+  const backupData = prepareCurrentBackupData(prepared.data, summary.exportedAt)
 
   await db.transaction(async (transactionDb) => {
     const tx = transactionDb as unknown as Db
@@ -171,6 +188,16 @@ export async function clearAndRestoreBackupData(
     await insertBackupData(tx, backupData)
     await seedInitialCatalog(tx, now)
     await validateTopicRegistry(tx)
+    await replacePracticeStorageDataInTransaction(
+      tx,
+      {
+        schedulerProfiles: backupData.practice.schedulerProfiles,
+        reviewEvidence: backupData.practice.reviewEvidence,
+        generations: backupData.practice.generations,
+        commandReceipts: backupData.practice.commandReceipts,
+      },
+      now,
+    )
   })
 }
 
@@ -181,6 +208,16 @@ export async function resetLocalDataToFreshInstall(db: Db, now = new Date()) {
     await clearAllTables(tx)
     await seedInitialCatalog(tx, now)
     await validateTopicRegistry(tx)
+    await replacePracticeStorageDataInTransaction(
+      tx,
+      {
+        schedulerProfiles: [],
+        reviewEvidence: [],
+        generations: [],
+        commandReceipts: [],
+      },
+      now,
+    )
   })
 }
 
@@ -195,6 +232,7 @@ async function validateTopicRegistry(db: Db) {
 }
 
 async function clearAllTables(db: Db) {
+  await clearPracticeStorageDataInTransaction(db)
   await db.delete(reviewAttempts)
   await db.delete(fsrsCards)
   await db.delete(problemPractice)

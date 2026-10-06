@@ -213,6 +213,8 @@ describe('runtime-policy', () => {
       'backup.validateFullBackup',
       'backup.restoreFullBackup',
       'backup.resetLocalData',
+      'backup.getPendingReplacement',
+      'backup.retryPendingReplacement',
     ]) {
       expect(canCallExtensionMethod(method, 'dashboard')).toBe(true)
       expect(canCallExtensionMethod(method, 'popup')).toBe(false)

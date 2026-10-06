@@ -199,6 +199,16 @@ Current behavior:
   order and placements, and practice progress. Missing, null, and empty
   optional data does not clear local content. See the
   [content format reference](import-format.md) for the v1 contract.
+- Full backups export version 6 and accept supported versions 1–6. Restore
+  preserves recorded history and scheduling evidence; older backups explicitly
+  retain unknown historical configuration. Existing due dates and progress are
+  not recalculated by restore. Newly exported backups require an updated client.
+  If replacement still needs publication, Data Management shows Retry saving.
+  It finishes saving the already applied data rather than restoring again. If
+  data is saved but sync bookkeeping failed, the same action retries only sync
+  status. Further writes, imports, exports and sync wait for recovery. The
+  selected restore draft remains available while pending; Settings reload can
+  show recovery while the same background worker remains alive.
 - The dashboard header shows compact pull and push shortcuts after GitHub Gist
   sync is configured.
 - Analytics shows local review-day totals, all-time review counts, current
@@ -246,6 +256,14 @@ target retention to `ts-fsrs`, then persists the returned card and review log.
 The persisted FSRS `card.due` value, stored locally as `dueAt`, is the authority
 for the next review date. Current retrievability is a separate FSRS estimate for
 display and queue ranking; it does not replace or cancel the persisted due date.
+
+Database upgrades preserve existing history, due dates, settings and earned
+progress. Older reviews have unknown scheduling provenance rather than an
+invented historical configuration. Imported card identities and recorded
+scheduling evidence are retained. Ordinary histories remain correctable with
+Update; histories containing captured or legacy-derived scheduling evidence
+temporarily disable Update while the guarded correction workflow is integrated.
+Save can still record a new review without changing that earlier evidence.
 
 Target-retention changes are prospective. They are used by `ts-fsrs` on the
 next saved review and do not reschedule existing cards or rewrite their due

@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { defaultUserSettings } from '@/features/settings/domain'
 import {
@@ -20,14 +20,37 @@ import {
   trackSession,
   tracks,
 } from '@/platform/db/schema'
-import { createTestDb } from '@/platform/db/test-db'
+import { createTestDb as createUninitializedTestDb } from '@/platform/db/test-db'
+import {
+  createPracticeGenerationKey,
+  practiceReceiptAcknowledgementSchema,
+  practiceReceiptCommandSummarySchema,
+  statusFromReview,
+} from '@/features/practice/domain'
+import { preparePracticeStorage } from '@/features/practice/server/practice-storage-service'
+import {
+  overrideLastReviewResult,
+  saveReviewResult,
+  setPracticeSuspended,
+} from '@/features/practice/server/practice-service'
+import {
+  createInitialFsrsCard,
+  createFsrsSchedulerProfile,
+  scheduleReviewWithProfile,
+  serializeFsrsReviewLogSnapshot,
+  serializeFsrsCardSnapshot,
+  serializeFsrsSchedulerProfile,
+  toSerializableFsrsCardSnapshot,
+} from '@/lib/fsrs'
 import { createBackupRepository } from '../data/backup-repository'
 
 import { backupSchemaVersion, type BackupFile } from '../api/backup-contracts'
+import { prepareFullBackupRestore } from '../domain/backup-preflight'
 import {
   exportFullBackup,
   resetLocalData,
   restoreFullBackup,
+  restoreValidatedBackupData,
   validateFullBackup,
 } from './backup-service'
 
@@ -42,14 +65,254 @@ const settingsValue = JSON.stringify({
 })
 
 describe('backup service', () => {
-  it('exports and restores v5 external-progress policy without derived progress rows', async () => {
+  it('retains opaque card IDs for Save and Update after export and restore', async () => {
+    const source = await createTestDb({ now })
+    await insertCustomState(source.db)
+    const backup = await exportFullBackup(source.db, { exportedAt: now })
+    const target = await createTestDb({ now })
+    await restoreFullBackup(target.db, backup)
+    const saved = await saveReviewResult(target.db, {
+      problemSlug: 'custom-problem',
+      rating: 'hard',
+      reviewAttemptId: 'opaque-after-restore',
+      reviewedAt: new Date(timestamp + 86_400_000),
+    })
+    const corrected = await overrideLastReviewResult(target.db, {
+      problemSlug: 'custom-problem',
+      rating: 'easy',
+    })
+    expect(saved.cardId).toBe('card-custom')
+    expect(corrected.cardId).toBe('card-custom')
+    expect(await target.db.select().from(fsrsCards)).toHaveLength(1)
+    expect(() => validateFullBackup(backup)).not.toThrow()
+    const exported = await exportFullBackup(target.db, { exportedAt: now })
+    expect(() => validateFullBackup(exported)).not.toThrow()
+  })
+
+  it('protects retained known history after restore even after a new unknown Save', async () => {
+    const { db } = await createTestDb({ now })
+    await insertCustomState(db)
+    const backup = withSchedulingHistory(
+      await exportFullBackup(db, { exportedAt: now }),
+    )
+    await restoreFullBackup(db, backup)
+    await saveReviewResult(db, {
+      problemSlug: 'custom-problem',
+      rating: 'good',
+      reviewAttemptId: 'new-unknown-after-known',
+      reviewedAt: new Date(timestamp + 172_800_000),
+    })
+    const before = await createBackupRepository(db).readBackupData()
+    await expect(
+      overrideLastReviewResult(db, {
+        problemSlug: 'custom-problem',
+        rating: 'easy',
+      }),
+    ).rejects.toThrow(/protected scheduling evidence/)
+    expect(await createBackupRepository(db).readBackupData()).toEqual(before)
+  })
+
+  it('round trips untouched suspension and accepts New cards with zero memory and no last review', async () => {
+    const { db } = await createTestDb({ now })
+    await setPracticeSuspended(db, { problemSlug: 'two-sum', suspended: true })
+    const backup = await exportFullBackup(db, { exportedAt: now })
+    backup.data.practice.fsrsCards.push({
+      id: 'new/opaque',
+      problemSlug: 'two-sum',
+      cardKind: 'default',
+      ...toSerializableFsrsCardSnapshot(createInitialFsrsCard(now)),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    })
+    expect(() => validateFullBackup(backup)).not.toThrow()
+    await restoreFullBackup(db, backup)
+    const exported = await exportFullBackup(db, { exportedAt: now })
+    expect(exported.data.practice.problemPractice[0]).toMatchObject({
+      problemSlug: 'two-sum',
+      isSuspended: true,
+    })
+    expect(exported.data.practice.fsrsCards).toEqual(
+      backup.data.practice.fsrsCards,
+    )
+    expect(() => validateFullBackup(exported)).not.toThrow()
+  })
+
+  it('uses a detached synchronous preparation and preserves historical corrected receipts through restore', async () => {
+    const { db } = await createTestDb({ now })
+    await insertCustomState(db)
+    const backup = withSchedulingHistory(
+      await exportFullBackup(db, { exportedAt: now }),
+    )
+    const original = structuredClone(backup)
+    const prepared = prepareFullBackupRestore(backup)
+    expect(prepared).not.toBeInstanceOf(Promise)
+    expect(prepared.summary).toEqual(validateFullBackup(backup))
+    expect(backup).toEqual(original)
+    prepared.data.practice.reviewAttempts[0]!.notes = 'detached edit'
+    expect(backup).toEqual(original)
+
+    await restoreFullBackup(db, backup)
+    const exported = await exportFullBackup(db, { exportedAt: now })
+    expect(exported.data.practice).toEqual({
+      ...backup.data.practice,
+      generations: exported.data.practice.generations,
+    })
+    expect(exported.data.practice.generations).not.toEqual(
+      backup.data.practice.generations,
+    )
+    expect(exported.data.settings).toEqual(backup.data.settings)
+    expect(exported.data.tracks.progress).toEqual(backup.data.tracks.progress)
+    expect(() => validateFullBackup(exported)).not.toThrow()
+  })
+
+  it.each([
+    'profile-version',
+    'profile-clipping',
+    'profile-weights',
+    'duplicate-profile',
+    'missing-profile',
+    'missing-evidence',
+    'wrong-evidence-card',
+    'duplicate-sequence',
+    'negative-revision',
+    'assessment-rating',
+    'generation-scope',
+    'generation-local',
+    'generation-key',
+    'dangling-receipt',
+    'forged-ack',
+    'update-revision',
+    'save-target',
+    'receipt-card',
+    'receipt-status',
+    'receipt-log',
+  ])(
+    'rejects invalid metadata before any delete through full and typed restore: %s',
+    async (caseName) => {
+      const { db } = await createTestDb({ now })
+      await insertCustomState(db)
+      const before = await createBackupRepository(db).readBackupData()
+      const backup = withSchedulingHistory(
+        await exportFullBackup(db, { exportedAt: now }),
+      )
+      const practice = backup.data.practice
+      const evidence = practice.reviewEvidence[0]!
+      const receipt = practice.commandReceipts[0]!
+      const profile = JSON.parse(
+        practice.schedulerProfiles[0]!.profileJson,
+      ) as {
+        libraryVersion: string
+        parameters: { weights: number[]; maximumInterval: number }
+      }
+      const ack = practiceReceiptAcknowledgementSchema.parse(
+        JSON.parse(receipt.resultJson),
+      )
+      const summary = practiceReceiptCommandSummarySchema.parse(
+        JSON.parse(receipt.commandSummaryJson),
+      )
+      if (caseName === 'profile-version') profile.libraryVersion = '6.0.0'
+      if (caseName === 'profile-clipping')
+        profile.parameters.weights[0] = 1_000_000_000
+      if (caseName === 'profile-weights') profile.parameters.weights.pop()
+      if (caseName.startsWith('profile-'))
+        practice.schedulerProfiles[0]!.profileJson = JSON.stringify(profile)
+      if (caseName === 'duplicate-profile')
+        practice.schedulerProfiles.push({
+          ...practice.schedulerProfiles[0]!,
+          id: 'duplicate-canonical-profile',
+        })
+      if (caseName === 'missing-profile')
+        evidence.schedulerProfileId = 'missing'
+      if (caseName === 'missing-evidence') practice.reviewEvidence.shift()
+      if (caseName === 'wrong-evidence-card') evidence.cardId = 'missing'
+      if (caseName === 'duplicate-sequence')
+        practice.reviewEvidence[1]!.applicationSequence =
+          evidence.applicationSequence
+      if (caseName === 'negative-revision') evidence.revision = -1
+      if (caseName === 'assessment-rating')
+        evidence.assessmentEvidenceJson = JSON.stringify({
+          schemaVersion: 1,
+          source: 'manual',
+          policyVersion: null,
+          submissionIntent: null,
+          reasonCode: null,
+          lockReason: null,
+          finalRating: 'easy',
+        })
+      if (caseName === 'generation-scope')
+        practice.generations[0]!.scopeId = 'other'
+      if (caseName === 'generation-local')
+        practice.generations = practice.generations.filter(
+          (row) => row.scopeId !== 'local',
+        )
+      if (caseName === 'generation-key')
+        receipt.generationKey = '[ "old-local", "old-problem" ]'
+      if (caseName === 'dangling-receipt') receipt.reviewAttemptId = 'missing'
+      if (caseName === 'forged-ack') ack.cardId = 'missing'
+      if (caseName === 'update-revision') summary.expectedRevision = 2
+      if (caseName === 'save-target') {
+        receipt.operation = 'save'
+        receipt.revision = 0
+        ack.operation = 'save'
+        ack.revision = 0
+      }
+      if (caseName === 'receipt-card') ack.card.lastReviewAt = null
+      if (caseName === 'receipt-status') ack.status = 'new'
+      if (caseName === 'receipt-log') ack.fsrsReviewLog!.rating = 'easy'
+      receipt.resultJson = JSON.stringify(ack)
+      receipt.commandSummaryJson = JSON.stringify(summary)
+      const transaction = vi.spyOn(db, 'transaction')
+
+      expect(() => validateFullBackup(backup)).toThrow()
+      await expect(restoreFullBackup(db, backup)).rejects.toThrow()
+      await expect(restoreValidatedBackupData(db, backup)).rejects.toThrow()
+      expect(transaction).not.toHaveBeenCalled()
+      expect(await createBackupRepository(db).readBackupData()).toEqual(before)
+    },
+  )
+
+  it.each([
+    'negative-memory',
+    'unsafe-counter',
+    'missing-last-review',
+    'log-rating',
+    'log-time',
+  ])('rejects malformed scheduling before any delete: %s', async (caseName) => {
+    const { db } = await createTestDb({ now })
+    await insertCustomState(db)
+    const backup = await exportFullBackup(db, { exportedAt: now })
+    const card = backup.data.practice.fsrsCards[0]!
+    const attempt = backup.data.practice.reviewAttempts[0]!
+    if (caseName === 'negative-memory') card.stability = -1
+    if (caseName === 'unsafe-counter') card.reps = Number.MAX_SAFE_INTEGER + 1
+    if (caseName === 'missing-last-review') card.lastReviewAt = null
+    if (caseName.startsWith('log-')) {
+      const profile = createFsrsSchedulerProfile({ targetRetention: 0.75 })
+      const scheduled = scheduleReviewWithProfile(
+        createInitialFsrsCard(now),
+        caseName === 'log-rating' ? 'hard' : 'good',
+        caseName === 'log-time' ? new Date(timestamp + 1_000) : now,
+        profile,
+      )
+      attempt.fsrsReviewLog = serializeFsrsReviewLogSnapshot(scheduled.log)
+    }
+    const before = await createBackupRepository(db).readBackupData()
+    const transaction = vi.spyOn(db, 'transaction')
+
+    expect(() => validateFullBackup(backup)).toThrow()
+    await expect(restoreFullBackup(db, backup)).rejects.toThrow()
+    expect(transaction).not.toHaveBeenCalled()
+    expect(await createBackupRepository(db).readBackupData()).toEqual(before)
+  })
+
+  it('exports and restores current external-progress policy without derived progress rows', async () => {
     const source = await createTestDb({ now })
     await insertCustomState(source.db)
     await source.db.update(tracks).set({ allowExternalProgress: true })
 
     const backup = await exportFullBackup(source.db, { exportedAt: now })
 
-    expect(backup.schemaVersion).toBe(5)
+    expect(backup.schemaVersion).toBe(backupSchemaVersion)
     expect(backup.data.tracks.tracks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -85,6 +348,11 @@ describe('backup service', () => {
       schemaVersion: 4,
       data: {
         ...current.data,
+        practice: {
+          problemPractice: current.data.practice.problemPractice,
+          fsrsCards: current.data.practice.fsrsCards,
+          reviewAttempts: current.data.practice.reviewAttempts,
+        },
         tracks: {
           ...current.data.tracks,
           tracks: current.data.tracks.tracks.map((track) =>
@@ -599,8 +867,18 @@ describe('backup service', () => {
       target.db,
     ).readBackupData()
     await restoreFullBackup(target.db, backup)
-    expect(await createBackupRepository(target.db).readBackupData()).toEqual(
-      firstRestore,
+    const secondRestore = await createBackupRepository(
+      target.db,
+    ).readBackupData()
+    expect(secondRestore).toEqual({
+      ...firstRestore,
+      practice: {
+        ...firstRestore.practice,
+        generations: secondRestore.practice.generations,
+      },
+    })
+    expect(secondRestore.practice.generations).not.toEqual(
+      firstRestore.practice.generations,
     )
   })
 
@@ -1001,6 +1279,7 @@ async function insertCustomState(db: TestDb) {
     value: settingsValue,
     updatedAt: timestamp,
   })
+  await preparePracticeStorage(db, now)
 }
 
 async function insertOtherState(db: TestDb) {
@@ -1012,4 +1291,144 @@ async function insertOtherState(db: TestDb) {
     createdAt: timestamp,
     updatedAt: timestamp,
   })
+}
+
+async function createTestDb(
+  options: Parameters<typeof createUninitializedTestDb>[0],
+) {
+  const handle = await createUninitializedTestDb(options)
+  await preparePracticeStorage(handle.db, now)
+  return handle
+}
+
+function withSchedulingHistory(backup: BackupFile): BackupFile {
+  const result = structuredClone(backup)
+  const practice = result.data.practice
+  const originalAttempt = practice.reviewAttempts[0]!
+  const originalCard = practice.fsrsCards[0]!
+  const oldProfile = createFsrsSchedulerProfile({ targetRetention: 0.75 })
+  const currentProfile = createFsrsSchedulerProfile({ targetRetention: 0.85 })
+  const initial = createInitialFsrsCard(now)
+  const historical = scheduleReviewWithProfile(initial, 'good', now, oldProfile)
+  const corrected = scheduleReviewWithProfile(
+    initial,
+    'again',
+    now,
+    currentProfile,
+  )
+  const laterTime = new Date(timestamp + 86_400_000)
+  const later = scheduleReviewWithProfile(
+    corrected.card,
+    'good',
+    laterTime,
+    currentProfile,
+  )
+  Object.assign(originalCard, toSerializableFsrsCardSnapshot(later.card))
+  originalAttempt.rating = 'again'
+  originalAttempt.fsrsReviewLog = serializeFsrsReviewLogSnapshot(corrected.log)
+  practice.reviewAttempts.push(
+    {
+      ...originalAttempt,
+      id: 'later-attempt',
+      rating: 'good',
+      reviewedAt: laterTime.toISOString(),
+      fsrsReviewLog: serializeFsrsReviewLogSnapshot(later.log),
+    },
+    {
+      ...originalAttempt,
+      id: 'unknown-tied-attempt',
+      rating: 'hard',
+      reviewedAt: laterTime.toISOString(),
+      fsrsReviewLog: null,
+    },
+  )
+  practice.schedulerProfiles = [
+    {
+      id: 'current-profile',
+      profileJson: serializeFsrsSchedulerProfile(currentProfile),
+      createdAt: now.toISOString(),
+    },
+    {
+      id: 'historical-profile',
+      profileJson: serializeFsrsSchedulerProfile(oldProfile),
+      createdAt: now.toISOString(),
+    },
+  ]
+  practice.reviewEvidence = [
+    {
+      reviewAttemptId: originalAttempt.id,
+      cardId: originalCard.id,
+      applicationSequence: 7,
+      revision: 2,
+      sequenceSource: 'applied',
+      schedulingEvidenceKind: 'legacy-derived',
+      schedulerProfileId: 'current-profile',
+      preCardJson: serializeFsrsCardSnapshot(initial),
+      assessmentEvidenceJson: null,
+    },
+    {
+      reviewAttemptId: 'later-attempt',
+      cardId: originalCard.id,
+      applicationSequence: 8,
+      revision: 0,
+      sequenceSource: 'applied',
+      schedulingEvidenceKind: 'captured',
+      schedulerProfileId: 'current-profile',
+      preCardJson: serializeFsrsCardSnapshot(corrected.card),
+      assessmentEvidenceJson: null,
+    },
+    {
+      reviewAttemptId: 'unknown-tied-attempt',
+      cardId: originalCard.id,
+      applicationSequence: 9,
+      revision: 0,
+      sequenceSource: 'legacy-inferred',
+      schedulingEvidenceKind: 'unknown',
+      schedulerProfileId: null,
+      preCardJson: null,
+      assessmentEvidenceJson: null,
+    },
+  ]
+  practice.commandReceipts = [
+    {
+      generationKey: createPracticeGenerationKey({
+        localGenerationToken: 'historical-local',
+        problemGenerationToken: 'historical-problem',
+      }),
+      commandId: 'historical-good-correction',
+      payloadFingerprint: 'a'.repeat(64),
+      operation: 'update',
+      problemSlug: originalAttempt.problemSlug,
+      cardId: originalCard.id,
+      reviewAttemptId: originalAttempt.id,
+      applicationSequence: 7,
+      revision: 1,
+      acceptedAt: now.toISOString(),
+      commandSummaryJson: JSON.stringify({
+        schemaVersion: 1,
+        rating: 'good',
+        reviewedAt: now.toISOString(),
+        targetAttemptId: originalAttempt.id,
+        expectedRevision: 0,
+      }),
+      resultJson: JSON.stringify({
+        schemaVersion: 1,
+        operation: 'update',
+        problemSlug: originalAttempt.problemSlug,
+        cardId: originalCard.id,
+        reviewAttemptId: originalAttempt.id,
+        applicationSequence: 7,
+        revision: 1,
+        rating: 'good',
+        reviewedAt: now.toISOString(),
+        dueAt: historical.card.dueAt.toISOString(),
+        status: statusFromReview('good', historical.card),
+        card: toSerializableFsrsCardSnapshot(historical.card),
+        fsrsReviewLog: historical.log,
+        schedulingEvidenceKind: 'captured',
+        schedulerProfileId: 'historical-profile',
+      }),
+    },
+  ]
+  return result
 }

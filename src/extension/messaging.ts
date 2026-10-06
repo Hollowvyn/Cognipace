@@ -18,12 +18,16 @@ import type {
   BackupPayloadRequest,
   BackupRequest,
   BackupSummary,
+  BackupReplacementState,
+  BackupReplacementResult,
 } from '@/features/backup/api/backup-contracts'
 export {
   backupFileSchema,
   backupPayloadRequestSchema,
   backupRequestSchema,
   backupSummarySchema,
+  backupReplacementStateSchema,
+  backupReplacementResultSchema,
 } from '@/features/backup/api/backup-contracts'
 import type {
   ClearAiProviderSecretRequest,
@@ -332,8 +336,14 @@ export interface ProtocolMap {
   'app.openDashboard'(request: OpenDashboardRequest): null
   'backup.exportFullBackup'(request: BackupRequest): BackupFile
   'backup.validateFullBackup'(request: BackupPayloadRequest): BackupSummary
-  'backup.restoreFullBackup'(request: BackupPayloadRequest): BackupSummary
-  'backup.resetLocalData'(request: BackupRequest): null
+  'backup.restoreFullBackup'(
+    request: BackupPayloadRequest,
+  ): BackupReplacementResult
+  'backup.resetLocalData'(request: BackupRequest): BackupReplacementResult
+  'backup.getPendingReplacement'(request: BackupRequest): BackupReplacementState
+  'backup.retryPendingReplacement'(
+    request: BackupRequest,
+  ): BackupReplacementResult
   'genai.getAiProviderSecretPresence'(
     request: GetAiProviderSecretPresenceRequest,
   ): AiProviderSecretPresence
@@ -460,6 +470,8 @@ export const protocolMethodNames = [
   'backup.validateFullBackup',
   'backup.restoreFullBackup',
   'backup.resetLocalData',
+  'backup.getPendingReplacement',
+  'backup.retryPendingReplacement',
   'genai.getAiProviderSecretPresence',
   'genai.setAiProviderSecret',
   'genai.clearAiProviderSecret',

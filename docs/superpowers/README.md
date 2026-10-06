@@ -28,7 +28,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-03-overview-daily-time-design.md`](./specs/2026-10-03-overview-daily-time-design.md): approved fourth Overview card for saved elapsed time from today's local-date assessments, including repeats and failures.
 
-- [`specs/2026-10-03-fsrs-remediation-design.md`](./specs/2026-10-03-fsrs-remediation-design.md): approved eight-priority FSRS remediation design covering reliable saves/corrections, recorded profiles, daily scheduling, queue and preview behavior, preserving upgrades, measured local scaling and an evaluated personalization pilot; October 4 amendment assigns the 180-day maximum interval policy, native boundary verification and existing-date decision to Phase E. Phase A merged in PR #190. B is implemented with reviewed pure helpers and passing automated/build checks; its human smoke proof remains pending. C–H remain unimplemented.
+- [`specs/2026-10-03-fsrs-remediation-design.md`](./specs/2026-10-03-fsrs-remediation-design.md): approved eight-priority FSRS remediation design covering reliable saves/corrections, recorded profiles, daily scheduling, queue and preview behavior, preserving upgrades, measured local scaling and an evaluated personalization pilot; October 4 amendment assigns the 180-day maximum interval policy, native boundary verification and existing-date decision to Phase E. Phase A merged in PR #190. B merged in PR #196 with reviewed pure helpers and passing automated/build checks; its handoff retains the historical human-proof status. C is implemented with independently reviewed storage/backup/recovery, 2,900 passing tests and a Chrome build; human smoke/visual proof remains pending before review/merge. D–H remain unimplemented.
 
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
@@ -95,6 +95,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`plans/2026-10-03-overview-daily-time.md`](./plans/2026-10-03-overview-daily-time.md): Practice read-model total, Overview contract/presentation, validation, and required human smoke proof.
 
+- [`plans/2026-10-04-fsrs-phase-c-storage-restore.md`](./plans/2026-10-04-fsrs-phase-c-storage-restore.md): reviewed and executed Phase C plan for additive evidence storage, frozen v1–v5 backup readers, v6 preflight, opaque identities, fresh lifecycle generations and replacement publication retry; full checks/build passed and human smoke/visual proof remains pending.
 - [`plans/2026-10-04-fsrs-phase-b-scheduling-evidence.md`](./plans/2026-10-04-fsrs-phase-b-scheduling-evidence.md): executed plan for complete immutable profiles, detached codecs, captured-context correction and guarded legacy estimates; five tasks reviewed, sparse-history repair verified, automated/build checks passed and human compatibility proof pending. No schema or daily activation.
 - [`plans/2026-10-03-fsrs-remediation.md`](./plans/2026-10-03-fsrs-remediation.md): dependency and acceptance map for all eight FSRS findings; foundation precedes daily experience, including Phase E's approved 180-day interval policy, measured local growth and the optimizer pilot. A and B have detailed plans; later slices require their own code-level plans against verified predecessors.
 - [`plans/2026-10-03-fsrs-phase-a-preserving-baseline.md`](./plans/2026-10-03-fsrs-phase-a-preserving-baseline.md): executed preservation plan merged in PR #190 for the frozen through-0009 baseline, independent recovery, populated singleton upgrade/reopen and background preparation guard; the handoff retains exact validation and historical proof status.
@@ -150,6 +151,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-04-fsrs-phase-c-storage-restore.md`](./handoffs/2026-10-04-fsrs-phase-c-storage-restore.md): reviewed evidence storage, v6 backup and recoverable replacement with real preserving migration, repaired collision/cache/import-boundary findings, exact validation and a runnable human fault-smoke procedure; installed-extension proof remains pending with the owner's October 5 decision to merge then test after backing up.
 
 - [`handoffs/2026-10-04-overlay-ai-hints.md`](./handoffs/2026-10-04-overlay-ai-hints.md): reviewed Phase 2 source, exact final/historical checks, progressive-hint fixture proof, pending human installed-extension smoke and live provider quality, and release/recovery notes.
 

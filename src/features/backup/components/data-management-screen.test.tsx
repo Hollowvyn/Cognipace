@@ -3,11 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { sendMessage } from '@/extension/messaging'
+import { useSyncAction } from '@/features/sync/api/sync-api'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 
 import {
   backupSchemaVersion,
   type BackupFile,
+  type BackupReplacementKind,
+  type BackupReplacementResult,
+  type BackupReplacementState,
   type BackupSummary,
 } from '../api/backup-contracts'
 import { DataManagementScreen } from './data-management-screen'
@@ -25,6 +29,13 @@ vi.mock('@/features/sync', () => ({
 describe('DataManagementScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'backup.getPendingReplacement') {
+        return Promise.resolve({ status: 'idle' })
+      }
+
+      return Promise.reject(new Error(`Unexpected method ${method}`))
+    })
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:backup')
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
@@ -34,7 +45,13 @@ describe('DataManagementScreen', () => {
 
   it('exports a full backup and shows completion feedback', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockResolvedValue(validBackup)
+    vi.mocked(sendMessage).mockImplementation((method) =>
+      Promise.resolve(
+        method === 'backup.getPendingReplacement'
+          ? { status: 'idle' }
+          : validBackup,
+      ),
+    )
     const { wrapper } = createQueryTestHarness()
 
     render(<DataManagementScreen />, { wrapper })
@@ -81,7 +98,13 @@ describe('DataManagementScreen', () => {
 
   it('validates an imported backup, shows the selected file, and keeps restore calm', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockResolvedValue(validSummary)
+    vi.mocked(sendMessage).mockImplementation((method) =>
+      Promise.resolve(
+        method === 'backup.getPendingReplacement'
+          ? { status: 'idle' }
+          : validSummary,
+      ),
+    )
     const { wrapper } = createQueryTestHarness()
 
     render(<DataManagementScreen />, { wrapper })
@@ -135,18 +158,25 @@ describe('DataManagementScreen', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Invalid JSON backup file.',
     )
-    expect(sendMessage).not.toHaveBeenCalled()
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'backup.validateFullBackup',
+      expect.anything(),
+    )
   })
 
   it('requires confirmation before restoring a full backup', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'backup.getPendingReplacement') {
+        return Promise.resolve({ status: 'idle' })
+      }
+
       if (method === 'backup.validateFullBackup') {
         return Promise.resolve(validSummary)
       }
 
       if (method === 'backup.restoreFullBackup') {
-        return Promise.resolve(validSummary)
+        return Promise.resolve(durableResult('restore'))
       }
 
       return Promise.reject(new Error(`Unexpected method ${method}`))
@@ -189,6 +219,10 @@ describe('DataManagementScreen', () => {
   it('offers a backup export inside the clear confirmation dialog', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'backup.getPendingReplacement') {
+        return Promise.resolve({ status: 'idle' })
+      }
+
       if (method === 'backup.exportFullBackup') {
         return Promise.resolve(validBackup)
       }
@@ -226,7 +260,13 @@ describe('DataManagementScreen', () => {
 
   it('cancels and confirms clearing local data through a confirmation dialog', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockResolvedValue(null)
+    vi.mocked(sendMessage).mockImplementation((method) =>
+      Promise.resolve(
+        method === 'backup.getPendingReplacement'
+          ? { status: 'idle' }
+          : durableResult('reset'),
+      ),
+    )
     const { wrapper } = createQueryTestHarness()
 
     render(<DataManagementScreen />, { wrapper })
@@ -244,7 +284,10 @@ describe('DataManagementScreen', () => {
         screen.queryByRole('dialog', { name: 'Clear local data?' }),
       ).not.toBeInTheDocument()
     })
-    expect(sendMessage).not.toHaveBeenCalled()
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'backup.resetLocalData',
+      expect.anything(),
+    )
 
     await user.click(screen.getByRole('button', { name: 'Clear local data' }))
     await user.click(
@@ -260,7 +303,6 @@ describe('DataManagementScreen', () => {
 
   it('closes clear confirmation when the backdrop is clicked', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockResolvedValue(null)
     const { wrapper } = createQueryTestHarness()
 
     render(<DataManagementScreen />, { wrapper })
@@ -278,9 +320,377 @@ describe('DataManagementScreen', () => {
         screen.queryByRole('dialog', { name: 'Clear local data?' }),
       ).not.toBeInTheDocument()
     })
-    expect(sendMessage).not.toHaveBeenCalled()
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'backup.resetLocalData',
+      expect.anything(),
+    )
+  })
+
+  it('closes a pending restore confirmation and retains its selected draft without saved feedback', async () => {
+    const user = userEvent.setup()
+    mockReplacementRuntime({ kind: 'restore' })
+    const { wrapper } = createQueryTestHarness()
+    render(<DataManagementScreen />, { wrapper })
+
+    await chooseAndRestoreBackup(user)
+
+    expect(await screen.findByText(persistenceMessage)).toBeVisible()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('backup.json')).toBeVisible()
+    expect(screen.getByText('Problems: 1')).toBeVisible()
+    expect(screen.queryByText('Backup restored.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry saving' })).toBeEnabled()
+    expectReplacementActionsDisabled()
+  })
+
+  it.each(['restore', 'reset', 'gist-pull'] as const)(
+    'reads %s recovery on Settings reload without retrying or replacing data',
+    async (kind) => {
+      mockReplacementRuntime({ kind, initialPending: true })
+      const first = createQueryTestHarness()
+      const view = render(<DataManagementScreen />, { wrapper: first.wrapper })
+      await screen.findByRole('button', { name: 'Retry saving' })
+      view.unmount()
+      const second = createQueryTestHarness()
+
+      render(<DataManagementScreen />, { wrapper: second.wrapper })
+
+      expect(
+        await screen.findByRole('button', { name: 'Retry saving' }),
+      ).toBeEnabled()
+      expect(sendMessage).toHaveBeenCalledTimes(2)
+      expect(sendMessage).toHaveBeenNthCalledWith(
+        2,
+        'backup.getPendingReplacement',
+        { surface: 'dashboard' },
+      )
+      expectReplacementActionsDisabled()
+    },
+  )
+
+  it('retries only publication and clears the restore draft after complete durable recovery', async () => {
+    const user = userEvent.setup()
+    mockReplacementRuntime({ kind: 'restore' })
+    const { wrapper } = createQueryTestHarness()
+    render(<DataManagementScreen />, { wrapper })
+    await chooseAndRestoreBackup(user)
+    await screen.findByRole('button', { name: 'Retry saving' })
+
+    await user.click(screen.getByRole('button', { name: 'Retry saving' }))
+
+    expect(sendMessage).toHaveBeenCalledWith('backup.retryPendingReplacement', {
+      surface: 'dashboard',
+    })
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.filter(([method]) => method === 'backup.restoreFullBackup'),
+    ).toHaveLength(1)
+    expect(
+      await screen.findByRole('status', { name: 'Data management feedback' }),
+    ).toHaveTextContent('Backup restored.')
+    expect(screen.getByText('No backup file selected')).toBeVisible()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Retry saving' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Export backup' })).toBeEnabled()
+  })
+
+  it('recovers a reset without clearing the selected restore draft or showing a restore success', async () => {
+    const user = userEvent.setup()
+    mockReplacementRuntime({ kind: 'reset' })
+    const { wrapper } = createQueryTestHarness()
+    render(<DataManagementScreen />, { wrapper })
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      createBackupFile(validBackup),
+    )
+    await screen.findByText('Problems: 1')
+    await user.click(screen.getByRole('button', { name: 'Clear local data' }))
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Clear local data',
+      }),
+    )
+    await screen.findByRole('button', { name: 'Retry saving' })
+    expect(screen.getByText(resetPersistenceMessage)).toBeVisible()
+    expect(screen.queryByText(persistenceMessage)).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Local data cleared.')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Retry saving' }))
+
+    expect(await screen.findByText('Local data cleared.')).toBeVisible()
+    expect(screen.getByText('backup.json')).toBeVisible()
+    expect(screen.queryByText('Backup restored.')).not.toBeInTheDocument()
+  })
+
+  it('keeps metadata recovery visible with saved-data text and the selected draft', async () => {
+    const user = userEvent.setup()
+    mockReplacementRuntime({
+      kind: 'restore',
+      status: 'durable-sync-metadata-pending',
+    })
+    const { wrapper } = createQueryTestHarness()
+    render(<DataManagementScreen />, { wrapper })
+
+    await chooseAndRestoreBackup(user)
+
+    expect(await screen.findByText(metadataMessage)).toBeVisible()
+    expect(screen.queryByText(persistenceMessage)).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('backup.json')).toBeVisible()
+    expect(screen.queryByText('Backup restored.')).not.toBeInTheDocument()
+    expectReplacementActionsDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Retry saving' }))
+
+    expect(
+      await screen.findByRole('status', { name: 'Data management feedback' }),
+    ).toHaveTextContent('Backup restored.')
+    expect(screen.getByText('No backup file selected')).toBeVisible()
+  })
+
+  it('clears stale recovery on a no-pending response without claiming that the data was saved', async () => {
+    const user = userEvent.setup()
+    mockReplacementRuntime({
+      kind: 'restore',
+      retryResult: { status: 'no-pending' },
+    })
+    const { wrapper } = createQueryTestHarness()
+    render(<DataManagementScreen />, { wrapper })
+    await chooseAndRestoreBackup(user)
+    await screen.findByRole('button', { name: 'Retry saving' })
+
+    await user.click(screen.getByRole('button', { name: 'Retry saving' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: 'Retry saving' }),
+      ).not.toBeInTheDocument()
+    })
+    expect(screen.queryByText(persistenceMessage)).not.toBeInTheDocument()
+    expect(screen.queryByText('Backup restored.')).not.toBeInTheDocument()
+    expect(screen.getByText('backup.json')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Export backup' })).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'Restore full backup' }),
+    ).toBeEnabled()
+  })
+
+  it('reveals Gist recovery when the sync action refreshes pending replacement status', async () => {
+    const user = userEvent.setup()
+    let pending = false
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'backup.getPendingReplacement') {
+        return Promise.resolve(
+          pending
+            ? pendingState('gist-pull', 'persistence-pending')
+            : { status: 'idle' },
+        )
+      }
+      if (method === 'sync.pullLatest') {
+        pending = true
+        return Promise.resolve({
+          action: 'pull-latest',
+          direction: 'pull',
+          outcome: 'error',
+          message: 'Gist data still needs saving.',
+          reason: 'unknown',
+          retryable: true,
+          occurredAt: '2026-05-25T12:00:00.000Z',
+          status: {
+            enabled: false,
+            configured: false,
+            tokenConfigured: false,
+            tokenStatus: {
+              provider: 'github:gist',
+              configured: false,
+              updatedAt: null,
+              fingerprint: null,
+            },
+            gistId: null,
+            isSyncing: false,
+            lastSyncAt: null,
+            lastSyncDirection: null,
+            lastPullAt: null,
+            lastPushAt: null,
+            needsPush: false,
+            lastBlockingReason: null,
+            lastError: null,
+            conflict: null,
+          },
+        })
+      }
+      return Promise.reject(new Error(`Unexpected method ${method}`))
+    })
+    const { wrapper } = createQueryTestHarness()
+    render(
+      <>
+        <DataManagementScreen />
+        <SyncActionTestButton />
+      </>,
+      { wrapper },
+    )
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith('backup.getPendingReplacement', {
+        surface: 'dashboard',
+      })
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Test Gist pull' }))
+
+    expect(
+      await screen.findByRole('button', { name: 'Retry saving' }),
+    ).toBeVisible()
+    expectReplacementActionsDisabled()
+    expect(screen.queryByText('Backup restored.')).not.toBeInTheDocument()
+  })
+
+  it('keeps retry saving available after a read-status failure and reports retry errors outside a dialog', async () => {
+    const user = userEvent.setup()
+    let committed = false
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'backup.getPendingReplacement') {
+        return committed
+          ? Promise.reject(new Error('Status unavailable.'))
+          : Promise.resolve({ status: 'idle' })
+      }
+      if (method === 'backup.validateFullBackup') {
+        return Promise.resolve(validSummary)
+      }
+      if (method === 'backup.restoreFullBackup') {
+        committed = true
+        return Promise.resolve(pendingState('restore', 'persistence-pending'))
+      }
+      if (method === 'backup.retryPendingReplacement') {
+        return Promise.reject(new Error('Saving unavailable.'))
+      }
+      return Promise.reject(new Error(`Unexpected method ${method}`))
+    })
+    const { wrapper } = createQueryTestHarness()
+    render(<DataManagementScreen />, { wrapper })
+    await chooseAndRestoreBackup(user)
+    await screen.findByRole('button', { name: 'Retry saving' })
+
+    await user.click(screen.getByRole('button', { name: 'Retry saving' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Saving unavailable.',
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry saving' })).toBeEnabled()
+    expect(screen.getByText('backup.json')).toBeVisible()
   })
 })
+
+const persistenceMessage =
+  'Your data was restored, but it still needs saving. Keep this extension open and choose Retry saving.'
+const resetPersistenceMessage =
+  'Your data was cleared, but it still needs saving. Keep this extension open and choose Retry saving.'
+const metadataMessage = 'Your data is saved. Sync status still needs saving.'
+
+function pendingState(
+  kind: BackupReplacementKind,
+  status: Exclude<BackupReplacementState['status'], 'idle'>,
+) {
+  return { status, kind, summary: kind === 'reset' ? null : validSummary }
+}
+
+function durableResult(kind: BackupReplacementKind) {
+  return {
+    status: 'durable',
+    syncMetadataPending: false,
+    kind,
+    summary: kind === 'reset' ? null : validSummary,
+  } as const
+}
+
+function mockReplacementRuntime({
+  kind,
+  status = 'persistence-pending',
+  initialPending = false,
+  retryResult = durableResult(kind),
+}: {
+  kind: BackupReplacementKind
+  status?: Exclude<BackupReplacementState['status'], 'idle'>
+  initialPending?: boolean
+  retryResult?: BackupReplacementResult
+}) {
+  let state: BackupReplacementState = initialPending
+    ? pendingState(kind, status)
+    : { status: 'idle' }
+  vi.mocked(sendMessage).mockImplementation((method) => {
+    if (method === 'backup.getPendingReplacement') {
+      return Promise.resolve(state)
+    }
+    if (method === 'backup.validateFullBackup') {
+      return Promise.resolve(validSummary)
+    }
+    if (
+      method === 'backup.restoreFullBackup' ||
+      method === 'backup.resetLocalData'
+    ) {
+      state = pendingState(kind, status)
+      return Promise.resolve(
+        status === 'persistence-pending'
+          ? state
+          : { ...durableResult(kind), syncMetadataPending: true },
+      )
+    }
+    if (method === 'backup.retryPendingReplacement') {
+      state = { status: 'idle' }
+      return Promise.resolve(retryResult)
+    }
+    return Promise.reject(new Error(`Unexpected method ${method}`))
+  })
+}
+
+async function chooseAndRestoreBackup(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  await user.upload(
+    screen.getByLabelText('Backup file'),
+    createBackupFile(validBackup),
+  )
+  await screen.findByText('Problems: 1')
+  await user.click(screen.getByRole('button', { name: 'Restore full backup' }))
+  await user.click(screen.getByRole('button', { name: 'Confirm restore' }))
+}
+
+function expectReplacementActionsDisabled() {
+  expect(screen.getByRole('button', { name: 'Export backup' })).toBeDisabled()
+  expect(
+    screen.getByRole('button', { name: 'Choose backup file' }),
+  ).toBeDisabled()
+  expect(screen.getByLabelText('Backup file')).toBeDisabled()
+  expect(
+    screen.getByRole('button', { name: 'Clear local data' }),
+  ).toBeDisabled()
+  const restore = screen.queryByRole('button', { name: 'Restore full backup' })
+  if (restore) {
+    expect(restore).toBeDisabled()
+  }
+}
+
+function SyncActionTestButton() {
+  const action = useSyncAction(() =>
+    sendMessage('sync.pullLatest', {
+      surface: 'dashboard',
+      confirmLocalOverwrite: false,
+    }),
+  )
+  return (
+    <button
+      onClick={() => {
+        void action.mutateAsync()
+      }}
+    >
+      Test Gist pull
+    </button>
+  )
+}
 
 function createBackupFile(backup: BackupFile) {
   return new File([JSON.stringify(backup)], 'backup.json', {
@@ -355,6 +765,10 @@ const validBackup = {
     problemTopics: [{ problemSlug: 'two-sum', topicId: 'array' }],
     problemCompanies: [{ problemSlug: 'two-sum', companyId: 'meta' }],
     practice: {
+      schedulerProfiles: [],
+      reviewEvidence: [],
+      generations: [],
+      commandReceipts: [],
       problemPractice: [
         {
           problemSlug: 'two-sum',

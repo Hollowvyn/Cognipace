@@ -204,11 +204,8 @@ describe('supported topic snapshot upgrade', () => {
 
 describe('shipped FSRS snapshot baseline', () => {
   it('pins all ten shipped files and selects only appended SQL', () => {
-    const suffix = 'CREATE TABLE fsrs_upgrade_probe (id TEXT PRIMARY KEY);'
-    const entries = [
-      ...frozenV9MigrationEntries,
-      { path: './migrations/0010_fsrs_upgrade_probe.sql', sql: suffix },
-    ]
+    const suffix = migrationEntries[10]!
+    expect(suffix.path).toBe('./migrations/0010_fsrs_evidence.sql')
 
     expect(frozenV9MigrationEntries).toHaveLength(10)
     expect(frozenV9MigrationEntries.at(-1)?.path).toBe(
@@ -219,9 +216,9 @@ describe('shipped FSRS snapshot baseline', () => {
     expect(selectSnapshotBaselineSql(expectedV9MigrationFingerprint)).toBe(
       frozenV9MigrationSql,
     )
-    expect(selectUpgradeSql(expectedV9MigrationFingerprint, entries)).toBe(
-      suffix,
-    )
+    expect(
+      selectUpgradeSql(expectedV9MigrationFingerprint, migrationEntries),
+    ).toBe(suffix.sql)
     expect(
       selectUpgradeSql(
         expectedV9MigrationFingerprint,

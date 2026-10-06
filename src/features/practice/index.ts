@@ -65,3 +65,5 @@ export {
   type SaveReviewResultInput,
   type SetPracticeSuspendedInput,
 } from './domain'
+
+export * from './domain/practice-storage'

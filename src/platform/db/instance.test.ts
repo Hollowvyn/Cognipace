@@ -133,6 +133,71 @@ function readOwnedRows(db: Awaited<ReturnType<typeof getAppDb>>) {
 }
 
 describe('app database startup', () => {
+  it.each([
+    'missing-evidence',
+    'partial-evidence',
+    'missing-local',
+    'missing-problem',
+  ])(
+    'rejects current %s without preparation, rotation or publication',
+    async (caseName) => {
+      const storage = installStorage()
+      const handle = await getBackgroundDb()
+      openedHandles.push(handle)
+      await saveReviewResult(handle.db, {
+        problemSlug: 'two-sum',
+        rating: 'good',
+        reviewAttemptId: 'first-current',
+      })
+      await saveReviewResult(handle.db, {
+        problemSlug: 'two-sum',
+        rating: 'hard',
+        reviewAttemptId: 'second-current',
+      })
+      if (caseName === 'missing-evidence')
+        handle.rawDb.exec('DELETE FROM practice_review_evidence')
+      if (caseName === 'partial-evidence')
+        handle.rawDb.exec(
+          "DELETE FROM practice_review_evidence WHERE review_attempt_id = 'first-current'",
+        )
+      if (caseName === 'missing-local')
+        handle.rawDb.exec(
+          "DELETE FROM practice_generations WHERE scope_id = 'local'",
+        )
+      if (caseName === 'missing-problem')
+        handle.rawDb.exec(
+          "DELETE FROM practice_generations WHERE scope_id = 'problem:two-sum'",
+        )
+      await flushDbSnapshot()
+      const original = { ...storage.values }
+      storage.set.mockClear()
+      resetAppDbForTesting()
+      await expect(getBackgroundDb()).rejects.toThrow(
+        /Practice|generation|evidence/i,
+      )
+      expect(storage.values).toEqual(original)
+      expect(storage.set).not.toHaveBeenCalled()
+    },
+  )
+
+  it('invokes the current-data callback without preparation and retains bytes on rejection', async () => {
+    const storage = installStorage()
+    await openTestDb()
+    const original = { ...storage.values }
+    resetAppDbForTesting()
+    storage.set.mockClear()
+    const beforePublish = vi.fn()
+    const validateCurrentData = vi.fn(() =>
+      Promise.reject(new Error('feature preflight failed')),
+    )
+    await expect(
+      getAppDb({ beforePublish, validateCurrentData }),
+    ).rejects.toThrow('feature preflight failed')
+    expect(beforePublish).not.toHaveBeenCalled()
+    expect(validateCurrentData).toHaveBeenCalledTimes(1)
+    expect(storage.set).not.toHaveBeenCalled()
+    expect(storage.values).toEqual(original)
+  })
   it('upgrades populated shipped v8 while preserving an earlier v7 recovery and the v8 original', async () => {
     const storage = installStorage()
     const legacy = await createDb({
@@ -540,7 +605,7 @@ describe('app database startup', () => {
       ) VALUES (
         'legacy-review', 'legacy-two-sum', 'legacy-card', 'good', 'free-practice',
         201, 42, 1, 'two-pointers', 'O(n)', 'O(1)', '["TypeScript"]',
-        'review note', '{"rating":"good"}', 201, 202
+        'review note', '{"rating":"good","state":"new","dueAt":"1970-01-01T00:00:00.101Z","stability":0,"difficulty":0,"elapsedDays":0,"lastElapsedDays":0,"scheduledDays":0,"learningSteps":0,"reviewedAt":"1970-01-01T00:00:00.201Z"}', 201, 202
       );
       INSERT INTO tracks (id, slug, title, description, due_at, created_at, updated_at)
       VALUES ('legacy-track', 'legacy-track', 'Legacy Track', 'preserve order', 456789, 101, 202);
