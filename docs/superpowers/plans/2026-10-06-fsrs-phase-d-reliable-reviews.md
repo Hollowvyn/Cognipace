@@ -170,8 +170,8 @@ await expect(
 
 ## Task 3: Publish command acknowledgements through the background queue
 
-- [ ] Write failing handler/API tests requiring authenticated strict command payloads, original acknowledgement separately from current state, flush failure returning pending, duplicate retry performing no second effects and invalidation only after successful flush.
-- [ ] Change ProtocolMap save/update return types to `PracticeReviewCommandResult`, retain methods/sender permissions, and route both methods through a small review-specific composition in the existing gated mutation queue. Fetch Settings for a first apply, execute the whole workflow, flush, then perform existing invalidation/dirty/sync bookkeeping. Do not turn flush failure into a generic mutation rejection that encourages a new command.
+- [x] Write failing handler/API tests requiring authenticated strict command payloads, original acknowledgement separately from current state, flush failure returning pending, duplicate retry performing no second effects and invalidation only after successful flush.
+- [x] Change ProtocolMap save/update return types to `PracticeReviewCommandResult`, retain methods/sender permissions, and route both methods through a small review-specific composition in the existing gated mutation queue. Fetch Settings for a first apply, execute the whole workflow, flush, then perform existing invalidation/dirty/sync bookkeeping. Do not turn flush failure into a generic mutation rejection that encourages a new command.
 
 ```ts
 return runGatedMutationQueue(async () => {
@@ -196,8 +196,8 @@ return runGatedMutationQueue(async () => {
 })
 ```
 
-- [ ] Ensure every runtime response is Zod parsed, no command fields are forged on the server for old clients, and no invalidation claims pending state is durable. Existing backup pending admission continues to block these writes.
-- [ ] Run `rtk npm run test -- src/extension/background/register-handlers.test.ts src/extension/background/runtime-policy.test.ts src/features/practice/api/practice-contracts.test.ts src/features/practice/api/practice-api.test.tsx` and typecheck. Obtain SPEC then QUALITY review and commit `feat(runtime): acknowledge reviews after durable snapshot save`.
+- [x] Ensure every runtime response is Zod parsed, no command fields are forged on the server for old clients, and no invalidation claims pending state is durable. Existing backup pending admission continues to block these writes.
+- [x] Run `rtk npm run test -- src/extension/background/register-handlers.test.ts src/extension/background/runtime-policy.test.ts src/features/practice/api/practice-contracts.test.ts src/features/practice/api/practice-api.test.tsx` and typecheck. Obtain SPEC then QUALITY review and commit `feat(runtime): acknowledge reviews after durable snapshot save`.
 
 ## Task 4: Freeze accepted commands in the overlay and expose safe retry
 

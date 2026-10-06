@@ -112,20 +112,24 @@ import { generateLeetCodeHintsInBackground } from '@/features/leetcode-review-as
 import { analyzeLeetCodeSubmissionInBackground } from '@/features/leetcode-review-assistant/server/analysis-runtime-service'
 import {
   practiceDetailsRequestSchema,
+  practiceReviewCommandResultSchema,
   practiceOverrideLastReviewResultRequestSchema,
   practiceResetScheduleRequestSchema,
   practiceSaveReviewResultRequestSchema,
   practiceSetSuspendedRequestSchema,
 } from '@/features/practice/api/practice-contracts'
 import {
+  acceptedPracticeReviewCommandSchema,
+  type AcceptedPracticeReviewCommand,
+} from '@/features/practice/domain'
+import {
   serializeNormalizedPracticeState,
   serializePracticeDetails,
 } from '@/features/practice/api/practice-serializers'
 import {
   getPracticeDetails,
-  overrideLastReviewResultWithTrackProgress,
+  executePracticeReviewCommand,
   resetPracticeSchedule,
-  saveReviewResultWithTrackProgress,
   setPracticeSuspended,
 } from '@/features/practice/server/practice-service'
 import {
@@ -818,70 +822,30 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) => {
-        const settings = await getSettings(db)
-        const reviewedAt = request.reviewedAt
-          ? new Date(request.reviewedAt)
-          : new Date()
-        const reviewInput = {
-          problemSlug: request.problemSlug,
-          rating: request.rating,
-          elapsedSeconds: request.elapsedSeconds,
-          isCorrect: request.isCorrect,
-          log: readReviewLogRequest(request),
-          targetRetention: settings.review.targetRetention,
-        }
-
-        await saveReviewResultWithTrackProgress(
-          db,
-          {
-            ...reviewInput,
-            reviewedAt,
-            ...(request.reviewMode ? { reviewMode: request.reviewMode } : {}),
-          },
-          settings,
-        )
-        const details = await getPracticeDetails(db, request.problemSlug)
-
-        return serializePracticeDetails(details)
-      },
-      () =>
-        broadcastPracticeInvalidation({
-          problemSlug: request.problemSlug,
-          source: request.surface,
-        }),
+    const { surface, ...command } = request
+    return runPracticeReviewCommand(
+      acceptedPracticeReviewCommandSchema.parse({
+        ...command,
+        operation: 'save',
+      }),
+      surface,
     )
   })
 
   onMessage('practice.overrideLastReviewResult', ({ data, sender }) => {
     const request = practiceOverrideLastReviewResultRequestSchema.parse(data)
-
     assertCanSenderCallExtensionMethod(
       'practice.overrideLastReviewResult',
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) => {
-        const settings = await getSettings(db)
-        await overrideLastReviewResultWithTrackProgress(db, {
-          problemSlug: request.problemSlug,
-          rating: request.rating,
-          elapsedSeconds: request.elapsedSeconds,
-          isCorrect: request.isCorrect,
-          log: readReviewLogRequest(request),
-          targetRetention: settings.review.targetRetention,
-        })
-        const details = await getPracticeDetails(db, request.problemSlug)
-
-        return serializePracticeDetails(details)
-      },
-      () =>
-        broadcastPracticeInvalidation({
-          problemSlug: request.problemSlug,
-          source: request.surface,
-        }),
+    const { surface, ...command } = request
+    return runPracticeReviewCommand(
+      acceptedPracticeReviewCommandSchema.parse({
+        ...command,
+        operation: 'update',
+      }),
+      surface,
     )
   })
 
@@ -1623,6 +1587,34 @@ let dbMutationQueue: Promise<void> = Promise.resolve()
 let dbMutationDepth = 0
 let hasPendingDirtyMarkRetry = false
 
+function runPracticeReviewCommand(
+  command: AcceptedPracticeReviewCommand,
+  source: UiSurface,
+) {
+  return runGatedMutationQueue(async () => {
+    const { db } = await getAppDb()
+    const result = practiceReviewCommandResultSchema.parse(
+      await executePracticeReviewCommand(db, command),
+    )
+    if (result.status === 'conflict') return result
+    try {
+      await flushDbSnapshot()
+    } catch {
+      return practiceReviewCommandResultSchema.parse({
+        ...result,
+        status: 'persistence-pending',
+      })
+    }
+    await broadcastPracticeInvalidation({
+      problemSlug: command.problemSlug,
+      source,
+    })
+    await markSyncLocalDataChangedBestEffort()
+    await scheduleAutoPushAfterMutationBestEffort()
+    return practiceReviewCommandResultSchema.parse(result)
+  })
+}
+
 function runDbMutation<T>(
   write: (db: Db) => Promise<T>,
   afterFlush?: (result: T) => unknown,
@@ -1748,25 +1740,6 @@ function runRemoteRestoreInMutationQueue<T>(
   }
 
   return runInMutationQueue(guardedWork)
-}
-
-function readReviewLogRequest(request: {
-  log?:
-    | {
-        interviewPattern?: string | null | undefined
-        timeComplexity?: string | null | undefined
-        spaceComplexity?: string | null | undefined
-        languages?: string | null | undefined
-        notes?: string | null | undefined
-      }
-    | undefined
-  notes?: string | null | undefined
-}) {
-  if (request.log) {
-    return request.log
-  }
-
-  return request.notes === undefined ? undefined : { notes: request.notes }
 }
 
 function readSingleChangedProblemSlug(problemSlugs: readonly string[]) {

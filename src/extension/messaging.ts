@@ -92,6 +92,7 @@ import type {
 import {
   normalizedPracticeStateSchema,
   type PracticeDetailsRequest,
+  type PracticeReviewCommandResult,
   type PracticeOverrideLastReviewResultRequest,
   type PracticeResetScheduleRequest,
   type PracticeSaveReviewResultRequest,
@@ -415,13 +416,13 @@ export interface ProtocolMap {
   ): ProblemDeleteResponse
   'practice.saveReviewResult'(
     request: PracticeSaveReviewResultRequest,
-  ): SerializedPracticeDetails
+  ): PracticeReviewCommandResult
   'practice.getDetails'(
     request: PracticeDetailsRequest,
   ): SerializedPracticeDetails
   'practice.overrideLastReviewResult'(
     request: PracticeOverrideLastReviewResultRequest,
-  ): SerializedPracticeDetails
+  ): PracticeReviewCommandResult
   'practice.setSuspended'(
     request: PracticeSetSuspendedRequest,
   ): SerializedPracticeDetails
