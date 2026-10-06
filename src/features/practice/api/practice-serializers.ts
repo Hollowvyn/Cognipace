@@ -48,6 +48,13 @@ export function serializePracticeDetails(
       : null,
     currentLog: serializePracticeLog(details.currentLog),
     canOverrideLatestReview: details.canOverrideLatestReview,
+    generation: details.generation,
+    latestReview: details.latestReview
+      ? {
+          ...details.latestReview,
+          reviewedAt: details.latestReview.reviewedAt.toISOString(),
+        }
+      : null,
   })
 }
 

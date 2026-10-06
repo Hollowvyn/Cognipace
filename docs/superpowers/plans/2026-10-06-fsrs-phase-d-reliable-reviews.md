@@ -30,11 +30,23 @@ interface PracticeCommandIdentity {
 }
 // Save request: identity + existing Save fields, with reviewedAt required.
 // Update request: identity + targetAttemptId + expectedRevision + existing fields.
-interface PracticeReviewCommandResult {
-  status: 'saved' | 'persistence-pending'
-  acknowledgement: PracticeReceiptAcknowledgement
-  current: SerializedPracticeDetails
-}
+type PracticeReviewCommandResult =
+  | {
+      status: 'saved' | 'persistence-pending'
+      acknowledgement: PracticeReceiptAcknowledgement
+      current: SerializedPracticeDetails
+    }
+  | {
+      status: 'conflict'
+      reason:
+        | 'stale-review'
+        | 'backdated'
+        | 'unsupported-legacy'
+        | 'stale-generation'
+        | 'command-conflict'
+      message: string
+      current: SerializedPracticeDetails
+    }
 ```
 
 `acknowledgement` is C's bounded original scheduling/operation identity; it is stored in the receipt. `current` is a separate fresh read and is never copied into a receipt. Overlay result snapshots use acknowledgement identity/rating plus their frozen accepted elapsed/correctness fields, never whichever attempt happens to be latest. Existing receipt acknowledgement v1 remains unchanged.
@@ -48,6 +60,8 @@ PracticeDetails gains readonly `generation` and `latestReview` (`reviewAttemptId
 **Scheduling:** Save allocates sequence as max retained sequence + 1, rejects a time before the last applied event or card last review, accepts equal timestamps, creates the complete effective legacy profile using saved retention, deduplicates its canonical JSON, and schedules through `scheduleReviewWithProfile`. Persist captured pre-card/profile/native log and any validated accepted assessment evidence atomically with attempt/card/aggregate/track/receipt. No full-history replay on Save or Update.
 
 **Correction:** validate target owner, last application sequence, expected revision and original reviewedAt inside the same transaction. Captured/legacy-derived events use `correctReviewFromEvidence` with their stored context. Unknown legacy events use `correctLegacyReview` only when complete retained chronological/log/card evidence uniquely verifies the final transition; tied/reordered/missing/inconsistent evidence rejects without changing the draft or history. Return recovered pre-card context from that already-verified facade operation and persist it as legacy-derived. Increment revision, retain attempt ID/sequence/event time, preserve timing/log fields unless explicitly edited, and reconcile only that attempt's existing linked track progress.
+
+**Conflicts:** a small Practice-owned typed conflict error distinguishes stale review/revision, backdating, unsupported legacy context, stale generation and command-ID payload conflict from transport/storage failure. Only this error becomes a strict runtime `conflict` result; it writes nothing. Overlay can end that rejected accepted command while preserving the selected draft and its original target, leaving deliberate Restart available. Other errors retain the frozen command for retry. Do not parse human error strings or silently rebase onto a newer review.
 
 **Durability:** review runtime uses the existing gated mutation queue, executes the workflow, calls `flushDbSnapshot`, and broadcasts/invokes existing dirty/sync bookkeeping only after a successful flush. Flush failure returns `persistence-pending` with the original acknowledgement and a current read, never a Saved message. Retry resends the same command, finds the persisted/in-memory receipt, skips all mutation effects and retries flush. No worker-local pending flag serves as the command identity. If restart loses an unflushed transaction, the last durable snapshot remains intact and the same command can apply once against that snapshot; if the receipt was published before acknowledgement loss, restart finds it and never reapplies.
 
@@ -65,7 +79,7 @@ PracticeDetails gains readonly `generation` and `latestReview` (`reviewAttemptId
 
 ## Task 1: Capture scheduling context and correct one identified event
 
-- [ ] Write failing regressions in FSRS correction/core Practice tests for captured Save metadata, same-time sequence, backdated rejection, original-profile correction after Settings changes, custom imported card IDs, stale target/revision, tied unknown legacy rejection and verified legacy-derived context.
+- [x] Write failing regressions in FSRS correction/core Practice tests for captured Save metadata, same-time sequence, backdated rejection, original-profile correction after Settings changes, custom imported card IDs, stale target/revision, tied unknown legacy rejection and verified legacy-derived context.
 
 ```ts
 const saved = await repository.saveReviewResult({
@@ -90,10 +104,10 @@ expect(
 ).toBe(1)
 ```
 
-- [ ] Run `rtk npm run test -- src/lib/fsrs/scheduler/review-correction.test.ts src/features/practice/practice-core.integration.test.ts`; confirm meaningful failures before edits.
-- [ ] Extend `correctLegacyReview` to return the verified context (`preCard` serialized by existing codec, original ISO event time, effective compatibility profile). Keep native rollback and every current verification guard.
-- [ ] Change Save to persist canonical complete profile, serialized pre-card and captured evidence instead of unknown. Use immutable profile JSON uniqueness, opaque IDs and safe counters from C. Reject backdating before writes, allow ties in sequence order. Optional assessment evidence uses C's schema and must match the effective rating.
-- [ ] Replace repository Update replay with exact target/revision guard, captured context scheduling or verified legacy correction. Preserve other events and linked metadata. Use the retained application sequence for details/history/latest ordering, without changing Analytics' separately owned first-assessment cohort tie policy.
+- [x] Run `rtk npm run test -- src/lib/fsrs/scheduler/review-correction.test.ts src/features/practice/practice-core.integration.test.ts`; confirm meaningful failures before edits.
+- [x] Extend `correctLegacyReview` to return the verified context (`preCard` serialized by existing codec, original ISO event time, effective compatibility profile). Keep native rollback and every current verification guard.
+- [x] Change Save to persist canonical complete profile, serialized pre-card and captured evidence instead of unknown. Use immutable profile JSON uniqueness, opaque IDs and safe counters from C. Reject backdating before writes, allow ties in sequence order. Optional assessment evidence uses C's schema and must match the effective rating.
+- [x] Replace repository Update replay with exact target/revision guard, captured context scheduling or verified legacy correction. Preserve other events and linked metadata. Use the retained application sequence for details/history/latest ordering, without changing Analytics' separately owned first-assessment cohort tie policy.
 
 ```ts
 const event = evidenceById.get(input.targetAttemptId)
@@ -117,9 +131,9 @@ const replacement =
 // Persist replacement card/log, existing attempt identity/time/sequence, revision + 1.
 ```
 
-- [ ] Add readonly generation/latest-review context to details; derive `canOverrideLatestReview` from the same safe correction context validation used by writes.
-- [ ] Adapt existing direct repository/core/Tracks tests to explicit Update identity and new captured evidence behavior; preserve assertions about counts, time/log and track semantics.
-- [ ] Rerun focused tests and C storage/backup validation tests. Obtain SPEC then QUALITY review, repair findings, commit `feat(fsrs): capture review inputs and guard single-event corrections`.
+- [x] Add readonly generation/latest-review context to details; derive `canOverrideLatestReview` from the same safe correction context validation used by writes.
+- [x] Adapt existing direct repository/core/Tracks tests to explicit Update identity and new captured evidence behavior; preserve assertions about counts, time/log and track semantics.
+- [x] Rerun focused tests and C storage/backup validation tests. Obtain SPEC then QUALITY review, repair findings, commit `feat(fsrs): capture review inputs and guard single-event corrections`.
 
 ## Task 2: Deduplicate the whole Practice and track transaction
 

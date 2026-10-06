@@ -62,6 +62,7 @@ export function correctLegacyReview(
   readonly evidence: 'legacy-derived'
   readonly profile: FsrsSchedulerProfile
   readonly originalProfile: null
+  readonly context: FsrsReviewContext
 } {
   assertValidFsrsCardSnapshot(card)
   const latest = history.at(-1)
@@ -134,7 +135,7 @@ export function correctLegacyReview(
     rejectLegacyCorrection()
   }
 
-  const scheduled = scheduleCardReviewWithProfile(
+  const scheduled = scheduleReviewWithProfile(
     preCard,
     replacementRating,
     eventAt,

@@ -109,6 +109,24 @@ export const practiceDetailsSchema = normalizedPracticeStateSchema.extend({
   card: fsrsCardSnapshotSchema.nullable(),
   currentLog: practiceLogSnapshotSchema,
   canOverrideLatestReview: z.boolean(),
+  generation: z
+    .object({
+      localGenerationToken: z.string().min(1),
+      problemGenerationToken: z.string().min(1).nullable(),
+    })
+    .nullable(),
+  latestReview: z
+    .object({
+      reviewAttemptId: z.string().min(1),
+      applicationSequence: z
+        .number()
+        .int()
+        .positive()
+        .refine(Number.isSafeInteger),
+      revision: z.number().int().nonnegative().refine(Number.isSafeInteger),
+      reviewedAt: z.iso.datetime(),
+    })
+    .nullable(),
 })
 
 export type SerializedPracticeDetails = z.infer<typeof practiceDetailsSchema>
@@ -157,6 +175,12 @@ export const practiceOverrideLastReviewResultRequestSchema = z
     surface: practiceRuntimeSurfaceSchema,
     problemSlug: z.string(),
     rating: z.enum(reviewRatings),
+    targetAttemptId: z.string().min(1),
+    expectedRevision: z
+      .number()
+      .int()
+      .nonnegative()
+      .refine(Number.isSafeInteger),
     elapsedSeconds: z.number().int().positive().nullish(),
     isCorrect: z.boolean().nullish(),
     log: practiceLogPatchSchema.optional(),

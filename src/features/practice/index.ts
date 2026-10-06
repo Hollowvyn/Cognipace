@@ -67,3 +67,7 @@ export {
 } from './domain'
 
 export * from './domain/practice-storage'
+export {
+  ReviewCommandConflictError,
+  type ReviewCommandConflictReason,
+} from './domain/practice-command'
