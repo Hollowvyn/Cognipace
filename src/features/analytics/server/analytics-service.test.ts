@@ -27,6 +27,122 @@ import { calculateAnalyticsReadiness } from '../domain/analytics-readiness'
 import { getAnalyticsSummary } from './analytics-service'
 
 describe('getAnalyticsSummary dashboard views', () => {
+  it.each([30, 90, 'all'] as const)(
+    'aggregates truthful raw selected activity for %s before chart eligibility and serializes it',
+    async (range) => {
+      const handle = await createTestDb({ seed: false })
+      await insertAnalyticsProblem(handle.db, 'repeated', 'Repeated', [
+        'Arrays',
+        'Hashing',
+      ])
+      await insertAnalyticsHistory(handle.db, 'repeated', {
+        id: 'repeated',
+        dates: [
+          new Date('2026-03-07T12:00:00Z'),
+          new Date('2026-03-08T05:00:00Z'),
+          new Date('2026-03-08T05:10:00Z'),
+          new Date('2026-03-08T05:30:00Z'),
+          new Date('2026-03-08T05:30:00.001Z'),
+        ],
+        ratings: ['again', 'good', 'easy', 'good', 'good'],
+        correct: [true, true, false, null, true],
+        elapsedSeconds: [60, 120, 900, 900, 500],
+        dueAt: new Date('2026-03-09T12:00:00Z'),
+        stability: 4,
+        difficulty: 4,
+      })
+      await insertAnalyticsProblem(handle.db, 'invalid', 'Invalid', [])
+      await insertAnalyticsHistory(handle.db, 'invalid', {
+        id: 'invalid',
+        dates: [new Date('2026-03-08T05:20:00Z')],
+        ratings: ['good'],
+        correct: [true],
+        dueAt: new Date('2026-03-09T12:00:00Z'),
+        stability: 4,
+        difficulty: 4,
+      })
+      await handle.db
+        .update(reviewAttempts)
+        .set({ rating: 'invalid' })
+        .where(eq(reviewAttempts.id, 'invalid:0'))
+      await insertAnalyticsProblem(handle.db, 'old', 'Old', [])
+      await insertAnalyticsHistory(handle.db, 'old', {
+        id: 'old',
+        dates: [new Date('2025-11-01T12:00:00Z')],
+        ratings: ['good'],
+        correct: [true],
+        elapsedSeconds: [300],
+        dueAt: new Date('2026-03-09T12:00:00Z'),
+        stability: 4,
+        difficulty: 4,
+      })
+      const summary = await getAnalyticsSummary(handle.db, {
+        range,
+        now: new Date('2026-03-08T05:30:00Z'),
+        timeZone: 'America/New_York',
+      })
+      const activity = {
+        assessmentDays: range === 'all' ? 3 : 2,
+        recordedAssessments: range === 'all' ? 6 : 5,
+        knownCorrectnessAssessments: range === 'all' ? 5 : 4,
+        successfulAssessments: range === 'all' ? 4 : 3,
+        distinctSuccessfulProblems: range === 'all' ? 3 : 2,
+        observedCorrectness: range === 'all' ? 4 / 5 : 3 / 4,
+        timedSuccessfulAssessments: range === 'all' ? 3 : 2,
+        untimedSuccessfulAssessments: 1,
+        successfulRecordedSeconds: range === 'all' ? 480 : 180,
+      }
+      expect(summary.activity).toEqual(activity)
+      expect(summary.observedRatingSampleSize).toBe(range === 'all' ? 5 : 4)
+      expect(summary.observedRatingQuality).toBeNull()
+      const response = analyticsSummarySchema.parse({
+        ...summary,
+        observedRatingQuality: {
+          value: summary.observedRatingQuality,
+          sampleSize: summary.observedRatingSampleSize,
+          lowSample: summary.lowSample,
+        },
+      })
+      expect(response.activity).toEqual(activity)
+      const transported: unknown = JSON.parse(JSON.stringify(response))
+      expect(transported).toMatchObject({ activity })
+      expect(response).not.toHaveProperty('events')
+    },
+  )
+
+  it.each([null, false] as const)(
+    'preserves zero versus unavailable successful totals for a wholly %s correctness cohort',
+    async (isCorrect) => {
+      const handle = await createTestDb({ seed: false })
+      await insertAnalyticsProblem(handle.db, 'no-success', 'No success', [])
+      await insertAnalyticsHistory(handle.db, 'no-success', {
+        id: 'no-success',
+        dates: [new Date('2026-03-08T05:00:00Z')],
+        ratings: ['easy'],
+        correct: [isCorrect],
+        elapsedSeconds: [300],
+        dueAt: new Date('2026-03-09T12:00:00Z'),
+        stability: 4,
+        difficulty: 4,
+      })
+      const summary = await getAnalyticsSummary(handle.db, {
+        range: 30,
+        now: new Date('2026-03-08T05:30:00Z'),
+      })
+      expect(summary.activity).toEqual({
+        assessmentDays: 1,
+        recordedAssessments: 1,
+        knownCorrectnessAssessments: isCorrect === null ? 0 : 1,
+        successfulAssessments: 0,
+        distinctSuccessfulProblems: isCorrect === null ? null : 0,
+        observedCorrectness: isCorrect === null ? null : 0,
+        timedSuccessfulAssessments: 0,
+        untimedSuccessfulAssessments: 0,
+        successfulRecordedSeconds: isCorrect === null ? null : 0,
+      })
+    },
+  )
+
   it('preserves invalid-zone fallback provenance on the report and independent Recall and backlog frames', async () => {
     const handle = await createTestDb({ seed: false })
     await insertAnalyticsProblem(

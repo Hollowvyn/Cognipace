@@ -80,6 +80,17 @@ function baseAnalyticsSummary(): SerializedAnalyticsSummary {
     },
     reviewDays: 42,
     totalReviews: 381,
+    activity: {
+      assessmentDays: 12,
+      recordedAssessments: 60,
+      knownCorrectnessAssessments: 40,
+      successfulAssessments: 30,
+      distinctSuccessfulProblems: 22,
+      observedCorrectness: 0.75,
+      timedSuccessfulAssessments: 24,
+      untimedSuccessfulAssessments: 6,
+      successfulRecordedSeconds: 5400,
+    },
     observedRatingQuality: { value: 0.72, sampleSize: 58, lowSample: false },
     observedRatingSampleSize: 58,
   })

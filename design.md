@@ -270,8 +270,11 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   workload pair retain their placement. The section is implemented on this
   branch with passing automated checks and production-component browser proof;
   required human installed-extension happy-path/edge-case smoke remains pending.
-- Keep the explicit 14-day daily, 30-day three-day, and 90-day weekly grouping
-  and feature-supplied values. Historical trend charts trim
+- Keep explicit 30 / 90 / All time selection and feature-supplied calendar
+  grouping. Show available young history without switching selection; preserve
+  genuine inactivity in older histories. All time uses bounded calendar bins,
+  and Recall uses its supplied first-pair display frame through report as-of.
+  The legacy 14-day URL resolves to 30. Historical trend charts trim
   unsupported beginning and ending buckets only, using the same contiguous activity
   window for Chart, Table, and inspection. Preserve every internal gap and each
   retained interval's dates.

@@ -873,11 +873,96 @@ export const historicalReadinessSchema = z.object({
   recommendedRange: z.union([z.literal(30), z.literal(90)]).nullable(),
 })
 
+export const analyticsSelectedActivitySchema = z
+  .object({
+    assessmentDays: countSchema,
+    recordedAssessments: countSchema,
+    knownCorrectnessAssessments: countSchema,
+    successfulAssessments: countSchema,
+    distinctSuccessfulProblems: countSchema.nullable(),
+    observedCorrectness: nullablePercentageSchema,
+    timedSuccessfulAssessments: countSchema,
+    untimedSuccessfulAssessments: countSchema,
+    successfulRecordedSeconds: z.number().nonnegative().nullable(),
+  })
+  .strict()
+  .superRefine((activity, context) => {
+    if (
+      activity.successfulAssessments > activity.knownCorrectnessAssessments ||
+      activity.knownCorrectnessAssessments > activity.recordedAssessments ||
+      activity.timedSuccessfulAssessments +
+        activity.untimedSuccessfulAssessments !==
+        activity.successfulAssessments
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Activity counts must match the recorded, known-correctness, and successful populations.',
+      })
+    if (
+      activity.assessmentDays > activity.recordedAssessments ||
+      (activity.assessmentDays === 0) !== (activity.recordedAssessments === 0)
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Assessment days must match the recorded activity population.',
+        path: ['assessmentDays'],
+      })
+    const whollyUnknown =
+      activity.recordedAssessments > 0 &&
+      activity.knownCorrectnessAssessments === 0
+    if (
+      whollyUnknown
+        ? activity.distinctSuccessfulProblems !== null
+        : activity.distinctSuccessfulProblems === null ||
+          activity.distinctSuccessfulProblems >
+            activity.successfulAssessments ||
+          (activity.distinctSuccessfulProblems === 0) !==
+            (activity.successfulAssessments === 0)
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Solved questions must match successful assessments and known correctness coverage.',
+        path: ['distinctSuccessfulProblems'],
+      })
+    const expectedCorrectness =
+      activity.knownCorrectnessAssessments === 0
+        ? null
+        : activity.successfulAssessments / activity.knownCorrectnessAssessments
+    if (activity.observedCorrectness !== expectedCorrectness)
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Observed correctness must equal successful assessments divided by known correctness assessments.',
+        path: ['observedCorrectness'],
+      })
+    const unavailableTime =
+      whollyUnknown ||
+      (activity.successfulAssessments > 0 &&
+        activity.timedSuccessfulAssessments === 0)
+    if (
+      unavailableTime
+        ? activity.successfulRecordedSeconds !== null
+        : activity.timedSuccessfulAssessments === 0
+          ? activity.successfulRecordedSeconds !== 0
+          : activity.successfulRecordedSeconds === null ||
+            activity.successfulRecordedSeconds <= 0
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Successful recorded time must reflect actual positive timing and correctness coverage.',
+        path: ['successfulRecordedSeconds'],
+      })
+  })
+
 export const analyticsSummarySchema = z
   .object({
     range: analyticsRangeSchema,
     generatedAt: z.iso.datetime(),
     timeFrame: analyticsTimeFrameSchema,
+    activity: analyticsSelectedActivitySchema,
     reviewDays: countSchema,
     totalReviews: countSchema,
     currentStreak: countSchema,
@@ -897,6 +982,16 @@ export const analyticsSummarySchema = z
   })
   .superRefine((summary, context) => {
     const selectedFrame = summary.timeFrame
+    if (
+      selectedFrame.history &&
+      summary.activity.assessmentDays > selectedFrame.history.availableDays
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Assessment days cannot exceed the displayed available calendar days.',
+        path: ['activity', 'assessmentDays'],
+      })
     const recallFrame = summary.views.observedRecallVsFsrs.timeFrame
     const backlogFrame = summary.views.overdueBacklog.timeFrame
     for (const [view, frame] of [

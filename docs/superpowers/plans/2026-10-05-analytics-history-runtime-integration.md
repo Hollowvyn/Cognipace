@@ -1,6 +1,6 @@
 # Analytics History Runtime Integration Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Wire approved 30 / 90 / All time history bounds, the paired Recall frame, independent workload dates, and four truthful period totals through the existing Analytics runtime.
 
@@ -10,7 +10,7 @@
 
 ---
 
-Status: Task 1 implemented and independently reviewed; Task 2 is next. User approved the final prototype and continuation; execution mode is already authorized. Root owns commits, authority-doc alignment, and final full validation.
+Status: implemented and independently reviewed. Runtime and activity are complete; the weighted presentation and compact UI phases follow. User approved the final prototype and continuation; execution mode is already authorized. Root owns commits, authority-doc alignment, and final full validation.
 
 ## Contract Decisions
 
@@ -140,7 +140,7 @@ Root dispatches fresh read-only reviewers and routes fixes back to the implement
 - Modify: `src/features/analytics/api/analytics-contracts.test.ts`
 - Modify: `src/testing/analytics-fixtures.ts`
 
-- [ ] **Step 1: Add failing raw-activity tests.**
+- [x] **Step 1: Add failing raw-activity tests.**
 
 Expose `buildSelectedActivity(events, { start, asOf, timeZone })` from summary, consuming raw `AnalyticsReviewEvent` with persisted correctness. Deduplicate IDs defensively as the repository does. Test `isCorrect: true` with rating Again, false with rating Easy, and null with rating Good. For one slug with two successful durations 60 and 120, assert one unique question, two successful assessments, and 180 seconds. Add local-midnight boundaries, invalid/future dates, invalid ratings, zero/negative/nonfinite/missing durations, empty activity, all failures, all-unknown correctness, and partial timing coverage.
 
@@ -162,21 +162,21 @@ interface AnalyticsSelectedActivity {
 
 Observed correctness is true/(true+false), without a low-sample cutoff or a rating fallback. Wholly unknown nonempty correctness gives null unique-solved/time; empty activity or known zero successes gives 0 unique-solved/time. Successful records with no positive recorded timing give null time. Preserve exact positive seconds, summing repeated successes.
 
-- [ ] **Step 2: Run RED, implement aggregation and additive validated `activity`.**
+- [x] **Step 2: Run RED, implement aggregation and additive validated `activity`.**
 
 Run `rtk npm run test -- src/features/analytics/domain/summary.test.ts`. Expected: new raw-activity tests fail. Aggregate once from selected raw events before narrowing chart eligibility. Keep the legacy raw Good/Easy measure separate, rather than renaming it into correctness. Ensure service response and message serialization carry `activity`; validate nonnegative counts, timed + untimed = successful, successful <= known <= recorded, and consistent null/zero/rate meanings. Cross-check service activity against a database fixture with conflicting rating/flag and repeated timed successes.
 
-- [ ] **Step 3: Run GREEN, review, and commit.**
+- [x] **Step 3: Run GREEN, review, and commit.**
 
 Run `rtk npm run test -- src/features/analytics/domain/summary.test.ts src/features/analytics/server/analytics-service.test.ts src/features/analytics/api/analytics-contracts.test.ts`. Expected: all pass. Fresh specification review then quality review. Root commits `fix: derive analytics activity from selected assessments`.
 
 ## Phase Completion And Validation
 
-- [ ] Format only touched files with repository Prettier.
-- [ ] Run `rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` with Node 24.20.0/npm 11.19.0.
-- [ ] Record exact run/skipped commands and reasons. No database generation: no persisted-schema change. Do not mark required human extension smoke as N/A.
-- [ ] Update current authority docs to describe the implemented selection/frames/activity while preserving honest old-layout status until the compact UI phase lands.
-- [ ] Continue directly to the weighted presentation and compact UI phases already authorized by the user. This phase alone does not complete the Analytics refactor.
+- [x] Format only touched files with repository Prettier.
+- [x] Run `rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` with Node 24.20.0/npm 11.19.0.
+- [x] Record exact run/skipped commands and reasons. No database generation: no persisted-schema change. Do not mark required human extension smoke as N/A.
+- [x] Update current authority docs to describe the implemented selection/frames/activity while preserving honest old-layout status until the compact UI phase lands.
+- [x] Continue directly to the weighted presentation and compact UI phases already authorized by the user. This phase alone does not complete the Analytics refactor.
 
 ## Task 1 Execution Record
 
@@ -193,3 +193,29 @@ rtk git diff --check
 ```
 
 `npm run check` and `npm run build` are deferred to this phase's checkpoint after Task 2, as planned. `npm run format` is replaced by touched-file Prettier checks; no repository-wide formatting changes are needed. `npm run db:generate` is skipped because persisted schema is unchanged. Required human installed-extension Analytics/Chart Targets happy-path and edge-case smoke with screenshot/recording proof remains pending before PR review or merge. This task does not finish the full page implementation.
+
+## Task 2 And Phase Execution Record
+
+Selected raw activity is implemented as a required additive runtime value. It counts persisted correctness independently of ratings, sums repeated successful timing exactly, and conserves null/zero/coverage meanings. Existing historical eligibility and legacy rating quality remain separate. Specification review and quality review both passed with no remaining findings.
+
+Verified summary RED: 17 failed / 13 passed for missing aggregation and activity; service/contract RED: 56 failed / 101 passed. An available-day consistency regression also failed before its guard was added. Final focused GREEN: 188 passed; affected regressions: 179 passed. A test-only unsafe JSON access found by lint was corrected; the subsequent service rerun passed 44 tests. Root's final full gate passed database validation, generated types, TypeScript and lint; 217 test files passed, 2 skipped, 3,172 tests passed and 9 skipped under existing conditions. Production build passed with the existing large-chunk warning. Current authority docs now describe implemented selection/frames/activity and explicitly retain pending compact-page status.
+
+Exact commands run with pinned Node 24.20.0/npm 11.19.0:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/summary.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/server/analytics-service.test.ts src/features/analytics/api/analytics-contracts.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/api/analytics-contracts.test.ts -t "rejects more assessment days"
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/summary.test.ts src/features/analytics/server/analytics-service.test.ts src/features/analytics/api/analytics-contracts.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/api/analytics-api.test.tsx src/extension/background/register-handlers.test.ts src/extension/background/dev-smoke-service.test.ts src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/data/analytics-repository.test.ts src/features/analytics/domain/chart-data.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/server/analytics-service.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run lint
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run check
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run build
+rtk git diff --check
+```
+
+Touched-file Prettier write/check and ESLint covered `summary.ts`, its tests, service/tests, contracts/tests, `analytics-fixtures.ts`, handler tests and screen tests. Root formatted/checked this plan, `docs/superpowers/README.md`, `docs/product.md`, `docs/architecture.md`, `docs/testing.md` and `design.md` using the repository Prettier with `--ignore-path /dev/null`.
+
+Skipped `npm run db:generate`: persisted schema is unchanged. Skipped repository-wide `npm run format`: touched-file checks cover this phase without formatting unrelated files. Required human installed-extension happy-path and edge-case smoke remains pending, including selection/Recall calendar, conflicting flags/ratings, repeated timing and unknown correctness. Production-component browser proof of the completed page follows in the final assembly phase; neither pending proof is N/A. Continue directly to the approved weighted presentation plan.

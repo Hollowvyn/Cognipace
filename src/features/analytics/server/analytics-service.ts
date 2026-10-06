@@ -56,6 +56,7 @@ import { buildWorkloadAnalyticsViews } from '../domain/workload-presentation'
 import {
   buildObservedRatingQuality,
   buildAnalyticsSummary,
+  buildSelectedActivity,
   type AnalyticsSummary,
 } from '../domain/summary'
 
@@ -130,6 +131,11 @@ export async function getAnalyticsSummary(
     timeFrame: presentationTimeFrame,
   }
   const analyticsReviewHistory = reviewHistory satisfies AnalyticsReviewEvent[]
+  const activity = buildSelectedActivity(analyticsReviewHistory, {
+    start: periodStart,
+    asOf: periodEnd,
+    timeZone: presentationTimeFrame.timeZone,
+  })
   const pairedReviews = buildRepeatReviewPairs(analyticsReviewHistory, {
     start: new Date(presentationTimeFrame.history?.nominalStart ?? periodStart),
     end: periodEnd,
@@ -331,6 +337,7 @@ export async function getAnalyticsSummary(
   return buildAnalyticsSummary({
     generatedAt: now,
     timeFrame: presentationTimeFrame,
+    activity,
     reviewDays: dayStats.reviewDays,
     totalReviews: dayStats.totalReviews,
     currentStreak: practiceProgress.currentStreak,

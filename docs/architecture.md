@@ -315,18 +315,29 @@ review and FSRS inputs
 The owners in that flow are:
 
 - `src/features/analytics/domain/analytics-history-window.ts` prepares the
-  approved 30 / 90 / All time migration as a pure date foundation. It separates
-  raw retained-history origin from nominal, displayed, and prior-period bounds;
-  groups the available calendar span into at most 60 intervals; and supplies an
-  independent last-30-day daily backlog frame. It is not yet wired into the
-  runtime or page. The following integration phase replaces the finite range
-  contract and consumes these bounds rather than duplicating date policy.
+  implemented 30 / 90 / All time selection. It separates raw retained-history
+  origin from nominal, displayed, and prior-period bounds, groups the available
+  calendar span into at most 60 intervals, and supplies an independent
+  last-30-day daily backlog frame. The service consumes it through the small
+  feature-local `analytics-history-frame.ts` adapter. Young history clips only
+  display bounds; finite comparisons retain their complete nominal prior window
+  and matched local wall-clock cutoff. All time has no previous period.
 - `src/features/analytics/domain/analytics-range-policy.ts` selects and builds
-  local-date bucket boundaries. The current contract supports 14-day daily,
-  30-day three-day, and 90-day weekly presentation buckets.
+  local-date bucket boundaries and as-of-capped measured intervals. Public
+  selection is 30 / 90 / All time; legacy URL 14 normalizes to 30. Explicit
+  calendar grouping comes from available history rather than selector text.
+  Recall has its own first-eligible-pair display frame, while its readiness uses
+  the shared selected-history calendar and actual pair counts.
 - `src/features/analytics/domain/analytics-readiness.ts` derives the effective
   window and readiness gates. `S`, `A`, `G`, `K`, and `E` mean eligible
   assessments, active buckets, longest gap, gap runs, and effective buckets.
+- `src/features/analytics/domain/summary.ts` aggregates selected raw activity
+  independently of valid ratings: distinct report-local assessment days, unique
+  problems with persisted correct outcomes, true/(true+false) correctness, and
+  exact positive recorded seconds from every persisted correct assessment.
+  Required runtime `activity` conserves counts and distinguishes unavailable
+  correctness/timing from known zeros. The compact headline replacement is
+  still pending; legacy displayed totals remain until that composition lands.
 - `src/features/analytics/data/analytics-repository.ts` reads current catalog
   `problemDifficulty` and persisted `elapsedSeconds`, preserving attempt-ID
   deduplication across topic joins. Numeric FSRS difficulty remains separate.

@@ -430,6 +430,16 @@ inspection. Its calculations remain read-only and derived from local practice
 state. The narrowly editable chart goals are Settings-owned preferences; they
 do not introduce hosted reporting or account behavior.
 
+The runtime now supplies truthful selected activity independently of rating
+eligibility: review days count local dates with any assessment; solved questions
+are unique problems with a persisted correct outcome; observed correctness is
+true/(true+false), excluding unknown flags; recorded solve time sums all finite
+positive durations on correct assessments, including repeated successes. Wholly
+unknown correctness and wholly missing successful timing stay unavailable;
+empty or known zero success is zero. The four-card headline composition and
+weighted compact page are still pending, so the current legacy summary row has
+not yet been replaced.
+
 New Problem Success retains the combined first-recorded outcome chart beside
 Recall vs FSRS Estimate. Its simultaneous Hard + Good + Easy and Good + Easy
 curves include all difficulties, including Unknown, using pooled valid-rating
@@ -488,9 +498,17 @@ paths and never change measured outcomes or FSRS schedules.
 
 Historical Analytics uses adaptive presentation buckets and evidence gates:
 
-- The implemented range choices are 14 days with daily buckets, 30 days with
-  three-day buckets, and 90 days with weekly buckets. The selection is always
-  explicit and never silently changes to a shorter period.
+- The implemented range choices are 30 days (default), 90 days, and All time.
+  Legacy 14-day links normalize to 30. Young history uses available retained
+  dates without changing selection; sparse established history preserves real
+  inactive dates. Grouping is daily through fourteen available dates, three-day
+  through thirty, then calendar weeks; All time longer than a year uses the
+  first month/quarter/year grouping that fits sixty intervals, with bounded year
+  strides for longer history. All time has no prior comparison. Finite prior
+  comparisons retain the complete nominal window and matched as-of cutoff.
+- Recall's supplied display frame begins at its first eligible selected pair
+  and ends at the report as-of. Long genuinely paired history remains long;
+  grouping/cropping the display never improves its underlying readiness.
 - Historical trend plots trim only unsupported beginning and ending buckets from
   their presentation. Chart, Table, and inspection share the contiguous
   first-supported through last-supported

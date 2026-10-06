@@ -22,6 +22,160 @@ import { buildAnalyticsHistoryTimeFrame } from '../domain/analytics-history-fram
 import { buildAnalyticsTimeFrame } from '../domain/analytics-time'
 import { buildAnalyticsBacklogTimeFrame } from '../domain/analytics-history-window'
 
+const selectedActivity = {
+  assessmentDays: 2,
+  recordedAssessments: 5,
+  knownCorrectnessAssessments: 4,
+  successfulAssessments: 3,
+  distinctSuccessfulProblems: 2,
+  observedCorrectness: 3 / 4,
+  timedSuccessfulAssessments: 2,
+  untimedSuccessfulAssessments: 1,
+  successfulRecordedSeconds: 180.125,
+}
+
+describe('selected activity contract', () => {
+  it('requires the additive activity read model and preserves exact recorded seconds', () => {
+    const summary = createSerializedAnalyticsSummary()
+    expect(
+      analyticsSummarySchema.parse({ ...summary, activity: selectedActivity })
+        .activity,
+    ).toEqual(selectedActivity)
+    expect(
+      analyticsSummarySchema.safeParse({ ...summary, activity: undefined })
+        .success,
+    ).toBe(false)
+  })
+
+  it.each(Object.keys(selectedActivity))('requires %s', (field) => {
+    const activity = { ...selectedActivity, [field]: undefined }
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...createSerializedAnalyticsSummary(),
+        activity,
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects more assessment days than the displayed available history', () => {
+    const timeFrame = buildAnalyticsHistoryTimeFrame({
+      selection: 30,
+      asOf: new Date('2026-10-05T12:00:00Z'),
+      timeZone: 'UTC',
+      history: [{ reviewedAt: new Date('2026-10-05T11:00:00Z') }],
+    })
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...createSerializedAnalyticsSummary({ timeFrame }),
+        activity: selectedActivity,
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each([
+    { assessmentDays: -1 },
+    { assessmentDays: 1.5 },
+    { recordedAssessments: -1 },
+    { knownCorrectnessAssessments: 1.5 },
+    { successfulAssessments: -1 },
+    { distinctSuccessfulProblems: 1.5 },
+    { timedSuccessfulAssessments: -1 },
+    { untimedSuccessfulAssessments: 1.5 },
+    { successfulRecordedSeconds: -1 },
+    { successfulRecordedSeconds: NaN },
+    { successfulRecordedSeconds: Infinity },
+    { observedCorrectness: 2 },
+    { assessmentDays: 6 },
+    { assessmentDays: 0 },
+    { knownCorrectnessAssessments: 6 },
+    { successfulAssessments: 5 },
+    { distinctSuccessfulProblems: 4 },
+    { distinctSuccessfulProblems: 0 },
+    { distinctSuccessfulProblems: null },
+    { timedSuccessfulAssessments: 1 },
+    { untimedSuccessfulAssessments: 0 },
+    { observedCorrectness: null },
+    { observedCorrectness: 0.5 },
+    { successfulRecordedSeconds: null },
+    { successfulRecordedSeconds: 0 },
+  ])('rejects inconsistent selected activity %j', (overrides) => {
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...createSerializedAnalyticsSummary(),
+        activity: { ...selectedActivity, ...overrides },
+      }).success,
+    ).toBe(false)
+  })
+
+  const empty = {
+    assessmentDays: 0,
+    recordedAssessments: 0,
+    knownCorrectnessAssessments: 0,
+    successfulAssessments: 0,
+    distinctSuccessfulProblems: 0,
+    observedCorrectness: null,
+    timedSuccessfulAssessments: 0,
+    untimedSuccessfulAssessments: 0,
+    successfulRecordedSeconds: 0,
+  }
+  const unknown = {
+    ...empty,
+    assessmentDays: 1,
+    recordedAssessments: 2,
+    distinctSuccessfulProblems: null,
+    successfulRecordedSeconds: null,
+  }
+  const failure = {
+    ...empty,
+    assessmentDays: 1,
+    recordedAssessments: 2,
+    knownCorrectnessAssessments: 1,
+    observedCorrectness: 0,
+  }
+  const untimed = {
+    ...empty,
+    assessmentDays: 1,
+    recordedAssessments: 2,
+    knownCorrectnessAssessments: 1,
+    successfulAssessments: 1,
+    distinctSuccessfulProblems: 1,
+    observedCorrectness: 1,
+    untimedSuccessfulAssessments: 1,
+    successfulRecordedSeconds: null,
+  }
+  it.each([empty, unknown, failure, untimed])(
+    'accepts truthful empty, unknown, known-failure, and untimed semantics %j',
+    (activity) => {
+      const result = analyticsSummarySchema.parse({
+        ...createSerializedAnalyticsSummary(),
+        activity,
+      })
+      expect(result.activity).toEqual(activity)
+    },
+  )
+  it.each([
+    { ...empty, distinctSuccessfulProblems: null },
+    { ...empty, successfulRecordedSeconds: null },
+    { ...empty, observedCorrectness: 0 },
+    { ...empty, assessmentDays: 1 },
+    { ...unknown, distinctSuccessfulProblems: 0 },
+    { ...unknown, successfulRecordedSeconds: 0 },
+    { ...unknown, observedCorrectness: 0 },
+    { ...failure, distinctSuccessfulProblems: null },
+    { ...failure, successfulRecordedSeconds: null },
+    { ...failure, successfulRecordedSeconds: 10 },
+    { ...untimed, successfulRecordedSeconds: 0 },
+    { ...untimed, successfulRecordedSeconds: 10 },
+  ])('rejects fabricated zero or unknown totals %j', (activity) => {
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...createSerializedAnalyticsSummary(),
+        activity,
+      }).success,
+    ).toBe(false)
+  })
+})
+
 describe('history frame and paired Recall invariants', () => {
   it('requires view frames to preserve the selected report fallback provenance', () => {
     const summary = createSerializedAnalyticsSummary()

@@ -7,17 +7,295 @@ import type {
   HistoricalReadiness,
 } from './summary'
 import type { AnalyticsReadiness } from './analytics-readiness'
+import type { AnalyticsReviewEvent } from './chart-data'
 import {
   buildAnalyticsTimeFrame,
   type AnalyticsTimeFrame,
 } from './analytics-time'
 import { buildHistoricalAnalyticsViews } from './historical-presentation'
 import { buildAnalyticsBucketsFromTimeFrame } from './analytics-range-policy'
-import { buildObservedRatingQuality, buildAnalyticsSummary } from './summary'
+import {
+  buildObservedRatingQuality,
+  buildAnalyticsSummary,
+  buildSelectedActivity,
+} from './summary'
 
 const now = new Date(2026, 0, 15, 12, 0, 0)
 const recentDate = new Date(2026, 0, 14, 12, 0, 0)
 const oldDate = new Date(2025, 11, 14, 12, 0, 0) // > 30 days before now
+
+const activityOptions = {
+  start: new Date('2026-03-07T05:00:00.000Z'),
+  asOf: new Date('2026-03-08T05:30:00.000Z'),
+  timeZone: 'America/New_York',
+}
+const emptyActivity = {
+  assessmentDays: 0,
+  recordedAssessments: 0,
+  knownCorrectnessAssessments: 0,
+  successfulAssessments: 0,
+  distinctSuccessfulProblems: 0,
+  observedCorrectness: null,
+  timedSuccessfulAssessments: 0,
+  untimedSuccessfulAssessments: 0,
+  successfulRecordedSeconds: 0,
+}
+
+describe('buildSelectedActivity', () => {
+  it('uses persisted correctness independently from Again, Easy, Good, and invalid ratings', () => {
+    const result = buildSelectedActivity(
+      [
+        activityEvent({
+          id: 'true-again',
+          rating: 'again',
+          isCorrect: true,
+          elapsedSeconds: 60,
+        }),
+        activityEvent({
+          id: 'false-easy',
+          rating: 'easy',
+          isCorrect: false,
+          elapsedSeconds: 900,
+        }),
+        activityEvent({
+          id: 'unknown-good',
+          rating: 'good',
+          isCorrect: null,
+          elapsedSeconds: 900,
+        }),
+        activityEvent({
+          id: 'true-invalid',
+          problemSlug: 'other',
+          rating: 'invalid',
+          isCorrect: true,
+          elapsedSeconds: 120,
+        }),
+      ],
+      activityOptions,
+    )
+
+    expect(result).toEqual({
+      assessmentDays: 1,
+      recordedAssessments: 4,
+      knownCorrectnessAssessments: 3,
+      successfulAssessments: 2,
+      distinctSuccessfulProblems: 2,
+      observedCorrectness: 2 / 3,
+      timedSuccessfulAssessments: 2,
+      untimedSuccessfulAssessments: 0,
+      successfulRecordedSeconds: 180,
+    })
+  })
+
+  it('counts one solved question and every timed success for repeated successes', () => {
+    expect(
+      buildSelectedActivity(
+        [
+          activityEvent({ id: 'first', elapsedSeconds: 60 }),
+          activityEvent({ id: 'repeat', elapsedSeconds: 120 }),
+        ],
+        activityOptions,
+      ),
+    ).toEqual({
+      ...emptyActivity,
+      assessmentDays: 1,
+      recordedAssessments: 2,
+      knownCorrectnessAssessments: 2,
+      successfulAssessments: 2,
+      distinctSuccessfulProblems: 1,
+      observedCorrectness: 1,
+      timedSuccessfulAssessments: 2,
+      successfulRecordedSeconds: 180,
+    })
+  })
+
+  it('counts report-local dates across midnight and includes the exact start and as-of', () => {
+    expect(
+      buildSelectedActivity(
+        [
+          activityEvent({
+            id: 'start',
+            reviewedAt: activityOptions.start,
+            isCorrect: null,
+          }),
+          activityEvent({
+            id: 'before-midnight',
+            reviewedAt: new Date('2026-03-08T04:59:59.999Z'),
+            isCorrect: null,
+          }),
+          activityEvent({
+            id: 'midnight',
+            reviewedAt: new Date('2026-03-08T05:00:00.000Z'),
+            isCorrect: null,
+          }),
+          activityEvent({
+            id: 'as-of',
+            reviewedAt: activityOptions.asOf,
+            isCorrect: null,
+          }),
+          activityEvent({
+            id: 'too-early',
+            reviewedAt: new Date(activityOptions.start.getTime() - 1),
+          }),
+          activityEvent({
+            id: 'future',
+            reviewedAt: new Date(activityOptions.asOf.getTime() + 1),
+          }),
+          activityEvent({ id: 'invalid-date', reviewedAt: new Date(NaN) }),
+        ],
+        activityOptions,
+      ),
+    ).toMatchObject({
+      assessmentDays: 2,
+      recordedAssessments: 4,
+      knownCorrectnessAssessments: 0,
+      distinctSuccessfulProblems: null,
+      successfulRecordedSeconds: null,
+    })
+  })
+
+  it('deduplicates raw attempt IDs without removing distinct repeated successes', () => {
+    const event = activityEvent({ id: 'duplicate', elapsedSeconds: 60 })
+    expect(
+      buildSelectedActivity(
+        [
+          event,
+          { ...event, topicLabels: ['Different joined topic'] },
+          activityEvent({ id: 'repeat', elapsedSeconds: 120 }),
+        ],
+        activityOptions,
+      ),
+    ).toMatchObject({
+      assessmentDays: 1,
+      recordedAssessments: 2,
+      successfulAssessments: 2,
+      distinctSuccessfulProblems: 1,
+      successfulRecordedSeconds: 180,
+    })
+  })
+
+  it.each([undefined, null, 0, -1, NaN, Infinity, -Infinity])(
+    'keeps a successful record with duration %s untimed',
+    (elapsedSeconds) => {
+      expect(
+        buildSelectedActivity(
+          [activityEvent({ elapsedSeconds })],
+          activityOptions,
+        ),
+      ).toMatchObject({
+        successfulAssessments: 1,
+        distinctSuccessfulProblems: 1,
+        observedCorrectness: 1,
+        timedSuccessfulAssessments: 0,
+        untimedSuccessfulAssessments: 1,
+        successfulRecordedSeconds: null,
+      })
+    },
+  )
+
+  it('preserves exact positive recorded seconds and partial timing coverage', () => {
+    expect(
+      buildSelectedActivity(
+        [
+          activityEvent({ id: 'timed', elapsedSeconds: 60.125 }),
+          activityEvent({ id: 'untimed', elapsedSeconds: null }),
+          activityEvent({
+            id: 'unknown',
+            isCorrect: null,
+            elapsedSeconds: 500,
+          }),
+        ],
+        activityOptions,
+      ),
+    ).toMatchObject({
+      recordedAssessments: 3,
+      knownCorrectnessAssessments: 2,
+      successfulAssessments: 2,
+      distinctSuccessfulProblems: 1,
+      observedCorrectness: 1,
+      timedSuccessfulAssessments: 1,
+      untimedSuccessfulAssessments: 1,
+      successfulRecordedSeconds: 60.125,
+    })
+  })
+
+  it('returns honest zero totals and unavailable correctness for an empty cohort', () => {
+    expect(buildSelectedActivity([], activityOptions)).toEqual(emptyActivity)
+  })
+
+  it('returns known zero solved and successful time for recorded failures', () => {
+    expect(
+      buildSelectedActivity(
+        [
+          activityEvent({
+            isCorrect: false,
+            rating: 'easy',
+            elapsedSeconds: 300,
+          }),
+        ],
+        activityOptions,
+      ),
+    ).toEqual({
+      ...emptyActivity,
+      assessmentDays: 1,
+      recordedAssessments: 1,
+      knownCorrectnessAssessments: 1,
+      observedCorrectness: 0,
+    })
+  })
+
+  it('does not imply known solved or time totals from wholly unknown correctness', () => {
+    expect(
+      buildSelectedActivity(
+        [activityEvent({ isCorrect: null, elapsedSeconds: 300 })],
+        activityOptions,
+      ),
+    ).toEqual({
+      ...emptyActivity,
+      assessmentDays: 1,
+      recordedAssessments: 1,
+      distinctSuccessfulProblems: null,
+      successfulRecordedSeconds: null,
+    })
+  })
+
+  it('excludes unknown correctness from a known failure denominator', () => {
+    expect(
+      buildSelectedActivity(
+        [
+          activityEvent({ id: 'false', isCorrect: false }),
+          activityEvent({ id: 'unknown', isCorrect: null }),
+        ],
+        activityOptions,
+      ),
+    ).toMatchObject({
+      recordedAssessments: 2,
+      knownCorrectnessAssessments: 1,
+      successfulAssessments: 0,
+      distinctSuccessfulProblems: 0,
+      observedCorrectness: 0,
+      successfulRecordedSeconds: 0,
+    })
+  })
+})
+
+function activityEvent(
+  overrides: Partial<AnalyticsReviewEvent> = {},
+): AnalyticsReviewEvent {
+  return {
+    id: 'assessment',
+    cardId: 'card',
+    problemSlug: 'question',
+    title: 'Question',
+    topicLabels: [],
+    reviewedAt: new Date('2026-03-07T12:00:00.000Z'),
+    rating: 'good',
+    isCorrect: true,
+    elapsedSeconds: null,
+    fsrsReviewLog: null,
+    ...overrides,
+  }
+}
 
 describe('buildObservedRatingQuality', () => {
   it('includes retained pre-epoch ratings in All time when no explicit period is supplied', () => {
@@ -215,6 +493,7 @@ describe('buildAnalyticsSummary', () => {
     const result = buildAnalyticsSummary({
       generatedAt,
       timeFrame,
+      activity: emptyActivity,
       views,
       reviewDays: 10,
       totalReviews: 42,
@@ -235,6 +514,7 @@ describe('buildAnalyticsSummary', () => {
     expect(result.lowSample).toBe(false)
     expect(result.targetRetention).toBe(0.9)
     expect(result.views).toBe(views)
+    expect(result.activity).toBe(emptyActivity)
   })
 
   it('keeps selected-range evidence and metric readiness explicit in the summary', () => {
@@ -246,6 +526,7 @@ describe('buildAnalyticsSummary', () => {
     const result = buildAnalyticsSummary({
       generatedAt: now,
       timeFrame,
+      activity: emptyActivity,
       views: createHistoricalViews(timeFrame),
       reviewDays: 0,
       totalReviews: 0,

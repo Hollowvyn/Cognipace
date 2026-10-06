@@ -919,11 +919,19 @@ exact pending case.
    reload button in `chrome://extensions` after the build. Reopen the dashboard
    and navigate to Analytics so the smoke uses the rebuilt local extension and
    its runtime, rather than a fixture page or an already-open stale dashboard.
-2. In both datasets, choose 14, 30, and 90 days. Confirm daily, three-day, and
-   weekly grouping respectively, and verify the selected range remains selected
-   until explicitly changed. Available charts remain visible under a readiness
-   warning; a suggested shorter ready range changes selection only when its
-   link is activated.
+2. In both datasets, choose 30, 90, and All time; confirm 30 is the default
+   and legacy `range=14` resolves to 30. Young twelve-date history remains
+   selected as 30 and displays those available dates. Old sparse history keeps
+   real inactive dates; All time uses its explicit calendar grouping with at
+   most sixty intervals. Finite comparisons retain nominal prior bounds and
+   the matched local wall-clock cutoff; All time has no comparison. Recall's
+   display starts at its first eligible selected pair through the same as-of;
+   long paired history remains long and its selected-history readiness does
+   not improve solely from regrouping. Backlog stays Last 30 days/daily and
+   Upcoming stays Next 14 days under every historical selection. Available
+   charts remain visible under readiness guidance; a shorter-ready link
+   changes selection only when activated. The compact layout and four selected
+   activity headlines require their later implementation smoke cases.
 3. Check the report's selected timezone and as-of context, sparse calendar-date
    ticks, and full bucket intervals in inspection. Marks use each supplied
    interval's midpoint, including shortened edge intervals. Tick labels use
