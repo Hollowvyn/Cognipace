@@ -185,6 +185,98 @@
     }
   }
 
+  .cp-performance-content,
+  .cp-time-target-content {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    min-width: 0;
+    font-size: var(--cp-copy-font-size);
+    line-height: 1.5;
+  }
+
+  .cp-performance-content .cp-analytics-adapter-select,
+  .cp-time-target-content .cp-analytics-adapter-select {
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--cp-control-radius);
+    background: var(--color-card);
+    color: var(--color-foreground);
+    padding: 0 8px;
+    font: inherit;
+  }
+
+  .cp-performance-hero,
+  .cp-time-target-hero {
+    display: grid;
+    gap: 2px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .cp-performance-hero strong,
+  .cp-time-target-hero strong {
+    font-size: 30px;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cp-performance-method,
+  .cp-time-target-method,
+  .cp-time-target-settings,
+  .cp-performance-pooled-controls {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .cp-performance-method p,
+  .cp-time-target-method p,
+  .cp-time-target-settings p,
+  .cp-time-target-bar-row p,
+  .cp-time-target-unclassified {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .cp-performance-series,
+  .cp-time-target-difficulties {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cp-performance-series button,
+  .cp-time-target-difficulties button {
+    border: 1px solid var(--color-border);
+    border-radius: var(--cp-control-radius);
+    background: var(--color-muted);
+    padding: 4px 8px;
+    font: inherit;
+    color: var(--color-foreground);
+  }
+
+  .cp-performance-series button[aria-pressed='false'],
+  .cp-time-target-difficulties button[aria-pressed='false'] {
+    opacity: 0.5;
+  }
+
+  .cp-time-target-bars {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .cp-time-target-bar-row {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+  }
+
   .cp-retention-map {
     --cp-analytics-healthy: light-dark(#34865a, #8fdfa9);
     --cp-analytics-attention: light-dark(#a87906, #ffd449);

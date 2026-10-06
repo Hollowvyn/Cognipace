@@ -223,4 +223,26 @@ describe('Problem Solving', () => {
     ).toBeVisible()
     expect(screen.getByText(/can differ from FSRS-paired Recall/)).toBeVisible()
   })
+
+  it('uses explicit no-prior-period copy in legacy raw Compare summaries and inspection', async () => {
+    const user = userEvent.setup()
+    render(
+      <NewProblemSuccessView
+        view={{ ...view(), previousPeriod: null }}
+        timeFrame={timeFrame}
+      />,
+    )
+    await choose(user, 'View', 'Compare')
+    const outcomes = plot('Success by Difficulty')
+    expect(outcomes.getAllByText('No previous period')).toHaveLength(3)
+    fireEvent.keyDown(
+      outcomes.getByRole('button', { name: 'Inspect Easy outcome comparison' }),
+      { key: 'Enter' },
+    )
+    expect(screen.getByRole('tooltip')).toHaveTextContent('No previous period')
+    expect(screen.getByRole('tooltip')).not.toHaveTextContent('· 0 valid')
+    expect(screen.getByRole('tooltip')).not.toHaveTextContent(
+      'Sparse comparison',
+    )
+  })
 })

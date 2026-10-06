@@ -10,7 +10,7 @@
 
 ---
 
-Status: written after the approved prototype and read-only production component audit. Execute after the history/runtime, weighted-presentation and compact-foundation plans. Root owns commits; run each task through specification review before quality review. Do not ask the user to reapprove the already accepted card design.
+Status: Task 1 is implemented and independently specification/quality reviewed. Continue Task 2 after the reviewed history/runtime, weighted-presentation, and compact-foundation phases. Root owns commits; run each task through specification review before quality review. Do not ask the user to reapprove the already accepted card design.
 
 ## Shared Adapter Contract
 
@@ -22,7 +22,7 @@ Adapters accept typed supplied views, their correct frame, and a target save cal
   title="Performance"
   description="First attempts · weighted by difficulty"
   mode={mode}
-  action={
+  headerAction={
     <button onClick={toggleMode}>
       {mode === 'overview' ? 'Details' : 'Overview'}
     </button>
@@ -36,6 +36,8 @@ Adapters accept typed supplied views, their correct frame, and a target save cal
 
 The shell API may use an explicit `compact` option from the preceding plan; use its actual reviewed names. Typography, dimensions, short descriptions, restrained colors and subtle Performance area match the final approved asset. Preserve original calendar coordinates, all available rows and zeros. Lower page size when controls/long text require it; never clip content or shrink fonts to hide overflow.
 
+Adapters own report-context page resets even when Details tables are unmounted. Test paging, hiding Details, receiving a fresh as-of/frame, and reopening at the first page. Keep equivalent rerenders on the current page. Persistent goal controllers must also guard ownership: a pending save completing after another goal is selected may reset its own successful draft, but must not close the active goal or steal focus.
+
 ## Task 1: Performance And Time
 
 **Files:**
@@ -48,15 +50,17 @@ The shell API may use an explicit `compact` option from the preceding plan; use 
 - Modify: `src/features/analytics/components/new-problem-success-view.tsx`
 - Modify: `src/features/analytics/components/problem-solving-charts.tsx`
 - Modify: `src/features/analytics/components/problem-solving-model.ts` only for presentation control extraction.
+- Modify: `src/styles/analytics.css` only for compact Performance/Time presentation.
+- Modify: `src/features/analytics/components/analytics-target-editor.tsx` and `.test.tsx` only for the independently reviewed stale-save visibility/focus race.
 - Test: existing combined/new/problem-solving focused suites.
 
-- [ ] **Step 1: Add failing adapter capability tests.**
+- [x] **Step 1: Add failing adapter capability tests.**
 
 Performance fixture uses the reviewed 13,210 / 195 acceptance case: hero rounds only for display to 68/100, exact Details remains 67.743589…. Test new/follow-up reachability, Unknown influence and invalid exclusions, inactive holds, no arbitrary score grade/target, stable shell, and all rating/difficulty/Mix/interval pages. Verify the original pooled two-rate chart includes Unknown, raw difficulty Trend/Compare and rate switches remain reachable, all four saved goals map to their original metrics, and changing Performance's cohort never changes Time's local cohort.
 
 Time defaults to all timed assessments/New problems. Test three normalized horizontal median bars with under/over/exact target labels, 150% uncapped ratio, amber only on the excess after 100%, no Unknown target, coverage rather than pooled median hero, missing durations unavailable, successful subset, independent cohort, minutes/% units, difficulty visibility, Trend/Compare, quartiles and exact field groups.
 
-- [ ] **Step 2: Run RED and implement Performance's compact sections.**
+- [x] **Step 2: Run RED and implement Performance's compact sections.**
 
 Run the two new suites. Expected: missing adapters fail. Use `buildPerformancePresentation` and cumulative renderer for Overview. Show a compact cohort selector and no simultaneous Hard+Good+Easy/Good+Easy labels there.
 
@@ -69,15 +73,37 @@ Details starts with **Ratings / Difficulty / Mix / Intervals**, preserving:
 
 Compact secondary sections expose original **Pooled outcomes / Difficulty outcomes / Goals / Method** rather than adding overview cards. Extract the existing plot pieces and make their controls controlled; keep unchanged pure calculations/inspection and expose selected cohort instead of the combined renderer's hardcoded New problems. Raw percentage goal references belong only on those raw plots. Method explains fixed rubric, current difficulty, first-retained-record limits and selected-period pooling in bounded pages.
 
-- [ ] **Step 3: Implement Time's independent compact sections.**
+- [x] **Step 3: Implement Time's independent compact sections.**
 
 Overview uses full-period medians from `buildTimeTargetPresentation`; the horizontal width domain includes at least 100 and the largest ratio. Labels give raw time/target and signed difference without relying on color. Split a bar at 100 only when it exceeds target. Keep known zero versus missing timing truthful.
 
 Details **Trend / Compare / Intervals / Method** keeps its local timing subset, units, cohort, difficulty visibility and original distributions. Exact groups expose median/Q1/Q3, raw/valid/invalid counts, eligible/timed counts, recorded seconds and current targets. Explain saved assessment duration/current allowances and Strict Timing without changing assessment policy.
 
-- [ ] **Step 4: Run GREEN, review, and commit.**
+- [x] **Step 4: Run GREEN, review, and commit.**
 
 Run new adapter and existing outcome/time suites plus typecheck. Expected: all pass. Fresh specification then quality review. Root commits `feat: add compact performance and target time cards`.
+
+### Task 1 Execution Record
+
+Implemented against `846e9996` in ten source/test/CSS files. Original New Problem view/model source needed no edit; the existing New Problem regression suite gained the absent-prior summary test. Performance and Time each use one compact panel with independent controls, exact field pages and original advanced plots. Time leads with the timed count and eligible coverage; normalized bars use green bases and amber excess only. Restored the existing theme owner classes so SVG strokes/fills resolve correctly.
+
+Specification review found and fixed four exact-evidence gaps: absent prior counts versus measured zero; raw Compare tooltip/legacy summary absent-prior copy; prior Time raw/valid/invalid counts including Unclassified; and reachable raw Compare context/as-of/timezone. Quality review found and fixed stale successful goal completion closing/focusing another active editor, and hidden-table report refresh failing to reset pagination. Three deferred-save and eight hidden-refresh cases proved RED then GREEN; equivalent report rerenders preserve the current page. Both independent re-reviews passed without remaining findings.
+
+Final implementer validation passed 133 tests in fourteen suites, typecheck, touched ESLint/Prettier and whitespace. Exact commands:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/performance-card.test.tsx src/features/analytics/components/cards/time-target-card.test.tsx src/features/analytics/components/combined-problem-outcomes-view.test.tsx src/features/analytics/components/new-problem-success-view.test.tsx src/features/analytics/components/charts/historical-chart.test.tsx src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/charts/cumulative-trend.test.tsx src/features/analytics/components/analytics-target-editor.test.tsx src/features/analytics/components/analytics-exact-table.test.tsx src/features/analytics/components/analytics-card-controls.test.tsx src/features/analytics/components/analytics-chart-panel.test.tsx src/features/analytics/domain/performance-presentation.test.ts src/features/analytics/domain/time-target-presentation.test.ts src/features/analytics/domain/cumulative-trend-geometry.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx eslint src/features/analytics/components/cards/performance-card.tsx src/features/analytics/components/cards/performance-card.test.tsx src/features/analytics/components/cards/time-target-card.tsx src/features/analytics/components/cards/time-target-card.test.tsx src/features/analytics/components/combined-problem-outcomes-view.tsx src/features/analytics/components/problem-solving-charts.tsx src/features/analytics/components/new-problem-success-view.test.tsx src/features/analytics/components/analytics-target-editor.tsx src/features/analytics/components/analytics-target-editor.test.tsx
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --check src/features/analytics/components/cards/performance-card.tsx src/features/analytics/components/cards/performance-card.test.tsx src/features/analytics/components/cards/time-target-card.tsx src/features/analytics/components/cards/time-target-card.test.tsx src/features/analytics/components/combined-problem-outcomes-view.tsx src/features/analytics/components/problem-solving-charts.tsx src/features/analytics/components/new-problem-success-view.test.tsx src/features/analytics/components/analytics-target-editor.tsx src/features/analytics/components/analytics-target-editor.test.tsx src/styles/analytics.css
+rtk git diff --check
+```
+
+Final bounded specification re-review ran the two cards, target editor, exact-table and chart-panel suites: 55 tests/five suites passed. Final quality re-review ran the two cards, target editor and combined/new outcome suites: 53 tests/five suites passed. The first quality scan also passed architecture boundaries with 124 tests/twelve suites before the eleven new race/reset cases. All reviewers independently checked the source; both quality bugs were reproduced and then repaired in DOM probes.
+
+Root production-component CUA checkpoint verified fixed Overview/Details geometry at desktop, the two-column boundary and phone width; all exact fields/last pages remain reachable. Post-SPEC Time Compare traversal checked all27 groups and four classification pages at measured320px CSS width without overflow. Post-QUALITY browser pending save First-attempt95 → edit Recall80 → resolve earlier save preserved the Recall draft/Goals surface and did not steal header focus. Current IAB override numbers are physical pixels; the final proof must verify actual CSS dimensions after each override. Draft proof journal/screenshots remain outside the repository; full integrated proof follows assembly.
+
+Skipped at this phase: `npm run lint`, `npm run format`, `npm run check`, `npm run build` are deferred to root's final assembled-source gates; `npm run db:generate` is not applicable because no persisted shape changed; `npm run zip` is not needed because no packaging/release action was requested. Final integrated browser proof and human installed-extension happy/edge smoke remain pending. The agent thread cap requires reusing the three registered implementer/spec/quality actors with bounded new briefs; review authors remain independent.
 
 ## Task 2: Recall, Practice, And Memory
 
@@ -89,6 +115,7 @@ Run new adapter and existing outcome/time suites plus typecheck. Expected: all p
 - Modify: `src/features/analytics/components/recall-ratings-views.tsx`
 - Modify: `src/features/analytics/components/practice-ratings-view.tsx`
 - Modify: `src/features/analytics/components/memory-practice-views.tsx`
+- Modify: `src/styles/analytics.css` only for compact Recall/Practice/Memory presentation.
 - Test: existing focused Recall/Practice/Memory suites.
 
 - [ ] **Step 1: Add failing compact population and exact-parity tests.**

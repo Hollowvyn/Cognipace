@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 
 import {
@@ -51,12 +51,17 @@ export function AnalyticsTargetEditor({
   const restoreFocusRef = useRef(false)
   const [internalOpen, setInternalOpen] = useState(false)
   const open = controlledOpen ?? internalOpen
+  const lifecycleRef = useRef({ open, onOpenChange })
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const draftText = draft ?? percentageText(value)
   const validation = validateDraft(draftText, targets, key)
   const error = validation.error ?? saveError
+
+  useLayoutEffect(() => {
+    lifecycleRef.current = { open, onOpenChange }
+  }, [open, onOpenChange])
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
@@ -69,7 +74,7 @@ export function AnalyticsTargetEditor({
 
   function setOpen(nextOpen: boolean) {
     if (controlledOpen === undefined) setInternalOpen(nextOpen)
-    onOpenChange?.(nextOpen)
+    lifecycleRef.current.onOpenChange?.(nextOpen)
   }
 
   function close() {
@@ -87,8 +92,10 @@ export function AnalyticsTargetEditor({
     setSaveError(null)
     try {
       await onSave(validation.patch)
-      restoreFocusRef.current = true
-      setOpen(false)
+      // A mounted Goals controller can finish after the user opens another one.
+      // Only the visible controller owns the parent's close and focus return.
+      restoreFocusRef.current = lifecycleRef.current.open
+      if (lifecycleRef.current.open) setOpen(false)
       setDraft(null)
     } catch (error) {
       setSaveError(

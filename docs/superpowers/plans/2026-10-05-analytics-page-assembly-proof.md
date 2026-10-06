@@ -23,6 +23,7 @@ Status: written for execution after the card adapter plan. Root owns final integ
 - Modify: `src/features/analytics/components/analytics-readiness-state.tsx` for neutral fixed metadata/Details.
 - Modify: `src/app/dashboard/screens/analytics-page.tsx`
 - Modify: `src/styles/analytics.css`
+- Create: `src/assets/fonts/analytics/nunito-sans-latin.woff2`, `literata-latin.woff2`, and their original OFL license files.
 - Modify: `src/testing/analytics-fixtures.ts` for honest established/young/empty complete summary fixtures.
 
 - [ ] **Step 1: Add failing selected-summary and composition tests.**
@@ -55,6 +56,8 @@ Run `rtk npm run test -- src/features/analytics/components/analytics-screen.test
 Headline cards have equal 148px outer height in all data states, four columns on wide desktop, two then one on narrower containers. Use supplied counts, not legacy `reviewDays`, all-time `totalReviews`, or rating-derived quality. Captions are short: days practiced, unique correct questions, correct/assessed, timed/total successful attempts. Replace all legacy range interpolation in the metric row: All time must never render as "all-day period." Positive recorded durations below one minute must remain distinguishable from measured zero, with exact seconds retained in evidence.
 
 Use one page-width ten-card grid with two columns whenever usable container width supports two360px cards plus its gap. All card modes stay464px there and512px stacked, including error/skeleton/unavailable. The chart consumes measured remaining height. Retain Terra Compact tokens, Nunito Sans text/Literata page title, short approved descriptions and light/dark support.
+
+The repository currently has system-font tokens and no bundled Nunito Sans or Literata files. Bundle the official Google Fonts Latin variable WOFF2 assets and original licenses for the already approved typography, scoped to Analytics rather than changing unrelated surfaces. The two font files total 70,208 bytes; load them locally without runtime font-service requests or a new dependency. Keep documented system fallbacks for glyphs outside the bundled subset, and verify final geometry after fonts load.
 
 - [ ] **Step 3: Run GREEN, review, and commit.**
 

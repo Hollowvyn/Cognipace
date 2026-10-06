@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useRef, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -355,5 +355,73 @@ describe('controlled Goals surface', () => {
       expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument(),
     )
     expect(screen.getByRole('button', { name: 'Goals' })).toHaveFocus()
+  })
+
+  it('resets its successful hidden draft without restoring focus into the departed Goals surface', async () => {
+    const user = userEvent.setup()
+    let resolve!: () => void
+    const save = vi.fn(
+      () =>
+        new Promise<void>((done) => {
+          resolve = done
+        }),
+    )
+    render(<ControlledGoals save={save} />)
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    change('80')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Overview' }))
+    expect(screen.getByRole('button', { name: 'Overview' })).toHaveFocus()
+    await act(async () => {
+      resolve()
+      await Promise.resolve()
+    })
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Overview' })).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    expect(input()).toHaveValue(90)
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(save).toHaveBeenCalledExactlyOnceWith({ targetRecall: 0.8 })
+  })
+
+  it('notifies the latest controlled owner when a visible save completes', async () => {
+    const user = userEvent.setup()
+    let resolve!: () => void
+    const save = vi.fn(
+      () =>
+        new Promise<void>((done) => {
+          resolve = done
+        }),
+    )
+    const oldOwner = vi.fn(),
+      latestOwner = vi.fn()
+    const { rerender } = render(
+      <AnalyticsTargetEditor
+        targets={targets}
+        metric="recall"
+        onSave={save}
+        surface="goals"
+        open
+        onOpenChange={oldOwner}
+      />,
+    )
+    change('80')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    rerender(
+      <AnalyticsTargetEditor
+        targets={targets}
+        metric="recall"
+        onSave={save}
+        surface="goals"
+        open
+        onOpenChange={latestOwner}
+      />,
+    )
+    await act(async () => {
+      resolve()
+      await Promise.resolve()
+    })
+    expect(oldOwner).not.toHaveBeenCalled()
+    expect(latestOwner).toHaveBeenCalledExactlyOnceWith(false)
   })
 })
