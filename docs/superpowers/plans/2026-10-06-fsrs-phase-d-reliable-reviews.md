@@ -137,7 +137,7 @@ const replacement =
 
 ## Task 2: Deduplicate the whole Practice and track transaction
 
-- [ ] Define accepted command domain types, generation/target guards and fixed-order payload hashing using the existing Practice ownership. Add strict runtime request schemas with required command metadata and required original event time; expose new result schema and public types.
+- [x] Define accepted command domain types, generation/target guards and fixed-order payload hashing using the existing Practice ownership. Add strict runtime request schemas with required command metadata and required original event time; expose new result schema and public types.
 
 ```ts
 const fingerprint = Array.from(
@@ -151,7 +151,7 @@ const fingerprint = Array.from(
 ).join('')
 ```
 
-- [ ] Write failing workflow integration tests: identical retry after changed retention/active track/newer review; same ID different payload; two concurrent corrections; old correction receipt after later revision; bootstrap scope retry; targeted/full reset and restore generation rejection; rollback removes every write including track and receipt.
+- [x] Write failing workflow integration tests: identical retry after changed retention/active track/newer review; same ID different payload; two concurrent corrections; old correction receipt after later revision; bootstrap scope retry; targeted/full reset and restore generation rejection; rollback removes every write including track and receipt.
 
 ```ts
 const first = await executePracticeReviewCommand(db, command, settings)
@@ -164,9 +164,9 @@ await expect(
 ).rejects.toThrow(/command/i)
 ```
 
-- [ ] Add the workflow transaction around generation/receipt lookup and existing repository/track writes. Store C's command summary and bounded original acknowledgement in `practiceCommandReceipts`; do not store current details/history. Duplicate returns original acknowledgement plus a fresh current read outside the receipt. Keep the existing public service boundary and reset workflow.
-- [ ] Receipt insert and every side effect share the outer transaction; preserve the existing nested track transaction support. Lookup precedes mutable event guards and all scheduling/track work. Retention/profile and active track are used only on a receipt miss.
-- [ ] Run workflow, core Practice, Tracks, C backup/storage and architecture tests. Obtain SPEC then QUALITY review, fix findings, commit `feat(practice): apply accepted review commands exactly once`.
+- [x] Add the workflow transaction around generation/receipt lookup and existing repository/track writes. Store C's command summary and bounded original acknowledgement in `practiceCommandReceipts`; do not store current details/history. Duplicate returns original acknowledgement plus a fresh current read outside the receipt. Keep the existing public service boundary and reset workflow.
+- [x] Receipt insert and every side effect share the outer transaction; preserve the existing nested track transaction support. Lookup precedes mutable event guards and all scheduling/track work. Retention/profile and active track are used only on a receipt miss.
+- [x] Run workflow, core Practice, Tracks, C backup/storage and architecture tests. Obtain SPEC then QUALITY review, fix findings, commit `feat(practice): apply accepted review commands exactly once`.
 
 ## Task 3: Publish command acknowledgements through the background queue
 
@@ -227,6 +227,7 @@ if (result.status === 'persistence-pending') {
 
 ## Task 5: Verify restart, compatibility and whole-phase behavior
 
+- [ ] Guard snapshot publication while a SQLite transaction is open. An October 6 read-only WASM probe confirmed `sqlite3_js_db_export` includes uncommitted rows even when the live transaction later rolls back. The existing debounced writer must defer publication until the transaction ends; an explicit flush must never report success for deferred/uncommitted data. Add a stalled-transaction automatic-publication regression followed by rollback/reopen, preserving the last durable snapshot. Keep this guard in the existing platform snapshot owner (`src/platform/db/instance.ts` and colocated tests), without another queue or outbox.
 - [ ] Add real SQLite serialized-reopen tests showing a published receipt dedupes after lost acknowledgement, unflushed state cannot replace the durable snapshot on publication failure, same accepted retry applies once if restart lost unflushed state, and old commands reject after actual backup/target reset generation rotation. Exercise populated C fixtures and v6 export/import of D captured/legacy-derived evidence and current/historical correction receipts.
 - [ ] Update current product/architecture/testing authority and the master plan/index. Add a Phase D handoff with exact failures repaired, run/skipped commands, preservation and rollback limits, and a human installed-extension checklist for Submit/Update, two-tab conflict, pending retry and worker restart. Preserve C's proof record; the user's confirmation is not an invented screenshot.
 - [ ] Run the affected focused integrations first, then `rtk npm run db:check`, `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run format`, explicit touched-Markdown Prettier check and `rtk git diff --check`.
