@@ -10,7 +10,7 @@
 
 ---
 
-Status: Task 1 implemented and independently reviewed; Task 2 follows directly. Root owns commits and independent reviews. Approved reference: `docs/superpowers/specs/assets/2026-10-05-analytics-range-summary-approved.html`.
+Status: Tasks 1–2 implemented and independently reviewed. Continue directly to the compact card adapters. Root owns commits and independent reviews. Approved reference: `docs/superpowers/specs/assets/2026-10-05-analytics-range-summary-approved.html`.
 
 ## Task 1: Fixed Panel Geometry And Feature Paging
 
@@ -95,7 +95,7 @@ Run the three new/focused suites, then `rtk npm run typecheck`. Expected: all pa
 - Modify: `src/features/analytics/components/analytics-target-editor.tsx`
 - Modify: `src/features/analytics/components/analytics-target-editor.test.tsx`
 
-- [ ] **Step 1: Add failing fitted-plot and held-marker tests.**
+- [x] **Step 1: Add failing fitted-plot and held-marker tests.**
 
 Keep the original chart inspector's pointer/touch/native keyboard parity and exact raw-row tooltips. Add an explicit compact chart option that uses supplied remaining body height, removes the competing minimum/aspect ratio, and optionally moves repeated grouping text into the card footer without changing data positions. Both axes and boundary markers must remain inside usable plot space at 320px and desktop widths.
 
@@ -103,13 +103,13 @@ The cumulative SVG renderer consumes reviewed pure geometry and existing public 
 
 The existing model ends each interval at next local midnight. Add an explicit cumulative-only presentation cutoff so the final partial interval's numeric end and midpoint respect report as-of. Thread it through both the chart and axis model calls, adapt fractional-cutoff ticks, and preserve the original date keys, `isPartial`, values and inspection rows. Derive the report-zone calendar coordinate through the existing local-day helpers, including DST; raw outcome/time/Memory/Practice/Mix positioning keeps its default behavior. Test early-day, shortened, same-day and DST edges without inventing future marks or a new event timestamp.
 
-- [ ] **Step 2: Run RED, implement the fitted renderer and goal option.**
+- [x] **Step 2: Run RED, implement the fitted renderer and goal option.**
 
 Run focused historical/cumulative/target editor tests. Expected: new behavior fails before implementation. Draw paths using existing `useXAxisScale` / `useYAxisScale` / `usePlotArea`; preserve original rows in `HistoricalChart` for inspection. Do not replace generic `LineSegments` for raw/time/memory charts. No chart-library docs lookup is required unless actual API syntax is uncertain; then use Context7 as the repository requires.
 
 Allow the existing target editor to render its already validated form in a dedicated Goals surface, with a parent-controlled open/close callback or equivalent lean option. Existing legacy trigger behavior remains compatible. Keep one selected form visible at a time and mount its controller while hidden: navigating Overview/Details must preserve drafts and failed save errors. Enter/Save, Escape/Cancel, focus return, counterpart validation, one-key patch, pending guard, and error association stay unchanged. Persistent errors remain beside fields; optional floating confirmation never replaces them.
 
-- [ ] **Step 3: Run GREEN, review, and commit.**
+- [x] **Step 3: Run GREEN, review, and commit.**
 
 Run focused chart/model/target/editor suites and typecheck. Expected: all pass. Fresh specification review then quality review. Root commits `feat: fit analytics plots and goal editors to fixed cards`.
 
@@ -117,7 +117,7 @@ Run focused chart/model/target/editor suites and typecheck. Expected: all pass. 
 
 - [ ] Format touched files and run focused tests before required full `rtk npm run lint`, `rtk npm run check`, `rtk npm run build` at page integration.
 - [ ] Record exact commands and remaining human extension proof. A fixed shell without migrated cards is not the finished Analytics page.
-- [ ] Continue directly to card adapters and assembly already authorized by the user.
+- [x] Continue directly to card adapters and assembly already authorized by the user.
 
 ## Task 1 Execution Record
 
@@ -134,6 +134,27 @@ rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH"
 rtk git diff --check
 ```
 
-Root's outside-repository Vite preview imports the actual panel, controls, exact table, production styles, and dashboard typography. CUA verified 464px Overview/Details shells at a 1,232px page and the exact 736px two-column boundary; a 735px page stacks into 512px cards. At a 320px viewport the 296px card and 256px body retain full labels, three bounded rows, reachable field groups, distinct zero/unavailable values, and a separate footer pager without horizontal overflow. Goals retains the same 512px height and Close restores header-action focus. This foundation proof does not claim all-card or installed-extension validation.
+Root's outside-repository Vite preview imports the actual panel, controls, exact table, production styles, and dashboard typography. CUA verified 464px Overview/Details shells at a 1,232px page and the exact 736px two-column boundary; a 735px page stacks into 512px cards. With complete production utility CSS and borders, a 320px viewport gives a 296px card and 254px body width. Full labels, three bounded rows, reachable field groups, distinct zero/unavailable values, and a separate footer pager fit without horizontal overflow. Measured bodies are 234px/306px high for desktop Overview/Details and 240px/314px high stacked. Goals retains the same 512px height and Close restores header-action focus. This foundation proof does not claim all-card or installed-extension validation.
 
 Full `npm run lint`, `npm run check`, and `npm run build` are deferred to page integration as planned; their preceding presentation-phase checkpoint already passed. Full production card proof and human installed-extension happy-path/edge-case smoke remain pending. `npm run db:generate` and `npm run zip` are not applicable to this shell phase because it changes neither persistence nor packaging.
+
+## Task 2 Execution Record
+
+`HistoricalChart` now accepts `compact={{ height, showGroupingLabel }}` and `cumulativeAsOf`. Both model calls receive the explicit cutoff. `historicalAsOfCoordinate` uses report-zone local day boundaries, including DST and milliseconds; midnight singleton display scales extend into the past without changing the zero-width original interval. `CumulativeTrend` renders the reviewed pure geometry with public chart scales, update-only circles/diamonds, bounded active curves, long dashed horizontal holds, selected measured markers, and optional supported-history area fill. Generic raw line rendering is unchanged.
+
+`AnalyticsTargetEditor` adds `surface="goals"`, controlled `open`/`onOpenChange`, and `returnFocusRef`. Future adapters must keep every metric controller keyed and mounted. Hiding preserves draft/error; explicit Save, Cancel, and Escape finish the edit. Existing validation, one-key patches, pending duplicate guard, and legacy trigger behavior remain.
+
+RED produced eight missing-feature failures while 27 legacy tests passed, then three renderer failures. Final GREEN passed 60 tests across five suites. Pinned typecheck, eight-file ESLint, Prettier, and whitespace checks passed. Independent specification review passed; independent quality review passed 76 tests including architecture boundaries. The agent service rejected fresh reviewer dispatch with `agent thread limit reached`; root reused existing independent reviewers with complete bounded review briefs. Neither reviewer authored the implementation.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/charts/historical-chart.test.tsx src/features/analytics/components/charts/cumulative-trend.test.tsx src/features/analytics/components/analytics-target-editor.test.tsx src/features/analytics/domain/cumulative-trend-geometry.test.ts
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:/opt/homebrew/bin:/usr/bin:/bin npm run test -- src/features/analytics/components/charts/historical-chart.test.tsx src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/charts/cumulative-trend.test.tsx src/features/analytics/components/analytics-target-editor.test.tsx src/features/analytics/domain/cumulative-trend-geometry.test.ts src/testing/architecture-boundaries.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx eslint src/features/analytics/components/charts/historical-chart.tsx src/features/analytics/components/charts/historical-chart.test.tsx src/features/analytics/components/charts/historical-chart-model.ts src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/charts/cumulative-trend.tsx src/features/analytics/components/charts/cumulative-trend.test.tsx src/features/analytics/components/analytics-target-editor.tsx src/features/analytics/components/analytics-target-editor.test.tsx
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --check src/features/analytics/components/charts/historical-chart.tsx src/features/analytics/components/charts/historical-chart.test.tsx src/features/analytics/components/charts/historical-chart-model.ts src/features/analytics/components/charts/historical-chart-model.test.ts src/features/analytics/components/charts/cumulative-trend.tsx src/features/analytics/components/charts/cumulative-trend.test.tsx src/features/analytics/components/analytics-target-editor.tsx src/features/analytics/components/analytics-target-editor.test.tsx
+rtk git diff --check
+```
+
+CUA verified actual chart/renderer/target components with complete production CSS. At 320px a supplied 152px compact plot produces a 152px host, nested responsive container, and SVG; the nested computed minimum is 0px. There are no nonfinite paths. End keyboard inspection reaches an inactive interval and reports zero new ratings plus its carried score. A failed goal value of 85 and its associated error survive Overview/Goals navigation; allowing retry and submitting with Enter succeeds, restores header-action focus, and retains the 512px shell. The 215px form fits its 314px remaining body without horizontal overflow.
+
+Full gates remain deferred to final integration; all ten adapters, complete responsive browser proof, and human installed-extension smoke are still required. This executed foundation alone does not complete the Analytics redesign.

@@ -221,3 +221,100 @@ describe('historical calendar model', () => {
     expect(sparseHistoricalYTicks([0, 0.5, 1])).toEqual([0, 0.5, 1])
   })
 })
+
+describe('cumulative presentation cutoff', () => {
+  it('opts in to an early-day cutoff without changing original rows or legacy positions', () => {
+    const frame = { ...timeFrame, asOf: '2026-10-02T04:10:00.123Z' }
+    const original = [
+      { ...row('2026-09-30', '2026-10-01', 0.4), isPartial: false },
+      { ...row('2026-10-02', '2026-10-02', 0.8), isPartial: true },
+    ]
+    const legacy = buildHistoricalChartModel(original, frame, 320, true)
+    const model = buildHistoricalChartModel(original, frame, 320, true, true)
+    const end = historicalDayOrdinal('2026-10-02') + 600123 / 86400000
+    expect(legacy.rows.at(-1)!.endX).toBe(historicalDayOrdinal('2026-10-03'))
+    expect(model.domain).toEqual([legacy.rows[0]!.x, end])
+    expect(model.rows.at(-1)!.x).toBe(
+      (historicalDayOrdinal('2026-10-02') + end) / 2,
+    )
+    expect(model.rows.at(-1)).toMatchObject(original.at(-1)!)
+    expect(original.at(-1)).not.toHaveProperty('x')
+    expect(model.visibleEnd).toBe(end)
+    expect(model.ticks.length).toBeGreaterThan(0)
+    for (const tick of model.ticks) {
+      expect(tick).toBeGreaterThanOrEqual(model.domain[0])
+      expect(tick).toBeLessThanOrEqual(end)
+    }
+  })
+
+  it.each([
+    [
+      '2026-03-08',
+      '2026-03-08T16:00:00.321Z',
+      11 * 3600000 + 321,
+      23 * 3600000,
+    ],
+    [
+      '2026-11-01',
+      '2026-11-01T17:00:00.321Z',
+      13 * 3600000 + 321,
+      25 * 3600000,
+    ],
+  ] as const)(
+    'uses the actual local-day duration on %s with milliseconds',
+    (date, asOf, elapsed, duration) => {
+      const model = buildHistoricalChartModel(
+        [row(date)],
+        { ...timeFrame, asOf },
+        320,
+        false,
+        true,
+      )
+      const end = historicalDayOrdinal(date) + elapsed / duration
+      expect(model.rows[0]!.endX).toBe(end)
+      expect(model.rows[0]!.x).toBe((historicalDayOrdinal(date) + end) / 2)
+      expect(
+        model.ticks.every((tick) => tick <= end && tick >= model.domain[0]),
+      ).toBe(true)
+    },
+  )
+
+  it('keeps shortened first intervals and an exact-midnight resumed update honest', () => {
+    const frame = { ...timeFrame, asOf: '2026-10-02T04:00:00.000Z' }
+    const model = buildHistoricalChartModel(
+      [
+        row('2026-09-28', '2026-09-28'),
+        row('2026-09-29', '2026-10-01'),
+        row('2026-10-02'),
+      ],
+      frame,
+      320,
+      true,
+      true,
+    )
+    expect(model.rows[0]!.endX - model.rows[0]!.startX).toBe(1)
+    expect(model.rows.at(-1)!.startX).toBe(model.rows.at(-1)!.endX)
+    expect(model.rows.at(-1)!.x).toBe(model.visibleEnd)
+    expect(
+      model.ticks.every(
+        (tick) =>
+          Number.isFinite(tick) &&
+          tick >= model.domain[0] &&
+          tick <= model.visibleEnd,
+      ),
+    ).toBe(true)
+    const singleton = buildHistoricalChartModel(
+      [row('2026-10-02')],
+      frame,
+      320,
+      true,
+      true,
+    )
+    expect(singleton.rows[0]!.startX).toBe(singleton.rows[0]!.endX)
+    expect(singleton.domain[0]).toBeLessThan(singleton.domain[1])
+    expect(singleton.domain[1]).toBe(historicalDayOrdinal('2026-10-02'))
+    expect(singleton.ticks.every((tick) => tick <= singleton.visibleEnd)).toBe(
+      true,
+    )
+  })
+})

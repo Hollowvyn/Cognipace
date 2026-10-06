@@ -1,3 +1,8 @@
+import {
+  addAnalyticsCalendarDays,
+  getAnalyticsDateKey,
+  getAnalyticsLocalDayStart,
+} from '../../domain/analytics-time'
 import type { AnalyticsHistoryGrouping } from '../../domain/analytics-history-window'
 
 export interface HistoricalChartTimeFrame {
@@ -133,17 +138,47 @@ export function trimHistoricalEmptyEdges<Row>(
   return rows.slice(first, last + 1)
 }
 
+/** Position report time in its local calendar day, including DST and milliseconds. */
+export function historicalAsOfCoordinate(
+  timeFrame: HistoricalChartTimeFrame,
+): number {
+  const asOf = new Date(timeFrame.asOf)
+  const today = getAnalyticsDateKey(asOf, timeFrame.timeZone)
+  const midnight = Date.parse(
+    getAnalyticsLocalDayStart(today, timeFrame.timeZone),
+  )
+  const nextMidnight = Date.parse(
+    getAnalyticsLocalDayStart(
+      addAnalyticsCalendarDays(today, 1),
+      timeFrame.timeZone,
+    ),
+  )
+  return (
+    historicalDayOrdinal(today) +
+    (asOf.getTime() - midnight) / (nextMidnight - midnight)
+  )
+}
+
 export function buildHistoricalChartModel<Row extends HistoricalChartRow>(
   rows: readonly Row[],
   timeFrame?: HistoricalChartTimeFrame,
   width = 640,
   startAtFirstPoint = false,
+  cumulativeAsOf = false,
 ) {
-  const positionedRows: PositionedHistoricalRow<Row>[] = rows.map((row) => {
-    const startX = historicalDayOrdinal(row.bucketStart)
-    const endX = historicalDayOrdinal(row.bucketEnd) + 1
-    return { ...row, startX, endX, x: (startX + endX) / 2 }
-  })
+  const cutoff =
+    cumulativeAsOf && timeFrame ? historicalAsOfCoordinate(timeFrame) : null
+  const positionedRows: PositionedHistoricalRow<Row>[] = rows.map(
+    (row, index) => {
+      const startX = historicalDayOrdinal(row.bucketStart)
+      const intervalEnd = historicalDayOrdinal(row.bucketEnd) + 1
+      const endX =
+        cutoff !== null && index === rows.length - 1
+          ? Math.max(startX, Math.min(intervalEnd, cutoff))
+          : intervalEnd
+      return { ...row, startX, endX, x: (startX + endX) / 2 }
+    },
+  )
   const domain: [number, number] = positionedRows.length
     ? [
         startAtFirstPoint && positionedRows.length > 1
@@ -152,8 +187,11 @@ export function buildHistoricalChartModel<Row extends HistoricalChartRow>(
         positionedRows.at(-1)!.endX,
       ]
     : [0, 1]
+  // A midnight singleton has no elapsed interval. Expand only the display scale
+  // into the past; the source interval and its marker stay at the exact cutoff.
+  if (cutoff !== null && domain[0] === domain[1]) domain[0] -= 0.5
   const firstDay = Math.floor(domain[0])
-  const lastDay = domain[1] - 1
+  const lastDay = cutoff === null ? domain[1] - 1 : Math.floor(domain[1])
   const span = lastDay - firstDay
   const longestLabel = Math.max(
     formatHistoricalDate(dateKeyFromOrdinal(firstDay), timeFrame).length,
@@ -180,10 +218,17 @@ export function buildHistoricalChartModel<Row extends HistoricalChartRow>(
     }
     days.push(lastDay)
   }
-  const ticks = positionedRows.length ? days.map((day) => day + 0.5) : []
+  const ticks = positionedRows.length
+    ? cutoff === null
+      ? days.map((day) => day + 0.5)
+      : [...new Set(days.map((day) => Math.min(day + 0.5, domain[1])))].filter(
+          (tick) => tick >= domain[0] && tick <= domain[1],
+        )
+    : []
   return {
     rows: positionedRows,
     domain,
+    visibleEnd: domain[1],
     ticks,
     formatTick: (value: number) =>
       formatHistoricalDate(dateKeyFromOrdinal(value), timeFrame),

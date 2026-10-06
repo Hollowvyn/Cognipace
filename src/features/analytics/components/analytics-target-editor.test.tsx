@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { defaultAnalyticsTargets } from '@/features/settings/domain'
@@ -230,5 +230,130 @@ describe('Analytics target editor', () => {
     await waitFor(() =>
       expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument(),
     )
+  })
+})
+
+function ControlledGoals({
+  save,
+  current = targets,
+}: {
+  save: (patch: Partial<typeof targets>) => Promise<unknown>
+  current?: typeof targets
+}) {
+  const [open, setOpen] = useState(false)
+  const returnFocusRef = useRef<HTMLButtonElement>(null)
+  return (
+    <>
+      <button ref={returnFocusRef} onClick={() => setOpen(true)} type="button">
+        Goals
+      </button>
+      <button onClick={() => setOpen(false)} type="button">
+        Overview
+      </button>
+      <AnalyticsTargetEditor
+        targets={current}
+        metric="recall"
+        onSave={save}
+        surface="goals"
+        open={open}
+        onOpenChange={setOpen}
+        returnFocusRef={returnFocusRef}
+      />
+    </>
+  )
+}
+
+describe('controlled Goals surface', () => {
+  it('retains a draft and associated failed-save error while the mounted form is hidden, then retries one key', async () => {
+    const user = userEvent.setup()
+    const save = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Try again'))
+      .mockResolvedValueOnce(undefined)
+    render(<ControlledGoals save={save} />)
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    expect(input()).toHaveFocus()
+    expect(
+      screen.queryByRole('button', { name: 'Target Recall 90%' }),
+    ).not.toBeInTheDocument()
+    change('80')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Try again')
+    expect(input()).toHaveAttribute('aria-invalid', 'true')
+    expect(input().getAttribute('aria-describedby')).toContain(
+      screen.getByRole('alert').id,
+    )
+    await user.click(screen.getByRole('button', { name: 'Overview' }))
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    expect(input()).toHaveValue(80)
+    expect(screen.getByRole('alert')).toHaveTextContent('Try again')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Goals' })).toHaveFocus(),
+    )
+    expect(save).toHaveBeenNthCalledWith(2, { targetRecall: 0.8 })
+  })
+
+  it('reads current targets on first opening and validates a preserved draft against the latest counterpart', async () => {
+    const user = userEvent.setup()
+    const save = vi.fn().mockResolvedValue(undefined)
+    const { rerender } = render(<ControlledGoals save={save} />)
+    rerender(
+      <ControlledGoals
+        save={save}
+        current={{ ...targets, targetRecall: 0.7 }}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    expect(input()).toHaveValue(70)
+    change('85')
+    await user.click(screen.getByRole('button', { name: 'Overview' }))
+    rerender(
+      <ControlledGoals
+        save={save}
+        current={{ ...targets, targetRecall: 0.7, targetReviewSuccess: 0.8 }}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    expect(input()).toHaveValue(85)
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Review Success target must be at least your Recall target',
+    )
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Goals' })).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    expect(input()).toHaveValue(70)
+  })
+
+  it('guards pending saves across hiding and reopening and wraps controls without shrinking text', async () => {
+    const user = userEvent.setup()
+    let resolve!: () => void
+    const save = vi.fn(
+      () =>
+        new Promise<void>((done) => {
+          resolve = done
+        }),
+    )
+    render(<ControlledGoals save={save} />)
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    const fieldset = screen.getByRole('group', { name: 'Target Recall' })
+    expect(fieldset).toHaveClass('min-w-0')
+    expect(screen.getByTestId('target-editor-controls')).toHaveClass(
+      'flex-wrap',
+    )
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Overview' }))
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+    await user.keyboard('{Enter}{Escape}')
+    expect(save).toHaveBeenCalledTimes(1)
+    resolve()
+    await waitFor(() =>
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('button', { name: 'Goals' })).toHaveFocus()
   })
 })
