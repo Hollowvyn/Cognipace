@@ -1,9 +1,19 @@
+import { Lightbulb } from 'lucide-react'
+
 import { IconButton } from '@/components/ui/icon-button'
+
+import type { OverlayHintState } from '../../../hooks/use-leetcode-code-hints'
+import { OverlayHintBlock } from './overlay-hint-block'
 
 import { createYouTubeSearchUrl } from '../../../domain'
 
 export type OverlayHelpSectionProps = {
   searchQuery: string | null
+  hints?: OverlayHintState
+  onToggleHints?: () => void
+  onRevealNextHint?: () => void
+  onRetryHints?: () => void
+  onSettings?: () => void
 }
 
 const HELP_ACTION_LABEL = 'Search YouTube for this problem'
@@ -22,7 +32,16 @@ function YouTubeIcon() {
   )
 }
 
-export function OverlayHelpSection({ searchQuery }: OverlayHelpSectionProps) {
+export function OverlayHelpSection({
+  searchQuery,
+  hints = { status: 'idle', isOpen: false },
+  onToggleHints,
+  onRevealNextHint,
+  onRetryHints,
+  onSettings,
+}: OverlayHelpSectionProps) {
+  const hintActionLabel =
+    hints.status === 'idle' ? 'Request AI hints' : 'Show AI hints'
   const searchUrl = searchQuery ? createYouTubeSearchUrl(searchQuery) : null
 
   return (
@@ -34,33 +53,54 @@ export function OverlayHelpSection({ searchQuery }: OverlayHelpSectionProps) {
         Help
       </h2>
 
-      {searchUrl ? (
-        <IconButton
-          asChild
-          label={HELP_ACTION_LABEL}
-          tooltip={HELP_ACTION_LABEL}
-          variant="ghost"
-        >
-          <a href={searchUrl} rel="noopener noreferrer" target="_blank">
+      <div className="flex items-center gap-1">
+        {searchUrl ? (
+          <IconButton
+            asChild
+            label={HELP_ACTION_LABEL}
+            tooltip={HELP_ACTION_LABEL}
+            variant="ghost"
+          >
+            <a href={searchUrl} rel="noopener noreferrer" target="_blank">
+              <YouTubeIcon />
+            </a>
+          </IconButton>
+        ) : (
+          <IconButton
+            disabled
+            aria-describedby={HELP_UNAVAILABLE_DESCRIPTION_ID}
+            label={HELP_ACTION_LABEL}
+            tooltip="Problem details are still loading"
+            variant="ghost"
+          >
             <YouTubeIcon />
-          </a>
-        </IconButton>
-      ) : (
+          </IconButton>
+        )}
+        {!searchUrl ? (
+          <span className="sr-only" id={HELP_UNAVAILABLE_DESCRIPTION_ID}>
+            Problem details are still loading
+          </span>
+        ) : null}
         <IconButton
-          disabled
-          aria-describedby={HELP_UNAVAILABLE_DESCRIPTION_ID}
-          label={HELP_ACTION_LABEL}
-          tooltip="Problem details are still loading"
           variant="ghost"
+          label={hintActionLabel}
+          tooltip={hintActionLabel}
+          disabled={hints.status === 'pending' || !onToggleHints}
+          aria-expanded={hints.isOpen}
+          aria-controls="overlay-ai-hint-block"
+          onClick={onToggleHints}
         >
-          <YouTubeIcon />
+          <Lightbulb aria-hidden="true" className="size-4" />
         </IconButton>
-      )}
-      {!searchUrl ? (
-        <span className="sr-only" id={HELP_UNAVAILABLE_DESCRIPTION_ID}>
-          Problem details are still loading
-        </span>
-      ) : null}
+      </div>
+      <div id="overlay-ai-hint-block">
+        <OverlayHintBlock
+          state={hints}
+          onRevealNext={onRevealNextHint}
+          onRetry={onRetryHints}
+          onSettings={onSettings}
+        />
+      </div>
     </section>
   )
 }

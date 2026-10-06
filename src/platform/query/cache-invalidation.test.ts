@@ -182,3 +182,104 @@ it.each([
     }
   },
 )
+
+describe('public hint connection invalidation', () => {
+  const saved = {
+    available: true,
+    provider: 'gemini',
+    revision: '00000000-0000-4000-8000-000000000001',
+  }
+  const queryKey = queryKeys.genai.hintConnection()
+
+  it.each(['hanging', 'failed'] as const)(
+    'clears cached and observed metadata before a %s replacement read without waiting for it',
+    async (kind) => {
+      const client = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      })
+      client.setQueryData(queryKey, saved)
+      let oldSignal!: AbortSignal
+      let finishOld!: (value: typeof saved) => void
+      let failNew!: (error: Error) => void
+      const read = vi
+        .fn<({ signal }: { signal: AbortSignal }) => Promise<typeof saved>>()
+        .mockImplementationOnce(({ signal }) => {
+          oldSignal = signal
+          return new Promise((resolve) => {
+            finishOld = resolve
+          })
+        })
+        .mockImplementationOnce(
+          () =>
+            new Promise((_resolve, reject) => {
+              failNew = reject
+            }),
+        )
+      const observer = new QueryObserver(client, { queryKey, queryFn: read })
+      const unsubscribe = observer.subscribe(() => {})
+      try {
+        expect(read).toHaveBeenCalledTimes(1)
+        const invalidation = invalidateTaggedQueries(
+          client,
+          ['settings', 'genai'],
+          { resetHintConnection: true },
+        )
+        await invalidation
+        expect(oldSignal.aborted).toBe(true)
+        expect(read).toHaveBeenCalledTimes(2)
+        expect(client.getQueryData(queryKey)).toBeUndefined()
+        expect(observer.getCurrentResult().data).toBeUndefined()
+        finishOld(saved)
+        await Promise.resolve()
+        expect(client.getQueryData(queryKey)).toBeUndefined()
+        expect(observer.getCurrentResult().data).toBeUndefined()
+        if (kind === 'failed') {
+          failNew(new Error('replacement unavailable'))
+          await vi.waitFor(() =>
+            expect(observer.getCurrentResult().status).toBe('error'),
+          )
+          expect(observer.getCurrentResult().data).toBeUndefined()
+          expect(client.getQueryData(queryKey)).toBeUndefined()
+        }
+        expect(read).toHaveBeenCalledTimes(2)
+      } finally {
+        unsubscribe()
+        client.clear()
+      }
+    },
+  )
+
+  it('preserves saved metadata during ordinary GenAI invalidation even when the replacement fails', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    client.setQueryData(queryKey, saved)
+    let finishOld!: (value: typeof saved) => void
+    const read = vi
+      .fn<() => Promise<typeof saved>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishOld = resolve
+          }),
+      )
+      .mockRejectedValue(new Error('replacement unavailable'))
+    const observer = new QueryObserver(client, { queryKey, queryFn: read })
+    const unsubscribe = observer.subscribe(() => {})
+    try {
+      await invalidateTaggedQueries(client, ['settings', 'genai'])
+      expect(observer.getCurrentResult().data).toEqual(saved)
+      await vi.waitFor(() =>
+        expect(observer.getCurrentResult().status).toBe('error'),
+      )
+      finishOld({ ...saved, available: false })
+      await Promise.resolve()
+      expect(observer.getCurrentResult().data).toEqual(saved)
+      expect(client.getQueryData(queryKey)).toEqual(saved)
+      expect(read).toHaveBeenCalledTimes(2)
+    } finally {
+      unsubscribe()
+      client.clear()
+    }
+  })
+})

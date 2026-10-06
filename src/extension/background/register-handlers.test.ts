@@ -30,7 +30,11 @@ import {
   makeValidAnalysis,
 } from '@/features/leetcode-review-assistant/testing/code-analysis-fixtures'
 import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
-import { abortLeetCodeAnalyses } from './leetcode-analysis-operations'
+import {
+  abortLeetCodeAnalyses,
+  abortLeetCodeHints,
+} from './leetcode-analysis-operations'
+import { generateLeetCodeHintsRequestSchema } from '@/features/leetcode-review-assistant/api/code-hint-contracts'
 import type { PopupAppShellData } from '@/features/app-shell/api/app-shell-contracts'
 import {
   backupSchemaVersion,
@@ -138,6 +142,8 @@ const backgroundMocks = vi.hoisted(() => {
     setActiveTrack: vi.fn(),
     getSettings: vi.fn(),
     getAiProviderSecretPresence: vi.fn(),
+    getAiHintConnectionStatus: vi.fn(),
+    generateLeetCodeHintsInBackground: vi.fn(),
     setAiProviderSecret: vi.fn(),
     clearAiProviderSecret: vi.fn(),
     loadActiveProviderConfig: vi.fn(),
@@ -237,6 +243,7 @@ vi.mock('@/features/queue/server/queue-service', () => ({
 
 vi.mock('@/features/genai/server/genai-settings-service', () => ({
   getAiProviderSecretPresence: backgroundMocks.getAiProviderSecretPresence,
+  getAiHintConnectionStatus: backgroundMocks.getAiHintConnectionStatus,
   setAiProviderSecret: backgroundMocks.setAiProviderSecret,
   clearAiProviderSecret: backgroundMocks.clearAiProviderSecret,
   loadActiveProviderConfig: backgroundMocks.loadActiveProviderConfig,
@@ -246,7 +253,8 @@ vi.mock('@/features/genai/server/genai-connection-service', () => ({
   testAiConnection: backgroundMocks.testAiConnection,
 }))
 
-vi.mock('@/lib/ai', () => ({
+vi.mock('@/lib/ai', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/ai')>()),
   generateJson: backgroundMocks.generateJson,
 }))
 
@@ -354,11 +362,20 @@ vi.mock(
   }),
 )
 
+vi.mock(
+  '@/features/leetcode-review-assistant/server/hint-runtime-service',
+  () => ({
+    generateLeetCodeHintsInBackground:
+      backgroundMocks.generateLeetCodeHintsInBackground,
+  }),
+)
+
 vi.mock('./cache-invalidation-broadcaster', () => ({
   broadcastCacheInvalidation: backgroundMocks.broadcastCacheInvalidation,
 }))
 
-vi.mock('./runtime-policy', () => ({
+vi.mock('./runtime-policy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./runtime-policy')>()),
   assertCanSenderCallExtensionMethod:
     backgroundMocks.assertCanSenderCallExtensionMethod,
 }))
@@ -494,6 +511,7 @@ describe('background handler registration', () => {
       openai: false,
       anthropic: false,
       gemini: false,
+      openrouter: false,
     })
     backgroundMocks.setAiProviderSecret.mockImplementation(
       async (
@@ -502,13 +520,23 @@ describe('background handler registration', () => {
         afterPersist?: () => Promise<void>,
       ) => {
         await afterPersist?.()
-        return { openai: true, anthropic: false, gemini: false }
+        return {
+          openai: true,
+          anthropic: false,
+          gemini: false,
+          openrouter: false,
+        }
       },
     )
     backgroundMocks.clearAiProviderSecret.mockImplementation(
       async (_provider: unknown, afterPersist?: () => Promise<void>) => {
         await afterPersist?.()
-        return { openai: false, anthropic: false, gemini: false }
+        return {
+          openai: false,
+          anthropic: false,
+          gemini: false,
+          openrouter: false,
+        }
       },
     )
     backgroundMocks.loadActiveProviderConfig.mockResolvedValue(null)
@@ -607,6 +635,7 @@ describe('background handler registration', () => {
     const retry = backgroundMocks.handlers.get('backup.retryPendingReplacement')
     await retry?.({ data: { surface: 'dashboard' }, sender: extensionSender })
     abortLeetCodeAnalyses()
+    abortLeetCodeHints()
     vi.clearAllTimers()
     vi.useRealTimers()
   })
@@ -637,13 +666,25 @@ describe('background handler registration', () => {
       expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
       if (method !== 'genai.getAiProviderSecretPresence') {
         expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith(
-          { reason: 'genai-updated', source: 'dashboard', tags: ['genai'] },
+          {
+            reason: 'genai-updated',
+            source: 'dashboard',
+            tags: ['genai'],
+            hintProvider: 'gemini',
+          },
         )
       }
     },
   )
 
   it('adds GenAI invalidation only to AI Settings patches', async () => {
+    backgroundMocks.updateSettings.mockResolvedValue({
+      ...defaultUserSettings,
+      aiAssessment: {
+        ...defaultUserSettings.aiAssessment,
+        model: 'gemini-test',
+      },
+    })
     await sendRuntimeMessage('settings.updateSettings', {
       surface: 'dashboard',
       patch: { aiAssessment: { model: 'gemini-test' } },
@@ -652,6 +693,166 @@ describe('background handler registration', () => {
       reason: 'settings-updated',
       source: 'dashboard',
       tags: ['settings', 'genai'],
+      hintConnectionChanged: true,
+    })
+  })
+
+  it('preserves hint connection for automatic enabled-only toggles', async () => {
+    const enabled = !defaultUserSettings.aiAssessment.enabled
+    backgroundMocks.updateSettings.mockResolvedValue({
+      ...defaultUserSettings,
+      aiAssessment: { ...defaultUserSettings.aiAssessment, enabled },
+    })
+    await sendRuntimeMessage('settings.updateSettings', {
+      surface: 'dashboard',
+      patch: { aiAssessment: { enabled } },
+    })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      reason: 'settings-updated',
+      source: 'dashboard',
+      tags: ['settings', 'genai'],
+      hintConnectionChanged: false,
+    })
+  })
+
+  describe('manual hint handlers', () => {
+    const sender = {
+      tab: { id: 7 },
+      frameId: 0,
+      url: 'https://leetcode.com/problems/two-sum/',
+    }
+    const problem = {
+      host: 'leetcode.com' as const,
+      slug: 'two-sum',
+      title: 'Two Sum',
+      statement: 'Find two indices.',
+      examples: [],
+      constraints: [],
+    }
+    const request = generateLeetCodeHintsRequestSchema.parse({
+      surface: 'content-script',
+      requestId: 'hint-1',
+      problem,
+      connectionRevision: '00000000-0000-4000-8000-000000000001',
+      connectionProvider: 'gemini',
+    })
+    const response = {
+      status: 'ready',
+      requestId: request.requestId,
+      batch: { hints: ['Consider lookup.'] },
+    }
+    beforeEach(async () => {
+      const actual =
+        await vi.importActual<typeof import('./runtime-policy')>(
+          './runtime-policy',
+        )
+      backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementation(
+        actual.assertCanSenderCallExtensionMethod,
+      )
+      backgroundMocks.generateLeetCodeHintsInBackground
+        .mockReset()
+        .mockResolvedValue(response)
+      backgroundMocks.getAiHintConnectionStatus.mockReset().mockResolvedValue({
+        available: true,
+        provider: 'gemini',
+        revision: request.connectionRevision,
+      })
+    })
+    afterEach(() =>
+      backgroundMocks.assertCanSenderCallExtensionMethod.mockReset(),
+    )
+
+    it('rejects a different actual problem before database or provider work', () => {
+      const other = { ...problem, slug: 'three-sum' }
+      const mismatch = {
+        ...request,
+        problem: other,
+      }
+      expect(() =>
+        sendRuntimeMessage('genai.generateLeetCodeHints', mismatch, sender),
+      ).toThrow(/must match/)
+      expect(backgroundMocks.getAppDb).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.generateLeetCodeHintsInBackground,
+      ).not.toHaveBeenCalled()
+      expect(backgroundMocks.getAiHintConnectionStatus).not.toHaveBeenCalled()
+    })
+    it('uses strict hint responses and direct sender-owned cancellation without persistence', async () => {
+      await expect(
+        sendRuntimeMessage('genai.generateLeetCodeHints', request, sender),
+      ).resolves.toEqual(response)
+      expect(
+        backgroundMocks.generateLeetCodeHintsInBackground,
+      ).toHaveBeenCalledWith(
+        request,
+        expect.any(Function),
+        expect.any(AbortSignal),
+      )
+      expect(
+        sendRuntimeMessage(
+          'genai.cancelLeetCodeHints',
+          { surface: 'content-script', requestId: request.requestId },
+          { ...sender, url: 'https://leetcode.com/explore/' },
+        ),
+      ).toEqual({ requestId: request.requestId, cancelled: false })
+      backgroundMocks.generateLeetCodeHintsInBackground.mockResolvedValue({
+        ...response,
+        private: 'secret',
+      })
+      await expect(
+        sendRuntimeMessage('genai.generateLeetCodeHints', request, sender),
+      ).rejects.toThrow()
+      expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+      expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    })
+    it('loads only strict public connection metadata', async () => {
+      await expect(
+        sendRuntimeMessage(
+          'genai.getHintConnection',
+          { surface: 'content-script' },
+          sender,
+        ),
+      ).resolves.toEqual({
+        available: true,
+        provider: 'gemini',
+        revision: request.connectionRevision,
+      })
+      expect(backgroundMocks.getAiHintConnectionStatus).toHaveBeenCalledWith(
+        backgroundMocks.db,
+      )
+      backgroundMocks.getAiHintConnectionStatus.mockResolvedValue({
+        available: true,
+        provider: 'gemini',
+        revision: request.connectionRevision,
+        private: 'secret',
+      })
+      await expect(
+        sendRuntimeMessage(
+          'genai.getHintConnection',
+          { surface: 'content-script' },
+          sender,
+        ),
+      ).rejects.toThrow(
+        'Saved AI connection could not be loaded. Please retry.',
+      )
+    })
+    it('bounds metadata database preparation and hides private failures', async () => {
+      backgroundMocks.getAppDb.mockReturnValue(new Promise(() => {}))
+      const pending = Promise.resolve(
+        sendRuntimeMessage(
+          'genai.getHintConnection',
+          { surface: 'content-script' },
+          sender,
+        ),
+      )
+      const assertion = expect(pending).rejects.toThrow(
+        'Saved AI connection could not be loaded. Please retry.',
+      )
+      await vi.advanceTimersByTimeAsync(20000)
+      await assertion
+      expect(backgroundMocks.getAiHintConnectionStatus).not.toHaveBeenCalled()
+      expect(vi.getTimerCount()).toBe(0)
     })
   })
 
@@ -1210,6 +1411,7 @@ describe('background handler registration', () => {
       openai: false,
       anthropic: false,
       gemini: false,
+      openrouter: false,
     })
 
     const response = await sendRuntimeMessage('devSmoke.run', {
@@ -1240,6 +1442,7 @@ describe('background handler registration', () => {
       openai: true,
       anthropic: false,
       gemini: false,
+      openrouter: false,
     })
     backgroundMocks.loadActiveProviderConfig.mockResolvedValue({
       provider: 'openai',
@@ -2049,6 +2252,7 @@ describe('background handler registration', () => {
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
       reason: 'problem-catalog-updated',
       source: 'dashboard',
+      hintConnectionReset: true,
       tags: [
         'settings',
         'genai',
@@ -2080,6 +2284,7 @@ describe('background handler registration', () => {
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
       reason: 'problem-catalog-updated',
       source: 'dashboard',
+      hintConnectionReset: true,
       tags: [
         'settings',
         'genai',

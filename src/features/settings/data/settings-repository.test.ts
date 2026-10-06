@@ -229,3 +229,31 @@ describe('SettingsRepository', () => {
     })
   })
 })
+
+it('persists an OpenRouter connection exactly without changing unrelated defaults', async () => {
+  const handle = await createTestDb({ seed: false })
+  const repository = createSettingsRepository(handle.db)
+  const aiAssessment = {
+    enabled: false,
+    provider: 'openrouter' as const,
+    model: 'vendor/custom-model:free',
+  }
+  await repository.updateSettings({ aiAssessment })
+  await repository.updateSettings({ practice: { dailyGoal: 9 } })
+  const reopened = await createSettingsRepository(handle.db).getSettings()
+  expect(reopened.aiAssessment).toEqual(aiAssessment)
+  expect(reopened.practice.dailyGoal).toBe(9)
+  expect(reopened.schemaVersion).toBe(defaultUserSettings.schemaVersion)
+  await repository.updateSettings({ aiAssessment: { enabled: true } })
+  expect(await repository.getSettings()).toEqual({
+    ...reopened,
+    aiAssessment: { ...aiAssessment, enabled: true },
+  })
+  const rows = await handle.db.select().from(settingsKv)
+  expect(rows).toHaveLength(1)
+  const stored: unknown = JSON.parse(rows[0]!.value)
+  expect(stored).toHaveProperty('aiAssessment', {
+    ...aiAssessment,
+    enabled: true,
+  })
+})

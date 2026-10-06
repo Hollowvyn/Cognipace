@@ -21,6 +21,7 @@ export const queryKeys = {
     configurationRevision: () =>
       [...queryKeys.genai.all, 'configuration-revision'] as const,
     secretPresence: () => [...queryKeys.genai.all, 'secret-presence'] as const,
+    hintConnection: () => [...queryKeys.genai.all, 'hint-connection'] as const,
   },
   practice: {
     all: ['practice-details'] as const,

@@ -17,12 +17,14 @@ export const aiProviderLabels: Record<GenAiProviderId, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   gemini: 'Gemini',
+  openrouter: 'OpenRouter',
 }
 
 export const aiProviderModelDefaults: Record<GenAiProviderId, string> = {
   openai: 'gpt-5.4-mini',
   anthropic: 'claude-haiku-4-5',
   gemini: 'gemini-3.5-flash-lite',
+  openrouter: 'openrouter/free',
 }
 
 type ConnectionStep =
@@ -97,14 +99,29 @@ export function useAiConnectionController(gate: SettingsOperationGate) {
   const saved = settingsQuery.data?.aiAssessment ?? draft.saved
   const isBusy = gate.activeOperation !== null
   const presenceReady = !presenceQuery.isPending && !presenceQuery.isError
-  const canSubmit = Boolean(
+  const connectionReady = Boolean(
     draft.saved &&
     presenceReady &&
     draft.model.trim() &&
     draft.model.trim().length <= 120 &&
-    (draft.key.trim() || hasKey) &&
     !isBusy,
   )
+  const matchesActive = Boolean(
+    saved &&
+    draft.provider === saved.provider &&
+    draft.model.trim() === saved.model.trim(),
+  )
+  const canSubmit = Boolean(
+    connectionReady &&
+    (draft.key.trim() || hasKey) &&
+    (draft.key.trim() || !matchesActive),
+  )
+  const canTestConnection = Boolean(
+    connectionReady && matchesActive && hasKey && !draft.key.trim(),
+  )
+  const activeConnection = saved?.model.trim()
+    ? { provider: saved.provider, model: saved.model.trim() }
+    : null
   const canEnableAssessment = Boolean(
     saved &&
     presenceReady &&
@@ -155,9 +172,6 @@ export function useAiConnectionController(gate: SettingsOperationGate) {
       key: draft.key.trim(),
     }
     let keySaved = false
-    let configurationSaved = false
-    let testEpoch: number | null = null
-    let testRevision: number | null = null
     try {
       if (captured.key) {
         setStep('saving-key')
@@ -194,11 +208,35 @@ export function useAiConnectionController(gate: SettingsOperationGate) {
         })
       }
       dispatchDraft({ type: 'changed', patch: { model: captured.model } })
-      configurationSaved = true
-      testEpoch = ++epoch.current
-      testRevision = readRevision()
-      setStep('testing')
-      setTest({ status: 'testing', revision: testRevision })
+      setFeedback({
+        tone: 'success',
+        message: `Active provider: ${aiProviderLabels[captured.provider]} · ${captured.model}.`,
+      })
+    } catch {
+      if (!mounted.current) return
+      setFeedback({
+        tone: 'danger',
+        message: keySaved
+          ? 'Key saved; provider and model could not be saved. Try Save & make active again.'
+          : 'Could not save the connection. Your changes are ready to retry.',
+      })
+    } finally {
+      if (mounted.current) setStep(null)
+      release()
+    }
+  }
+
+  async function testSavedConnection() {
+    if (!canTestConnection) return
+    const release = gate.acquire('ai')
+    if (!release) return
+    clearTest()
+    const captured = { provider: draft.provider, model: draft.model.trim() }
+    const testEpoch = epoch.current
+    const testRevision = readRevision()
+    setStep('testing')
+    setTest({ status: 'testing', revision: testRevision })
+    try {
       const result = await testConnection.mutateAsync({
         provider: captured.provider,
         model: captured.model,
@@ -209,6 +247,7 @@ export function useAiConnectionController(gate: SettingsOperationGate) {
         testRevision !== readRevision()
       )
         return
+      dispatchDraft({ type: 'changed', patch: { model: captured.model } })
       if (result.status === 'success') {
         setTest({ status: 'connected', revision: testRevision })
         setFeedback({
@@ -219,36 +258,21 @@ export function useAiConnectionController(gate: SettingsOperationGate) {
         setTest({ status: 'error', revision: testRevision })
         setFeedback({
           tone: 'danger',
-          message: `Configuration saved; connection test failed. ${result.message}`,
+          message: `Connection test failed. ${result.message}`,
         })
       }
     } catch {
       if (
         !mounted.current ||
-        (testEpoch !== null &&
-          (testEpoch !== epoch.current || testRevision !== readRevision()))
+        testEpoch !== epoch.current ||
+        testRevision !== readRevision()
       )
         return
-      if (configurationSaved) {
-        setTest({ status: 'error', revision: readRevision() })
-        setFeedback({
-          tone: 'danger',
-          message:
-            'Configuration saved; connection test failed. Please try again.',
-        })
-      } else if (keySaved) {
-        setFeedback({
-          tone: 'danger',
-          message:
-            'Key saved; provider and model could not be saved. Try Save & test connection again.',
-        })
-      } else {
-        setFeedback({
-          tone: 'danger',
-          message:
-            'Could not save the connection. Your changes are ready to retry.',
-        })
-      }
+      setTest({ status: 'error', revision: testRevision })
+      setFeedback({
+        tone: 'danger',
+        message: 'Connection test failed. Please try again.',
+      })
     } finally {
       if (mounted.current) setStep(null)
       release()
@@ -318,6 +342,14 @@ export function useAiConnectionController(gate: SettingsOperationGate) {
     hasKey,
     isBusy,
     canSubmit,
+    canTestConnection,
+    activeConnection,
+    activeConnectionPending: settingsQuery.isPending,
+    activeKeyMissing: Boolean(
+      activeConnection &&
+      presenceReady &&
+      !presenceQuery.data?.[activeConnection.provider],
+    ),
     canEnableAssessment,
     connectionStatus,
     feedback,
@@ -330,6 +362,7 @@ export function useAiConnectionController(gate: SettingsOperationGate) {
         : 'Save a model first.',
     actions: {
       submit,
+      testConnection: testSavedConnection,
       clearKey,
       setAssessmentEnabled,
       reset,
@@ -337,7 +370,14 @@ export function useAiConnectionController(gate: SettingsOperationGate) {
       setKeyInput: (key: string) => edit({ key }),
       setProvider: (provider: GenAiProviderId) => {
         if (provider !== draft.provider)
-          edit({ provider, model: aiProviderModelDefaults[provider], key: '' })
+          edit({
+            provider,
+            model:
+              provider === saved?.provider
+                ? saved.model
+                : aiProviderModelDefaults[provider],
+            key: '',
+          })
       },
       discard: () => {
         if (gate.isBusy() || !saved) return

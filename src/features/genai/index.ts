@@ -20,3 +20,11 @@ export {
   type TestAiConnectionRequest,
   type TestAiConnectionResponse,
 } from './api'
+
+export { useAiHintConnection } from './api/hint-connection-hooks'
+export {
+  hintConnectionRequestSchema,
+  hintConnectionStatusSchema,
+  type HintConnectionRequest,
+  type HintConnectionStatus,
+} from './api/hint-connection-contracts'

@@ -9,6 +9,7 @@ import {
   extensionMethodNames,
   getMessageSenderSurface,
   isExtensionMethod,
+  assertHintProblemSender,
 } from './runtime-policy'
 import { getAppShellRuntimeSurface } from './register-handlers'
 
@@ -366,6 +367,9 @@ it('keeps connection testing dashboard-only and rejects a forged sender', () => 
 it.each([
   'genai.analyzeLeetCodeSubmission',
   'genai.cancelLeetCodeAnalysis',
+  'genai.getHintConnection',
+  'genai.generateLeetCodeHints',
+  'genai.cancelLeetCodeHints',
 ] as const)(
   'keeps %s content-script-only and rejects forged surfaces',
   (method) => {
@@ -390,6 +394,9 @@ it.each([
 describe.each([
   'genai.analyzeLeetCodeSubmission',
   'genai.cancelLeetCodeAnalysis',
+  'genai.getHintConnection',
+  'genai.generateLeetCodeHints',
+  'genai.cancelLeetCodeHints',
 ] as const)('%s actual LeetCode page authorization', (method) => {
   it.each([
     'https://leetcode.com/problems/two-sum/',
@@ -423,6 +430,46 @@ describe.each([
       ).toThrow(/LeetCode/i)
     },
   )
+})
+
+it('binds hint problem identity to the actual sender host and slug', () => {
+  const sender = {
+    tab: { id: 7 },
+    url: 'https://leetcode.com/problems/two-sum/',
+  }
+  expect(() =>
+    assertHintProblemSender(sender, { host: 'leetcode.com', slug: 'two-sum' }),
+  ).not.toThrow()
+  for (const problem of [
+    { host: 'leetcode.com', slug: 'three-sum' },
+    { host: 'www.leetcode.com', slug: 'two-sum' },
+  ])
+    expect(() => assertHintProblemSender(sender, problem)).toThrow(/must match/)
+})
+
+it('permits hint cancellation after navigation but requires problem pages for new hints and metadata', () => {
+  const sender = { tab: { id: 7 }, url: 'https://leetcode.com/explore/' }
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.cancelLeetCodeHints',
+      'content-script',
+      sender,
+    ),
+  ).not.toThrow()
+  for (const method of [
+    'genai.getHintConnection',
+    'genai.generateLeetCodeHints',
+  ])
+    expect(() =>
+      assertCanSenderCallExtensionMethod(method, 'content-script', sender),
+    ).toThrow(/problem page/)
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.generateLeetCodeHints',
+      'dashboard',
+      { tab: { id: 7 }, url: 'https://leetcode.com/problems/two-sum/' },
+    ),
+  ).toThrow(/cannot claim/)
 })
 
 it('allows owner cancellation after LeetCode SPA navigation while rejecting new generation off problem pages', () => {

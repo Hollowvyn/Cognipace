@@ -54,6 +54,7 @@ export default defineConfig({
         'https://api.openai.com/*',
         'https://api.anthropic.com/*',
         'https://generativelanguage.googleapis.com/*',
+        'https://openrouter.ai/*',
       ],
       content_security_policy: {
         extension_pages:
@@ -70,6 +71,10 @@ export default defineConfig({
   },
   vite: () => ({
     plugins: [tailwindcss()],
+    optimizeDeps: {
+      // WXT recreates dist during startup; scan only source entrypoints.
+      entries: ['src/entrypoints/**/*.html'],
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

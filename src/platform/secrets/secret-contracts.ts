@@ -5,6 +5,7 @@ export const secretProviderIdSchema = z.enum([
   'genai:openai',
   'genai:anthropic',
   'genai:google',
+  'genai:openrouter',
 ])
 
 export type SecretProviderId = z.infer<typeof secretProviderIdSchema>

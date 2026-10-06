@@ -19,6 +19,9 @@ const methodSurfaceAccess = {
   'genai.testConnection': ['dashboard'],
   'genai.analyzeLeetCodeSubmission': ['content-script'],
   'genai.cancelLeetCodeAnalysis': ['content-script'],
+  'genai.getHintConnection': ['content-script'],
+  'genai.generateLeetCodeHints': ['content-script'],
+  'genai.cancelLeetCodeHints': ['content-script'],
   'imports.preview': ['dashboard'],
   'imports.apply': ['dashboard'],
   'imports.retryPersistence': ['dashboard'],
@@ -160,7 +163,10 @@ export function assertCanSenderCallExtensionMethod(
   assertCanCallExtensionMethod(method, senderSurface)
   if (
     method === 'genai.analyzeLeetCodeSubmission' ||
-    method === 'genai.cancelLeetCodeAnalysis'
+    method === 'genai.cancelLeetCodeAnalysis' ||
+    method === 'genai.getHintConnection' ||
+    method === 'genai.generateLeetCodeHints' ||
+    method === 'genai.cancelLeetCodeHints'
   ) {
     const senderUrl = readMessageSender(sender).url
     const actualUrl = senderUrl ? readUrl(senderUrl) : null
@@ -171,13 +177,30 @@ export function assertCanSenderCallExtensionMethod(
     )
       throw new Error('Analysis requires an actual HTTPS LeetCode sender.')
     if (
-      method === 'genai.analyzeLeetCodeSubmission' &&
+      (method === 'genai.analyzeLeetCodeSubmission' ||
+        method === 'genai.getHintConnection' ||
+        method === 'genai.generateLeetCodeHints') &&
       !parseLeetCodeProblemLocation(actualUrl)
     )
       throw new Error(
         'Analysis requires an actual LeetCode problem page sender.',
       )
   }
+}
+
+export function assertHintProblemSender(
+  sender: unknown,
+  problem: { host: string; slug: string },
+) {
+  const senderUrl = readMessageSender(sender).url
+  const actualUrl = senderUrl ? readUrl(senderUrl) : null
+  const location = actualUrl ? parseLeetCodeProblemLocation(actualUrl) : null
+  if (
+    !location ||
+    location.host !== problem.host ||
+    location.slug !== problem.slug
+  )
+    throw new Error('Hint problem must match the actual sender page.')
 }
 
 function readMessageSender(sender: unknown) {

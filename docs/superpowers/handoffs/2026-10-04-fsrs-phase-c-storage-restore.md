@@ -2,7 +2,9 @@
 
 Status: implementation, independent specification/quality reviews, complete
 repository check, Chrome build and formatting passed. Human smoke/visual proof
-remains pending before PR review or merge.
+remains pending. On October 5 the owner explicitly chose to merge then smoke-test
+after confirming a backup, accepting reverting if needed; this overrides the
+normal pre-merge smoke gate for this PR without claiming that testing was done.
 
 Branch: `codex/fsrs-phase-c-storage-restore`, based on latest main `d829a705`
 after Phase B merged in PR #196. The [approved design](../specs/2026-10-03-fsrs-remediation-design.md)
@@ -327,8 +329,9 @@ marker prevents automatic remote overwrite. Keep a pre-upgrade backup and
 private recovery copies; do not reinstall an older client onto an upgraded
 snapshot or discard the original during recovery.
 
-Human happy-path and edge-case testing remains required before PR review or
-merge under `docs/agent-governance.md`. Use [FSRS Evidence And Recoverable
+Human happy-path and edge-case testing normally precedes PR review or
+merge under `docs/agent-governance.md`; the October 5 owner instruction above
+chooses post-merge testing for this PR. Use [FSRS Evidence And Recoverable
 Replacement](../../testing.md#fsrs-evidence-and-recoverable-replacement) and its
 disposable-profile failure harness. Record:
 
@@ -347,3 +350,50 @@ disposable-profile failure harness. Record:
 Automated regressions separately prove exact transaction rollback, one
 generation rotation and callback counts. The installed-extension observations
 above have not been executed or marked N/A by the agent.
+
+## October 5 PR review and merge-conflict resolution
+
+PR [#198](https://github.com/Hollowvyn/Cognipace/pull/198) was updated against
+`origin/main` at `9cafaf7b`. The two conflicts were resolved by retaining all
+FSRS and overlay handoff entries in the planning index and retaining both the
+replacement coordinator and the new hint sender authorization imports in the
+background handler. Automatically merged runtime, messaging and cache changes
+were inspected together. Shipped migrations through 0009 and the preservation
+fixture remain unchanged.
+
+The requested Ponytail complexity review found no further justified cuts:
+**Lean already. Ship.** The owner explicitly chose to merge and then run human
+smoke tests after backing up. Human testing and screenshots remain pending.
+No merge of the PR into main was performed by the agent.
+
+Exact validation commands:
+
+```sh
+rtk npm ci
+rtk proxy npm run test -- src/extension/background/register-handlers.test.ts src/extension/background/backup-replacement.test.ts src/extension/background/runtime-policy.test.ts src/platform/query/cache-invalidation.test.ts src/platform/db/fsrs-preservation.integration.test.ts
+rtk npm run check
+rtk npm run build
+rtk npm run format
+rtk proxy node node_modules/prettier/bin/prettier.cjs --ignore-path /dev/null --check docs/superpowers/README.md docs/superpowers/handoffs/2026-10-04-fsrs-phase-c-storage-restore.md
+rtk proxy node /private/tmp/fsrs-c-pr-hygiene.cjs
+rtk git diff --check
+rtk git diff --cached --check
+```
+
+The initial focused run passed 27 tests but two suites could not import the
+newly merged OpenRouter dependency. Installing main's locked dependencies
+fixed the environment without source changes. The repeated focused run passed
+203 tests across five suites. The full check passed database validation,
+WXT/TypeScript, lint and 3,231 tests across 219 suites, with nine tests in two
+opt-in live-provider suites skipped. The production Chrome build passed
+(4.86 MB); its chunk-size advisory and JSDOM scrollTo notices are non-failing.
+Formatting passed, and the PR body was checked against the unchanged hygiene
+workflow with local changed-file fixtures.
+
+Skipped validation: `rtk npm run zip` (archive behavior unchanged),
+`rtk npm run db:generate` (the existing 0010 schema/migration was unchanged),
+live-provider evaluation in `code-analysis-provider-evaluation.test.ts` and
+`code-hint-provider-evaluation.test.ts` (opt-in credentials not enabled), and
+installed-extension happy-path/edge-case smoke and visual proof (explicit owner
+decision to test after merging). A source revert alone does not downgrade an
+upgraded snapshot; recovery to an older client requires the pre-upgrade backup.

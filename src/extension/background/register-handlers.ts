@@ -73,12 +73,17 @@ import { getAnalyticsSummary } from '@/features/analytics/server/analytics-servi
 import {
   clearAiProviderSecret,
   getAiProviderSecretPresence,
+  getAiHintConnectionStatus,
   loadActiveProviderConfig,
   setAiProviderSecret,
 } from '@/features/genai/server/genai-settings-service'
 import { testAiConnection } from '@/features/genai/server/genai-connection-service'
 import { aiProviderSecretPresenceSchema } from '@/features/genai/domain'
-import { generateJson } from '@/lib/ai'
+import { generateJson, withAiDeadline } from '@/lib/ai'
+import {
+  hintConnectionRequestSchema,
+  hintConnectionStatusSchema,
+} from '@/features/genai/api/hint-connection-contracts'
 import {
   exportFullBackup,
   resetLocalData,
@@ -97,6 +102,13 @@ import {
   cancelLeetCodeAnalysisRequestSchema,
   cancelLeetCodeAnalysisResponseSchema,
 } from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
+import {
+  generateLeetCodeHintsRequestSchema,
+  generateLeetCodeHintsResponseSchema,
+  cancelLeetCodeHintsRequestSchema,
+  cancelLeetCodeHintsResponseSchema,
+} from '@/features/leetcode-review-assistant/api/code-hint-contracts'
+import { generateLeetCodeHintsInBackground } from '@/features/leetcode-review-assistant/server/hint-runtime-service'
 import { analyzeLeetCodeSubmissionInBackground } from '@/features/leetcode-review-assistant/server/analysis-runtime-service'
 import {
   practiceDetailsRequestSchema,
@@ -164,6 +176,8 @@ import { z } from 'zod'
 import {
   analysisOwner,
   cancelOwnedAnalysis,
+  cancelOwnedHints,
+  runOwnedHints,
   runOwnedAnalysis,
 } from './leetcode-analysis-operations'
 import { broadcastCacheInvalidation } from './cache-invalidation-broadcaster'
@@ -173,7 +187,10 @@ import {
 } from './dev-smoke-service'
 import { registerImportHandlers } from './import-handlers'
 import { createBackupReplacementCoordinator } from './backup-replacement'
-import { assertCanSenderCallExtensionMethod } from './runtime-policy'
+import {
+  assertCanSenderCallExtensionMethod,
+  assertHintProblemSender,
+} from './runtime-policy'
 import { getBackgroundDb as getAppDb } from './app-db'
 import { createAlarmScheduler } from './scheduler/alarm-scheduler'
 import { createSyncAutoSync } from './sync-auto-sync'
@@ -1286,6 +1303,7 @@ export function registerBackgroundHandlers() {
         reason: 'genai-updated',
         source: request.surface,
         tags: ['genai'],
+        hintProvider: request.provider,
       })
     })
       .then((presence) => aiProviderSecretPresenceSchema.parse(presence))
@@ -1306,6 +1324,7 @@ export function registerBackgroundHandlers() {
         reason: 'genai-updated',
         source: request.surface,
         tags: ['genai'],
+        hintProvider: request.provider,
       })
     })
       .then((presence) => aiProviderSecretPresenceSchema.parse(presence))
@@ -1326,6 +1345,60 @@ export function registerBackgroundHandlers() {
     return testAiConnection(request, async () => (await getAppDb()).db).then(
       (result) => testAiConnectionResponseSchema.parse(result),
     )
+  })
+
+  onMessage('genai.getHintConnection', ({ data, sender }) => {
+    const request = hintConnectionRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'genai.getHintConnection',
+      request.surface,
+      sender,
+    )
+    return withAiDeadline({ timeoutMs: 20_000 }, async (signal) => {
+      const { db } = await getAppDb()
+      signal.throwIfAborted()
+      const status = await getAiHintConnectionStatus(db)
+      signal.throwIfAborted()
+      return hintConnectionStatusSchema.parse(status)
+    }).catch(() => {
+      throw new Error('Saved AI connection could not be loaded. Please retry.')
+    })
+  })
+
+  onMessage('genai.generateLeetCodeHints', ({ data, sender }) => {
+    const request = generateLeetCodeHintsRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'genai.generateLeetCodeHints',
+      request.surface,
+      sender,
+    )
+    assertHintProblemSender(sender, request.problem)
+    return runOwnedHints(
+      analysisOwner(sender),
+      request.requestId,
+      request.connectionProvider,
+      async (signal) =>
+        generateLeetCodeHintsResponseSchema.parse(
+          await generateLeetCodeHintsInBackground(
+            request,
+            async () => (await getAppDb()).db,
+            signal,
+          ),
+        ),
+    )
+  })
+
+  onMessage('genai.cancelLeetCodeHints', ({ data, sender }) => {
+    const request = cancelLeetCodeHintsRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'genai.cancelLeetCodeHints',
+      request.surface,
+      sender,
+    )
+    return cancelLeetCodeHintsResponseSchema.parse({
+      requestId: request.requestId,
+      cancelled: cancelOwnedHints(analysisOwner(sender), request.requestId),
+    })
   })
 
   onMessage('genai.analyzeLeetCodeSubmission', ({ data, sender }) => {
@@ -1474,6 +1547,15 @@ async function runSettingsMutation(
         reason: 'settings-updated',
         source,
         tags: affectsGenAi ? ['settings', 'genai'] : ['settings'],
+        ...(affectsGenAi
+          ? {
+              hintConnectionChanged:
+                prev === undefined ||
+                prev.aiAssessment.provider !== next.aiAssessment.provider ||
+                prev.aiAssessment.model.trim() !==
+                  next.aiAssessment.model.trim(),
+            }
+          : {}),
       })
       if (prev !== undefined) {
         try {
@@ -1736,6 +1818,7 @@ function broadcastSyncInvalidation(source: 'dashboard') {
 
 function broadcastDataManagementInvalidation(source: 'dashboard') {
   return broadcastCacheInvalidation({
+    hintConnectionReset: true,
     reason: 'problem-catalog-updated',
     source,
     tags: [

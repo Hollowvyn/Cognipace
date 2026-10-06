@@ -86,10 +86,32 @@ Current behavior:
 - target-time awareness
 - quick submit preparation from the collapsed state
 - expanded submit, fail, update, restart, and rating controls
-- focused review controls without structured-log or notes editing
+- focused Solve, AI, and reserved Notes tabs in expanded mode
+- timer, assessment, submission dates, Help, review actions, feedback, and
+  next-step guidance in Solve; the full review footer appears only in Solve
+- existing completed-submission analysis in AI, with loading, error, unavailable,
+  and disabled explanations plus Settings and Retry where useful
+- a reserved Notes placeholder without editing or persistence
 - settings access from the overlay
 - compact expanded-mode Help access that opens a YouTube search for the current problem in a new tab
+- an explicit AI hints action beside YouTube in Solve's Help row, using the
+  selected saved provider, model, and key independently of whether automatic
+  AI assessment is on or off
+- one requested batch of one to three progressively stronger short pointers:
+  the first appears immediately when ready, and Reveal next exposes the next
+  pointer locally without another provider request
+- session-only hints that retain their batch, revealed count, and disclosure
+  across folding/reopening Help, tab switches, collapse/dock/restore, accepted
+  or failed review saves, rating updates, and ordinary metadata refetches;
+  none of these actions generates another batch
+- hints reset on Restart, a different problem, page reload, overlay remount,
+  selected problem-input changes, a changed or removed saved connection, or
+  clear local data; toggling automatic AI assessment alone preserves them
 - page metadata and problem context sync through content-script/runtime messages
+
+Hints exist only in the current overlay session. They never write review/log
+fields, rating, solve time, FSRS, Analytics, backup, or sync data. Notes remains
+a reserved, deferred tab without editing or persistence.
 
 Submission notes stay in LeetCode. Existing saved CogniPace log fields remain
 preserved in local practice history, backups, and sync; overlay review saves and
@@ -368,18 +390,45 @@ user-facing setting: queue ordering follows the fixed waterfall, while the
 legacy stored `review.order` value is retained only for settings schema-v1
 compatibility. Changing target retention never rewrites existing schedules.
 
-Settings exposes an AI connection for OpenAI, Anthropic, or Google Gemini.
-Choosing a provider fills an editable default model; saved custom model ids
-survive reopening Settings. Save & test connection saves the selected provider,
-model, and any newly entered key, then makes a small request to the selected
-provider. Test connection checks an unchanged saved connection. A failed test
-keeps the saved connection and explains whether authentication, model access,
-quota, networking, or provider output needs attention. Saving other preferences
-does not commit or discard unfinished AI connection edits.
+Settings exposes an AI connection for OpenAI, Anthropic, Google Gemini, or
+OpenRouter using the user's own selected-provider API key. Choosing a provider
+fills an editable suggested model; OpenRouter suggests `openrouter/free`.
+Saved custom model IDs survive reopening Settings exactly. OpenRouter's
+**Use free models** action changes only the connection draft to `openrouter/free`,
+clears old verification, and requires **Save & make active** to persist.
+**Discard connection changes** restores the saved provider and model.
+
+**Active provider** always shows the saved provider and model, even while another
+provider is selected in the editor. Multiple provider keys can be saved; AI
+assessment uses only the active provider's key. A blank saved model shows no
+active provider, and a missing active key is identified separately.
+
+**Save & make active** saves the selected provider, model, and any newly entered
+key without making a provider request. For another provider with a saved key,
+**Make active** reuses that key and activates the displayed model. Other provider
+keys remain saved. Saving is disabled for an unchanged active connection.
+
+The separate **Test connection** button checks the saved active connection with
+a small structured request, without saving or activating anything. Unsaved
+connection edits must be saved or activated first. Testing works while
+assessment is disabled and does not enable it. A failed test keeps the saved
+connection and shows controlled authentication, permission, model access,
+billing, quota, network, timeout, refusal, or output guidance. Saving other
+preferences leaves unfinished AI connection edits alone.
+
+OpenRouter's free route chooses a free model automatically; quality, latency,
+availability, and usage limits can vary. Users can explicitly enter another free
+or paid model ID. CogniPace never configures paid fallback model IDs or switches
+a failed free request to a paid model. Connection testing checks basic access
+and structured output, not full report quality or every future routed model.
+OpenRouter forwards submission code and problem context to a model provider;
+OpenRouter and provider data policies apply, including account privacy routing
+settings.
 
 AI assessment has a separate enable control for automatic completed-submission
-code analysis. Testing a connection does not enable assessment, and assessment
-can be turned off even when its key or model is missing. Reset Defaults disables assessment and clears provider/model
+code analysis. Saving, activating, or testing a connection does not enable
+assessment, and assessment can be turned off even when its key or model is
+missing. Reset Defaults disables assessment and clears provider/model
 configuration while preserving saved provider keys. Removing a key refreshes
 its availability across extension surfaces; connection results become stale
 when the configuration or saved key changes.

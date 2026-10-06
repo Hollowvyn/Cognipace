@@ -125,6 +125,7 @@ const settingsErrors: ReadonlySet<CodeAnalysisErrorCode> = new Set([
   'permission',
   'bad-request',
   'model-unavailable',
+  'billing',
   'not-configured',
   'stale-configuration',
 ])

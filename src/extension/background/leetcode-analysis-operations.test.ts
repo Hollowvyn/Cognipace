@@ -5,6 +5,9 @@ import {
   analysisOwner,
   cancelOwnedAnalysis,
   runOwnedAnalysis,
+  runOwnedHints,
+  cancelOwnedHints,
+  abortLeetCodeHints,
 } from './leetcode-analysis-operations'
 
 function deferred<T>() {
@@ -18,6 +21,90 @@ function deferred<T>() {
 }
 afterEach(() => {
   abortLeetCodeAnalyses()
+  abortLeetCodeHints()
+})
+
+describe('independent sender-owned hints', () => {
+  it('isolates hints from reports, provider cancellation, and other owners', async () => {
+    const report = deferred<void>()
+    const hint = deferred<void>()
+    let reportSignal!: AbortSignal
+    let hintSignal!: AbortSignal
+    const reportWork = runOwnedAnalysis('10:0', 'report', (signal) => {
+      reportSignal = signal
+      return report.promise
+    })
+    const hintWork = runOwnedHints('10:0', 'hint', 'gemini', (signal) => {
+      hintSignal = signal
+      return hint.promise
+    })
+    await Promise.resolve()
+    expect(hintSignal).not.toBe(reportSignal)
+    abortLeetCodeHints('anthropic')
+    expect(hintSignal.aborted).toBe(false)
+    expect(cancelOwnedHints('20:0', 'hint')).toBe(false)
+    expect(cancelOwnedHints('10:0', 'hint')).toBe(true)
+    expect(hintSignal.aborted).toBe(true)
+    expect(reportSignal.aborted).toBe(false)
+    report.resolve()
+    hint.resolve()
+    await Promise.all([reportWork, hintWork])
+  })
+
+  it('shares duplicate promises and protects replacement ownership from old cleanup', async () => {
+    const old = deferred<void>()
+    const current = deferred<void>()
+    const work = vi.fn<(signal: AbortSignal) => Promise<void>>(
+      () => old.promise,
+    )
+    const first = runOwnedHints('replacement', 'old', 'gemini', work)
+    expect(runOwnedHints('replacement', 'old', 'gemini', work)).toBe(first)
+    await Promise.resolve()
+    const second = runOwnedHints(
+      'replacement',
+      'new',
+      'anthropic',
+      () => current.promise,
+    )
+    expect(work).toHaveBeenCalledTimes(1)
+    expect(work.mock.calls[0]![0].aborted).toBe(true)
+    expect(cancelOwnedHints('replacement', 'old')).toBe(false)
+    old.resolve()
+    await first
+    expect(cancelOwnedHints('replacement', 'new')).toBe(true)
+    current.resolve()
+    await second
+    expect(cancelOwnedHints('replacement', 'new')).toBe(false)
+  })
+
+  it('aborts only matching providers, or all providers when omitted', async () => {
+    const finishes = [deferred<void>(), deferred<void>()]
+    const signals: AbortSignal[] = []
+    const pending = (['gemini', 'anthropic'] as const).map((provider, index) =>
+      runOwnedHints(`provider-${index}`, 'id', provider, (signal) => {
+        signals[index] = signal
+        return finishes[index]!.promise
+      }),
+    )
+    await Promise.resolve()
+    abortLeetCodeHints('gemini')
+    expect(signals.map((signal) => signal.aborted)).toEqual([true, false])
+    abortLeetCodeHints()
+    expect(signals.every((signal) => signal.aborted)).toBe(true)
+    finishes.forEach((finish) => finish.resolve())
+    await Promise.all(pending)
+  })
+
+  it('cleans up rejected hint work and permits retrying the same id', async () => {
+    const first = runOwnedHints('failure', 'id', 'gemini', () =>
+      Promise.reject(new Error('controlled')),
+    )
+    await expect(first).rejects.toThrow('controlled')
+    expect(cancelOwnedHints('failure', 'id')).toBe(false)
+    await expect(
+      runOwnedHints('failure', 'id', 'gemini', () => Promise.resolve('retry')),
+    ).resolves.toBe('retry')
+  })
 })
 
 describe('analysis ownership from actual Chrome sender', () => {

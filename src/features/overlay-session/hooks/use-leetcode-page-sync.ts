@@ -15,6 +15,7 @@ import {
   createLeetCodePageWatcher,
   parseLeetCodeProblemLocation,
   reduceLeetCodeCaptureState,
+  type LeetCodeCaptureState,
   type LeetCodePageEvent,
 } from '@/lib/leetcode'
 import { readErrorMessage } from '@/utils/errors'
@@ -45,6 +46,7 @@ export function useLeetCodePageSync({
   const [captureState, setCaptureState] = useState(() =>
     createEmptyLeetCodeCaptureState(initialLocation),
   )
+  const captureRef = useRef(captureState)
   const [syncedProblemSlug, setSyncedProblemSlug] = useState<string | null>(
     null,
   )
@@ -165,9 +167,8 @@ export function useLeetCodePageSync({
     return () => watcher.stop()
 
     function handlePageEvent(event: LeetCodePageEvent) {
-      setCaptureState((currentCaptureState) =>
-        reduceLeetCodeCaptureState(currentCaptureState, event),
-      )
+      captureRef.current = reduceLeetCodeCaptureState(captureRef.current, event)
+      setCaptureState(captureRef.current)
 
       switch (event.type) {
         case 'page-changed':
@@ -220,6 +221,28 @@ export function useLeetCodePageSync({
     [queryClient],
   )
 
+  const readCapture = useCallback(() => captureRef.current, [])
+  const publishHintCapture = useCallback(
+    (prepared: LeetCodeCaptureState, expectedSyncToken: number) => {
+      const current = captureRef.current
+      if (
+        syncTokenRef.current !== expectedSyncToken ||
+        !prepared.location ||
+        current.location?.host !== prepared.location.host ||
+        current.location.slug !== prepared.location.slug
+      )
+        return false
+      captureRef.current = {
+        ...current,
+        metadata: prepared.metadata,
+        problemContent: prepared.problemContent,
+      }
+      setCaptureState(captureRef.current)
+      return true
+    },
+    [],
+  )
+
   return {
     capture: captureState,
     context,
@@ -227,6 +250,8 @@ export function useLeetCodePageSync({
     latestContextRef,
     location: captureState.location,
     metadata: captureState.metadata,
+    readCapture,
+    publishHintCapture,
     refreshContext,
     submission: {
       result: captureState.submissionResult,

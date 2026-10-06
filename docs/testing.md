@@ -553,8 +553,10 @@ count as completed browser proof.
 2. Navigate to Settings.
 3. Select Gemini in the AI connection section. Confirm a default model appears,
    then enter a custom model id and your own provider key.
-4. Choose Save & test connection. Confirm it saves the provider/model/key,
-   reports success for an accessible model, and leaves AI assessment disabled.
+4. Choose Save & make active. Confirm it saves the provider/model/key, updates
+   Active provider, makes no provider request, and leaves AI assessment disabled.
+   Choose the separate Test connection button and confirm success for an
+   accessible model without settings or key writes.
 5. Leave Settings and reopen it. Confirm Gemini and the exact custom model
    remain selected, the key input is empty, and the saved-key status is present.
 6. Choose Test connection without re-entering the key. Enable AI assessment and
@@ -564,6 +566,11 @@ count as completed browser proof.
    Confirm those edits remain available and are not persisted by Save Settings.
 8. Repeat connection testing with OpenAI and Anthropic if you have their keys;
    confirm each provider uses its own saved key and editable model.
+9. With two provider keys saved, select the inactive provider. Confirm Active
+   provider still names the saved connection and Test connection is disabled.
+   Choose Make active and confirm the summary updates without replacing either
+   key or testing. Test connection separately. Reopen Settings and confirm the
+   active provider/model persist and unchanged Save & make active is disabled.
 
 Edge cases to run in the installed extension:
 
@@ -576,9 +583,10 @@ Edge cases to run in the installed extension:
 - Replace or remove the selected provider key in another Settings window during
   a test. Confirm the original window does not show a valid result for the old
   key, even when both old and new keys have a presence value of true.
-- Enter a key and press Enter. Confirm the AI action runs once and does not
-  submit unrelated preferences. While saving/testing, confirm conflicting
-  saves, provider/model edits, and Reset Defaults cannot run.
+- Enter a key and press Enter. Confirm saving/activation runs once without
+  testing or submitting unrelated preferences. Click Test connection and confirm
+  one request with no settings/key writes. While saving/testing, confirm
+  conflicting saves, provider/model edits, and Reset Defaults cannot run.
 - Remove the selected key, then turn AI assessment off. Confirm turning it off
   succeeds without credentials. Reset Defaults and confirm assessment is off,
   the model is blank, and the remaining saved provider keys are preserved.
@@ -590,10 +598,54 @@ Attach human-run happy-path and edge-case screenshots or a recording before PR
 review or merge. Automated provider-wire tests and component fixtures do not
 prove live credential access or installed service-worker behavior.
 
-Expected: provider keys stay in trusted local extension secret storage. Save &
-test uses the same reusable provider integration as assessment; settings and
-credentials persist independently of provider availability, and stale results
+Expected: provider keys stay in trusted local extension secret storage. Test
+connection uses the same reusable provider integration as assessment. Saving or
+activating makes no provider request; settings and credentials persist
+independently of provider availability, and stale results
 cannot validate a replacement key or model.
+
+#### OpenRouter connection and analysis smoke
+
+1. Select OpenRouter with AI assessment off. Confirm editable `openrouter/free`,
+   masked empty key input, free-routing/usage copy, and key/data-policy links.
+   Enter your own key, Save & make active, then Test connection, and confirm
+   assessment remains off.
+2. Enter an accessible custom text-model ID and Save & make active. Reopen
+   Settings: confirm the exact custom model, selected OpenRouter, saved-key presence,
+   empty masked input, and untested status. Test the saved connection.
+3. Click Use free models. Confirm draft `openrouter/free`, cleared verification,
+   and no automatic network request or save. Discard and confirm the saved
+   custom model returns. Choose the preset again, explicitly Save & make active,
+   then Test connection.
+4. Leave unfinished connection model/key edits while saving an unrelated
+   preference. Confirm only the preference persisted and draft edits survived.
+   During preference save, key save, and connection test, confirm the preset and
+   conflicting controls are disabled. Verify keyboard/Enter submission order.
+5. Enable assessment, refresh a supported LeetCode problem page, and complete an
+   authored submission. Confirm a full Approach/Efficiency/Code Style report;
+   record requested/served model when available and response time. Confirm report
+   arrival does not save a review. Save the manual review independently.
+6. Try invalid key and invalid model. Confirm safe actionable errors. Exercise
+   unavailable free capacity or quota when available; distinguish 402 balance/key
+   limit guidance from 429 quota guidance. Account privacy/capability restrictions
+   may make a model unavailable; do not loosen privacy settings automatically.
+   Confirm no automatic retries or app-configured paid fallback requests.
+7. Remove the OpenRouter key. Confirm unavailable analysis and that other saved
+   provider keys remain. Assessment can be disabled after removal. Reset Defaults
+   keeps saved keys, disables assessment, and restores the blank default model.
+8. Interrupt an in-flight test/analysis, navigate, change model/provider, replace
+   the key (including identical bytes), and remove the key. Confirm late replies
+   cannot restore stale connected/report state and timers clean up. Run the
+   existing fresh-identity Retry, reload, refresh-capture, cancellation, and
+   stale-worker flows from the code-analysis smoke instructions.
+9. Verify popup/dashboard/overlay configuration availability updates across
+   surfaces and direct-provider connection behavior still works. Inspect a backup
+   and runtime status for presence only, with no OpenRouter key or raw provider
+   response. Attach screenshots/recording with date, build, and observed outcomes.
+
+Human installed-extension OpenRouter happy-path and edge-case proof is pending;
+attach dated screenshots or recording before PR review or merge. Component
+fixtures and native wire tests supplement this proof.
 
 ### Dashboard Dev Smoke
 
@@ -1388,7 +1440,8 @@ this checklist has passed.
 2. Confirm the CogniPace overlay appears after page context is read.
 3. Start, pause, and reset the timer.
 4. Expand the overlay. Confirm Structured Log, Interview Pattern, Time
-   Complexity, Space Complexity, Languages, and Notes controls are absent.
+   Complexity, Space Complexity, Languages, and Notes editing controls are absent.
+   The reserved Notes tab contains only a placeholder.
 5. Focus the Help shelf’s YouTube action, confirm its tooltip, activate it, and
    confirm a new tab opens with the current problem title.
 6. From `chrome://extensions`, reload the CogniPace extension to clear its
@@ -1419,6 +1472,127 @@ For this behavior-changing overlay update, a human engineer must run the title
 happy path, slug-fallback edge path, and structured-log removal/preservation
 flows above and attach screenshot or screen-recording proof before PR review or
 merge. Automated checks do not replace that proof.
+
+#### Focused overlay tabs
+
+Status: **HUMAN INSTALLED-EXTENSION SMOKE PENDING** until the human engineer
+attaches proof. Automated and production-component fixture evidence is recorded
+in [the Phase 1 handoff](superpowers/handoffs/2026-10-04-overlay-focused-tabs.md);
+it does not complete these installed-extension checks.
+
+- [ ] Open a problem and expand into Solve. Verify submission dates, timer,
+      assessment, Help, and review controls, then save and check feedback and
+      next-step guidance.
+- [ ] Select AI and Notes. Confirm the full review footer is absent, every AI
+      state has useful text and Settings/Retry where appropriate, and Notes has
+      a placeholder with no editor or save action.
+- [ ] Open AI disclosures, scroll, switch through Solve and Notes, and return to
+      AI. Verify open disclosures, Copy feedback, and panel scroll positions
+      remain. Replace the report and confirm its disclosures start closed.
+- [ ] In the actual content-script ShadowRoot, use Left/Right, Home/End, and Tab.
+      Verify wrapping, visible focus, paired panels, one tab-list stop, and no
+      hidden Solve/AI controls in the focus sequence.
+- [ ] Change tabs during a delayed save. Confirm completion preserves the tab
+      selected at completion while expanded. Complete saves while collapsed and
+      docked and confirm they open Solve.
+- [ ] Collapse and dock from AI and Notes, then restore. Verify the selected tab
+      and report remain. Navigate to a new problem and use Restart; both select
+      Solve.
+- [ ] Exercise accepted and failed autosaves, quick and manual untimed reviews,
+      rating updates, strict overtime, AI off/unavailable/pending/error, and
+      next-step errors. Verify rating locks, elapsed time, a single attempt,
+      historical-log fields, and review guidance remain correct. Also run the
+      existing historical-log preservation and real-submission analysis checks
+      in this document.
+- [ ] At 392px and 320px widths and a short viewport, inspect long literal code.
+      Verify vertical scrolling belongs to the selected panel, Solve's footer
+      remains reachable, and horizontal overflow belongs only to the code block.
+- [ ] Attach human-run happy-path and edge-case screenshots or a screen recording
+      before PR review or merge. Record the installed extension version and
+      exact tested flows with the proof.
+
+#### Required human installed-extension manual hints smoke
+
+Status: **HUMAN INSTALLED-EXTENSION SMOKE PENDING** and **LIVE PROVIDER
+QUALITY EVALUATION PENDING**. The human engineer must run the following
+happy-path and edge-case realtime flows and attach screenshots or a recording
+before PR review or merge. [The hints handoff](superpowers/handoffs/2026-10-04-overlay-ai-hints.md)
+records automated checks and production-component fixture screenshots. Neither
+fixture screenshots nor mock/unit tests complete these human or live gates.
+
+- [ ] Save a provider/model/key connection, turn automatic AI assessment OFF,
+      and open a problem before submitting. Activate Solve's Help AI action and
+      verify the first pointer appears after the busy state. Rapid repeated
+      activation must produce one provider call. Reveal subsequent pointers
+      locally with previous pointers retained, actual counts, and a final state
+      for the actual one-to-three-pointer batch. Fold/reopen without regeneration.
+- [ ] During preparation/generation, start/pause the timer, choose a rating,
+      save an accepted and a failed review, and update the rating. Confirm
+      immediate persistence and the expected review count, rating/correctness,
+      elapsed/solve time, FSRS scheduling, and preserved existing log values,
+      comparing with the same workflow without hints. Hint arrival must leave
+      these saved values unchanged and cause no extra write. Export a backup and inspect sync payloads:
+      neither contains hint text.
+- [ ] Retain ready and partially revealed batches through Solve/AI/Notes,
+      collapse/expand, dock then restore to collapsed then explicitly expand,
+      accepted and failed saves, rating updates, and ordinary metadata refetch.
+      Toggle automatic assessment on and off; hints remain. Exercise Phase 1
+      tab scroll retention and independent AI report disclosures too.
+- [ ] Run a hint and an automatic report simultaneously. Cancel either owner
+      without cancelling the other. Restart the overlay session and confirm
+      both reset and late output stays absent.
+- [ ] Change/remove the selected saved key, provider, or model while hints are
+      pending and ready. Reject old results, clear ready hints, and use the new
+      connection only after a new explicit request. Change an unselected
+      provider's key and verify the current batch remains.
+- [ ] Exercise missing, partial, oversized, or mismatched problem capture;
+      slow capture/configuration/key reads; authentication, unavailable-model,
+      transport, and timeout failures. Verify controlled redacted messages,
+      useful Settings/Retry, and explicit Retry with a fresh request. A missing
+      connection must offer Settings without generating automatically.
+- [ ] Rapidly navigate between problems, leave LeetCode, restart, reload,
+      remount, and clear local data while pending and ready. Old or late output
+      must not appear. Repeat reset/restore with failed or hung public metadata
+      reads; stale ready hints must clear before the reread succeeds.
+- [ ] Use keyboard and pointer controls at 320px and 392px widths, both themes,
+      and a short viewport in the installed content-script ShadowRoot. Inspect
+      the compact Help row, absent idle card, readable inert wrapping pointers,
+      visible focus, busy state, Retry, Settings, and reachable Solve controls.
+- [ ] Record the installed extension version and exact flows. Attach ready
+      first-pointer, progressive, final, busy, error, retained-after-save, and
+      restart/navigation screenshots or a recording. These are human-run proof,
+      separate from production-component fixture captures.
+
+#### Manual hints provider evaluation
+
+The three authored inputs in
+`src/features/leetcode-review-assistant/testing/code-hint-evaluation-fixtures.ts`
+exercise the problem-only `generateCodeHints` service. Normal checks leave
+`COGNIPACE_AI_EVAL` unset or `0` and skip all three live cases before reading
+private provider/model/key configuration. The 2026-10-05 check was presence-only:
+opt-in was false and private configuration fields were absent. No application
+stored key was read and no live request was made.
+
+Status: **LIVE PROVIDER QUALITY EVALUATION PENDING**. With private test-only
+provider/model/key environment configuration already prepared by the human,
+use the pinned Node 24.20.0 and npm 11.19.0 toolchain and run:
+
+```sh
+rtk proxy env COGNIPACE_AI_EVAL=1 npm test -- src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts --run
+```
+
+Do not paste keys into commands, reports, logs, screenshots, or Git, and do not
+read the app's trusted key store for this evaluation. Record provider, model,
+date, latency, and each fixture's progressive strength, usefulness, short
+length, lack of duplicates, and spoiler restraint. Inspect every real batch;
+schema/mock success proves structural bounds only. Human installed-extension
+smoke and live provider quality remain separate pending gates, neither N/A.
+Successful opted-in cases write only batch, provider metadata, criterion, and
+checked date under `/private/tmp/cognipace-hint-evaluation`; verify fresh dates
+before citing artifacts. Each real service call has a 30-second deadline and a
+35-second test timeout with a single 1,024-token generation attempt.
+Keep the existing six-case automatic-analysis evaluation and generated-code
+checks below unchanged.
 
 #### LeetCode Submission Capture
 
@@ -1454,7 +1628,7 @@ JavaScript baseline inputs; that does not test generated suggestions.
 Normal checks leave `COGNIPACE_AI_EVAL` unset or set it to `0`. All six live
 cases skip before reading evaluation configuration. Only a human who intends
 a provider request should privately prepare `COGNIPACE_AI_EVAL=1`,
-`COGNIPACE_AI_EVAL_PROVIDER` (openai, anthropic, or gemini),
+`COGNIPACE_AI_EVAL_PROVIDER` (openai, anthropic, gemini, or openrouter),
 `COGNIPACE_AI_EVAL_MODEL`, and `COGNIPACE_AI_EVAL_KEY` in the process environment.
 Never paste a key into commands, reports, logs, screenshots, or Git. These
 test-only variables do not read or change the app's trusted provider keys.
@@ -1466,6 +1640,14 @@ npm 11.19.0 toolchain:
 ```sh
 rtk proxy zsh -c 'source /Users/tobiolutimehin/.nvm/nvm.sh && nvm use 24.20.0 && rtk npm run test -- src/features/leetcode-review-assistant/server/code-analysis-provider-evaluation.test.ts --maxWorkers=1'
 ```
+
+For OpenRouter, privately select `openrouter/free` or an explicit accessible text
+model. Record the requested model and optional resolved model for each current
+artifact: free routing can select different serving models across requests.
+Inspect full rubric usefulness and suggested-code validity, not only connection
+success or schema validity. Mocked wire tests are separate evidence. Capacity,
+account privacy settings, billing, or schema-support failures remain controlled
+and do not trigger app-configured paid fallback requests.
 
 Each case calls the actual `analyzeCode` service with a 30-second deadline and
 35-second test timeout, using the existing single 8,192-token SDK path. A

@@ -3,6 +3,7 @@ export {
   hasSubmittedSessionChanges,
   initialOverlaySessionState,
   overlaySessionReducer,
+  type OverlayExpandedTab,
   type OverlayFeedback,
   type OverlayNextStepState,
   type OverlayReviewStatus,

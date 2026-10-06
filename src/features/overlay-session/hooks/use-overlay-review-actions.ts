@@ -16,6 +16,7 @@ import {
   deriveOverlayAssessmentSessionContext,
   hasSubmittedSessionChanges,
   toAssessmentPracticeContext,
+  type OverlayExpandedTab,
   type OverlayFeedback,
   type OverlaySessionState,
   type OverlaySubmittedSession,
@@ -62,6 +63,7 @@ export type OverlayReviewActions = {
   ) => Promise<boolean>
   updateReview: () => Promise<void>
   restartLocalSession: () => void
+  selectExpandedTab: (tab: OverlayExpandedTab) => void
   selectRating: (rating: ReviewRating) => void
   openSettings: () => void
 }
@@ -391,6 +393,10 @@ export function useOverlayReviewActions({
     onRestart?.()
   }
 
+  function selectExpandedTab(tab: OverlayExpandedTab) {
+    dispatch({ type: 'set-expanded-tab', tab })
+  }
+
   function selectRating(rating: ReviewRating) {
     dispatch({ type: 'set-selected-rating', rating })
   }
@@ -431,6 +437,7 @@ export function useOverlayReviewActions({
     restartLocalSession,
     restore,
     saveLeetCodeSubmissionResult,
+    selectExpandedTab,
     selectRating,
     startTimer: timer.start,
     submitReview,

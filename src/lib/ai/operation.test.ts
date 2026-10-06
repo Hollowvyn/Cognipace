@@ -110,4 +110,40 @@ describe('withAiDeadline', () => {
     expect(operation).not.toHaveBeenCalled()
     expect(vi.getTimerCount()).toBe(0)
   })
+  it.each([
+    ['timeout', 'resolve'],
+    ['timeout', 'reject'],
+    ['cancelled', 'resolve'],
+    ['cancelled', 'reject'],
+  ] as const)(
+    'keeps %s settled and cleaned up when ignored-abort work later %s',
+    async (code, lateOutcome) => {
+      vi.useFakeTimers()
+      const controller = new AbortController()
+      const remove = vi.spyOn(controller.signal, 'removeEventListener')
+      let resolveWork: (value: number) => void = () => {}
+      let rejectWork: (reason: Error) => void = () => {}
+      const work = new Promise<number>((resolve, reject) => {
+        resolveWork = resolve
+        rejectWork = reject
+      })
+      const pending = withAiDeadline(
+        { timeoutMs: 40, signal: controller.signal },
+        () => work,
+      )
+      const assertion = expect(pending).rejects.toMatchObject({ code })
+      await Promise.resolve()
+      if (code === 'timeout') await vi.advanceTimersByTimeAsync(41)
+      else controller.abort(new Error('private key from caller'))
+      await assertion
+      expect(remove).toHaveBeenCalledOnce()
+      expect(vi.getTimerCount()).toBe(0)
+      if (lateOutcome === 'resolve') resolveWork(42)
+      else rejectWork(new Error('private provider diagnostic'))
+      await Promise.resolve()
+      await expect(pending).rejects.toMatchObject({ code })
+      expect(remove).toHaveBeenCalledOnce()
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
 })

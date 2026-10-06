@@ -548,11 +548,13 @@ Current integrations:
 - `src/lib/github/api`: GitHub Gist REST requests for sync.
 - `src/lib/leetcode/api`: LeetCode GraphQL and submission REST requests used by
   LeetCode capture readers.
-- `src/lib/ai`: reusable structured generation through Vercel AI SDK and its
-  official OpenAI, Anthropic, and Google adapters. The library accepts explicit
-  credentials, model, prompt, and Zod schema; it does not own Settings,
-  assessment, runtime messaging, or secret persistence. Feature services call
-  this library directly; GenAI owns configuration and trusted credential loading.
+- `src/lib/ai`: reusable structured generation through Vercel AI SDK, official
+  OpenAI/Anthropic/Google adapters, and OpenRouter's dedicated
+  `@openrouter/ai-sdk-provider`. The library accepts explicit credentials,
+  model, prompt, and Zod schema; GenAI owns configuration and trusted key
+  loading. SDK/provider imports are confined to this library. OpenRouter uses
+  the fixed `https://openrouter.ai/api/v1` endpoint, strict structured outputs,
+  and `provider.require_parameters: true`; there is no editable transport URL.
 
 BYOK secrets use `src/platform/secrets`, backed by `chrome.storage.local` with
 trusted-context access. UI surfaces may save or delete secrets through runtime
@@ -562,23 +564,39 @@ in TanStack Query cache payloads or mutation variables. Stored-token validation 
 dashboard-authorized runtime method so the UI can test the saved token without
 receiving or echoing the secret value.
 
-GenAI provider keys use `src/platform/secrets` with provider ids
-`genai:openai`, `genai:anthropic`, and `genai:google`. UI and runtime status
-payloads may expose provider key presence only. Raw keys must not be written to
-the app database, backup exports, sync envelopes, logs, or query cache. Approved
-provider host permissions are exactly:
+GenAI provider keys use `src/platform/secrets` with IDs `genai:openai`,
+`genai:anthropic`, `genai:google`, and `genai:openrouter`. UI/runtime status
+exposes exactly four key-presence booleans. Raw keys stay out of the app
+database, backups, sync envelopes, logs, query caches, mutation variables, and
+returned runtime data. Approved AI host permissions are exactly:
 
 - `https://api.openai.com/*`
 - `https://api.anthropic.com/*`
 - `https://generativelanguage.googleapis.com/*`
+- `https://openrouter.ai/*`
 
-Provider calls run from trusted background code after settings and BYOK secret
-checks. The SDK receives explicit direct-provider model objects and approved
-hosts, with retries disabled, bounded output, and telemetry disabled. The
-SDK validates structured output against the supplied Zod schema. The library
-returns controlled errors and provider/model/duration metadata; raw SDK errors
-and provider response bodies do not cross the runtime boundary. Its deadline
-covers request preparation, headers, body consumption, and output validation.
+Provider calls run in trusted background code after configuration and key
+checks. Explicit model objects use controlled fetch with redirects rejected,
+SDK retries disabled, bounded output, and telemetry disabled. Strict SDK/Zod
+and report-consistency validation remain required. OpenRouter requests specify
+only the selected model, without paid fallback IDs or privacy overrides;
+OpenRouter can perform internal routing within CogniPace's single request.
+
+Metadata keeps requested `model` as configuration identity and optionally adds
+bounded `resolvedModel` for a successful OpenRouter response that identifies a
+served model. Missing, blank, oversized, equal-to-request, or router-alias values
+are omitted. Runtime identity checks continue using requested provider/model
+and trusted key revision. Reports remain session-only; evaluation artifacts
+preserve metadata without expanding app persistence or sync.
+
+Controlled errors use actual HTTP status and allowlisted machine metadata.
+OpenRouter's HTTP-200 errors can contain embedded numeric error codes and the
+adapter may expose wrapped or flattened data. Billing (402) is distinct from
+request quotas (429). Unknown 503 stays a network failure; model-unavailable
+guidance can mention required capabilities and privacy/routing settings without
+claiming a diagnosed cause. Raw SDK messages, bodies, and metadata.raw never
+cross the runtime boundary. The complete deadline includes preparation,
+headers, body reading, and validation.
 
 Dashboard-only `genai.testConnection` accepts the saved provider and model
 identity. It loads credentials in the background, makes a fixed small
@@ -589,8 +607,15 @@ operations await retryable trusted-storage readiness without waiting for the
 database. Background runtime listeners register synchronously during startup.
 
 Settings owns a separate AI connection draft and serializes its writes with
-ordinary preference saves and Reset Defaults. AI configuration writes and
-secret changes broadcast GenAI invalidation; a volatile query-cache revision
+ordinary preference saves and Reset Defaults. Its Active provider summary reads
+saved configuration independently of the editor. Save & make active persists
+the provider/model and any entered key; Make active reuses another provider's
+saved key. Neither action calls the provider. The separate Test connection
+action calls the existing saved-configuration endpoint without writing settings
+or secrets. Unchanged saving and testing unsaved edits are disabled. Only one
+provider/model pair is active, while provider keys remain stored independently.
+AI configuration writes and secret changes broadcast GenAI invalidation; a
+volatile query-cache revision
 invalidates connection results even when key-presence booleans stay the same.
 Pending presence/availability reads are cancelled before refetch; combined
 Settings/GenAI events also cancel the initial Settings read so it cannot restore
@@ -658,6 +683,79 @@ report, provider metadata, criterion, and checked date in
 `/private/tmp/cognipace-ai-evaluation`. Its environment option does not replace
 or read the application's trusted secret store. Normal tests skip all six live
 cases before reading any evaluation provider/model/key values.
+
+### Manual progressive hints
+
+`overlay-session` owns the transient hint batch, revealed count, disclosure,
+and in-flight operation above the collapsed, expanded, and docked modes. The
+Solve Help action starts a request explicitly; folding, reopening, tab or mode
+changes, review saves/updates, and ordinary refetches do not generate hints.
+Accepted and failed saves retain the batch. Restart, navigation, reload/remount,
+selected input changes, saved connection changes/removal, and local-data clear
+invalidate it. Automatic-assessment enable-only changes preserve it. Notes
+remains reserved without editing or persistence.
+
+`leetcode-capture` prepares complete matching problem context without requiring
+a submission: canonical title, statement, `examples[].rawText`, and
+constraints, with supported host and slug. The selected JSON identity contains
+only those inputs. Editor code, submissions, diagnostics, topics, official
+hints, follow-ups, and authentication data are excluded; enrichment of excluded
+fields preserves the batch, while any selected-input change invalidates it.
+Preparation and the strict problem-only runtime contract reject incomplete,
+mismatched, or oversized input rather than repairing or truncating it. Selected
+problem JSON is limited to 24,000 characters, 50 examples, and 100 constraints.
+Selected-input identity stays local to the controller. Runtime requests contain
+`surface`, `requestId`, problem and connection revision/provider; problem
+host/slug is not duplicated. Responses correlate by `requestId`, while the
+controller verifies its current operation, local input identity and connection.
+
+`leetcode-review-assistant` owns the hint request/response schemas, prompt, and
+service. A batch contains one to three distinct, trimmed, nonblank pointers of
+at most 200 characters each. The prompt requests increasingly specific
+conceptual nudges without code or a complete answer. Structural validation does
+not establish usefulness, progressive strength, or spoiler restraint; real
+provider quality requires separate evaluation.
+
+GenAI exposes only `{ available, provider, revision }` to the content script;
+`revision` is an opaque UUID, and availability uses the selected saved provider,
+model, and key independently of automatic-assessment enablement. The private
+key-bearing connection identity remains in background memory. Selected
+provider/model/key changes rotate the revision; unselected provider keys and
+enable-only changes do not. Per-database issued/committed read ordering and a
+captured registry reset epoch prevent late configuration reads from overwriting
+a newer observation or repopulating a reset registry.
+
+Broad GenAI invalidation refetches public connection metadata; the batch
+survives when revision and selected inputs remain the same. Full local-data
+reset/restore rotates the private in-memory registry before broadcast. The
+single existing application cache listener recognizes the existing full
+replacement signature and clears cached public hint metadata after cancelling
+reads and before refetch, so a failed or hung read cannot retain ready hints.
+Ordinary Settings/provider invalidation retains cached metadata while fetching.
+Queries contain only public metadata; pointers use session memory and plain
+runtime APIs, outside query/mutation caches and persistence.
+
+`src/extension` validates strict Zod envelopes and binds generation to the
+sender's actual supported HTTPS LeetCode host and problem slug. Hints and
+automatic reports have separate tab/frame/request operation maps and owning
+cancellation; the same-host owner may cancel after SPA navigation. Reports keep
+their existing automatic cancellation rules, including assessment disable;
+hints remain independent and survive enable-only toggles. Neither operation
+can cancel the other's request.
+
+Hint preparation has a 15-second deadline. The whole background operation,
+including startup/database/configuration/key loading, generation, and the final
+connection check, is bounded at 30 seconds. The complete client operation is
+bounded at 50 seconds. A request makes at most one provider attempt with
+`maxOutputTokens: 1024`. Public connection metadata has a 20-second whole
+background deadline and a 25-second client deadline. Explicit Retry creates a
+fresh request UUID; stale-configuration/not-configured recovery refreshes
+metadata within that same client deadline. A missing connection offers Settings
+without automatic generation.
+
+Hint completion has no review, rating, correctness, solve-time, FSRS, Analytics,
+backup, or sync effects. This adds no database shape, migration, Chrome
+permission, provider host, authentication, backend, or persisted log format.
 
 ## Database And Persistence
 
@@ -994,6 +1092,15 @@ When adding or changing data dependencies:
 6. Update popup tests and any affected feature tests.
 
 ### Change Overlay Behavior
+
+Selected expanded-tab state lives in the overlay session above the visual
+modes. `ExpandedOverlay` keeps Solve, AI, and Notes panels mounted and renders
+the full review footer only in Solve. Ordinary tab switches retain native AI
+disclosures, Copy feedback, and each panel's scroll position; hidden panels and
+their controls are inaccessible. A save completed while expanded preserves the
+current tab at completion; a save completed while collapsed or docked opens
+Solve. A new problem or Restart selects Solve. AI generation stays owned by the
+session controller, and tab navigation starts no provider call or Practice write.
 
 1. Start in `src/app/overlay/overlay-app.tsx` for composition changes.
 2. Use `src/features/overlay-session` for overlay UI state, timer, page

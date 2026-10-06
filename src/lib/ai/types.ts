@@ -1,6 +1,11 @@
 import type { ZodType } from 'zod'
 
-export const aiProviderIds = ['openai', 'anthropic', 'gemini'] as const
+export const aiProviderIds = [
+  'openai',
+  'anthropic',
+  'gemini',
+  'openrouter',
+] as const
 export type AiProviderId = (typeof aiProviderIds)[number]
 
 export const aiErrorCodes = [
@@ -9,6 +14,7 @@ export const aiErrorCodes = [
   'permission',
   'bad-request',
   'model-unavailable',
+  'billing',
   'rate-limit',
   'network',
   'timeout',
@@ -39,6 +45,7 @@ export type AiGenerateJsonRequest<T> = AiProviderConfig & {
 export type AiProviderMetadata = {
   provider: AiProviderId
   model: string
+  resolvedModel?: string
   /** Whole operation duration, including preparation and validation. */
   durationMs: number
 }

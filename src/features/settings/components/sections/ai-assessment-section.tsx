@@ -19,6 +19,7 @@ const providerOptions: ReadonlyArray<{
   { label: 'OpenAI', value: 'openai' },
   { label: 'Anthropic', value: 'anthropic' },
   { label: 'Gemini', value: 'gemini' },
+  { label: 'OpenRouter', value: 'openrouter' },
 ]
 
 const inputClassName =
@@ -26,9 +27,6 @@ const inputClassName =
 const stepLabels = {
   'saving-key': 'Saving key…',
   'saving-settings': 'Saving configuration…',
-  testing: 'Testing connection…',
-  'removing-key': 'Removing key…',
-  'saving-assessment': 'Saving assessment…',
 }
 
 export function AiAssessmentSection({
@@ -39,6 +37,30 @@ export function AiAssessmentSection({
   const { provider, model, actions } = controller
   return (
     <SettingsSection id="ai-assessment-settings" title="AI connection">
+      <SettingsRow
+        controlClassName="w-full md:max-w-[34rem]"
+        hint="This provider is used when AI assessment is on."
+        id="ai-active-provider-row"
+        label="Active provider"
+      >
+        <div className="grid min-w-0 gap-1.5">
+          <p
+            aria-live="polite"
+            className="m-0 text-[length:var(--cp-copy-font-size)] [overflow-wrap:anywhere]"
+          >
+            {controller.activeConnectionPending
+              ? 'Loading active provider…'
+              : controller.activeConnection
+                ? `${aiProviderLabels[controller.activeConnection.provider]} · ${controller.activeConnection.model}`
+                : 'No active provider'}
+          </p>
+          {controller.activeKeyMissing ? (
+            <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
+              The active provider has no saved key.
+            </p>
+          ) : null}
+        </div>
+      </SettingsRow>
       <SettingsRow
         controlClassName="w-full md:max-w-[34rem]"
         id="ai-provider-row"
@@ -60,20 +82,39 @@ export function AiAssessmentSection({
         labelFor="ai-model"
       >
         <div className="grid gap-1.5">
-          <input
-            className={inputClassName}
-            id="ai-model"
-            maxLength={120}
-            onChange={(event) => actions.setModel(event.currentTarget.value)}
-            placeholder={aiProviderModelDefaults[provider]}
-            spellCheck={false}
-            type="text"
-            value={model}
-          />
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <input
+              className={`${inputClassName} flex-1 basis-48`}
+              id="ai-model"
+              maxLength={120}
+              onChange={(event) => actions.setModel(event.currentTarget.value)}
+              placeholder={aiProviderModelDefaults[provider]}
+              spellCheck={false}
+              type="text"
+              value={model}
+            />
+            {provider === 'openrouter' ? (
+              <Button
+                disabled={controller.isBusy}
+                onClick={() => actions.setModel('openrouter/free')}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Use free models
+              </Button>
+            ) : null}
+          </div>
           {model.trim() === '' ? (
             <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
-              Enter a model to save and test the connection. The suggestion is
-              not saved.
+              Enter a model to save the connection. The suggestion is not saved.
+            </p>
+          ) : null}
+          {provider === 'openrouter' ? (
+            <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
+              Free models are chosen automatically; quality and response time
+              may vary. Usage limits apply. You can enter a specific free or
+              paid model instead.
             </p>
           ) : null}
         </div>
@@ -110,6 +151,31 @@ export function AiAssessmentSection({
               Get a key in Google AI Studio
             </a>
           ) : null}
+          {provider === 'openrouter' ? (
+            <>
+              <a
+                className="w-fit text-[length:var(--cp-copy-font-size)] text-primary underline underline-offset-4"
+                href="https://openrouter.ai/settings/keys"
+                rel="noreferrer"
+                target="_blank"
+              >
+                Get an OpenRouter API key
+              </a>
+              <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
+                OpenRouter forwards your submission code and problem context to
+                a model provider. OpenRouter and provider{' '}
+                <a
+                  className="text-primary underline underline-offset-4"
+                  href="https://openrouter.ai/docs/guides/privacy/provider-logging"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  data policies
+                </a>{' '}
+                apply.
+              </p>
+            </>
+          ) : null}
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Badge>{controller.connectionStatus}</Badge>
             {controller.presenceError ? (
@@ -141,20 +207,37 @@ export function AiAssessmentSection({
       <SettingsRow
         controlClassName="w-full md:max-w-[34rem]"
         id="ai-actions-row"
-        label="Connection test"
+        label="Connection actions"
       >
         <div className="grid gap-2">
           <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
-            Sends one small request to the saved provider and model. Testing
-            works while AI assessment is off.
+            Test connection sends one small request to the active provider and
+            model. It does not save changes and works while AI assessment is
+            off.
           </p>
           <div className="flex min-w-0 flex-wrap gap-2">
+            <Button
+              disabled={!controller.canTestConnection}
+              onClick={() => {
+                void actions.testConnection()
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {controller.step === 'testing'
+                ? 'Testing connection…'
+                : 'Test connection'}
+            </Button>
             <Button disabled={!controller.canSubmit} size="sm" type="submit">
-              {controller.step
+              {controller.step === 'saving-key' ||
+              controller.step === 'saving-settings'
                 ? stepLabels[controller.step]
-                : controller.hasChanges
-                  ? 'Save & test connection'
-                  : 'Test connection'}
+                : controller.hasKey &&
+                    !controller.keyInput.trim() &&
+                    provider !== controller.activeConnection?.provider
+                  ? 'Make active'
+                  : 'Save & make active'}
             </Button>
             {controller.hasChanges ? (
               <Button
@@ -168,6 +251,11 @@ export function AiAssessmentSection({
               </Button>
             ) : null}
           </div>
+          {controller.hasChanges && !controller.canTestConnection ? (
+            <p className="m-0 text-[length:var(--cp-copy-font-size)] text-muted-foreground">
+              Save or make this connection active before testing.
+            </p>
+          ) : null}
           {controller.feedback ? (
             <InlineStatus
               aria-label="AI connection feedback"

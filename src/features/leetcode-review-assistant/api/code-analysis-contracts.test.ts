@@ -240,6 +240,71 @@ describe('code analysis contracts', () => {
       expect(responseSchema.safeParse(response).success).toBe(false)
   })
 
+  it('preserves requested and resolved OpenRouter model identities in a strict ready response', () => {
+    const response = {
+      status: 'ready',
+      ...analysisIdentity(makeAnalysisRequest()),
+      report: makeValidAnalysis(),
+      providerMetadata: {
+        provider: 'openrouter',
+        model: 'openrouter/free',
+        resolvedModel: 'test/served-model:free',
+        durationMs: 10,
+      },
+    }
+    expect(responseSchema.parse(response)).toEqual(response)
+    for (const resolvedModel of ['', ' \n\t ', 'x'.repeat(121), null, 10]) {
+      expect(
+        responseSchema.safeParse({
+          ...response,
+          providerMetadata: { ...response.providerMetadata, resolvedModel },
+        }).success,
+      ).toBe(false)
+    }
+    expect(
+      responseSchema.safeParse({
+        ...response,
+        providerMetadata: {
+          ...response.providerMetadata,
+          apiKey: 'private-key',
+        },
+      }).success,
+    ).toBe(false)
+    expect(
+      responseSchema.safeParse({
+        ...response,
+        providerMetadata: {
+          ...response.providerMetadata,
+          provider: 'unknown-provider',
+        },
+      }).success,
+    ).toBe(false)
+    const { resolvedModel, ...withoutResolution } = response.providerMetadata
+    expect(resolvedModel).toBe('test/served-model:free')
+    expect(
+      responseSchema.parse({
+        ...response,
+        providerMetadata: withoutResolution,
+      }),
+    ).toMatchObject({
+      providerMetadata: { provider: 'openrouter', model: 'openrouter/free' },
+    })
+  })
+
+  it('accepts a controlled billing failure without adding provider bodies', () => {
+    const response = {
+      status: 'error',
+      ...analysisIdentity(makeAnalysisRequest()),
+      code: 'billing',
+      message: 'Check your OpenRouter balance or key spending limit.',
+    }
+    expect(responseSchema.parse(response)).toEqual(response)
+    expect(
+      responseSchema.safeParse({ ...response, raw: 'private upstream body' })
+        .success,
+    ).toBe(false)
+  })
+
   it('validates cancellation without accepting a claimed owner', () => {
     const request = { surface: 'content-script', requestId: ' request-1 ' }
     expect(cancelRequestSchema.parse(request)).toEqual(request)
