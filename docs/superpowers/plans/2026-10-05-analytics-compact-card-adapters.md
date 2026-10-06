@@ -101,7 +101,7 @@ Practice preserves original interval union, known zero volume, unavailable ratin
 
 Run the three new suites. Expected: new adapters fail. Recall Overview uses cumulative paired model, existing goal mutation and two series. Details **Summary / Intervals / Method**, with interval/cumulative field groups, pair counts, reconstructed provenance, difference, evidence, last update and report dates. Goals is a fitting dedicated surface.
 
-Practice reuses original rating stacks/completed-review line in the measured chart body. Tighten bars to use their available interval width without changing the date spacing. Details **Ratings / Intervals / Comparison / Method**; the old 13-column table becomes exact Ratings/Counts/Outcomes/Evidence groups. Retain Good/Easy aspiration and all original counts, raw rates, comparison readiness and association-only explanation.
+Practice reuses original rating stacks/completed-review line in the measured chart body. Tighten bars to use their available interval width without changing the date spacing. Details **Ratings / Intervals / Comparison / Method**; the old table's fourteen headers (Bucket plus thirteen evidence fields) become exact Ratings/Counts/Outcomes/Evidence groups. Preserve Completed reviews, all four rating counts, Good + Easy, Review Success, its target, Valid ratings, Challenging reviews, both Practice/Ratings evidence and Period context. Retain Good/Easy aspiration, comparison readiness and association-only explanation.
 
 Memory uses original median/whisker rendering at remaining height. Details **Intervals / Evidence / Method**, preserving all original fields and full context. Do not smooth memory medians into cumulative values.
 
@@ -142,6 +142,7 @@ Run full retention/current-state focused suites and typecheck. Fresh specificati
 - Create: `src/features/analytics/components/cards/memory-signals-card.tsx` and `.test.tsx`
 - Create: `src/features/analytics/components/cards/backlog-card.tsx` and `.test.tsx`
 - Create: `src/features/analytics/components/cards/upcoming-card.tsx` and `.test.tsx`
+- Modify: `src/features/analytics/components/historical-views.tsx` only if extracting the existing Topic plot/inspection pieces; this is the current Topic owner.
 - Modify: `src/features/analytics/components/memory-practice-views.tsx`
 - Modify: `src/features/analytics/components/workload-views.tsx`
 - Modify: `src/features/analytics/domain/workload-presentation.ts` and `.test.ts` for strict watch counts.

@@ -88,6 +88,7 @@ Run the three new/focused suites, then `rtk npm run typecheck`. Expected: all pa
 **Files:**
 
 - Modify: `src/features/analytics/components/charts/historical-chart.tsx`
+- Modify: `src/features/analytics/components/charts/historical-chart-model.ts` and `.test.ts` only for an opt-in cumulative as-of cutoff.
 - Modify: `src/features/analytics/components/charts/historical-chart.test.tsx` or its existing focused model/render test owner.
 - Create: `src/features/analytics/components/charts/cumulative-trend.tsx`
 - Create: `src/features/analytics/components/charts/cumulative-trend.test.tsx`
@@ -99,6 +100,8 @@ Run the three new/focused suites, then `rtk npm run typecheck`. Expected: all pa
 Keep the original chart inspector's pointer/touch/native keyboard parity and exact raw-row tooltips. Add an explicit compact chart option that uses supplied remaining body height, removes the competing minimum/aspect ratio, and optionally moves repeated grouping text into the card footer without changing data positions. Both axes and boundary markers must remain inside usable plot space at 320px and desktop widths.
 
 The cumulative SVG renderer consumes reviewed pure geometry and existing public chart scale hooks. Test updated-only marks, long-dashed horizontal holds, short-dashed FSRS active curve, neutral unavailable leading rows, bounded natural active curves, selected-marker visibility, and Performance area fill only over supported cumulative history. Held rows inspect raw zero new evidence plus carried cumulative value and last update; they are never advertised as newly measured.
+
+The existing model ends each interval at next local midnight. Add an explicit cumulative-only presentation cutoff so the final partial interval's numeric end and midpoint respect report as-of. Thread it through both the chart and axis model calls, adapt fractional-cutoff ticks, and preserve the original date keys, `isPartial`, values and inspection rows. Derive the report-zone calendar coordinate through the existing local-day helpers, including DST; raw outcome/time/Memory/Practice/Mix positioning keeps its default behavior. Test early-day, shortened, same-day and DST edges without inventing future marks or a new event timestamp.
 
 - [ ] **Step 2: Run RED, implement the fitted renderer and goal option.**
 

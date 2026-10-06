@@ -10,7 +10,7 @@
 
 ---
 
-Status: Tasks 1 and 2 implemented and independently reviewed; Task 3 follows. The approved design is `docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md`; the final source is `assets/2026-10-05-analytics-range-summary-approved.html`. Root owns commits and independent reviews.
+Status: Tasks 1–3 implemented and independently reviewed; full presentation-phase checks and production build passed. Continue to compact UI work. The approved design is `docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md`; the final source is `assets/2026-10-05-analytics-range-summary-approved.html`. Root owns commits and independent reviews.
 
 ## Task 1: Shared Weighted And Cumulative Models
 
@@ -128,7 +128,7 @@ Run the same suites plus service tests to prove validated message production. Ex
 - Create: `src/features/analytics/domain/cumulative-trend-geometry.ts`
 - Create: `src/features/analytics/domain/cumulative-trend-geometry.test.ts`
 
-- [ ] **Step 1: Add failing geometry fixtures.**
+- [x] **Step 1: Add failing geometry fixtures.**
 
 Input points contain actual numeric `x`, `startX`, `endX`, value, and cumulative state. Return semantic active cubic segments and horizontal held segments; marker coordinates only for updated points. Verify no path/marker before first evidence, held values add no marker, long inactive spans are flat, resumed change begins at the active interval's start rather than earlier inactive time, active curves stay between neighboring values, local extrema do not overshoot, equal active values remain flat/solid with measured marks, and trailing holds extend to the supplied visible end cutoff. Both performance and recall use this same geometry.
 
@@ -142,21 +142,21 @@ interface CumulativeTrendPoint {
 }
 ```
 
-- [ ] **Step 2: Run RED and implement bounded monotone cubic segments.**
+- [x] **Step 2: Run RED and implement bounded monotone cubic segments.**
 
 Run `rtk npm run test -- src/features/analytics/domain/cumulative-trend-geometry.test.ts`. For each contiguous active run use slope-limited monotone tangents (zero at slope changes/extrema); clamp cubic control ordinates within each segment's endpoint values. On an inactive run draw horizontal held spans. When evidence resumes, use a synthetic geometry anchor at the next active interval's start carrying the preceding cumulative value; the anchor never becomes evidence, a tooltip row, or a marker. Tangent at a hold joins flat. Keep geometry separate from aggregation and chart scales.
 
 For an active segment from `(x0,y0)` to `(x1,y1)`, encode cubic controls at one-third/two-thirds of its horizontal span with slope-limited ordinates. The consumer draws one continuous path per run and a long-dashed hold path, preserving natural shared tangents between consecutive updates. Do not join unavailable leading points, diagonally bridge held intervals, or smooth a discrete zero into invented evidence.
 
-- [ ] **Step 3: Run GREEN, review, and commit.**
+- [x] **Step 3: Run GREEN, review, and commit.**
 
 Run new geometry tests and the Performance/Recall tests. Expected: all pass. Fresh specification review then quality review; root commits `feat: model continuous analytics trends with honest holds`.
 
 ## Validation And Continuation
 
-- [ ] Run focused tests before full `rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` after integration.
-- [ ] Record exact commands and skipped commands. Human installed-extension Analytics/Chart Targets happy-path and edge-case smoke remains pending until the full UI is available.
-- [ ] Continue to compact production composition and browser proof. Pure models alone do not satisfy the approved Analytics page.
+- [x] Run focused tests before full `rtk npm run lint`, `rtk npm run check`, and `rtk npm run build` after integration.
+- [x] Record exact commands and skipped commands. Human installed-extension Analytics/Chart Targets happy-path and edge-case smoke remains pending until the full UI is available.
+- [x] Continue to compact production composition and browser proof. Pure models alone do not satisfy the approved Analytics page.
 
 ## Task 1 Execution Record
 
@@ -194,3 +194,39 @@ rtk git diff --check
 ```
 
 Full `npm run lint`, `npm run check`, `npm run build` and repository-wide `npm run format` are deferred to page integration; focused touched-file formatting ran. No `npm run db:generate` is needed because persistence is unchanged. Actual-production fixtures were regenerated successfully with the new runtime matrix. Production UI proof and human installed-extension happy-path/edge-case smoke remain pending. Continue to natural cumulative geometry.
+
+## Task 3 Execution Record
+
+The shared pure geometry returns bounded active cubic runs, horizontal held segments and genuine updated-only marker coordinates. It preserves leading unavailability, explicit end cutoffs, natural shared tangents, local extrema, flat equals and interval-start resumption without changing raw chart geometry. A midnight cutoff can give a resumed interval zero width; that endpoint retains its marker and prior hold without a NaN cubic or invented transition.
+
+RED was verified against an absent module and then empty output (18 semantic failures); the added midnight regression separately exposed a NaN control before repair. Final focused GREEN passed 22 geometry tests and 42 Geometry/Performance/Recall tests. Specification and quality reviews passed. Quality independently checked 16 architecture tests and 3,000 deterministic calendar histories covering 66,388 cubic segments. Pinned typecheck, two-file ESLint/Prettier and whitespace checks passed.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/cumulative-trend-geometry.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/cumulative-trend-geometry.test.ts src/features/analytics/domain/performance-presentation.test.ts src/features/analytics/domain/cumulative-recall-presentation.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/testing/architecture-boundaries.test.ts --run
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec -- eslint src/features/analytics/domain/cumulative-trend-geometry.ts src/features/analytics/domain/cumulative-trend-geometry.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec -- prettier --write src/features/analytics/domain/cumulative-trend-geometry.ts src/features/analytics/domain/cumulative-trend-geometry.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec -- prettier --check src/features/analytics/domain/cumulative-trend-geometry.ts src/features/analytics/domain/cumulative-trend-geometry.test.ts
+rtk git diff --check
+rtk proxy git diff --no-index --check /dev/null src/features/analytics/domain/cumulative-trend-geometry.ts
+rtk proxy git diff --no-index --check /dev/null src/features/analytics/domain/cumulative-trend-geometry.test.ts
+```
+
+The `/dev/null` comparisons returned expected difference exit status 1 with no whitespace diagnostics. Full phase lint/check/build results follow below. Renderer/goal/card integration and production/browser/human proof remain pending; the pure model phase is not the finished page. The read-only preservation audit also corrected the future Topic owner, Practice's fourteen original headers, and the cumulative-only as-of coordinate option in the compact plans.
+
+## Presentation Phase Integration Checkpoint
+
+Root ran the full gates on the reviewed phase source before starting compact UI edits. `npm run lint` passed. `npm run check` passed database checks, WXT preparation/typecheck, ESLint and 3,288 tests in 221 files; nine opt-in live-provider tests in two files were skipped because provider evaluation was not enabled. The existing jsdom `Window.scrollTo` notices did not fail tests. `npm run build` passed with the existing greater-than-500kB chunk-size warning. No new dependency or persisted shape was introduced.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run lint
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run check
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run build
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec -- prettier --ignore-path /dev/null --write docs/superpowers/plans/2026-10-05-analytics-weighted-presentation.md docs/superpowers/plans/2026-10-05-analytics-compact-card-foundation.md docs/superpowers/plans/2026-10-05-analytics-compact-card-adapters.md
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm exec -- prettier --ignore-path /dev/null --check docs/superpowers/plans/2026-10-05-analytics-weighted-presentation.md docs/superpowers/plans/2026-10-05-analytics-compact-card-foundation.md docs/superpowers/plans/2026-10-05-analytics-compact-card-adapters.md
+rtk git diff --check
+```
+
+Repository-wide `npm run format` remains deferred to final page validation; all touched source and Markdown were explicitly formatted/checked. `npm run db:generate` and `npm run zip` were not run because persisted schema and artifact packaging are unchanged. Production card proof and required human installed-extension Analytics/Chart Targets happy-path, edge-case and screenshot/recording proof remain pending until UI integration. Continue directly to the compact foundation, adapters and page assembly plans.
