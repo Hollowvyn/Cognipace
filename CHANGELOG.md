@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.0](https://github.com/Hollowvyn/Cognipace/compare/v2.2.0...v2.3.0) (2026-10-09)
+
+
+### Features
+
+* **fsrs:** preserve evidence and recover backup replacements ([#198](https://github.com/Hollowvyn/Cognipace/issues/198)) ([9230a70](https://github.com/Hollowvyn/Cognipace/commit/9230a7094e4811a38f87d1573c7ea1dee648129f))
+* **overlay:** add focused tabs and progressive AI hints ([#202](https://github.com/Hollowvyn/Cognipace/issues/202)) ([9cafaf7](https://github.com/Hollowvyn/Cognipace/commit/9cafaf7bb1fcea02b16fb78bd1329100c618ae36))
+
 ## [2.2.0](https://github.com/Hollowvyn/Cognipace/compare/v2.1.0...v2.2.0) (2026-10-05)
 
 
