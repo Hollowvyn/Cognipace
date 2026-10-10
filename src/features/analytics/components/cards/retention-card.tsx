@@ -134,8 +134,6 @@ export function RetentionCard({ view, timeFrame }: RetentionCardProps) {
   const [belowTarget, setBelowTarget] = useState(false)
   const [section, setSection] = useState<DetailSection>('summary')
   const [fieldGroup, setFieldGroup] = useState<FieldGroup>('recall')
-  const [methodPage, setMethodPage] = useState(0)
-  const [summaryPage, setSummaryPage] = useState(0)
   const rows = belowTarget
     ? view.rows.filter((row) => row.retrievability < view.targetRetention)
     : view.rows
@@ -154,17 +152,27 @@ export function RetentionCard({ view, timeFrame }: RetentionCardProps) {
   const [problemPagination, setProblemPagination] = useState({
     key: reportKey,
     page: 0,
+    method: 0,
+    summary: 0,
   })
   const [candidatePagination, setCandidatePagination] = useState({
     key: '',
     page: 0,
   })
   if (problemPagination.key !== reportKey)
-    setProblemPagination({ key: reportKey, page: 0 })
+    setProblemPagination({ key: reportKey, page: 0, method: 0, summary: 0 })
   const problemPage =
     problemPagination.key === reportKey ? problemPagination.page : 0
   const setProblemPage = (page: number) =>
-    setProblemPagination({ key: reportKey, page })
+    setProblemPagination((current) => ({ ...current, key: reportKey, page }))
+  const methodPage =
+    problemPagination.key === reportKey ? problemPagination.method : 0
+  const summaryPage =
+    problemPagination.key === reportKey ? problemPagination.summary : 0
+  const setMethodPage = (method: number) =>
+    setProblemPagination((current) => ({ ...current, key: reportKey, method }))
+  const setSummaryPage = (summary: number) =>
+    setProblemPagination((current) => ({ ...current, key: reportKey, summary }))
   const controller = useRetentionMapController({
     rows,
     view,

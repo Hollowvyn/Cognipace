@@ -3,46 +3,54 @@ import type { SerializedAnalyticsSummary } from '../api/analytics-contracts'
 
 export function AnalyticsMetricRow({
   summary,
+  state = 'loading',
 }: {
-  summary: SerializedAnalyticsSummary
+  summary?: SerializedAnalyticsSummary | undefined
+  state?: 'loading' | 'error'
 }) {
-  const activity = summary.activity
+  const activity = summary?.activity
   const successKnown =
-    activity.recordedAssessments === 0 ||
-    activity.knownCorrectnessAssessments > 0
+    activity !== undefined &&
+    (activity.recordedAssessments === 0 ||
+      activity.knownCorrectnessAssessments > 0)
   const metrics = [
     {
       label: 'Review days',
       accessibleLabel: 'Review Days',
-      value: activity.assessmentDays,
+      value: activity?.assessmentDays ?? '—',
       caption: 'Days with recorded practice',
     },
     {
       label: 'Questions solved',
-      value: activity.distinctSuccessfulProblems ?? 'Unavailable',
+      value: activity
+        ? (activity.distinctSuccessfulProblems ?? 'Unavailable')
+        : '—',
       caption: 'Unique questions marked correct',
     },
     {
       label: 'Observed correctness',
-      value:
-        activity.observedCorrectness === null
+      value: !activity
+        ? '—'
+        : activity.observedCorrectness === null
           ? 'Unavailable'
           : `${Math.round(activity.observedCorrectness * 100)}%`,
-      caption: activity.knownCorrectnessAssessments
+      caption: activity?.knownCorrectnessAssessments
         ? `${activity.successfulAssessments} of ${activity.knownCorrectnessAssessments} assessed`
         : 'No recorded results yet',
     },
     {
       label: 'Recorded solve time',
-      value:
-        activity.successfulRecordedSeconds === null
+      value: !activity
+        ? '—'
+        : activity.successfulRecordedSeconds === null
           ? 'Unavailable'
           : formatSolveTime(activity.successfulRecordedSeconds),
-      caption: successKnown
-        ? `${activity.timedSuccessfulAssessments} of ${activity.successfulAssessments} successful attempts timed${activity.untimedSuccessfulAssessments ? ` · ${activity.untimedSuccessfulAssessments} untimed` : ''}`
-        : 'No recorded results yet',
+      caption:
+        activity && successKnown
+          ? `${activity.timedSuccessfulAssessments} of ${activity.successfulAssessments} successful attempts timed${activity.untimedSuccessfulAssessments ? ` · ${activity.untimedSuccessfulAssessments} untimed` : ''}`
+          : 'No recorded results yet',
       exactValue:
-        activity.successfulRecordedSeconds !== null
+        activity && activity.successfulRecordedSeconds !== null
           ? `${activity.successfulRecordedSeconds} recorded seconds`
           : undefined,
     },
@@ -62,7 +70,13 @@ export function AnalyticsMetricRow({
         >
           <h2>{metric.label}</h2>
           <strong title={metric.exactValue}>{metric.value}</strong>
-          <p>{metric.caption}</p>
+          <p>
+            {activity
+              ? metric.caption
+              : state === 'error'
+                ? 'Report unavailable'
+                : 'Awaiting report'}
+          </p>
         </Surface>
       ))}
     </div>

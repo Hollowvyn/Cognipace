@@ -59,8 +59,7 @@ export function RecallCard({
   const [section, setSection] = useState<Section>('summary')
   const [series, setSeries] = useState({ observed: true, estimate: true })
   const [metric, setMetric] = useState<'recall' | 'reviewSuccess'>('recall')
-  const [pagination, setPagination] = useState({ key: '', page: 0 })
-  const [methodPage, setMethodPage] = useState(0)
+  const [pagination, setPagination] = useState({ key: '', page: 0, method: 0 })
   const [metadataHeight, setMetadataHeight] = useState(0)
   const headerRef = useRef<HTMLButtonElement>(null)
   const metadataRef = useRef<HTMLDivElement>(null)
@@ -97,9 +96,14 @@ export function RecallCard({
     return () => observer.disconnect()
   }, [mode])
   const resetKey = `${timeFrame.asOf}:${timeFrame.requestedDays}:${timeFrame.timeZone}:${timeFrame.grouping?.unit}:${timeFrame.grouping?.step}:${section}:${view.rows.map((row) => row.id).join('|')}`
-  if (pagination.key !== resetKey) setPagination({ key: resetKey, page: 0 })
+  if (pagination.key !== resetKey)
+    setPagination({ key: resetKey, page: 0, method: 0 })
   const page = pagination.key === resetKey ? pagination.page : 0
-  const setPage = (page: number) => setPagination({ key: resetKey, page })
+  const setPage = (page: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, page }))
+  const methodPage = pagination.key === resetKey ? pagination.method : 0
+  const setMethodPage = (method: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, method }))
   const openGoal = (next: typeof metric) => {
     setMetric(next)
     setSection('goals')

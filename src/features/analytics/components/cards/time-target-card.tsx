@@ -53,8 +53,7 @@ export function TimeTargetCard({ view, timeFrame }: TimeTargetCardProps) {
   const [exactDisplay, setExactDisplay] = useState<
     'intervals' | 'compare' | 'period'
   >('intervals')
-  const [pagination, setPagination] = useState({ key: '', page: 0 })
-  const [methodPage, setMethodPage] = useState(0)
+  const [pagination, setPagination] = useState({ key: '', page: 0, method: 0 })
   const selected = view.cohorts[cohort]
   const presentation = buildTimeTargetPresentation(
     selected,
@@ -69,9 +68,14 @@ export function TimeTargetCard({ view, timeFrame }: TimeTargetCardProps) {
   )
   const resetKey = `${timeFrame?.asOf}:${timeFrame?.requestedDays}:${timeFrame?.timeZone}:${timeFrame?.grouping?.unit}:${timeFrame?.grouping?.step}:${cohort}:${timing}:${units}:${section}:${exactDisplay}:${shown.map(({ key }) => key).join(':')}`
   // The report can refresh while Overview has unmounted its exact table.
-  if (pagination.key !== resetKey) setPagination({ key: resetKey, page: 0 })
+  if (pagination.key !== resetKey)
+    setPagination({ key: resetKey, page: 0, method: 0 })
   const page = pagination.key === resetKey ? pagination.page : 0
-  const setPage = (page: number) => setPagination({ key: resetKey, page })
+  const setPage = (page: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, page }))
+  const methodPage = pagination.key === resetKey ? pagination.method : 0
+  const setMethodPage = (method: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, method }))
   const context = historicalReportContext(timeFrame)
   const plotOptions = {
     view,

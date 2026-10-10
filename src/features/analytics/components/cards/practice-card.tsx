@@ -60,8 +60,7 @@ export function PracticeCard({
   const [mode, setMode] = useState<'overview' | 'details' | 'goals'>('overview')
   const [section, setSection] = useState<Section>('ratings')
   const [showReviews, setShowReviews] = useState(true)
-  const [pagination, setPagination] = useState({ key: '', page: 0 })
-  const [methodPage, setMethodPage] = useState(0)
+  const [pagination, setPagination] = useState({ key: '', page: 0, method: 0 })
   const [legendHeight, setLegendHeight] = useState(0)
   const headerRef = useRef<HTMLButtonElement>(null)
   const legendRef = useRef<HTMLDivElement>(null)
@@ -91,9 +90,14 @@ export function PracticeCard({
     comparison.difference !== null &&
     comparison.direction !== null
   const resetKey = `${timeFrame?.asOf}:${timeFrame?.requestedDays}:${timeFrame?.timeZone}:${timeFrame?.grouping?.unit}:${timeFrame?.grouping?.step}:${section}:${rows.map((row) => row.id).join('|')}`
-  if (pagination.key !== resetKey) setPagination({ key: resetKey, page: 0 })
+  if (pagination.key !== resetKey)
+    setPagination({ key: resetKey, page: 0, method: 0 })
   const page = pagination.key === resetKey ? pagination.page : 0
-  const setPage = (page: number) => setPagination({ key: resetKey, page })
+  const setPage = (page: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, page }))
+  const methodPage = pagination.key === resetKey ? pagination.method : 0
+  const setMethodPage = (method: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, method }))
   let exactRows: ExactRow[]
   if (section === 'ratings')
     exactRows = categories.map((key) => {
@@ -296,7 +300,7 @@ export function PracticeCard({
       footer={(geometry) =>
         mode === 'overview' ? (
           <>
-            <span>Independent count and rating shares</span>
+            <span>Count · rating shares</span>
             <Button
               className="cp-analytics-card-control"
               size="sm"

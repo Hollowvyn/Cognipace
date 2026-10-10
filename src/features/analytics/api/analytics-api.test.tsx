@@ -273,6 +273,39 @@ describe('analytics runtime API', () => {
     expect(result.current.data).toEqual(payload)
   })
 
+  it('excludes the previous timezone report while the new timezone request is pending', async () => {
+    let timeZone = 'UTC'
+    const resolvedOptions = new Intl.DateTimeFormat().resolvedOptions()
+    const zone = vi
+      .spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions')
+      .mockImplementation(() => ({ ...resolvedOptions, timeZone }))
+    try {
+      const payload = createSerializedAnalyticsSummary()
+      vi.mocked(sendMessage)
+        .mockResolvedValueOnce(payload)
+        .mockReturnValueOnce(new Promise(() => {}))
+      const { wrapper } = createQueryTestHarness()
+      const { result, rerender } = renderHook(() => useAnalyticsSummary(30), {
+        wrapper,
+      })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true))
+      expect(result.current.data).toEqual(payload)
+      timeZone = 'America/New_York'
+      rerender()
+      expect(result.current.isPending).toBe(true)
+      expect(result.current.data).toBeUndefined()
+      await waitFor(() =>
+        expect(sendMessage).toHaveBeenLastCalledWith('analytics.getSummary', {
+          surface: 'dashboard',
+          range: 30,
+          timeZone,
+        }),
+      )
+    } finally {
+      zone.mockRestore()
+    }
+  })
+
   it('rejects incompatible summaries before dashboard components render them', async () => {
     const summary = createSerializedAnalyticsSummary()
 

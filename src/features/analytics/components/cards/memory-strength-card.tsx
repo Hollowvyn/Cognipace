@@ -47,15 +47,19 @@ export function MemoryStrengthCard({
 }: MemoryStrengthCardProps) {
   const [mode, setMode] = useState<'overview' | 'details'>('overview')
   const [section, setSection] = useState<Section>('intervals')
-  const [pagination, setPagination] = useState({ key: '', page: 0 })
-  const [methodPage, setMethodPage] = useState(0)
+  const [pagination, setPagination] = useState({ key: '', page: 0, method: 0 })
   const rows = memoryStrengthRows(view.rows)
   const supported = rows.filter((row) => finite(row.medianStrengthDays))
   const latest = supported.at(-1)
   const resetKey = `${timeFrame?.asOf}:${timeFrame?.requestedDays}:${timeFrame?.timeZone}:${timeFrame?.grouping?.unit}:${timeFrame?.grouping?.step}:${section}:${rows.map((row) => row.id).join('|')}`
-  if (pagination.key !== resetKey) setPagination({ key: resetKey, page: 0 })
+  if (pagination.key !== resetKey)
+    setPagination({ key: resetKey, page: 0, method: 0 })
   const page = pagination.key === resetKey ? pagination.page : 0
-  const setPage = (page: number) => setPagination({ key: resetKey, page })
+  const setPage = (page: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, page }))
+  const methodPage = pagination.key === resetKey ? pagination.method : 0
+  const setMethodPage = (method: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, method }))
   const exactRows: ExactRow[] =
     section === 'evidence'
       ? Object.entries(readiness ?? { status: 'Readiness unavailable' }).map(

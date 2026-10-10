@@ -85,7 +85,7 @@ Full `npm run lint`, `npm run check`, `npm run build`, and `npm run format` are 
 - Modify: `src/features/analytics/api/analytics-api.ts` and `.test.tsx` only if query compatibility needs adjustment.
 - Modify: compact shell/readiness/target editor and adjacent tests only for state regressions.
 
-- [ ] **Step 1: Add failing initial/range/refresh state tests.**
+- [x] **Step 1: Add failing initial/range/refresh state tests.**
 
 Initial loading renders all four summary and ten chart shells with the same geometry. Initial error shows clear failed state and Retry inside reserved space. Empty activity is distinct from unavailable model evidence and known zero. Range changes clear incompatible results; same-key refresh may retain its compatible snapshot with Updating. Same-key failed refresh retains original as-of and values, shows refresh failure and Retry, and never presents stale values under new period dates. Keep routine readiness/coverage neutral in reserved metadata and full reasons in Details; no orange page-moving banners. Distinct Practice/rating evidence remains reachable/visible as appropriate.
 
@@ -105,13 +105,28 @@ const state = usableData
 
 Timezone compatibility comes from the existing query key/validated report metadata; do not carry an old range/timezone response through placeholder data. Existing target save cancellation/cache tests remain required. Test a failed draft surviving Overview/Details, field validation and Retry, pending duplicate-save guard, and counterpart changes.
 
-- [ ] **Step 2: Run RED and implement reserved state slots.**
+- [x] **Step 2: Run RED and implement reserved state slots.**
 
 Run screen/API/target suites. Expected: old early-return/full-page warning behavior fails the new tests. Keep scope/status geometry reserved and neutral, with one polite live announcement per load/range/refresh transition. Do not duplicate every card's loading text in competing live regions. Persistent field errors retain their draft and error association. If adding a floating save confirmation, it is supplementary and never the sole failure feedback.
 
-- [ ] **Step 3: Run GREEN, review, and commit.**
+- [x] **Step 3: Run GREEN, review, and commit.**
 
 Run focused screen/API/target tests and typecheck. Fresh specification then quality review. Root commits `fix: keep analytics geometry stable across data states`.
+
+### Task 2 execution record
+
+Implemented neutral reserved report metadata/status, four summary and ten chart shells in initial loading/error/range transitions, compatible mounted cards during Updating/failed refresh, retained exact snapshot/as-of, Retry and one global polite report status. Existing query-key timezone/range and Settings/editor race behavior are preserved. Six card owners reset hidden Method/Retention Summary pages on semantic report changes without remounting equivalent reports. Shortened the Practice footer copy. Fresh SPEC and final end-to-end QUALITY reviews passed.
+
+Focused final affected tests passed48/48 (Screen31/API10/semantic resets7), with unchanged target/metric/shared-shell31 already passing; route readiness wait repair passed62/62. No exhaustive layout/accessibility matrix was added after the user's scope update. Direct TypeScript, touched ESLint/Prettier and diff checks passed. Exact affected commands:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/api/analytics-api.test.tsx src/features/analytics/components/cards/analytics-card-report-state.test.tsx
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/app/dashboard/routes.test.tsx
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx tsc --noEmit -p tsconfig.json
+rtk git diff --check
+```
+
+Actual1360CSS desktop production-component proof: all four148px headlines and ten464px cards preserve summaryY214.297/gridY378.293 with no region overflow through initial pending/error/Retry, range transition, Updating, failed refresh/recovery, and empty Light. Failed refresh retains identical totals and full scope/as-of. Root final full gates are separately recorded in the handoff; human installed-extension smoke remains pending.
 
 ## Task 3: Production Browser Proof, Authority Docs, And Final Gates
 

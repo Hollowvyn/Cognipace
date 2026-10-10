@@ -123,8 +123,7 @@ export function PerformanceCard({
   const [cohort, setCohort] = useState<ProblemCohort>('newProblems')
   const [section, setSection] = useState<Section>('ratings')
   const [beforeGoals, setBeforeGoals] = useState<Section>('ratings')
-  const [pagination, setPagination] = useState({ key: '', page: 0 })
-  const [methodPage, setMethodPage] = useState(0)
+  const [pagination, setPagination] = useState({ key: '', page: 0, method: 0 })
   const [evidenceScope, setEvidenceScope] = useState<
     keyof NonNullable<PerformanceCardProps['historicalReadiness']> | 'activity'
   >('requested')
@@ -174,9 +173,14 @@ export function PerformanceCard({
   const goal = problemGoal(view, cohort, measure)
   const resetKey = `${timeFrame?.asOf}:${timeFrame?.requestedDays}:${timeFrame?.timeZone}:${timeFrame?.grouping?.unit}:${timeFrame?.grouping?.step}:${cohort}:${section}:${evidenceScope}:${outcomeMode}:${measure}:${mixMeasure}:${shown.map(({ key }) => key).join(':')}`
   // The report can refresh while Overview has unmounted its exact table.
-  if (pagination.key !== resetKey) setPagination({ key: resetKey, page: 0 })
+  if (pagination.key !== resetKey)
+    setPagination({ key: resetKey, page: 0, method: 0 })
   const page = pagination.key === resetKey ? pagination.page : 0
-  const setPage = (page: number) => setPagination({ key: resetKey, page })
+  const setPage = (page: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, page }))
+  const methodPage = pagination.key === resetKey ? pagination.method : 0
+  const setMethodPage = (method: number) =>
+    setPagination((current) => ({ ...current, key: resetKey, method }))
   const lastUpdate = presentation.rows.at(-1)?.lastUpdatedInterval
   const chooseSection = (next: Section) => {
     if (next === 'goals' && section !== 'goals') setBeforeGoals(section)

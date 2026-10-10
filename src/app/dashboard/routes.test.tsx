@@ -282,6 +282,11 @@ describe('dashboard routes', () => {
       '/analytics?range=90&context=retention-health',
     )
 
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Performance Details' }),
+      ).toBeEnabled(),
+    )
     const performance = within(
       await screen.findByRole('region', { name: 'Performance' }),
     )

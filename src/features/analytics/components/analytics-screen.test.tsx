@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -18,6 +18,7 @@ import { buildAnalyticsTimeFrame } from '../domain/analytics-time'
 
 import { buildAnalyticsHistoryTimeFrame } from '../domain/analytics-history-frame'
 
+import { analyticsQueryKeys } from '../api/analytics-api'
 import { AnalyticsScreen } from './analytics-screen'
 
 vi.mock('@/extension/messaging', () => ({
@@ -128,7 +129,7 @@ describe('AnalyticsScreen', () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce(readyAnalyticsSummary())
     renderAnalyticsScreen()
-    await screen.findByRole('region', { name: 'Performance' })
+    await findLoadedRegion({ name: 'Performance' })
     const titles = [
       'Performance',
       'Time vs target',
@@ -203,7 +204,7 @@ describe('AnalyticsScreen', () => {
           analytics: { ...defaultUserSettings.analytics, [field]: value },
         })
       const harness = renderAnalyticsScreen()
-      const region = await screen.findByRole('region', { name: panel })
+      const region = await findLoadedRegion({ name: panel })
       const card = within(region)
       if (panel === 'Performance') {
         await user.click(
@@ -277,7 +278,10 @@ describe('AnalyticsScreen', () => {
   it('renders loading state while analytics data is pending', () => {
     vi.mocked(sendMessage).mockReturnValueOnce(new Promise(() => {}))
     renderAnalyticsScreen()
-    expect(screen.getByText('Loading analytics...')).toBeVisible()
+    expect(
+      screen.getByRole('status', { name: 'Analytics report status' }),
+    ).toHaveTextContent('Loading analytics...')
+    expectFixedShells()
   })
 
   it('renders error state then succeeds after retry', async () => {
@@ -288,12 +292,107 @@ describe('AnalyticsScreen', () => {
       .mockResolvedValueOnce(createAnalyticsSummary())
     renderAnalyticsScreen()
     deferred.reject(new Error('network error'))
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Failed to load Analytics.',
-    )
+    expect(
+      await screen.findByText('Failed to load Analytics.'),
+    ).toHaveTextContent('Failed to load Analytics.')
+    expectFixedShells()
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(2))
-    expect(await screen.findByLabelText('Review Days metric')).toBeVisible()
+    await screen.findByText('Report ready.')
+    expect(screen.getByLabelText('Review Days metric')).toBeVisible()
+  })
+
+  it('clears the old report while a different range is pending', async () => {
+    const next = createDeferred<SerializedAnalyticsSummary>()
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(readyAnalyticsSummary())
+      .mockReturnValueOnce(next.promise)
+    const harness = renderAnalyticsScreen()
+    await screen.findByText('Report ready.')
+    expect(screen.getByLabelText('Review Days metric')).toHaveTextContent('12')
+    harness.rerender(<AnalyticsScreen range={90} />)
+    expectFixedShells()
+    expect(
+      screen.getByRole('status', { name: 'Analytics report status' }),
+    ).toHaveTextContent('Loading analytics...')
+    expect(screen.getByLabelText('Review Days metric')).not.toHaveTextContent(
+      '12',
+    )
+    expect(screen.getByText(/Range: 90 days/)).not.toHaveTextContent(
+      'Jan 15, 2026',
+    )
+    const timeFrame = buildAnalyticsTimeFrame({
+      requestedDays: 90,
+      asOf: new Date('2026-02-01T12:00:00Z'),
+      timeZone: 'UTC',
+    })
+    await act(async () => {
+      next.resolve(readyAnalyticsSummary({ range: 90, timeFrame }))
+      await next.promise
+    })
+    await screen.findByText('Report ready.')
+    expect(screen.getByText(/Range: 90 days/)).toHaveTextContent(
+      'As of: Feb 1, 2026',
+    )
+  })
+
+  it('retains the compatible values, as-of and mounted failed Goals draft through refresh failure and Retry', async () => {
+    const user = userEvent.setup()
+    const refresh = createDeferred<SerializedAnalyticsSummary>()
+    const retry = createDeferred<SerializedAnalyticsSummary>()
+    const snapshot = readyAnalyticsSummary()
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(snapshot)
+      .mockRejectedValueOnce(new Error('Storage unavailable'))
+      .mockReturnValueOnce(refresh.promise)
+      .mockReturnValueOnce(retry.promise)
+    const harness = renderAnalyticsScreen()
+    await screen.findByText('Report ready.')
+    const card = within(screen.getByRole('region', { name: 'Recall' }))
+    await user.click(card.getByRole('button', { name: 'Target Recall 90%' }))
+    const field = card.getByLabelText('Target Recall (%)')
+    await user.clear(field)
+    await user.type(field, '80{Enter}')
+    await card.findByText('Storage unavailable')
+    expect(field).toHaveAttribute('aria-invalid', 'true')
+    expect(field.getAttribute('aria-describedby')).toContain(
+      card.getByRole('alert').id,
+    )
+    await user.click(card.getByRole('button', { name: 'Recall Overview' }))
+    await act(async () => {
+      void harness.queryClient.invalidateQueries({
+        queryKey: analyticsQueryKeys.all,
+      })
+      await Promise.resolve()
+    })
+    await screen.findByText('Updating analytics...')
+    const metadata = screen.getByText(/Range: 30 days/).textContent ?? ''
+    expect(screen.getByLabelText('Review Days metric')).toHaveTextContent('12')
+    await act(async () => {
+      refresh.reject(new Error('Refresh unavailable'))
+      await refresh.promise.catch(() => {})
+    })
+    await screen.findByText('Refresh failed. Showing the last report.')
+    expectFixedShells()
+    expect(screen.getByText(/Range: 30 days/)).toHaveTextContent(metadata)
+    expect(
+      harness.queryClient.getQueriesData<SerializedAnalyticsSummary>({
+        queryKey: analyticsQueryKeys.all,
+      })[0]?.[1]?.generatedAt,
+    ).toBe(snapshot.generatedAt)
+    await user.click(card.getByRole('button', { name: 'Recall Details' }))
+    expect(card.getByLabelText('Target Recall (%)')).toHaveValue(80)
+    expect(card.getByRole('alert')).toHaveTextContent('Storage unavailable')
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await screen.findByText('Updating analytics...')
+    expect(card.getByLabelText('Target Recall (%)')).toHaveValue(80)
+    await act(async () => {
+      retry.resolve(snapshot)
+      await retry.promise
+    })
+    await screen.findByText('Report ready.')
+    expect(card.getByLabelText('Target Recall (%)')).toHaveValue(80)
+    expect(screen.getByText(/Range: 30 days/)).toHaveTextContent(metadata)
   })
 
   it('renders the recoverable error state for an incompatible summary', async () => {
@@ -306,16 +405,17 @@ describe('AnalyticsScreen', () => {
       },
     } as never)
     renderAnalyticsScreen()
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Failed to load Analytics.',
-    )
+    expect(
+      await screen.findByText('Failed to load Analytics.'),
+    ).toHaveTextContent('Failed to load Analytics.')
     expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible()
   })
 
   it('keeps the selected persisted activity above the chart story', async () => {
     vi.mocked(sendMessage).mockResolvedValueOnce(createAnalyticsSummary())
     renderAnalyticsScreen()
-    const reviewDays = await screen.findByLabelText('Review Days metric')
+    await screen.findByText('Report ready.')
+    const reviewDays = screen.getByLabelText('Review Days metric')
     expect(within(reviewDays).getByText('12')).toBeVisible()
     expect(
       within(reviewDays).getByText('Days with recorded practice'),
@@ -351,6 +451,7 @@ describe('AnalyticsScreen', () => {
       }),
     )
     renderAnalyticsScreen()
+    await screen.findByText('Report ready.')
     const metadata = await screen.findByText(
       (_, node) =>
         node?.tagName === 'P' &&
@@ -389,7 +490,7 @@ describe('AnalyticsScreen', () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockResolvedValueOnce(readyAnalyticsSummary())
     renderAnalyticsScreen()
-    const region = await screen.findByRole('region', { name: 'Performance' })
+    const region = await findLoadedRegion({ name: 'Performance' })
     const card = within(region)
     expect(
       card.getByRole('button', { name: 'Performance Details' }),
@@ -443,9 +544,7 @@ describe('AnalyticsScreen', () => {
         : unready
       vi.mocked(sendMessage).mockResolvedValueOnce(summary)
       renderAnalyticsScreen()
-      const card = within(
-        await screen.findByRole('region', { name: 'Practice' }),
-      )
+      const card = within(await findLoadedRegion({ name: 'Practice' }))
       await user.click(card.getByRole('button', { name: 'Practice Details' }))
       await user.selectOptions(
         card.getByLabelText('Practice detail section'),
@@ -488,9 +587,7 @@ describe('AnalyticsScreen', () => {
     ]
     vi.mocked(sendMessage).mockResolvedValueOnce(summary)
     renderAnalyticsScreen()
-    const topics = within(
-      await screen.findByRole('region', { name: 'Topic performance' }),
-    )
+    const topics = within(await findLoadedRegion({ name: 'Topic performance' }))
     expect(topics.getByText('Graphs')).toBeVisible()
     expect(topics.getByText('1 qualifying topics')).toBeVisible()
     const performance = await openEvidence(user, 'topics')
@@ -510,7 +607,8 @@ describe('AnalyticsScreen', () => {
       }),
     )
     renderAnalyticsScreen()
-    const metric = await screen.findByLabelText('Observed correctness metric')
+    await screen.findByText('Report ready.')
+    const metric = screen.getByLabelText('Observed correctness metric')
     expect(within(metric).getByText('75%')).toBeVisible()
     expect(
       screen.queryByText(/Observed correctness needs more data/),
@@ -523,7 +621,7 @@ describe('AnalyticsScreen', () => {
     summary.historicalReadiness.recommendedRange = 30
     vi.mocked(sendMessage).mockResolvedValueOnce(summary)
     renderAnalyticsScreen()
-    expect(await screen.findByRole('region', { name: 'Recall' })).toBeVisible()
+    expect(await findLoadedRegion({ name: 'Recall' })).toBeVisible()
     expect(
       screen.queryByLabelText('30-day analytics readiness'),
     ).not.toBeInTheDocument()
@@ -644,7 +742,7 @@ describe('AnalyticsScreen', () => {
     const summary = createSerializedAnalyticsSummary()
     vi.mocked(sendMessage).mockResolvedValueOnce(summary)
     renderAnalyticsScreen()
-    const recall = within(await screen.findByRole('region', { name: 'Recall' }))
+    const recall = within(await findLoadedRegion({ name: 'Recall' }))
     expect(
       recall.getByText(
         'No repeat reviews have a valid rating and reconstructed FSRS estimate. Initial reviews build memory for later comparisons.',
@@ -776,9 +874,7 @@ async function openEvidence(
   user: ReturnType<typeof userEvent.setup>,
   scope = 'requested',
 ) {
-  const card = within(
-    await screen.findByRole('region', { name: 'Performance' }),
-  )
+  const card = within(await findLoadedRegion({ name: 'Performance' }))
   await user.click(card.getByRole('button', { name: 'Performance Details' }))
   await user.selectOptions(
     card.getByLabelText('Performance detail section'),
@@ -818,8 +914,10 @@ async function collectRows(
 
 function renderAnalyticsScreen(range?: 30 | 90 | 'all') {
   const harness = createQueryTestHarness()
-  render(<AnalyticsScreen range={range} />, { wrapper: harness.wrapper })
-  return harness
+  const rendered = render(<AnalyticsScreen range={range} />, {
+    wrapper: harness.wrapper,
+  })
+  return { ...harness, ...rendered }
 }
 
 function createDeferred<T>() {
@@ -829,5 +927,40 @@ function createDeferred<T>() {
     resolve = res
     reject = rej
   })
+  void promise.catch(() => {})
   return { promise, reject, resolve }
+}
+
+async function findLoadedRegion(options: { name: string }) {
+  await screen.findByText('Report ready.')
+  return screen.getByRole('region', options)
+}
+
+function expectFixedShells() {
+  expect(document.querySelectorAll('.cp-analytics-summary-card')).toHaveLength(
+    4,
+  )
+  const cards = Array.from(document.querySelectorAll('.cp-analytics-card'))
+  expect(
+    cards.map(
+      (card) =>
+        within(card as HTMLElement).getByRole('heading', { level: 2 })
+          .textContent,
+    ),
+  ).toEqual([
+    'Performance',
+    'Time vs target',
+    'Practice',
+    'Topic performance',
+    'Recall',
+    'Memory strength',
+    'Retention map',
+    'Memory signals',
+    'Overdue backlog',
+    'Upcoming reviews',
+  ])
+  expect(document.querySelectorAll('[data-cp-tone="warning"]')).toHaveLength(0)
+  expect(
+    screen.getAllByRole('status', { name: 'Analytics report status' }),
+  ).toHaveLength(1)
 }
