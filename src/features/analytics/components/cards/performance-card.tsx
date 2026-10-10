@@ -1,5 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
+import { Link } from '@tanstack/react-router'
+import type { SerializedAnalyticsSummary } from '../../api/analytics-contracts'
+import { getAnalyticsReadinessMessages } from '../analytics-readiness-state'
 import type { AnalyticsTargets } from '@/features/settings/domain'
 import {
   buildPerformancePresentation,
@@ -59,6 +62,7 @@ type Section =
   | 'pooled'
   | 'difficultyOutcomes'
   | 'goals'
+  | 'evidence'
   | 'method'
 type DetailRow = {
   id: string
@@ -102,12 +106,18 @@ export interface PerformanceCardProps {
   onSaveTarget?:
     | ((patch: Partial<AnalyticsTargets>) => Promise<unknown>)
     | undefined
+  historicalReadiness?:
+    | SerializedAnalyticsSummary['historicalReadiness']
+    | undefined
+  activity?: SerializedAnalyticsSummary['activity'] | undefined
 }
 
 export function PerformanceCard({
   view,
   timeFrame,
   onSaveTarget,
+  historicalReadiness,
+  activity,
 }: PerformanceCardProps) {
   const [mode, setMode] = useState<'overview' | 'details' | 'goals'>('overview')
   const [cohort, setCohort] = useState<ProblemCohort>('newProblems')
@@ -115,6 +125,9 @@ export function PerformanceCard({
   const [beforeGoals, setBeforeGoals] = useState<Section>('ratings')
   const [pagination, setPagination] = useState({ key: '', page: 0 })
   const [methodPage, setMethodPage] = useState(0)
+  const [evidenceScope, setEvidenceScope] = useState<
+    keyof NonNullable<PerformanceCardProps['historicalReadiness']> | 'activity'
+  >('requested')
   const [pooledDisplay, setPooledDisplay] = useState<'trend' | 'values'>(
     'trend',
   )
@@ -159,7 +172,7 @@ export function PerformanceCard({
     (row) => row.validRatings > 0,
   )
   const goal = problemGoal(view, cohort, measure)
-  const resetKey = `${timeFrame?.asOf}:${timeFrame?.requestedDays}:${timeFrame?.timeZone}:${timeFrame?.grouping?.unit}:${timeFrame?.grouping?.step}:${cohort}:${section}:${outcomeMode}:${measure}:${mixMeasure}:${shown.map(({ key }) => key).join(':')}`
+  const resetKey = `${timeFrame?.asOf}:${timeFrame?.requestedDays}:${timeFrame?.timeZone}:${timeFrame?.grouping?.unit}:${timeFrame?.grouping?.step}:${cohort}:${section}:${evidenceScope}:${outcomeMode}:${measure}:${mixMeasure}:${shown.map(({ key }) => key).join(':')}`
   // The report can refresh while Overview has unmounted its exact table.
   if (pagination.key !== resetKey) setPagination({ key: resetKey, page: 0 })
   const page = pagination.key === resetKey ? pagination.page : 0
@@ -186,7 +199,64 @@ export function PerformanceCard({
   let labels: string[] = []
   let tableLabel = ''
   let rowHeading = ''
-  if (section === 'ratings') {
+  if (section === 'evidence') {
+    tableLabel = 'Performance Evidence exact values'
+    rowHeading = 'Evidence'
+    labels = ['Value']
+    const evidence =
+      evidenceScope === 'activity'
+        ? activity
+        : historicalReadiness?.[evidenceScope]
+    const entries: Array<[string, ReactNode]> = []
+    if (evidenceScope === 'activity') {
+      entries.push(
+        [
+          'Population',
+          'All retained selected-period assessments, independent of Performance population.',
+        ],
+        [
+          'Exact recorded successful seconds',
+          activity?.successfulRecordedSeconds ?? 'Unavailable',
+        ],
+      )
+    } else if (
+      evidenceScope === 'requested' &&
+      historicalReadiness?.recommendedRange
+    ) {
+      const recommendation = historicalReadiness.recommendedRange
+      entries.push([
+        'Ready shorter view',
+        <Link
+          search={(previous) => ({ ...previous, range: recommendation })}
+          to="/analytics"
+        >
+          Use ready {recommendation}-day view
+        </Link>,
+      ])
+    }
+    if (evidence && typeof evidence === 'object') {
+      if ('failingReasons' in evidence)
+        getAnalyticsReadinessMessages(evidence).forEach((message, index) =>
+          entries.push([`Guidance ${index + 1}`, message]),
+        )
+      entries.push(
+        ...Object.entries(evidence).map(([key, value]): [string, ReactNode] => [
+          key,
+          typeof value === 'object' ? JSON.stringify(value) : String(value),
+        ]),
+      )
+    } else entries.push(['Status', 'Evidence unavailable'])
+    entries.push(
+      ['Report context', context],
+      ['Report as of', timeFrame?.asOf ?? 'Unavailable'],
+      ['Timezone', timeFrame?.timeZone ?? 'Unavailable'],
+    )
+    exactRows = entries.map(([label, value]) => ({
+      id: label,
+      label,
+      values: { Value: value },
+    }))
+  } else if (section === 'ratings') {
     tableLabel = 'Performance Ratings exact values'
     rowHeading = 'Rating'
     labels = ['Description', 'Count', 'Fixed points', 'Weighted contribution']
@@ -575,7 +645,7 @@ export function PerformanceCard({
             )
           }
         >
-          {mode === 'overview' ? 'Details' : 'Overview'}
+          {mode === 'overview' ? 'Breakdown' : 'Overview'}
         </Button>
       }
       hero={
@@ -590,11 +660,14 @@ export function PerformanceCard({
       }
       footer={(geometry) =>
         mode === 'overview' ? (
-          <span>
-            {lastUpdate
-              ? `Last update ${formatHistoricalBucket(lastUpdate, timeFrame)}`
-              : 'No valid ratings yet'}
-          </span>
+          <>
+            <span className="cp-performance-hold-key">No new ratings</span>
+            <span>
+              {lastUpdate
+                ? `Last update ${formatHistoricalBucket(lastUpdate, timeFrame)}`
+                : 'No valid ratings yet'}
+            </span>
+          </>
         ) : section === 'method' ? (
           <AnalyticsCardPager
             label="Performance method pages"
@@ -733,9 +806,30 @@ export function PerformanceCard({
                     Difficulty outcomes
                   </option>
                   <option value="goals">Goals</option>
+                  <option value="evidence">Evidence</option>
                   <option value="method">Method</option>
                 </optgroup>
               </select>
+              {section === 'evidence' ? (
+                <select
+                  className="cp-analytics-adapter-select"
+                  aria-label="Performance evidence scope"
+                  value={evidenceScope}
+                  onChange={(event) =>
+                    setEvidenceScope(event.target.value as typeof evidenceScope)
+                  }
+                >
+                  <option value="requested">Selected range</option>
+                  <option value="firstAttemptOutcomes">First attempts</option>
+                  <option value="recallQuality">Recall</option>
+                  <option value="practiceRhythm">Practice</option>
+                  <option value="ratingsMix">Ratings</option>
+                  <option value="topics">Topics</option>
+                  <option value="stability">Memory strength</option>
+                  <option value="overdueBacklog">Backlog</option>
+                  <option value="activity">Selected activity</option>
+                </select>
+              ) : null}
               {section === 'pooled' ? (
                 <div className="cp-performance-pooled-controls">
                   <select

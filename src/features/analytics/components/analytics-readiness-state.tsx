@@ -30,6 +30,23 @@ export interface AnalyticsReadinessStateProps {
   title?: string
 }
 
+export function getAnalyticsReadinessMessages(
+  readiness: AnalyticsReadiness,
+): string[] {
+  const messages = readiness.failingReasons.map((reason) =>
+    readinessMessages[reason](readiness),
+  )
+  if (
+    readiness.effectiveStart !== null &&
+    readiness.effectiveBuckets < readiness.requestedBuckets
+  ) {
+    messages.push(
+      `Showing ${readiness.effectiveBuckets} ${bucketNoun(readiness)} of usable history from your selected ${readiness.requestedDays === null ? 'All time range' : `${readiness.requestedDays}-day range`}.`,
+    )
+  }
+  return messages
+}
+
 export function AnalyticsReadinessState({
   readiness,
   recommendedRange,

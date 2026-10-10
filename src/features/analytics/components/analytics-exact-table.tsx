@@ -64,7 +64,7 @@ export function AnalyticsExactTable<Row>({
     if (nextPage !== page) onPageChange(nextPage)
   }, [dataKey, width, size, resetKey, currentPage, page, onPageChange])
 
-  // Narrow cards expose one value beside the complete row label. Split supplied
+  // Narrow cards expose one value with the complete row label. Split supplied
   // groups, and include ungrouped fields, so fitting never removes evidence.
   const columnCount = width >= 480 ? 3 : width >= 360 ? 2 : 1
   const sourceGroups = groups
@@ -155,26 +155,34 @@ export function AnalyticsExactTable<Row>({
       <table
         aria-label={label}
         className="cp-analytics-exact-table"
+        data-layout={width < 300 ? 'stacked' : 'columns'}
         data-value-columns={selectedGroup?.fields.length ?? 0}
+        role="table"
       >
-        <thead>
-          <tr>
-            <th scope="col">{rowLabelHeading}</th>
+        <thead role="rowgroup">
+          <tr role="row">
+            <th role="columnheader" scope="col">
+              {rowLabelHeading}
+            </th>
             {selectedGroup?.fields.map((field) => (
-              <th key={field.key} scope="col">
+              <th key={field.key} role="columnheader" scope="col">
                 {field.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {rows
             .slice(currentPage * size, (currentPage + 1) * size)
             .map((row) => (
-              <tr key={rowKey(row)}>
-                <th scope="row">{rowLabel(row)}</th>
+              <tr key={rowKey(row)} role="row">
+                <th role="rowheader" scope="row">
+                  {rowLabel(row)}
+                </th>
                 {selectedGroup?.fields.map((field) => (
-                  <td key={field.key}>{field.value(row) ?? '—'}</td>
+                  <td key={field.key} role="cell">
+                    {field.value(row) ?? '—'}
+                  </td>
                 ))}
               </tr>
             ))}

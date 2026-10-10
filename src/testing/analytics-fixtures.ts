@@ -5,6 +5,10 @@ import {
 } from '@/features/analytics/domain/historical-presentation'
 import { buildAnalyticsBucketsFromTimeFrame } from '@/features/analytics/domain/analytics-range-policy'
 import { buildAnalyticsBacklogTimeFrame } from '@/features/analytics/domain/analytics-history-window'
+import {
+  getAnalyticsDateKey,
+  addAnalyticsCalendarDays,
+} from '@/features/analytics/domain/analytics-time'
 import { normalizeFsrsSchedulingOptions } from '@/lib/fsrs'
 import type { PerformanceCountMatrix } from '@/features/analytics/domain/performance-presentation'
 
@@ -126,13 +130,13 @@ export function createSerializedAnalyticsSummary(
       untimedSuccessfulAssessments: 0,
       successfulRecordedSeconds: 0,
     },
-    reviewDays: 30,
-    totalReviews: 150,
-    currentStreak: 7,
-    observedRatingQuality: { value: 0.85, sampleSize: 50, lowSample: false },
+    reviewDays: 0,
+    totalReviews: 0,
+    currentStreak: 0,
+    observedRatingQuality: { value: null, sampleSize: 0, lowSample: true },
     predictedRecall: { value: null, sampleSize: 0, lowSample: true },
-    observedRatingSampleSize: 50,
-    lowSample: false,
+    observedRatingSampleSize: 0,
+    lowSample: true,
     targetRetention: 0.9,
     views: {
       problemSolving: buildHistoricalAnalyticsViews([], {
@@ -206,7 +210,10 @@ export function createSerializedAnalyticsSummary(
       },
       upcomingReviewLoad: {
         rows: Array.from({ length: 14 }, (_, index) => ({
-          date: `1970-01-${String(index + 1).padStart(2, '0')}`,
+          date: addAnalyticsCalendarDays(
+            getAnalyticsDateKey(new Date(timeFrame.asOf), timeFrame.timeZone),
+            index,
+          ),
           dueCount: 0,
           overdueCount: 0,
           today: index === 0,

@@ -1,6 +1,6 @@
 # Analytics Page Assembly And Proof Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Put the complete approved Analytics page into the real dashboard, verify all states and responsive modes, and document honest production and human validation.
 
@@ -26,7 +26,7 @@ Status: written for execution after the card adapter plan. Root owns final integ
 - Create: `src/assets/fonts/analytics/nunito-sans-latin.woff2`, `literata-latin.woff2`, and their original OFL license files.
 - Modify: `src/testing/analytics-fixtures.ts` for honest established/young/empty complete summary fixtures.
 
-- [ ] **Step 1: Add failing selected-summary and composition tests.**
+- [x] **Step 1: Add failing selected-summary and composition tests.**
 
 Assert four summary values from validated `activity` only: Review days, Questions solved, Observed correctness, Recorded solve time. Persisted true with rating Again still counts correct; false with rating Easy does not; null is excluded. Repeated successes affect time/count coverage but unique question only once. Wholly unknown correctness shows unavailable solved/time, empty/known zero success shows zero, partial/missing timing preserves its exact coverage. Format seconds as compact hours/minutes without changing stored seconds; finite ranges never show all-time totals.
 
@@ -49,7 +49,7 @@ expect(cardTitles).toEqual([
 
 For every card test Details/Overview reachability and no extra full-width Problem Solving card. Keep target callbacks on the existing Settings patch path. Scope labels distinguish historical period, current snapshots, Last30days backlog and Next14days upcoming. Verify explicit available young history and All time literal label.
 
-- [ ] **Step 2: Run RED and compose the approved page.**
+- [x] **Step 2: Run RED and compose the approved page.**
 
 Run `rtk npm run test -- src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/components/analytics-metric-row.test.tsx src/app/dashboard/routes.test.tsx`; omit a nonexistent separate metric file only if these assertions live in screen tests and record the actual command. Expected: old three-metric/nine-panel layout fails new expectations.
 
@@ -59,9 +59,23 @@ Use one page-width ten-card grid with two columns whenever usable container widt
 
 The repository currently has system-font tokens and no bundled Nunito Sans or Literata files. Bundle the official Google Fonts Latin variable WOFF2 assets and original licenses for the already approved typography, scoped to Analytics rather than changing unrelated surfaces. The two font files total 70,208 bytes; load them locally without runtime font-service requests or a new dependency. Keep documented system fallbacks for glyphs outside the bundled subset, and verify final geometry after fonts load.
 
-- [ ] **Step 3: Run GREEN, review, and commit.**
+- [x] **Step 3: Run GREEN, review, and commit.**
 
 Run screen/metric/route and all new card component suites plus typecheck. Fresh specification then quality review. Root commits `feat: assemble the refined analytics dashboard`.
+
+### Task 1 execution record
+
+Implemented four activity-only 148px headlines, ten ordered 464px desktop cards, per-metric scope ownership, local Analytics typography, and retained complete evidence/actions. Fresh SPEC and QUALITY accepted the source. Focused validation passed 21 files / 465 tests, TypeScript, touched ESLint/Prettier and diff checks. Actual production-component desktop proof confirmed all ten card regions fit with fonts loaded; established 30/90/All, young/old paired history, and zero/unknown/timing cases retain truthful values. Existing narrow-screen proof is retained; further exhaustive layout/accessibility validation was stopped at the user's request. A minor Practice footer copy wrap at the two-column boundary is nonblocking for the requested full-size desktop focus.
+
+Exact focused test/type/diff commands:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/analytics-screen.test.tsx src/features/analytics/components/analytics-metric-row.test.tsx src/app/dashboard/routes.test.tsx src/features/analytics/components/cards src/features/analytics/components/analytics-readiness-state.test.tsx src/features/analytics/components/analytics-exact-table.test.tsx src/features/analytics/components/analytics-chart-panel.test.tsx src/features/analytics/components/analytics-card-controls.test.tsx src/features/analytics/domain/summary.test.ts src/features/analytics/api/analytics-contracts.test.ts src/features/analytics/api/analytics-api.test.tsx src/testing/architecture-boundaries.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json
+rtk git diff --check
+```
+
+Full `npm run lint`, `npm run check`, `npm run build`, and `npm run format` are deferred to Task 3; focused checks do not replace them. `npm run zip` and `npm run db:generate` are not selected because no packaging/schema change was requested. Human installed-extension smoke and screenshot/recording proof remain pending before PR review/merge. Task 2 query states and hidden detail-page resets remain unfinished.
 
 ## Task 2: Stable Query And Action States
 
@@ -100,6 +114,8 @@ Run screen/API/target suites. Expected: old early-return/full-page warning behav
 Run focused screen/API/target tests and typecheck. Fresh specification then quality review. Root commits `fix: keep analytics geometry stable across data states`.
 
 ## Task 3: Production Browser Proof, Authority Docs, And Final Gates
+
+**Execution scope update:** The user subsequently prioritized the full-size desktop experience and requested no further exhaustive layout/accessibility tests. Preserve existing responsive/accessibility behavior and completed evidence; remaining proof focuses on desktop query/action states, data correctness, and required automated gates. Do not expand the narrow-screen matrix below.
 
 **Files:**
 

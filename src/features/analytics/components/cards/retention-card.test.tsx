@@ -158,6 +158,28 @@ function clickPoint(control: HTMLElement, slug: string, detail = 0) {
 }
 
 describe('compact Retention card', () => {
+  it('fits the plot to wrapped reference text inside a 222px dashboard body', () => {
+    const resize = resizeFixture()
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: HTMLElement) {
+        return {
+          width: 222,
+          height: this.classList.contains('cp-retention-card-references')
+            ? 36
+            : this.classList.contains('cp-retention-card-preview')
+              ? 56
+              : 0,
+        } as DOMRect
+      },
+    )
+    render(<RetentionCard view={fixture(31)} timeFrame={timeFrame} />)
+    resize(222, 240)
+    expect(
+      screen.getByRole('region', { name: 'Retention Map chart' }),
+    ).toHaveStyle({ height: '90px' })
+    expect(screen.getAllByText(/31 eligible/)[0]).toBeVisible()
+  })
+
   it.each([31, 150])(
     'plots every one of %i rows and preserves full counts and coordinates after filtering',
     (count) => {

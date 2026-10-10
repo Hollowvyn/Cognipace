@@ -182,7 +182,7 @@ export function MemoryStrengthCard({
           </strong>
           <span>
             {latest
-              ? `${latest.eligibleReviews} eligible reviews · latest supported median`
+              ? `${latest.eligibleReviews} reviews · latest median`
               : 'No eligible stability evidence'}
           </span>
         </div>

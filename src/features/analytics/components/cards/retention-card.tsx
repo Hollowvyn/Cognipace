@@ -124,6 +124,12 @@ function ProblemLink({ row }: { row: RetentionRow }) {
 
 export function RetentionCard({ view, timeFrame }: RetentionCardProps) {
   const headerActionRef = useRef<HTMLButtonElement>(null)
+  const referencesRef = useRef<HTMLParagraphElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
+  const [overviewCopy, setOverviewCopy] = useState({
+    references: 18,
+    preview: 56,
+  })
   const [mode, setMode] = useState<'overview' | 'details'>('overview')
   const [belowTarget, setBelowTarget] = useState(false)
   const [section, setSection] = useState<DetailSection>('summary')
@@ -179,6 +185,26 @@ export function RetentionCard({ view, timeFrame }: RetentionCardProps) {
     summaryId,
   } = controller
   const cardMode = selection && selectionOpen ? 'selection' : mode
+  useEffect(() => {
+    if (cardMode !== 'overview') return
+    const measure = () => {
+      const references =
+        referencesRef.current?.getBoundingClientRect().height ?? 0
+      const preview = previewRef.current?.getBoundingClientRect().height ?? 0
+      if (references <= 0 || preview <= 0) return
+      setOverviewCopy((current) =>
+        current.references === references && current.preview === preview
+          ? current
+          : { references, preview },
+      )
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    if (referencesRef.current) observer.observe(referencesRef.current)
+    if (previewRef.current) observer.observe(previewRef.current)
+    return () => observer.disconnect()
+  }, [cardMode])
   const candidateKey = `${reportKey}:${candidates.map((row) => row.slug).join('|')}`
   if (candidatePagination.key !== candidateKey)
     setCandidatePagination({ key: candidateKey, page: 0 })
@@ -477,7 +503,10 @@ export function RetentionCard({ view, timeFrame }: RetentionCardProps) {
               />
               {cardMode === 'overview' ? (
                 <>
-                  <p className="cp-retention-card-references">
+                  <p
+                    className="cp-retention-card-references"
+                    ref={referencesRef}
+                  >
                     FSRS target {formatPercent(view.targetRetention)} · 7d
                     durability reference
                   </p>
@@ -495,7 +524,13 @@ export function RetentionCard({ view, timeFrame }: RetentionCardProps) {
                       controller={controller}
                       rows={rows}
                       view={view}
-                      height={Math.max(60, geometry.bodyHeight - 132)}
+                      height={Math.max(
+                        60,
+                        geometry.bodyHeight -
+                          overviewCopy.references -
+                          overviewCopy.preview -
+                          58,
+                      )}
                     />
                   ) : (
                     <p>
@@ -505,6 +540,7 @@ export function RetentionCard({ view, timeFrame }: RetentionCardProps) {
                   )}
                   <div
                     className="cp-retention-card-preview"
+                    ref={previewRef}
                     aria-live="polite"
                     role="status"
                   >

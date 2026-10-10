@@ -180,11 +180,7 @@ describe('dashboard routes', () => {
     ['/', 'Overview', 'What should I practice now'],
     ['/tracks', 'Tracks', 'Core interview practice'],
     ['/library', 'Library', 'Total'],
-    [
-      '/analytics',
-      'How your memory is changing',
-      'A focused view of recall, practice patterns, weak spots, and workload',
-    ],
+    ['/analytics', 'Analytics', 'Your progress, memory, and next reviews'],
     ['/settings', 'Settings', 'Daily goal'],
   ])('renders the %s route', async (path, heading, expectedCopy) => {
     renderDashboard(path)
@@ -244,6 +240,7 @@ describe('dashboard routes', () => {
   })
 
   it('preserves analytics search context when a readiness recommendation changes the range', async () => {
+    const user = userEvent.setup()
     const readiness = {
       ...analyticsSummary.historicalReadiness.requested,
       requestedDays: 90,
@@ -285,6 +282,16 @@ describe('dashboard routes', () => {
       '/analytics?range=90&context=retention-health',
     )
 
+    const performance = within(
+      await screen.findByRole('region', { name: 'Performance' }),
+    )
+    await user.click(
+      performance.getByRole('button', { name: 'Performance Details' }),
+    )
+    await user.selectOptions(
+      performance.getByLabelText('Performance detail section'),
+      'evidence',
+    )
     const recommendation = await screen.findByRole('link', {
       name: 'Use ready 30-day view',
     })
@@ -309,7 +316,7 @@ describe('dashboard routes', () => {
       renderDashboard(`/analytics?range=${range}`)
 
       await screen.findByRole('heading', {
-        name: 'How your memory is changing',
+        name: 'Analytics',
       })
       await waitFor(() =>
         expect(sendMessage).toHaveBeenCalledWith('analytics.getSummary', {
@@ -330,7 +337,7 @@ describe('dashboard routes', () => {
     renderDashboard(path)
 
     await screen.findByRole('heading', {
-      name: 'How your memory is changing',
+      name: 'Analytics',
     })
     await waitFor(() =>
       expect(sendMessage).toHaveBeenCalledWith('analytics.getSummary', {

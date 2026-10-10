@@ -65,6 +65,69 @@ const props = {
 }
 
 describe('AnalyticsExactTable', () => {
+  it('stacks a complete long topic label and keeps final fields reachable at 222px', async () => {
+    const user = userEvent.setup()
+    const title =
+      'A deliberately long topic name covering advanced graph traversal and state compression techniques'
+    const topicFields: AnalyticsExactField<Row>[] = [
+      { key: 'samples', label: 'Valid ratings', value: (row) => row.samples },
+      { key: 'correct', label: 'Good + Easy', value: (row) => row.correct },
+      { key: 'target', label: 'Raw target Review Success', value: () => '90%' },
+    ]
+    const topicGroups = [
+      {
+        key: 'ratings',
+        label: 'Ratings',
+        fieldKeys: topicFields.map((field) => field.key),
+      },
+    ]
+    const { container, rerender } = render(
+      <AnalyticsExactTable
+        {...props}
+        width={222}
+        rows={[{ ...rows[0]!, title }]}
+        page={0}
+        pageSize={1}
+        groups={topicGroups}
+        fields={topicFields}
+        onPageChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('table')).toHaveAttribute('data-layout', 'stacked')
+    const next = screen.getByRole('button', {
+      name: 'Next Recall exact values fields',
+    })
+    for (const [index, field] of topicFields.entries()) {
+      expect(screen.getByRole('rowheader', { name: title })).toBeVisible()
+      expect(
+        screen.getByRole('columnheader', { name: field.label }),
+      ).toBeVisible()
+      expect(screen.getAllByRole('columnheader')).toHaveLength(2)
+      if (index < topicFields.length - 1) {
+        next.focus()
+        await user.keyboard('{Enter}')
+      }
+    }
+    expect(screen.getByRole('cell', { name: '90%' })).toBeVisible()
+    expect(next).toBeDisabled()
+    expect(container.innerHTML).not.toMatch(
+      /overflow|truncate|line-clamp|ellipsis/,
+    )
+    rerender(
+      <AnalyticsExactTable
+        {...props}
+        width={400}
+        rows={[{ ...rows[0]!, title }]}
+        page={0}
+        pageSize={1}
+        groups={topicGroups}
+        fields={topicFields}
+        onPageChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('table')).toHaveAttribute('data-layout', 'columns')
+  })
+
   it('preserves complete row labels, measured zero and unavailable values', () => {
     const { container } = render(
       <AnalyticsExactTable

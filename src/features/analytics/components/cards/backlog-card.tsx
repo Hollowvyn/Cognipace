@@ -150,8 +150,7 @@ export function BacklogCard({ view }: BacklogCardProps) {
             {view.currentBacklog === null ? 'Unavailable' : view.currentBacklog}
           </strong>
           <span>
-            Current overdue problems · {view.knownDays}/{view.selectedDays}{' '}
-            known days
+            Current overdue · {view.knownDays}/{view.selectedDays} known days
           </span>
         </div>
       }

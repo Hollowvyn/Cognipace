@@ -129,6 +129,13 @@ describe('PerformanceCard', () => {
     )
     expect(screen.getByTestId('performance-score')).toHaveTextContent('68/100')
     expect(screen.getByText('100 valid ratings')).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Performance Details' }),
+    ).toHaveTextContent('Breakdown')
+    expect(screen.getByText('No new ratings')).toBeVisible()
+    expect(screen.getByText(/Last update/)).toHaveTextContent(
+      'Last update 08/03',
+    )
     expect(screen.getAllByTestId(/performance-trend-marker-/)).toHaveLength(1)
     expect(
       screen.queryByTestId('combined-successRate-markers'),
