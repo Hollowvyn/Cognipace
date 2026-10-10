@@ -71,7 +71,7 @@ type DetailRow = {
 }
 type Field = { key: string; label: string }
 const ratingDescriptions = {
-  again: 'Could not complete',
+  again: 'Needs more practice',
   hard: 'Completed with difficulty',
   good: 'Completed confidently',
   easy: 'Completed easily',

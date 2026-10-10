@@ -201,21 +201,24 @@ function expectEveryLocalDateCovered(
   plan: ReturnType<typeof buildAnalyticsHistoryBucketPlan>,
   timeZone = 'UTC',
 ) {
-  const intervals = plan.buckets.map((bucket) => ({
-    start: Date.parse(bucket.start),
-    end: Date.parse(bucket.end),
-  }))
-  const lastKey = plan.buckets.at(-1)!.endKey
-  for (
-    let dateKey = plan.buckets[0]!.startKey;
-    dateKey <= lastKey;
-    dateKey = addAnalyticsCalendarDays(dateKey, 1)
-  ) {
-    const midnight = Date.parse(getAnalyticsLocalDayStart(dateKey, timeZone))
-    expect(
-      intervals.filter(({ start, end }) => midnight >= start && midnight < end),
-      dateKey,
-    ).toHaveLength(1)
+  // Matching local boundaries and adjacent intervals prove complete, exclusive
+  // coverage without formatting every date in decades of retained history.
+  for (const [index, bucket] of plan.buckets.entries()) {
+    expect(bucket.startKey <= bucket.endKey).toBe(true)
+    expect(bucket.start).toBe(
+      getAnalyticsLocalDayStart(bucket.startKey, timeZone),
+    )
+    expect(bucket.end).toBe(
+      getAnalyticsLocalDayStart(
+        addAnalyticsCalendarDays(bucket.endKey, 1),
+        timeZone,
+      ),
+    )
+    const previous = plan.buckets[index - 1]
+    if (previous) {
+      expect(bucket.startKey).toBe(addAnalyticsCalendarDays(previous.endKey, 1))
+      expect(bucket.start).toBe(previous.end)
+    }
   }
 }
 

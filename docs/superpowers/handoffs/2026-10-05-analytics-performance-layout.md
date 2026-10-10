@@ -1,6 +1,6 @@
 # Analytics Performance And Layout Handoff
 
-Status: locally implemented, independently reviewed, and validated. No PR, merge, or deployment was requested. Human installed-extension smoke/proof remains pending before PR review or merge.
+Status: implemented, independently reviewed, and published in draft PR #206. Human installed-extension smoke/proof remains pending before PR review or merge.
 
 ## Delivered behavior
 
@@ -54,6 +54,37 @@ were retained. The combined branch passed the same pinned `npm run format`,
 3,662 tests passed /9 opt-in cases skipped**. This supersedes the earlier
 pre-integration total for the current PR head; earlier phase results remain
 historical validation. No additional Analytics layout/a11y matrix was added.
+
+## Review follow-up — 2026-10-10
+
+Ponytail review found one incorrect rating description. Again now says “Needs
+more practice,” covering both unsuccessful attempts and completed solutions
+outside the Strict Timing allowance. The scoring rubric and recorded evidence
+are unchanged.
+
+GitHub's first combined-branch Check failed because two nearly sixty-year
+calendar fixtures exceeded the five-second per-test timeout. Their test helper
+now checks every bucket's local start/end and adjacency, proving complete,
+exclusive calendar coverage without walking every day. The timeout was not
+increased and no case or assertion about grouping/limits was removed.
+
+Fresh validation passed: 43 Performance/assessment tests; all 50 calendar tests
+(204ms assertion time); the final full check (239 files passed, 2 skipped;
+3,662 tests passed, 9 existing opt-in tests skipped); formatting and the 5.14MB
+Chrome MV3 build. Exact additional commands:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/performance-card.test.tsx src/features/assessment/domain/assessment.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/domain/analytics-history-window.test.ts
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --ignore-path /dev/null --check docs/superpowers/handoffs/2026-10-05-analytics-performance-layout.md
+```
+
+The pinned `npm run format`, `npm run check`, `npm run build` and
+`rtk git diff --check` commands above were rerun. Standalone `npm run lint`,
+`npm run db:check` and `npm run typecheck` remain covered by `check`;
+`npm run db:generate` and `npm run zip` remain skipped for the existing reasons.
+No additional layout/a11y matrix was run. Human installed-extension smoke/proof
+remains pending, with the same checklist below.
 
 ## Required human installed-extension smoke
 
