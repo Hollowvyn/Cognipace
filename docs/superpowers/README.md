@@ -188,4 +188,4 @@ Use these files to understand why work was shaped a certain way. Before changing
 
 - [`audits/2026-06-07-closed-issues-1-6-11-17.md`](./audits/2026-06-07-closed-issues-1-6-11-17.md): closed-issue rescue audit for issues 1, 6, 11, and 17.
 
-- [`handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md`](./handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md): Phase D captured context, frozen commands, atomic receipts/track effects, guarded corrections and durable snapshot proof; final independent review/full validation and human installed-extension proof are tracked separately.
+- [`handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md`](./handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md): Phase D captured context, frozen commands, atomic receipts/track effects, guarded corrections and durable snapshot proof; final independent SPEC/QUALITY and 3,290 tests passed in draft PR #205. Human installed-extension proof remains pending.

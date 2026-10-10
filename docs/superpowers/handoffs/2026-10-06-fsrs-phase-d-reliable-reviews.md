@@ -2,8 +2,8 @@
 
 Status: implementation and independent final SPEC then QUALITY/Ponytail review
 passed, including the final-review repairs. Root full validation passed with
-3,290 tests and nine live-provider skips. Commit/push and draft PR creation are
-the remaining branch handoff steps. Human installed-extension happy-path,
+3,290 tests and nine live-provider skips. [Draft PR #205](https://github.com/Hollowvyn/Cognipace/pull/205)
+is created and attached to the task. Human installed-extension happy-path,
 edge-case smoke and screenshot/recording proof remain pending; C's explicitly
 approved post-merge exception is historical and does not authorize D's proof.
 
