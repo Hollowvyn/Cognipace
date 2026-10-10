@@ -40,6 +40,25 @@ describe('FSRS scheduling options', () => {
     })
   })
 
+  it.each([0.75, 0.9])(
+    'retains every explicit daily scheduler option at %s retention',
+    (targetRetention) => {
+      const options = {
+        targetRetention,
+        maximumInterval: 180,
+        enableShortTerm: false,
+        learningSteps: [],
+        relearningSteps: [],
+        enableFuzz: false,
+      } as const
+
+      expect(normalizeFsrsSchedulingOptions(options)).toEqual(options)
+      expect(createFsrsSchedulerProfile(options).parameters).toMatchObject(
+        options,
+      )
+    },
+  )
+
   it.each([0, 1.1, Number.NaN])(
     'rejects invalid target retention value %s',
     (targetRetention) => {
