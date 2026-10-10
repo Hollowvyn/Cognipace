@@ -135,6 +135,7 @@ export interface PracticeReviewAttemptSnapshot {
 export interface PracticeSummary {
   phase: PracticePhase
   nextReviewAt: Date | null
+  eligibleOn: string | null
   lastReviewedAt: Date | null
   reviewCount: number
   lapses: number
@@ -194,6 +195,7 @@ export interface NormalizedPracticeState {
   isOverdue: boolean
   overdueDays: number
   dueAt: Date | null
+  eligibleOn: string | null
   lastReviewedAt: Date | null
 
   // FSRS metrics (computed from card)
@@ -235,6 +237,7 @@ export function deriveNormalizedPracticeState(input: {
     isOverdue: summary.isOverdue,
     overdueDays: summary.overdueDays,
     dueAt: summary.nextReviewAt,
+    eligibleOn: summary.eligibleOn,
     lastReviewedAt: summary.lastReviewedAt,
     retrievability: summary.retrievability,
     stability: summary.stability,
@@ -289,6 +292,7 @@ export function derivePracticeSummary(input: {
       : null
   const timing = derivePracticeScheduleTiming({
     dueAt: input.card?.dueAt ?? null,
+    lastReviewedAt,
     isStarted,
     isSuspended: suspended,
     now,
@@ -299,6 +303,7 @@ export function derivePracticeSummary(input: {
       ? 'suspended'
       : phaseFromPracticeAndCard(input.practice, input.card),
     nextReviewAt: input.card?.dueAt ?? null,
+    eligibleOn: timing.eligibleOn,
     lastReviewedAt,
     reviewCount,
     lapses: input.card?.lapses ?? 0,

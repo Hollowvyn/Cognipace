@@ -30,6 +30,7 @@ export const practiceLogPatchSchema = practiceLogSnapshotSchema.partial()
 const practiceSummarySchema = z.object({
   phase: z.enum(practicePhases),
   nextReviewAt: z.iso.datetime().nullable(),
+  eligibleOn: z.iso.date().nullable(),
   lastReviewedAt: z.iso.datetime().nullable(),
   reviewCount: z.number().int().min(0),
   lapses: z.number().int().min(0),
@@ -94,6 +95,7 @@ export const normalizedPracticeStateSchema = z.object({
   isOverdue: z.boolean(),
   overdueDays: z.number().int().min(0),
   dueAt: z.iso.datetime().nullable(),
+  eligibleOn: z.iso.date().nullable(),
   lastReviewedAt: z.iso.datetime().nullable(),
   retrievability: z.number().nullable(),
   stability: z.number().nullable(),
