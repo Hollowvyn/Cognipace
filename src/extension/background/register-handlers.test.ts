@@ -42,6 +42,7 @@ import {
 } from '@/features/backup/api/backup-contracts'
 import { analyticsSummarySchema } from '@/features/analytics/api/analytics-contracts'
 import { defaultUserSettings } from '@/features/settings/domain'
+import { practiceReviewCommandResultSchema } from '@/features/practice/api/practice-contracts'
 import type { ActiveTrack } from '@/features/tracks/domain'
 import { createSerializedPracticeDetails } from '@/testing/practice-fixtures'
 import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
@@ -128,6 +129,7 @@ const backgroundMocks = vi.hoisted(() => {
     deleteTrack: vi.fn(),
     bulkUpdateProblems: vi.fn(),
     getPracticeDetails: vi.fn(),
+    executePracticeReviewCommand: vi.fn(),
     getTrackForEdit: vi.fn(),
     getWorkspace: vi.fn(),
     recordActiveTrackProblemCompletion: vi.fn(),
@@ -277,6 +279,8 @@ vi.mock(
     return {
       ...actual,
       getPracticeDetails: backgroundMocks.getPracticeDetails,
+      executePracticeReviewCommand:
+        backgroundMocks.executePracticeReviewCommand,
       overrideLastReviewResultWithTrackProgress:
         backgroundMocks.overrideLastReviewResultWithTrackProgress,
       overrideLastReviewResult: backgroundMocks.overrideLastReviewResult,
@@ -490,6 +494,9 @@ describe('background handler registration', () => {
     backgroundMocks.createTrack.mockResolvedValue(trackForEditResponse)
     backgroundMocks.deleteTrack.mockResolvedValue(undefined)
     backgroundMocks.bulkUpdateProblems.mockResolvedValue(undefined)
+    backgroundMocks.executePracticeReviewCommand.mockResolvedValue(
+      commandResult,
+    )
     backgroundMocks.getPracticeDetails.mockResolvedValue(practiceDetails)
     backgroundMocks.getTrackForEdit.mockResolvedValue(trackForEditResponse)
     backgroundMocks.getWorkspace.mockResolvedValue(trackWorkspaceResponse)
@@ -2984,135 +2991,394 @@ describe('background handler registration', () => {
     })
   })
 
-  it('saves review results through the atomic practice workflow', async () => {
-    await sendRuntimeMessage('practice.saveReviewResult', {
-      surface: 'dashboard',
-      problemSlug: 'two-sum',
-      rating: 'hard',
-      reviewedAt: '2026-01-02T00:00:00.000Z',
-      elapsedSeconds: 725,
-      isCorrect: false,
-      notes: 'Missed a branch.',
-    })
-
+  it('returns the original acknowledgement separately from fresh current after durable flush', async () => {
+    const response = await sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    expectRuntimePolicy('practice.saveReviewResult', 'dashboard')
+    const { surface, ...command } = saveCommandRequest
+    expect(surface).toBe('dashboard')
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledWith(
+      backgroundMocks.db,
+      { ...command, operation: 'save' },
+    )
+    expect(backgroundMocks.getSettings).not.toHaveBeenCalled()
     expect(
       backgroundMocks.saveReviewResultWithTrackProgress,
-    ).toHaveBeenCalledWith(
+    ).not.toHaveBeenCalled()
+    expect(response).toEqual(commandResult)
+    expectFlushBeforeBroadcast()
+    expect(
+      backgroundMocks.markSyncLocalDataChanged.mock.invocationCallOrder[0],
+    ).toBeLessThan(backgroundMocks.flushDbSnapshot.mock.invocationCallOrder[0]!)
+  })
+
+  it('returns persistence pending without publication and retries the same executor command', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('disk failed'),
+    )
+    const pending = await sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    expect(pending).toEqual({ ...commandResult, status: 'persistence-pending' })
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+    expect(
+      await sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).toEqual(commandResult)
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      2,
+    )
+    expect(backgroundMocks.executePracticeReviewCommand.mock.calls[0]).toEqual(
+      backgroundMocks.executePracticeReviewCommand.mock.calls[1],
+    )
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(2)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
+    expect(
+      backgroundMocks.saveReviewResultWithTrackProgress,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('protects a pending review from automatic remote replacement and recovers publication before sync admission', async () => {
+    const { createTestDb } = await import('@/platform/db/test-db')
+    const { preparePracticeStorage } =
+      await import('@/features/practice/server/practice-storage-service')
+    const practice = await vi.importActual<
+      typeof import('@/features/practice/server/practice-service')
+    >('@/features/practice/server/practice-service')
+    const backup = await vi.importActual<
+      typeof import('@/features/backup/server/backup-service')
+    >('@/features/backup/server/backup-service')
+    const { createSyncService, createSyncOperationCoordinator } =
+      await vi.importActual<
+        typeof import('@/features/sync/server/sync-service')
+      >('@/features/sync/server/sync-service')
+    const { buildSyncEnvelope } =
+      await import('@/features/sync/domain/sync-envelope')
+    const { readPracticeStorageData } =
+      await import('@/features/practice/data/practice-storage-repository')
+    const syncMetadata = await vi.importActual<
+      typeof import('@/features/sync/data/sync-metadata-store')
+    >('@/features/sync/data/sync-metadata-store')
+    const handle = await createTestDb()
+    await preparePracticeStorage(handle.db)
+    const remoteBackup = await backup.exportFullBackup(handle.db)
+    const request = {
+      ...saveCommandRequest,
+      generation: (await practice.getPracticeDetails(handle.db, 'two-sum'))
+        .generation!,
+    }
+    await syncMetadata.writeSyncMetadata({
+      ...cleanSyncMetadata,
+      lastSyncDirection: 'pull',
+    })
+    const order: string[] = []
+    const getGist = vi.fn().mockResolvedValue({
+      id: cleanSyncMetadata.gistId,
+      htmlUrl: 'https://gist.github.com/gist_1',
+      updatedAt: '2026-05-26T12:20:00.000Z',
+      remoteVersion: 'changed-remote',
+      content: JSON.stringify(
+        buildSyncEnvelope({
+          backup: remoteBackup,
+          dataUpdatedAt: '2026-05-26T12:20:00.000Z',
+        }),
+      ),
+      contentTruncated: false,
+      rawUrl: null,
+    })
+    const restoreBackup = vi.fn((input: unknown) =>
+      backup.restoreFullBackup(handle.db, input),
+    )
+    backgroundMocks.getAppDb.mockResolvedValue(handle)
+    backgroundMocks.getSettings.mockResolvedValue({
+      ...defaultUserSettings,
+      practice: { ...defaultUserSettings.practice, mode: 'freePractice' },
+    })
+    backgroundMocks.executePracticeReviewCommand.mockImplementation(
+      practice.executePracticeReviewCommand,
+    )
+    backgroundMocks.readSyncMetadata.mockImplementation(
+      syncMetadata.readSyncMetadata,
+    )
+    backgroundMocks.markSyncLocalDataChanged.mockImplementation(() => {
+      order.push('dirty')
+      return syncMetadata.markLocalDataChanged()
+    })
+    backgroundMocks.flushDbSnapshot.mockRejectedValue(new Error('disk failed'))
+    backgroundMocks.createBackgroundSyncService.mockImplementation(() => {
+      order.push('sync')
+      return createSyncService({
+        readToken: () => Promise.resolve('configured-token'),
+        saveToken: () => Promise.resolve(),
+        deleteToken: () => Promise.resolve(),
+        getTokenStatus: () => Promise.resolve(syncStatus.tokenStatus),
+        createGitHubClient: () => ({
+          getGist,
+          validateToken: vi.fn(),
+          createSyncGist: vi.fn(),
+          updateSyncGist: vi.fn(),
+        }),
+        readMetadata: syncMetadata.readSyncMetadata,
+        writeMetadata: syncMetadata.writeSyncMetadata,
+        exportFullBackup: () => backup.exportFullBackup(handle.db),
+        restoreBackup,
+        flushDbSnapshot: backgroundMocks.flushDbSnapshot,
+        broadcastInvalidation: () => Promise.resolve(),
+        ...readLatestSyncFactoryOptions(),
+        syncCoordinator: createSyncOperationCoordinator(),
+        now: () => new Date(),
+      })
+    })
+    try {
+      const pending = practiceReviewCommandResultSchema.parse(
+        await sendRuntimeMessage('practice.saveReviewResult', request),
+      )
+      expect(pending).toMatchObject({ status: 'persistence-pending' })
+      const retainedDetails = await practice.getPracticeDetails(
+        handle.db,
+        'two-sum',
+      )
+      const retainedStorage = await readPracticeStorageData(handle.db)
+      expect(retainedStorage.commandReceipts).toHaveLength(1)
+      expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+      await expect(
+        sendRuntimeMessage('sync.checkRemoteOnOpen', { surface: 'dashboard' }),
+      ).rejects.toThrow('sync metadata could not be saved')
+      expect(backgroundMocks.createBackgroundSyncService).not.toHaveBeenCalled()
+      expect(getGist).not.toHaveBeenCalled()
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+      ).not.toHaveBeenCalled()
+
+      order.length = 0
+      backgroundMocks.flushDbSnapshot.mockImplementation(() => {
+        order.push('flush')
+        return Promise.resolve()
+      })
+      expect(
+        await readLatestSyncAutoSyncDeps().runCleanPullCheck(),
+      ).toMatchObject({ outcome: 'no-change', reason: 'local-dirty' })
+      expect(order).toEqual(['flush', 'dirty', 'sync'])
+      expect(getGist).not.toHaveBeenCalled()
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(await practice.getPracticeDetails(handle.db, 'two-sum')).toEqual(
+        retainedDetails,
+      )
+      expect(await readPracticeStorageData(handle.db)).toEqual(retainedStorage)
+      expect(
+        await sendRuntimeMessage('practice.saveReviewResult', request),
+      ).toEqual({ ...pending, status: 'saved' })
+      expect(await readPracticeStorageData(handle.db)).toEqual(retainedStorage)
+    } finally {
+      backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
+      await sendRuntimeMessage('backup.retryPendingReplacement', {
+        surface: 'dashboard',
+      })
+      handle.rawDb.close()
+    }
+  })
+
+  it('persists review dirty intent before publication so a fresh sync worker protects a saved review while invalidation stalls', async () => {
+    const metadata = await vi.importActual<
+      typeof import('@/features/sync/data/sync-metadata-store')
+    >('@/features/sync/data/sync-metadata-store')
+    const { createSyncService, createSyncOperationCoordinator } =
+      await vi.importActual<
+        typeof import('@/features/sync/server/sync-service')
+      >('@/features/sync/server/sync-service')
+    const { createBackupReplacementCoordinator } =
+      await import('./backup-replacement')
+    await metadata.writeSyncMetadata({
+      ...cleanSyncMetadata,
+      lastSyncDirection: 'pull',
+    })
+    backgroundMocks.markSyncLocalDataChanged.mockImplementation(
+      metadata.markLocalDataChanged,
+    )
+    const invalidation = createDeferred<null>()
+    backgroundMocks.broadcastCacheInvalidation.mockReturnValueOnce(
+      invalidation.promise,
+    )
+    const saved = sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    try {
+      await waitUntil(() =>
+        expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalled(),
+      )
+      expect(backgroundMocks.flushDbSnapshot).toHaveResolvedTimes(1)
+      expect((await metadata.readSyncMetadata()).dirtySinceLastSync).toBe(true)
+      expect(
+        backgroundMocks.markSyncLocalDataChanged.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        backgroundMocks.flushDbSnapshot.mock.invocationCallOrder[0]!,
+      )
+      const getGist = vi.fn()
+      const restoreBackup = vi.fn()
+      const freshSyncWorker = createSyncService({
+        readToken: () => Promise.resolve('configured-token'),
+        saveToken: () => Promise.resolve(),
+        deleteToken: () => Promise.resolve(),
+        getTokenStatus: () => Promise.resolve(syncStatus.tokenStatus),
+        createGitHubClient: () => ({
+          getGist,
+          validateToken: vi.fn(),
+          createSyncGist: vi.fn(),
+          updateSyncGist: vi.fn(),
+        }),
+        readMetadata: metadata.readSyncMetadata,
+        writeMetadata: metadata.writeSyncMetadata,
+        exportFullBackup: () => Promise.resolve(validBackup),
+        restoreBackup,
+        flushDbSnapshot: () => Promise.resolve(),
+        broadcastInvalidation: () => Promise.resolve(),
+        runReplacement: createBackupReplacementCoordinator().run,
+        syncCoordinator: createSyncOperationCoordinator(),
+        now: () => new Date(),
+      })
+      expect(await freshSyncWorker.checkRemoteOnOpen()).toMatchObject({
+        outcome: 'no-change',
+        reason: 'local-dirty',
+      })
+      expect(getGist).not.toHaveBeenCalled()
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+      ).not.toHaveBeenCalled()
+    } finally {
+      invalidation.resolve(null)
+      await saved
+    }
+  })
+
+  it.each([
+    'stale-review',
+    'backdated',
+    'unsupported-legacy',
+    'stale-generation',
+    'command-conflict',
+  ])('returns %s conflicts without flushing or publication', async (reason) => {
+    const conflict = {
+      status: 'conflict',
+      reason,
+      message: 'Refresh context',
+      current: practiceDetails,
+    }
+    backgroundMocks.executePracticeReviewCommand.mockResolvedValueOnce(conflict)
+    expect(
+      await sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).toEqual(conflict)
+    expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('passes an exact update target and revision to the command executor', async () => {
+    const { reviewMode, ...request } = saveCommandRequest
+    expect(reviewMode).toBe('leetcode')
+    await sendRuntimeMessage('practice.overrideLastReviewResult', {
+      ...request,
+      targetAttemptId: 'original-event',
+      expectedRevision: 2,
+    })
+    const { surface, ...command } = request
+    expect(surface).toBe('dashboard')
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledWith(
       backgroundMocks.db,
       {
-        problemSlug: 'two-sum',
-        rating: 'hard',
-        reviewedAt: new Date('2026-01-02T00:00:00.000Z'),
-        elapsedSeconds: 725,
-        isCorrect: false,
-        log: { notes: 'Missed a branch.' },
-        targetRetention: defaultUserSettings.review.targetRetention,
+        ...command,
+        operation: 'update',
+        targetAttemptId: 'original-event',
+        expectedRevision: 2,
       },
-      defaultUserSettings,
     )
-    expect(
-      backgroundMocks.recordActiveTrackProblemCompletion,
-    ).not.toHaveBeenCalled()
-    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'dashboard',
-      tags: ['practice'],
-    })
   })
 
-  it('passes free-practice settings into the atomic practice workflow', async () => {
-    resetRuntimeMutationMocks()
-    const freePracticeSettings = {
-      ...defaultUserSettings,
-      practice: {
-        ...defaultUserSettings.practice,
-        mode: 'freePractice' as const,
-      },
+  it('serializes concurrent review commands through snapshot publication', async () => {
+    let release!: () => void
+    backgroundMocks.flushDbSnapshot.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve
+        }),
+    )
+    const first = sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    await vi.waitFor(() =>
+      expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1),
+    )
+    const second = sendRuntimeMessage('practice.saveReviewResult', {
+      ...saveCommandRequest,
+      commandId: 'second',
+    })
+    await Promise.resolve()
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
+    release()
+    await Promise.all([first, second])
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      2,
+    )
+  })
+
+  it('rejects old clients and forged command fields before execution', () => {
+    for (const request of [
+      { surface: 'dashboard', problemSlug: 'two-sum', rating: 'good' },
+      { ...saveCommandRequest, notes: 'old field' },
+      { ...saveCommandRequest, reviewedAt: '2026-01-01T00:00:00Z' },
+      { ...saveCommandRequest, reviewAttemptId: 'forged' },
+    ]) {
+      expect(() =>
+        sendRuntimeMessage('practice.saveReviewResult', request),
+      ).toThrow()
     }
-    backgroundMocks.getSettings.mockResolvedValueOnce(freePracticeSettings)
-
-    await sendRuntimeMessage('practice.saveReviewResult', {
-      surface: 'dashboard',
-      problemSlug: 'two-sum',
-      rating: 'good',
-      reviewedAt: '2026-01-03T00:00:00.000Z',
-      reviewMode: 'leetcode',
-    })
-
-    expect(
-      backgroundMocks.saveReviewResultWithTrackProgress,
-    ).toHaveBeenCalledWith(
-      backgroundMocks.db,
-      expect.objectContaining({
-        problemSlug: 'two-sum',
-        rating: 'good',
-        reviewedAt: new Date('2026-01-03T00:00:00.000Z'),
-        reviewMode: 'leetcode',
-      }),
-      freePracticeSettings,
-    )
-    expect(
-      backgroundMocks.recordActiveTrackProblemCompletion,
-    ).not.toHaveBeenCalled()
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
   })
 
-  it('invalidates tracks after saving a review through the atomic workflow', async () => {
-    resetRuntimeMutationMocks()
-
-    await sendRuntimeMessage('practice.saveReviewResult', {
-      surface: 'dashboard',
-      problemSlug: 'two-sum',
-      rating: 'easy',
-      reviewedAt: '2026-01-03T00:00:00.000Z',
-    })
-
-    expect(
-      backgroundMocks.saveReviewResultWithTrackProgress,
-    ).toHaveBeenCalledWith(
-      backgroundMocks.db,
-      expect.objectContaining({
-        problemSlug: 'two-sum',
-        rating: 'easy',
-      }),
-      defaultUserSettings,
+  it('rejects unauthorized commands before execution', () => {
+    backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementationOnce(
+      () => {
+        throw new Error('unauthorized')
+      },
     )
-    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'dashboard',
-      tags: ['practice'],
-    })
+    expect(() =>
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).toThrow('unauthorized')
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
   })
 
-  it('invalidates tracks after overriding a saved review result', async () => {
-    resetRuntimeMutationMocks()
-    backgroundMocks.overrideLastReviewResultWithTrackProgress.mockResolvedValue(
-      undefined,
+  it('keeps unexpected storage and invalid response errors as transport failures', async () => {
+    backgroundMocks.executePracticeReviewCommand.mockRejectedValueOnce(
+      new Error('storage unavailable'),
     )
-
-    await sendRuntimeMessage('practice.overrideLastReviewResult', {
-      surface: 'dashboard',
-      problemSlug: 'two-sum',
-      rating: 'hard',
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).rejects.toThrow('storage unavailable')
+    backgroundMocks.executePracticeReviewCommand.mockResolvedValueOnce({
+      status: 'saved',
+      current: practiceDetails,
     })
-
-    expect(
-      backgroundMocks.overrideLastReviewResultWithTrackProgress,
-    ).toHaveBeenCalledWith(
-      backgroundMocks.db,
-      expect.objectContaining({
-        problemSlug: 'two-sum',
-        rating: 'hard',
-      }),
-    )
-    expect(backgroundMocks.overrideLastReviewResult).not.toHaveBeenCalled()
-    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'dashboard',
-      tags: ['practice'],
-    })
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).rejects.toThrow()
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
   })
 
   it('forwards pinned identity and refresh through the authorized capture handlers', async () => {
@@ -3309,25 +3575,6 @@ function isSyncFactoryOptions(value: unknown): value is SyncFactoryOptions {
     typeof (value as { runRemoteRestore?: unknown }).runRemoteRestore ===
     'function'
   )
-}
-
-function resetRuntimeMutationMocks() {
-  vi.clearAllMocks()
-  backgroundMocks.getAppDb.mockResolvedValue({ db: backgroundMocks.db })
-  backgroundMocks.broadcastCacheInvalidation.mockResolvedValue(null)
-  backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
-  backgroundMocks.getSettings.mockResolvedValue(defaultUserSettings)
-  backgroundMocks.getPracticeDetails.mockResolvedValue(practiceDetails)
-  backgroundMocks.overrideLastReviewResultWithTrackProgress.mockResolvedValue(
-    undefined,
-  )
-  backgroundMocks.saveReviewResultWithTrackProgress.mockResolvedValue(undefined)
-  backgroundMocks.saveReviewResult.mockResolvedValue(undefined)
-  backgroundMocks.createBackgroundSyncService.mockReturnValue(
-    backgroundMocks.syncService,
-  )
-  backgroundMocks.markSyncLocalDataChanged.mockResolvedValue(cleanSyncMetadata)
-  backgroundMocks.readSyncMetadata.mockResolvedValue(cleanSyncMetadata)
 }
 
 async function expectTrackWrite<TRequest>(input: {
@@ -3775,3 +4022,49 @@ const validBackup = backupFileSchema.parse({
   },
 })
 const validBackupSummary = createBackupSummary(validBackup)
+
+const saveCommandRequest = {
+  surface: 'dashboard',
+  commandId: 'review-command',
+  problemSlug: 'two-sum',
+  generation: {
+    localGenerationToken: 'local-generation',
+    problemGenerationToken: null,
+  },
+  rating: 'good',
+  reviewMode: 'leetcode',
+  reviewedAt: '2026-01-01T00:00:00.000Z',
+  log: { notes: 'Accepted notes' },
+} as const
+const commandResult = {
+  status: 'saved',
+  current: practiceDetails,
+  acknowledgement: {
+    schemaVersion: 1,
+    operation: 'save',
+    problemSlug: 'two-sum',
+    cardId: 'opaque-card',
+    reviewAttemptId: 'original-event',
+    applicationSequence: 1,
+    revision: 0,
+    rating: 'good',
+    reviewedAt: '2026-01-01T00:00:00.000Z',
+    dueAt: '2026-01-02T00:00:00.000Z',
+    status: 'review',
+    card: {
+      dueAt: '2026-01-02T00:00:00.000Z',
+      stability: 1,
+      difficulty: 5,
+      elapsedDays: 0,
+      scheduledDays: 1,
+      learningSteps: 0,
+      reps: 1,
+      lapses: 0,
+      state: 'review',
+      lastReviewAt: '2026-01-01T00:00:00.000Z',
+    },
+    fsrsReviewLog: null,
+    schedulingEvidenceKind: 'unknown',
+    schedulerProfileId: null,
+  },
+}

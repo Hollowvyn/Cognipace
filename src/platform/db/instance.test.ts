@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./proxy', async (importOriginal) => {
@@ -131,6 +132,48 @@ function readOwnedRows(db: Awaited<ReturnType<typeof getAppDb>>) {
     ]),
   )
 }
+
+describe('committed snapshot publication', () => {
+  it.each(['ROLLBACK', 'COMMIT'])(
+    'defers automatic publication until a stalled transaction ends with %s',
+    async (ending) => {
+      const storage = installStorage()
+      const handle = await openTestDb()
+      const settings = createSettingsRepository(handle.db)
+      await settings.updateSettings({ appearance: { themeMode: 'dark' } }, now)
+      await flushDbSnapshot()
+      const baseline = storage.values[SNAPSHOT_KEY]
+      handle.rawDb.exec('BEGIN')
+      await handle.db.run(
+        sql`UPDATE settings_kv SET value = ${JSON.stringify({ ...(await settings.getSettings()), appearance: { themeMode: 'light' } })} WHERE key = 'user-settings'`,
+      )
+      await new Promise((resolve) => setTimeout(resolve, 325))
+      expect(storage.values[SNAPSHOT_KEY] === baseline).toBe(true)
+      handle.rawDb.exec(ending)
+      await new Promise((resolve) => setTimeout(resolve, 325))
+      resetAppDbForTesting()
+      const reopened = await openTestDb()
+      expect(
+        (await createSettingsRepository(reopened.db).getSettings()).appearance
+          .themeMode,
+      ).toBe(ending === 'COMMIT' ? 'light' : 'dark')
+    },
+  )
+
+  it('rejects explicit flush during an open transaction and retains the durable baseline', async () => {
+    const storage = installStorage()
+    const handle = await openTestDb()
+    const baseline = storage.values[SNAPSHOT_KEY]
+    handle.rawDb.exec('BEGIN')
+    await handle.db.run(
+      sql`INSERT INTO settings_kv (key, value, updated_at) VALUES ('guard-probe', 'uncommitted', 1)`,
+    )
+    await expect(flushDbSnapshot()).rejects.toThrow(/transaction/i)
+    expect(storage.values[SNAPSHOT_KEY] === baseline).toBe(true)
+    handle.rawDb.exec('ROLLBACK')
+    await flushDbSnapshot()
+  })
+})
 
 describe('app database startup', () => {
   it.each([

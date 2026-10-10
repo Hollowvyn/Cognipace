@@ -50,6 +50,7 @@ export function resetPracticeSchedule(
 }
 
 export {
+  executePracticeReviewCommand,
   overrideLastReviewResultWithTrackProgress,
   resetPracticeScheduleWithTrackProgress,
   saveReviewResultWithTrackProgress,

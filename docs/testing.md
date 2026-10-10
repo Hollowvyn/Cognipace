@@ -110,6 +110,50 @@ checks exact metadata/token equality on matching reopen. A real staged
 preparation failure rejects a malformed log without changing the stored
 original or first recovery record.
 
+### Reliable Review Commands (Phase D)
+
+Human installed-extension proof is pending. Use a disposable profile with a
+pre-D full backup and attach screenshots or a recording before PR review or
+merge. C's historical proof record and user confirmation do not provide D proof.
+
+1. Submit a timed review and confirm Saved only after durable publication. Reload
+   and inspect one event, its original time, log, card ID and track credit.
+2. Reselect the rating and Update repeatedly; verify one attempt/count, unchanged
+   event and solve time/log, incrementing revision and original-profile schedule
+   even after changing target retention. Restart then Submit must add a genuine
+   new review. Existing assessment rating locks must still hold.
+3. Open the same problem in two tabs. Update in one then submit the other's stale
+   Update; verify conflict, no extra mutation and preserved selected draft. Use
+   deliberate refresh/reselect to recover.
+4. Reuse the test-only `cpBackupSmoke` storage fault shim below to reject snapshot
+   publication after a review transaction. Verify pending feedback, no Saved or
+   next-step success, locked rating/Restart and accessible Retry. Remove the fault
+   and retry the same accepted command; reload shows one event/track effect.
+5. Lose the review acknowledgement after publication and terminate/restart the
+   service worker, keeping the caller's accepted command. Retry returns the
+   original acknowledgement without a second review. If restart instead loses
+   unflushed state, the same command applies once against the durable baseline.
+6. Retain a pending command, perform an actual targeted schedule reset or full
+   backup restore from another surface, then retry. Verify stale-generation
+   rejection, preserved draft, fresh tokens and untouched replacement history.
+7. Export/restore v6 with captured/legacy-derived evidence and historical
+   correction receipts; compare opaque IDs, history, event/solve time, logs,
+   settings/profiles and track metadata. Imported receipt keys cannot acknowledge
+   old local commands. Check ambiguous legacy Update's explanation and new Save.
+8. With configured Gist sync and a changed remote backup, force review publication
+   failure and request an open check or pull without overwrite consent. Confirm
+   the pending local review remains. Clear the fault and Retry; a clean check must
+   still see local changes. Also stop the worker after publication while the
+   acknowledgement is delayed; after restart automatic sync must preserve the
+   published review until the existing explicit sync decision is made.
+
+Automated real-WASM proof is in `practice-durability.integration.test.ts`,
+`practice-command.integration.test.ts` and `platform/db/instance.test.ts`.
+It covers stored snapshot reopen, lost acknowledgement, failed publication,
+unflushed bootstrap retry, historical correction replay, populated C/v6
+compatibility, reset/restore rotation and stalled transaction rollback/commit.
+Runtime/overlay suites separately cover pending UI, authentication and locks.
+
 ### FSRS Evidence And Recoverable Replacement
 
 Run these human happy-path and edge-case flows in a disposable installed
@@ -129,8 +173,10 @@ review or merge. Automated tests do not replace this proof.
 3. Import valid v6 evidence with opaque IDs, recorded profiles and historical
    correction receipts. A Good revision-1 acknowledgement must survive a
    current Again revision-2 event. Verify subsequent Save reuses the card ID;
-   protected-history Update stays unavailable, including after a new unknown
-   Save. An occupied prospective card ID must leave its sibling unchanged.
+   captured/legacy-derived Update uses original context and preserves identity,
+   time and count. Ambiguous unknown history explains why Update is unavailable;
+   a genuine new Save establishes captured context. An occupied prospective card
+   ID must leave its sibling unchanged.
 4. Try malformed logs, profiles, evidence ownership/sequences, generations and
    historical acknowledgements. Validation must reject before replacement;
    existing rows and generation tokens stay unchanged.

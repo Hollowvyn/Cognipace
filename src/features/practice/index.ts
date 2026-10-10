@@ -21,12 +21,14 @@ export {
   practiceResetScheduleRequestSchema,
   practiceReviewAttemptSchema,
   practiceReviewResultSchema,
+  practiceReviewCommandResultSchema,
   practiceRuntimeSurfaceSchema,
   practiceSaveReviewResultRequestSchema,
   practiceSetSuspendedRequestSchema,
   normalizedPracticeStateSchema,
   practiceStateSnapshotSchema,
   type PracticeDetailsRequest,
+  type PracticeReviewCommandResult,
   type PracticeOverrideLastReviewResultRequest,
   type PracticeResetScheduleRequest,
   type PracticeSaveReviewResultRequest,
@@ -67,3 +69,7 @@ export {
 } from './domain'
 
 export * from './domain/practice-storage'
+export {
+  ReviewCommandConflictError,
+  type ReviewCommandConflictReason,
+} from './domain/practice-command'

@@ -260,10 +260,24 @@ display and queue ranking; it does not replace or cancel the persisted due date.
 Database upgrades preserve existing history, due dates, settings and earned
 progress. Older reviews have unknown scheduling provenance rather than an
 invented historical configuration. Imported card identities and recorded
-scheduling evidence are retained. Ordinary histories remain correctable with
-Update; histories containing captured or legacy-derived scheduling evidence
-temporarily disable Update while the guarded correction workflow is integrated.
-Save can still record a new review without changing that earlier evidence.
+scheduling evidence are retained. New reviews capture their pre-review card,
+original event time and complete scheduling profile prospectively. Update
+corrects exactly the acknowledged latest attempt and revision using that
+original context, preserving its identity, event time, application order,
+solve time, log and review count. Verified legacy compatibility records a
+legacy-derived context using the saved user retention at first acceptance; it
+does not claim to recover the unknown original profile. Ambiguous or incomplete
+legacy history explains why Update is unavailable. A genuine new review can
+establish captured context without rewriting earlier history.
+
+Submit and Update freeze an accepted command before transport. Repeated delivery
+returns its original acknowledgement and fresh current details without repeating
+review or track effects. Saved feedback follows durable snapshot publication.
+A storage or transport failure retains the accepted command for Retry; pending
+state locks rating/session changes and does not show success. Stale two-tab
+corrections retain the selected draft for deliberate refresh/reselect. Restart
+after success creates a genuine new review. Reset and full restore rotate live
+generations so old accepted commands cannot mutate replacement data.
 
 Target-retention changes are prospective. They are used by `ts-fsrs` on the
 next saved review and do not reschedule existing cards or rewrite their due

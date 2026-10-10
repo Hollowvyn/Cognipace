@@ -39,6 +39,9 @@ describe('Practice additive storage', () => {
     await db
       .update(practiceReviewEvidence)
       .set({
+        schedulingEvidenceKind: 'unknown',
+        schedulerProfileId: null,
+        preCardJson: null,
         assessmentEvidenceJson: JSON.stringify({
           schemaVersion: 1,
           source: 'assessment',
@@ -53,6 +56,8 @@ describe('Practice additive storage', () => {
     await validatePracticeStorage(db)
     await repository.overrideLastReviewResult({
       problemSlug: 'two-sum',
+      targetAttemptId: 'assessment-unknown',
+      expectedRevision: 0,
       rating: 'hard',
     })
     await validatePracticeStorage(db)
@@ -60,7 +65,7 @@ describe('Practice additive storage', () => {
       {
         revision: 1,
         applicationSequence: 1,
-        schedulingEvidenceKind: 'unknown',
+        schedulingEvidenceKind: 'legacy-derived',
         assessmentEvidenceJson: null,
       },
     )
@@ -177,7 +182,9 @@ describe('Practice additive storage', () => {
     await insertSaveReceipt(db, 'sibling-event')
     await db.insert(fsrsSchedulerProfiles).values({
       id: 'retained-profile',
-      profileJson: serializeFsrsSchedulerProfile(createFsrsSchedulerProfile()),
+      profileJson: serializeFsrsSchedulerProfile(
+        createFsrsSchedulerProfile({ targetRetention: 0.75 }),
+      ),
       createdAt: 0,
     })
     const before = await readPracticeStorageData(db)
@@ -286,9 +293,6 @@ describe('Practice additive storage', () => {
     const profileJson = serializeFsrsSchedulerProfile(
       createFsrsSchedulerProfile(),
     )
-    await db
-      .insert(fsrsSchedulerProfiles)
-      .values({ id: 'profile', profileJson, createdAt: 0 })
     await expect(
       db
         .insert(fsrsSchedulerProfiles)

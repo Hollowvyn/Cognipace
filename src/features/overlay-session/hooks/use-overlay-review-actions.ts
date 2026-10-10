@@ -1,12 +1,15 @@
+import { useRef } from 'react'
+
 import {
   evaluateLeetCodeAssessment,
   type LeetCodeAssessmentDecision,
+  type AssessmentSubmissionIntent,
 } from '@/features/assessment'
 import { openDashboardViaRuntime } from '@/features/app-shell'
 import {
   overrideLastReviewResultViaRuntime,
   saveReviewResultViaRuntime,
-  type SerializedPracticeDetails,
+  type PracticeReviewCommandResult,
 } from '@/features/practice'
 import type { ReviewRating } from '@/lib/fsrs'
 import type { LeetCodeSubmissionResult } from '@/lib/leetcode'
@@ -21,7 +24,10 @@ import {
   type OverlaySessionState,
   type OverlaySubmittedSession,
 } from '../domain'
-import type { OverlaySessionAction } from '../domain/overlay-session-state'
+import type {
+  OverlayAcceptedCommand,
+  OverlaySessionAction,
+} from '../domain/overlay-session-state'
 import type { OverlayTimerController } from './use-overlay-timer'
 import type { LeetCodeOverlayContext } from './use-leetcode-page-sync'
 
@@ -62,6 +68,7 @@ export type OverlayReviewActions = {
     result: LeetCodeSubmissionResult,
   ) => Promise<boolean>
   updateReview: () => Promise<void>
+  retryReview: () => Promise<void>
   restartLocalSession: () => void
   selectExpandedTab: (tab: OverlayExpandedTab) => void
   selectRating: (rating: ReviewRating) => void
@@ -77,13 +84,31 @@ export function useOverlayReviewActions({
   timer,
   onRestart,
 }: UseOverlayReviewActionsOptions): OverlayReviewActions {
-  async function refreshNextStep(problemSlug: string, saveToken: number) {
+  // React dispatch is deferred. These refs also guard multiple events in one tick.
+  const acceptedRef = useRef<OverlayAcceptedCommand | null>(null)
+  const inFlightRef = useRef<OverlayAcceptedCommand | null>(null)
+  const nextStepCommandRef = useRef<OverlayAcceptedCommand | null>(null)
+
+  function readAcceptedCommand() {
+    if (acceptedRef.current?.syncToken !== syncTokenRef.current) {
+      acceptedRef.current = null
+    }
+    const command = acceptedRef.current ?? overlayRef.current.acceptedCommand
+    return command?.syncToken === syncTokenRef.current ? command : null
+  }
+
+  async function refreshNextStep(command: OverlayAcceptedCommand) {
+    const { problemSlug } = command.request
+    const saveToken = command.syncToken
+    const isCurrentSession = () =>
+      syncTokenRef.current === saveToken &&
+      nextStepCommandRef.current === command
     dispatch({ type: 'next-step-loading' })
 
     try {
       const nextContext = await refreshContext(problemSlug, saveToken)
 
-      if (!nextContext) {
+      if (!nextContext || !isCurrentSession()) {
         return
       }
 
@@ -92,7 +117,7 @@ export function useOverlayReviewActions({
         nextStep: nextContext.nextStep,
       })
     } catch (error) {
-      if (syncTokenRef.current !== saveToken) {
+      if (!isCurrentSession()) {
         return
       }
 
@@ -151,7 +176,7 @@ export function useOverlayReviewActions({
       return
     }
 
-    await saveAcceptedReview(decision)
+    await saveAcceptedReview(decision, 'quick-submit')
   }
 
   async function submitReview() {
@@ -184,7 +209,7 @@ export function useOverlayReviewActions({
       return
     }
 
-    await saveAcceptedReview(decision)
+    await saveAcceptedReview(decision, 'selected-rating')
   }
 
   async function failReview() {
@@ -216,7 +241,7 @@ export function useOverlayReviewActions({
       return
     }
 
-    await saveAcceptedReview(decision)
+    await saveAcceptedReview(decision, 'fail')
   }
 
   async function saveLeetCodeSubmissionResult(
@@ -262,123 +287,177 @@ export function useOverlayReviewActions({
       return false
     }
 
-    return saveAcceptedReview(decision)
+    return saveAcceptedReview(
+      decision,
+      result.status === 'accepted' ? 'leetcode-accepted' : 'fail',
+    )
   }
 
-  async function saveAcceptedReview(decision: AcceptedAssessmentDecision) {
-    const saveToken = syncTokenRef.current
+  async function saveAcceptedReview(
+    decision: AcceptedAssessmentDecision,
+    intent: AssessmentSubmissionIntent,
+  ) {
     const currentContext = contextRef.current
     const problem = currentContext?.problem
     const currentOverlay = overlayRef.current
-
-    if (!currentContext || !problem || currentOverlay.submittedSession) {
+    if (
+      !currentContext ||
+      !problem ||
+      currentOverlay.submittedSession ||
+      readAcceptedCommand()
+    )
+      return false
+    const generation = currentContext.practice?.generation
+    if (!generation) {
+      setOverlayError('CogniPace is still syncing this problem.')
       return false
     }
-
-    dispatch({ type: 'save-started' })
-
-    try {
-      const details = await saveReviewResultViaRuntime({
+    const command: OverlayAcceptedCommand = {
+      operation: 'save',
+      syncToken: syncTokenRef.current,
+      lockReason: decision.lockReason,
+      feedback: formatAssessmentFeedback(decision),
+      request: {
         surface: 'content-script',
+        commandId: crypto.randomUUID(),
         problemSlug: problem.problemSlug,
+        generation: { ...generation },
+        reviewedAt: readReviewEventTime(),
         rating: decision.rating,
         reviewMode: 'leetcode',
         elapsedSeconds: decision.elapsedSeconds,
         isCorrect: decision.isCorrect,
-      })
-
-      if (syncTokenRef.current !== saveToken) {
-        return false
-      }
-
-      const snapshot = createSubmittedSnapshotFromPracticeDetails(
-        details,
-        decision.lockReason,
-      )
-      timer.lockAt(snapshot.elapsedSeconds)
-      dispatch({
-        type: 'submit-succeeded',
-        snapshot,
-        nextStep: null,
-        feedback: formatAssessmentFeedback(decision),
-      })
-      await refreshNextStep(problem.problemSlug, saveToken)
-      return true
-    } catch (error) {
-      if (syncTokenRef.current !== saveToken) {
-        return false
-      }
-
-      dispatch({
-        type: 'mutation-failed',
-        message: error instanceof Error ? error.message : String(error),
-      })
-      return false
+        assessmentEvidence: {
+          schemaVersion: 1,
+          source: 'assessment',
+          policyVersion: null,
+          submissionIntent: intent,
+          reasonCode: decision.reason.code,
+          lockReason: decision.lockReason,
+          finalRating: decision.rating,
+        },
+      },
     }
+    return executeAcceptedCommand(freezeCommand(command))
   }
 
   async function updateReview() {
-    const saveToken = syncTokenRef.current
     const currentContext = contextRef.current
     const problem = currentContext?.problem
     const currentOverlay = overlayRef.current
     const submittedSession = currentOverlay.submittedSession
-
     if (
       !currentContext ||
       !problem ||
       !submittedSession ||
+      readAcceptedCommand() ||
       !hasSubmittedSessionChanges(currentOverlay)
-    ) {
+    )
       return
-    }
-
     const rating = currentOverlay.ratingLockReason
       ? submittedSession.rating
       : currentOverlay.selectedRating
+    // Target and generation are one acknowledged identity. Refetch must not
+    // rebase a correction onto a reset or restored lifecycle.
+    const generation = submittedSession.generation
+    await executeAcceptedCommand(
+      freezeCommand({
+        operation: 'update',
+        syncToken: syncTokenRef.current,
+        lockReason: submittedSession.lockReason,
+        feedback: { tone: 'success', message: 'Latest review updated.' },
+        request: {
+          surface: 'content-script',
+          commandId: crypto.randomUUID(),
+          problemSlug: problem.problemSlug,
+          generation: { ...generation },
+          targetAttemptId: submittedSession.reviewAttemptId,
+          expectedRevision: submittedSession.revision,
+          reviewedAt: submittedSession.reviewedAt,
+          rating,
+          elapsedSeconds: submittedSession.elapsedSeconds,
+          isCorrect: rating !== 'again',
+          assessmentEvidence: {
+            schemaVersion: 1,
+            source: 'manual',
+            policyVersion: null,
+            submissionIntent: 'selected-rating',
+            reasonCode: null,
+            lockReason: submittedSession.lockReason,
+            finalRating: rating,
+          },
+        },
+      }),
+    )
+  }
 
-    dispatch({ type: 'update-started' })
+  async function retryReview() {
+    const command = readAcceptedCommand()
+    if (command) await executeAcceptedCommand(command)
+  }
 
+  async function executeAcceptedCommand(command: OverlayAcceptedCommand) {
+    if (inFlightRef.current?.syncToken === syncTokenRef.current) return false
+    if (command.syncToken !== syncTokenRef.current) return false
+    acceptedRef.current = command
+    inFlightRef.current = command
+    nextStepCommandRef.current = null
+    dispatch({ type: 'command-started', command })
+    const isCurrentCommand = () =>
+      syncTokenRef.current === command.syncToken &&
+      acceptedRef.current === command
     try {
-      const details = await overrideLastReviewResultViaRuntime({
-        surface: 'content-script',
-        problemSlug: problem.problemSlug,
-        rating,
-        elapsedSeconds: submittedSession.elapsedSeconds,
-        isCorrect: rating !== 'again',
-      })
-
-      if (syncTokenRef.current !== saveToken) {
-        return
+      const result =
+        command.operation === 'save'
+          ? await saveReviewResultViaRuntime(command.request)
+          : await overrideLastReviewResultViaRuntime(command.request)
+      if (!isCurrentCommand()) return false
+      if (contextRef.current)
+        contextRef.current = { ...contextRef.current, practice: result.current }
+      if (result.status === 'conflict') {
+        acceptedRef.current = null
+        dispatch({ type: 'command-conflicted', message: result.message })
+        return false
       }
-
-      const snapshot = createSubmittedSnapshotFromPracticeDetails(
-        details,
-        submittedSession.lockReason,
-      )
+      if (result.status === 'persistence-pending') {
+        dispatch({ type: 'command-pending' })
+        return false
+      }
+      const snapshot = createSubmittedSnapshot(result, command)
+      acceptedRef.current = null
+      inFlightRef.current = null
+      nextStepCommandRef.current = command
+      timer.lockAt(snapshot.elapsedSeconds)
       dispatch({
-        type: 'update-succeeded',
+        type:
+          command.operation === 'save'
+            ? 'submit-succeeded'
+            : 'update-succeeded',
         snapshot,
         nextStep: null,
-        feedback: {
-          tone: 'success',
-          message: 'Latest review updated.',
-        },
+        feedback: command.feedback,
       })
-      await refreshNextStep(problem.problemSlug, saveToken)
+      await refreshNextStep(command)
+      return true
     } catch (error) {
-      if (syncTokenRef.current !== saveToken) {
-        return
-      }
-
+      if (!isCurrentCommand()) return false
       dispatch({
         type: 'mutation-failed',
-        message: error instanceof Error ? error.message : String(error),
+        message: readErrorMessage(
+          error,
+          'Review could not be confirmed. Retry to confirm it is saved.',
+        ),
       })
+      return false
+    } finally {
+      // An old SPA request must never release a newer request's guard.
+      if (inFlightRef.current === command) inFlightRef.current = null
     }
   }
 
   function restartLocalSession() {
+    if (readAcceptedCommand()) return
+    nextStepCommandRef.current = null
     timer.reset()
     const currentPractice = contextRef.current?.practice
     const selectedRating =
@@ -431,35 +510,60 @@ export function useOverlayReviewActions({
     expand,
     failReview,
     openSettings,
-    pauseTimer: timer.pause,
+    pauseTimer: () => {
+      if (!readAcceptedCommand()) timer.pause()
+    },
     prepareQuickSubmit,
-    resetTimer: timer.reset,
+    resetTimer: () => {
+      if (!readAcceptedCommand()) timer.reset()
+    },
     restartLocalSession,
     restore,
     saveLeetCodeSubmissionResult,
     selectExpandedTab,
     selectRating,
-    startTimer: timer.start,
+    startTimer: () => {
+      if (!readAcceptedCommand()) timer.start()
+    },
     submitReview,
     updateReview,
+    retryReview,
   }
 }
 
-function createSubmittedSnapshotFromPracticeDetails(
-  details: SerializedPracticeDetails,
-  lockReason: OverlaySubmittedSession['lockReason'],
+function readReviewEventTime() {
+  return new Date().toISOString()
+}
+
+function freezeCommand(
+  command: OverlayAcceptedCommand,
+): OverlayAcceptedCommand {
+  Object.freeze(command.request.generation)
+  if (command.request.log) Object.freeze(command.request.log)
+  if (command.request.assessmentEvidence)
+    Object.freeze(command.request.assessmentEvidence)
+  Object.freeze(command.request)
+  Object.freeze(command.feedback)
+  return Object.freeze(command)
+}
+
+function createSubmittedSnapshot(
+  result: Exclude<PracticeReviewCommandResult, { status: 'conflict' }>,
+  command: OverlayAcceptedCommand,
 ): OverlaySubmittedSession {
-  const latestAttempt = details.latestAttempt
-
-  if (!latestAttempt) {
-    throw new Error('Saved review did not include the latest attempt.')
-  }
-
+  const acknowledgement = result.acknowledgement
+  const generation = result.current.generation
+  if (!generation)
+    throw new Error('Saved review did not include its current generation.')
   return {
-    rating: latestAttempt.rating,
-    elapsedSeconds: latestAttempt.elapsedSeconds,
-    isCorrect: latestAttempt.isCorrect ?? latestAttempt.rating !== 'again',
-    lockReason,
+    reviewAttemptId: acknowledgement.reviewAttemptId,
+    revision: acknowledgement.revision,
+    reviewedAt: acknowledgement.reviewedAt,
+    generation: { ...generation },
+    rating: acknowledgement.rating,
+    elapsedSeconds: command.request.elapsedSeconds ?? null,
+    isCorrect: command.request.isCorrect ?? acknowledgement.rating !== 'again',
+    lockReason: command.lockReason,
   }
 }
 

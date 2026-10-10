@@ -1,17 +1,26 @@
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, or } from 'drizzle-orm'
 
 import {
   createInitialFsrsCard,
+  createFsrsSchedulerProfile,
+  correctLegacyReview,
+  correctReviewFromEvidence,
+  assertFsrsReviewLogMatchesPreCard,
   defaultFsrsCardKind,
   parseSerializedFsrsReviewLogSnapshot,
   parseFsrsCardState,
   parseReviewRating,
-  replayReviewHistorySequence,
-  scheduleReview,
+  parseSerializedFsrsCardSnapshot,
+  parseSerializedFsrsSchedulerProfile,
+  scheduleReviewWithProfile,
+  serializeFsrsCardSnapshot,
+  serializeFsrsSchedulerProfile,
+  toSerializableFsrsCardSnapshot,
   serializeFsrsReviewLogSnapshot,
   type FsrsCardKind,
   type FsrsCardSnapshot,
   type FsrsReviewLogSnapshot,
+  type FsrsReviewContext,
 } from '@/lib/fsrs'
 import type { Db } from '@/platform/db'
 import {
@@ -20,9 +29,12 @@ import {
   reviewAttempts,
   practiceReviewEvidence,
   practiceCommandReceipts,
+  practiceGenerations,
+  fsrsSchedulerProfiles,
   type FsrsCardRow,
   type ProblemPracticeRow,
   type ReviewAttemptRow,
+  type PracticeReviewEvidenceRow,
 } from '@/platform/db/schema'
 
 import {
@@ -32,6 +44,8 @@ import {
   normalizeReviewLogFields,
   parsePracticeStatus,
   reviewModes,
+  ReviewCommandConflictError,
+  practiceAssessmentEvidenceSchema,
   statusFromReview,
   type NormalizedPracticeState,
   type OverrideLastReviewResultInput,
@@ -94,10 +108,10 @@ export class PracticeRepository {
       .select()
       .from(practiceReviewEvidence)
       .where(eq(practiceReviewEvidence.cardId, cardId))
-    const existingAttempts = await writeDb
-      .select({ id: reviewAttempts.id })
-      .from(reviewAttempts)
-      .where(eq(reviewAttempts.cardId, cardId))
+    const existingAttempts = await this.readReviewAttempts(writeDb, {
+      problemSlug: input.problemSlug,
+      cardId,
+    })
     const evidenceIds = new Set(evidenceRows.map((row) => row.reviewAttemptId))
     if (existingAttempts.some((attempt) => !evidenceIds.has(attempt.id))) {
       throw new Error(
@@ -112,9 +126,27 @@ export class PracticeRepository {
       maximumSequence,
       'application sequence',
     )
-    const scheduled = scheduleReview(currentCard, input.rating, reviewedAt, {
-      targetRetention: input.targetRetention,
-    })
+    const latestAttempt = existingAttempts.at(-1)
+    if (
+      (latestAttempt && timestamp < latestAttempt.reviewedAt.getTime()) ||
+      (currentCard.lastReviewAt &&
+        timestamp < currentCard.lastReviewAt.getTime())
+    ) {
+      throw new ReviewCommandConflictError(
+        'backdated',
+        'This review time precedes the last applied review. Refresh before saving; your draft is preserved.',
+      )
+    }
+    const scheduled = scheduleReviewWithProfile(
+      currentCard,
+      input.rating,
+      reviewedAt,
+      createFsrsSchedulerProfile({ targetRetention: input.targetRetention }),
+    )
+    const assessmentEvidenceJson = serializeAssessmentEvidence(
+      input.assessmentEvidence,
+      input.rating,
+    )
     const status = statusFromReview(input.rating, scheduled.card)
     const previousPractice = await this.getPracticeState(
       input.problemSlug,
@@ -128,6 +160,11 @@ export class PracticeRepository {
     await ensurePracticeGenerationsInTransaction(
       writeDb,
       [input.problemSlug],
+      createdAt,
+    )
+    const schedulerProfileId = await this.ensureSchedulerProfile(
+      writeDb,
+      scheduled.context,
       createdAt,
     )
     await this.upsertCard(writeDb, {
@@ -159,10 +196,10 @@ export class PracticeRepository {
       applicationSequence,
       revision: 0,
       sequenceSource: 'applied',
-      schedulingEvidenceKind: 'unknown',
-      schedulerProfileId: null,
-      preCardJson: null,
-      assessmentEvidenceJson: null,
+      schedulingEvidenceKind: 'captured',
+      schedulerProfileId,
+      preCardJson: JSON.stringify(scheduled.context.preCard),
+      assessmentEvidenceJson,
     })
 
     const attempts = await this.readReviewAttempts(writeDb, {
@@ -226,10 +263,6 @@ export class PracticeRepository {
     })
     const latestAttempt = attempts.at(-1)
 
-    if (!latestAttempt) {
-      throw new Error('No review result exists to override.')
-    }
-
     const evidenceRows = await writeDb
       .select()
       .from(practiceReviewEvidence)
@@ -237,35 +270,47 @@ export class PracticeRepository {
     const evidenceById = new Map(
       evidenceRows.map((row) => [row.reviewAttemptId, row]),
     )
+    const targetEvidence = evidenceById.get(input.targetAttemptId)
     if (
-      attempts.some(
-        (attempt) =>
-          evidenceById.get(attempt.id)?.schedulingEvidenceKind !== 'unknown',
-      )
+      !currentCardRecord ||
+      !latestAttempt ||
+      latestAttempt.id !== input.targetAttemptId ||
+      !targetEvidence ||
+      targetEvidence.cardId !== cardId ||
+      targetEvidence.applicationSequence !==
+        evidenceRows.reduce(
+          (max, row) => Math.max(max, row.applicationSequence),
+          0,
+        ) ||
+      targetEvidence.revision !== input.expectedRevision ||
+      (input.reviewedAt !== undefined &&
+        input.reviewedAt.getTime() !== latestAttempt.reviewedAt.getTime())
     ) {
-      throw new Error(
-        'Update is unavailable for history with protected scheduling evidence. Recorded profiles require evidence-aware correction.',
+      throw new ReviewCommandConflictError(
+        'stale-review',
+        'This review changed. Refresh before updating; your draft is preserved.',
       )
     }
-    const targetEvidence = evidenceById.get(latestAttempt.id)!
     const revision = incrementPracticeCounter(
       targetEvidence.revision,
       'revision',
     )
-
+    const context = await this.getCorrectionContext(
+      writeDb,
+      currentCardRecord.card,
+      attempts,
+      evidenceById,
+      input.targetRetention,
+    )
+    const replacement = correctReviewFromEvidence(context, input.rating)
     const previousPractice = await this.getPracticeState(
       input.problemSlug,
       writeDb,
     )
     const changedAt = new Date()
-    const updatedLogSnapshot = createPracticeLogSnapshot(
-      previousPractice?.log ?? latestAttempt.log,
-      input.log,
-    )
     const updatedAttempt: StoredPracticeReviewAttempt = {
       ...latestAttempt,
       rating: input.rating,
-      reviewedAt: latestAttempt.reviewedAt,
       elapsedSeconds:
         input.elapsedSeconds === undefined
           ? latestAttempt.elapsedSeconds
@@ -274,59 +319,71 @@ export class PracticeRepository {
         input.isCorrect === undefined
           ? latestAttempt.isCorrect
           : input.isCorrect,
-      log: updatedLogSnapshot,
+      log: createPracticeLogSnapshot(latestAttempt.log, input.log),
       updatedAt: changedAt,
+      fsrsReviewLog: replacement.log,
+      hasStoredFsrsReviewLog: true,
     }
     const updatedAttempts = [...attempts.slice(0, -1), updatedAttempt]
-    const replayedReviews = replayReviewHistorySequence(updatedAttempts, {
-      targetRetention: input.targetRetention,
-    })
-    const replayedReview = replayedReviews.at(-1)
-    // The legacy target is selected by createdAt/id while replay is chronological.
-    // Keep that target and final card, but store the log produced for its own event.
-    const targetReplayIndex = updatedAttempts
-      .toSorted(
-        (left, right) => left.reviewedAt.getTime() - right.reviewedAt.getTime(),
-      )
-      .findIndex((attempt) => attempt.id === updatedAttempt.id)
-    const targetReplayedReview = replayedReviews[targetReplayIndex]
-    if (!replayedReview || !targetReplayedReview) {
-      throw new Error('No review result exists to override.')
-    }
-
-    const replayedCard = replayedReview.card
-    const status = statusFromReview(input.rating, replayedCard)
+    const correctedCard = replacement.card
+    const status = statusFromReview(input.rating, correctedCard)
+    const assessmentEvidenceJson = serializeAssessmentEvidence(
+      input.assessmentEvidence,
+      input.rating,
+    )
 
     await ensurePracticeGenerationsInTransaction(
       writeDb,
       [input.problemSlug],
       changedAt,
     )
+    const schedulerProfileId = await this.ensureSchedulerProfile(
+      writeDb,
+      context,
+      changedAt,
+    )
     await this.upsertCard(writeDb, {
       id: cardId,
       problemSlug: input.problemSlug,
       cardKind,
-      card: replayedCard,
+      card: correctedCard,
       now: changedAt,
     })
-
     await writeDb
       .update(reviewAttempts)
       .set({
         rating: updatedAttempt.rating,
-        reviewedAt: updatedAttempt.reviewedAt.getTime(),
         elapsedSeconds: updatedAttempt.elapsedSeconds,
         isCorrect: updatedAttempt.isCorrect,
         ...toReviewLogRow(updatedAttempt.log),
-        fsrsReviewLog: serializeFsrsReviewLogSnapshot(targetReplayedReview.log),
+        fsrsReviewLog: serializeFsrsReviewLogSnapshot(replacement.log),
         updatedAt: updatedAttempt.updatedAt.getTime(),
       })
-      .where(eq(reviewAttempts.id, updatedAttempt.id))
-
+      .where(
+        and(
+          eq(reviewAttempts.id, input.targetAttemptId),
+          eq(reviewAttempts.problemSlug, input.problemSlug),
+          eq(reviewAttempts.cardId, cardId),
+        ),
+      )
     await writeDb
       .update(practiceReviewEvidence)
-      .set({ revision, assessmentEvidenceJson: null })
-      .where(eq(practiceReviewEvidence.reviewAttemptId, updatedAttempt.id))
+      .set({
+        revision,
+        schedulingEvidenceKind:
+          targetEvidence.schedulingEvidenceKind === 'unknown'
+            ? 'legacy-derived'
+            : targetEvidence.schedulingEvidenceKind,
+        schedulerProfileId,
+        preCardJson: JSON.stringify(context.preCard),
+        assessmentEvidenceJson,
+      })
+      .where(
+        and(
+          eq(practiceReviewEvidence.reviewAttemptId, input.targetAttemptId),
+          eq(practiceReviewEvidence.revision, input.expectedRevision),
+        ),
+      )
 
     const practice = await this.upsertPracticeAggregate(writeDb, {
       problemSlug: input.problemSlug,
@@ -338,7 +395,7 @@ export class PracticeRepository {
     })
     const summary = derivePracticeSummary({
       practice,
-      card: replayedCard,
+      card: correctedCard,
       now: changedAt,
     })
 
@@ -348,9 +405,9 @@ export class PracticeRepository {
       reviewAttemptId: updatedAttempt.id,
       rating: input.rating,
       status,
-      dueAt: replayedCard.dueAt,
+      dueAt: correctedCard.dueAt,
       reviewedAt: updatedAttempt.reviewedAt,
-      card: replayedCard,
+      card: correctedCard,
       summary,
     }
   }
@@ -445,20 +502,42 @@ export class PracticeRepository {
     const cardRecord = await this.getCardRecord(problemSlug, cardKind, db)
     const cardId = cardRecord?.id ?? createFsrsCardId(problemSlug, cardKind)
     const card = cardRecord?.card ?? null
-    const [practice, attempts, evidenceRows] = await Promise.all([
+    const [practice, attempts, evidenceRows, generations] = await Promise.all([
       this.getPracticeState(problemSlug, db),
       this.readReviewAttempts(db, { problemSlug, cardId }),
       db
         .select()
         .from(practiceReviewEvidence)
         .where(eq(practiceReviewEvidence.cardId, cardId)),
+      db
+        .select()
+        .from(practiceGenerations)
+        .where(
+          or(
+            eq(practiceGenerations.scopeId, 'local'),
+            eq(practiceGenerations.scopeId, `problem:${problemSlug}`),
+          ),
+        ),
     ])
     const attemptSnapshots = attempts.map(toReviewAttemptSnapshot)
-    const unknownEvidenceIds = new Set(
-      evidenceRows
-        .filter((row) => row.schedulingEvidenceKind === 'unknown')
-        .map((row) => row.reviewAttemptId),
+    const evidenceById = new Map(
+      evidenceRows.map((row) => [row.reviewAttemptId, row]),
     )
+    const latest = attempts.at(-1)
+    const latestEvidence = latest ? evidenceById.get(latest.id) : null
+    const localGeneration = generations.find((row) => row.scopeId === 'local')
+    const problemGeneration = generations.find(
+      (row) => row.scopeId === `problem:${problemSlug}`,
+    )
+    let canOverrideLatestReview = false
+    if (card && latestEvidence) {
+      try {
+        await this.getCorrectionContext(db, card, attempts, evidenceById)
+        canOverrideLatestReview = true
+      } catch {
+        // Reads expose unsafe context as unavailable; writes retain the error.
+      }
+    }
     const normalized = deriveNormalizedPracticeState({
       problemSlug,
       cardId,
@@ -473,9 +552,22 @@ export class PracticeRepository {
       practice,
       card,
       currentLog: practice?.log ?? normalizeReviewLogFields(),
-      canOverrideLatestReview:
-        normalized.latestAttempt !== null &&
-        attempts.every((attempt) => unknownEvidenceIds.has(attempt.id)),
+      canOverrideLatestReview,
+      generation: localGeneration
+        ? {
+            localGenerationToken: localGeneration.generationToken,
+            problemGenerationToken: problemGeneration?.generationToken ?? null,
+          }
+        : null,
+      latestReview:
+        latest && latestEvidence
+          ? {
+              reviewAttemptId: latest.id,
+              applicationSequence: latestEvidence.applicationSequence,
+              revision: latestEvidence.revision,
+              reviewedAt: latest.reviewedAt,
+            }
+          : null,
     }
   }
 
@@ -572,15 +664,137 @@ export class PracticeRepository {
     const rows = await db
       .select()
       .from(reviewAttempts)
+      .leftJoin(
+        practiceReviewEvidence,
+        eq(practiceReviewEvidence.reviewAttemptId, reviewAttempts.id),
+      )
       .where(
         and(
           eq(reviewAttempts.problemSlug, input.problemSlug),
           eq(reviewAttempts.cardId, input.cardId),
         ),
       )
-      .orderBy(asc(reviewAttempts.createdAt), asc(reviewAttempts.id))
+      .orderBy(asc(practiceReviewEvidence.applicationSequence))
 
-    return rows.map(mapReviewAttempt)
+    return rows.map((row) => mapReviewAttempt(row.review_attempts))
+  }
+
+  private async ensureSchedulerProfile(
+    db: PracticeWriteDb,
+    context: FsrsReviewContext,
+    now: Date,
+  ): Promise<string> {
+    const profileJson = serializeFsrsSchedulerProfile(context.profile)
+    const [existing] = await db
+      .select()
+      .from(fsrsSchedulerProfiles)
+      .where(eq(fsrsSchedulerProfiles.profileJson, profileJson))
+      .limit(1)
+    if (existing) return existing.id
+    const id = crypto.randomUUID()
+    await db
+      .insert(fsrsSchedulerProfiles)
+      .values({ id, profileJson, createdAt: now.getTime() })
+    return id
+  }
+
+  /** Reads and verifies the exact same context used by Update availability. */
+  private async getCorrectionContext(
+    db: PracticeReadDb,
+    card: FsrsCardSnapshot,
+    attempts: StoredPracticeReviewAttempt[],
+    evidenceById: Map<string, PracticeReviewEvidenceRow>,
+    targetRetention?: number,
+  ): Promise<FsrsReviewContext> {
+    const latest = attempts.at(-1)
+    const evidence = latest ? evidenceById.get(latest.id) : null
+    if (
+      !latest ||
+      !evidence ||
+      attempts.some((attempt) => !evidenceById.has(attempt.id))
+    ) {
+      throw new ReviewCommandConflictError(
+        'unsupported-legacy',
+        'Unsupported or ambiguous legacy FSRS correction evidence.',
+      )
+    }
+    if (
+      evidence.cardId !== latest.cardId ||
+      evidence.applicationSequence !==
+        [...evidenceById.values()].reduce(
+          (max, row) => Math.max(max, row.applicationSequence),
+          0,
+        )
+    ) {
+      throw new ReviewCommandConflictError(
+        'stale-review',
+        'This review changed. Refresh before updating; your draft is preserved.',
+      )
+    }
+    if (evidence.schedulingEvidenceKind === 'unknown') {
+      if (attempts.some((attempt) => !attempt.hasStoredFsrsReviewLog)) {
+        throw new ReviewCommandConflictError(
+          'unsupported-legacy',
+          'Unsupported or ambiguous legacy FSRS correction evidence.',
+        )
+      }
+      try {
+        return correctLegacyReview(
+          card,
+          attempts.map((attempt) => ({
+            reviewedAt: attempt.reviewedAt,
+            rating: attempt.rating,
+            log: attempt.fsrsReviewLog,
+          })),
+          latest.rating,
+          targetRetention ?? 0.9,
+        ).context
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message ===
+            'Unsupported or ambiguous legacy FSRS correction evidence.'
+        ) {
+          throw new ReviewCommandConflictError(
+            'unsupported-legacy',
+            error.message,
+          )
+        }
+        throw error
+      }
+    }
+    const [profileRow] =
+      evidence.schedulerProfileId === null
+        ? []
+        : await db
+            .select()
+            .from(fsrsSchedulerProfiles)
+            .where(eq(fsrsSchedulerProfiles.id, evidence.schedulerProfileId))
+            .limit(1)
+    if (!profileRow || !evidence.preCardJson || !latest.fsrsReviewLog) {
+      throw new Error('Captured Practice correction context is incomplete.')
+    }
+    const preCard = parseSerializedFsrsCardSnapshot(evidence.preCardJson)
+    const profile = parseSerializedFsrsSchedulerProfile(profileRow.profileJson)
+    assertFsrsReviewLogMatchesPreCard(latest.fsrsReviewLog, preCard, profile)
+    const context: FsrsReviewContext = {
+      preCard: toSerializableFsrsCardSnapshot(preCard),
+      profile,
+      reviewedAt: latest.reviewedAt.toISOString(),
+    }
+    const original = correctReviewFromEvidence(context, latest.rating)
+    if (
+      serializeFsrsCardSnapshot(original.card) !==
+        serializeFsrsCardSnapshot(card) ||
+      serializeFsrsReviewLogSnapshot(original.log) !==
+        serializeFsrsReviewLogSnapshot(latest.fsrsReviewLog)
+    ) {
+      throw new ReviewCommandConflictError(
+        'stale-review',
+        'This review changed. Refresh before updating; your draft is preserved.',
+      )
+    }
+    return context
   }
 
   private async upsertPracticeAggregate(
@@ -773,6 +987,7 @@ function incrementPracticeCounter(value: number, label: string): number {
 
 interface StoredPracticeReviewAttempt extends PracticeReviewAttemptSnapshot {
   fsrsReviewLog: FsrsReviewLogSnapshot | null
+  hasStoredFsrsReviewLog: boolean
 }
 
 export function createFsrsCardId(problemSlug: string, cardKind: FsrsCardKind) {
@@ -838,6 +1053,7 @@ function mapReviewAttempt(row: ReviewAttemptRow): StoredPracticeReviewAttempt {
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt),
     fsrsReviewLog: parseStoredFsrsReviewLogSnapshot(row.fsrsReviewLog),
+    hasStoredFsrsReviewLog: row.fsrsReviewLog !== null,
   }
 }
 
@@ -898,6 +1114,20 @@ function normalizeElapsedSeconds(value: number | null | undefined) {
   }
 
   return Math.round(value)
+}
+
+function serializeAssessmentEvidence(
+  value: SaveReviewResultInput['assessmentEvidence'],
+  rating: SaveReviewResultInput['rating'],
+): string | null {
+  if (value === undefined) return null
+  const evidence = practiceAssessmentEvidenceSchema.parse(value)
+  if (evidence.finalRating !== rating) {
+    throw new Error(
+      'Practice assessment evidence must match the effective rating.',
+    )
+  }
+  return JSON.stringify(evidence)
 }
 
 function toPracticeLogRow(log: Required<PracticeLogFields>) {
