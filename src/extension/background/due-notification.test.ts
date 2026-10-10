@@ -6,8 +6,7 @@ import {
 } from './due-notification'
 import type { DueNotificationDeps } from './due-notification'
 
-// All tests use TZ=UTC so setHours() is deterministic.
-// Run with: TZ=UTC pnpm test src/extension/background/due-notification.test.ts
+// Vitest defaults to UTC; local-day cases explicitly change and verify TZ.
 
 describe('normalizeNotificationTime', () => {
   it('returns minutes to a future time today', () => {
@@ -199,6 +198,148 @@ describe('runDailyCheck', () => {
       'You have 4 reviews due.',
     )
     expect(deps.writeState).toHaveBeenCalledWith('2026-05-30')
+  })
+
+  it('deduplicates by the browser-local study day near UTC midnight', async () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    try {
+      expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe(
+        'America/New_York',
+      )
+      const deps = createDeps({
+        now: () => new Date('2026-05-30T01:00:00.000Z'),
+        readState: vi.fn(() =>
+          Promise.resolve({ lastNotifiedDate: '2026-05-29' }),
+        ),
+        readQueueSummary: vi.fn(() => Promise.resolve({ dueToday: 1 })),
+      })
+
+      await createDueNotification(deps).runDailyCheck()
+
+      expect(deps.notify).not.toHaveBeenCalled()
+      expect(deps.writeState).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('migrates a legacy UTC reminder key once without duplicating or suppressing the next local day', async () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    try {
+      expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe(
+        'America/New_York',
+      )
+      let now = new Date('2026-05-30T01:00:00.000Z')
+      let state: {
+        lastNotifiedDate: string | null
+        isLegacyUtcDate?: boolean
+      } = { lastNotifiedDate: '2026-05-30', isLegacyUtcDate: true }
+      const deps = createDeps({
+        now: () => now,
+        readSettings: vi.fn(() =>
+          Promise.resolve(makeReminders({ time: '21:00' })),
+        ),
+        readState: vi.fn(() => Promise.resolve(state)),
+        writeState: vi.fn((date: string) => {
+          state = { lastNotifiedDate: date, isLegacyUtcDate: false }
+          return Promise.resolve()
+        }),
+        readQueueSummary: vi.fn(() => Promise.resolve({ dueToday: 1 })),
+      })
+      const notification = createDueNotification(deps)
+
+      await notification.runDailyCheck()
+      expect(deps.notify).not.toHaveBeenCalled()
+      expect(deps.writeState).toHaveBeenCalledWith('2026-05-29')
+
+      now = new Date('2026-05-31T01:00:00.000Z')
+      await notification.runDailyCheck()
+      expect(deps.notify).toHaveBeenCalledTimes(1)
+      expect(deps.writeState).toHaveBeenLastCalledWith('2026-05-30')
+      await notification.runDailyCheck()
+      expect(deps.notify).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('does not treat yesterday evening’s legacy UTC key as today after upgrade', async () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    try {
+      expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe(
+        'America/New_York',
+      )
+      const deps = createDeps({
+        now: () => new Date('2026-05-31T01:00:00.000Z'),
+        readSettings: vi.fn(() =>
+          Promise.resolve(makeReminders({ time: '21:00' })),
+        ),
+        readState: vi.fn(() =>
+          Promise.resolve({
+            lastNotifiedDate: '2026-05-30',
+            isLegacyUtcDate: true,
+          }),
+        ),
+        readQueueSummary: vi.fn(() => Promise.resolve({ dueToday: 1 })),
+      })
+
+      await createDueNotification(deps).runDailyCheck()
+
+      expect(deps.notify).toHaveBeenCalledTimes(1)
+      expect(deps.writeState).toHaveBeenCalledWith('2026-05-30')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('avoids a same-day duplicate after the old worker notified late on startup', async () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    try {
+      const deps = createDeps({
+        now: () => new Date('2026-05-30T02:00:00.000Z'),
+        readSettings: vi.fn(() =>
+          Promise.resolve(makeReminders({ time: '09:00' })),
+        ),
+        readState: vi.fn(() =>
+          Promise.resolve({
+            lastNotifiedDate: '2026-05-30',
+            isLegacyUtcDate: true,
+          }),
+        ),
+        readQueueSummary: vi.fn(() => Promise.resolve({ dueToday: 1 })),
+      })
+
+      await createDueNotification(deps).runDailyCheck()
+
+      expect(deps.notify).not.toHaveBeenCalled()
+      expect(deps.writeState).toHaveBeenCalledWith('2026-05-29')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it.each([
+    ['spring', '2026-03-08T07:30:00.000Z', '2026-03-08'],
+    ['autumn', '2026-11-01T06:30:00.000Z', '2026-11-01'],
+  ])('keeps the %s DST review day deduplicated', async (_season, at, day) => {
+    vi.stubEnv('TZ', 'America/New_York')
+    try {
+      expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe(
+        'America/New_York',
+      )
+      const deps = createDeps({
+        now: () => new Date(at),
+        readState: vi.fn(() => Promise.resolve({ lastNotifiedDate: day })),
+        readQueueSummary: vi.fn(() => Promise.resolve({ dueToday: 1 })),
+      })
+
+      await createDueNotification(deps).runDailyCheck()
+
+      expect(deps.notify).not.toHaveBeenCalled()
+      expect(deps.writeState).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })
 

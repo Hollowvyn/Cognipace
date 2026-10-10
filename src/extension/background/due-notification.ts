@@ -1,3 +1,4 @@
+import { toPracticeDateKey } from '@/features/practice'
 import type { UserSettings } from '@/features/settings/domain'
 import { browser } from 'wxt/browser'
 import type { AlarmScheduler } from './scheduler/alarm-scheduler'
@@ -8,7 +9,10 @@ export type DueNotificationDeps = {
   now: () => Date
   readSettings: () => Promise<Pick<UserSettings, 'reminders'>>
   readQueueSummary: () => Promise<{ dueToday: number }>
-  readState: () => Promise<{ lastNotifiedDate: string | null }>
+  readState: () => Promise<{
+    lastNotifiedDate: string | null
+    isLegacyUtcDate?: boolean
+  }>
   writeState: (date: string) => Promise<void>
   notify: (title: string, message: string) => Promise<void>
   checkAlarmScheduled: (name: string) => Promise<boolean>
@@ -28,10 +32,6 @@ export function normalizeNotificationTime(time: string, now: Date): number {
   return Math.ceil((target.getTime() - now.getTime()) / 60_000)
 }
 
-function toDateString(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
-
 function hasTimePassed(time: string, now: Date): boolean {
   const parts = time.split(':').map(Number)
   const hours = parts[0]!
@@ -42,17 +42,29 @@ function hasTimePassed(time: string, now: Date): boolean {
 }
 
 const notificationStateKey = 'cognipace:notification:lastNotifiedDate'
+const localNotificationStateKey = 'cognipace:notification:lastNotifiedLocalDate'
 
 export async function readDueNotificationState(): Promise<{
   lastNotifiedDate: string | null
+  isLegacyUtcDate: boolean
 }> {
-  const result = await browser.storage.local.get(notificationStateKey)
-  const value = result[notificationStateKey]
-  return { lastNotifiedDate: typeof value === 'string' ? value : null }
+  const result = await browser.storage.local.get([
+    localNotificationStateKey,
+    notificationStateKey,
+  ])
+  const localValue = result[localNotificationStateKey]
+  if (typeof localValue === 'string') {
+    return { lastNotifiedDate: localValue, isLegacyUtcDate: false }
+  }
+  const legacyValue = result[notificationStateKey]
+  return {
+    lastNotifiedDate: typeof legacyValue === 'string' ? legacyValue : null,
+    isLegacyUtcDate: typeof legacyValue === 'string',
+  }
 }
 
 export async function writeDueNotificationState(date: string): Promise<void> {
-  await browser.storage.local.set({ [notificationStateKey]: date })
+  await browser.storage.local.set({ [localNotificationStateKey]: date })
 }
 
 export function createDueNotification(deps: DueNotificationDeps) {
@@ -65,11 +77,25 @@ export function createDueNotification(deps: DueNotificationDeps) {
     }
 
     const now = deps.now()
-    const today = toDateString(now)
+    const today = toPracticeDateKey(now)
     const state = await deps.readState()
     const { dueToday } = await deps.readQueueSummary()
+    const [hours, minutes] = settings.reminders.daily.time
+      .split(':')
+      .map(Number)
+    const scheduledToday = new Date(now)
+    scheduledToday.setHours(hours ?? 0, minutes ?? 0, 0, 0)
+    const legacyDateMayBeToday =
+      state.isLegacyUtcDate &&
+      (state.lastNotifiedDate === scheduledToday.toISOString().slice(0, 10) ||
+        state.lastNotifiedDate === now.toISOString().slice(0, 10))
 
-    if (state.lastNotifiedDate !== today && dueToday > 0) {
+    if (legacyDateMayBeToday) {
+      await deps.writeState(today)
+    } else if (
+      (state.isLegacyUtcDate || state.lastNotifiedDate !== today) &&
+      dueToday > 0
+    ) {
       await deps.notify(
         'Reviews due',
         `You have ${dueToday} review${dueToday === 1 ? '' : 's'} due.`,
