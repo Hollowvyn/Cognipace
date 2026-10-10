@@ -43,6 +43,41 @@ describe('cache invalidation query-key mapping', () => {
     )
   })
 
+  it('reveals pending replacement to a mounted query after automatic Sync invalidation', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    const queryKey = queryKeys.backup.pendingReplacement()
+    client.setQueryData(queryKey, { status: 'idle' })
+    const readPending = vi.fn().mockResolvedValue({
+      status: 'persistence-pending',
+      kind: 'gist-pull',
+      summary: null,
+    })
+    const observer = new QueryObserver(client, {
+      queryKey,
+      queryFn: readPending,
+      staleTime: Infinity,
+    })
+    const unsubscribe = observer.subscribe(() => {})
+
+    try {
+      expect(readPending).not.toHaveBeenCalled()
+      await invalidateTaggedQueries(client, ['sync'])
+      await vi.waitFor(() =>
+        expect(observer.getCurrentResult().data).toEqual({
+          status: 'persistence-pending',
+          kind: 'gist-pull',
+          summary: null,
+        }),
+      )
+      expect(readPending).toHaveBeenCalledTimes(1)
+    } finally {
+      unsubscribe()
+      client.clear()
+    }
+  })
+
   it('deduplicates query families when multiple tags overlap', () => {
     expect(
       readQueryKeysForInvalidation(['settings', 'practice', 'queue']),

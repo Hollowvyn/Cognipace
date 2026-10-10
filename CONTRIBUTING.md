@@ -219,7 +219,9 @@ business reads/writes.
 Table ownership:
 
 - `problems` and taxonomy joins: `features/problems`
-- `problem_practice`, `fsrs_cards`, `review_attempts`: `features/practice`
+- `problem_practice`, `fsrs_cards`, `review_attempts`,
+  `fsrs_scheduler_profiles`, `practice_review_evidence`,
+  `practice_generations`, `practice_command_receipts`: `features/practice`
 - `settings_kv`: `features/settings`
 - `tracks`, `track_groups`, `track_group_problems`, `track_session`:
   `features/tracks`
@@ -232,10 +234,15 @@ npm run db:check
 npm run check
 ```
 
-Current persistence is snapshot-based. Migration SQL is fingerprinted; if the
-fingerprint changes, the stored extension snapshot can be cleared and rebuilt
-from migrations plus seed data. Treat schema changes as local-data-resetting
-until a durable migration strategy is introduced.
+Current persistence is snapshot-based. Exact shipped migration prefixes through
+0007, 0008 and 0009 support staged preserving upgrades. Each upgrade retains the
+original in its own recovery slot, applies only appended SQL, prepares feature
+metadata, validates the result and publishes last. Failed or unsupported opens
+retain the original rather than clearing and reseeding. Matching current opens
+validate existing Practice metadata without repairing or rotating it. Keep
+historical SQL and snapshots unchanged; add a populated preservation test for
+each persisted-shape change. See [Database And Persistence](docs/architecture.md#database-and-persistence)
+and [Local Database Recovery](docs/testing.md#local-database-recovery).
 
 Write rules:
 

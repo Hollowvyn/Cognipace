@@ -31,6 +31,7 @@ export {
   type NormalizedFsrsSchedulingOptions,
 } from './domain/scheduling-options'
 export {
+  assertFsrsReviewLogMatchesPreCard,
   isFsrsReviewLogSnapshot,
   parseFsrsReviewLogSnapshot,
   parseSerializedFsrsReviewLogSnapshot,

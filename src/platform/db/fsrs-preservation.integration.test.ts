@@ -1,25 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('./migration-sql', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./migration-sql')>()
-  // A test-only suffix exercises staged upgrades without adding production SQL.
-  const suffix = 'CREATE TABLE fsrs_upgrade_probe (id TEXT PRIMARY KEY);'
-  return {
-    ...actual,
-    migrationEntries: [
-      ...actual.migrationEntries,
-      { path: './migrations/0010_fsrs_upgrade_probe.sql', sql: suffix },
-    ],
-    migrationSql: `${actual.migrationSql}\n${suffix}`,
-  }
-})
-
 // This platform integration test verifies feature progress reads after snapshot upgrade.
 // eslint-disable-next-line no-restricted-imports
 import { buildPracticeProgressSummary } from '@/features/practice/domain/practice-progress'
 // This platform integration test verifies the owning settings repository reads preserved values.
 // eslint-disable-next-line no-restricted-imports
 import { createSettingsRepository } from '@/features/settings/data/settings-repository'
+// This platform integration test verifies real feature-owned migration preparation.
+// eslint-disable-next-line no-restricted-imports
+import {
+  preparePracticeStorage,
+  readPracticeStorageData,
+  validatePracticeStorage,
+} from '@/features/practice/server/practice-storage-service'
 import { getBackgroundDb } from '@/extension/background/app-db'
 import { expectedV9MigrationFingerprint } from '@/testing/fixtures/fsrs-remediation-legacy-migrations'
 import {
@@ -31,7 +24,7 @@ import {
 } from '@/testing/fixtures/fsrs-preservation'
 import type { DbHandle } from './client'
 import { flushDbSnapshot, getAppDb, resetAppDbForTesting } from './instance'
-import { migrationSql } from './migration-sql'
+import { migrationEntries, migrationSql } from './migration-sql'
 import {
   bytesToBase64,
   computeFingerprint,
@@ -128,6 +121,12 @@ function progress(attempts: ReturnType<typeof readProgressAttempts>) {
 }
 
 describe('populated FSRS snapshot preservation', () => {
+  it('uses the real appended evidence migration', () => {
+    expect(migrationEntries.at(-1)?.path).toBe(
+      './migrations/0010_fsrs_evidence.sql',
+    )
+  })
+
   it('keeps all original rows through the production background bridge', async () => {
     const { fixture } = await installPopulatedStorage()
     const handle = await getBackgroundDb()
@@ -170,17 +169,61 @@ describe('populated FSRS snapshot preservation', () => {
       expect(await createSettingsRepository(handle.db).getSettings()).toEqual(
         fixture.settings,
       )
+      await preparePracticeStorage(handle.db, preservationNow)
+      expect(readPreservationRows(handle)).toEqual(fixture.rows)
     })
-    const upgraded = await getAppDb({ beforePublish })
+    const upgraded = await getAppDb({
+      beforePublish,
+      validateCurrentData: (handle) => validatePracticeStorage(handle.db),
+    })
     handles.push(upgraded)
     expect(beforePublish).toHaveBeenCalledOnce()
     expect(readPreservationRows(upgraded)).toEqual(fixture.rows)
     expect(
       upgraded.rawDb.exec({
-        sql: 'SELECT * FROM fsrs_upgrade_probe',
+        sql: "SELECT name FROM sqlite_schema WHERE type = 'table' AND name IN ('fsrs_scheduler_profiles', 'practice_review_evidence', 'practice_generations', 'practice_command_receipts') ORDER BY name",
         returnValue: 'resultRows',
       }),
-    ).toEqual([])
+    ).toEqual([
+      ['fsrs_scheduler_profiles'],
+      ['practice_command_receipts'],
+      ['practice_generations'],
+      ['practice_review_evidence'],
+    ])
+    const metadata = await readPracticeStorageData(upgraded.db)
+    expect(metadata.schedulerProfiles).toEqual([])
+    expect(metadata.commandReceipts).toEqual([])
+    expect(metadata.reviewEvidence).toHaveLength(6)
+    expect(
+      metadata.reviewEvidence.map((row) => [
+        row.reviewAttemptId,
+        row.cardId,
+        row.applicationSequence,
+      ]),
+    ).toEqual([
+      ['attempt-b-1', 'card-1', 1],
+      ['attempt-b-2', 'card-1', 2],
+      ['attempt-a-1', 'card-custom', 1],
+      ['attempt-a-2', 'card-custom', 2],
+      ['attempt-a-3', 'card-custom', 3],
+      ['attempt-s-1', 'suspended-opaque', 1],
+    ])
+    for (const row of metadata.reviewEvidence)
+      expect(row).toMatchObject({
+        revision: 0,
+        sequenceSource: 'legacy-inferred',
+        schedulingEvidenceKind: 'unknown',
+        schedulerProfileId: null,
+        preCardJson: null,
+        assessmentEvidenceJson: null,
+      })
+    expect(metadata.generations.map((row) => row.scopeId)).toEqual([
+      'local',
+      'problem:day-a',
+      'problem:day-b',
+      'problem:fresh-zero',
+      'problem:suspended',
+    ])
     expect(storage.values[FINGERPRINT_KEY]).toBe(
       computeFingerprint(migrationSql),
     )
@@ -190,10 +233,14 @@ describe('populated FSRS snapshot preservation', () => {
     await flushDbSnapshot()
     resetAppDbForTesting()
     const matchingPrepare = vi.fn()
-    const reopened = await getAppDb({ beforePublish: matchingPrepare })
+    const reopened = await getAppDb({
+      beforePublish: matchingPrepare,
+      validateCurrentData: (handle) => validatePracticeStorage(handle.db),
+    })
     handles.push(reopened)
     expect(matchingPrepare).not.toHaveBeenCalled()
     expect(readPreservationRows(reopened)).toEqual(fixture.rows)
+    expect(await readPracticeStorageData(reopened.db)).toEqual(metadata)
     expect(await createSettingsRepository(reopened.db).getSettings()).toEqual(
       fixture.settings,
     )
@@ -237,13 +284,14 @@ describe('populated FSRS snapshot preservation', () => {
       }
       await expect(
         getAppDb({
-          beforePublish: (handle) => {
+          beforePublish: async (handle) => {
             if (failure === 'preparation')
               throw new Error('preparation rejected')
             if (failure === 'target schema')
               handle.rawDb.exec('CREATE TABLE unexpected_table (id TEXT)')
-            return Promise.resolve()
+            await preparePracticeStorage(handle.db, preservationNow)
           },
+          validateCurrentData: (handle) => validatePracticeStorage(handle.db),
         }),
       ).rejects.toThrow(new Error(errors[failure]))
       expect(storage.values[SNAPSHOT_KEY]).toBe(original[SNAPSHOT_KEY])
@@ -262,7 +310,7 @@ describe('populated FSRS snapshot preservation', () => {
       if (failure !== 'collision') {
         storage.failure = null
         resetAppDbForTesting()
-        const retried = await getAppDb()
+        const retried = await getBackgroundDb()
         handles.push(retried)
         expect(readPreservationRows(retried)).toEqual(fixture.rows)
         expectEarlierRecoveries(storage, earlier)
@@ -277,4 +325,43 @@ describe('populated FSRS snapshot preservation', () => {
       }
     },
   )
+
+  it('retains the original through real preparation failure, then retries and reopens without replacing recovery', async () => {
+    const { fixture, storage, earlier, original } =
+      await installPopulatedStorage()
+    await expect(
+      getAppDb({
+        beforePublish: async (handle) => {
+          handle.rawDb.exec(
+            "UPDATE review_attempts SET fsrs_review_log = '{}' WHERE id = (SELECT id FROM review_attempts LIMIT 1)",
+          )
+          await preparePracticeStorage(handle.db, preservationNow)
+        },
+        validateCurrentData: (handle) => validatePracticeStorage(handle.db),
+      }),
+    ).rejects.toThrow('Invalid FSRS review log snapshot.')
+    expect(storage.values[SNAPSHOT_KEY]).toBe(original[SNAPSHOT_KEY])
+    expect(storage.values[FINGERPRINT_KEY]).toBe(original[FINGERPRINT_KEY])
+    expectEarlierRecoveries(storage, earlier)
+    const recovery = storage.values[FSRS_RECOVERY_KEY]
+    expect(recovery).toEqual({
+      version: 1,
+      raw: original,
+      savedAt: expect.any(String) as unknown,
+    })
+
+    resetAppDbForTesting()
+    const retried = await getBackgroundDb()
+    handles.push(retried)
+    expect(readPreservationRows(retried)).toEqual(fixture.rows)
+    const metadata = await readPracticeStorageData(retried.db)
+    await flushDbSnapshot()
+    resetAppDbForTesting()
+    const reopened = await getBackgroundDb()
+    handles.push(reopened)
+    expect(readPreservationRows(reopened)).toEqual(fixture.rows)
+    expect(await readPracticeStorageData(reopened.db)).toEqual(metadata)
+    expect(storage.values[FSRS_RECOVERY_KEY]).toEqual(recovery)
+    expectEarlierRecoveries(storage, earlier)
+  })
 })

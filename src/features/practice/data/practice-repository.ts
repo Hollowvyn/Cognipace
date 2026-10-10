@@ -18,6 +18,8 @@ import {
   fsrsCards,
   problemPractice,
   reviewAttempts,
+  practiceReviewEvidence,
+  practiceCommandReceipts,
   type FsrsCardRow,
   type ProblemPracticeRow,
   type ReviewAttemptRow,
@@ -47,6 +49,11 @@ import {
   type SetPracticeSuspendedInput,
 } from '../domain'
 
+import {
+  ensurePracticeGenerationsInTransaction,
+  rotateProblemPracticeGenerationInTransaction,
+} from './practice-storage-repository'
+
 export function createPracticeRepository(db: Db) {
   return new PracticeRepository(db)
 }
@@ -66,7 +73,14 @@ export class PracticeRepository {
   ): Promise<ReviewResult> {
     const reviewedAt = input.reviewedAt ?? new Date()
     const cardKind = input.cardKind ?? defaultFsrsCardKind
-    const cardId = createFsrsCardId(input.problemSlug, cardKind)
+    const currentCardRecord = await this.getCardRecord(
+      input.problemSlug,
+      cardKind,
+      writeDb,
+    )
+    const cardId =
+      currentCardRecord?.id ??
+      (await this.createAvailableCardId(input.problemSlug, cardKind, writeDb))
     const timestamp = reviewedAt.getTime()
     const createdAt = new Date()
     const createdAtTimestamp = createdAt.getTime()
@@ -75,8 +89,29 @@ export class PracticeRepository {
       createReviewAttemptId(input.problemSlug, timestamp)
 
     const currentCard =
-      (await this.getCard(input.problemSlug, cardKind, writeDb)) ??
-      createInitialFsrsCard(reviewedAt)
+      currentCardRecord?.card ?? createInitialFsrsCard(reviewedAt)
+    const evidenceRows = await writeDb
+      .select()
+      .from(practiceReviewEvidence)
+      .where(eq(practiceReviewEvidence.cardId, cardId))
+    const existingAttempts = await writeDb
+      .select({ id: reviewAttempts.id })
+      .from(reviewAttempts)
+      .where(eq(reviewAttempts.cardId, cardId))
+    const evidenceIds = new Set(evidenceRows.map((row) => row.reviewAttemptId))
+    if (existingAttempts.some((attempt) => !evidenceIds.has(attempt.id))) {
+      throw new Error(
+        'Practice history requires storage preparation before Save.',
+      )
+    }
+    const maximumSequence = evidenceRows.reduce(
+      (maximum, row) => Math.max(maximum, row.applicationSequence),
+      0,
+    )
+    const applicationSequence = incrementPracticeCounter(
+      maximumSequence,
+      'application sequence',
+    )
     const scheduled = scheduleReview(currentCard, input.rating, reviewedAt, {
       targetRetention: input.targetRetention,
     })
@@ -90,6 +125,11 @@ export class PracticeRepository {
       input.log,
     )
 
+    await ensurePracticeGenerationsInTransaction(
+      writeDb,
+      [input.problemSlug],
+      createdAt,
+    )
     await this.upsertCard(writeDb, {
       id: cardId,
       problemSlug: input.problemSlug,
@@ -111,6 +151,18 @@ export class PracticeRepository {
       fsrsReviewLog: serializeFsrsReviewLogSnapshot(scheduled.log),
       createdAt: createdAtTimestamp,
       updatedAt: createdAtTimestamp,
+    })
+
+    await writeDb.insert(practiceReviewEvidence).values({
+      reviewAttemptId,
+      cardId,
+      applicationSequence,
+      revision: 0,
+      sequenceSource: 'applied',
+      schedulingEvidenceKind: 'unknown',
+      schedulerProfileId: null,
+      preCardJson: null,
+      assessmentEvidenceJson: null,
     })
 
     const attempts = await this.readReviewAttempts(writeDb, {
@@ -160,7 +212,13 @@ export class PracticeRepository {
     writeDb: Db,
   ): Promise<ReviewResult> {
     const cardKind = input.cardKind ?? defaultFsrsCardKind
-    const cardId = createFsrsCardId(input.problemSlug, cardKind)
+    const currentCardRecord = await this.getCardRecord(
+      input.problemSlug,
+      cardKind,
+      writeDb,
+    )
+    const cardId =
+      currentCardRecord?.id ?? createFsrsCardId(input.problemSlug, cardKind)
 
     const attempts = await this.readReviewAttempts(writeDb, {
       problemSlug: input.problemSlug,
@@ -171,6 +229,29 @@ export class PracticeRepository {
     if (!latestAttempt) {
       throw new Error('No review result exists to override.')
     }
+
+    const evidenceRows = await writeDb
+      .select()
+      .from(practiceReviewEvidence)
+      .where(eq(practiceReviewEvidence.cardId, cardId))
+    const evidenceById = new Map(
+      evidenceRows.map((row) => [row.reviewAttemptId, row]),
+    )
+    if (
+      attempts.some(
+        (attempt) =>
+          evidenceById.get(attempt.id)?.schedulingEvidenceKind !== 'unknown',
+      )
+    ) {
+      throw new Error(
+        'Update is unavailable for history with protected scheduling evidence. Recorded profiles require evidence-aware correction.',
+      )
+    }
+    const targetEvidence = evidenceById.get(latestAttempt.id)!
+    const revision = incrementPracticeCounter(
+      targetEvidence.revision,
+      'revision',
+    )
 
     const previousPractice = await this.getPracticeState(
       input.problemSlug,
@@ -197,16 +278,30 @@ export class PracticeRepository {
       updatedAt: changedAt,
     }
     const updatedAttempts = [...attempts.slice(0, -1), updatedAttempt]
-    const replayedReview = replayReviewHistorySequence(updatedAttempts, {
+    const replayedReviews = replayReviewHistorySequence(updatedAttempts, {
       targetRetention: input.targetRetention,
-    }).at(-1)
-    if (!replayedReview) {
+    })
+    const replayedReview = replayedReviews.at(-1)
+    // The legacy target is selected by createdAt/id while replay is chronological.
+    // Keep that target and final card, but store the log produced for its own event.
+    const targetReplayIndex = updatedAttempts
+      .toSorted(
+        (left, right) => left.reviewedAt.getTime() - right.reviewedAt.getTime(),
+      )
+      .findIndex((attempt) => attempt.id === updatedAttempt.id)
+    const targetReplayedReview = replayedReviews[targetReplayIndex]
+    if (!replayedReview || !targetReplayedReview) {
       throw new Error('No review result exists to override.')
     }
 
     const replayedCard = replayedReview.card
     const status = statusFromReview(input.rating, replayedCard)
 
+    await ensurePracticeGenerationsInTransaction(
+      writeDb,
+      [input.problemSlug],
+      changedAt,
+    )
     await this.upsertCard(writeDb, {
       id: cardId,
       problemSlug: input.problemSlug,
@@ -223,10 +318,15 @@ export class PracticeRepository {
         elapsedSeconds: updatedAttempt.elapsedSeconds,
         isCorrect: updatedAttempt.isCorrect,
         ...toReviewLogRow(updatedAttempt.log),
-        fsrsReviewLog: serializeFsrsReviewLogSnapshot(replayedReview.log),
+        fsrsReviewLog: serializeFsrsReviewLogSnapshot(targetReplayedReview.log),
         updatedAt: updatedAttempt.updatedAt.getTime(),
       })
       .where(eq(reviewAttempts.id, updatedAttempt.id))
+
+    await writeDb
+      .update(practiceReviewEvidence)
+      .set({ revision, assessmentEvidenceJson: null })
+      .where(eq(practiceReviewEvidence.reviewAttemptId, updatedAttempt.id))
 
     const practice = await this.upsertPracticeAggregate(writeDb, {
       problemSlug: input.problemSlug,
@@ -259,32 +359,34 @@ export class PracticeRepository {
     input: SetPracticeSuspendedInput,
   ): Promise<PracticeDetails> {
     const now = new Date()
-    const existing = await this.getPracticeState(input.problemSlug)
-
-    if (!existing && !input.suspended) {
-      return this.getPracticeDetails(input.problemSlug, { now })
-    }
-
-    if (!existing) {
-      await this.upsertEmptyPracticeState(this.db, {
-        problemSlug: input.problemSlug,
-        status: 'new',
-        log: normalizeReviewLogFields(),
-        isSuspended: true,
+    return this.db.transaction(async (tx) => {
+      const writeDb = tx as unknown as Db
+      const existing = await this.getPracticeState(input.problemSlug, writeDb)
+      if (!existing && !input.suspended)
+        return this.getPracticeDetails(input.problemSlug, { now }, writeDb)
+      await ensurePracticeGenerationsInTransaction(
+        writeDb,
+        [input.problemSlug],
         now,
-      })
-
-      return this.getPracticeDetails(input.problemSlug, { now })
-    }
-
-    await this.updateSuspensionFlag(this.db, {
-      problemSlug: input.problemSlug,
-      status: existing.status === 'suspended' ? 'new' : existing.status,
-      isSuspended: input.suspended,
-      now,
+      )
+      if (!existing) {
+        await this.upsertEmptyPracticeState(writeDb, {
+          problemSlug: input.problemSlug,
+          status: 'new',
+          log: normalizeReviewLogFields(),
+          isSuspended: true,
+          now,
+        })
+      } else {
+        await this.updateSuspensionFlag(writeDb, {
+          problemSlug: input.problemSlug,
+          status: existing.status === 'suspended' ? 'new' : existing.status,
+          isSuspended: input.suspended,
+          now,
+        })
+      }
+      return this.getPracticeDetails(input.problemSlug, { now }, writeDb)
     })
-
-    return this.getPracticeDetails(input.problemSlug, { now })
   }
 
   async resetPracticeSchedule(
@@ -310,6 +412,9 @@ export class PracticeRepository {
       existing?.isSuspended === true || existing?.status === 'suspended'
 
     await writeDb
+      .delete(practiceCommandReceipts)
+      .where(eq(practiceCommandReceipts.problemSlug, input.problemSlug))
+    await writeDb
       .delete(reviewAttempts)
       .where(eq(reviewAttempts.problemSlug, input.problemSlug))
     await writeDb
@@ -322,6 +427,11 @@ export class PracticeRepository {
       isSuspended,
       now,
     })
+    await rotateProblemPracticeGenerationInTransaction(
+      writeDb,
+      input.problemSlug,
+      now,
+    )
 
     return this.getPracticeDetails(input.problemSlug, { now }, writeDb)
   }
@@ -332,13 +442,23 @@ export class PracticeRepository {
     db: PracticeReadDb = this.db,
   ): Promise<PracticeDetails> {
     const cardKind = options.cardKind ?? defaultFsrsCardKind
-    const cardId = createFsrsCardId(problemSlug, cardKind)
-    const [practice, card, attempts] = await Promise.all([
+    const cardRecord = await this.getCardRecord(problemSlug, cardKind, db)
+    const cardId = cardRecord?.id ?? createFsrsCardId(problemSlug, cardKind)
+    const card = cardRecord?.card ?? null
+    const [practice, attempts, evidenceRows] = await Promise.all([
       this.getPracticeState(problemSlug, db),
-      this.getCard(problemSlug, cardKind, db),
       this.readReviewAttempts(db, { problemSlug, cardId }),
+      db
+        .select()
+        .from(practiceReviewEvidence)
+        .where(eq(practiceReviewEvidence.cardId, cardId)),
     ])
     const attemptSnapshots = attempts.map(toReviewAttemptSnapshot)
+    const unknownEvidenceIds = new Set(
+      evidenceRows
+        .filter((row) => row.schedulingEvidenceKind === 'unknown')
+        .map((row) => row.reviewAttemptId),
+    )
     const normalized = deriveNormalizedPracticeState({
       problemSlug,
       cardId,
@@ -353,7 +473,9 @@ export class PracticeRepository {
       practice,
       card,
       currentLog: practice?.log ?? normalizeReviewLogFields(),
-      canOverrideLatestReview: normalized.latestAttempt !== null,
+      canOverrideLatestReview:
+        normalized.latestAttempt !== null &&
+        attempts.every((attempt) => unknownEvidenceIds.has(attempt.id)),
     }
   }
 
@@ -391,6 +513,14 @@ export class PracticeRepository {
     cardKind: FsrsCardKind = defaultFsrsCardKind,
     db: PracticeReadDb = this.db,
   ): Promise<FsrsCardSnapshot | null> {
+    return (await this.getCardRecord(problemSlug, cardKind, db))?.card ?? null
+  }
+
+  private async getCardRecord(
+    problemSlug: string,
+    cardKind: FsrsCardKind,
+    db: PracticeReadDb,
+  ): Promise<{ id: string; card: FsrsCardSnapshot } | null> {
     const rows = await db
       .select()
       .from(fsrsCards)
@@ -402,7 +532,21 @@ export class PracticeRepository {
       )
       .limit(1)
 
-    return rows[0] ? mapFsrsCardRow(rows[0]) : null
+    return rows[0] ? { id: rows[0].id, card: mapFsrsCardRow(rows[0]) } : null
+  }
+
+  private async createAvailableCardId(
+    problemSlug: string,
+    cardKind: FsrsCardKind,
+    db: PracticeReadDb,
+  ): Promise<string> {
+    const canonicalId = createFsrsCardId(problemSlug, cardKind)
+    const [occupied] = await db
+      .select({ id: fsrsCards.id })
+      .from(fsrsCards)
+      .where(eq(fsrsCards.id, canonicalId))
+      .limit(1)
+    return occupied ? crypto.randomUUID() : canonicalId
   }
 
   async getPracticeState(
@@ -595,7 +739,7 @@ export class PracticeRepository {
       .insert(fsrsCards)
       .values(row)
       .onConflictDoUpdate({
-        target: fsrsCards.id,
+        target: [fsrsCards.problemSlug, fsrsCards.cardKind],
         set: {
           dueAt: row.dueAt,
           stability: row.stability,
@@ -615,6 +759,17 @@ export class PracticeRepository {
 
 type PracticeReadDb = Pick<Db, 'select'>
 type PracticeWriteDb = Pick<Db, 'delete' | 'insert' | 'select' | 'update'>
+
+function incrementPracticeCounter(value: number, label: string): number {
+  if (
+    !Number.isSafeInteger(value) ||
+    value < 0 ||
+    value >= Number.MAX_SAFE_INTEGER
+  ) {
+    throw new Error(`Practice ${label} cannot be incremented safely.`)
+  }
+  return value + 1
+}
 
 interface StoredPracticeReviewAttempt extends PracticeReviewAttemptSnapshot {
   fsrsReviewLog: FsrsReviewLogSnapshot | null

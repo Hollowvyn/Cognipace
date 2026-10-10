@@ -44,6 +44,17 @@ Final desktop state proof uses actual hooks with visible controlled transport ac
 
 Final source commits include `71dda6d` (page assembly) and `37cd6df` (stable states), following the reviewed history/runtime/weighted/foundation/card phases. Authority docs now match the delivered models, scopes, four totals and quiet states; all non-Analytics content was preserved.
 
+## PR integration validation
+
+Draft PR #206 was created in the canonical repository, `Hollowvyn/Cognipace`.
+Latest `main` (`9230a709`, FSRS evidence/storage recovery) was integrated to resolve
+the PR conflict. Only the handoff index needed manual resolution; both entries
+were retained. The combined branch passed the same pinned `npm run format`,
+`npm run check` and `npm run build` commands above: **239 files passed /2 skipped;
+3,662 tests passed /9 opt-in cases skipped**. This supersedes the earlier
+pre-integration total for the current PR head; earlier phase results remain
+historical validation. No additional Analytics layout/a11y matrix was added.
+
 ## Required human installed-extension smoke
 
 Pending before PR review or merge under `docs/agent-governance.md` and `docs/testing.md`. Agent fixture screenshots supplement this gate. A human engineer must rebuild/load the extension and attach realtime screenshot or recording proof for:

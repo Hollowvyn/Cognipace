@@ -6,6 +6,7 @@ describe('FSRS public API facade', () => {
   it('exports the stable feature-facing scheduler facade', () => {
     expect(Object.keys(fsrs).sort()).toEqual(
       [
+        'assertFsrsReviewLogMatchesPreCard',
         'correctLegacyReview',
         'correctReviewFromEvidence',
         'createFsrsSchedulerProfile',

@@ -1,20 +1,28 @@
 import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
 import {
   FeedbackToast,
   type FeedbackToastStatus,
 } from '@/components/ui/feedback-toast'
+import { InlineStatus } from '@/components/ui/inline-status'
 import { ImportContentPanel } from '@/features/imports'
 import { GitHubSyncSettingsSection } from '@/features/sync'
 
 import {
   downloadBackupFile,
   useExportFullBackup,
+  usePendingBackupReplacement,
   useResetLocalData,
   useRestoreFullBackup,
+  useRetryPendingBackupReplacement,
   useValidateFullBackup,
 } from '../api/backup-api'
-import type { BackupSummary } from '../api/backup-contracts'
+import type {
+  BackupReplacementResult,
+  BackupSummary,
+} from '../api/backup-contracts'
 
 import {
   BackupConfirmationDialog,
@@ -27,6 +35,8 @@ export function DataManagementScreen() {
   const validateBackup = useValidateFullBackup()
   const restoreBackup = useRestoreFullBackup()
   const resetLocalData = useResetLocalData()
+  const pendingReplacement = usePendingBackupReplacement()
+  const retryReplacement = useRetryPendingBackupReplacement()
   const [selectedBackup, setSelectedBackup] = useState<unknown>(null)
   const [selectedBackupFileName, setSelectedBackupFileName] = useState<
     string | null
@@ -40,8 +50,16 @@ export function DataManagementScreen() {
   const [resetError, setResetError] = useState<string | null>(null)
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [recoveryError, setRecoveryError] = useState<string | null>(null)
+  const replacementState = pendingReplacement.data
+  const isReplacementPending =
+    replacementState?.status === 'persistence-pending' ||
+    replacementState?.status === 'durable-sync-metadata-pending'
 
   async function handleExport(scope: 'backup' | 'reset') {
+    if (isReplacementPending) {
+      return
+    }
     clearStatus(scope)
 
     try {
@@ -59,6 +77,9 @@ export function DataManagementScreen() {
   }
 
   async function handleFileSelect(file: File) {
+    if (isReplacementPending) {
+      return
+    }
     setSelectedBackup(null)
     setSelectedBackupFileName(file.name)
     setBackupSummary(null)
@@ -88,34 +109,64 @@ export function DataManagementScreen() {
   }
 
   async function handleRestoreConfirm() {
-    if (!selectedBackup) {
+    if (!selectedBackup || isReplacementPending) {
       return
     }
 
     setBackupError(null)
+    setBackupToast(null)
+    setRecoveryError(null)
 
     try {
-      await restoreBackup.mutateAsync(selectedBackup)
-      setSelectedBackup(null)
-      setSelectedBackupFileName(null)
-      setBackupSummary(null)
-      setBackupToast({ message: 'Backup restored.', tone: 'success' })
+      const result = await restoreBackup.mutateAsync(selectedBackup)
       setRestoreDialogOpen(false)
+      completeReplacement(result)
     } catch (error) {
       setBackupError(readErrorMessage(error, 'Failed to restore backup.'))
     }
   }
 
   async function handleResetConfirm() {
+    if (isReplacementPending) {
+      return
+    }
     setResetError(null)
     setResetStatus(null)
+    setRecoveryError(null)
 
     try {
-      await resetLocalData.mutateAsync()
-      setResetStatus('Local data cleared.')
+      const result = await resetLocalData.mutateAsync()
       setResetDialogOpen(false)
+      completeReplacement(result)
     } catch (error) {
       setResetError(readErrorMessage(error, 'Failed to clear local data.'))
+    }
+  }
+
+  async function handleRetrySaving() {
+    setRecoveryError(null)
+
+    try {
+      completeReplacement(await retryReplacement.mutateAsync())
+    } catch (error) {
+      setRecoveryError(readErrorMessage(error, 'Failed to save local data.'))
+    }
+  }
+
+  function completeReplacement(result: BackupReplacementResult) {
+    if (result.status !== 'durable' || result.syncMetadataPending) {
+      return
+    }
+
+    if (result.kind === 'restore') {
+      setSelectedBackup(null)
+      setSelectedBackupFileName(null)
+      setBackupSummary(null)
+      setBackupError(null)
+      setBackupToast({ message: 'Backup restored.', tone: 'success' })
+    } else if (result.kind === 'reset') {
+      setResetError(null)
+      setResetStatus('Local data cleared.')
     }
   }
 
@@ -155,11 +206,46 @@ export function DataManagementScreen() {
         </p>
       </header>
 
+      {isReplacementPending ? (
+        <div className="grid gap-2">
+          <InlineStatus>
+            {replacementState.status === 'persistence-pending'
+              ? replacementState.kind === 'reset'
+                ? 'Your data was cleared, but it still needs saving. Keep this extension open and choose Retry saving.'
+                : 'Your data was restored, but it still needs saving. Keep this extension open and choose Retry saving.'
+              : 'Your data is saved. Sync status still needs saving.'}
+          </InlineStatus>
+          {recoveryError ? (
+            <InlineStatus role="alert" tone="danger">
+              {recoveryError}
+            </InlineStatus>
+          ) : null}
+          <div>
+            <Button
+              disabled={retryReplacement.isPending}
+              onClick={() => {
+                void handleRetrySaving()
+              }}
+              size="sm"
+            >
+              {retryReplacement.isPending ? (
+                <Loader2
+                  aria-hidden="true"
+                  className="animate-spin motion-reduce:animate-none"
+                />
+              ) : null}
+              Retry saving
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <BackupRestorePanel
         backup={selectedBackup}
         error={backupError}
         isExporting={exportBackup.isPending}
         isRestoring={restoreBackup.isPending}
+        isReplacementPending={isReplacementPending}
         isValidating={validateBackup.isPending}
         onExport={() => {
           void handleExport('backup')
@@ -183,6 +269,7 @@ export function DataManagementScreen() {
       <ResetLocalDataPanel
         error={resetError}
         isResetting={resetLocalData.isPending}
+        isReplacementPending={isReplacementPending}
         onOpenResetDialog={() => {
           setResetError(null)
           setResetDialogOpen(true)

@@ -1,9 +1,13 @@
 import { eq } from 'drizzle-orm'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { setAiProviderSecret } from '@/features/genai/server/genai-settings-service'
 import { defaultUserSettings } from '@/features/settings/domain'
 import { createSettingsRepository } from '@/features/settings/data/settings-repository'
+import {
+  preparePracticeStorage,
+  readPracticeStorageData,
+} from '@/features/practice/server/practice-storage-service'
 import {
   companies,
   fsrsCards,
@@ -25,6 +29,8 @@ import {
 import { createTestDb } from '@/platform/db/test-db'
 
 import type { BackupData } from '../api/backup-contracts'
+import { backupSchemaVersion } from '../api/backup-contracts'
+import { prepareFullBackupRestore } from '../domain/backup-preflight'
 import {
   clearAndRestoreBackupData,
   createBackupRepository,
@@ -49,6 +55,99 @@ const settingsValue = JSON.stringify({
 })
 
 describe('backup repository', () => {
+  it('requires explicit initialized generations before exporting current storage', async () => {
+    const { db } = await createTestDb({ now })
+    await expect(createBackupRepository(db).readBackupData()).rejects.toThrow(
+      /local generation is required/,
+    )
+    await preparePracticeStorage(db, now)
+    await expect(
+      createBackupRepository(db).readBackupData(),
+    ).resolves.toMatchObject({
+      practice: {
+        generations: [expect.objectContaining({ scopeId: 'local' })],
+      },
+    })
+  })
+  it('exports prepared metadata and rotates all active tokens on every identical restore', async () => {
+    const { db } = await createTestDb({ now })
+    await insertCustomState(db)
+    const data = await createBackupRepository(db).readBackupData()
+    const original = await readPracticeStorageData(db)
+    expect(data.practice.reviewEvidence).toEqual(original.reviewEvidence)
+    expect(data.practice.generations).toEqual(original.generations)
+    const prepared = prepareData(data)
+
+    await clearAndRestoreBackupData(db, prepared, now)
+    const first = await readPracticeStorageData(db)
+    await clearAndRestoreBackupData(db, prepared, now)
+    const second = await readPracticeStorageData(db)
+
+    expect(first.reviewEvidence).toEqual(original.reviewEvidence)
+    expect(second.reviewEvidence).toEqual(original.reviewEvidence)
+    expect(first.generations.map((row) => row.scopeId)).toEqual(
+      original.generations.map((row) => row.scopeId),
+    )
+    for (const originalRow of original.generations) {
+      const firstToken = first.generations.find(
+        (row) => row.scopeId === originalRow.scopeId,
+      )!.generationToken
+      const secondToken = second.generations.find(
+        (row) => row.scopeId === originalRow.scopeId,
+      )!.generationToken
+      expect(firstToken).not.toBe(originalRow.generationToken)
+      expect(secondToken).not.toBe(firstToken)
+    }
+  })
+
+  it('rechecks a forged prepared payload before opening its destructive transaction', async () => {
+    const { db } = await createTestDb({ now })
+    await insertCustomState(db)
+    const before = await createBackupRepository(db).readBackupData()
+    const prepared = prepareData(before)
+    prepared.data.practice.fsrsCards[0]!.stability = -1
+    const transaction = vi.spyOn(db, 'transaction')
+
+    await expect(clearAndRestoreBackupData(db, prepared, now)).rejects.toThrow()
+    expect(transaction).not.toHaveBeenCalled()
+    expect(await createBackupRepository(db).readBackupData()).toEqual(before)
+  })
+
+  it('reconciles curated taxonomy again for forged prepared data before opening a transaction', async () => {
+    const { db } = await createTestDb({ now })
+    await insertCustomState(db)
+    const before = await createBackupRepository(db).readBackupData()
+    const prepared = prepareData(before)
+    prepared.data.topicAliases.find((row) => row.aliasKey === 'dp')!.topicId =
+      'custom-topic'
+    const transaction = vi.spyOn(db, 'transaction')
+
+    expect(() => prepareData(prepared.data)).toThrow(/Conflicting alias.*DP/i)
+    await expect(clearAndRestoreBackupData(db, prepared, now)).rejects.toThrow(
+      /Conflicting alias.*DP/i,
+    )
+    expect(transaction).not.toHaveBeenCalled()
+    expect(await createBackupRepository(db).readBackupData()).toEqual(before)
+  })
+
+  it('rolls every base row and generation back when fresh generation creation fails', async () => {
+    const { db } = await createTestDb({ now })
+    await insertCustomState(db)
+    const before = await createBackupRepository(db).readBackupData()
+    const prepared = prepareData(before)
+    const uuid = vi.spyOn(crypto, 'randomUUID').mockImplementation(() => {
+      throw new Error('generation creation failed')
+    })
+    try {
+      await expect(
+        clearAndRestoreBackupData(db, prepared, now),
+      ).rejects.toThrow('generation creation failed')
+    } finally {
+      uuid.mockRestore()
+    }
+    expect(await createBackupRepository(db).readBackupData()).toEqual(before)
+  })
+
   it('exports all durable local data categories after inserting custom state', async () => {
     const { db } = await createTestDb({ now })
     await insertCustomState(db)
@@ -181,7 +280,7 @@ describe('backup repository', () => {
     await db.delete(companies)
     await db.delete(settingsKv)
 
-    await clearAndRestoreBackupData(db, backupData, now)
+    await clearAndRestoreBackupData(db, prepareData(backupData), now)
     await expect(createSettingsRepository(db).getSettings()).resolves.toEqual(
       JSON.parse(settingsValue),
     )
@@ -240,7 +339,16 @@ describe('backup repository', () => {
       }
 
       await expect(
-        clearAndRestoreBackupData(db, invalidBackupData, now),
+        clearAndRestoreBackupData(
+          db,
+          {
+            data: invalidBackupData,
+            summary: prepareData(
+              await createBackupRepository(db).readBackupData(),
+            ).summary,
+          },
+          now,
+        ),
       ).rejects.toThrow(/settings value must contain current UserSettings JSON/)
 
       expect(
@@ -264,6 +372,15 @@ describe('backup repository', () => {
     await insertCustomState(db)
 
     await resetLocalDataToFreshInstall(db, now)
+
+    expect(await readPracticeStorageData(db)).toEqual({
+      schedulerProfiles: [],
+      reviewEvidence: [],
+      commandReceipts: [],
+      generations: [
+        expect.objectContaining({ scopeId: 'local', problemSlug: null }),
+      ],
+    })
 
     expect(await db.select().from(settingsKv)).toHaveLength(0)
     expect(await db.select().from(reviewAttempts)).toHaveLength(0)
@@ -453,5 +570,16 @@ async function insertCustomState(db: TestDb) {
     key: 'user-settings',
     value: settingsValue,
     updatedAt: timestamp,
+  })
+  await preparePracticeStorage(db, now)
+}
+
+function prepareData(data: BackupData) {
+  return prepareFullBackupRestore({
+    schemaVersion: backupSchemaVersion,
+    app: 'cognipace',
+    exportedAt: now.toISOString(),
+    source: {},
+    data,
   })
 }

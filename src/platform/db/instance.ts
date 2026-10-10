@@ -36,6 +36,7 @@ let snapshotWriteChain: Promise<void> = Promise.resolve()
 
 export interface AppDbOptions {
   beforePublish?: (handle: DbHandle, context: PublishContext) => Promise<void>
+  validateCurrentData?: (handle: DbHandle) => Promise<void>
 }
 
 export function getAppDb(options: AppDbOptions = {}) {
@@ -122,6 +123,8 @@ async function openAppDb(options: AppDbOptions, generation: number) {
           : selectSnapshotBaselineSql(candidateFingerprint)
       await validateSnapshotSchema(candidate, expectedSql)
       assertDatabaseIntegrity(candidate)
+      if (candidateFingerprint === fingerprint)
+        await options.validateCurrentData?.(candidate)
     },
     upgrade: (candidate, fromFingerprint) => {
       candidate.rawDb.exec(selectUpgradeSql(fromFingerprint, migrationEntries))
