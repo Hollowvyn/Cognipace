@@ -185,6 +185,114 @@
     }
   }
 
+  .cp-recall-content,
+  .cp-practice-content,
+  .cp-memory-content {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    min-width: 0;
+    min-height: 0;
+    font-size: var(--cp-copy-font-size);
+    line-height: 1.5;
+  }
+
+  .cp-recall-content .cp-analytics-adapter-select,
+  .cp-practice-content .cp-analytics-adapter-select,
+  .cp-memory-content .cp-analytics-adapter-select {
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--cp-control-radius);
+    background: var(--color-card);
+    color: var(--color-foreground);
+    padding: 0 8px;
+    font: inherit;
+  }
+
+  .cp-recall-hero,
+  .cp-practice-hero,
+  .cp-memory-hero {
+    display: grid;
+    gap: 2px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .cp-recall-summary {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
+  .cp-recall-primary,
+  .cp-recall-context {
+    display: grid;
+    min-width: 0;
+  }
+
+  .cp-recall-context {
+    overflow-wrap: anywhere;
+  }
+
+  .cp-practice-legend {
+    min-width: 0;
+  }
+
+  .cp-recall-hero strong,
+  .cp-practice-hero strong,
+  .cp-memory-hero strong {
+    font-size: 30px;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cp-recall-method,
+  .cp-practice-method,
+  .cp-memory-method,
+  .cp-recall-goals,
+  .cp-practice-goals {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .cp-recall-series,
+  .cp-recall-goal-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .cp-recall-metadata {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .cp-recall-hold-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-muted-foreground);
+  }
+
+  .cp-recall-content p,
+  .cp-practice-content p,
+  .cp-memory-content p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .cp-recall-goals[hidden],
+  .cp-practice-goals[hidden] {
+    display: none;
+  }
+
   .cp-performance-content,
   .cp-time-target-content {
     display: grid;

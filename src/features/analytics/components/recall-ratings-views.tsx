@@ -17,6 +17,8 @@ import {
 import { HistoricalTable } from './charts/historical-table'
 import { HistoricalTargetLine } from './charts/historical-target-line'
 import { LineSegments } from './charts/line-segments'
+import { CumulativeTrend } from './charts/cumulative-trend'
+import type { CumulativeRecallPresentationRow } from '../domain/cumulative-recall-presentation'
 
 type RecallRow = AnalyticsViews['observedRecallVsFsrs']['rows'][number]
 
@@ -243,7 +245,7 @@ export function ObservedRecallVsFsrsView({
   )
 }
 
-function SeriesSwitch({
+export function SeriesSwitch({
   label,
   pressed,
   onClick,
@@ -295,6 +297,131 @@ function SeriesSwitch({
       </svg>
       {label}
     </button>
+  )
+}
+
+/** Compact cumulative adapter; the legacy raw interval view remains compatible. */
+export function CumulativeRecallPlot({
+  rows,
+  view,
+  timeFrame = view.timeFrame,
+  series,
+  height,
+}: {
+  rows: readonly CumulativeRecallPresentationRow[]
+  view: AnalyticsViews['observedRecallVsFsrs']
+  timeFrame?: HistoricalChartTimeFrame | undefined
+  series: { observed: boolean; estimate: boolean }
+  height: number
+}) {
+  const values = rows
+    .flatMap((row) => [
+      row.cumulativeObservedRecall,
+      row.cumulativeFsrsEstimate,
+    ])
+    .filter(
+      (value): value is number => value !== null && Number.isFinite(value),
+    )
+  const domain: [number, number] = [
+    Math.min(view.scale.domain[0], view.targetRecall, ...values),
+    Math.max(view.scale.domain[1], view.targetRecall, ...values),
+  ]
+  return (
+    <HistoricalChart
+      compact={{ height, showGroupingLabel: false }}
+      cumulativeAsOf
+      startAtFirstPoint
+      config={{}}
+      name="Recall cumulative chart"
+      description={`${series.observed ? 'Observed recall: solid circles. ' : ''}${series.estimate ? 'FSRS estimate: short dashes and diamonds. ' : ''}${!series.observed && !series.estimate ? 'Both data series are hidden. ' : ''}Cumulative paired repeat reviews; long dashes hold existing evidence through as-of without adding observations. Target Recall: ${percent(view.targetRecall)}. ${historicalReportContext(timeFrame)}`}
+      rows={rows}
+      timeFrame={timeFrame}
+      inspectionResetKey={`${series.observed}:${series.estimate}`}
+      yAxes={[
+        {
+          label: 'Recall (%)',
+          scale: { ...view.scale, domain },
+          format: percent,
+        },
+      ]}
+      tooltip={(row) => (
+        <div className="rounded border border-border bg-popover p-2 text-xs shadow-md">
+          <p className="m-0">
+            {formatHistoricalBucket(row, timeFrame)} · {row.state}
+          </p>
+          <p className="m-0">
+            Cumulative {row.cumulativeRecalledCount} recalled /{' '}
+            {row.cumulativePairedReviews} paired reviews.
+          </p>
+          {series.observed ? (
+            <p className="m-0">
+              Observed recall: {percent(row.cumulativeObservedRecall)}
+            </p>
+          ) : null}
+          {series.estimate ? (
+            <p className="m-0">
+              FSRS estimate: {percent(row.cumulativeFsrsEstimate)}
+            </p>
+          ) : null}
+          {series.observed && series.estimate ? (
+            <p className="m-0">
+              Difference: {difference(row.cumulativeDifference)}
+            </p>
+          ) : null}
+          <p className="m-0">
+            Target Recall: {percent(view.targetRecall)}. Interval{' '}
+            {row.recalledCount}/{row.pairedReviews};{' '}
+            {row.state === 'held'
+              ? 'No new paired evidence; prior value held.'
+              : row.state === 'unavailable'
+                ? 'No paired evidence yet.'
+                : 'Updated from paired evidence.'}
+          </p>
+          <p className="m-0">
+            Last update:{' '}
+            {row.lastUpdatedInterval
+              ? formatHistoricalBucket(row.lastUpdatedInterval, timeFrame)
+              : 'None'}
+            . Reconstructed. {historicalIntervalContext(row, timeFrame)} ·{' '}
+            {historicalReportContext(timeFrame)}
+          </p>
+        </div>
+      )}
+    >
+      {(positioned, selected, visible) => (
+        <>
+          <HistoricalTargetLine
+            testId="recall-target"
+            value={view.targetRecall}
+          />
+          {series.observed ? (
+            <CumulativeTrend
+              rows={positioned}
+              value={(row) => row.cumulativeObservedRecall}
+              state={(row) => row.state}
+              visibleEnd={positioned.at(-1)?.endX ?? 0}
+              color="var(--cp-analytics-observed)"
+              markerShape="circle"
+              selectedRow={visible ? selected : null}
+              testId="recall-observed"
+            />
+          ) : null}
+          {series.estimate ? (
+            <CumulativeTrend
+              rows={positioned}
+              value={(row) => row.cumulativeFsrsEstimate}
+              state={(row) => row.state}
+              visibleEnd={positioned.at(-1)?.endX ?? 0}
+              color="var(--cp-analytics-predicted)"
+              markerShape="diamond"
+              strokeDasharray="4 4"
+              selectedRow={visible ? selected : null}
+              testId="recall-estimate"
+            />
+          ) : null}
+        </>
+      )}
+    </HistoricalChart>
   )
 }
 

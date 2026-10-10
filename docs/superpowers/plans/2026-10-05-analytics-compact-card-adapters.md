@@ -10,7 +10,7 @@
 
 ---
 
-Status: Task 1 is implemented and independently specification/quality reviewed. Continue Task 2 after the reviewed history/runtime, weighted-presentation, and compact-foundation phases. Root owns commits; run each task through specification review before quality review. Do not ask the user to reapprove the already accepted card design.
+Status: Tasks 1–2 are implemented and independently specification/quality reviewed. Continue Task 3 after the reviewed history/runtime, weighted-presentation, and compact-foundation phases. Root owns commits; run each task through specification review before quality review. Do not ask the user to reapprove the already accepted card design.
 
 ## Shared Adapter Contract
 
@@ -118,13 +118,13 @@ Skipped at this phase: `npm run lint`, `npm run format`, `npm run check`, `npm r
 - Modify: `src/styles/analytics.css` only for compact Recall/Practice/Memory presentation.
 - Test: existing focused Recall/Practice/Memory suites.
 
-- [ ] **Step 1: Add failing compact population and exact-parity tests.**
+- [x] **Step 1: Add failing compact population and exact-parity tests.**
 
 Recall fixture: global All time raw history spans 612 days but eligible pairs span Sep9–Oct5; card uses its supplied paired frame, 52 pairs/48 recalled, estimate sum46.16 and 9 three-day intervals. Observed/predicted share the same pair count and visible dates; switches hide matching curve/marks/inspection values together, retain domain and target, both-hidden is truthful, and inactive held rows show no new pairs. Test a long sparse paired history separately so it is not reduced to recent dates.
 
 Practice preserves original interval union, known zero volume, unavailable rating counterpart, independent count/percentage scales and Reviews switch. Keep distinct Practice readiness and rating-composition readiness. Memory preserves measured singleton/zero, eligible count, median/Q1/Q3 and median change; quartiles stay absent below four samples.
 
-- [ ] **Step 2: Run RED and implement fitted adapters.**
+- [x] **Step 2: Run RED and implement fitted adapters.**
 
 Run the three new suites. Expected: new adapters fail. Recall Overview uses cumulative paired model, existing goal mutation and two series. Details **Summary / Intervals / Method**, with interval/cumulative field groups, pair counts, reconstructed provenance, difference, evidence, last update and report dates. Goals is a fitting dedicated surface.
 
@@ -132,9 +132,41 @@ Practice reuses original rating stacks/completed-review line in the measured cha
 
 Memory uses original median/whisker rendering at remaining height. Details **Intervals / Evidence / Method**, preserving all original fields and full context. Do not smooth memory medians into cumulative values.
 
-- [ ] **Step 3: Run GREEN, review, and commit.**
+- [x] **Step 3: Run GREEN, review, and commit.**
 
 Run new and existing Recall/Practice/Memory focused suites plus chart/target regressions and typecheck. Fresh specification then quality review. Root commits `feat: fit recall practice and memory analytics cards`.
+
+### Task 2 Execution Record
+
+Implemented the three fitting adapters and bounded legacy plot extractions against `d2381fa8`. Recall uses its paired calendar and identical observed/FSRS population; Practice keeps original interval union, ratings/count scales and Reviews control; Memory shares the original supported-edge window across chart, inspection and Details. Exact original evidence, readiness, goals and report context remain reachable through bounded sections and field groups.
+
+Independent specification review found three gaps and the same implementer repaired them with targeted RED→GREEN tests: visible paired dates/grouping, the inactive-span key/actual last eligible interval, and Memory Details sharing supported-edge trimming. Quality review then reproduced a valid 100%/100% Recall hero overflow at 320px and wrapped coarse-control Practice legend overflow. Repairs use the approved primary Recall headline/secondary FSRS context and measured legend height plus its 8px gap. Effective optional frame metadata is consistent; compact friendly Practice labels retain original ratings in native inspection/Details and legacy defaults. Both final independent re-reviews passed: SPEC 36 tests/four suites, QUALITY 42 tests/five suites. The earlier full quality scan passed 107 tests/thirteen suites including architecture boundaries.
+
+Final implementer checks passed 95 tests/twelve suites (41 new adapter tests), typecheck, touched ESLint, Prettier and whitespace. Exact final commands, all rerun after repairs:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/recall-card.test.tsx src/features/analytics/components/cards/practice-card.test.tsx src/features/analytics/components/cards/memory-strength-card.test.tsx src/features/analytics/components/recall-ratings-views.test.tsx src/features/analytics/components/practice-ratings-view.test.tsx src/features/analytics/components/practice-ratings-model.test.ts src/features/analytics/components/memory-practice-views.test.tsx src/features/analytics/domain/cumulative-recall-presentation.test.ts src/features/analytics/components/charts/historical-chart.test.tsx src/features/analytics/components/charts/cumulative-trend.test.tsx src/features/analytics/components/analytics-target-editor.test.tsx src/features/analytics/components/analytics-exact-table.test.tsx --maxWorkers=1 > /private/tmp/cognipace-task2-tests.log 2>&1
+```
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+```
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx eslint src/features/analytics/components/cards/recall-card.tsx src/features/analytics/components/cards/recall-card.test.tsx src/features/analytics/components/cards/practice-card.tsx src/features/analytics/components/cards/practice-card.test.tsx src/features/analytics/components/cards/memory-strength-card.tsx src/features/analytics/components/cards/memory-strength-card.test.tsx src/features/analytics/components/recall-ratings-views.tsx src/features/analytics/components/practice-ratings-view.tsx src/features/analytics/components/practice-ratings-view.test.tsx src/features/analytics/components/memory-practice-views.tsx
+```
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --check src/features/analytics/components/cards/recall-card.tsx src/features/analytics/components/cards/recall-card.test.tsx src/features/analytics/components/cards/practice-card.tsx src/features/analytics/components/cards/practice-card.test.tsx src/features/analytics/components/cards/memory-strength-card.tsx src/features/analytics/components/cards/memory-strength-card.test.tsx src/features/analytics/components/recall-ratings-views.tsx src/features/analytics/components/practice-ratings-view.tsx src/features/analytics/components/practice-ratings-view.test.tsx src/features/analytics/components/memory-practice-views.tsx src/styles/analytics.css
+```
+
+```sh
+rtk git diff --check
+```
+
+Root CUA component proof checked desktop 464px and stacked 512px cards, all three Method pages, all 33 Practice and 24 Recall narrow interval field groups, empty/unavailable and genuinely old paired history. Post-repair valid SQLite/FSRS 12/12 pairs with both values 100% at actual 320px gives a 254×64px hero with identical client/scroll dimensions and no horizontal document overflow. Practice's actual body/content are 234px at desktop, 240px at medium and 320px, including a disposable CSS fixture mirroring the existing coarse-pointer Reviews minimum; this is controlled geometry proof, not native-device emulation. Pending Recall save while another goal is edited preserves the active draft and focus. Final integrated page/font proof follows assembly.
+
+Skipped full `npm run lint`, `npm run format`, `npm run check`, `npm run build`: root owns final assembled-source gates. Standalone `npm run db:check` is deferred to the full check; `npm run db:generate` is inapplicable without persisted schema changes; `npm run zip` is outside this implementation request. Human installed-extension happy/edge smoke with screenshot/recording proof remains required before PR review/merge. October 10 execution used fresh independent reviewers, unlike the earlier thread-cap reuse. No application phase ran concurrently with another application implementer. The Task 4 file list now names the actual Signals/threshold owners; this corrects ownership without changing the approved design.
 
 ## Task 3: Complete Interactive Retention
 
@@ -170,11 +202,12 @@ Run full retention/current-state focused suites and typecheck. Fresh specificati
 - Create: `src/features/analytics/components/cards/backlog-card.tsx` and `.test.tsx`
 - Create: `src/features/analytics/components/cards/upcoming-card.tsx` and `.test.tsx`
 - Modify: `src/features/analytics/components/historical-views.tsx` only if extracting the existing Topic plot/inspection pieces; this is the current Topic owner.
-- Modify: `src/features/analytics/components/memory-practice-views.tsx`
-- Modify: `src/features/analytics/components/workload-views.tsx`
+- Modify: `src/features/analytics/components/current-state-views.tsx` only if extracting existing Memory Signals list/inspection pieces; this is the current Signals owner.
+- Test: `src/features/analytics/components/current-state-views.test.tsx` for Signals preservation.
 - Modify: `src/features/analytics/domain/workload-presentation.ts` and `.test.ts` for strict watch counts.
-- Modify: existing workload threshold segment model and focused tests.
-- Test: existing Topic/current-state/workload suites.
+- Modify: `src/features/analytics/components/workload-views.tsx` and `.test.tsx` for the existing threshold segment model, markers, inspection and copy.
+- Modify: `src/styles/analytics.css` only for compact Topics/Signals/workload presentation.
+- Test: `historical-views.test.tsx`, `current-state-views.test.tsx`, `workload-views.test.tsx`, and `domain/workload-presentation.test.ts` plus the existing weighted Topic/domain/contract suites.
 
 - [ ] **Step 1: Add failing exact-count and threshold tests.**
 

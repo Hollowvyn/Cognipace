@@ -296,7 +296,7 @@ describe('merged Practice Rhythm chart', () => {
     expect(part('ratings-good-label-1')).not.toBeVisible()
     expect(part('ratings-easy-1')).toHaveAttribute('height', height)
     measureTextBox.mockReturnValue({
-      width: 50,
+      width: 1000,
       height: 12,
     })
     rerender(
