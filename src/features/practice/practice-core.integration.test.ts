@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+
 import { eq } from 'drizzle-orm'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -334,7 +336,7 @@ describe('practice core', () => {
           ...target,
         }),
       ).rejects.toThrow(/changed|refresh/i)
-      expect(serializeDb(handle)).toEqual(before)
+      expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
     }
   })
 

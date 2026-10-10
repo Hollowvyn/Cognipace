@@ -143,14 +143,12 @@ describe('accepted Practice commands', () => {
       targetRetention: 0.75,
       reviewAttemptId: 'legacy-latest',
     })
-    await handle.db
-      .update(practiceReviewEvidence)
-      .set({
-        schedulingEvidenceKind: 'unknown',
-        schedulerProfileId: null,
-        preCardJson: null,
-        sequenceSource: 'legacy-inferred',
-      })
+    await handle.db.update(practiceReviewEvidence).set({
+      schedulingEvidenceKind: 'unknown',
+      schedulerProfileId: null,
+      preCardJson: null,
+      sequenceSource: 'legacy-inferred',
+    })
     await createSettingsRepository(handle.db).updateSettings({
       review: { targetRetention: 0.75 },
     })
@@ -204,6 +202,45 @@ describe('accepted Practice commands', () => {
     if (replay.status === 'conflict') throw new Error('unexpected conflict')
     expect(replay.acknowledgement).toEqual(first.acknowledgement)
     expect(serializeDb(handle)).toEqual(before)
+
+    const second = await executePracticeReviewCommand(handle.db, {
+      ...update,
+      commandId: 'legacy-update-two',
+      expectedRevision: 1,
+      rating: 'easy',
+    })
+    expect(second.status).toBe('saved')
+    const originalStorage = await readPracticeStorageData(handle.db)
+    const ownedRows = handle.rawDb.exec({
+      sql: 'SELECT * FROM review_attempts ORDER BY id',
+      returnValue: 'resultRows',
+    })
+    const cardRows = handle.rawDb.exec({
+      sql: 'SELECT * FROM fsrs_cards ORDER BY id',
+      returnValue: 'resultRows',
+    })
+    await restoreFullBackup(handle.db, await exportFullBackup(handle.db))
+    const imported = await readPracticeStorageData(handle.db)
+    expect(imported.reviewEvidence).toEqual(originalStorage.reviewEvidence)
+    expect(imported.schedulerProfiles).toEqual(
+      originalStorage.schedulerProfiles,
+    )
+    expect(imported.commandReceipts).toEqual(originalStorage.commandReceipts)
+    expect(
+      handle.rawDb.exec({
+        sql: 'SELECT * FROM review_attempts ORDER BY id',
+        returnValue: 'resultRows',
+      }),
+    ).toEqual(ownedRows)
+    expect(
+      handle.rawDb.exec({
+        sql: 'SELECT * FROM fsrs_cards ORDER BY id',
+        returnValue: 'resultRows',
+      }),
+    ).toEqual(cardRows)
+    expect(await executePracticeReviewCommand(handle.db, update)).toMatchObject(
+      { status: 'conflict', reason: 'stale-generation' },
+    )
   })
   it('rejects a retained bootstrap command after targeted reset', async () => {
     const { handle, command } = await fixture()

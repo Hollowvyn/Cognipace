@@ -1597,9 +1597,12 @@ function runPracticeReviewCommand(
       await executePracticeReviewCommand(db, command),
     )
     if (result.status === 'conflict') return result
+    // Persist the overwrite guard before a published review can outlive this worker.
+    await markSyncLocalDataChangedBestEffort()
     try {
       await flushDbSnapshot()
     } catch {
+      hasPendingDirtyMarkRetry = true
       return practiceReviewCommandResultSchema.parse({
         ...result,
         status: 'persistence-pending',
@@ -1609,7 +1612,6 @@ function runPracticeReviewCommand(
       problemSlug: command.problemSlug,
       source,
     })
-    await markSyncLocalDataChangedBestEffort()
     await scheduleAutoPushAfterMutationBestEffort()
     return practiceReviewCommandResultSchema.parse(result)
   })
@@ -1709,6 +1711,7 @@ async function retryPendingDirtyMark() {
   }
 
   try {
+    await flushDbSnapshot()
     await markSyncLocalDataChanged()
     hasPendingDirtyMarkRetry = false
     return true

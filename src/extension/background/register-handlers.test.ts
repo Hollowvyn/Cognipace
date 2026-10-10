@@ -42,6 +42,7 @@ import {
 } from '@/features/backup/api/backup-contracts'
 import { analyticsSummarySchema } from '@/features/analytics/api/analytics-contracts'
 import { defaultUserSettings } from '@/features/settings/domain'
+import { practiceReviewCommandResultSchema } from '@/features/practice/api/practice-contracts'
 import type { ActiveTrack } from '@/features/tracks/domain'
 import { createSerializedPracticeDetails } from '@/testing/practice-fixtures'
 import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
@@ -3009,10 +3010,8 @@ describe('background handler registration', () => {
     expect(response).toEqual(commandResult)
     expectFlushBeforeBroadcast()
     expect(
-      backgroundMocks.flushDbSnapshot.mock.invocationCallOrder[0],
-    ).toBeLessThan(
-      backgroundMocks.markSyncLocalDataChanged.mock.invocationCallOrder[0]!,
-    )
+      backgroundMocks.markSyncLocalDataChanged.mock.invocationCallOrder[0],
+    ).toBeLessThan(backgroundMocks.flushDbSnapshot.mock.invocationCallOrder[0]!)
   })
 
   it('returns persistence pending without publication and retries the same executor command', async () => {
@@ -3025,7 +3024,7 @@ describe('background handler registration', () => {
     )
     expect(pending).toEqual({ ...commandResult, status: 'persistence-pending' })
     expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
-    expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+    expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
     expect(
       backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
     ).not.toHaveBeenCalled()
@@ -3043,6 +3042,224 @@ describe('background handler registration', () => {
     expect(
       backgroundMocks.saveReviewResultWithTrackProgress,
     ).not.toHaveBeenCalled()
+  })
+
+  it('protects a pending review from automatic remote replacement and recovers publication before sync admission', async () => {
+    const { createTestDb } = await import('@/platform/db/test-db')
+    const { preparePracticeStorage } =
+      await import('@/features/practice/server/practice-storage-service')
+    const practice = await vi.importActual<
+      typeof import('@/features/practice/server/practice-service')
+    >('@/features/practice/server/practice-service')
+    const backup = await vi.importActual<
+      typeof import('@/features/backup/server/backup-service')
+    >('@/features/backup/server/backup-service')
+    const { createSyncService, createSyncOperationCoordinator } =
+      await vi.importActual<
+        typeof import('@/features/sync/server/sync-service')
+      >('@/features/sync/server/sync-service')
+    const { buildSyncEnvelope } =
+      await import('@/features/sync/domain/sync-envelope')
+    const { readPracticeStorageData } =
+      await import('@/features/practice/data/practice-storage-repository')
+    const syncMetadata = await vi.importActual<
+      typeof import('@/features/sync/data/sync-metadata-store')
+    >('@/features/sync/data/sync-metadata-store')
+    const handle = await createTestDb()
+    await preparePracticeStorage(handle.db)
+    const remoteBackup = await backup.exportFullBackup(handle.db)
+    const request = {
+      ...saveCommandRequest,
+      generation: (await practice.getPracticeDetails(handle.db, 'two-sum'))
+        .generation!,
+    }
+    await syncMetadata.writeSyncMetadata({
+      ...cleanSyncMetadata,
+      lastSyncDirection: 'pull',
+    })
+    const order: string[] = []
+    const getGist = vi.fn().mockResolvedValue({
+      id: cleanSyncMetadata.gistId,
+      htmlUrl: 'https://gist.github.com/gist_1',
+      updatedAt: '2026-05-26T12:20:00.000Z',
+      remoteVersion: 'changed-remote',
+      content: JSON.stringify(
+        buildSyncEnvelope({
+          backup: remoteBackup,
+          dataUpdatedAt: '2026-05-26T12:20:00.000Z',
+        }),
+      ),
+      contentTruncated: false,
+      rawUrl: null,
+    })
+    const restoreBackup = vi.fn((input: unknown) =>
+      backup.restoreFullBackup(handle.db, input),
+    )
+    backgroundMocks.getAppDb.mockResolvedValue(handle)
+    backgroundMocks.getSettings.mockResolvedValue({
+      ...defaultUserSettings,
+      practice: { ...defaultUserSettings.practice, mode: 'freePractice' },
+    })
+    backgroundMocks.executePracticeReviewCommand.mockImplementation(
+      practice.executePracticeReviewCommand,
+    )
+    backgroundMocks.readSyncMetadata.mockImplementation(
+      syncMetadata.readSyncMetadata,
+    )
+    backgroundMocks.markSyncLocalDataChanged.mockImplementation(() => {
+      order.push('dirty')
+      return syncMetadata.markLocalDataChanged()
+    })
+    backgroundMocks.flushDbSnapshot.mockRejectedValue(new Error('disk failed'))
+    backgroundMocks.createBackgroundSyncService.mockImplementation(() => {
+      order.push('sync')
+      return createSyncService({
+        readToken: () => Promise.resolve('configured-token'),
+        saveToken: () => Promise.resolve(),
+        deleteToken: () => Promise.resolve(),
+        getTokenStatus: () => Promise.resolve(syncStatus.tokenStatus),
+        createGitHubClient: () => ({
+          getGist,
+          validateToken: vi.fn(),
+          createSyncGist: vi.fn(),
+          updateSyncGist: vi.fn(),
+        }),
+        readMetadata: syncMetadata.readSyncMetadata,
+        writeMetadata: syncMetadata.writeSyncMetadata,
+        exportFullBackup: () => backup.exportFullBackup(handle.db),
+        restoreBackup,
+        flushDbSnapshot: backgroundMocks.flushDbSnapshot,
+        broadcastInvalidation: () => Promise.resolve(),
+        ...readLatestSyncFactoryOptions(),
+        syncCoordinator: createSyncOperationCoordinator(),
+        now: () => new Date(),
+      })
+    })
+    try {
+      const pending = practiceReviewCommandResultSchema.parse(
+        await sendRuntimeMessage('practice.saveReviewResult', request),
+      )
+      expect(pending).toMatchObject({ status: 'persistence-pending' })
+      const retainedDetails = await practice.getPracticeDetails(
+        handle.db,
+        'two-sum',
+      )
+      const retainedStorage = await readPracticeStorageData(handle.db)
+      expect(retainedStorage.commandReceipts).toHaveLength(1)
+      expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+      await expect(
+        sendRuntimeMessage('sync.checkRemoteOnOpen', { surface: 'dashboard' }),
+      ).rejects.toThrow('sync metadata could not be saved')
+      expect(backgroundMocks.createBackgroundSyncService).not.toHaveBeenCalled()
+      expect(getGist).not.toHaveBeenCalled()
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+      ).not.toHaveBeenCalled()
+
+      order.length = 0
+      backgroundMocks.flushDbSnapshot.mockImplementation(() => {
+        order.push('flush')
+        return Promise.resolve()
+      })
+      expect(
+        await readLatestSyncAutoSyncDeps().runCleanPullCheck(),
+      ).toMatchObject({ outcome: 'no-change', reason: 'local-dirty' })
+      expect(order).toEqual(['flush', 'dirty', 'sync'])
+      expect(getGist).not.toHaveBeenCalled()
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(await practice.getPracticeDetails(handle.db, 'two-sum')).toEqual(
+        retainedDetails,
+      )
+      expect(await readPracticeStorageData(handle.db)).toEqual(retainedStorage)
+      expect(
+        await sendRuntimeMessage('practice.saveReviewResult', request),
+      ).toEqual({ ...pending, status: 'saved' })
+      expect(await readPracticeStorageData(handle.db)).toEqual(retainedStorage)
+    } finally {
+      backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
+      await sendRuntimeMessage('backup.retryPendingReplacement', {
+        surface: 'dashboard',
+      })
+      handle.rawDb.close()
+    }
+  })
+
+  it('persists review dirty intent before publication so a fresh sync worker protects a saved review while invalidation stalls', async () => {
+    const metadata = await vi.importActual<
+      typeof import('@/features/sync/data/sync-metadata-store')
+    >('@/features/sync/data/sync-metadata-store')
+    const { createSyncService, createSyncOperationCoordinator } =
+      await vi.importActual<
+        typeof import('@/features/sync/server/sync-service')
+      >('@/features/sync/server/sync-service')
+    const { createBackupReplacementCoordinator } =
+      await import('./backup-replacement')
+    await metadata.writeSyncMetadata({
+      ...cleanSyncMetadata,
+      lastSyncDirection: 'pull',
+    })
+    backgroundMocks.markSyncLocalDataChanged.mockImplementation(
+      metadata.markLocalDataChanged,
+    )
+    const invalidation = createDeferred<null>()
+    backgroundMocks.broadcastCacheInvalidation.mockReturnValueOnce(
+      invalidation.promise,
+    )
+    const saved = sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    try {
+      await waitUntil(() =>
+        expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalled(),
+      )
+      expect(backgroundMocks.flushDbSnapshot).toHaveResolvedTimes(1)
+      expect((await metadata.readSyncMetadata()).dirtySinceLastSync).toBe(true)
+      expect(
+        backgroundMocks.markSyncLocalDataChanged.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        backgroundMocks.flushDbSnapshot.mock.invocationCallOrder[0]!,
+      )
+      const getGist = vi.fn()
+      const restoreBackup = vi.fn()
+      const freshSyncWorker = createSyncService({
+        readToken: () => Promise.resolve('configured-token'),
+        saveToken: () => Promise.resolve(),
+        deleteToken: () => Promise.resolve(),
+        getTokenStatus: () => Promise.resolve(syncStatus.tokenStatus),
+        createGitHubClient: () => ({
+          getGist,
+          validateToken: vi.fn(),
+          createSyncGist: vi.fn(),
+          updateSyncGist: vi.fn(),
+        }),
+        readMetadata: metadata.readSyncMetadata,
+        writeMetadata: metadata.writeSyncMetadata,
+        exportFullBackup: () => Promise.resolve(validBackup),
+        restoreBackup,
+        flushDbSnapshot: () => Promise.resolve(),
+        broadcastInvalidation: () => Promise.resolve(),
+        runReplacement: createBackupReplacementCoordinator().run,
+        syncCoordinator: createSyncOperationCoordinator(),
+        now: () => new Date(),
+      })
+      expect(await freshSyncWorker.checkRemoteOnOpen()).toMatchObject({
+        outcome: 'no-change',
+        reason: 'local-dirty',
+      })
+      expect(getGist).not.toHaveBeenCalled()
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+      ).not.toHaveBeenCalled()
+    } finally {
+      invalidation.resolve(null)
+      await saved
+    }
   })
 
   it.each([

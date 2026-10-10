@@ -63,7 +63,9 @@ PracticeDetails gains readonly `generation` and `latestReview` (`reviewAttemptId
 
 **Conflicts:** a small Practice-owned typed conflict error distinguishes stale review/revision, backdating, unsupported legacy context, stale generation and command-ID payload conflict from transport/storage failure. Only this error becomes a strict runtime `conflict` result; it writes nothing. Overlay can end that rejected accepted command while preserving the selected draft and its original target, leaving deliberate Restart available. Other errors retain the frozen command for retry. Do not parse human error strings or silently rebase onto a newer review.
 
-**Durability:** review runtime uses the existing gated mutation queue, executes the workflow, calls `flushDbSnapshot`, and broadcasts/invokes existing dirty/sync bookkeeping only after a successful flush. Flush failure returns `persistence-pending` with the original acknowledgement and a current read, never a Saved message. Retry resends the same command, finds the persisted/in-memory receipt, skips all mutation effects and retries flush. No worker-local pending flag serves as the command identity. If restart loses an unflushed transaction, the last durable snapshot remains intact and the same command can apply once against that snapshot; if the receipt was published before acknowledgement loss, restart finds it and never reapplies.
+**Durability:** review runtime uses the existing gated mutation queue, executes the workflow, retains the existing conservative sync dirty marker before publication, calls `flushDbSnapshot`, and broadcasts/schedules automatic sync only after a successful flush. Flush failure returns `persistence-pending` with the original acknowledgement and a current read, never a Saved message. The existing dirty-recovery flag guards sync admission while publication is pending; recovery flushes before marking dirty or admitting sync. It is not command identity. Retry resends the same command, finds the persisted/in-memory receipt, skips all review/track mutation effects and retries flush. If restart loses an unflushed transaction, the last durable snapshot remains intact and the same command can apply once against that snapshot; if the receipt was published before acknowledgement loss, restart finds it and never reapplies.
+
+**October 10 quality repair:** the original post-flush dirty-marker order allowed a clean changed-remote check to replace a pending review, and worker termination after publication but before dirty bookkeeping left a published receipt unprotected. Restore the existing pre-publication dirty intent rather than adding metadata fields or an outbox. This guard does not claim Saved or durable review publication. Conflicts still return before dirty/flush effects; explicit reset/restore keeps its generation semantics. Existing best-effort sync metadata failure remains a separate reported limit.
 
 ## File map
 
@@ -171,7 +173,7 @@ await expect(
 ## Task 3: Publish command acknowledgements through the background queue
 
 - [x] Write failing handler/API tests requiring authenticated strict command payloads, original acknowledgement separately from current state, flush failure returning pending, duplicate retry performing no second effects and invalidation only after successful flush.
-- [x] Change ProtocolMap save/update return types to `PracticeReviewCommandResult`, retain methods/sender permissions, and route both methods through a small review-specific composition in the existing gated mutation queue. Fetch Settings for a first apply, execute the whole workflow, flush, then perform existing invalidation/dirty/sync bookkeeping. Do not turn flush failure into a generic mutation rejection that encourages a new command.
+- [x] Change ProtocolMap save/update return types to `PracticeReviewCommandResult`, retain methods/sender permissions, and route both methods through a small review-specific composition in the existing gated mutation queue. Fetch Settings for a first apply, execute the whole workflow, retain conservative dirty intent, flush, then perform existing invalidation/automatic sync bookkeeping. Do not turn flush failure into a generic mutation rejection that encourages a new command.
 
 ```ts
 return runGatedMutationQueue(async () => {
@@ -181,16 +183,18 @@ return runGatedMutationQueue(async () => {
     command,
     await getSettings(db),
   )
+  if (committed.status === 'conflict') return committed
+  await markSyncLocalDataChangedBestEffort()
   try {
     await flushDbSnapshot()
   } catch {
+    hasPendingDirtyMarkRetry = true
     return serializeCommandResult('persistence-pending', committed)
   }
   await broadcastPracticeInvalidation({
     problemSlug: command.problemSlug,
     source,
   })
-  await markSyncLocalDataChangedBestEffort()
   await scheduleAutoPushAfterMutationBestEffort()
   return serializeCommandResult('saved', committed)
 })
@@ -227,12 +231,12 @@ if (result.status === 'persistence-pending') {
 
 ## Task 5: Verify restart, compatibility and whole-phase behavior
 
-- [ ] Guard snapshot publication while a SQLite transaction is open. An October 6 read-only WASM probe confirmed `sqlite3_js_db_export` includes uncommitted rows even when the live transaction later rolls back. The existing debounced writer must defer publication until the transaction ends; an explicit flush must never report success for deferred/uncommitted data. Add a stalled-transaction automatic-publication regression followed by rollback/reopen, preserving the last durable snapshot. Keep this guard in the existing platform snapshot owner (`src/platform/db/instance.ts` and colocated tests), without another queue or outbox.
-- [ ] Add real SQLite serialized-reopen tests showing a published receipt dedupes after lost acknowledgement, unflushed state cannot replace the durable snapshot on publication failure, same accepted retry applies once if restart lost unflushed state, and old commands reject after actual backup/target reset generation rotation. Exercise populated C fixtures and v6 export/import of D captured/legacy-derived evidence and current/historical correction receipts.
-- [ ] Update current product/architecture/testing authority and the master plan/index. Add a Phase D handoff with exact failures repaired, run/skipped commands, preservation and rollback limits, and a human installed-extension checklist for Submit/Update, two-tab conflict, pending retry and worker restart. Preserve C's proof record; the user's confirmation is not an invented screenshot.
-- [ ] Run the affected focused integrations first, then `rtk npm run db:check`, `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run format`, explicit touched-Markdown Prettier check and `rtk git diff --check`.
-- [ ] Final independent SPEC then QUALITY review and requested simplicity principles: no command bus, generic outbox, full-history receipts or replay correction. Repair important findings before claiming completion or creating the phase PR.
-- [ ] Commit `docs(fsrs): document durable reviews and correction validation`, push phase branch, create and attach a draft PR under the established phase workflow. Human smoke remains pending until the engineer confirms it; C's one-PR post-merge exception is not presumed to authorize a new exception for D.
+- [x] Guard snapshot publication while a SQLite transaction is open. An October 6 read-only WASM probe confirmed `sqlite3_js_db_export` includes uncommitted rows even when the live transaction later rolls back. The existing debounced writer must defer publication until the transaction ends; an explicit flush must never report success for deferred/uncommitted data. Add a stalled-transaction automatic-publication regression followed by rollback/reopen, preserving the last durable snapshot. Keep this guard in the existing platform snapshot owner (`src/platform/db/instance.ts` and colocated tests), without another queue or outbox.
+- [x] Add real SQLite serialized-reopen tests showing a published receipt dedupes after lost acknowledgement, unflushed state cannot replace the durable snapshot on publication failure, same accepted retry applies once if restart lost unflushed state, and old commands reject after actual backup/target reset generation rotation. Exercise populated C fixtures and v6 export/import of D captured/legacy-derived evidence and current/historical correction receipts.
+- [x] Update current product/architecture/testing authority and the master plan/index. Add a Phase D handoff with exact failures repaired, run/skipped commands, preservation and rollback limits, and a human installed-extension checklist for Submit/Update, two-tab conflict, pending retry and worker restart. Preserve C's proof record; the user's confirmation is not an invented screenshot.
+- [x] Run the affected focused integrations first, then `rtk npm run db:check`, `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run format`, explicit touched-Markdown Prettier check and `rtk git diff --check`. Final full result: 3,290 passing tests, nine live-provider skips; Chrome MV3 build passed. The handoff retains both prior timeout failures and their exact-byte comparison repair.
+- [x] Final independent SPEC then QUALITY/Ponytail review passed after the October 10 repairs. No command bus, generic outbox, full-history receipts or replay correction. Core exact-byte proof retains its assertions without generic matcher overhead; sync dirty intent/recovery protects pending and published reviews at the existing metadata-success boundary.
+- [ ] Commit `fix(db): guard committed snapshots and verify review durability`, push phase branch, create and attach a draft PR under the established phase workflow. Human smoke remains pending until the engineer confirms it; C's one-PR post-merge exception is not presumed to authorize a new exception for D.
 
 Skipped unless the implementation changes their scope: `rtk npm run db:generate` (no new schema), `rtk npm run zip` (archive behavior unchanged), live AI provider evaluations (no provider behavior changes or credentials), performance/optimizer experiments (G/H). Record actual skipped commands and remaining human proof in the handoff and PR.
 
