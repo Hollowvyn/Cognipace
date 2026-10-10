@@ -10,7 +10,7 @@
 
 ---
 
-Status: Tasks 1–2 implemented and independently reviewed. Continue directly to the compact card adapters. Root owns commits and independent reviews. Approved reference: `docs/superpowers/specs/assets/2026-10-05-analytics-range-summary-approved.html`.
+Status: implemented and independently reviewed; integrated into the completed Analytics page. Final automated gates and desktop state proof passed. Human installed-extension smoke/proof remains pending before PR review or merge; see `../handoffs/2026-10-05-analytics-performance-layout.md`.
 
 ## Task 1: Fixed Panel Geometry And Feature Paging
 
@@ -115,8 +115,8 @@ Run focused chart/model/target/editor suites and typecheck. Expected: all pass. 
 
 ## Validation And Continuation
 
-- [ ] Format touched files and run focused tests before required full `rtk npm run lint`, `rtk npm run check`, `rtk npm run build` at page integration.
-- [ ] Record exact commands and remaining human extension proof. A fixed shell without migrated cards is not the finished Analytics page.
+- [x] Format touched files and run focused tests before required full `rtk npm run lint`, `rtk npm run check`, `rtk npm run build` at page integration.
+- [x] Record exact commands and remaining human extension proof. A fixed shell without migrated cards is not the finished Analytics page.
 - [x] Continue directly to card adapters and assembly already authorized by the user.
 
 ## Task 1 Execution Record

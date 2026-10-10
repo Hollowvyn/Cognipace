@@ -10,7 +10,7 @@
 
 ---
 
-Status: implemented and independently reviewed. The pure foundation remains unwired; runtime integration follows immediately under the already authorized implementation scope.
+Status: implemented and independently reviewed; integrated into the completed Analytics page. Final automated gates and desktop state proof passed. Human installed-extension smoke/proof remains pending before PR review or merge; see `../handoffs/2026-10-05-analytics-performance-layout.md`.
 
 Design: [Analytics Performance And Layout](../specs/2026-10-05-analytics-performance-layout-design.md#historical-range-and-available-history).
 

@@ -10,7 +10,7 @@
 
 ---
 
-Status: implemented and independently reviewed. Runtime and activity are complete; the weighted presentation and compact UI phases follow. User approved the final prototype and continuation; execution mode is already authorized. Root owns commits, authority-doc alignment, and final full validation.
+Status: implemented and independently reviewed; integrated into the completed Analytics page. Final automated gates and desktop state proof passed. Human installed-extension smoke/proof remains pending before PR review or merge; see `../handoffs/2026-10-05-analytics-performance-layout.md`.
 
 ## Contract Decisions
 

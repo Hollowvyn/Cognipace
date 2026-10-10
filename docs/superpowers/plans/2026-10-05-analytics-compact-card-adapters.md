@@ -10,7 +10,7 @@
 
 ---
 
-Status: Tasks 1–4 are implemented and independently specification/quality reviewed. Continue page assembly and final production proof after these reviewed adapters. Root owns commits; run each task through specification review before quality review. Do not ask the user to reapprove the already accepted card design.
+Status: implemented and independently reviewed; integrated into the completed Analytics page. Final automated gates and desktop state proof passed. Human installed-extension smoke/proof remains pending before PR review or merge; see `../handoffs/2026-10-05-analytics-performance-layout.md`.
 
 ## Shared Adapter Contract
 
@@ -230,7 +230,6 @@ rtk git status --short
 
 PASS: final formatting/diff check17:20:27; only five intended files changed/new. Earlier focused6-file GREEN runs progressed30→39→40 passing tests; two-file retention/current-state22 passed after delayed-cancel fix; card-only10 passed after hidden width repair.
 
-
 Independent SPEC PASS:4 suites32tests; QUALITY PASS:6 suites51tests and whitespace check. No actionable findings. Exact independent commands:
 
 ```sh
@@ -274,7 +273,6 @@ Run all new/focused Topic/Signals/workload/threshold suites and typecheck. Fresh
 ## Completion Boundary
 
 All ten adapters are complete when all underlying measurements/actions are reachable, their focused tests pass, and independent reviews approve. Continue to page assembly/browser proof. The obsolete full-width wrappers are not used by the final page; delete only confirmed unused presentation after preserving meaningful regressions. Required full gates and human extension proof are recorded in the assembly plan.
-
 
 ## Task 4 October 10 execution record
 

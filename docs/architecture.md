@@ -293,12 +293,10 @@ creates a fresh migrated and seeded database.
 
 Analytics calculations remain feature-owned and read-only. The only editable
 Analytics behavior is the chart-goal preferences owned by Settings.
-Difficulty And Recorded Time is implemented on this branch with passing automated
-checks and production-component browser validation.
-The chart-target and merged Practice Rhythm implementations and automated/fixture
-validation are recorded in their handoffs; human installed-extension happy-path
-and edge-case smoke with screenshot or recording proof remains pending before
-review or merge. The background Analytics
+Implementation handoffs record the automated and production-component proof
+actually run. Human installed-extension happy-path and edge-case smoke with
+screenshot or recording proof remains required before PR review or merge.
+The background Analytics
 service reads the full review history once for a request, together with the
 current FSRS cards and supporting local state; chart components do not make
 per-chart database calls. Its data flow is:
@@ -336,8 +334,9 @@ The owners in that flow are:
   problems with persisted correct outcomes, true/(true+false) correctness, and
   exact positive recorded seconds from every persisted correct assessment.
   Required runtime `activity` conserves counts and distinguishes unavailable
-  correctness/timing from known zeros. The compact headline replacement is
-  still pending; legacy displayed totals remain until that composition lands.
+  correctness/timing from known zeros. The screen consumes validated `activity`
+  for all four selected-period headlines, without rating fallback, weighted
+  evidence counts, or mixing all-time totals into finite ranges.
 - `src/features/analytics/data/analytics-repository.ts` reads current catalog
   `problemDifficulty` and persisted `elapsedSeconds`, preserving attempt-ID
   deduplication across topic joins. Numeric FSRS difficulty remains separate.
@@ -361,7 +360,11 @@ The owners in that flow are:
   dashed next-valid-point line continuity. Practice Rhythm retains zero-volume
   buckets after its first supported bucket.
 - `src/features/analytics/api/analytics-contracts.ts` validates the serialized
-  read model with Zod before it crosses the extension runtime boundary.
+  read model with Zod before it crosses the extension runtime boundary. Paired
+  Recall requires recalled count no greater than pairs; zero pairs have null
+  rates/difference and unmeasured evidence, while positive pairs have finite
+  rates, observed = recalled/pairs, and an exact observed-minus-estimate
+  difference. Genuine zero estimates remain valid.
 - Settings owns defaulted `analytics.targetRecall` and
   `analytics.targetReviewSuccess` fractions in its existing JSON preferences,
   both 0.9 by default. Full-pair validation requires finite values from 0
@@ -400,47 +403,59 @@ The owners in that flow are:
   `LineSegments` in
   `src/features/analytics/components/charts/line-segments.tsx` renders measured
   runs and dashed next-valid-point bridges without interpolating data.
-- `new-problem-success-view.tsx` owns the expanded Difficulty And Recorded Time
-  section's shared local cohort, Trend/Compare, outcome measure, difficulty
-  visibility, time units/subset, and Mix controls. `analytics-screen.tsx` places
-  its paired Success/Time plots and full-width Mix below the combined New Problem
-  Success/Recall pair. `combined-problem-outcomes-view.tsx` pools the canonical
-  new-problem counts across Easy/Medium/Hard/Unknown for its two simultaneous
-  curves; it neither averages difficulty rates nor rebuilds raw cohorts. Its
-  fitted domain uses both pooled rates and both first-attempt goals, independently
-  of the known-difficulty plot scale and controls. No duplicate runtime view is
-  needed. Practice remains full width, followed by the Memory/Topic pair,
-  Retention Map, Memory Signals, and workload pair.
-  The view transforms supplied values for presentation; it does not rebuild raw
-  cohorts. New problems selects first-attempt goals; Follow-up practice selects
-  Recall/Review Success aspirations while naming its different raw population.
-  Only the selected measure's existing Settings-owned editor/reference is shown.
-  Shared Easy/Medium/Hard identities are mint circles, blue diamonds, and amber
-  triangles. Hidden difficulties leave both plots and inspection, while Mix
-  retains all raw assessments/positive-time sums, including neutral Unknown.
-  Compare uses supplied full-period rates, time medians/quartiles, exact current/
-  prior denominators, and Sparse comparison when either valid n is below ten.
-  Time transforms seconds to minutes or percent of current allowances; quartile
-  whiskers require four timed records and one visible difficulty in Trend.
-- Shared `historical-chart.tsx`, `LineSegments`, date/report helpers, ChartTable,
-  and seven-row `historical-table.tsx` retain immutable supplied rows, calendar
-  midpoints, sparse ticks, exact Table values, and native keyboard/touch
-  inspection. Long-dash bridges connect measured neighbors across unavailable
-  intervals without creating observations. The paired problem-solving Trend
-  window is one contiguous slice supported by any known-difficulty raw activity,
-  preserving internal gaps independently of visibility, measure, or time subset.
-  `trimHistoricalEmptyEdges` retains Recall when either rate is known, including
-  zero; Memory requires a finite median, including zero/subday values, rather
-  than quartile support. Recall enables `startAtFirstPoint`: multiple intervals
-  begin at the first midpoint with 12px left clearance and retain the last
-  interval's end; a singleton keeps its original domain and centered point.
-  Series visibility cannot shift dates or supplied fits. Memory retains its
-  fitted duration scale; Recall's percentage fit includes its saved goal at
-  zero or one. Practice's fixed percentage axis preserves its independent count
-  scale. Feature components and native editors own semantics and preferences;
-  drawing primitives do not persist data. Scoped styles remain in
-  `src/styles/analytics.css`. Goal edits never change observations, timing,
-  FSRS scheduling, or Retention Map values.
+- Feature-owned `performance-presentation.ts`, `cumulative-recall-presentation.ts`,
+  `time-target-presentation.ts`, and `cumulative-trend-geometry.ts` derive pure
+  presentation from supplied exact evidence. Performance pools weighted points/
+  units with the fixed Again 0 / Hard 50 / Good 80 / Easy 100 rubric and current
+  Easy/Medium/Hard/Unknown influence 1/2/3/1; evidence is actual valid n.
+  Cumulative Recall pools recalled counts and pair-weighted unrounded FSRS means
+  over identical pairs without difficulty weights. Normalized Time retains
+  separate period medians and coverage, not a pooled median from medians.
+  Raw interval values remain available alongside cumulative values and counts.
+- `components/cards/performance-card.tsx` and `time-target-card.tsx` own
+  independent local first/follow-up cohorts. Performance Breakdown retains
+  Ratings/Difficulty/Mix/Intervals plus original Pooled outcomes, Difficulty
+  outcomes, raw goals, Trend/Compare, visibility, and exact fields. Pooled raw
+  rates include Unknown and use summed counts, never averaged difficulty rates.
+  The independent Time card retains Trend/Compare, minutes/current-target
+  percentage, all/successful timing subsets, known difficulty visibility,
+  median/Q1/Q3, exact current/prior counts, and Unknown coverage without a target.
+  Weighted comparisons use unrounded score points; raw-rate comparisons keep
+  percentage points, and either valid n below ten yields Sparse comparison.
+  All time has no prior comparison. Current targets and metadata do not rewrite
+  recorded outcomes or seconds.
+- `components/cards/recall-card.tsx`, `practice-card.tsx`, and
+  `memory-strength-card.tsx` adapt the existing metric renderers. Recall consumes
+  its supplied paired display frame and keeps original and cumulative values/
+  counts, reconstructed provenance, both native series switches, last updated
+  interval, and fitting Summary/Intervals/Goals/Method sections. Practice retains
+  the exact interval union, independent counts, raw rating shares and original
+  rating names in inspection/Details; friendly labels only change Overview copy.
+  Memory retains fitted post-review stability and supported quartiles.
+- `analytics-screen.tsx` composes ten compact adapters in the approved order:
+  Performance / Time vs target, Practice / Topic performance, Recall / Memory
+  strength, Retention map / Memory signals, Overdue backlog / Upcoming reviews.
+  The shared `analytics-chart-panel.tsx` supplies measured definite body geometry;
+  `analytics-exact-table.tsx` and feature controls preserve every original row,
+  field, action, and unavailable value through bounded sections/pages. Pagination
+  clamps/reflows with width, row, range, and report changes even while hidden.
+  Equivalent report rerenders preserve a current page. Overview/Details and goal/
+  selection surfaces keep the same shell and restore controls/selections/focus.
+  Scoped `src/styles/analytics.css` owns 464px two-column cards at 736px actual
+  content width and 512px stacked cards below it, plus four equal 148px headlines.
+  Local Latin Nunito Sans UI and Literata page-title fonts are scoped to Analytics
+  with system glyph fallbacks; no runtime font-service request is needed.
+- Shared historical chart/date/report helpers retain immutable supplied rows,
+  calendar midpoints, sparse ticks, exact values, and native keyboard/pointer/
+  tap inspection. `CumulativeTrend` uses reviewed bounded geometry and a report
+  as-of cutoff only for Performance and paired Recall: update markers represent
+  new evidence, horizontal long dashes hold a prior aggregate without new samples,
+  and transitions cannot move through unsupported time. Recall fits both
+  cumulative series and its saved goal independently of visibility. Raw outcome/
+  time, Memory, and Practice retain their supported-edge slices, internal gaps,
+  existing next-valid-point bridges, and their original interval-boundary domains.
+  Drawing primitives do not persist data. Goal edits never change observations,
+  timing, weighted scores, readiness, FSRS scheduling, or Retention values.
 - `src/features/analytics/components/practice-ratings-model.ts` is the pure
   presentation join for unchanged `views.practiceRhythm` and `views.ratingsMix`.
   It keys rows by ID plus exact `bucketStart`/`bucketEnd`, sorts their interval
@@ -462,31 +477,54 @@ The owners in that flow are:
   full interval, partial state, timezone, and report time. The native Reviews
   switch hides the line, markers, right axis, and tooltip count together, without
   changing dates, rows, target, or Table values. The selected-period challenging
-  summary and evidence-gated prior comparison remain below the view. The chart
+  summary and evidence-gated prior comparison remain reachable in Details. The chart
   explains association only: count-line crossings with a percentage target
   carry no percentage meaning.
-- Topic Performance retains all qualifying domain rows in its Zod-validated
-  view, preserving success/count/name ordering and bounded low-evidence details.
-  Its omitted-qualifying compatibility count is zero. The screen supplies the
-  existing Practice `targetReviewSuccess` and Settings-owned editor; no new
-  preference or message is introduced. Categorical columns have a fixed
-  percentage scale, bounded scrolling and synchronized full-topic inspection.
-- Memory Signals render supplied ranks, canonical titles and typed reasons as
-  compact inline rows. Reason wording is produced by the owning domain, not
-  parsed by the view. The panel opts into natural body height and a 36rem cap;
-  other panels retain their body-height default.
+- Topic performance retains all qualifying direct-topic rows and its original
+  raw rate/count fields. Required `ratingCountsByDifficulty` contains all sixteen
+  nonnegative integer cells; their sum equals `validRatings`, Good/Easy equals
+  `goodEasy`, and `reviewSuccess = goodEasy / validRatings`. The shared weighted
+  helper orders by unrounded /100 score, then actual valid count descending and
+  normalized name. Eligibility remains at least ten valid ratings and three
+  distinct valid-reviewed problems, with overlapping direct membership and no
+  ancestor rollups. Its omitted-qualifying compatibility count is zero; bounded
+  pages retain full names/all rows and the alphabetical first five returned
+  low-evidence topics with their exact additional count.
+  Weighted scores have no percentage target. The original raw rate, unrounded
+  goal status, and Settings-owned Review Success editor stay in rating Details.
+- `components/cards/memory-signals-card.tsx` renders supplied ranks, canonical
+  titles, severity, and every typed reason in original order through fitting
+  linked pages. Reason wording comes from its domain, never view parsing. The
+  separate returned-top-25 limit and qualifying-total count remain explicit;
+  the fixed shell does not discard flags or reasons. Current as-of, timezone,
+  and fallback context stays in Scope; historical selection alone does not
+  reset an equivalent current report's page.
 - Workload views preserve their domain contracts. Backlog draws exact known
   daily dots and straight threshold-aware connectors, with null dates breaking
-  runs. Upcoming labels original positive stack components without minimum bar
-  heights or duplicate totals. Workload inspection uses supplied dates/counts
+  runs. Both lines and markers are green at counts strictly below five and amber
+  at or above five; exact crossings split geometry without another observation.
+  Backlog uses its own Last 30 days daily frame. Its current value is the last
+  supplied count, remaining unavailable if that day is unknown; no earlier
+  observation is carried forward. Known peak excludes unknown days, and its
+  strict below-five/at-or-above-five counts conserve known days. Upcoming uses
+  the fixed Today-plus-thirteen-local-dates schedule snapshot, without future
+  reviews or rescheduling. Its bars fill actual projected date slots minus
+  bounded gaps, preserving all fourteen slots and zero geometry. Upcoming
+  labels original positive stack components without minimum bar heights or
+  duplicate totals. Workload inspection uses supplied dates/counts
   and the report context for pointer, tap and keyboard. The reconstructed
   backlog timestamp rule remains distinct from Upcoming's local-date overdue
-  classification.
+  classification. Upcoming retains only as-of/timezone/fallback report context,
+  not the historical page range, and preserves pages for equivalent current
+  reports under historical selection alone.
 - Retention Map returns every eligible current-state row. Its Zod contract keeps
   positive ranks and valid estimates without the former 30-row/rank limit;
   Memory Signals keeps its separate 25-row limit. Full-cohort scales/counts and
-  eligibility remain domain-owned. `current-state-views.tsx` composes the
-  All/Below target filter and the same filtered Chart/Table rows.
+  eligibility remain domain-owned. Its compact adapter keeps All/Below target,
+  the same full filtered rows, all eleven original table fields (linked title,
+  rank, recall, target, gap, durability, review/due dates, FSRS difficulty,
+  lapses, and status), plus supplied Region in Problems. Fitting linked
+  selection details expose the original fields inside the fixed card.
   `retention-map-chart.tsx` owns a local controlled viewport and native
   inspection/gesture state; `retention-map-model.ts` keeps presentation math and
   shared labels feature-local. Public Recharts plot, forward and inverse scales
@@ -502,14 +540,28 @@ The owners in that flow are:
 
 The Analytics service applies the range policy, calculates readiness separately
 for each metric's eligibility rules, and builds its Zod-validated summary.
-Legacy summary series may trim unsupported leading history. Historical trend
-views trim unsupported edges at the component presentation boundary,
-preserving the service response, selected-period totals, readiness, supplied
-scales, report time, and internal gaps. Historical readiness is exposed as
-confidence context; it does not suppress available Difficulty And Recorded Time, Recall Quality, Practice
-Rhythm, Memory Strength, or Recent Overdue Backlog points. Current Retention
-Health, Fragile Knowledge, and the fixed 14-day Upcoming Review Load do not
-depend on the historical range being ready.
+Legacy summary series may trim unsupported leading history. Performance retains
+the full available global-history calendar, leading unavailability, and trailing
+holds through real as-of. Recall uses its supplied first-selected-pair-to-as-of
+display frame and grouping; both series retain the same selected pairs/totals,
+while readiness uses their actual evidence on the shared global calendar.
+Held rows never improve samples, active buckets, gaps, or readiness. Other
+historical views keep their supported-edge trimming and internal gaps,
+preserving the service response, selected-period totals, supplied scales,
+and report context. Confidence guidance never suppresses available values.
+Current Retention/Signals and independent Last 30 days Backlog / Next 14 days
+Upcoming remain useful when historical evidence is sparse.
+
+The screen owns query compatibility: a range/timezone change clears incompatible
+values immediately, while a same-key refresh may retain its exact snapshot with
+Updating. A failed refresh retains the original values/as-of and persistent
+failure status with Retry. Initial loading/error, no evidence, and known zero
+use the reserved fixed shells. Neutral metadata exposes routine limitations;
+full reasons and distinct Practice/Rating readiness remain reachable in Details.
+One polite range/refresh announcement avoids competing card announcements.
+Persistent goal controllers preserve active drafts and associated field errors
+across Overview/Details, use the existing Settings mutation path, and prevent
+a completed earlier save from closing or focusing another active editor.
 
 Readiness diagnostics are a read-only view of that same production
 calculation—not a second implementation. They include `S/A/G/K/E`, selected

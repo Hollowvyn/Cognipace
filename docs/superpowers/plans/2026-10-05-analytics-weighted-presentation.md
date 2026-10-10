@@ -10,7 +10,7 @@
 
 ---
 
-Status: Tasks 1–3 implemented and independently reviewed; full presentation-phase checks and production build passed. Continue to compact UI work. The approved design is `docs/superpowers/specs/2026-10-05-analytics-performance-layout-design.md`; the final source is `assets/2026-10-05-analytics-range-summary-approved.html`. Root owns commits and independent reviews.
+Status: implemented and independently reviewed; integrated into the completed Analytics page. Final automated gates and desktop state proof passed. Human installed-extension smoke/proof remains pending before PR review or merge; see `../handoffs/2026-10-05-analytics-performance-layout.md`.
 
 ## Task 1: Shared Weighted And Cumulative Models
 

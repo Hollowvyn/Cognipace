@@ -10,7 +10,7 @@
 
 ---
 
-Status: written for execution after the card adapter plan. Root owns final integration review, commits and browser proof. The final approved asset is `docs/superpowers/specs/assets/2026-10-05-analytics-range-summary-approved.html`.
+Status: implemented and independently reviewed; integrated into the completed Analytics page. Final automated gates and desktop state proof passed. Human installed-extension smoke/proof remains pending before PR review or merge; see `../handoffs/2026-10-05-analytics-performance-layout.md`.
 
 ## Task 1: Four Truthful Headlines And Ten Ordered Cards
 
@@ -140,11 +140,11 @@ Actual1360CSS desktop production-component proof: all four148px headlines and te
 - Create: screenshot proof under a feature-specific `docs/superpowers/specs/assets` subdirectory.
 - Temporary outside repo: disposable Vite harness using actual production `AnalyticsScreen`/cards and honest established/young/unavailable fixtures.
 
-- [ ] **Step 1: Run all required automated gates on the final source.**
+- [x] **Step 1: Run all required automated gates on the final source.**
 
 Use pinned Node24.20.0/npm11.19.0. Run focused suites, touched-file Prettier, `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk git diff --check`. Record exact actual commands and outputs. No `db:generate`: no persisted schema change. Do not broaden testing after clean final gates unless a new change/failure/concern warrants it.
 
-- [ ] **Step 2: Render actual production components in the browser.**
+- [x] **Step 2: Render actual production components in the browser.**
 
 Use a disposable local Vite harness outside the tracked repo; production components and pure models are imported directly, query data comes from validated complete fixtures, and controlled failures represent real hook states. Use CUA browser tooling, not shell Puppeteer/Playwright. Inspect rendered DOM geometry as read-only verification and capture screenshots. A toy HTML replica is not production proof.
 
@@ -152,15 +152,19 @@ Verify at wide desktop, two-column boundary, stacked tablet and320px: four headl
 
 Fixture coverage: established30/90/All, young12-day history, old sparse raw history with recent paired Recall, genuinely old sparse paired Recall, empty, invalid-only, known zeros, no recorded successful durations, partial timing coverage, singleton, internal/trailing inactive holds, initial pending/error, incompatible range transition, same-key refreshing/failed-refresh with original as-of. Backlog crosses exact5 in both directions and retains unknown breaks; Upcoming stays14dates for every selected range.
 
-- [ ] **Step 3: Align authority docs and record human smoke requirement.**
+- [x] **Step 3: Align authority docs and record human smoke requirement.**
 
 Replace obsolete14/30/90 and full-width panel guidance with the implemented contract/layout; preserve original advanced measurement/target meanings. Update Analytics/Chart Targets manual flows to include the new selection, four truth-tested headlines, cumulative curves, fixed geometry, all Details/actions, retention completeness, strict backlog boundary and quiet states.
 
 Human installed-extension happy-path and edge-case realtime smoke/proof is required before PR review or merge. Agent production fixture screenshots do not satisfy that gate. State the exact pending cases and include the checklist; never mark it N/A. User has authorized implementation, not fabricated human proof.
 
-- [ ] **Step 4: Final independent code review and commit.**
+- [x] **Step 4: Final independent code review and commit.**
 
 Root requests final end-to-end review, resolves concrete issues and reruns only affected/full required checks when changes justify them. Format touched Markdown; root commits `docs: record analytics redesign validation and smoke checklist`. Preserve user work and approved prototype source. No PR/merge/deployment is needed unless separately requested.
+
+### Final execution record
+
+All required final gates passed on the completed source: format, lint, check (236 files /3,459 tests passed;2 files /9 opt-in provider cases skipped), build and diff check. Initial full-check failure was a route test clicking the new disabled placeholder too early; the correct readiness wait preserves original assertions, passes62/62 routes, and the rerun full check passes. Final end-to-end QUALITY review accepted source and authority alignment. No further exhaustive narrow-screen/accessibility matrix was added after the user's scope change. Exact commands, raw agent screenshots, remaining human smoke and build warnings are recorded in `../handoffs/2026-10-05-analytics-performance-layout.md`.
 
 ## Done-When
 
