@@ -57,8 +57,8 @@ export function RecentOverdueBacklogView({
         {view.peak === null ? 'Not measured' : formatCount(view.peak)}.
       </p>
       <p className="m-0 text-sm text-muted-foreground">
-        {formatCount(view.withinWatchDays)} known days within the 5-problem
-        watch zone; {formatCount(view.aboveWatchDays)} known days above it.
+        {formatCount(view.withinWatchDays)} known days below 5 problems;{' '}
+        {formatCount(view.aboveWatchDays)} known days at or above 5.
       </p>
       <ChartTable
         chart={<OverdueBacklogChart view={view} timeFrame={timeFrame} />}
@@ -127,17 +127,19 @@ function useWorkloadInspection(rowCount: number) {
   }
 }
 
-function OverdueBacklogChart({
+export function OverdueBacklogChart({
   view,
   timeFrame,
+  compact,
 }: {
   view: AnalyticsViews['overdueBacklog']
   timeFrame?: ReportTimeFrame | undefined
+  compact?: { width: number; height: number } | undefined
 }) {
   const summaryId = useId()
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const inspection = useWorkloadInspection(view.rows.length)
-  if (view.knownDays === 0)
+  if (view.knownDays === 0 && !compact)
     return (
       <p className="m-0 text-sm text-muted-foreground">
         Historical overdue backlog could not be reconstructed for this period.
@@ -149,9 +151,9 @@ function OverdueBacklogChart({
         Active non-suspended overdue backlog reconstructed from persisted FSRS
         review logs and current card state. Daily local rows span the last 30
         days; unknown days are not measured and break the line. The y-axis is
-        overdue problems from zero to {formatCount(view.scale.domain[1])}. Five
-        problems is the CogniPace watch zone. Today is measured through as of
-        time and is in progress.
+        overdue problems from zero to {formatCount(view.scale.domain[1])}. Green
+        is below five problems; amber is at or above five. Today is measured
+        through as of time and is in progress.
       </p>
       <ChartContainer
         accessibleDescription="Daily summaries over the last 30 days. Reconstructed overdue backlog; unknown days break the line."
@@ -159,14 +161,19 @@ function OverdueBacklogChart({
         aria-describedby={summaryId}
         aria-label="Recent Overdue Backlog chart"
         aria-roledescription="interactive daily line"
-        className="aspect-auto h-72 min-h-[18rem]"
+        className={
+          compact
+            ? 'cp-workload-plot aspect-auto min-h-0'
+            : 'aspect-auto h-72 min-h-[18rem]'
+        }
+        style={compact ? { height: compact.height, minHeight: 0 } : undefined}
         config={{
           overdue: {
             label: 'Overdue problems',
             color: 'var(--cp-analytics-attention)',
           },
         }}
-        initialDimension={chartDimension}
+        initialDimension={compact ?? chartDimension}
         ref={setHost}
         role="region"
       >
@@ -179,14 +186,14 @@ function OverdueBacklogChart({
           <ReferenceArea
             fill="var(--cp-analytics-healthy)"
             fillOpacity={0.035}
-            label="Within watch zone"
+            label="Below 5"
             y1={0}
             y2={watchZone}
           />
           <ReferenceArea
             fill="var(--cp-analytics-attention)"
             fillOpacity={0.035}
-            label="Above watch zone"
+            label="At or above 5"
             y1={watchZone}
             y2={view.scale.domain[1]}
           />
@@ -232,7 +239,7 @@ function OverdueBacklogChart({
             name="Recent Overdue Backlog chart"
             rows={view.rows}
             describe={(row) =>
-              `${formatDate(row.date)}. ${row.overdueCount === null ? 'Not measured. Watch status unknown' : `${formatCount(row.overdueCount)} overdue problems. ${row.overdueCount <= watchZone ? 'Within' : 'Above'} watch zone`}${row.inProgress ? '. In progress' : ''}`
+              `${formatDate(row.date)}. ${row.overdueCount === null ? 'Not measured. Watch status unknown' : `${formatCount(row.overdueCount)} overdue problems. ${row.overdueCount < watchZone ? 'Below 5; green' : 'At or above 5; amber'} watch zone`}${row.inProgress ? '. In progress' : ''}`
             }
             tooltip={(row) => (
               <BacklogTooltip row={row} timeFrame={timeFrame} />
@@ -252,8 +259,10 @@ interface ThresholdLineSegment {
   d: string
   status: 'within-watch' | 'above-watch'
 }
-function getThresholdStatus(value: number): ThresholdLineSegment['status'] {
-  return value <= watchZone ? 'within-watch' : 'above-watch'
+export function getThresholdStatus(
+  value: number,
+): ThresholdLineSegment['status'] {
+  return value < watchZone ? 'within-watch' : 'above-watch'
 }
 
 export function buildThresholdLineSegments(
@@ -356,7 +365,7 @@ function BacklogMarks({
             data-selected={index === selectedIndex}
             data-workload-dot=""
             fill={
-              row.overdueCount <= watchZone
+              row.overdueCount < watchZone
                 ? 'var(--cp-analytics-healthy)'
                 : 'var(--cp-analytics-attention)'
             }
@@ -371,12 +380,18 @@ function BacklogMarks({
   )
 }
 
-function UpcomingLoadChart({
+export function UpcomingLoadChart({
   view,
   timeFrame,
+  reportContext,
+  compact,
 }: {
   view: AnalyticsViews['upcomingReviewLoad']
   timeFrame?: ReportTimeFrame | undefined
+  reportContext?:
+    | Pick<ReportTimeFrame, 'asOf' | 'timeZone' | 'timeZoneFallback'>
+    | undefined
+  compact?: { width: number; height: number } | undefined
 }) {
   const summaryId = useId(),
     hatchId = `overdue-hatch-${summaryId.replaceAll(':', '')}`
@@ -397,19 +412,33 @@ function UpcomingLoadChart({
         aria-describedby={summaryId}
         aria-label="Upcoming Review Load chart"
         aria-roledescription="interactive stacked daily columns"
-        className="aspect-auto h-72 min-h-[18rem]"
+        className={
+          compact
+            ? 'cp-workload-plot aspect-auto min-h-0'
+            : 'aspect-auto h-72 min-h-[18rem]'
+        }
+        style={compact ? { height: compact.height, minHeight: 0 } : undefined}
         config={{
           due: { label: 'Due', color: 'var(--cp-analytics-healthy)' },
           overdue: { label: 'Overdue', color: overdueFill },
         }}
-        initialDimension={chartDimension}
+        initialDimension={compact ?? chartDimension}
         ref={setHost}
         role="region"
       >
         <ComposedChart
           accessibilityLayer={false}
           data={view.rows.map((row, position) => ({ ...row, position }))}
-          margin={{ bottom: 8, left: 0, right: 8, top: 76 }}
+          margin={{
+            bottom: 8,
+            left: 0,
+            right: 8,
+            top:
+              compact &&
+              view.rows.every((row) => row.dueCount + row.overdueCount === 0)
+                ? 16
+                : 76,
+          }}
         >
           <defs>
             <pattern
@@ -468,7 +497,12 @@ function UpcomingLoadChart({
               `${row.today ? 'Today, ' : ''}${formatDate(row.date)}. Due ${formatCount(row.dueCount)}. Overdue ${formatCount(row.overdueCount)}. Total ${formatCount(row.dueCount + row.overdueCount)}.`
             }
             tooltip={(row) => (
-              <UpcomingTooltip row={row} timeFrame={timeFrame} />
+              <UpcomingTooltip
+                row={row}
+                reportContext={reportContext ?? timeFrame}
+                firstDate={view.rows[0]?.date}
+                lastDate={view.rows.at(-1)?.date}
+              />
             )}
           />
         </ComposedChart>
@@ -528,7 +562,9 @@ function UpcomingMarks({
   if (!plot || !xScale || !yScale) return null
   const widthOf = (text: string) => measurements[text]?.width ?? text.length * 7
   const heightOf = (text: string) => measurements[text]?.height ?? 14
-  const width = Math.min(36, (plot.width / rows.length) * 0.72)
+  const slotWidth = plot.width / rows.length
+  const gap = Math.min(14, Math.max(6, slotWidth * 0.12), slotWidth * 0.2)
+  const width = Math.max(0, slotWidth - gap)
   const outside: Array<{
     index: number
     anchor: number
@@ -899,9 +935,9 @@ function BacklogTooltip({
         Watch status:{' '}
         {row.overdueCount === null
           ? 'Unknown'
-          : row.overdueCount <= watchZone
-            ? 'Within watch zone (≤5)'
-            : 'Above watch zone (>5)'}
+          : row.overdueCount < watchZone
+            ? 'Below 5 (<5)'
+            : 'At or above 5 (≥5)'}
       </p>
       <p className="m-0 text-muted-foreground">
         Daily summaries · Last 30 days · Reconstructed{' '}
@@ -913,10 +949,16 @@ function BacklogTooltip({
 }
 function UpcomingTooltip({
   row,
-  timeFrame,
+  reportContext,
+  firstDate,
+  lastDate,
 }: {
   row: UpcomingRow
-  timeFrame?: ReportTimeFrame | undefined
+  reportContext?:
+    | Pick<ReportTimeFrame, 'asOf' | 'timeZone' | 'timeZoneFallback'>
+    | undefined
+  firstDate?: string | undefined
+  lastDate?: string | undefined
 }) {
   return (
     <div className="rounded border border-border bg-card px-3 py-2 text-xs shadow-overlay">
@@ -929,7 +971,16 @@ function UpcomingTooltip({
       <p className="m-0">
         Total: {formatCount(row.dueCount + row.overdueCount)}
       </p>
-      <ReportContext timeFrame={timeFrame} />
+      <p className="m-0 text-muted-foreground">
+        Next 14 local dates: {firstDate} through {lastDate}. Fixed schedule
+        snapshot.
+      </p>
+      {reportContext ? (
+        <p className="m-0 text-muted-foreground">
+          As of {reportContext.asOf} · {reportContext.timeZone}
+          {reportContext.timeZoneFallback ? ' (fallback)' : ''}
+        </p>
+      ) : null}
     </div>
   )
 }

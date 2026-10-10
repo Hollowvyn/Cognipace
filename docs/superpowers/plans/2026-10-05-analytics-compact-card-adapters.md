@@ -10,7 +10,7 @@
 
 ---
 
-Status: Tasks 1–3 are implemented and independently specification/quality reviewed. Continue Task 4 after the reviewed history/runtime, weighted-presentation, and compact-foundation phases. Root owns commits; run each task through specification review before quality review. Do not ask the user to reapprove the already accepted card design.
+Status: Tasks 1–4 are implemented and independently specification/quality reviewed. Continue page assembly and final production proof after these reviewed adapters. Root owns commits; run each task through specification review before quality review. Do not ask the user to reapprove the already accepted card design.
 
 ## Shared Adapter Contract
 
@@ -257,20 +257,150 @@ Skipped full `npm run lint`, `npm run format`, `npm run check`, `npm run build`:
 - Modify: `src/styles/analytics.css` only for compact Topics/Signals/workload presentation.
 - Test: `historical-views.test.tsx`, `current-state-views.test.tsx`, `workload-views.test.tsx`, and `domain/workload-presentation.test.ts` plus the existing weighted Topic/domain/contract suites.
 
-- [ ] **Step 1: Add failing exact-count and threshold tests.**
+- [x] **Step 1: Add failing exact-count and threshold tests.**
 
 Topics must show every qualifying topic through paged horizontal bars, full names, reviewed weighted ordering and sixteen-cell breakdown; low-evidence topics retain their independent list/additional count. Signals retains all returned flags/canonical links/rank and total qualifying versus top25 returned count, three rows wide/two narrow with page clamp. Backlog fixtures cross 5 in both directions, include a point at exactly5, known zero and unknown days. Green is strictly below5; amber at5 and above; crossings split exactly and create no measured marker. Unknown days break segments. Upcoming keeps exact fixed14 local dates and Due/Overdue/Total/Today semantics.
 
-- [ ] **Step 2: Run RED and implement the four adapters.**
+- [x] **Step 2: Run RED and implement the four adapters.**
 
 Run new and existing Topic/workload/current-state suites. Expected: new compact assertions fail. Topics Overview uses shared weighted helper, no score target. Details **Scores / Ratings / Evidence / Method** preserves original Good/Easy success rate/goal status/editor and direct overlapping memberships. Prefer bounded topic pages to horizontal chart scrolling so full names and card geometry remain clear.
 
 Signals is a paginated linked problem list without meaningless Chart/Table control. Details **Problems / Scope / Method** preserves exact flags. Backlog Overview shows current overdue count and fitted daily plot; Details **Days / Summary / Method** includes peak, known/unknown days and strict threshold accounting. Change `withinWatchDays` to count `<5` and `aboveWatchDays` to count `>=5`, and label that meaning explicitly. Upcoming Overview uses width-filling fixed-date bars; Details **Days / Summary / Method** retains all exact values. Both use their supplied independent frames, not selected historical labels.
 
-- [ ] **Step 3: Run GREEN, review, and commit.**
+- [x] **Step 3: Run GREEN, review, and commit.**
 
 Run all new/focused Topic/Signals/workload/threshold suites and typecheck. Fresh specification then quality review. Root commits `feat: compact topic signals and workload analytics`.
 
 ## Completion Boundary
 
 All ten adapters are complete when all underlying measurements/actions are reachable, their focused tests pass, and independent reviews approve. Continue to page assembly/browser proof. The obsolete full-width wrappers are not used by the final page; delete only confirmed unused presentation after preserving meaningful regressions. Required full gates and human extension proof are recorded in the assembly plan.
+
+
+## Task 4 October 10 execution record
+
+All four production adapters are implemented. Independent SPEC review found a hidden Scope/Method page reset gap in Signals; the original actor repaired it and six regressions passed. Independent QUALITY review found stale Topics inspection after footer focus left the card and an inclusive/exclusive Method date-label mismatch; the original actor repaired both, including the adjacent empty-bucket positive-timezone fallback. Fresh re-reviews passed with no unresolved findings. The 13-file freeze hashes matched at both final reviews. No other application implementer ran concurrently.
+
+The final original focused run passed 270 tests in 11 suites; subsequent affected checks passed 18 Signals/current-state tests and 17 Topics/historical tests after ten meaningful regression additions. These are separate runs, not a claim that 280 were rerun together. Independent SPEC reproduced its two failing cases and then passed both; QUALITY passed three independent regressions plus 33 affected/architecture tests after repair. Required final assembled-source gates remain pending.
+
+Root CUA production-component proof used Zod-validated actual SQLite/service fixtures, regenerated successfully across 15 scenarios and six range/timezone contexts. At 320px all four cards fit the 512px shell in Overview and Details: long Topics all 33 Ratings field groups including sixteen matrix cells, all sixteen Evidence fields with five returned low-evidence topics plus one additional, all 25 returned Signals and a full long three-reason title, workload all exact fields/summary/method/final dates. Three native Topics inspection pages retain their pin; Tab out dismisses it; a 95% goal draft survives hiding/reopening. Included Method dates now end October 5, not exclusive October 6. Strict green-below-five/amber-at-five segments and dots, unknown breaks/last-day unavailability, all-unknown inspection and measured zero forecast were checked. At 1360px all ten adapter Overview shells remain 464px; these four Details remain the same height. Final bundled-font/page/state proof remains pending.
+
+Independent final commands:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- --config /private/tmp/task4-spec-vitest.config.mts --maxWorkers=1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/memory-signals-card.test.tsx src/features/analytics/components/current-state-views.test.tsx --maxWorkers=1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- --config /private/tmp/task4-quality-review.config.mts --maxWorkers=1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx src/features/analytics/components/historical-views.test.tsx src/testing/architecture-boundaries.test.ts --maxWorkers=1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" node node_modules/vitest/vitest.mjs run --config /private/tmp/cognipace-analytics-refactor-proof/fixture.config.ts
+rtk proxy shasum -a 256 -c /private/tmp/task4-source-freeze.sha256
+rtk git diff --check
+```
+
+The implementer commands and explicitly skipped checks below describe this bounded adapter phase; final assembly must run required full gates. Human installed-extension happy-path/edge-case realtime smoke with screenshot/recording proof remains pending and required before PR review/merge.
+
+## Final commands run and results
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx src/features/analytics/components/cards/backlog-card.test.tsx src/features/analytics/components/cards/upcoming-card.test.tsx src/features/analytics/components/historical-views.test.tsx src/features/analytics/components/current-state-views.test.tsx src/features/analytics/components/workload-views.test.tsx src/features/analytics/domain/workload-presentation.test.ts src/features/analytics/domain/historical-presentation.test.ts src/features/analytics/domain/performance-presentation.test.ts src/features/analytics/api/analytics-contracts.test.ts --maxWorkers=1 > /private/tmp/task4-final-focused.log 2>&1
+```
+
+PASS:11 suites270 tests, final run duration14.61s.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck > /private/tmp/task4-final-typecheck.log 2>&1
+```
+
+PASS: WXT prepare and tsc, exit0.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx eslint src/features/analytics/components/cards/topics-card.tsx src/features/analytics/components/cards/topics-card.test.tsx src/features/analytics/components/cards/memory-signals-card.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx src/features/analytics/components/cards/backlog-card.tsx src/features/analytics/components/cards/backlog-card.test.tsx src/features/analytics/components/cards/upcoming-card.tsx src/features/analytics/components/cards/upcoming-card.test.tsx src/features/analytics/components/workload-views.tsx src/features/analytics/components/workload-views.test.tsx src/features/analytics/domain/workload-presentation.ts src/features/analytics/domain/workload-presentation.test.ts > /private/tmp/task4-final-eslint.log 2>&1
+```
+
+PASS: touched source/tests lint exit0, no output.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --check src/features/analytics/components/cards/topics-card.tsx src/features/analytics/components/cards/topics-card.test.tsx src/features/analytics/components/cards/memory-signals-card.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx src/features/analytics/components/cards/backlog-card.tsx src/features/analytics/components/cards/backlog-card.test.tsx src/features/analytics/components/cards/upcoming-card.tsx src/features/analytics/components/cards/upcoming-card.test.tsx src/features/analytics/components/workload-views.tsx src/features/analytics/components/workload-views.test.tsx src/features/analytics/domain/workload-presentation.ts src/features/analytics/domain/workload-presentation.test.ts src/styles/analytics.css > /private/tmp/task4-final-format.log 2>&1
+rtk git diff --check
+rtk git status --short
+```
+
+PASS: all13 matched files formatted, clean whitespace, exactly13 intended changed/new files. Formatting writes were limited to this same file list.
+
+## Commands skipped and remaining validation
+
+- `npm run lint`, `npm run check`, `npm run build`: deliberately root-owned after final assembly; no parallel full WXT gates.
+- `npm run format`: repository-wide formatting is outside this bounded task; all touched files have final Prettier check.
+- `npm run db:check`: no database or persisted behavior changes; applicable full check deferred to root.
+- `npm run db:generate`: no schema/migration change.
+- `npm run zip`: outside the requested adapter phase.
+- Human installed-extension happy-path/edge-case realtime smoke and screenshot/recording proof remain required before PR review/merge. They are pending, not N/A. Parent root is preparing actual-service SQLite fixtures and CUA proof; the implementer performed no browser interactions.
+
+Required human/parent follow-through: desktop and320px/zoom full names plus long3flag Signals; all qualifying Topics and low-evidence additional count, all16 cells, goal draft/save/error/Cancel; Signals rank25/canonical links/returned-versus-qualifying; Backlog4→6,6→4,exact5flat/markers,known0/singleton/trailingunknown/allunknown, all30dates; Upcoming14dates/zero schedule/mixed/tiny positive segments/only prior-date overdue, all count/context fields. Root reported earlier successful long Topic3inspection-page native click proof and bounded Method/Scope proof; final15fixture reproof and fresh SPEC/QUALITY are still parent-owned at this handoff.
+
+Suggested commit: `feat: compact topic signals and workload analytics`. Product effect includes the approved strict amber-at-five boundary. Rollback is the13-file Task4 diff; runtime/persistence transport remains compatible.
+
+## Additional exact focused commands
+
+Each RED result above is intentionally failed behavior evidence; GREEN runs below passed unless listed as a correction above.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/workload-views.test.tsx src/features/analytics/domain/workload-presentation.test.ts --maxWorkers=1 > /private/tmp/task4-threshold-red.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx src/features/analytics/components/cards/backlog-card.test.tsx src/features/analytics/components/cards/upcoming-card.test.tsx --maxWorkers=1 > /private/tmp/task4-cards-red.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx --maxWorkers=1 > /private/tmp/task4-topics-green.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx --maxWorkers=1 > /private/tmp/task4-topic-inspection-red.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx --maxWorkers=1 > /private/tmp/task4-topic-inspection-green.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx -t "keeps pinned" --maxWorkers=1 > /private/tmp/task4-topic-footer-red.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx --maxWorkers=1 > /private/tmp/task4-topic-footer-green.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/backlog-card.test.tsx -t "all-unknown" --maxWorkers=1 > /private/tmp/task4-unknown-red.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/backlog-card.test.tsx src/features/analytics/components/cards/upcoming-card.test.tsx src/features/analytics/components/workload-views.test.tsx --maxWorkers=1 > /private/tmp/task4-workload-fit-green.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx -t "original seven" --maxWorkers=1 > /private/tmp/task4-topic-id-red.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx --maxWorkers=1 > /private/tmp/task4-topic-id-green.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx --maxWorkers=1 > /private/tmp/task4-final-copy-focused.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx eslint src/features/analytics/components/cards/topics-card.tsx src/features/analytics/components/cards/topics-card.test.tsx src/features/analytics/components/cards/memory-signals-card.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx > /private/tmp/task4-final-copy-eslint.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --check src/features/analytics/components/cards/topics-card.tsx src/features/analytics/components/cards/topics-card.test.tsx src/features/analytics/components/cards/memory-signals-card.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx > /private/tmp/task4-final-copy-format.log 2>&1
+```
+
+The full11suite invocation above was also run earlier to `/private/tmp/task4-green.log`; corrected failures are recorded above. The six-card/workload/domain subset was run to `/private/tmp/task4-cards-green.log` (36 passed). The final workload-fit invocation first encountered the temporary JSX parse error, then was rerun GREEN24 after correction; logs now show the final result. Full touched `npx eslint` was first run to `/private/tmp/task4-eslint.log` and corrected one unnecessary test cast. `npm run typecheck` first ran to `/private/tmp/task4-typecheck.log`, then reran GREEN after test fixture/import correction.
+
+## Fresh SPEC finding repair and refreeze
+
+Fresh read-only SPEC found P2: hidden Memory Signals Scope/Method copy pages did not reset when current report context changed. This reopened the freeze. Same implementer moved copyPage into the existing keyed pagination state. As-of/timezone/returned row identity changes reset both problem and copy pages even while Overview hides Details; equivalent reports with newly allocated rows/reasons retain both pages. No API, geometry, content or ownership change.
+
+Six new parameterized component regressions cover Scope and Method under changed asOf, timezone and row slug identity, each proving equivalent hidden rerender retention before changed-context reset. `/private/tmp/task4-signals-hidden-copy-red.log`:6 expected failures,4 prior tests passed. GREEN focused MemorySignals/current-state suites:18 tests passed. Previous final Task4 full11suite270 pass remains valid for unchanged owners; the six added tests give276 Task4 focused assertions in total. Full gates still root-owned; no new commits/docs/page assembly.
+
+Exact repair validation commands:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/memory-signals-card.test.tsx --maxWorkers=1 > /private/tmp/task4-signals-hidden-copy-red.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/memory-signals-card.test.tsx src/features/analytics/components/current-state-views.test.tsx --maxWorkers=1 > /private/tmp/task4-signals-hidden-copy-green.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx eslint src/features/analytics/components/cards/memory-signals-card.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx > /private/tmp/task4-signals-hidden-copy-eslint.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --write src/features/analytics/components/cards/memory-signals-card.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --check src/features/analytics/components/cards/memory-signals-card.tsx src/features/analytics/components/cards/memory-signals-card.test.tsx > /private/tmp/task4-signals-hidden-copy-format.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck > /private/tmp/task4-signals-hidden-copy-typecheck.log 2>&1
+rtk git diff --check
+```
+
+GREEN focused18; touched lint/format, WXT prepare/tsc and whitespace checks all exit0. Hash manifest refreshed. Root owns fresh reviewer reproof and final browser/gates/commit.
+
+## Fresh QUALITY findings repair and refreeze
+
+Fresh read-only QUALITY confirmed two P2s: native Topic inspection persisted after footer focus Tabbed outside the card, and Topics Method described the raw exclusive periodEnd as an included date. Same implementer reopened freeze and repaired only Topics card/test owner.
+
+- Added a min-width-zero card-scope wrapper with bubbling boundary blur dismissal. All within-card mark/footer focus retains inspection; keyboard or touch pins and native footer clicks remain usable. Focus leaving from any descendant closes inspection, restores Overview pager and clears polite inspection content. It adds no visible copy, shell height, scrolling or API change.
+- Method context now reuses the already-computed inclusive local `period`; exact ISO start and `Period end (exclusive)` remain separate exact fields. Parent noted the adjacent empty-bucket positive-timezone start fallback; both fallback dates now use the existing shared getAnalyticsDateKey helper in the report timezone, preferring supplied bucket date keys.
+- `/private/tmp/task4-topics-quality-red.log`: three intended failures (keyboard/touch footer exit dismissal plus exclusive-end Method copy),7 prior tests passed. `/private/tmp/task4-topics-local-fallback-red.log`: intended Tokyo empty-bucket start-day failure. GREEN Topics/historical2suites17 passed, including old within-card paging, all16 cells, original7 fields and draft behavior.
+
+Exact repair validation commands:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx --maxWorkers=1 > /private/tmp/task4-topics-quality-red.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx -t "empty-bucket" --maxWorkers=1 > /private/tmp/task4-topics-local-fallback-red.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/topics-card.test.tsx src/features/analytics/components/historical-views.test.tsx --maxWorkers=1 > /private/tmp/task4-topics-quality-green.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --write src/features/analytics/components/cards/topics-card.tsx src/features/analytics/components/cards/topics-card.test.tsx
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx eslint src/features/analytics/components/cards/topics-card.tsx src/features/analytics/components/cards/topics-card.test.tsx > /private/tmp/task4-topics-quality-eslint.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --check src/features/analytics/components/cards/topics-card.tsx src/features/analytics/components/cards/topics-card.test.tsx > /private/tmp/task4-topics-quality-format.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck > /private/tmp/task4-topics-quality-typecheck.log 2>&1
+rtk git diff --check
+```
+
+Final affected focused17 tests, touched lint/format, WXT prepare/tsc and whitespace pass. Manifest refreshed. Since original270-task focused run,6 Signals and4 Topics tests were added:280 total assertions across the same11suites. Affected suites were rerun after each repair; full repo gates still root-owned and not run here. Fresh independent re-review/browser reproof remain parent-owned.
