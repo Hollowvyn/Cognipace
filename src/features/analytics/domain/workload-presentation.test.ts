@@ -22,6 +22,24 @@ const timeFrame = {
 }
 
 describe('workload analytics presentation', () => {
+  it('counts exactly five as at or above watch and never carries through an unknown current day', () => {
+    const { overdueBacklog } = buildWorkloadAnalyticsViews({
+      overdueSnapshots: [
+        { date: new Date('2026-08-10T03:59:59.999Z'), overdueCount: 4 },
+        { date: new Date('2026-08-11T03:59:59.999Z'), overdueCount: 5 },
+        { date: new Date('2026-08-12T03:59:59.999Z'), overdueCount: 6 },
+      ],
+      timeFrame,
+      upcomingLoad: upcomingRows(),
+    })
+    expect(overdueBacklog).toMatchObject({
+      withinWatchDays: 1,
+      aboveWatchDays: 2,
+      knownDays: 3,
+      currentBacklog: null,
+      peak: 6,
+    })
+  })
   it('keeps every selected local day, preserves unknown reconstruction gaps, and reports known backlog summaries', () => {
     const views = buildWorkloadAnalyticsViews({
       overdueSnapshots: [

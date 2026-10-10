@@ -5,9 +5,9 @@ import type { AnalyticsRange } from '../api/analytics-contracts'
 import { cn } from '@/utils/cn'
 
 const rangeOptions: readonly { label: string; value: AnalyticsRange }[] = [
-  { label: '14 days', value: 14 },
   { label: '30 days', value: 30 },
   { label: '90 days', value: 90 },
+  { label: 'All time', value: 'all' },
 ]
 
 export function AnalyticsRangeControl({ range }: { range: AnalyticsRange }) {

@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall, ten equal cards in Overview and Details, target-relative timing, strict backlog color boundary, and 30/90/All time with available young history. The final prototype adds four selected-period activity totals and quiet fixed card states. Backlog stays Last 30 days, Upcoming Next 14 days, and tooltip cleanup is deferred. Implementation, independent reviews, automated gates and desktop state proof are complete; human installed-extension smoke/proof remains pending before PR review or merge. See the dated handoff.
+
 - [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
 
 - [`specs/2026-10-04-openrouter-provider-design.md`](./specs/2026-10-04-openrouter-provider-design.md): approved optional OpenRouter BYOK connection and host permission, suggested editable `openrouter/free`, explicit free preset, protected key storage, structured reports, and routed-model metadata; implemented with independent SPEC/QUALITY reviews, passing automated gates and production-component browser proof; live full-report/generated-code and human installed-extension proof remain pending.
@@ -73,6 +75,12 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-05-analytics-history-window-foundation.md`](./plans/2026-10-05-analytics-history-window-foundation.md): implemented and independently reviewed pure selection, raw-history bounds, bounded calendar intervals and fixed daily backlog foundation; 69 focused tests and the required full check pass. Runtime/service/route/readiness integration is implemented in the following phase.
+- [`plans/2026-10-05-analytics-history-runtime-integration.md`](./plans/2026-10-05-analytics-history-runtime-integration.md): implemented and independently reviewed public selections, explicit report frames, paired Recall dates with shared-calendar readiness, nominal comparisons, independent workload frames, and truthful selected activity through validated messages; 3,172 tests and build pass. Weighted models and compact UI are implemented in the following completed phases.
+- [`plans/2026-10-05-analytics-weighted-presentation.md`](./plans/2026-10-05-analytics-weighted-presentation.md): shared weighted Performance, cumulative paired Recall, normalized Time, sixteen-cell topic evidence, and natural cumulative trend geometry before compact production composition.
+- [`plans/2026-10-05-analytics-compact-card-foundation.md`](./plans/2026-10-05-analytics-compact-card-foundation.md): fixed card geometry, measured plots, bounded exact paging, and persistent fitting goal surfaces.
+- [`plans/2026-10-05-analytics-compact-card-adapters.md`](./plans/2026-10-05-analytics-compact-card-adapters.md): all ten production adapters, retaining advanced outcomes/time/Mix, paired Recall, exact evidence, complete Retention interactions and independent workload scopes.
+- [`plans/2026-10-05-analytics-page-assembly-proof.md`](./plans/2026-10-05-analytics-page-assembly-proof.md): completed four period headlines, ten-card grid, quiet query/action states, desktop production proof, authority-doc alignment and pending human extension smoke checklist.
 - [`plans/2026-10-06-fsrs-phase-d-reliable-reviews.md`](./plans/2026-10-06-fsrs-phase-d-reliable-reviews.md): approved-scope implementation plan for frozen review commands, atomic receipts/track effects, single-event guarded Update, durable acknowledgement and overlay retry after merged Phase C.
 
 - [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
@@ -154,6 +162,7 @@ Use these files to understand why work was shaped a certain way. Before changing
 
 ## Handoffs
 
+- [`handoffs/2026-10-05-analytics-performance-layout.md`](./handoffs/2026-10-05-analytics-performance-layout.md): completed Analytics implementation, exact final checks, production-component proof, and required pending human extension smoke.
 - [`handoffs/2026-10-04-fsrs-phase-c-storage-restore.md`](./handoffs/2026-10-04-fsrs-phase-c-storage-restore.md): reviewed evidence storage, v6 backup and recoverable replacement with real preserving migration, repaired collision/cache/import-boundary findings, exact validation and a runnable human fault-smoke procedure; installed-extension proof remains pending with the owner's October 5 decision to merge then test after backing up.
 
 - [`handoffs/2026-10-04-overlay-ai-hints.md`](./handoffs/2026-10-04-overlay-ai-hints.md): reviewed Phase 2 source, exact final/historical checks, progressive-hint fixture proof, pending human installed-extension smoke and live provider quality, and release/recovery notes.

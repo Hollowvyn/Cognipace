@@ -19,7 +19,7 @@ import {
   addAnalyticsCalendarDays,
   getAnalyticsDateKey,
   getAnalyticsLocalDayStart,
-  shiftAnalyticsCalendarDays,
+  getAnalyticsPreviousPeriod,
   type AnalyticsTimeFrame,
 } from './analytics-time'
 
@@ -194,7 +194,7 @@ export function buildRecallQualityPoints(
     point.predicted.push(pair.estimate)
   }
 
-  return trimLeadingEmptyBuckets(
+  return presentHistoricalPoints(
     points.map((point) => ({
       ...bucketBounds(point.bucket),
       observedRecall: recomputeBucketRatio([point.observed]),
@@ -209,6 +209,7 @@ export function buildRecallQualityPoints(
       eligibleSampleSize: point.observed.denominator,
     })),
     (point) => point.observedRecall !== null || point.predictedRecall !== null,
+    options,
   )
 }
 
@@ -249,7 +250,7 @@ export function buildPracticeRhythmPoints(
     }
   }
 
-  return trimLeadingEmptyBuckets(
+  return presentHistoricalPoints(
     points.map((point) => ({
       ...bucketBounds(point.bucket),
       reviewCount: point.reviewCount,
@@ -258,6 +259,7 @@ export function buildPracticeRhythmPoints(
       associationOnly: true,
     })),
     (point) => point.reviewCount > 0,
+    options,
   )
 }
 
@@ -265,7 +267,7 @@ export function buildRatingsMixPoints(
   events: readonly AnalyticsReviewEvent[],
   options: AnalyticsRangeOptions,
 ): RatingsMixPoint[] {
-  return trimLeadingEmptyBuckets(
+  return presentHistoricalPoints(
     options.buckets.map((bucket) => {
       const counts = { again: 0, hard: 0, good: 0, easy: 0 }
       for (const event of events)
@@ -285,6 +287,7 @@ export function buildRatingsMixPoints(
       }
     }),
     (point) => point.total > 0,
+    options,
   )
 }
 
@@ -293,23 +296,15 @@ export function buildHardAgainSummary(
   options: AnalyticsRangeOptions,
   lowSampleThreshold = 10,
 ): HardAgainSummary {
-  const previousStart = options.timeFrame
-    ? shiftAnalyticsCalendarDays(
-        new Date(options.timeFrame.periodStart),
-        -options.timeFrame.requestedDays,
-        options.timeFrame.timeZone,
-      )
-    : new Date(
-        options.start.getTime() -
-          (options.end.getTime() - options.start.getTime()),
-      )
-  const previousEnd = options.timeFrame
-    ? shiftAnalyticsCalendarDays(
-        new Date(options.timeFrame.asOf),
-        -options.timeFrame.requestedDays,
-        options.timeFrame.timeZone,
-      )
-    : options.start
+  const previous = options.timeFrame
+    ? getAnalyticsPreviousPeriod(options.timeFrame)
+    : {
+        start: new Date(
+          options.start.getTime() -
+            (options.end.getTime() - options.start.getTime()),
+        ),
+        asOf: options.start,
+      }
   const selectedRatings = events.filter(
     (event) =>
       event.reviewedAt >= options.start &&
@@ -318,9 +313,10 @@ export function buildHardAgainSummary(
   )
   const previousRatings = events.filter(
     (event) =>
-      event.reviewedAt >= previousStart &&
+      previous !== null &&
+      event.reviewedAt >= previous.start &&
       (options.timeFrame
-        ? event.reviewedAt <= previousEnd
+        ? event.reviewedAt <= previous.asOf
         : event.reviewedAt < options.start) &&
       hasValidReviewRating(event),
   )
@@ -404,13 +400,14 @@ export function buildStabilityPoints(
     point.values.push(stability)
   }
 
-  return trimLeadingEmptyBuckets(
+  return presentHistoricalPoints(
     points.map((point) => ({
       ...bucketBounds(point.bucket),
       medianStabilityDays: medianBucketValues(point.values),
       sampleSize: point.values.length,
     })),
     (point) => point.sampleSize > 0,
+    options,
   )
 }
 
@@ -536,6 +533,16 @@ function bucketBounds(bucket: AnalyticsBucket) {
     bucketStart: bucket.startKey ?? toAnalyticsDateKey(bucket.start),
     bucketEnd: bucket.endKey ?? toAnalyticsDateKey(bucket.end),
   }
+}
+
+function presentHistoricalPoints<T>(
+  points: readonly T[],
+  hasEvidence: (point: T) => boolean,
+  options: AnalyticsRangeOptions,
+): T[] {
+  return options.timeFrame?.history
+    ? [...points]
+    : trimLeadingEmptyBuckets(points, hasEvidence)
 }
 
 function trimLeadingEmptyBuckets<T>(

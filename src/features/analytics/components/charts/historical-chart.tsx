@@ -66,6 +66,10 @@ export interface HistoricalChartProps<Row extends HistoricalChartRow> {
   inspectionResetKey?: string
   chartRoleDescription?: string
   startAtFirstPoint?: boolean
+  /** Remaining plot height supplied by the fitted card after its controls. */
+  compact?: { height: number; showGroupingLabel?: boolean } | undefined
+  /** Cumulative presentation only: stop the final interval at report time. */
+  cumulativeAsOf?: boolean
 }
 
 export function HistoricalChart<Row extends HistoricalChartRow>({
@@ -82,6 +86,8 @@ export function HistoricalChart<Row extends HistoricalChartRow>({
   inspectionResetKey = '',
   chartRoleDescription,
   startAtFirstPoint = false,
+  compact,
+  cumulativeAsOf = false,
 }: HistoricalChartProps<Row>) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const descriptionId = useId()
@@ -111,7 +117,9 @@ export function HistoricalChart<Row extends HistoricalChartRow>({
     timeFrame,
     640,
     startAtFirstPoint,
+    cumulativeAsOf,
   )
+  const fittedHeight = compact?.height ?? height
   const selectedRow = model.rows[index] ?? null
   const select = useCallback(
     (nextIndex: number, nextVisible = true) =>
@@ -137,11 +145,14 @@ export function HistoricalChart<Row extends HistoricalChartRow>({
     <ChartContainer
       accessibleName={name}
       aria-label={name}
-      className="cp-historical-chart aspect-auto min-h-48 [&_.recharts-cartesian-axis-tick_text]:text-xs [&_.recharts-cartesian-axis-tick_text]:font-medium"
+      className={`cp-historical-chart aspect-auto ${compact ? 'min-h-0 [&_.recharts-responsive-container]:min-h-0!' : 'min-h-48'} [&_.recharts-cartesian-axis-tick_text]:text-xs [&_.recharts-cartesian-axis-tick_text]:font-medium`}
       config={config}
-      initialDimension={{ width: 640, height }}
+      initialDimension={{ width: 640, height: fittedHeight }}
       ref={setHost}
-      style={{ height }}
+      style={{
+        height: fittedHeight,
+        ...(compact ? { minHeight: 0, aspectRatio: 'auto' } : {}),
+      }}
     >
       <ComposedChart
         accessibilityLayer={false}
@@ -154,6 +165,9 @@ export function HistoricalChart<Row extends HistoricalChartRow>({
       >
         <desc id={descriptionId}>{description}</desc>
         <HistoricalXAxis
+          compact={compact !== undefined}
+          cumulativeAsOf={cumulativeAsOf}
+          showGroupingLabel={compact?.showGroupingLabel ?? true}
           rows={rows}
           startAtFirstPoint={startAtFirstPoint}
           timeFrame={timeFrame}
@@ -195,10 +209,16 @@ function HistoricalXAxis<Row extends HistoricalChartRow>({
   rows,
   timeFrame,
   startAtFirstPoint,
+  compact,
+  cumulativeAsOf,
+  showGroupingLabel,
 }: {
   rows: readonly Row[]
   timeFrame?: HistoricalChartTimeFrame | undefined
   startAtFirstPoint: boolean
+  compact: boolean
+  cumulativeAsOf: boolean
+  showGroupingLabel: boolean
 }) {
   const plot = usePlotArea()
   const model = buildHistoricalChartModel(
@@ -206,6 +226,7 @@ function HistoricalXAxis<Row extends HistoricalChartRow>({
     timeFrame,
     plot?.width ?? 576,
     startAtFirstPoint,
+    cumulativeAsOf,
   )
   return (
     <XAxis
@@ -213,19 +234,23 @@ function HistoricalXAxis<Row extends HistoricalChartRow>({
       axisLine={false}
       dataKey="x"
       domain={model.domain}
-      height={50}
+      height={showGroupingLabel ? 50 : 28}
       interval={0}
       padding={{
-        left: startAtFirstPoint && rows.length > 1 ? 12 : 0,
-        right: 0,
+        left: startAtFirstPoint && rows.length > 1 ? 12 : compact ? 8 : 0,
+        right: compact ? 8 : 0,
       }}
-      label={{
-        value: `Local date · ${historicalGroupingLabel(timeFrame).toLowerCase()}`,
-        position: 'insideBottom',
-        offset: -2,
-        fontSize: 11,
-        fill: 'var(--color-muted-foreground)',
-      }}
+      {...(showGroupingLabel
+        ? {
+            label: {
+              value: `Local date · ${historicalGroupingLabel(timeFrame).toLowerCase()}`,
+              position: 'insideBottom' as const,
+              offset: -2,
+              fontSize: 11,
+              fill: 'var(--color-muted-foreground)',
+            },
+          }
+        : {})}
       scale="linear"
       tick={({ x, y, payload }) => (
         <text

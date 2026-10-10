@@ -1,8 +1,10 @@
+import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import type { AnalyticsViews } from '../api/analytics-contracts'
+import { buildAnalyticsHistoryTimeFrame } from '../domain/analytics-history-frame'
 import { ObservedRecallVsFsrsView } from './recall-ratings-views'
 
 type RecallRow = AnalyticsViews['observedRecallVsFsrs']['rows'][number]
@@ -44,6 +46,7 @@ const missing: Partial<RecallRow> = {
 
 function recallView(rows: RecallRow[]): AnalyticsViews['observedRecallVsFsrs'] {
   return {
+    timeFrame: createSerializedAnalyticsSummary().timeFrame,
     rows,
     scale: { domain: [0, 1], ticks: [0, 0.2, 0.4, 0.6, 0.8, 1] },
     targetRecall: 0.87,
@@ -56,6 +59,36 @@ const tooltip = () => screen.getByRole('tooltip')
 const inspect = () => screen.getByRole('button', { name: inspectName })
 
 describe('Recall historical view composition', () => {
+  it('uses its transported pair frame and retains its unmeasured tail through as-of', async () => {
+    const user = userEvent.setup()
+    const frame = buildAnalyticsHistoryTimeFrame({
+      selection: 'all',
+      asOf: new Date('2026-10-05T12:00:00Z'),
+      timeZone: 'UTC',
+      history: [{ reviewedAt: new Date('2026-10-02T12:00:00Z') }],
+    })
+    const view = {
+      ...recallView(
+        frame.buckets.map((bucket, index) =>
+          recallRow(index, {
+            id: bucket.key,
+            bucketStart: bucket.startKey,
+            bucketEnd: bucket.endKey,
+            isPartial: bucket.isPartial,
+            ...(index > 0 ? missing : {}),
+          }),
+        ),
+      ),
+      timeFrame: frame,
+    }
+    render(<ObservedRecallVsFsrsView view={view} />)
+    expect(
+      screen.getByRole('img', { name: 'Recall vs FSRS Estimate chart' }),
+    ).toHaveAccessibleDescription(/Daily summaries/)
+    await user.click(screen.getByRole('tab', { name: 'Table' }))
+    expect(screen.getByRole('table')).toHaveTextContent('10/05')
+  })
+
   it('wires measured shapes, missing bridges, middle inspection, exact values and Table pagination', async () => {
     const user = userEvent.setup()
     const rows = Array.from({ length: 8 }, (_, index) =>

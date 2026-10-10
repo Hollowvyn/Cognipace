@@ -211,12 +211,10 @@ Current behavior:
   show recovery while the same background worker remains alive.
 - The dashboard header shows compact pull and push shortcuts after GitHub Gist
   sync is configured.
-- Analytics shows local review-day totals, all-time review counts, current
-  streak, low-sample-aware observed rating quality, a tracked-card memory
-  profile, current retention health, fragile knowledge, and a fixed 14-day
-  upcoming-review forecast. Its historical charts use the selected 14-, 30-,
-  or 90-day range as evidence-gated presentation windows rather than promising
-  a trend from sparse local history.
+- Analytics shows four selected-period activity totals and ten local evidence
+  cards, with 30 days (default), 90 days, or All time selection. Available values
+  remain visible with metric-specific guidance. Retention and Signals are
+  current snapshots, Backlog stays Last 30 days, and Upcoming stays Next 14 days.
 - Overview shows the current review recommendation, Reviews Due, Completed
   Today, Streak, Time Today, active-track guidance, and a Today Queue preview.
   Time Today sums saved elapsed time for all assessments recorded on today's
@@ -462,19 +460,78 @@ inspection. Its calculations remain read-only and derived from local practice
 state. The narrowly editable chart goals are Settings-owned preferences; they
 do not introduce hosted reporting or account behavior.
 
-New Problem Success retains the combined first-recorded outcome chart beside
-Recall vs FSRS Estimate. Its simultaneous Hard + Good + Easy and Good + Easy
-curves include all difficulties, including Unknown, using pooled valid-rating
-counts. Both saved first-attempt goals remain editable above the chart. Its
-fitted scale includes both pooled curves and both goals; hiding a curve changes
-neither scale nor dates. Invalid-only outer buckets are trimmed, internal gaps
-remain, and measured zero is retained.
+The four headlines use the selected period, resolved report timezone, and as-of
+cutoff, derived from deduplicated raw assessments before chart eligibility
+filters. Review days counts distinct local assessment dates; Questions solved
+counts unique problems with a persisted correct outcome; Observed correctness
+is persisted true/(true+false), excluding unknown flags without a rating fallback.
+Recorded solve time sums finite positive seconds on every persisted correct
+assessment, including repeat successes, with timed-success/total-success
+coverage. Display hours and minutes while retaining exact seconds; positive
+subminute time remains distinct from zero. Wholly unknown correctness and
+wholly missing successful timing stay unavailable; empty activity or known
+zero successes can show zero solved/time. No finite headline mixes all-time
+totals, and Review days cannot exceed the available calendar dates.
 
-The full-width Difficulty And Recorded Time section, shown as Problem Solving,
-adds the difficulty, time and mix plots below this pair. Its controls do not
-filter the combined chart. Human installed-extension happy-path and edge-case
-smoke with screenshot or recording proof remains required. Existing repeat-only Recall,
-chart targets, and merged Practice Rhythm retain their calculation rules.
+The four equal 148px headline cards reflow from four to two to one column.
+The ten chart cards follow this reading order: Performance / Time vs target,
+Practice / Topic performance, Recall / Memory strength, Retention map / Memory
+signals, then Overdue backlog / Upcoming reviews. At an actual page-content
+width of at least 736px, two 360px cards fit with a 16px gap and all ten cards
+are 464px high; below that boundary they stack at 512px. Overview, Breakdown/
+Details, Chart, Table, loading, sparse, empty, and error states retain those
+same shells. Short descriptions and local controls leave a definite remaining
+plot area. Breakdown/Details replace the plot and reclaim the hero space;
+Overview restores filters, series, selections, and trigger focus. Fitting
+subsections and bounded pages retain every original raw field, row, linked
+question, calculation, provenance note, goal, action, and error without
+clipping, smaller text, or internal vertical scrolling. Page lengths adapt to
+usable space and clamp/reflow on range or width changes even while hidden.
+
+Performance defaults to First attempts, with optional Follow-up practice,
+using the existing first-recorded/later raw cohorts. It is
+`sum(weight * points) / sum(weight)`: Again 0, Hard 50, Good 80, Easy 100;
+current catalog Easy/Medium/Hard weights are 1/2/3, and Unknown has weight 1,
+displayed as Unclassified without treating it as Easy. The hero rounds to an
+integer /100; inspection retains one decimal and calculations keep full
+precision. Actual valid assessments are the evidence count, never weighted
+units. All Good is 80, all Again is measured zero, and no valid ratings is
+unavailable. There is no time/recency penalty or percentage goal on this index.
+
+Performance Breakdown retains Ratings, Difficulty, Mix, and Intervals, plus
+the original pooled outcome curves, difficulty Trend/Compare, raw outcome
+choices, goals, and method. The pooled Hard + Good + Easy and Good + Easy
+rates include every difficulty, including Unknown, using summed valid counts.
+Their fits retain both curves and raw goals independently of visibility.
+Pooled raw plots trim invalid-only outer buckets, retain internal gaps and
+measured zero, and preserve the original calendar rows in exact values.
+Weighted finite comparisons use unrounded score-point differences; raw-rate
+comparisons retain percentage-point meaning. Either period below ten valid
+assessments says Sparse comparison, and All time omits a prior delta.
+
+Time vs target is an independent peer with its own first/follow-up control.
+Its overview leads with timed/eligible coverage and shows known-difficulty
+period median bars against current Settings allowances: a shared 100%
+reference, uncapped overtime, and direct median/target/Under-Over-On labels.
+`percentOfTarget = 100 * medianSeconds / (targetMinutes * 60)`; minute
+difference is `medianSeconds / 60 - targetMinutes`. Do not infer a pooled
+median from difficulty medians. Unknown contributes coverage and exact
+details but has no comparable allowance.
+
+Routine sample, update, timing/backlog coverage, and in-progress context uses
+reserved neutral slots, with full reasons in Details. Shortened young history
+does not add a page warning. Initial loading keeps the headline and chart
+shells; range changes clear incompatible old values immediately. Same-key
+Updating may retain a snapshot; a failed refresh retains that exact snapshot
+and its original as-of with persistent failure status and Retry. No eligible
+evidence remains unavailable, while genuine zero work or no flagged problems
+is measured. Load errors stay in the fixed shell, save errors stay associated
+with their field and draft, and floating feedback is supplementary. Use one
+polite range/refresh announcement. Existing tooltip access remains truthful;
+tooltip cleanup is deferred. Human installed-extension happy-path and
+edge-case smoke with screenshot or recording proof remains required before
+PR review or merge.
+
 Target Recall and Target Review Success are independent saved goals, both
 defaulting to 90%, regardless of FSRS target retention. Each accepts whole
 percentages from 0 through 100. Target Review Success must be at least Target
@@ -482,8 +539,12 @@ Recall: this intentionally stricter aspiration never constrains measured
 rates. For the same review population, measured Review Success cannot exceed
 measured Recall, but these charts can use different eligible populations.
 
-Each relevant chart has a small native target button above its plot. It opens
-a compact inline editor with one percentage input for that chart, Save, Cancel,
+Recall overview keeps Target Recall; its Details Goals surface offers both
+Recall and Review Success buttons, one editor at a time. Performance's raw-rate
+goals remain reachable from Breakdown Ratings and its Goals surface. Practice
+retains Review Success, and Topics exposes that goal only beside raw rating
+details. A blocked pair names the rule and offers its counterpart in the same
+Goals surface. Each native target button opens a compact inline editor with one percentage input for that chart, Save, Cancel,
 and a short rating-combination and counterpart-limit hint. The input receives
 focus; Enter saves and Escape cancels and returns focus. Invalid values or an
 invalid pair cannot save, and the editor never adjusts the other goal
@@ -492,7 +553,8 @@ replacing the active draft. Saving sends only the edited goal; Settings merges
 and validates the final pair atomically, preserving the latest other goal.
 Saving shows a pending state and prevents duplicate submissions. Success
 updates both references from the saved result;
-failure keeps the prior goals and the open draft with a useful error. Cancel
+failure keeps the prior goals and the open draft with a persistent, associated
+field error. Overview/Details navigation preserves the draft and error. Cancel
 changes no saved values. Controls remain available with empty or sparse data,
 and reopening, reloading, or changing range preserves saved goals.
 
@@ -508,7 +570,7 @@ The New problems population has two additional independent saved goals:
 Target First-attempt Success (Hard + Good + Easy) and Target Good + Easy.
 Each defaults to 90% and accepts whole percentages from 0 through 100.
 Neither constrains the other or the existing Recall/Review Success goals.
-The section shows only the selected outcome measure's reference and compact
+The raw outcome view shows only the selected measure's reference and compact
 editor, using the existing one-key save path. Follow-up practice uses Recall
 or Review Success as the corresponding raw-rating aspiration; its population
 can differ from the FSRS-paired Recall population.
@@ -520,10 +582,22 @@ paths and never change measured outcomes or FSRS schedules.
 
 Historical Analytics uses adaptive presentation buckets and evidence gates:
 
-- The implemented range choices are 14 days with daily buckets, 30 days with
-  three-day buckets, and 90 days with weekly buckets. The selection is always
-  explicit and never silently changes to a shorter period.
-- Historical trend plots trim only unsupported beginning and ending buckets from
+- The implemented range choices are 30 days (default), 90 days, and All time.
+  Legacy 14-day links normalize to 30. Young history uses available retained
+  dates without changing selection; sparse established history preserves real
+  inactive dates. Grouping is daily through fourteen available dates, three-day
+  through thirty, then calendar weeks; All time longer than a year uses the
+  first month/quarter/year grouping that fits sixty intervals, with bounded year
+  strides for longer history. All time has no prior comparison. Finite prior
+  comparisons retain the complete nominal window and matched as-of cutoff.
+  Global origin is the earliest retained nonfuture raw review before metric
+  filters. The sixty-interval bound limits chart output, not the complete-history
+  read or FSRS replay. Every eligible record remains in totals; grouping never
+  averages bucket percentages, scores, or medians.
+- Recall's supplied display frame begins at its first eligible selected pair
+  and ends at the report as-of. Long genuinely paired history remains long;
+  display grouping never improves its underlying readiness.
+- Noncumulative historical trend plots trim only unsupported beginning and ending buckets from
   their presentation. Chart, Table, and inspection share the contiguous
   first-supported through last-supported
   slice, preserving every internal gap and each retained bucket's exact dates
@@ -531,33 +605,37 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
   selected-period totals, readiness, supplied scales, or report time.
 - Readiness's effective evidence window describes usable history separately
   from those rows; it does not control trimming or authorize invented values.
-  When the selected range is not ready, the page explains the relevant evidence
-  shortfall and can offer the richest shorter ready range as an explicit link;
-  available charts remain visible.
+  When the selected range is not ready, neutral card metadata and Details
+  explain the relevant shortfall. An explicit link can offer the richest shorter
+  ready range; available charts remain visible.
 - Practice Rhythm joins intervals supplied by the existing practice and rating
   views by ID plus exact start/end dates. A missing counterpart stays
   unavailable. A known zero completed-review count is an observation. Composition
   and success retain their supplied availability; completed-review counts remain
   independently supplied.
-- A dashed line bridge means two measured values are separated by a missing-
-  evidence gap. It is a visual connection only, never an interpolated data
-  value. Historical line charts connect each measured point to the next valid
-  point so sparse history does not create a broken visual story; unknown
-  buckets still do not receive markers or tooltip values.
+- Noncumulative historical line charts retain their next-valid-point bridges
+  across missing evidence. A bridge is a visual connection, never an interpolated
+  data value; unknown buckets receive no markers or tooltip values.
+  Performance and paired Recall instead accumulate through the period. Before
+  eligible evidence they are unavailable; supported updates use real interval
+  midpoints and measured markers. Later inactive intervals hold the prior
+  aggregate as horizontal long dashes through as-of, with zero new evidence,
+  unchanged cumulative counts, and the actual last updated interval. Holds add
+  no samples, active buckets, or readiness. Bounded natural connections stay
+  within supported endpoint values and do not move in unsupported time. Raw
+  interval and cumulative values/counts remain separate in inspection/Table.
+  Do not carry or smooth counts, forecasts, stability, or current model estimates.
 - Readiness is metric-specific and explainable. A range or metric can be held
   back for too little usable span, too few eligible assessments or active
   buckets, a gap that is too long, or too many gaps. Readiness is guidance for
   confidence, not a reason to hide an otherwise available chart.
 
-Difficulty And Recorded Time is a full-width section with paired Success and
-Time plots, stacked on narrow screens, followed by full-width Difficulty Mix.
-Recall vs FSRS Estimate remains separate, followed by Practice Rhythm. Memory
-Strength and Topic Performance share the next responsive row. Compact Memory
-Signals follow the Retention Map, then the workload panels share a responsive row.
+The advanced measurements remain available within the ten-card composition:
 
-- **Difficulty And Recorded Time** defaults to New problems, Trend, all three
+- **Raw outcomes and recorded time** retain New problems, Trend, all three
   difficulties, Hard + Good + Easy, percent of the current time target, all
-  timed assessments, and assessment-share Mix. Follow-up practice selects
+  timed assessments, and assessment-share Mix as advanced defaults. Performance
+  and Time own independent local cohorts. Follow-up practice selects
   every later raw assessment. Earliest selection uses complete retained history
   per problem across cards and modes, ordered by assessment time then ID,
   before rating, period, difficulty, or timing filters. An invalid earliest
@@ -565,9 +643,9 @@ Signals follow the Retention Map, then the workload panels share a responsive ro
   pre-period first record prevents a recent repeat from becoming new. Future
   records after the report's as-of time are excluded.
   Easy uses mint circles, Medium blue diamonds, and Hard amber triangles across
-  Success and Time. One shared difficulty legend hides each series and its
-  inspection values in both plots without changing the chosen outcome measure,
-  fitted scales, or dates. With all three hidden, show Select a difficulty;
+  raw outcomes and Time. Their independent difficulty controls hide a series
+  and its inspection values without changing the chosen measure, fitted scales,
+  or dates. With all three hidden, show Select a difficulty;
   Difficulty Mix still includes the full selected raw population.
   Hard + Good + Easy and Good + Easy divide by the same valid-rating count,
   including Again. All Again is measured zero; no valid ratings is unavailable.
@@ -592,40 +670,44 @@ Signals follow the Retention Map, then the workload panels share a responsive ro
   difficulty series. Follow-up counts are Assessments, since one problem can
   contribute several records. The summary reports selected-period assessment
   days, assessments/distinct problems, Good + Easy over valid ratings, and
-  invalid exclusions. Paired Trend plots share the contiguous first-through-last
-  known-difficulty raw activity window, preserving internal gaps independently
+  invalid exclusions. Raw Trend plots retain the contiguous first-through-last
+  known-difficulty activity window for their local cohort, preserving internal gaps independently
   of visibility, measure, or timing subset. Exact tables and inspection retain
   counts, timing coverage, full intervals, partial status, and timezone/as-of.
-- **Recall vs FSRS Estimate** pairs valid rating-derived recalled
-  outcomes (Hard, Good, or Easy) with reconstructed FSRS retrievability
-  immediately before the same repeat reviews. Each card's complete valid-rating
-  history is replayed, including initial and pre-range records for state; its
-  first replayed assessment is never emitted. Both curves, compatible summary
-  series, and Recall readiness use the exact same eligible pairs. Null or
-  conflicting correctness flags do not change this rating-derived population;
-  a genuine zero FSRS estimate remains valid. Initial-only history leaves this
-  graph empty while New problems outcomes can remain available.
-  Observed recall uses a solid line and
-  circle markers; the FSRS estimate uses short dashes and diamond markers.
-  Longer dashes bridge missing evidence. The dashed Target Recall reference
-  uses the saved personal goal, with an explicit editable caption, tooltip, and
-  accessible description. Its percentage scale includes that goal even at 0%
-  or 100%.
-  Each series can be toggled independently; its curve, markers, and tooltip
-  rate hide together, and the signed observed-minus-estimate difference appears
-  only when both series are visible. That difference comes from the supplied
-  exact value rather than subtracting rounded displayed percentages. Shared
-  recalled and paired-review counts remain available. A bucket with either a
-  known observed recall or FSRS estimate supports the retained activity window,
-  including a measured 0% rate. Series toggles do not change that window.
-  With at least two retained intervals, its calendar X domain begins at the
-  first interval's actual midpoint with 12px of left scale clearance, placing
-  the first marker close to the axis origin. The last interval's end remains
-  the domain's right boundary. A singleton keeps its original interval domain
-  and centered marker. Sparse ticks show true dates within the displayed
-  domain; tooltip and Table retain each full interval. Series toggles do not
-  shift the domain.
-- **Memory Strength** shows median reconstructed post-review FSRS stability in
+- **Recall** pairs valid rating-derived outcomes with reconstructed FSRS
+  retrievability immediately before the same repeat reviews. Again remains a
+  paired failure in the denominator; only Hard, Good, and Easy contribute to
+  recalled counts. Each card's complete valid-rating history is replayed,
+  including initial and pre-range records for state; its first replayed
+  assessment is never emitted. Both curves, compatible summary series, and
+  Recall readiness use the exact same eligible pairs. Null or conflicting
+  correctness flags do not change this rating-derived population; a genuine
+  zero FSRS estimate remains valid. Initial-only history leaves Recall empty
+  while First attempts can remain available.
+  Through each bucket, observed recall is cumulative recalled/cumulative pairs;
+  FSRS is the pair-weighted mean of unrounded bucket estimates. Latest values
+  equal selected-period totals and Recall has no difficulty weights. Zero pairs
+  means both rates and their difference are unavailable. Positive pairs require
+  finite rates, recalled no greater than paired, observed = recalled/paired,
+  and the exact observed-minus-estimate difference.
+  Observed recall uses a solid line and circles; the estimate uses short dashes
+  and diamonds. Long horizontal dashes mean no new paired reviews, preserving
+  cumulative counts and last update through report as-of. Series toggles hide
+  the curve, markers, and inspection rate together; the signed full-precision
+  percentage-point difference appears only with both visible. Shared counts
+  remain available. Raw interval rates/counts stay separate from cumulative
+  rates/counts in inspection/Table.
+  Recall labels its supplied first-selected-pair-to-as-of dates and grouping,
+  preserving internal inactivity and trailing holds. Long paired history is
+  not cropped to recent activity. Display grouping changes neither eligible
+  pairs/totals nor underlying readiness on the global selected-history frame.
+  Its fit includes both cumulative series and the saved Target Recall at 0%
+  or 100% independently of visibility. With multiple intervals the domain
+  begins at the first actual midpoint with 12px left clearance and ends at
+  as-of; a singleton retains its interval domain and centered marker. True date
+  ticks and full intervals remain available. One update plus holds is still
+  not enough for a trend.
+- **Memory strength** shows median reconstructed post-review FSRS stability in
   days. Discrete Q1–Q3 whiskers show the middle 50% only when the bucket has at
   least four eligible reviews and known quartiles. The duration scale fits all
   finite median and quartile values with padding and a minimum two-day window;
@@ -634,7 +716,7 @@ Signals follow the Retention Map, then the workload panels share a responsive ro
   reconstruction provenance. A finite median supports the retained activity
   window, including zero and sub-day values, without requiring quartiles or
   four eligible reviews. The four-review requirement applies only to whiskers.
-- **Practice Rhythm** combines exact rating composition and completed-review
+- **Practice** combines exact rating composition and completed-review
   volume in one plot. It stacks supplied shares bottom to top as Easy, Good,
   Hard, Again on the fixed 0–100% left axis, labeled Rating share (%). The upper
   boundary of Good + Easy expresses Review Success; there is no additional
@@ -643,8 +725,8 @@ Signals follow the Retention Map, then the workload panels share a responsive ro
   remains known, unavailable counts remain unavailable, and completed counts
   are never derived from valid-rating counts. The saved Target Review Success
   reference uses the left percentage axis and remains visible at 0% or 100%.
-  Its existing compact editor stays above the plot, including Chart/Table and
-  empty or sparse states. Goal edits do not change shares, review-count scale,
+  Its compact goal remains reachable through the fitting Goals surface,
+  including Table and empty or sparse states. Goal edits do not change shares, review-count scale,
   observations, rows, dates, gaps, or trimming.
   The activity window spans the first through last union interval with positive
   completed reviews, positive valid-rating counts in either source view, or a
@@ -654,22 +736,24 @@ Signals follow the Retention Map, then the workload panels share a responsive ro
   zero-height. Whole-percent labels appear at readable 12px only when they fit
   without colliding with the count line or target; rounded labels can total 99%
   or 101% without changing exact geometry.
-  Shared inspection and the seven-row Table retain completed reviews, each
+  Friendly Overview labels map Easy/Good/Hard/Again to Strong/Solid/Effortful/
+  Needs practice while retaining original rating names in inspection and Details. Shared inspection and fitting paged exact values retain completed
+  reviews, each
   rating count and precise share, Good + Easy numerator/valid-rating denominator,
   supplied success, target, each metric's evidence, full interval, timezone/as-of,
   and complete/in-progress context. A native Reviews switch hides the count
   line, markers, right axis, and tooltip count together, preserving rows, dates,
   target, and all Table values. Accessible copy reflects visible series.
   The selected-period Hard + Again summary and evidence-gated prior-period
-  comparison remain below the shared view. Distinct rating and count readiness
-  warnings remain visible when they differ, without hiding supported data. The
+  comparison remain in Details. Distinct rating and count readiness guidance
+  remains available when they differ, without hiding supported data. The
   visible explanation describes association rather than causation; a count-line
   crossing with the percentage target has no percentage meaning. A wholly
   unsupported selected period shows the explicit empty state.
 
 Historical trend plots use sparse calendar-date axis labels without dropping retained
 chart rows. Bucket marks sit at the midpoint of their actual local-date interval,
-including shortened edge intervals. Memory Strength and Practice Rhythm keep
+including shortened edge intervals. Memory strength and Practice keep
 their interval-boundary X domains and padding.
 Labels use MM/DD in the report's as-of
 year and MM/DD/YY for other years; cross-year tooltip intervals show both years.
@@ -677,59 +761,71 @@ Pointer or tap position selects the nearest retained original bucket. A native
 focusable inspection button provides the same tooltip through keyboard focus,
 Left/Right arrows, Home/End, and Enter/Space; Escape hides it. Inspection includes
 the full bucket range, grouping, complete or in-progress state, report time, and evidence
-without a permanent extra detail row. Each Table shows seven rows per page and
-uses the same retained rows and supplied values as its chart. A metric without
+without a permanent extra detail row. Fitting paged exact values use the same retained rows and supplied values as
+the relevant chart, preserving every field and unavailable state. A metric without
 supported buckets shows its explicit empty state.
 
-Topic Performance shows every topic with at least 10 valid ratings across three
-reviewed problems as rising columns, from lowest to highest Good + Easy Review
-Success. Ties prefer more valid ratings, then normalized topic name. Its fixed
-0–100% axis includes the saved Target Review Success, shared with Practice Rhythm;
-the same compact editor updates both. Status compares unrounded rates, while
-inspection/Table show one-decimal percentages and exact counts. Crowded topics
-scroll within the plot; full names and every qualifying topic remain available.
-Topic counts overlap when reviews have several direct topics, so these are
-below-target signals rather than additive contributions to an overall rate.
-Current direct assignments apply to retained history, without ancestor rollups.
+Topic performance shows every topic with at least ten valid ratings across
+three distinct valid-reviewed problems, using the same weighted /100 rubric
+over All assessments. Sort by unrounded score ascending, actual valid count
+descending, then normalized topic name. Full names and all qualifying rows
+remain accessible through bounded pages; the alphabetical first five
+low-evidence topics retain their separate list and exact additional count.
+The compatibility count for omitted qualifying topics is zero. Each row carries all sixteen nonnegative
+integer rating-by-difficulty cells: their total equals valid ratings, Good/Easy
+equals its raw numerator, and raw Review Success is Good/Easy divided by valid
+ratings. Original raw rates, counts, and unrounded below-goal status remain in
+rating details with the saved Review Success editor. Weighted scores have no
+percentage goal. Topic counts overlap when reviews have several direct topics;
+they are not additive contributions to the overall score. Current direct
+assignments apply to retained history without ancestor rollups.
 
-Recent Overdue Backlog connects known daily snapshots with straight lines and
-small measured dots. Unknown days break the line; zero and isolated observations
-remain visible. Values through five are within its watch zone. Pointer, tap and
+Overdue backlog uses its independent Last 30 days daily frame and connects
+known snapshots with straight lines and small measured dots. Unknown days break
+the line; zero and isolated observations remain visible. Lines and markers are
+green strictly below five and amber at or above five, including flat five. Pointer, tap and
 keyboard inspection share the same date/count/status; a connector crossing five
-is not an additional observation. Upcoming Review Load retains its fixed 14-date
-schedule with separate exact Due and Overdue segment counts. Labels sit inside
+is not an additional observation. The current value is the last supplied day's
+count; an unknown last day stays unavailable without carrying an earlier count.
+Known peak and below-five/at-or-above-five day totals exclude unknown days, and
+the two threshold totals sum to known days. Upcoming reviews retains its fixed
+Next 14 days schedule snapshot, Today plus thirteen local dates, with separate
+exact Due and Overdue segment counts. It does not simulate future reviews or
+rescheduling. Only Today includes cards due before today's local date; an earlier
+time today remains Due. Labels sit inside
 when they fit, with readable outside fallbacks for tiny segments. Zero segments
 stay zero-height and receive no label; Table and inspection retain their zeros.
 
-Historical readiness does not hide useful analytics. Difficulty And Recorded Time,
-Recall vs FSRS Estimate, Practice Rhythm, Memory Strength, and Recent Overdue Backlog keep
-showing available points when a historical selected range is unready; a
-one-point series says that it is not enough for a trend yet. Retention Map,
-Memory Signals by Problem, and the fixed 14-day Upcoming Review Load remain
-available as current or forecast views. Retention Map shows every eligible active
-reviewed problem, with no 30-question cutoff, at its exact current FSRS
+Historical readiness does not hide useful analytics. Performance, Time vs target,
+Recall, Practice, Memory strength, and Overdue backlog keep showing available points when a historical selected range is unready; a
+one-point series says that it is not enough for a trend yet. Retention map,
+Memory signals, and the fixed Next 14 days Upcoming reviews remain
+available as current or forecast views. Retention Map shows every eligible active,
+non-suspended reviewed problem, with no 30-question cutoff, at its exact current FSRS
 retrievability and total modeled durability. Durability is the interval from
 the latest review until recall crosses the scheduling target, not remaining
 time or time until due. The FSRS target is independent of personal chart goals.
 All/Below target filters preserve full-cohort counts and fitted domains. Three
 status keys pair color with circles, diamonds and triangles. Hover, tap and a
 native keyboard inspector expose the same original questions; a nearby-memory
-chooser preserves access to coincident points. Pinned details sit below the
-plot with a canonical LeetCode link, exact supplied values and dates. The
-seven-row Table retains every filtered question.
+chooser preserves access to coincident points. Pinned details replace the plot
+with a canonical LeetCode link, exact supplied values and dates in a fitting
+selection surface within the fixed card. Paged exact values retain all eleven
+original problem fields and every filtered question.
 Drag a rectangle to magnify that region; double-click or Reset view restores
 the full landscape while preserving pinned details. Wheel/pinch zoom,
 Shift-drag/touch pan and plus/minus controls remain available. Magnification
 updates true log-duration and linear-recall axes while marks keep their screen
 size. Keyboard inspection reveals offscreen questions. Zoom and filter state
 are presentation-only; they never change FSRS cards, scheduling or Settings.
-Memory Signals by Problem is a compact ranked list with canonical LeetCode
-problem links and wrapping reasons directly beneath each title, five rows per
-page. Reasons identify estimated recall below the FSRS retention target,
+Memory signals is a compact ranked list with canonical LeetCode problem links
+and wrapping reasons directly beneath each title, using fitting bounded pages. Its
+Scope retains current report as-of, timezone, and fallback context independently
+of historical selection. Equivalent current reports preserve the page. Reasons identify estimated recall below the FSRS retention target,
 calendar-date overdue reviews, or low total target-crossing durability. Its FSRS
 target is separate from the personal Recall goal; durability is not time until
-due. Severity, all flags and the returned-top-25 versus total distinction remain
-intact.
+due. Severity, every returned flag in original order, and the returned-top-25
+versus total-qualifying distinction remain intact.
 
 Observed correctness is the persisted share of eligible assessments marked
 correct. It is not FSRS-predicted recall, retention, or a record of first-try

@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest'
 import {
   analyticsChartPointFixtures,
   createSerializedAnalyticsSummary,
+  createTopicRatingCountMatrix,
 } from '@/testing/analytics-fixtures'
 
 import {
+  analyticsTimeFrameSchema,
+  observedRecallVsFsrsRowSchema,
   analyticsReadinessSchema,
   analyticsRangeSchema,
   analyticsSummaryRequestSchema,
@@ -13,9 +16,374 @@ import {
   hardAgainSummarySchema,
   practiceRhythmPointSchema,
   ratingsMixPointSchema,
+  topicPerformanceRowSchema,
   type AnalyticsReadiness,
   type SerializedAnalyticsSummary,
 } from './analytics-contracts'
+import { buildAnalyticsHistoryTimeFrame } from '../domain/analytics-history-frame'
+import { buildAnalyticsTimeFrame } from '../domain/analytics-time'
+import { buildAnalyticsBacklogTimeFrame } from '../domain/analytics-history-window'
+
+const selectedActivity = {
+  assessmentDays: 2,
+  recordedAssessments: 5,
+  knownCorrectnessAssessments: 4,
+  successfulAssessments: 3,
+  distinctSuccessfulProblems: 2,
+  observedCorrectness: 3 / 4,
+  timedSuccessfulAssessments: 2,
+  untimedSuccessfulAssessments: 1,
+  successfulRecordedSeconds: 180.125,
+}
+
+describe('selected activity contract', () => {
+  it('requires the additive activity read model and preserves exact recorded seconds', () => {
+    const summary = createSerializedAnalyticsSummary()
+    expect(
+      analyticsSummarySchema.parse({ ...summary, activity: selectedActivity })
+        .activity,
+    ).toEqual(selectedActivity)
+    expect(
+      analyticsSummarySchema.safeParse({ ...summary, activity: undefined })
+        .success,
+    ).toBe(false)
+  })
+
+  it.each(Object.keys(selectedActivity))('requires %s', (field) => {
+    const activity = { ...selectedActivity, [field]: undefined }
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...createSerializedAnalyticsSummary(),
+        activity,
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects more assessment days than the displayed available history', () => {
+    const timeFrame = buildAnalyticsHistoryTimeFrame({
+      selection: 30,
+      asOf: new Date('2026-10-05T12:00:00Z'),
+      timeZone: 'UTC',
+      history: [{ reviewedAt: new Date('2026-10-05T11:00:00Z') }],
+    })
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...createSerializedAnalyticsSummary({ timeFrame }),
+        activity: selectedActivity,
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each([
+    { assessmentDays: -1 },
+    { assessmentDays: 1.5 },
+    { recordedAssessments: -1 },
+    { knownCorrectnessAssessments: 1.5 },
+    { successfulAssessments: -1 },
+    { distinctSuccessfulProblems: 1.5 },
+    { timedSuccessfulAssessments: -1 },
+    { untimedSuccessfulAssessments: 1.5 },
+    { successfulRecordedSeconds: -1 },
+    { successfulRecordedSeconds: NaN },
+    { successfulRecordedSeconds: Infinity },
+    { observedCorrectness: 2 },
+    { assessmentDays: 6 },
+    { assessmentDays: 0 },
+    { knownCorrectnessAssessments: 6 },
+    { successfulAssessments: 5 },
+    { distinctSuccessfulProblems: 4 },
+    { distinctSuccessfulProblems: 0 },
+    { distinctSuccessfulProblems: null },
+    { timedSuccessfulAssessments: 1 },
+    { untimedSuccessfulAssessments: 0 },
+    { observedCorrectness: null },
+    { observedCorrectness: 0.5 },
+    { successfulRecordedSeconds: null },
+    { successfulRecordedSeconds: 0 },
+  ])('rejects inconsistent selected activity %j', (overrides) => {
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...createSerializedAnalyticsSummary(),
+        activity: { ...selectedActivity, ...overrides },
+      }).success,
+    ).toBe(false)
+  })
+
+  const empty = {
+    assessmentDays: 0,
+    recordedAssessments: 0,
+    knownCorrectnessAssessments: 0,
+    successfulAssessments: 0,
+    distinctSuccessfulProblems: 0,
+    observedCorrectness: null,
+    timedSuccessfulAssessments: 0,
+    untimedSuccessfulAssessments: 0,
+    successfulRecordedSeconds: 0,
+  }
+  const unknown = {
+    ...empty,
+    assessmentDays: 1,
+    recordedAssessments: 2,
+    distinctSuccessfulProblems: null,
+    successfulRecordedSeconds: null,
+  }
+  const failure = {
+    ...empty,
+    assessmentDays: 1,
+    recordedAssessments: 2,
+    knownCorrectnessAssessments: 1,
+    observedCorrectness: 0,
+  }
+  const untimed = {
+    ...empty,
+    assessmentDays: 1,
+    recordedAssessments: 2,
+    knownCorrectnessAssessments: 1,
+    successfulAssessments: 1,
+    distinctSuccessfulProblems: 1,
+    observedCorrectness: 1,
+    untimedSuccessfulAssessments: 1,
+    successfulRecordedSeconds: null,
+  }
+  it.each([empty, unknown, failure, untimed])(
+    'accepts truthful empty, unknown, known-failure, and untimed semantics %j',
+    (activity) => {
+      const result = analyticsSummarySchema.parse({
+        ...createSerializedAnalyticsSummary(),
+        activity,
+      })
+      expect(result.activity).toEqual(activity)
+    },
+  )
+  it.each([
+    { ...empty, distinctSuccessfulProblems: null },
+    { ...empty, successfulRecordedSeconds: null },
+    { ...empty, observedCorrectness: 0 },
+    { ...empty, assessmentDays: 1 },
+    { ...unknown, distinctSuccessfulProblems: 0 },
+    { ...unknown, successfulRecordedSeconds: 0 },
+    { ...unknown, observedCorrectness: 0 },
+    { ...failure, distinctSuccessfulProblems: null },
+    { ...failure, successfulRecordedSeconds: null },
+    { ...failure, successfulRecordedSeconds: 10 },
+    { ...untimed, successfulRecordedSeconds: 0 },
+    { ...untimed, successfulRecordedSeconds: 10 },
+  ])('rejects fabricated zero or unknown totals %j', (activity) => {
+    expect(
+      analyticsSummarySchema.safeParse({
+        ...createSerializedAnalyticsSummary(),
+        activity,
+      }).success,
+    ).toBe(false)
+  })
+})
+
+describe('history frame and paired Recall invariants', () => {
+  it('requires view frames to preserve the selected report fallback provenance', () => {
+    const summary = createSerializedAnalyticsSummary()
+    for (const view of ['observedRecallVsFsrs', 'overdueBacklog'] as const) {
+      const timeFrame = {
+        ...summary.views[view].timeFrame,
+        timeZoneFallback: true,
+      }
+      expect(analyticsTimeFrameSchema.safeParse(timeFrame).success).toBe(true)
+      expect(
+        analyticsSummarySchema.safeParse({
+          ...summary,
+          views: {
+            ...summary.views,
+            [view]: { ...summary.views[view], timeFrame },
+          },
+        }).success,
+      ).toBe(false)
+    }
+  })
+
+  it('rejects coherent view frames that belong to a different report or workload horizon', () => {
+    const input = { asOf: new Date('2026-10-05T12:00:00Z'), timeZone: 'UTC' }
+    const report = buildAnalyticsHistoryTimeFrame({
+      ...input,
+      selection: 30,
+      history: [{ reviewedAt: new Date('2026-09-24T12:00:00Z') }],
+    })
+    const summary = createSerializedAnalyticsSummary({ timeFrame: report })
+    summary.views.overdueBacklog.timeFrame = {
+      ...buildAnalyticsBacklogTimeFrame(input),
+      requestedDays: 30,
+      grouping: { unit: 'day', step: 1 },
+    }
+    const recallFrame = (
+      overrides: Partial<typeof input> = {},
+      selection: 30 | 90 = 30,
+    ) =>
+      buildAnalyticsHistoryTimeFrame({
+        ...input,
+        ...overrides,
+        selection,
+        history: [{ reviewedAt: new Date('2026-10-02T12:00:00Z') }],
+      })
+    const backlogFrame = (overrides: Partial<typeof input> = {}) => ({
+      ...buildAnalyticsBacklogTimeFrame({ ...input, ...overrides }),
+      requestedDays: 30,
+      grouping: { unit: 'day', step: 1 },
+    })
+    for (const [view, timeFrame] of [
+      ['observedRecallVsFsrs', recallFrame({}, 90)],
+      [
+        'observedRecallVsFsrs',
+        recallFrame({ asOf: new Date('2026-10-04T12:00:00Z') }),
+      ],
+      ['observedRecallVsFsrs', recallFrame({ timeZone: 'America/New_York' })],
+      [
+        'overdueBacklog',
+        backlogFrame({ asOf: new Date('2026-10-04T12:00:00Z') }),
+      ],
+      ['overdueBacklog', backlogFrame({ timeZone: 'America/New_York' })],
+      [
+        'overdueBacklog',
+        {
+          ...buildAnalyticsTimeFrame({ ...input, requestedDays: 14 }),
+          grouping: { unit: 'day', step: 1 },
+        },
+      ],
+      [
+        'overdueBacklog',
+        {
+          ...buildAnalyticsTimeFrame({ ...input, requestedDays: 30 }),
+          grouping: { unit: 'day', step: 3 },
+        },
+      ],
+      ['overdueBacklog', report],
+    ] as const) {
+      expect(
+        analyticsSummarySchema.safeParse({
+          ...summary,
+          views: {
+            ...summary.views,
+            [view]: { ...summary.views[view], timeFrame },
+          },
+        }).success,
+      ).toBe(false)
+    }
+  })
+
+  it('rejects false grouping and fabricated bucket metadata on a legacy finite frame', () => {
+    const legacy = buildAnalyticsTimeFrame({
+      asOf: new Date('2026-10-05T12:00:00Z'),
+      requestedDays: 30,
+      timeZone: 'UTC',
+    })
+    for (const invalid of [
+      { grouping: { unit: 'month', step: 1 } },
+      { grouping: null },
+      { periodStart: '2026-09-24T00:00:00.000Z' },
+      {
+        buckets: [
+          {
+            ...legacy.buckets[0],
+            startKey: '2026-09-99',
+            endKey: '2026-01-00',
+          },
+        ],
+      },
+      {
+        buckets: [{ ...legacy.buckets[0], start: '2026-09-07T00:00:00.000Z' }],
+      },
+      { buckets: [{ ...legacy.buckets[0], isPartial: true }] },
+      { buckets: [legacy.buckets[1], legacy.buckets[0]] },
+      { buckets: [legacy.buckets[0], legacy.buckets[0]] },
+    ])
+      expect(
+        analyticsTimeFrameSchema.safeParse({ ...legacy, ...invalid }).success,
+      ).toBe(false)
+  })
+  it('accepts canonical finite helper frames and the independent daily30 backlog frame', () => {
+    const input = { asOf: new Date('2026-10-05T12:00:00Z'), timeZone: 'UTC' }
+    for (const requestedDays of [14, 30, 90] as const)
+      expect(
+        analyticsTimeFrameSchema.safeParse(
+          buildAnalyticsTimeFrame({ ...input, requestedDays }),
+        ).success,
+      ).toBe(true)
+    const backlog = {
+      ...buildAnalyticsBacklogTimeFrame(input),
+      requestedDays: 30,
+      grouping: { unit: 'day', step: 1 },
+    }
+    expect(analyticsTimeFrameSchema.safeParse(backlog).success).toBe(true)
+  })
+
+  const frame = buildAnalyticsHistoryTimeFrame({
+    selection: 30,
+    asOf: new Date('2026-10-05T12:00:00Z'),
+    timeZone: 'UTC',
+    history: [{ reviewedAt: new Date('2026-09-24T12:00:00Z') }],
+  })
+  it('preserves a coherent clipped frame and rejects inconsistent bounds and grouping', () => {
+    expect(analyticsTimeFrameSchema.safeParse(frame).success).toBe(true)
+    expect(
+      analyticsTimeFrameSchema.safeParse({
+        ...frame,
+        history: { ...frame.history, availableDays: 30 },
+      }).success,
+    ).toBe(false)
+    expect(
+      analyticsTimeFrameSchema.safeParse({
+        ...frame,
+        grouping: { unit: 'week', step: 1 },
+      }).success,
+    ).toBe(false)
+    expect(
+      analyticsTimeFrameSchema.safeParse({ ...frame, requestedDays: 90 })
+        .success,
+    ).toBe(false)
+    expect(
+      analyticsTimeFrameSchema.safeParse({
+        ...frame,
+        buckets: Array(61).fill(frame.buckets[0]),
+      }).success,
+    ).toBe(false)
+  })
+  const pair = {
+    id: 'pair',
+    bucketStart: '2026-10-02',
+    bucketEnd: '2026-10-02',
+    isPartial: false,
+    recalledCount: 1,
+    pairedReviews: 2,
+    observedRecall: 0.5,
+    fsrsEstimate: 0.6,
+    difference: 0.5 - 0.6,
+    provenance: 'reconstructed',
+    evidence: 'measured',
+  }
+  it('requires exact rates and unrounded differences for the actual pair counts', () => {
+    expect(observedRecallVsFsrsRowSchema.safeParse(pair).success).toBe(true)
+    for (const invalid of [
+      { recalledCount: 3 },
+      { observedRecall: 0.6 },
+      { difference: -0.1 },
+      { pairedReviews: 0 },
+      { fsrsEstimate: null },
+      { evidence: 'not-measured' },
+    ])
+      expect(
+        observedRecallVsFsrsRowSchema.safeParse({ ...pair, ...invalid })
+          .success,
+      ).toBe(false)
+    expect(
+      observedRecallVsFsrsRowSchema.safeParse({
+        ...pair,
+        recalledCount: 0,
+        pairedReviews: 0,
+        observedRecall: null,
+        fsrsEstimate: null,
+        difference: null,
+        evidence: 'not-measured',
+      }).success,
+    ).toBe(true)
+  })
+})
 
 const readiness: AnalyticsReadiness = {
   ready: false,
@@ -43,7 +411,7 @@ const readyReadiness: AnalyticsReadiness = {
 
 function withRequestedReadiness(
   requested: AnalyticsReadiness,
-  recommendedRange: 14 | 30 | 90 | null,
+  recommendedRange: 30 | 90 | null,
 ) {
   return {
     requested,
@@ -58,27 +426,16 @@ function withRequestedReadiness(
   }
 }
 
+const validTimeFrame = buildAnalyticsTimeFrame({
+  asOf: new Date('2026-01-15T12:00:00Z'),
+  timeZone: 'America/New_York',
+  requestedDays: 30,
+})
+validTimeFrame.buckets = validTimeFrame.buckets.slice(0, 1)
 const validSummary = createSerializedAnalyticsSummary({
   range: 30,
-  generatedAt: '2026-01-15T12:00:00.000Z',
-  timeFrame: {
-    asOf: '2026-01-15T12:00:00.000Z',
-    timeZone: 'America/New_York',
-    timeZoneFallback: false,
-    requestedDays: 30,
-    periodStart: '2025-12-17T05:00:00.000Z',
-    periodEnd: '2026-01-16T05:00:00.000Z',
-    buckets: [
-      {
-        key: '2025-12-17',
-        start: '2025-12-17T05:00:00.000Z',
-        end: '2025-12-20T05:00:00.000Z',
-        startKey: '2025-12-17',
-        endKey: '2025-12-19',
-        isPartial: false,
-      },
-    ],
-  },
+  generatedAt: validTimeFrame.asOf,
+  timeFrame: validTimeFrame,
   reviewDays: 10,
   totalReviews: 42,
   currentStreak: 3,
@@ -96,7 +453,7 @@ const validSummary = createSerializedAnalyticsSummary({
   lowSample: false,
   targetRetention: 0.9,
   views: {
-    ...createSerializedAnalyticsSummary().views,
+    ...createSerializedAnalyticsSummary({ timeFrame: validTimeFrame }).views,
     upcomingReviewLoad: {
       rows: Array.from({ length: 14 }, (_, index) => ({
         date: `2026-01-${String(index + 1).padStart(2, '0')}`,
@@ -173,6 +530,9 @@ it('accepts all qualifying topics while keeping low-evidence diagnostics bounded
     goodEasy: 0,
     validRatings: 10,
     distinctProblems: 3,
+    ratingCountsByDifficulty: createTopicRatingCountMatrix({
+      unknown: { again: 10 },
+    }),
     evidence: 'Measured' as const,
   }
   const topicPerformance = {
@@ -199,6 +559,157 @@ it('accepts all qualifying topics while keeping low-evidence diagnostics bounded
       views: { ...validSummary.views, topicPerformance },
     }).success,
   ).toBe(false)
+})
+
+describe('topic joint rating evidence contract', () => {
+  const difficulties = ['easy', 'medium', 'hard', 'unknown'] as const
+  const ratings = ['again', 'hard', 'good', 'easy'] as const
+  const cells = difficulties.flatMap((difficulty) =>
+    ratings.map((rating) => ({ difficulty, rating })),
+  )
+  const topicRow = () => ({
+    id: 'graphs',
+    topic: 'Graphs',
+    reviewSuccess: 0.5,
+    goodEasy: 8,
+    validRatings: 16,
+    distinctProblems: 4,
+    evidence: 'Measured',
+    ratingCountsByDifficulty: createTopicRatingCountMatrix(
+      Object.fromEntries(
+        difficulties.map((difficulty) => [
+          difficulty,
+          { again: 1, hard: 1, good: 1, easy: 1 },
+        ]),
+      ),
+    ),
+  })
+
+  it('preserves all sixteen joint counts and the reconciled raw fields', () => {
+    expect(topicPerformanceRowSchema.parse(topicRow())).toEqual(topicRow())
+  })
+
+  it('requires the joint matrix', () => {
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...topicRow(),
+        ratingCountsByDifficulty: undefined,
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each(cells)('rejects negative $difficulty/$rating counts', (cell) => {
+    const row = topicRow()
+    row.ratingCountsByDifficulty = {
+      ...row.ratingCountsByDifficulty,
+      [cell.difficulty]: {
+        ...row.ratingCountsByDifficulty[cell.difficulty],
+        [cell.rating]: -1,
+      },
+    }
+    expect(topicPerformanceRowSchema.safeParse(row).success).toBe(false)
+  })
+
+  it.each(cells)('rejects fractional $difficulty/$rating counts', (cell) => {
+    const row = topicRow()
+    row.ratingCountsByDifficulty = {
+      ...row.ratingCountsByDifficulty,
+      [cell.difficulty]: {
+        ...row.ratingCountsByDifficulty[cell.difficulty],
+        [cell.rating]: 1.5,
+      },
+    }
+    expect(topicPerformanceRowSchema.safeParse(row).success).toBe(false)
+  })
+
+  it.each(cells)('requires the $difficulty/$rating cell', (cell) => {
+    const row = topicRow()
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...row,
+        ratingCountsByDifficulty: {
+          ...row.ratingCountsByDifficulty,
+          [cell.difficulty]: {
+            ...row.ratingCountsByDifficulty[cell.difficulty],
+            [cell.rating]: undefined,
+          },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each(difficulties)('requires the %s difficulty', (difficulty) => {
+    const row = topicRow()
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...row,
+        ratingCountsByDifficulty: {
+          ...row.ratingCountsByDifficulty,
+          [difficulty]: undefined,
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each(difficulties)('rejects additional %s rating cells', (difficulty) => {
+    const row = topicRow()
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...row,
+        ratingCountsByDifficulty: {
+          ...row.ratingCountsByDifficulty,
+          [difficulty]: {
+            ...row.ratingCountsByDifficulty[difficulty],
+            other: 0,
+          },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects additional difficulty cells', () => {
+    const row = topicRow()
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...row,
+        ratingCountsByDifficulty: {
+          ...row.ratingCountsByDifficulty,
+          other: { again: 0, hard: 0, good: 0, easy: 0 },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it.each([
+    {
+      overrides: { validRatings: 17, reviewSuccess: 8 / 17 },
+      path: 'validRatings',
+    },
+    {
+      overrides: { goodEasy: 9, reviewSuccess: 9 / 16 },
+      path: 'goodEasy',
+    },
+    { overrides: { reviewSuccess: 0.49 }, path: 'reviewSuccess' },
+  ])('rejects an inconsistent $path independently', ({ overrides, path }) => {
+    const result = topicPerformanceRowSchema.safeParse({
+      ...topicRow(),
+      ...overrides,
+    })
+    expect(result.success).toBe(false)
+    if (!result.success)
+      expect(result.error.issues.map((issue) => issue.path)).toEqual([[path]])
+  })
+
+  it('rejects zero raw counts paired with populated joint evidence', () => {
+    expect(
+      topicPerformanceRowSchema.safeParse({
+        ...topicRow(),
+        validRatings: 0,
+        goodEasy: 0,
+        reviewSuccess: 0,
+      }).success,
+    ).toBe(false)
+  })
 })
 
 describe('analyticsSummaryRequestSchema', () => {
@@ -256,7 +767,7 @@ describe('analyticsSummaryRequestSchema', () => {
     })
   })
 
-  it.each([14, 30, 90] as const)('accepts range %s', (range) => {
+  it.each([30, 90, 'all'] as const)('accepts range %s', (range) => {
     expect(
       analyticsSummaryRequestSchema.parse({
         surface: 'dashboard',
@@ -478,7 +989,7 @@ describe('analyticsSummarySchema', () => {
   it('rejects a fallback recommendation when the requested range is ready', () => {
     const result = analyticsSummarySchema.safeParse({
       ...validSummary,
-      historicalReadiness: withRequestedReadiness(readyReadiness, 14),
+      historicalReadiness: withRequestedReadiness(readyReadiness, 30),
     })
 
     expect(result.success).toBe(false)
@@ -493,12 +1004,21 @@ describe('analyticsSummarySchema', () => {
   })
 
   it('serializes an unready historical selection with feature-owned current and workload views', () => {
+    const timeFrame = buildAnalyticsTimeFrame({
+      asOf: new Date(validSummary.timeFrame.asOf),
+      requestedDays: 90,
+      timeZone: validSummary.timeFrame.timeZone,
+    })
     const parsed = analyticsSummarySchema.parse({
       ...validSummary,
       range: 90,
-      timeFrame: {
-        ...validSummary.timeFrame,
-        requestedDays: 90,
+      timeFrame,
+      views: {
+        ...validSummary.views,
+        observedRecallVsFsrs: {
+          ...validSummary.views.observedRecallVsFsrs,
+          timeFrame,
+        },
       },
       historicalReadiness: {
         ...validSummary.historicalReadiness,
@@ -690,12 +1210,13 @@ describe('hardAgainSummarySchema', () => {
 })
 
 describe('analyticsRangeSchema', () => {
-  it('accepts only the supported numeric ranges', () => {
+  it('accepts only the public finite and All time choices', () => {
     expect(
-      [14, 30, 90].every(
+      [30, 90, 'all'].every(
         (range) => analyticsRangeSchema.safeParse(range).success,
       ),
     ).toBe(true)
+    expect(analyticsRangeSchema.safeParse(14).success).toBe(false)
   })
 })
 

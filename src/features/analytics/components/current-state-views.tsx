@@ -6,6 +6,7 @@ import { createLeetCodeProblemUrl } from '@/lib/leetcode'
 
 import type { AnalyticsViews } from '../api/analytics-contracts'
 import { formatCount, formatPercent } from './charts/chart-shared'
+import type { AnalyticsExactField } from './analytics-exact-table'
 import { RetentionMapChart } from './retention-map-chart'
 import {
   formatDate,
@@ -13,7 +14,58 @@ import {
   formatGap,
   statusColor,
   statusLabel,
+  type RetentionRow,
 } from './retention-map-model'
+
+/** Original Retention table evidence, shared with compact field groups. */
+export function retentionProblemFields(
+  timeZone: string,
+): AnalyticsExactField<RetentionRow>[] {
+  return [
+    { key: 'rank', label: 'Rank', value: (row) => row.rank },
+    {
+      key: 'recall',
+      label: 'Estimated recall now',
+      value: (row) => formatPercent(row.retrievability),
+    },
+    {
+      key: 'target',
+      label: 'FSRS target',
+      value: (row) => formatPercent(row.targetRetention),
+    },
+    {
+      key: 'gap',
+      label: 'Target gap',
+      value: (row) => formatGap(row.targetGap),
+    },
+    {
+      key: 'durability',
+      label: 'Memory durability',
+      value: (row) => formatDuration(row.targetDurationDays),
+    },
+    {
+      key: 'review',
+      label: 'Last reviewed',
+      value: (row) => formatDate(row.lastReviewedAt, timeZone),
+    },
+    {
+      key: 'due',
+      label: 'Due',
+      value: (row) => formatDate(row.dueAt, timeZone),
+    },
+    {
+      key: 'difficulty',
+      label: 'Difficulty',
+      value: (row) => row.difficulty.toFixed(1),
+    },
+    {
+      key: 'lapses',
+      label: 'Lapses',
+      value: (row) => formatCount(row.lapseCount),
+    },
+    { key: 'status', label: 'Status', value: (row) => statusLabel(row.status) },
+  ]
+}
 
 export function RetentionMapView({
   timeZone = 'UTC',
@@ -141,15 +193,9 @@ function RetentionMapTable({
               {[
                 'Rank',
                 'Problem',
-                'Estimated recall now',
-                'FSRS target',
-                'Target gap',
-                'Memory durability',
-                'Last reviewed',
-                'Due',
-                'Difficulty',
-                'Lapses',
-                'Status',
+                ...retentionProblemFields(timeZone)
+                  .slice(1)
+                  .map((field) => field.label),
               ].map((label) => (
                 <th className="px-2 pb-2" key={label} scope="col">
                   {label}

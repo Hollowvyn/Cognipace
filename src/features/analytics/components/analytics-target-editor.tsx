@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 
 import {
   analyticsTargetsSchema,
@@ -13,6 +14,12 @@ interface AnalyticsTargetEditorProps {
   targets: AnalyticsTargets
   metric: TargetMetric
   onSave: (patch: Partial<AnalyticsTargets>) => Promise<unknown>
+  surface?: 'inline' | 'goals'
+  /** Controlled visibility: hiding a mounted editor preserves draft and errors. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** The parent's destination control, focused after Save/Cancel commits. */
+  returnFocusRef?: RefObject<HTMLButtonElement | null>
 }
 
 const inputClassName =
@@ -24,6 +31,10 @@ export function AnalyticsTargetEditor({
   targets,
   metric,
   onSave,
+  surface = 'inline',
+  open: controlledOpen,
+  onOpenChange,
+  returnFocusRef,
 }: AnalyticsTargetEditorProps) {
   const id = useId()
   const { key, label, hint: readHint, color } = targetMetrics[metric]
@@ -38,25 +49,39 @@ export function AnalyticsTargetEditor({
   const inputRef = useRef<HTMLInputElement>(null)
   const savingRef = useRef(false)
   const restoreFocusRef = useRef(false)
-  const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState(() => percentageText(value))
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const lifecycleRef = useRef({ open, onOpenChange })
+  const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const validation = validateDraft(draft, targets, key)
+  const draftText = draft ?? percentageText(value)
+  const validation = validateDraft(draftText, targets, key)
   const error = validation.error ?? saveError
+
+  useLayoutEffect(() => {
+    lifecycleRef.current = { open, onOpenChange }
+  }, [open, onOpenChange])
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
-    else if (restoreFocusRef.current) {
+    else if (restoreFocusRef.current && !saving) {
       restoreFocusRef.current = false
-      triggerRef.current?.focus()
+      const focusTarget = returnFocusRef?.current ?? triggerRef.current
+      focusTarget?.focus()
     }
-  }, [open, metric])
+  }, [open, metric, saving, returnFocusRef])
+
+  function setOpen(nextOpen: boolean) {
+    if (controlledOpen === undefined) setInternalOpen(nextOpen)
+    lifecycleRef.current.onOpenChange?.(nextOpen)
+  }
 
   function close() {
     if (savingRef.current) return
     restoreFocusRef.current = true
     setOpen(false)
+    setDraft(null)
     setSaveError(null)
   }
 
@@ -67,8 +92,11 @@ export function AnalyticsTargetEditor({
     setSaveError(null)
     try {
       await onSave(validation.patch)
-      restoreFocusRef.current = true
-      setOpen(false)
+      // A mounted Goals controller can finish after the user opens another one.
+      // Only the visible controller owns the parent's close and focus return.
+      restoreFocusRef.current = lifecycleRef.current.open
+      if (lifecycleRef.current.open) setOpen(false)
+      setDraft(null)
     } catch (error) {
       setSaveError(
         readErrorMessage(error, 'Could not save targets. Please try again.'),
@@ -80,37 +108,42 @@ export function AnalyticsTargetEditor({
   }
 
   return (
-    <div className="grid min-w-0 justify-items-end gap-2">
-      <button
-        aria-controls={`${id}-editor`}
-        aria-expanded={open}
-        className="inline-flex max-w-full items-center gap-2 rounded px-1 py-1 text-right text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-        disabled={saving}
-        onClick={() => {
-          if (open) close()
-          else {
-            setDraft(percentageText(value))
-            setSaveError(null)
-            setOpen(true)
-          }
-        }}
-        ref={triggerRef}
-        type="button"
-      >
-        <span
-          aria-hidden="true"
-          className="w-5 shrink-0 border-t border-dashed"
-          style={{ borderColor: referenceColor }}
-        />
-        {label} {formatPercent(value)}
-        <span aria-hidden="true" className="text-[10px]">
-          ▾
-        </span>
-      </button>
+    <div
+      className="grid min-w-0 justify-items-end gap-2"
+      hidden={surface === 'goals' && !open}
+    >
+      {surface === 'inline' ? (
+        <button
+          aria-controls={`${id}-editor`}
+          aria-expanded={open}
+          className="inline-flex max-w-full items-center gap-2 rounded px-1 py-1 text-right text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+          disabled={saving}
+          onClick={() => {
+            if (open) close()
+            else {
+              setDraft(percentageText(value))
+              setSaveError(null)
+              setOpen(true)
+            }
+          }}
+          ref={triggerRef}
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className="w-5 shrink-0 border-t border-dashed"
+            style={{ borderColor: referenceColor }}
+          />
+          {label} {formatPercent(value)}
+          <span aria-hidden="true" className="text-[10px]">
+            ▾
+          </span>
+        </button>
+      ) : null}
       {open ? (
         <form
           aria-label={`${label} editor`}
-          className="grid w-full max-w-72 min-w-0 gap-2 rounded-[var(--cp-control-radius)] border border-border bg-muted/30 p-2 text-left"
+          className={`grid w-full min-w-0 gap-2 rounded-[var(--cp-control-radius)] border border-border bg-muted/30 p-2 text-left ${surface === 'goals' ? 'max-w-full' : 'max-w-72'}`}
           id={`${id}-editor`}
           noValidate
           onKeyDown={(event) => {
@@ -125,68 +158,80 @@ export function AnalyticsTargetEditor({
             void save()
           }}
         >
-          <label className="sr-only" htmlFor={`${id}-value`}>
-            {label} (%)
-          </label>
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-1">
-              <input
-                aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`}
-                aria-invalid={Boolean(validation.error)}
-                autoComplete="off"
-                className={inputClassName}
+          <fieldset className="m-0 grid min-w-0 gap-2 border-0 p-0">
+            <legend
+              className={
+                surface === 'goals' ? 'mb-2 text-sm font-semibold' : 'sr-only'
+              }
+            >
+              {label}
+            </legend>
+            <label className="sr-only" htmlFor={`${id}-value`}>
+              {label} (%)
+            </label>
+            <div
+              className="flex min-w-0 flex-wrap items-center gap-2"
+              data-testid="target-editor-controls"
+            >
+              <div className="flex min-w-0 flex-1 basis-28 items-center gap-1">
+                <input
+                  aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`}
+                  aria-invalid={Boolean(error)}
+                  autoComplete="off"
+                  className={inputClassName}
+                  disabled={saving}
+                  id={`${id}-value`}
+                  inputMode="numeric"
+                  max={100}
+                  min={0}
+                  onChange={(event) => {
+                    setDraft(event.target.value)
+                    setSaveError(null)
+                  }}
+                  ref={inputRef}
+                  step={1}
+                  type="number"
+                  value={draftText}
+                />
+                <span
+                  aria-hidden="true"
+                  className="text-xs text-muted-foreground"
+                >
+                  %
+                </span>
+              </div>
+              <button
+                className={`${buttonClassName} bg-card text-foreground hover:bg-muted`}
                 disabled={saving}
-                id={`${id}-value`}
-                inputMode="numeric"
-                max={100}
-                min={0}
-                onChange={(event) => {
-                  setDraft(event.target.value)
-                  setSaveError(null)
-                }}
-                ref={inputRef}
-                step={1}
-                type="number"
-                value={draft}
-              />
-              <span
-                aria-hidden="true"
-                className="text-xs text-muted-foreground"
+                onClick={close}
+                type="button"
               >
-                %
-              </span>
+                Cancel
+              </button>
+              <button
+                className={`${buttonClassName} border-primary bg-primary text-primary-foreground`}
+                disabled={saving || Boolean(validation.error)}
+                type="submit"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
             </div>
-            <button
-              className={`${buttonClassName} bg-card text-foreground hover:bg-muted`}
-              disabled={saving}
-              onClick={close}
-              type="button"
-            >
-              Cancel
-            </button>
-            <button
-              className={`${buttonClassName} border-primary bg-primary text-primary-foreground`}
-              disabled={saving || Boolean(validation.error)}
-              type="submit"
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-          <p
-            className="m-0 text-[11px] leading-relaxed text-muted-foreground"
-            id={`${id}-hint`}
-          >
-            {hint}
-          </p>
-          {error ? (
             <p
-              className="m-0 text-xs text-[color:var(--cp-tone-danger-fg)]"
-              id={`${id}-error`}
-              role="alert"
+              className={`m-0 leading-relaxed text-muted-foreground ${surface === 'goals' ? 'text-xs' : 'text-[11px]'}`}
+              id={`${id}-hint`}
             >
-              {error}
+              {hint}
             </p>
-          ) : null}
+            {error ? (
+              <p
+                className="m-0 text-xs text-[color:var(--cp-tone-danger-fg)]"
+                id={`${id}-error`}
+                role="alert"
+              >
+                {error}
+              </p>
+            ) : null}
+          </fieldset>
         </form>
       ) : null}
     </div>

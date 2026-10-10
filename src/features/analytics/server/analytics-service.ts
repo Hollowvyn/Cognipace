@@ -22,10 +22,8 @@ import {
 
 import {
   buildHardAgainSummary,
-  buildPredictedRecallSamples,
   buildPracticeRhythmPoints,
   buildRatingsMixPoints,
-  buildRecallQualityPoints,
   buildStabilityPoints,
   buildTopicPoints,
   buildUpcomingLoadPoints,
@@ -41,23 +39,24 @@ import {
 import {
   calculateAnalyticsReadiness,
   findRichestReadyRange,
-  type AnalyticsReadiness,
 } from '../domain/analytics-readiness'
 import {
   buildAnalyticsBucketsFromTimeFrame,
   type AnalyticsBucket,
 } from '../domain/analytics-range-policy'
-import {
-  buildAnalyticsTimeFrame,
-  buildForecastBounds,
-} from '../domain/analytics-time'
+import { buildForecastBounds } from '../domain/analytics-time'
+import { buildAnalyticsHistoryTimeFrame } from '../domain/analytics-history-frame'
+import { buildAnalyticsBacklogTimeFrame } from '../domain/analytics-history-window'
+import type { AnalyticsTimeFrame } from '../domain/analytics-time'
 import { buildHistoricalAnalyticsViews } from '../domain/historical-presentation'
+import { buildRepeatReviewPairs } from '../domain/review-cohorts'
 import { buildCurrentStateAnalyticsViews } from '../domain/current-state-presentation'
 import { buildWorkloadAnalyticsViews } from '../domain/workload-presentation'
 
 import {
   buildObservedRatingQuality,
   buildAnalyticsSummary,
+  buildSelectedActivity,
   type AnalyticsSummary,
 } from '../domain/summary'
 
@@ -74,18 +73,7 @@ export async function getAnalyticsSummary(
   const range = nowOrOptions instanceof Date ? 30 : nowOrOptions.range
   const timeZone =
     nowOrOptions instanceof Date ? 'UTC' : (nowOrOptions.timeZone ?? 'UTC')
-  const presentationTimeFrame = buildAnalyticsTimeFrame({
-    asOf: now,
-    requestedDays: range,
-    timeZone,
-  })
-  const periodEnd = new Date(presentationTimeFrame.asOf)
-  const buckets = buildAnalyticsBucketsFromTimeFrame(presentationTimeFrame)
-  const periodStart = buckets[0]!.start
-  const forecastBounds = buildForecastBounds({
-    asOf: now,
-    timeZone: presentationTimeFrame.timeZone,
-  })
+  const forecastBounds = buildForecastBounds({ asOf: now, timeZone })
   const fourteenDaysLater = new Date(forecastBounds.end)
 
   const [dayStats, reviewHistory, currentFsrsCards, upcomingCards, settings] =
@@ -97,6 +85,21 @@ export async function getAnalyticsSummary(
       getSettings(db),
     ])
 
+  const presentationTimeFrame = buildAnalyticsHistoryTimeFrame({
+    selection: range,
+    asOf: now,
+    timeZone,
+    history: reviewHistory,
+  })
+  const periodEnd = new Date(presentationTimeFrame.asOf)
+  const buckets = buildAnalyticsBucketsFromTimeFrame(presentationTimeFrame)
+  const periodStart = new Date(presentationTimeFrame.periodStart)
+  const backlogTimeFrame: AnalyticsTimeFrame = {
+    ...buildAnalyticsBacklogTimeFrame({ asOf: now, timeZone }),
+    requestedDays: 30,
+    grouping: { unit: 'day', step: 1 },
+  }
+  const backlogBuckets = buildAnalyticsBucketsFromTimeFrame(backlogTimeFrame)
   const fsrsOptions = normalizeFsrsSchedulingOptions({
     targetRetention: settings.review.targetRetention,
   })
@@ -128,6 +131,16 @@ export async function getAnalyticsSummary(
     timeFrame: presentationTimeFrame,
   }
   const analyticsReviewHistory = reviewHistory satisfies AnalyticsReviewEvent[]
+  const activity = buildSelectedActivity(analyticsReviewHistory, {
+    start: periodStart,
+    asOf: periodEnd,
+    timeZone: presentationTimeFrame.timeZone,
+  })
+  const pairedReviews = buildRepeatReviewPairs(analyticsReviewHistory, {
+    start: new Date(presentationTimeFrame.history?.nominalStart ?? periodStart),
+    end: periodEnd,
+    fsrsOptions,
+  })
   const analyticsCurrentCards = buildCurrentAnalyticsCards(
     currentFsrsCards,
     now,
@@ -142,6 +155,7 @@ export async function getAnalyticsSummary(
       start: periodStart,
       timeZone: presentationTimeFrame.timeZone,
       timeFrame: presentationTimeFrame,
+      pairedReviews,
       analyticsTargets: settings.analytics,
       timeTargetsMinutes: settings.assessment.timeTargetsMinutes,
     },
@@ -179,7 +193,9 @@ export async function getAnalyticsSummary(
     hasValidReviewRating,
   )
   const requestedReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: baselineEvidenceCounts,
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
@@ -190,14 +206,21 @@ export async function getAnalyticsSummary(
     hasObservedCorrectnessReview,
   )
   const recallReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
-    evidenceCounts: historicalViews.observedRecallVsFsrs.rows.map(
-      (row) => row.pairedReviews,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
+    evidenceCounts: buildBucketEvidenceCounts(
+      pairedReviews,
+      buckets,
+      periodEnd,
+      () => true,
     ),
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
   const firstAttemptReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: historicalViews.problemSolving.cohorts.newProblems.rows.map(
       (row) =>
         Object.values(row.difficulties).reduce(
@@ -208,33 +231,39 @@ export async function getAnalyticsSummary(
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
   const practiceRhythmReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: correctnessEvidenceCounts,
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
   const ratingsMixReadiness = requestedReadiness
 
-  const recallQuality = buildRecallQualityPoints(
-    analyticsReviewHistory,
-    chartOptions,
+  const recallQuality = historicalViews.observedRecallVsFsrs.rows.map(
+    (row) => ({
+      bucketStart: row.bucketStart,
+      bucketEnd: row.bucketEnd,
+      observedRecall: row.observedRecall,
+      predictedRecall: row.fsrsEstimate,
+      targetRetention: fsrsOptions.targetRetention,
+      reviewCount: row.pairedReviews,
+      eligibleSampleSize: row.pairedReviews,
+    }),
   )
   const predictedRecall = buildMetricSummary(
-    buildPredictedRecallSamples(analyticsReviewHistory, chartOptions).map(
-      (sample) => sample.value,
-    ),
+    pairedReviews.map((pair) => pair.estimate),
   )
   const practiceRhythm = buildPracticeRhythmPoints(
     analyticsReviewHistory,
     chartOptions,
   )
-  const ratingsMix = trimHistoricalPoints(
-    buildRatingsMixPoints(analyticsReviewHistory, chartOptions),
-    ratingsMixReadiness,
-  )
+  const ratingsMix = buildRatingsMixPoints(analyticsReviewHistory, chartOptions)
   const hardAgain = buildHardAgainSummary(analyticsReviewHistory, chartOptions)
   const topics = buildTopicPoints(analyticsReviewHistory, chartOptions)
   const topicReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: buildBucketEvidenceCounts(
       analyticsReviewHistory,
       buckets,
@@ -245,7 +274,9 @@ export async function getAnalyticsSummary(
   })
   const stability = buildStabilityPoints(analyticsReviewHistory, chartOptions)
   const stabilityReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: buildBucketEvidenceCounts(
       analyticsReviewHistory,
       buckets,
@@ -257,15 +288,21 @@ export async function getAnalyticsSummary(
   const overdueSnapshots = reconstructOverdueBacklogSnapshots(
     analyticsReviewHistory,
     analyticsCurrentCards,
-    chartOptions,
+    {
+      ...chartOptions,
+      start: new Date(backlogTimeFrame.periodStart),
+      buckets: backlogBuckets,
+      timeFrame: backlogTimeFrame,
+    },
   )
   const overdueReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: 30,
+    grouping: backlogTimeFrame.grouping,
     evidenceCounts: bucketCountsFromDatedObservations(
-      buckets,
+      backlogBuckets,
       overdueSnapshots,
     ),
-    bucketKeys: buckets.map((bucket) => bucket.key),
+    bucketKeys: backlogBuckets.map((bucket) => bucket.key),
   })
   const historicalReadiness = {
     firstAttemptOutcomes: firstAttemptReadiness,
@@ -292,7 +329,7 @@ export async function getAnalyticsSummary(
   )
   const workloadViews = buildWorkloadAnalyticsViews({
     overdueSnapshots,
-    timeFrame: presentationTimeFrame,
+    timeFrame: backlogTimeFrame,
     upcomingLoad,
   })
   const views = { ...baseViews, ...workloadViews }
@@ -300,6 +337,7 @@ export async function getAnalyticsSummary(
   return buildAnalyticsSummary({
     generatedAt: now,
     timeFrame: presentationTimeFrame,
+    activity,
     reviewDays: dayStats.reviewDays,
     totalReviews: dayStats.totalReviews,
     currentStreak: practiceProgress.currentStreak,
@@ -375,11 +413,11 @@ function buildMetricSummary(
   }
 }
 
-function buildBucketEvidenceCounts(
-  events: readonly AnalyticsReviewEvent[],
+function buildBucketEvidenceCounts<T extends { reviewedAt: Date }>(
+  events: readonly T[],
   buckets: readonly AnalyticsBucket[],
   periodEnd: Date,
-  isEligible: (event: AnalyticsReviewEvent) => boolean,
+  isEligible: (event: T) => boolean,
 ): number[] {
   return buckets.map(
     (bucket) =>
@@ -406,37 +444,26 @@ function bucketCountsFromDatedObservations<T extends { date: Date }>(
   )
 }
 
-function trimHistoricalPoints<T extends { bucketStart: string }>(
-  points: readonly T[],
-  readiness: AnalyticsReadiness,
-): T[] {
-  if (readiness.effectiveStart === null) return []
-
-  const effectiveStartIndex = points.findIndex(
-    (point) => point.bucketStart === readiness.effectiveStart,
-  )
-
-  return effectiveStartIndex === -1 ? [] : points.slice(effectiveStartIndex)
-}
-
 function findRecommendedRange(
   events: readonly AnalyticsReviewEvent[],
   now: Date,
   requestedDays: AnalyticsRange,
   timeZone: string,
-): AnalyticsRange | null {
-  const ranges = ([14, 30, 90] as const)
-    .filter((range) => range < requestedDays)
+): 30 | 90 | null {
+  const ranges = ([30, 90] as const)
+    .filter((range) => requestedDays === 'all' || range < requestedDays)
     .map((range) => {
-      const buckets = buildAnalyticsBucketsFromTimeFrame(
-        buildAnalyticsTimeFrame({
-          asOf: now,
-          requestedDays: range,
-          timeZone,
-        }),
-      )
+      const timeFrame = buildAnalyticsHistoryTimeFrame({
+        selection: range,
+        asOf: now,
+        timeZone,
+        history: events,
+      })
+      const buckets = buildAnalyticsBucketsFromTimeFrame(timeFrame)
       const readiness = calculateAnalyticsReadiness({
         requestedDays: range,
+        grouping: timeFrame.grouping,
+        availableDays: timeFrame.history?.availableDays,
         evidenceCounts: buildBucketEvidenceCounts(
           events,
           buckets,
@@ -450,9 +477,7 @@ function findRecommendedRange(
     })
 
   const recommendedRange = findRichestReadyRange(ranges)
-  return recommendedRange === 14 ||
-    recommendedRange === 30 ||
-    recommendedRange === 90
+  return recommendedRange === 30 || recommendedRange === 90
     ? recommendedRange
     : null
 }

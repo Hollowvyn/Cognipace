@@ -1132,75 +1132,77 @@ exact pending case.
    reload button in `chrome://extensions` after the build. Reopen the dashboard
    and navigate to Analytics so the smoke uses the rebuilt local extension and
    its runtime, rather than a fixture page or an already-open stale dashboard.
-2. In both datasets, choose 14, 30, and 90 days. Confirm daily, three-day, and
-   weekly grouping respectively, and verify the selected range remains selected
-   until explicitly changed. Available charts remain visible under a readiness
-   warning; a suggested shorter ready range changes selection only when its
-   link is activated.
-3. Check the report's selected timezone and as-of context, sparse calendar-date
-   ticks, and full bucket intervals in inspection. Marks use each supplied
-   interval's midpoint, including shortened edge intervals. Tick labels use
-   MM/DD in the report's as-of year and /YY for another year; a cross-year
-   tooltip interval shows both years. The current partial interval is marked
-   in progress, with no future observations.
-   Historical trend charts must remove only unsupported beginning and ending
-   buckets from Chart, Table, and inspection while retaining all internal gaps.
-   Recall's window starts/ends with either known rate; Memory's starts/ends with
-   a finite median, including zero or sub-day values; Practice's starts/ends
-   with positive completed reviews, positive valid-rating counts in either
-   source view, or a finite supplied success rate including 0%. The paired
-   difficulty Success/Time plots share a window supported by any known-difficulty
-   raw assessment, including invalid ratings or unavailable time. Confirm the
-   selected range, period totals, readiness, serialized scales, and report time
-   remain unchanged.
+2. In both datasets, choose 30, 90, and All time; confirm 30 is the default
+   and legacy `range=14` resolves to 30. Young twelve-date history remains
+   selected as 30 and displays its available dates; old sparse history keeps
+   real inactivity. All time uses explicit calendar grouping with at most sixty
+   intervals and conserves every eligible record in totals. Finite comparisons
+   retain complete nominal prior bounds and matched local wall-clock cutoff;
+   All time has no comparison. Recall starts at its first eligible selected
+   pair through the same as-of; long paired history remains long and regrouping
+   cannot improve global selected-history readiness. Backlog stays Last 30 days/
+   daily and Upcoming stays Next 14 days under every selection. Available charts
+   remain visible with neutral guidance; a shorter-ready link changes selection
+   only when activated.
+3. Check the report timezone/as-of, actual displayed dates, sparse calendar
+   ticks, and full intervals in inspection. Marks use actual midpoints,
+   including clipped edges and partial as-of intervals; future observations
+   remain excluded. Dates use MM/DD in the as-of year and /YY otherwise;
+   cross-year tooltip intervals show both years.
+   Performance retains the global available-history domain with leading
+   unavailable rows and trailing cumulative holds. Recall uses its labelled
+   paired frame, preserving raw interval and cumulative counts independently.
+   Raw outcomes/time, Memory, and Practice trim only unsupported outer rows and
+   keep internal gaps. Memory support is a finite median including zero/subday;
+   Practice support is positive completed reviews, positive valid counts in
+   either source, or finite success including zero. Raw outcome/time windows
+   use their local cohort's known-difficulty raw activity, including invalid
+   ratings/unavailable time. Selection, totals, readiness, serialized fits, and
+   report time remain unchanged by presentation.
 4. In each chart, move the pointer across the plot and tap near its left,
    middle, and right buckets. The nearest retained original bucket must be
    inspected, including an internal empty bucket. Confirm no permanent bottom
    detail row is added and the tooltip remains hidden before interaction.
-5. Tab to each chart's native inspection button. Check visible focus,
-   Left/Right arrows, Home/End, Enter/Space, and Escape. Keyboard inspection
-   exposes the same exact bucket values as pointer/tap inspection; Escape and
-   blur hide the tooltip. A quiet selected guide must not create a measured
-   marker or value for unknown evidence.
-   In New Problem Success, verify both simultaneous outcome curves across all
-   difficulties, including Unknown. Compare pooled counts with the exact table
-   using unequal difficulty sample sizes; the overall rate must use summed
-   counts, not an average of difficulty rates. Inspect an internal gap, measured
-   zero, invalid-only outer buckets and an Unknown-only period. Both target
-   editors remain available in empty/Chart/Table states, equal goals share one
-   neutral reference and distinct goals show two. Save a goal and confirm both
-   the combined and difficulty views update. Toggle each outcome independently;
-   its tooltip value hides while dates, scale and goals remain fixed. Change
-   Problem Solving population, measure, view and difficulties; the combined
-   first-recorded chart must remain unchanged.
-6. Inspect the first and last measured values and extremes near axis bounds.
-   Circle/diamond markers and low whiskers must remain visible with sufficient
-   clearance. Missing-evidence bridges connect measured neighbors only; an
-   unknown bucket keeps its unavailable value. A single point remains visible
-   with “Not enough data for a trend yet.”
-7. In Recall vs FSRS Estimate, confirm repeat-only copy, a solid observed line with
-   circle markers, an opaque short-dashed estimate with diamonds, visibly longer
-   missing-evidence bridges, and the saved Target Recall button above the data.
-   With at least two retained intervals, verify the first marker sits 12px from
-   the plot's left axis at both wide and narrow widths. The domain starts at
-   that interval's actual midpoint and still ends at the last interval's end;
-   ticks must represent true dates within this domain. For example, a first
-   09/09–09/11 interval starts the domain at 09/10, while its tooltip and Table
-   still show 09/09–09/11. Inspect a first point at 0% or 100% and confirm its
-   ordinary and active circle/diamond remain fully visible. A singleton keeps
-   its original interval domain and centered marker. Memory Strength and Practice
-   Rhythm retain their interval-boundary X domains and padding.
-   Compare tooltip and Table recalled/paired counts, rate values, signed
-   observed-minus-estimate difference, evidence, and reconstruction provenance.
-   The difference must reflect the supplied value rather than subtraction of
-   rounded displayed rates.
-8. Toggle each Recall series with pointer and keyboard, then hide both. The
-   curve, markers, and tooltip rate hide together; the signed difference appears
-   only with both series visible. Shared sample counts and the target remain,
-   and the accessible description matches the visible series. The retained
-   window, X domain, first-point clearance, and dates must remain fixed while
-   toggling, even when an edge
-   bucket has only one known rate. A measured 0% edge remains supported.
+5. Tab to each chart's native inspector. Check visible focus, Left/Right,
+   Home/End, Enter/Space, Escape and blur. Pointer/tap/keyboard expose the same
+   original row; a quiet guide cannot create an unknown observation.
+   In Performance Breakdown, verify Ratings / Difficulty / Mix / Intervals and
+   Pooled outcomes / Difficulty outcomes / Goals / Method. Original simultaneous
+   pooled Hard + Good + Easy and Good + Easy curves include Unknown; unequal
+   difficulty sample sizes reconcile using summed counts. Raw rate controls,
+   goals, exclusions, timing/assessment Mix and every field remain reachable.
+   Toggle raw curves/difficulties: visible inspection changes, fits/dates stay.
+   Saving a raw goal updates its references while the weighted /100 score remains
+   unchanged. Performance's cohort/control changes never alter Time's cohort.
+6. Inspect first/last updates and extremes near axis bounds. Circle/diamond
+   markers and low whiskers must remain visible with clearance. Raw outcome/
+   time, Memory and Practice bridges connect measured neighbors without a
+   fabricated unknown value. Cumulative Performance/Recall instead show flat
+   no-new-evidence holds through as-of, retaining actual last update and
+   cumulative n. New evidence moves only within its supported interval toward
+   its actual midpoint; curves remain bounded. A single real update plus holds
+   still says Not enough data for a trend yet.
+7. In Recall, confirm repeat-only copy, solid observed circles, short-dashed
+   FSRS diamonds, longer horizontal held dashes, and the saved Target Recall.
+   Valid Again pairs remain failed outcomes in the denominator; Hard/Good/Easy
+   alone count as recalled. Check initial-only empty history, pre-range replay,
+   and genuine zero estimates. Its cumulative observed and FSRS values use the
+   exact same pairs and their latest values equal selected-period totals.
+   Inspect raw interval counts/rates separately from cumulative counts/rates,
+   full-precision signed difference, provenance, evidence and last update.
+   Verify the labelled first-pair-to-as-of frame/grouping; short paired history
+   and genuinely old paired history retain their own actual dates without
+   changing global readiness. With multiple intervals the first true midpoint
+   has 12px left clearance and the domain ends at as-of. A singleton retains
+   its original interval domain/centered marker; full interval details remain.
+   Memory and Practice keep interval-boundary domains/padding.
+8. Toggle each Recall series with pointer/keyboard, then hide both. Curve,
+   marks and inspection rate hide together, and signed difference appears only
+   with both visible. Shared interval/cumulative samples and saved target remain;
+   accessible copy follows visibility. Domains, dates, paired frame and fit
+   including both cumulative series plus the 0%/100% goal do not shift. Measured
+   zero remains supported, and holds show zero new pairs with unchanged
+   cumulative n and last updated interval.
 9. In Memory Strength, inspect a bucket with at least four eligible reviews and
    one with fewer than four. Only the supported bucket gets discrete Q1–Q3
    whiskers; known medians remain available in both. Confirm the Median/Middle
@@ -1215,14 +1217,14 @@ exact pending case.
     unavailable buckets remain inspectable. A single finite median retains its
     original interval and single-point guidance; wholly unavailable medians
     show the explicit empty state.
-11. Confirm one full-width Practice Rhythm card combines exact supplied shares
+11. Confirm the fixed Practice card combines exact supplied shares
     in bottom-to-top Easy, Good, Hard, Again order with a thin, straight neutral
     completed-review line and measured markers. The left axis is fixed at
     0–100% and labeled Rating share (%); the supplied independent right axis is
     labeled Reviews. The Good + Easy upper boundary expresses Review Success,
     with no separate success curve. The saved Target Review Success reference
-    uses the left percentage axis; its compact editor remains above the plot in
-    empty, sparse, Chart, and Table states. Test goals at 0% and 100% and confirm
+    uses the left percentage axis; its compact goal stays reachable in fitting
+    Goals, empty, sparse, Chart, and exact-value states. Test goals at 0% and 100% and confirm
     they do not change rating geometry, count scale, rows, or dates. Completed
     reviews must remain independently supplied rather than derived from valid
     ratings. The visible copy explains association rather than causation, and
@@ -1247,50 +1249,63 @@ exact pending case.
     shares. Toggle Reviews with pointer and keyboard: the count line, markers,
     right axis, and tooltip count hide/show together, and accessible copy follows
     that state. Dates, retained rows, target, Table counts, and category geometry
-    remain fixed. Confirm distinct practice/rating readiness warnings, the
-    selected-period Hard + Again summary, evidence-gated prior-period comparison,
-    and wholly unsupported-period empty state remain truthful.
-14. Switch each historical plot between Chart and Table. When more than
-    seven rows exist, confirm seven rows per page, Previous/Next boundary
-    states, and page reset after a range change. Inspect full interval,
-    complete/in-progress state, grouping, report time, and evidence context
-    across both views. Confirm Chart and Table use the same retained activity
-    window, and wholly unsupported periods show their explicit empty state.
-    Practice's Table retains all supplied counts/shares and unavailable states
-    when Reviews is hidden in Chart; its target control remains reachable.
-    Change range while a tooltip is visible to check that selection resets or
-    clamps to the new rows without stale values.
-15. Repeat ready and sparse paths at wide and 320px dashboard widths in both
-    light and dark themes. Check axis/key contrast, sparse ticks, control
-    reachability, tap coordinates, keyboard focus, table scrolling, and
-    the combined New Problem Success/Recall pair, paired difficulty Success/Time
-    plots, full-width Practice, and
-    Memory/Topic stacking. There must
-    be no horizontal document overflow. Include neighboring panels with different
-    readiness messages; plots and controls must retain usable alignment without
-    overlap or clipped labels.
+    remain fixed. Confirm distinct practice/rating readiness guidance, the
+    selected-period Hard + Again summary and evidence-gated comparison in
+    Details, plus the wholly unsupported-period empty state, remain truthful.
+14. Visit Chart and every fitting exact-value section/field group, including
+    final pages. Preserve all original rows/fields, interval/partial/grouping/
+    timezone/as-of/evidence context, measured zero and unavailable states.
+    Native Previous/Next boundaries and live ranges match the current page.
+    Range/report/width changes reset or clamp pages even while Details is hidden;
+    equivalent rerenders keep the page. Overview restores local filters, series,
+    selection and trigger focus. Practice retains every count/share when Reviews
+    is hidden; all goals remain reachable. Change range during inspection and
+    confirm selection resets/clamps without stale values.
+15. Repeat ready/sparse paths at wide desktop, actual content widths 736px
+    and 735px, and 320px in both themes and at 200% zoom. Verify four equal
+    148px headlines reflow four/two/one and the exact ten-card reading order:
+    Performance / Time vs target, Practice / Topic performance, Recall / Memory
+    strength, Retention map / Memory signals, Overdue backlog / Upcoming reviews.
+    The 736px boundary gives two 360px cards plus 16px gap at 464px height;
+    735px stacks at 512px. Every Overview/Details/goals/selection/Table/loading/
+    empty/sparse/error state retains that height. Fonts must be loaded before
+    measuring. Check long names, all-hidden series, control/tap/focus reachability,
+    plot growth and every final field page without clipping, smaller text,
+    internal vertical scrolling or horizontal document overflow.
 16. Reload the built extension again and reopen Analytics. Confirm the local
     data and expected values remain available, and repeat a range change and
     keyboard inspection through the extension runtime.
-17. Confirm Recent Overdue Backlog still has a watch zone at five problems:
-    values at or below five use healthy green, values above five use attention
-    yellow, and its tooltip reports threshold status. Unknown/reconstructable
-    history must not be made up. Confirm straight connections, dots for zero and
-    isolated known dates, null gaps, unclipped boundary dots, and matching
-    pointer/tap/keyboard inspection with arrows, Home/End and Escape.
+17. In Last 30 days/daily Overdue backlog, test 4/5/6, both crossing
+    directions, flat five, singleton zero, and unknown days. Lines and markers
+    are green strictly below five and amber at/above five; split exact crossings
+    without another observation. Unknown days break runs. Straight connectors,
+    zero/isolated dots, unclipped boundaries and exact threshold/day/count
+    context agree for pointer/tap/native keyboard arrows/Home/End/Escape.
+    Reconcile known/unknown days, known-only peak, and below-five plus
+    at-or-above-five totals to known days. An unknown last day keeps the current
+    headline unavailable without carrying an earlier observation.
+    Reconstructed history must not be invented.
 18. Confirm Upcoming Review Load still shows its fixed next 14 calendar days,
     including when the selected historical range is unready. Check separate Due
     and Overdue counts inside sufficiently large segments, tiny outside labels,
     overdue-only Today, neighboring label collisions, and zero schedules. Inspect
-    and Table must retain exact counts, dates and report context.
+    and Table must retain exact counts, dates and current as-of/timezone/fallback
+    context. Today plus thirteen local dates is a schedule snapshot without
+    future review/rescheduling simulation. Due earlier today remains Due; only
+    Today includes overdue cards from prior local dates. A historical selection
+    change alone preserves pages when current report context is equivalent.
 19. In Retention Map, use more than 30 eligible reviewed questions, including
     exact overlaps, boundary recall values, sub-day durability and long titles.
+    Include 31 eligible questions and, where available, 150; record the exact
+    larger-cohort smoke case as pending if it cannot be exercised locally.
     Confirm every eligible question remains in Chart/Table and the full status
     counts agree. All/Below target keeps the same fitted landscape; include an
     empty Below target result. Hover/tap and the native keyboard inspector must
     agree, nearby-memory choices must include every overlapping question, and
-    Home/End/arrows must reach the final question. Pin details below the chart,
-    check all supplied values/dates and canonical LeetCode links, then close,
+    Home/End/arrows must reach the final question. Pin details in the fixed
+    card's fitting selection surface, check all eleven supplied problem fields,
+    dates/rank and canonical LeetCode links; Problems retains the supplied Region
+    in addition to the eleven original table fields. Then close,
     Escape or click outside; focus must return appropriately.
     Drag forward and reversed boxes, a nested box and a box reaching each plot
     edge. Release must magnify the chosen region, keep all selected points
@@ -1304,24 +1319,93 @@ exact pending case.
     offscreen question. Test both themes at 320px and desktop, all Chart/Table
     pages, and refreshed data removing a selected question. Compare FSRS cards,
     due dates and Settings before/after to confirm presentation-only changes.
-20. In Memory Signals by Problem, confirm exactly five rows per page when more
-    than five exist, Previous/Next and the live row range update correctly, and
-    visible problem links open canonical LeetCode problems in new tabs. Confirm
-    compact inline reasons, long-title wrapping and severity order. Refresh data
-    while on a later page to check reset/clamping and top-25 versus total copy.
-21. For Topic Performance, include more than five qualifying topics, low-evidence
-    topics, long names, and rates at 0%, just below the goal, and 100%. Confirm
-    rising columns, stable ordering, the shared Review Success goal, unrounded
-    goal status, and all rows/full names in Table. Changing the goal from either
-    Topic or Practice Rhythm updates both while preserving outcomes. At 320px,
-    keyboard selection must reveal the active topic inside the bounded scroller;
-    neither the chart nor its editor may create document overflow.
+20. In Memory signals, visit every fitting linked page and final row.
+    Previous/Next and live range update correctly; canonical links open LeetCode
+    problems in new tabs. Keep every typed reason/flag, severity order and long
+    titles without clipping. Changed current as-of/timezone/fallback or returned
+    row identities while a later page is hidden must reset; width changes reflow/
+    clamp pages. Historical selection alone preserves an equivalent current
+    report's page. Scope must retain current report context without presenting
+    the historical selection as its population. Reconcile returned-top-25 versus qualifying-total
+    counts; no flagged problems is a measured empty result.
+21. In Topic performance, include more than five qualifying topics,
+    overlapping direct assignments, Unknown, long names, and low-evidence topics.
+    Qualifying requires at least ten valid ratings across three distinct
+    valid-reviewed problems. All /100 rows/full names remain reachable in
+    bounded pages with unrounded score-ascending/count-descending/name ordering.
+    The sixteen cells reconcile valid n, Good/Easy numerator and original raw
+    Review Success. The alphabetical first five returned low-evidence topics
+    and exact additional count stay separate; omitted qualifying topics is zero. Weighted
+    scores have no percentage goal; raw rate/unrounded goal status/editor remain
+    in Ratings. Editing that goal from Topic or Practice updates its raw
+    references without changing scores. Verify every page and native access at
+    320px without document overflow.
+    Expected: Analytics loads through the extension runtime without the failed-load
+    state, reflects only local practice data, and tells a truthful chart story
+    without filling missing evidence.
 
-Expected: Analytics loads through the extension runtime without the failed-load
-state, reflects only local practice data, and tells a truthful chart story
-without filling missing evidence.
+#### Compact Analytics headlines, continuity and query states
 
-#### Difficulty And Recorded Time and Repeat Recall
+For this redesign, the user's latest validation scope prioritizes full-size
+desktop and avoids expanding exhaustive narrow-screen/accessibility matrices.
+Preserve the existing behavior and completed evidence; focus remaining signoff
+on desktop data, query/action states, and required automated gates. The broader
+responsive checklist below remains reference coverage, rather than extra
+agent verification required for this iteration.
+
+All cases remain unchecked until the human runs them in the rebuilt installed
+extension. Record the induced method for loading/failure/race cases; anything
+uninduced remains pending. Production-component fixture proof stays separate.
+
+- [ ] **Selected headlines:** include first/repeat assessments, true with Again,
+      false with Easy, null with Good, invalid ratings, duplicates, repeated
+      successes, local midnight/overnight dates, future/invalid dates, and
+      all-known-failure/empty/all-unknown histories. Reconcile distinct assessment
+      dates, unique correct questions, true/(true+false), exact positive successful
+      seconds and timed/total successful coverage in 30/90/All. Include missing/
+      zero/negative/nonfinite durations and a positive 35-second duration; it
+      must not appear as measured zero. No finite headline uses all-time totals.
+- [ ] **Weighted reconciliation:** verify 0/50/80/100 points and 1/2/3/Unknown 1
+      influence, all Good 80, Again zero, invalid-only unavailable, and unequal
+      samples. Actual valid n stays distinct from weighted units. Hero/trend/
+      breakdown agree after first/follow-up switches; weighted delta uses
+      unrounded score points while raw deltas use percentage points. Check
+      n=9/n=10 prior gates, nominal windows, matched cutoff and no All delta.
+- [ ] **Cumulative pairs and holds:** reconcile final Performance and Recall
+      values to whole-period totals; raw interval counts never accompany a
+      cumulative rate as its denominator. Include leading unavailable, internal/
+      trailing inactivity, genuine zero estimates, equal updates and one-update
+      history. Again pairs remain failures, initial replay never emits, and
+      pre-range replay supplies the same pairs. Holds have zero new evidence,
+      unchanged cumulative n/last update, long horizontal dashes through as-of,
+      no extra markers/readiness and no movement in unsupported intervals.
+- [ ] **State and geometry:** induce initial pending/error and Retry, incompatible
+      range/timezone changes, same-key Updating and failed refresh. Four headlines/
+      ten cards retain fixed shells. Old-range values clear immediately; failed
+      refresh preserves the exact old snapshot/as-of with persistent failure and
+      Retry. Check one polite announcement, neutral evidence/coverage slots,
+      full distinct Practice/rating reasons in Details, no shortened-history
+      warning, and genuine zero/no flags versus unavailable evidence.
+- [ ] **Details and persistent goals:** visit all original field groups, method/
+      evidence pages and final rows at desktop/320px/200% zoom in both themes.
+      Long labels, all-hidden series, Table/Goals/Selection and pending/error
+      states fit without clipping, smaller text or internal vertical scrolling.
+      Returning restores local filters/series/selection/focus; hidden-table
+      report/width/range changes reflow/clamp. Goal drafts/errors survive
+      Overview/Details, counterpart changes and pending completions, using one
+      atomic edited-key save; retain all four raw goals and backup/configured
+      sync behavior.
+- [ ] **Independent scope and retained actions:** Time below/at/above target,
+      uncapped overtime, Unknown coverage/no target, all/successful subsets,
+      one-observation median/four-observation quartiles and legacy units/Trend/
+      Compare remain available independently of Performance. Topics retain
+      all qualifying and returned low-evidence rows, the exact additional count,
+      and sixteen cells; Signals keeps all
+      returned flags versus qualifying total. Backlog's strict five boundary
+      and Last 30 days, Upcoming's exact Next 14 dates, and every Retention
+      gesture/overlap/eleven-field/link/focus action survive fixed composition.
+
+#### Performance, Time vs target and cumulative Recall
 
 Human happy-path and edge-case smoke is pending. Run these unchecked cases in
 Chrome's rebuilt installed extension with disposable retained history and attach
@@ -1329,13 +1413,14 @@ screenshots or recording proof before PR review or merge. Agent automated and
 production-component checks are separate evidence; record any uninduced case as
 pending rather than passed.
 
-- [ ] **Opening state and placement:** confirm one expanded section replaces the
-      old standalone chart: paired Success/Time and full-width Mix, with Recall
-      separate. Defaults are New problems, Trend, all Easy/Medium/Hard, Hard +
-      Good + Easy, percent of current target, all timed assessments, and
-      assessment-share Mix. The summary uses selected-period assessment days,
-      recorded assessments/distinct problems, Good + Easy/valid and invalid
-      exclusions, rather than an all-time review count.
+- [ ] **Opening state and placement:** Performance defaults to First attempts
+      and Time has an independent New problems/all-timed cohort. Performance
+      Breakdown retains Ratings/Difficulty/Mix/Intervals plus Pooled outcomes,
+      Difficulty outcomes, Goals and Method; Time Details retains Trend/Compare/
+      Intervals/Settings/Method. Advanced defaults remain Trend, all known
+      difficulties, Hard + Good + Easy, current-target percentage and assessment
+      share. Summary details preserve assessment days, recorded assessments/
+      distinct problems, Good + Easy/valid and invalid exclusions.
 - [ ] **Raw cohorts and Recall:** record Again then Good on one problem; New
       problems retains Again and Follow-up practice includes Good. Include an
       invalid first followed by valid Good, different cards/modes, shuffled
@@ -1348,8 +1433,8 @@ pending rather than passed.
       measured. Raw later-record outcomes are independent of that paired cohort.
 - [ ] **Outcome denominators and prior evidence:** within a difficulty use Again,
       Hard, and Good: success is 2/3 and Good + Easy is 1/3 over the same valid n.
-      Check all-Again zero versus invalid-only unavailable, weighted period
-      totals, and exact current/prior counts against the immediately preceding
+      Check all-Again zero versus invalid-only unavailable, summed period
+      numerators/denominators, and exact current/prior counts against the immediately preceding
       equivalent local-calendar period. Either difficulty n below ten says
       Sparse comparison, including n=9; n=10 on both sides permits a directional
       change. Unknown stays separate in Mix and leaves the three outcome/time
@@ -1365,8 +1450,9 @@ pending rather than passed.
       above 100%. Pause excludes time, running idle may count, and Strict Timing
       can record Again for an accepted overtime solution. Caveats must not call
       these values cumulative solving time or historical policy compliance.
-- [ ] **Shared controls and Mix:** verify mint Easy circles, blue Medium diamonds,
-      amber Hard triangles and matching labels in both plots. Hide/reveal each
+- [ ] **Independent controls and Mix:** verify mint Easy circles, blue Medium
+      diamonds and amber Hard triangles in raw outcome/time details. Performance
+      and Time cohort/difficulty switches do not cross-filter each other. Hide/reveal each
       difficulty without resetting the selected outcome or changing domains or
       dates. Hidden series leave inspection; all-hidden shows Select a
       difficulty while Mix still counts the full cohort. Switch raw populations,
@@ -1386,14 +1472,14 @@ pending rather than passed.
       without changing recorded seconds or claiming historical compliance.
 - [ ] **Exact tables and access:** compare Trend/Compare Table values with selected
       measure, units/subset, raw/valid/excluded counts, prior n, timing coverage,
-      medians/quartiles, complete intervals and timezone/as-of. Check seven-row
-      pagination, links, visible focus, Left/Right/Home/End, Escape, hover and
+      medians/quartiles, complete intervals and timezone/as-of. Check every fitting
+      page/field group, links, visible focus, Left/Right/Home/End, Escape, hover and
       touch pinning. Inspection reports only visible series and measured values;
       no hidden or unavailable interval gets a fabricated observation.
-- [ ] **Gaps, boundaries and proof:** at 14/30/90 days test empty, Unknown-only,
+- [ ] **Gaps, boundaries and proof:** at 30/90/All time test empty, Unknown-only,
       no-time, first-only/follow-up-only, sparse zero, singleton, internal gaps,
-      partial edges and cross-year intervals. Both Trend plots retain their shared
-      raw-activity window regardless of difficulty, measure or timing switches;
+      partial edges and cross-year intervals. Raw outcome/time Trend retains each
+      local cohort's activity window despite difficulty/measure/timing switches;
       long-dash bridges create no values. Verify appropriate empty states and
       marker/whisker clearance. Check wide and 320px layouts in light/dark themes,
       including all-hidden, saved-goal editors, tables and tooltip placement,
@@ -1414,7 +1500,8 @@ proof.
       must be 90%. Record FSRS retention, representative card due dates, Recall
       and Review Success rates/counts, and Retention Map values before editing
       goals so the later comparisons use the same practice data.
-- [ ] **Save and cancel:** open Target Recall, confirm its input receives focus,
+- [ ] **Save and cancel:** open Target Recall from Overview/Details Goals,
+      confirm its input receives focus,
       and verify exactly one input with the Hard + Good + Easy hint and current
       Success limit. Save Recall 80%; Success remains 90%. Open Target Review
       Success, verify its single focused input and Good + Easy / Recall-limit
@@ -1426,6 +1513,8 @@ proof.
       101, and Recall 95% with Success 90%. Saving must be blocked without
       changing either goal or silently adjusting the other goal. The invalid
       pair says “Review Success target must be at least your Recall target.”
+      Both counterpart buttons remain reachable in the same Recall Goals surface;
+      change the counterpart explicitly rather than silently adjusting it.
       Equality, 0%, and 100% are valid when the pair satisfies the rule. Raise
       Success before raising Recall beyond it; lower Recall before lowering
       Success below it. With a draft open, change the counterpart from another
@@ -1434,8 +1523,11 @@ proof.
 - [ ] **Pending and failure:** use a controlled delayed and rejected
       `settings.updateSettings` mutation in a disposable local test build and
       record how it was induced. Confirm Saving and duplicate-submit prevention.
-      A rejected save must keep the prior captions/references and the open
-      draft with a useful error; retry succeeds and Cancel still discards it.
+      A rejected save must keep prior captions/references and the open draft
+      with an associated persistent field error. Move Overview/Details and back;
+      the same draft/error survives. Retry succeeds and Cancel still discards it.
+      Complete an earlier pending save after selecting another goal; it must
+      not close that active draft or steal focus.
       If either condition cannot be induced, record that exact case as pending.
 - [ ] **Boundary references:** save 0%/0%, 0%/100%, and 100%/100%. Inspect both
       named dashed references and accessible descriptions at 0% and 100%; each
@@ -1444,7 +1536,7 @@ proof.
       geometry and its supplied right review-count scale unchanged. Measured rates, counts, rows, dates,
       internal gaps, and trimming must match the pre-edit data.
 - [ ] **Range and presentation:** retain a non-default pair while changing
-      14/30/90-day ranges, including switching to an uncached range while a save
+      30/90/All time ranges, including switching to an uncached range while a save
       is pending, toggling Recall series and Practice's Reviews, switching Chart/Table, and
       opening empty or sparse datasets. The controls remain reachable and the
       saved pair remains fixed. Repeat closed, open, invalid, and boundary-goal

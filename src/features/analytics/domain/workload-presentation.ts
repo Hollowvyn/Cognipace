@@ -8,6 +8,7 @@ import {
 
 export interface WorkloadAnalyticsViews {
   overdueBacklog: {
+    timeFrame: AnalyticsTimeFrame
     rows: OverdueBacklogRow[]
     knownDays: number
     withinWatchDays: number
@@ -54,10 +55,11 @@ export function buildWorkloadAnalyticsViews({
 
   return {
     overdueBacklog: {
+      timeFrame,
       rows: overdueRows,
       knownDays: knownCounts.length,
-      withinWatchDays: knownCounts.filter((count) => count <= 5).length,
-      aboveWatchDays: knownCounts.filter((count) => count > 5).length,
+      withinWatchDays: knownCounts.filter((count) => count < 5).length,
+      aboveWatchDays: knownCounts.filter((count) => count >= 5).length,
       selectedDays: overdueRows.length,
       currentBacklog: currentRow?.overdueCount ?? null,
       peak: knownCounts.length === 0 ? null : Math.max(...knownCounts),
