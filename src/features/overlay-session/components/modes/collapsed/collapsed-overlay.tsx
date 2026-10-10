@@ -128,7 +128,7 @@ export function CollapsedOverlay({
           </OverlayControlButton>
 
           <OverlayControlButton
-            disabled={!canReset}
+            disabled={!canReset || isMutating}
             label={isSubmitted ? 'Restart Attempt' : 'Reset Timer'}
             onClick={isSubmitted ? onRestartLocalSession : onResetTimer}
             stopClickPropagation

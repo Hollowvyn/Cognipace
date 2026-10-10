@@ -73,6 +73,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-06-fsrs-phase-d-reliable-reviews.md`](./plans/2026-10-06-fsrs-phase-d-reliable-reviews.md): approved-scope implementation plan for frozen review commands, atomic receipts/track effects, single-event guarded Update, durable acknowledgement and overlay retry after merged Phase C.
+
 - [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
 
 - [`plans/2026-10-05-openrouter-provider.md`](./plans/2026-10-05-openrouter-provider.md): six-task implementation plan for shared contracts and trusted keys, the native OpenRouter adapter, runtime/permission boundaries, free/custom Settings flow, privacy/Store documentation, and automated/live/human validation. Implementation and automated gates are complete; the dated record keeps live/generated-code and human installed-extension proof pending.
@@ -185,3 +187,5 @@ Use these files to understand why work was shaped a certain way. Before changing
 ## Audits
 
 - [`audits/2026-06-07-closed-issues-1-6-11-17.md`](./audits/2026-06-07-closed-issues-1-6-11-17.md): closed-issue rescue audit for issues 1, 6, 11, and 17.
+
+- [`handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md`](./handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md): Phase D captured context, frozen commands, atomic receipts/track effects, guarded corrections and durable snapshot proof; final independent SPEC/QUALITY and 3,290 tests passed in draft PR #205. Human installed-extension proof remains pending.

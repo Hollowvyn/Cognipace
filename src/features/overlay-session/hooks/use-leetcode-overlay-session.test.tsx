@@ -21,7 +21,10 @@ import {
   overrideLastReviewResultViaRuntime,
   saveReviewResultViaRuntime,
 } from '@/features/practice'
-import type { SerializedPracticeDetails } from '@/features/practice/api/practice-contracts'
+import type {
+  PracticeReviewCommandResult,
+  SerializedPracticeDetails,
+} from '@/features/practice/api/practice-contracts'
 import { upsertProblemFromPageViaRuntime } from '@/features/problems'
 import type {
   LeetCodePageEvent,
@@ -206,8 +209,8 @@ describe('useLeetCodeOverlaySession', () => {
     vi.clearAllMocks()
     leetcodeMockState.onEvent = null
     vi.mocked(upsertProblemFromPageViaRuntime).mockResolvedValue(problemRecord)
-    saveReview.mockResolvedValue(createSavedPracticeDetails())
-    overrideReview.mockResolvedValue(createSavedPracticeDetails())
+    saveReview.mockResolvedValue(createSavedResult())
+    overrideReview.mockResolvedValue(createSavedResult())
     loadOverlayData.mockResolvedValue(createOverlayData())
     remote.readProblemContent.mockReset().mockResolvedValue({
       ok: true,
@@ -414,7 +417,7 @@ describe('useLeetCodeOverlaySession', () => {
   })
 
   it('preserves the tab selected while a review is saving', async () => {
-    const pending = createDeferred<SerializedPracticeDetails>()
+    const pending = createDeferred<PracticeReviewCommandResult>()
     saveReview.mockReturnValueOnce(pending.promise)
     const { result } = await renderReadySession()
 
@@ -432,7 +435,7 @@ describe('useLeetCodeOverlaySession', () => {
     )
     act(() => result.current.actions.selectExpandedTab('notes'))
     await act(async () => {
-      pending.resolve(createSavedPracticeDetails())
+      pending.resolve(createSavedResult())
       await saving
     })
 
@@ -471,7 +474,7 @@ describe('useLeetCodeOverlaySession', () => {
       const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
       const expected = { rating, elapsedSeconds, isCorrect: rating !== 'again' }
       saveReview.mockResolvedValueOnce(
-        createSavedPracticeDetails({ latestAttempt: expected }),
+        createSavedResult({ latestAttempt: expected }),
       )
       const { result } = await renderReadySession({
         aiAssessmentEnabled: true,
@@ -500,7 +503,7 @@ describe('useLeetCodeOverlaySession', () => {
       await waitFor(() =>
         expect(result.current.overlay.reviewStatus).toBe('submitted-clean'),
       )
-      expect(latestSavedReviewRequest()).toEqual({
+      expect(latestSavedReviewRequest()).toMatchObject({
         surface: 'content-script',
         problemSlug: 'two-sum',
         reviewMode: 'leetcode',
@@ -509,7 +512,7 @@ describe('useLeetCodeOverlaySession', () => {
       for (const status of ['pending', 'ready'] as const) {
         if (status === 'ready') await completePendingAnalysis(analysis, result)
         expect(result.current.aiAnalysis.status).toBe(status)
-        expect(result.current.overlay.submittedSession).toEqual({
+        expect(result.current.overlay.submittedSession).toMatchObject({
           ...expected,
           lockReason,
         })
@@ -613,7 +616,7 @@ describe('useLeetCodeOverlaySession', () => {
   it('can retry the same terminal result after an auto-save failure', async () => {
     saveReview
       .mockRejectedValueOnce(new Error('Review save failed.'))
-      .mockResolvedValueOnce(createSavedPracticeDetails())
+      .mockResolvedValueOnce(createSavedResult())
     const { result } = await renderReadySession({ autoDetectSolved: true })
     const submissionResult = createSubmissionResult({
       submissionId: 'retry-result',
@@ -628,7 +631,7 @@ describe('useLeetCodeOverlaySession', () => {
       )
     })
 
-    emitSubmissionResult({ ...submissionResult })
+    await runOverlayAction(result.current.actions.retryReview)
 
     await waitFor(() => {
       expect(saveReview).toHaveBeenCalledTimes(2)
@@ -651,10 +654,10 @@ describe('useLeetCodeOverlaySession', () => {
     const startTime = Date.now()
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startTime)
     saveReview.mockResolvedValueOnce(
-      createSavedPracticeDetails({ latestAttempt: { elapsedSeconds: 95 } }),
+      createSavedResult({ latestAttempt: { elapsedSeconds: 95 } }),
     )
     overrideReview.mockResolvedValueOnce(
-      createSavedPracticeDetails({
+      createSavedResult({
         latestAttempt: {
           rating: 'again',
           elapsedSeconds: 95,
@@ -675,7 +678,7 @@ describe('useLeetCodeOverlaySession', () => {
     await runOverlayAction(result.current.actions.updateReview)
 
     expect(latestSavedReviewRequest()).not.toHaveProperty('log')
-    expect(overrideReview.mock.calls[0]?.[0]).toEqual({
+    expect(overrideReview.mock.calls[0]?.[0]).toMatchObject({
       surface: 'content-script',
       problemSlug: 'two-sum',
       rating: 'again',
@@ -686,7 +689,7 @@ describe('useLeetCodeOverlaySession', () => {
     await completePendingAnalysis(analysis, result)
     expect(saveReview).toHaveBeenCalledOnce()
     expect(overrideReview).toHaveBeenCalledOnce()
-    expect(result.current.overlay.submittedSession).toEqual({
+    expect(result.current.overlay.submittedSession).toMatchObject({
       rating: 'again',
       elapsedSeconds: 95,
       isCorrect: false,
@@ -776,7 +779,7 @@ describe('useLeetCodeOverlaySession', () => {
     {
       outcome: 'result',
       finishSave: (deferred: DeferredReviewResult) =>
-        deferred.resolve(createSavedPracticeDetails()),
+        deferred.resolve(createSavedResult()),
     },
     {
       outcome: 'error',
@@ -786,7 +789,7 @@ describe('useLeetCodeOverlaySession', () => {
   ] as const)(
     'ignores an in-flight submit $outcome after page navigation',
     async ({ finishSave }) => {
-      const deferredSave = createDeferred<SerializedPracticeDetails>()
+      const deferredSave = createDeferred<PracticeReviewCommandResult>()
       saveReview.mockReturnValueOnce(deferredSave.promise)
       const { result } = await renderReadySession()
 
@@ -889,6 +892,368 @@ describe('useLeetCodeOverlaySession', () => {
     },
   )
 
+  it.each(['network', 'persistence-pending'] as const)(
+    'retries a frozen %s command after Settings refetch without success feedback',
+    async (failure) => {
+      if (failure === 'network')
+        saveReview.mockRejectedValueOnce(new Error('Acknowledgement lost.'))
+      else
+        saveReview.mockResolvedValueOnce({
+          ...createSavedResult(),
+          status: 'persistence-pending',
+        })
+      const { result, queryClient } = await renderReadySession()
+      await runOverlayAction(result.current.actions.submitReview)
+      const frozen = structuredClone(latestSavedReviewRequest())
+      expect(result.current.overlay.submittedSession).toBeNull()
+      expect(result.current.timer.status).not.toBe('locked')
+      expect(result.current.overlay.nextStep.status).toBe('hidden')
+      expect(result.current.overlay.acceptedCommand).not.toBeNull()
+      act(() => {
+        result.current.actions.selectRating('easy')
+        result.current.actions.restartLocalSession()
+      })
+      expect(result.current.overlay.selectedRating).toBe('good')
+      loadOverlayData.mockResolvedValue(
+        createOverlayData({ timing: { strictTiming: true } }),
+      )
+      await act(async () => {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.appShell.all,
+        })
+      })
+      await runOverlayAction(result.current.actions.retryReview)
+      expect(saveReview.mock.calls[1]![0]).toEqual(frozen)
+      expect(result.current.overlay.submittedSession?.rating).toBe('good')
+      expect(result.current.overlay.acceptedCommand).toBeNull()
+    },
+  )
+
+  it('guards same-tick double click and watcher overlap before the first await', async () => {
+    const pending = createDeferred<PracticeReviewCommandResult>()
+    saveReview.mockReturnValueOnce(pending.promise)
+    const { result } = await renderReadySession()
+    let first!: Promise<void>
+    act(() => {
+      first = result.current.actions.submitReview()
+      void result.current.actions.submitReview()
+      void result.current.actions.saveLeetCodeSubmissionResult(
+        createSubmissionResult(),
+      )
+    })
+    expect(saveReview).toHaveBeenCalledOnce()
+    await act(async () => {
+      pending.resolve(createSavedResult())
+      await first
+    })
+  })
+
+  it('pins acknowledged target and rating across later two-tab reviews and refuses stale Update without losing the draft', async () => {
+    const { result, queryClient } = await renderReadySession()
+    await runOverlayAction(result.current.actions.submitReview)
+    const original = result.current.overlay.submittedSession
+    const later = createSavedPracticeDetails({
+      latestAttempt: {
+        id: 'attempt-other-tab',
+        rating: 'easy',
+        reviewedAt: '2026-01-02T10:00:00.000Z',
+      },
+    })
+    loadOverlayData.mockResolvedValue(createOverlayData({ practice: later }))
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.appShell.all })
+    })
+    expect(result.current.overlay.submittedSession).toEqual(original)
+    expect(result.current.overlay.selectedRating).toBe('good')
+    act(() => result.current.actions.selectRating('hard'))
+    overrideReview.mockResolvedValueOnce({
+      status: 'conflict',
+      reason: 'stale-review',
+      message: 'Another review was saved. Restart to begin a new review.',
+      current: later,
+    })
+    await runOverlayAction(result.current.actions.updateReview)
+    expect(overrideReview.mock.calls[0]![0]).toMatchObject({
+      targetAttemptId: 'attempt-1',
+      expectedRevision: 0,
+      reviewedAt: original!.reviewedAt,
+      rating: 'hard',
+    })
+    expect(result.current.overlay.selectedRating).toBe('hard')
+    expect(result.current.overlay.submittedSession).toEqual(original)
+    expect(result.current.overlay.acceptedCommand).toBeNull()
+    expect(result.current.overlay.reviewStatus).toBe('submitted-dirty')
+  })
+
+  it('uses post-bootstrap generation for Update while retaining acknowledged event identity', async () => {
+    const { result } = await renderReadySession()
+    await runOverlayAction(result.current.actions.submitReview)
+    expect(
+      latestSavedReviewRequest().generation.problemGenerationToken,
+    ).toBeNull()
+    act(() => result.current.actions.selectRating('hard'))
+    await runOverlayAction(result.current.actions.updateReview)
+    expect(overrideReview.mock.calls[0]![0]).toMatchObject({
+      generation: {
+        localGenerationToken: 'local-1',
+        problemGenerationToken: 'problem-1',
+      },
+      targetAttemptId: 'attempt-1',
+      expectedRevision: 0,
+      reviewedAt: '2026-01-01T10:00:00.000Z',
+    })
+  })
+
+  it('keeps the acknowledged generation when restore refetch retains the same target identity and revision', async () => {
+    const { result, queryClient } = await renderReadySession()
+    await runOverlayAction(result.current.actions.submitReview)
+    const original = result.current.overlay.submittedSession!
+    const restored = createSavedPracticeDetails()
+    restored.generation = {
+      localGenerationToken: 'local-restored',
+      problemGenerationToken: 'problem-restored',
+    }
+    loadOverlayData.mockResolvedValue(createOverlayData({ practice: restored }))
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.appShell.all })
+    })
+    act(() => result.current.actions.selectRating('hard'))
+    overrideReview.mockResolvedValueOnce({
+      status: 'conflict',
+      reason: 'stale-generation',
+      message: 'Practice was replaced. Restart for a new review.',
+      current: restored,
+    })
+    await runOverlayAction(result.current.actions.updateReview)
+    expect(overrideReview.mock.calls[0]![0]).toMatchObject({
+      generation: original.generation,
+      targetAttemptId: original.reviewAttemptId,
+      expectedRevision: original.revision,
+      reviewedAt: original.reviewedAt,
+    })
+    expect(result.current.overlay.submittedSession).toEqual(original)
+    expect(result.current.overlay.selectedRating).toBe('hard')
+  })
+
+  it('retries an Update with its original target, revision, time and manual evidence', async () => {
+    const { result } = await renderReadySession()
+    await runOverlayAction(result.current.actions.submitReview)
+    act(() => result.current.actions.selectRating('hard'))
+    overrideReview.mockRejectedValueOnce(
+      new Error('Update acknowledgement lost.'),
+    )
+    const corrected = createSavedResult({ latestAttempt: { rating: 'hard' } })
+    corrected.acknowledgement.operation = 'update'
+    corrected.acknowledgement.revision = 1
+    overrideReview.mockResolvedValueOnce(corrected)
+    await runOverlayAction(result.current.actions.updateReview)
+    const frozen = structuredClone(overrideReview.mock.calls[0]![0])
+    expect(result.current.overlay.commandStatus).toBe('error')
+    expect(result.current.overlay.nextStep.status).toBe('hidden')
+    act(() => result.current.actions.selectRating('easy'))
+    await runOverlayAction(result.current.actions.retryReview)
+    expect(overrideReview.mock.calls[1]![0]).toEqual(frozen)
+    expect(frozen.assessmentEvidence).toMatchObject({
+      source: 'manual',
+      policyVersion: null,
+      finalRating: 'hard',
+    })
+    expect(result.current.overlay.submittedSession).toMatchObject({
+      reviewAttemptId: 'attempt-1',
+      revision: 1,
+      rating: 'hard',
+      reviewedAt: frozen.reviewedAt,
+    })
+  })
+
+  it('uses original acknowledgement and frozen timing when pending retry returns a later current review', async () => {
+    saveReview.mockResolvedValueOnce({
+      ...createSavedResult(),
+      status: 'persistence-pending',
+    })
+    const { result, queryClient } = await renderReadySession()
+    await runOverlayAction(result.current.actions.submitReview)
+    const later = createSavedPracticeDetails({
+      latestAttempt: { id: 'later-event', rating: 'easy', elapsedSeconds: 777 },
+    })
+    loadOverlayData.mockResolvedValue(createOverlayData({ practice: later }))
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.appShell.all })
+    })
+    expect(result.current.overlay.submittedSession).toBeNull()
+    expect(result.current.overlay.selectedRating).toBe('good')
+    saveReview.mockResolvedValueOnce({ ...createSavedResult(), current: later })
+    await runOverlayAction(result.current.actions.retryReview)
+    expect(result.current.overlay.submittedSession).toMatchObject({
+      reviewAttemptId: 'attempt-1',
+      rating: 'good',
+      elapsedSeconds: null,
+      isCorrect: true,
+    })
+    act(() => result.current.actions.selectRating('hard'))
+    await runOverlayAction(result.current.actions.updateReview)
+    expect(overrideReview.mock.calls[0]![0].targetAttemptId).toBe('attempt-1')
+  })
+
+  it.each(['local', 'problem'] as const)(
+    'ends a stale %s generation retry after reset without applying saved feedback or discarding the draft',
+    async (scope) => {
+      saveReview.mockRejectedValueOnce(new Error('Transport failed.'))
+      const { result } = await renderReadySession()
+      act(() => result.current.actions.selectRating('hard'))
+      await runOverlayAction(result.current.actions.submitReview)
+      const accepted = structuredClone(latestSavedReviewRequest())
+      const reset = createPracticeDetails({
+        generation: {
+          localGenerationToken: scope === 'local' ? 'local-reset' : 'local-1',
+          problemGenerationToken: 'problem-reset',
+        },
+      })
+      saveReview.mockResolvedValueOnce({
+        status: 'conflict',
+        reason: 'stale-generation',
+        message: 'Practice was reset. Restart for a new review.',
+        current: reset,
+      })
+      await runOverlayAction(result.current.actions.retryReview)
+      expect(saveReview.mock.calls[1]![0]).toEqual(accepted)
+      expect(result.current.overlay.acceptedCommand).toBeNull()
+      expect(result.current.overlay.submittedSession).toBeNull()
+      expect(result.current.overlay.selectedRating).toBe('hard')
+      expect(result.current.timer.status).not.toBe('locked')
+      act(() => result.current.actions.restartLocalSession())
+      expect(result.current.overlay.reviewStatus).toBe('draft')
+    },
+  )
+
+  it('does not let an old request response or finally clobber a newer problem command', async () => {
+    const old = createDeferred<PracticeReviewCommandResult>()
+    const fresh = createDeferred<PracticeReviewCommandResult>()
+    saveReview
+      .mockReturnValueOnce(old.promise)
+      .mockReturnValueOnce(fresh.promise)
+    const { result } = await renderReadySession()
+    let oldSave!: Promise<void>
+    act(() => {
+      oldSave = result.current.actions.submitReview()
+    })
+    emitNextPage()
+    const nextLocation = {
+      ...problemLocation,
+      slug: 'add-two-numbers',
+      url: 'https://leetcode.com/problems/add-two-numbers/',
+    }
+    loadOverlayData.mockResolvedValue(
+      createOverlayData({
+        overlay: {
+          problem: { ...overlayProblem, problemSlug: 'add-two-numbers' },
+          practice: {
+            ...createPracticeDetails(),
+            problemSlug: 'add-two-numbers',
+          },
+        },
+      }),
+    )
+    act(() => {
+      leetcodeMockState.onEvent?.({
+        type: 'page-ready',
+        location: nextLocation,
+        snapshot: {
+          location: nextLocation,
+          title: 'Add Two Numbers',
+          frontendId: '2',
+          difficulty: 'Easy',
+          isPremium: false,
+          topics: [],
+          isReady: true,
+          capturedAt: 2,
+        },
+        metadata: {
+          ...problemMetadata,
+          location: nextLocation,
+          title: 'Add Two Numbers',
+        },
+        pageReadyAt: Date.now(),
+      })
+    })
+    await waitFor(() =>
+      expect(result.current.overlay.activeProblemSlug).toBe('add-two-numbers'),
+    )
+    let freshSave!: Promise<void>
+    act(() => {
+      freshSave = result.current.actions.submitReview()
+    })
+    const freshCommand = result.current.overlay.acceptedCommand
+    await act(async () => {
+      old.resolve(createSavedResult())
+      await oldSave
+    })
+    expect(result.current.overlay.acceptedCommand).toBe(freshCommand)
+    expect(result.current.overlay.submittedSession).toBeNull()
+    act(() => {
+      void result.current.actions.retryReview()
+      void result.current.actions.submitReview()
+    })
+    expect(saveReview).toHaveBeenCalledTimes(2)
+    const saved = createSavedResult()
+    saved.acknowledgement.problemSlug = 'add-two-numbers'
+    saved.current.problemSlug = 'add-two-numbers'
+    await act(async () => {
+      fresh.resolve(saved)
+      await freshSave
+    })
+    expect(result.current.overlay.activeProblemSlug).toBe('add-two-numbers')
+    expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
+  })
+
+  it('keeps explicit Restart as a new draft after unrelated refetch of the previous review', async () => {
+    const { result, queryClient } = await renderReadySession()
+    await runOverlayAction(result.current.actions.submitReview)
+    act(() => result.current.actions.restartLocalSession())
+    act(() => result.current.actions.selectRating('hard'))
+    loadOverlayData.mockResolvedValue(
+      createOverlayData({ practice: createSavedPracticeDetails() }),
+    )
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.appShell.all })
+    })
+    expect(result.current.overlay.submittedSession).toBeNull()
+    expect(result.current.overlay.selectedRating).toBe('hard')
+    expect(result.current.overlay.reviewStatus).toBe('draft')
+    await runOverlayAction(result.current.actions.submitReview)
+    expect(saveReview).toHaveBeenCalledTimes(2)
+    expect(overrideReview).not.toHaveBeenCalled()
+    expect(saveReview.mock.calls[1]![0].commandId).not.toBe(
+      saveReview.mock.calls[0]![0].commandId,
+    )
+  })
+
+  it('allows a new review after durable acknowledgement while ignoring the restarted session old next-step request', async () => {
+    const pendingContext = createDeferred<OverlayAppShellData>()
+    const { result } = await renderReadySession()
+    loadOverlayData.mockReturnValueOnce(pendingContext.promise)
+    let first!: Promise<void>
+    act(() => {
+      first = result.current.actions.submitReview()
+    })
+    await waitFor(() =>
+      expect(result.current.overlay.reviewStatus).toBe('submitted-clean'),
+    )
+    act(() => result.current.actions.restartLocalSession())
+    expect(result.current.overlay.nextStep.status).toBe('hidden')
+    let second!: Promise<void>
+    act(() => {
+      second = result.current.actions.submitReview()
+    })
+    expect(saveReview).toHaveBeenCalledTimes(2)
+    await act(async () => {
+      pendingContext.resolve(createOverlayData())
+      await first
+      await second
+    })
+    expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
+  })
+
   it('excludes a ready AI report from both save and update payloads', async () => {
     const { result } = await renderReadySession({
       aiAssessmentEnabled: true,
@@ -912,7 +1277,7 @@ describe('useLeetCodeOverlaySession', () => {
 
 type RenderedOverlaySession = ReturnType<typeof renderOverlaySession>
 type DeferredReviewResult = ReturnType<
-  typeof createDeferred<SerializedPracticeDetails>
+  typeof createDeferred<PracticeReviewCommandResult>
 >
 
 async function renderReadySession(
@@ -1097,7 +1462,7 @@ function createOverlayData(options?: {
         autoDetectSolved: options?.autoDetectSolved ?? false,
       },
       problem: overlayProblem,
-      practice: options?.practice ?? null,
+      practice: options?.practice ?? createPracticeDetails(),
       timing: {
         ...defaultTiming,
         ...options?.timing,
@@ -1150,6 +1515,11 @@ function createPracticeDetails(
     recentAttempts: [],
     latestAttempt: null,
     canOverrideLatestReview: false,
+    generation: {
+      localGenerationToken: 'local-1',
+      problemGenerationToken: null,
+    },
+    latestReview: null,
     ...overrides,
   }
 }
@@ -1185,6 +1555,16 @@ function createSavedPracticeDetails(options?: {
     recentAttempts: [latestAttempt],
     latestAttempt,
     canOverrideLatestReview: true,
+    generation: {
+      localGenerationToken: 'local-1',
+      problemGenerationToken: 'problem-1',
+    },
+    latestReview: {
+      reviewAttemptId: latestAttempt.id,
+      applicationSequence: 1,
+      revision: 0,
+      reviewedAt: latestAttempt.reviewedAt,
+    },
   })
 }
 
@@ -1238,3 +1618,45 @@ const emptyPracticeLog = {
   languages: null,
   notes: null,
 } satisfies SerializedPracticeDetails['currentLog']
+
+function createSavedResult(
+  options?: Parameters<typeof createSavedPracticeDetails>[0],
+): Extract<
+  PracticeReviewCommandResult,
+  { status: 'saved' | 'persistence-pending' }
+> {
+  const current = createSavedPracticeDetails(options)
+  const attempt = current.latestAttempt!
+  return {
+    status: 'saved',
+    current,
+    acknowledgement: {
+      schemaVersion: 1,
+      operation: 'save',
+      problemSlug: current.problemSlug,
+      cardId: current.cardId,
+      reviewAttemptId: attempt.id,
+      applicationSequence: 1,
+      revision: 0,
+      rating: attempt.rating,
+      reviewedAt: attempt.reviewedAt,
+      dueAt: current.dueAt!,
+      status: current.status,
+      schedulingEvidenceKind: 'unknown',
+      schedulerProfileId: null,
+      fsrsReviewLog: null,
+      card: {
+        dueAt: current.dueAt!,
+        stability: 1,
+        difficulty: 5,
+        elapsedDays: 0,
+        scheduledDays: 1,
+        learningSteps: 0,
+        reps: 1,
+        lapses: 0,
+        state: 'learning',
+        lastReviewAt: attempt.reviewedAt,
+      },
+    },
+  }
+}

@@ -52,6 +52,39 @@ describe('ExpandedOverlay', () => {
     expect(props.commands.onSettings).toHaveBeenCalledOnce()
   })
 
+  it.each(['error', 'persistence-pending'] as const)(
+    'provides accessible %s retry while disabling rating and restart controls',
+    async (commandStatus) => {
+      const props = createProps({
+        view: {
+          overlay: {
+            ...createSubmittedOverlay(),
+            reviewStatus: 'updating',
+            commandStatus,
+            feedback: {
+              tone: 'neutral',
+              message:
+                'Review persistence is pending. Retry to confirm it is saved.',
+            },
+          },
+        },
+      })
+      render(<ExpandedOverlay {...props} />)
+      const user = userEvent.setup()
+      expect(screen.getByRole('button', { name: 'Restart' })).toBeDisabled()
+      for (const name of [
+        'EasyFast',
+        'GoodStable',
+        'HardLagging',
+        'AgainFailed',
+      ])
+        expect(screen.getByRole('button', { name })).toBeDisabled()
+      await user.click(screen.getByRole('button', { name: 'Retry review' }))
+      expect(props.commands.onRetryReview).toHaveBeenCalledOnce()
+      expect(screen.queryByText('Review saved.')).not.toBeInTheDocument()
+    },
+  )
+
   it('keeps review actions in Solve and shows focused AI and Notes panels', () => {
     const props = createProps()
     const { rerender } = render(<ExpandedOverlay {...props} />)
@@ -402,6 +435,7 @@ function createProps(
       onStartTimer: vi.fn(),
       onSubmit: vi.fn(),
       onUpdate: vi.fn(),
+      onRetryReview: vi.fn(),
       ...overrides.commands,
     },
     themeMode: 'system',
@@ -435,6 +469,13 @@ function createSubmittedOverlay(
     activeProblemSlug: 'two-sum',
     reviewStatus: 'submitted-clean',
     submittedSession: {
+      reviewAttemptId: 'attempt-1',
+      revision: 0,
+      reviewedAt: '2026-01-01T10:00:00.000Z',
+      generation: {
+        localGenerationToken: 'local-1',
+        problemGenerationToken: 'problem-1',
+      },
       elapsedSeconds: 95,
       isCorrect: true,
       lockReason: null,
@@ -450,6 +491,13 @@ function createFailedSubmittedOverlay(): ExpandedOverlayProps['view']['overlay']
     ratingLockReason: 'failed',
     selectedRating: 'again',
     submittedSession: {
+      reviewAttemptId: 'attempt-1',
+      revision: 0,
+      reviewedAt: '2026-01-01T10:00:00.000Z',
+      generation: {
+        localGenerationToken: 'local-1',
+        problemGenerationToken: 'problem-1',
+      },
       elapsedSeconds: null,
       isCorrect: false,
       lockReason: 'failed',

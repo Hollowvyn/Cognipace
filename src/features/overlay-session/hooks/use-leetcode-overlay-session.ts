@@ -10,7 +10,6 @@ import type {
 import {
   initialOverlaySessionState,
   overlaySessionReducer,
-  type OverlaySubmittedSession,
   type OverlaySessionState,
 } from '../domain'
 import {
@@ -98,8 +97,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
         return
       }
 
-      const submittedSession = latestOverlayRef.current.submittedSession
-
       dispatch({
         type: 'problem-context-refreshed',
         problemSlug: problem.problemSlug,
@@ -107,12 +104,7 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
           nextContext.practice?.latestAttempt?.rating ??
           nextContext.practice?.practice?.lastRating ??
           'good',
-        submittedSession: submittedSession
-          ? createSubmittedSessionFromContext(
-              nextContext,
-              submittedSession.lockReason,
-            )
-          : null,
+        submittedSession: null,
       })
     },
     [],
@@ -210,24 +202,6 @@ function getTargetSeconds(context: LeetCodeOverlayContext | null) {
   }
 
   return getLeetCodeSolveTimeTargetSeconds(problem.difficulty, context.timing)
-}
-
-function createSubmittedSessionFromContext(
-  context: LeetCodeOverlayContext,
-  lockReason: OverlaySubmittedSession['lockReason'],
-): OverlaySubmittedSession | null {
-  const latestAttempt = context.practice?.latestAttempt
-
-  if (!latestAttempt) {
-    return null
-  }
-
-  return {
-    rating: latestAttempt.rating,
-    elapsedSeconds: latestAttempt.elapsedSeconds,
-    isCorrect: latestAttempt.isCorrect ?? latestAttempt.rating !== 'again',
-    lockReason,
-  }
 }
 
 export type { OverlaySyncStatus } from './use-leetcode-page-sync'

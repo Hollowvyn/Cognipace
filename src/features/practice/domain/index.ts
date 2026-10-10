@@ -33,3 +33,4 @@ export {
 } from './practice-progress'
 
 export * from './practice-storage'
+export * from './practice-command'

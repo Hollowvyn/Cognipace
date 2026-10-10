@@ -148,13 +148,39 @@ command receipts in four additive side tables. Existing history receives
 inferred sequence order and unknown scheduling provenance; preparation never
 infers a past profile, replays reviews or changes an existing card.
 
-Current Save appends unknown evidence; Update retains its original event time
-and sequence and increments its revision. Update still uses the existing full
-replay and rejects histories containing captured or legacy-derived scheduling
-evidence before writing. Recorded imports are preserved until the guarded
-correction path is integrated. Opaque stored card IDs are reused across Practice,
-Library and Queue; new cards avoid occupied IDs and upserts enforce ownership.
-Live captured evidence and persisted command deduplication remain future work.
+Save captures the pre-review card, original ISO event time, complete canonical
+profile and optional existing assessment decision. Application sequence permits
+equal timestamps and rejects backdating. Update guards the exact latest attempt
+and expected revision in the transaction, schedules only that event from its
+captured context, and preserves time, sequence, logs and aggregate review count.
+Verified legacy correction records legacy-derived evidence with saved retention
+at first acceptance; ambiguous legacy context rejects without writes. Opaque
+stored card IDs are reused across Practice, Library and Queue.
+
+The Practice command workflow owns one transaction containing generation and
+receipt lookup, card/attempt/evidence/aggregate writes, track effects and a
+bounded original acknowledgement. Receipt lookup precedes mutable chronology
+and revision guards; payload mismatch conflicts. Receipts carry no history copy.
+Imported historical receipt keys remain inert under fresh local generations.
+Runtime uses the existing gated mutation queue, strict Zod contracts and sender
+authorization. The existing conservative sync dirty marker protects local
+changes before snapshot publication; Saved/invalidation and automatic push
+scheduling still follow a successful flush. Publication failure returns
+persistence-pending; exact retry bypasses mutation and tries publication again.
+The existing dirty-recovery admission guard flushes before recovering metadata
+or admitting sync, preventing unconfirmed reviews from being pulled over.
+After worker restart a published receipt deduplicates lost acknowledgement. If
+unflushed state was lost, the accepted bootstrap command can apply once against
+the intact durable baseline.
+
+The platform snapshot owner checks SQLite autocommit immediately before
+serialization, including queued writes. Export can include uncommitted pages;
+automatic publication defers with the existing debounce until the transaction
+ends. Explicit flush rejects an open transaction instead of claiming durable
+success. No second mutation queue, generic outbox or worker-local identity is
+introduced. Overlay accepted state freezes command ID/time/effective rating and
+original target/revision, retains pending/error retry, and preserves a draft on
+stale conflict. Day policy, 180-day cap, previews and optimizer remain E–H work.
 
 The persisted `ts-fsrs` `card.due` value is stored as `FsrsCardSnapshot.dueAt`
 and is the sole authority for a reviewed card's schedule. Read models derive

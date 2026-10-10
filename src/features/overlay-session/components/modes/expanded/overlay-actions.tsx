@@ -10,6 +10,8 @@ type OverlayActionsProps = {
   hasSubmittedChanges: boolean
   isSubmitted: boolean
   reviewStatus: OverlayReviewStatus
+  commandStatus: 'in-flight' | 'persistence-pending' | 'error' | null
+  onRetry: () => void
   onFail: () => void
   onRestart: () => void
   onSubmit: () => void
@@ -25,10 +27,14 @@ export function OverlayActions({
   onRestart,
   onSubmit,
   onUpdate,
+  commandStatus,
+  onRetry,
 }: OverlayActionsProps) {
   const isSaving = reviewStatus === 'saving'
   const isUpdating = reviewStatus === 'updating'
   const isMutating = isSaving || isUpdating
+  const canRetry =
+    commandStatus === 'error' || commandStatus === 'persistence-pending'
 
   return (
     <section className="grid gap-2" aria-label="Review actions">
@@ -74,6 +80,12 @@ export function OverlayActions({
           </Button>
         </>
       )}
+
+      {canRetry ? (
+        <Button onClick={onRetry} type="button" variant="primary">
+          Retry review
+        </Button>
+      ) : null}
 
       {feedback ? (
         <InlineStatus tone={feedback.tone}>{feedback.message}</InlineStatus>
