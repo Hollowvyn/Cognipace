@@ -81,6 +81,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`plans/2026-10-05-analytics-compact-card-foundation.md`](./plans/2026-10-05-analytics-compact-card-foundation.md): fixed card geometry, measured plots, bounded exact paging, and persistent fitting goal surfaces.
 - [`plans/2026-10-05-analytics-compact-card-adapters.md`](./plans/2026-10-05-analytics-compact-card-adapters.md): all ten production adapters, retaining advanced outcomes/time/Mix, paired Recall, exact evidence, complete Retention interactions and independent workload scopes.
 - [`plans/2026-10-05-analytics-page-assembly-proof.md`](./plans/2026-10-05-analytics-page-assembly-proof.md): completed four period headlines, ten-card grid, quiet query/action states, desktop production proof, authority-doc alignment and pending human extension smoke checklist.
+- [`plans/2026-10-06-fsrs-phase-d-reliable-reviews.md`](./plans/2026-10-06-fsrs-phase-d-reliable-reviews.md): approved-scope implementation plan for frozen review commands, atomic receipts/track effects, single-event guarded Update, durable acknowledgement and overlay retry after merged Phase C.
 
 - [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
 
@@ -195,3 +196,5 @@ Use these files to understand why work was shaped a certain way. Before changing
 ## Audits
 
 - [`audits/2026-06-07-closed-issues-1-6-11-17.md`](./audits/2026-06-07-closed-issues-1-6-11-17.md): closed-issue rescue audit for issues 1, 6, 11, and 17.
+
+- [`handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md`](./handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md): Phase D captured context, frozen commands, atomic receipts/track effects, guarded corrections and durable snapshot proof; final independent SPEC/QUALITY and 3,290 tests passed in draft PR #205. Human installed-extension proof remains pending.

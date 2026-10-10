@@ -45,8 +45,8 @@ const positiveInteger = z.number().int().positive().refine(Number.isSafeInteger)
 const nonNegativeNumber = z.number().finite().nonnegative()
 
 export interface PracticeGenerationContext {
-  localGenerationToken: string
-  problemGenerationToken: string | null
+  readonly localGenerationToken: string
+  readonly problemGenerationToken: string | null
 }
 
 const generationPairSchema = z.tuple([opaqueId, opaqueId.nullable()])
@@ -195,6 +195,10 @@ export const practiceAssessmentEvidenceSchema = z.strictObject({
   lockReason: z.enum(assessmentLockReasons).nullable(),
   finalRating: z.enum(reviewRatings),
 })
+
+export type PracticeAssessmentEvidence = z.infer<
+  typeof practiceAssessmentEvidenceSchema
+>
 
 export const practiceStorageDataSchema = z.strictObject({
   schedulerProfiles: z.array(practiceSchedulerProfileRecordSchema),

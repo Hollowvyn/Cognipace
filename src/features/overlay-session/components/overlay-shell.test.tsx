@@ -286,6 +286,7 @@ function createSession(
       startTimer: vi.fn(),
       submitReview: vi.fn(),
       updateReview: vi.fn(),
+      retryReview: vi.fn(),
       toggleHints: vi.fn(),
       revealNextHint: vi.fn(),
       retryHints: vi.fn(),

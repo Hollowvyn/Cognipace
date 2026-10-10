@@ -46,6 +46,8 @@ export function createSerializedPracticeDetails(
       notes: null,
     },
     canOverrideLatestReview: false,
+    generation: null,
+    latestReview: null,
     ...overrides,
   }
 }

@@ -7,6 +7,10 @@ import {
 import type { ProblemSlug } from '@/features/problems/domain'
 
 import { derivePracticeScheduleTiming } from './practice-schedule'
+import type {
+  PracticeGenerationContext,
+  PracticeAssessmentEvidence,
+} from './practice-storage'
 
 export const practiceStatuses = [
   'new',
@@ -58,16 +62,21 @@ export interface SaveReviewResultInput {
   cardKind?: FsrsCardKind | undefined
   targetRetention?: number | undefined
   reviewAttemptId?: string | undefined
+  assessmentEvidence?: PracticeAssessmentEvidence | undefined
 }
 
 export interface OverrideLastReviewResultInput {
   problemSlug: ProblemSlug
   rating: ReviewRating
+  targetAttemptId: string
+  expectedRevision: number
+  reviewedAt?: Date | undefined
   elapsedSeconds?: number | null | undefined
   isCorrect?: boolean | null | undefined
   log?: PracticeLogFields | undefined
   cardKind?: FsrsCardKind | undefined
   targetRetention?: number | undefined
+  assessmentEvidence?: PracticeAssessmentEvidence | undefined
 }
 
 export interface SetPracticeSuspendedInput {
@@ -155,6 +164,13 @@ export interface PracticeDetails extends NormalizedPracticeState {
   card: FsrsCardSnapshot | null
   currentLog: Required<PracticeLogFields>
   canOverrideLatestReview: boolean
+  readonly generation: PracticeGenerationContext | null
+  readonly latestReview: {
+    readonly reviewAttemptId: string
+    readonly applicationSequence: number
+    readonly revision: number
+    readonly reviewedAt: Date
+  } | null
 }
 
 /**

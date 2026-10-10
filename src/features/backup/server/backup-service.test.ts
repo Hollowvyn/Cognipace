@@ -79,6 +79,8 @@ describe('backup service', () => {
     })
     const corrected = await overrideLastReviewResult(target.db, {
       problemSlug: 'custom-problem',
+      targetAttemptId: saved.reviewAttemptId,
+      expectedRevision: 0,
       rating: 'easy',
     })
     expect(saved.cardId).toBe('card-custom')
@@ -89,27 +91,50 @@ describe('backup service', () => {
     expect(() => validateFullBackup(exported)).not.toThrow()
   })
 
-  it('protects retained known history after restore even after a new unknown Save', async () => {
+  it('corrects a new captured Save after restore while preserving retained known history', async () => {
     const { db } = await createTestDb({ now })
     await insertCustomState(db)
     const backup = withSchedulingHistory(
       await exportFullBackup(db, { exportedAt: now }),
     )
     await restoreFullBackup(db, backup)
-    await saveReviewResult(db, {
+    const saved = await saveReviewResult(db, {
       problemSlug: 'custom-problem',
       rating: 'good',
-      reviewAttemptId: 'new-unknown-after-known',
+      reviewAttemptId: 'new-captured-after-known',
       reviewedAt: new Date(timestamp + 172_800_000),
     })
     const before = await createBackupRepository(db).readBackupData()
-    await expect(
-      overrideLastReviewResult(db, {
-        problemSlug: 'custom-problem',
-        rating: 'easy',
-      }),
-    ).rejects.toThrow(/protected scheduling evidence/)
-    expect(await createBackupRepository(db).readBackupData()).toEqual(before)
+    await overrideLastReviewResult(db, {
+      problemSlug: 'custom-problem',
+      targetAttemptId: saved.reviewAttemptId,
+      expectedRevision: 0,
+      rating: 'easy',
+    })
+    const after = await createBackupRepository(db).readBackupData()
+    expect(
+      after.practice.reviewAttempts.filter(
+        (row) => row.id !== saved.reviewAttemptId,
+      ),
+    ).toEqual(
+      before.practice.reviewAttempts.filter(
+        (row) => row.id !== saved.reviewAttemptId,
+      ),
+    )
+    expect(
+      after.practice.reviewEvidence.filter(
+        (row) => row.reviewAttemptId !== saved.reviewAttemptId,
+      ),
+    ).toEqual(
+      before.practice.reviewEvidence.filter(
+        (row) => row.reviewAttemptId !== saved.reviewAttemptId,
+      ),
+    )
+    expect(after.practice.schedulerProfiles).toEqual(
+      before.practice.schedulerProfiles,
+    )
+    const exported = await exportFullBackup(db, { exportedAt: now })
+    expect(() => validateFullBackup(exported)).not.toThrow()
   })
 
   it('round trips untouched suspension and accepts New cards with zero memory and no last review', async () => {

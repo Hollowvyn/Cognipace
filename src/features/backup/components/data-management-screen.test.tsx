@@ -591,10 +591,9 @@ const resetPersistenceMessage =
   'Your data was cleared, but it still needs saving. Keep this extension open and choose Retry saving.'
 const metadataMessage = 'Your data is saved. Sync status still needs saving.'
 
-function pendingState(
-  kind: BackupReplacementKind,
-  status: Exclude<BackupReplacementState['status'], 'idle'>,
-) {
+function pendingState<
+  TStatus extends Exclude<BackupReplacementState['status'], 'idle'>,
+>(kind: BackupReplacementKind, status: TStatus) {
   return { status, kind, summary: kind === 'reset' ? null : validSummary }
 }
 

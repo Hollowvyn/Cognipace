@@ -11,7 +11,10 @@ import {
   type ReviewLog,
 } from 'ts-fsrs'
 
-import type { FsrsCardSnapshot } from '../domain/card-snapshot'
+import {
+  toSerializableFsrsCardSnapshot,
+  type FsrsCardSnapshot,
+} from '../domain/card-snapshot'
 import type { FsrsReviewLogSnapshot } from '../domain/review-log-snapshot'
 import type { FsrsSchedulerProfile } from '../domain/scheduler-profile'
 import type { ReviewRating } from '../domain/review-rating'
@@ -352,7 +355,17 @@ it('corrects verified latest memory with an explicitly unknown original profile'
     evidence: 'legacy-derived',
     originalProfile: null,
   })
-  expect(corrected).not.toHaveProperty('context')
+  expect(corrected.context).toEqual({
+    preCard: toSerializableFsrsCardSnapshot(
+      rollbackCardReview(card, history.at(-1)!.log!),
+    ),
+    reviewedAt: thirdAt.toISOString(),
+    profile: corrected.profile,
+  })
+  const repeated = correctReviewFromEvidence(corrected.context, 'hard')
+  const verified = correctLegacyReview(card, history, 'hard', 0.9)
+  expect(repeated.card).toEqual(verified.card)
+  expect(repeated.log).toEqual(verified.log)
   expect(corrected.profile.parameters.targetRetention).toBe(0.9)
   expect(JSON.stringify({ card, history })).toBe(before)
 })
