@@ -10,7 +10,7 @@
 
 ---
 
-Status: Tasks 1–2 are implemented and independently specification/quality reviewed. Continue Task 3 after the reviewed history/runtime, weighted-presentation, and compact-foundation phases. Root owns commits; run each task through specification review before quality review. Do not ask the user to reapprove the already accepted card design.
+Status: Tasks 1–3 are implemented and independently specification/quality reviewed. Continue Task 4 after the reviewed history/runtime, weighted-presentation, and compact-foundation phases. Root owns commits; run each task through specification review before quality review. Do not ask the user to reapprove the already accepted card design.
 
 ## Shared Adapter Contract
 
@@ -179,19 +179,67 @@ Skipped full `npm run lint`, `npm run format`, `npm run check`, `npm run build`:
 - Test: existing retention chart/model suites.
 - Modify: `src/styles/analytics.css` only scoped retention presentation.
 
-- [ ] **Step 1: Add failing full-cohort compact interaction tests.**
+- [x] **Step 1: Add failing full-cohort compact interaction tests.**
 
 Reuse the existing 31-eligible-row fixture and exact overlap/gesture tests. Assert every filtered row remains plotted without sample cap/jitter, status totals/domain stay full-cohort, keyboard End reaches final row after zoom through `revealRow`, all overlap candidates reachable through bounded pages, pin/close/return-to-map focus, filter removal of pin, double-click previous-pin restoration, Escape gesture cancellation before dismissal and trailing drag-click suppression. All modes share the same outer geometry.
 
-- [ ] **Step 2: Run RED and extract controlled interaction state.**
+- [x] **Step 2: Run RED and extract controlled interaction state.**
 
 Run new retention and current-state suites. Expected: compact adapter assertions fail. Keep existing viewport/model math and gestures. Lift only viewport, active/hover slug, selection, candidate page and problem-section control so the compact card can reclaim the hero/plot space when selection is pinned. Scatter still receives the complete filtered row array.
 
 Overview keeps **All / Below target**, full status counts, references, zoom/reset, reserved hover preview and native inspector. Details **Summary / Problems / Method** exposes all 11 exact original problem fields in fitting groups. Selection paginates three wide/two narrow candidates and splits pinned fields into **Recall** (status, estimate, target, gap), **Schedule** (durability, last review, due), **State** (FSRS difficulty, lapses), with rank and canonical problem link. Return to map keeps viewport/selection; Close clears selection and restores inspector focus. Remove internal candidate scrolling and variable below-plot detail appendices.
 
-- [ ] **Step 3: Run GREEN, review, and commit.**
+- [x] **Step 3: Run GREEN, review, and commit.**
 
 Run full retention/current-state focused suites and typecheck. Fresh specification then quality review. Root commits `feat: fit complete retention inspection into analytics cards`.
+
+### Task 3 Execution Record
+
+October 10: Retention adapter and minimal controller/canvas extraction completed. Complete eligible/filter cohorts, full-cohort domains/counts, all 11 fields plus Region/context, full canonical candidate/problem titles and local gestures remain. Selection, candidate paging and exact Details use one fixed shell. Pointer presentation is delayed up to 1,000ms while logical selection updates immediately, preserving real native fast/slower double-click targets; keyboard/touch selections remain immediate. The fitting hover preview uses Rank/status/estimate/total durability and retains full native title announcement plus visibly linked selection/Problems titles.
+
+Root production-component CUA proof: 320px Overview body240/footer64, selected/Details body314, all width254 without overflow; all35 nearby-candidate pages and all150 Problems pages traversed, including long titles. All eleven narrow field groups, three Method pages and all selected groups reachable; Close restores inspector focus. Desktop1360 card464px in both modes with body234/306/footer44. Native double-click reset140zoomed marks to150full and retained previous candidate pin. Below-target34rows preserves150cohort statuses/domain. Light controlled coarse CSS fixture44px footer controls and long selection fit; emptydark320 fits honest zeroeligible state. This fixture is not native device emulation. Wheel attempt did not yield an observable change, so native wheel is not claimed passed; handler regressions passed. Actual multitouch/Shift-pan and installed-extension smoke remain pending.
+
+## Tests and exact final successful commands
+
+All commands used pinned Node24.20.0/npm11.19.0 via PATH and RTK prefix.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" DEBUG_PRINT_LIMIT=1000 npm run test -- src/features/analytics/components/cards/retention-card.test.tsx src/features/analytics/components/current-state-views.test.tsx src/features/analytics/components/retention-map-model.test.ts src/features/analytics/components/analytics-chart-panel.test.tsx src/features/analytics/components/analytics-exact-table.test.tsx src/features/analytics/components/analytics-card-controls.test.tsx src/features/analytics/domain/current-state-presentation.test.ts
+```
+
+PASS: 7 files / 46 tests, final run17:20:27. Compact suite has16 tests:31+150 complete cohorts; full-filter coordinates/counts; zoom→End; all17 candidate traversal/canonical links; all field header union; narrow full long-title fields; semantic hidden reset/equivalent rerender; hidden geometry reset; real mounted650ms click series with no-prior/prior pin; remounted nonpassive wheel; Escape cancellation; blur/resize/pointercancel/lostcapture cancellation; thin trailing click; remounted touch pinch/remaining-touch pan; delayed callback invalidations; known zero versus no eligible; refreshed empty focus.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run typecheck
+```
+
+PASS: WXT prepare and TypeScript, final run17:20:27, exit0.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx eslint src/features/analytics/components/cards/retention-card.tsx src/features/analytics/components/cards/retention-card.test.tsx src/features/analytics/components/retention-map-chart.tsx src/features/analytics/components/current-state-views.tsx
+```
+
+PASS: final run after focus-request counter fix, exit0, no output.
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --write src/features/analytics/components/cards/retention-card.tsx src/features/analytics/components/cards/retention-card.test.tsx src/features/analytics/components/retention-map-chart.tsx src/features/analytics/components/current-state-views.tsx src/styles/analytics.css
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npx prettier --check src/features/analytics/components/cards/retention-card.tsx src/features/analytics/components/cards/retention-card.test.tsx src/features/analytics/components/retention-map-chart.tsx src/features/analytics/components/current-state-views.tsx src/styles/analytics.css
+rtk git diff --check
+rtk git status --short
+```
+
+PASS: final formatting/diff check17:20:27; only five intended files changed/new. Earlier focused6-file GREEN runs progressed30→39→40 passing tests; two-file retention/current-state22 passed after delayed-cancel fix; card-only10 passed after hidden width repair.
+
+
+Independent SPEC PASS:4 suites32tests; QUALITY PASS:6 suites51tests and whitespace check. No actionable findings. Exact independent commands:
+
+```sh
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" npm run test -- src/features/analytics/components/cards/retention-card.test.tsx src/features/analytics/components/current-state-views.test.tsx src/features/analytics/components/retention-map-model.test.ts src/features/analytics/domain/current-state-presentation.test.ts --maxWorkers=1 > /private/tmp/retention-spec-review-tests.log 2>&1
+rtk proxy env PATH="/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:$PATH" DEBUG_PRINT_LIMIT=1000 npm run test -- src/features/analytics/components/cards/retention-card.test.tsx src/features/analytics/components/current-state-views.test.tsx src/features/analytics/components/retention-map-model.test.ts src/features/analytics/components/analytics-exact-table.test.tsx src/features/analytics/components/analytics-card-controls.test.tsx src/testing/architecture-boundaries.test.ts --maxWorkers=1
+rtk git diff --check
+```
+
+Skipped full `npm run lint`, `npm run format`, `npm run check`, `npm run build`: final assembled-source gates remain root-owned. Standalone `npm run db:check` deferred to full check; `npm run db:generate` inapplicable without schema changes; `npm run zip` outside requested implementation. Human installed-extension happy/edge smoke with visual proof remains required before PR review/merge; actual unsupported device gesture checks are pending, not N/A.
 
 ## Task 4: Topics, Signals, And Workload
 
