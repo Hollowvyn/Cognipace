@@ -14,6 +14,17 @@ import {
 import { getAppShellRuntimeSurface } from './register-handlers'
 
 describe('runtime-policy', () => {
+  it('permits only the real content-script sender to request practice previews', () => {
+    expect(
+      canCallExtensionMethod('practice.previewReview', 'content-script'),
+    ).toBe(true)
+    expect(canCallExtensionMethod('practice.previewReview', 'popup')).toBe(
+      false,
+    )
+    expect(canCallExtensionMethod('practice.previewReview', 'dashboard')).toBe(
+      false,
+    )
+  })
   it('keeps protocol methods covered by runtime sender policy', () => {
     expect([...extensionMethodNames].sort()).toEqual(
       [...protocolMethodNames].sort(),

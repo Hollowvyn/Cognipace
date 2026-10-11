@@ -42,6 +42,25 @@ export function derivePracticeScheduleTiming(input: {
   }
 }
 
+/** Calendar key shared by preview day counts and study-day eligibility. */
+export function toPracticeStudyDateKey(date: Date, timeZone?: string): string {
+  const formatter = timeZone === undefined ? null : getDateFormatter(timeZone)
+  return calendarOrdinalToDateKey(localCalendarOrdinal(date, formatter))
+}
+
+/** Counts calendar dates, including midnight and DST, for preview copy. */
+export function countPracticeStudyDays(
+  reviewedAt: Date,
+  eligibleOn: string,
+  timeZone?: string,
+): number {
+  return (
+    (Date.parse(eligibleOn) -
+      Date.parse(toPracticeStudyDateKey(reviewedAt, timeZone))) /
+    dayMs
+  )
+}
+
 const dateFormatters = new Map<string, Intl.DateTimeFormat>()
 
 function getDateFormatter(timeZone: string): Intl.DateTimeFormat {

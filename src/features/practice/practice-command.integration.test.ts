@@ -6,6 +6,7 @@ import { preparePracticeStorage } from './server/practice-storage-service'
 import {
   executePracticeReviewCommand,
   getPracticeDetails,
+  previewPracticeReview,
   resetPracticeSchedule,
 } from './server/practice-service'
 import { createTracksRepository } from '@/features/tracks/data/tracks-repository'
@@ -48,6 +49,177 @@ async function fixture() {
 }
 
 describe('accepted Practice commands', () => {
+  it.each([0.9, 0.75])(
+    'previews a new card at %s retention without writes and matches all four fixed-time saves',
+    async (retention) => {
+      const { handle, command } = await fixture()
+      await createSettingsRepository(handle.db).updateSettings({
+        review: { targetRetention: retention },
+      })
+      const before = serializeDb(handle)
+      const preview = await previewPracticeReview(handle.db, {
+        mode: 'submit',
+        problemSlug: command.problemSlug,
+        generation: command.generation,
+        previewedAt: command.reviewedAt,
+      })
+      expect(serializeDb(handle)).toEqual(before)
+      expect(preview.status).toBe('ready')
+      if (preview.status !== 'ready') throw new Error('preview unavailable')
+      expect(preview.evidence).toBe('active')
+      for (const rating of ['again', 'hard', 'good', 'easy'] as const) {
+        const other = await fixture()
+        await createSettingsRepository(other.handle.db).updateSettings({
+          review: { targetRetention: retention },
+        })
+        const saved = await executePracticeReviewCommand(other.handle.db, {
+          ...other.command,
+          rating,
+        })
+        if (saved.status !== 'saved') throw new Error('save unavailable')
+        expect(preview.ratings[rating].dueAt).toBe(saved.acknowledgement.dueAt)
+      }
+    },
+    20_000,
+  )
+
+  it('previews exact original-event corrections without changing state', async () => {
+    const { handle, command } = await fixture()
+    const saved = await executePracticeReviewCommand(handle.db, command)
+    if (saved.status !== 'saved') throw new Error('save unavailable')
+    const request = {
+      mode: 'update' as const,
+      problemSlug: command.problemSlug,
+      generation: saved.current.generation!,
+      targetAttemptId: saved.acknowledgement.reviewAttemptId,
+      expectedRevision: 0,
+      reviewedAt: command.reviewedAt,
+    }
+    const before = serializeDb(handle)
+    const preview = await previewPracticeReview(handle.db, request)
+    expect(serializeDb(handle)).toEqual(before)
+    expect(preview.status).toBe('ready')
+    if (preview.status !== 'ready') throw new Error('preview unavailable')
+    expect(preview.ratings.easy.eligibleOn < '2026-10-10').toBe(true)
+    expect(
+      await previewPracticeReview(handle.db, {
+        ...request,
+        generation: {
+          ...request.generation,
+          localGenerationToken: 'old-generation',
+        },
+      }),
+    ).toMatchObject({ status: 'conflict', reason: 'stale-generation' })
+    const { reviewMode: _mode, ...updateFields } = command
+    void _mode
+    const updated = await executePracticeReviewCommand(handle.db, {
+      ...updateFields,
+      operation: 'update',
+      commandId: 'update-preview',
+      generation: request.generation,
+      targetAttemptId: request.targetAttemptId,
+      expectedRevision: 0,
+      rating: 'easy',
+    })
+    if (updated.status !== 'saved') throw new Error(JSON.stringify(updated))
+    expect(preview.ratings.easy.dueAt).toBe(updated.acknowledgement.dueAt)
+    expect(await previewPracticeReview(handle.db, request)).toMatchObject({
+      status: 'conflict',
+      reason: 'stale-review',
+    })
+  })
+
+  it.each([0.9, 0.75])(
+    'matches every captured Update rating at original %s retention after Settings change',
+    async (retention) => {
+      for (const rating of ['again', 'hard', 'good', 'easy'] as const) {
+        const { handle, command } = await fixture()
+        await createSettingsRepository(handle.db).updateSettings({
+          review: { targetRetention: retention },
+        })
+        const saved = await executePracticeReviewCommand(handle.db, command)
+        if (saved.status !== 'saved') throw new Error('save unavailable')
+        await createSettingsRepository(handle.db).updateSettings({
+          review: { targetRetention: retention === 0.9 ? 0.75 : 0.9 },
+        })
+        const request = {
+          mode: 'update' as const,
+          problemSlug: command.problemSlug,
+          generation: saved.current.generation!,
+          targetAttemptId: saved.acknowledgement.reviewAttemptId,
+          expectedRevision: 0,
+          reviewedAt: command.reviewedAt,
+        }
+        const before = serializeDb(handle)
+        const preview = await previewPracticeReview(handle.db, request)
+        expect(serializeDb(handle)).toEqual(before)
+        expect(preview.status).toBe('ready')
+        if (preview.status !== 'ready') throw new Error('preview unavailable')
+        expect(preview.evidence).toBe('captured')
+        const { reviewMode: _mode, ...updateFields } = command
+        void _mode
+        const updated = await executePracticeReviewCommand(handle.db, {
+          ...updateFields,
+          operation: 'update',
+          commandId: `update-${retention}-${rating}`,
+          generation: request.generation,
+          targetAttemptId: request.targetAttemptId,
+          expectedRevision: 0,
+          rating,
+        })
+        if (updated.status !== 'saved') throw new Error('update unavailable')
+        expect(preview.ratings[rating].dueAt).toBe(
+          updated.acknowledgement.dueAt,
+        )
+        expect(preview.ratings[rating].eligibleOn).toBe(
+          updated.current.eligibleOn,
+        )
+      }
+    },
+    20_000,
+  )
+
+  it('reports ambiguous legacy correction context without writes', async () => {
+    const { handle, command } = await fixture()
+    const repository = createPracticeRepository(handle.db)
+    await repository.saveReviewResult({
+      problemSlug: command.problemSlug,
+      rating: 'easy',
+      reviewedAt: new Date(command.reviewedAt),
+      reviewAttemptId: 'earlier',
+    })
+    await repository.saveReviewResult({
+      problemSlug: command.problemSlug,
+      rating: 'good',
+      reviewedAt: new Date('2026-01-10T10:00:00.000Z'),
+      reviewAttemptId: 'latest',
+    })
+    await handle.db.update(practiceReviewEvidence).set({
+      schedulingEvidenceKind: 'unknown',
+      schedulerProfileId: null,
+      preCardJson: null,
+      sequenceSource: 'legacy-inferred',
+    })
+    await handle.db
+      .update(reviewAttempts)
+      .set({ fsrsReviewLog: null })
+      .where(eq(reviewAttempts.id, 'earlier'))
+    const generation = (
+      await getPracticeDetails(handle.db, command.problemSlug)
+    ).generation!
+    const before = serializeDb(handle)
+    expect(
+      await previewPracticeReview(handle.db, {
+        mode: 'update',
+        problemSlug: command.problemSlug,
+        generation,
+        targetAttemptId: 'latest',
+        expectedRevision: 0,
+        reviewedAt: '2026-01-10T10:00:00.000Z',
+      }),
+    ).toMatchObject({ status: 'unavailable', reason: 'unsupported-legacy' })
+    expect(serializeDb(handle)).toEqual(before)
+  })
   it('replays the bootstrap receipt after settings changes and a later review, returning fresh current separately', async () => {
     const { handle, command } = await fixture()
     const tracks = createTracksRepository(handle.db)
@@ -178,6 +350,18 @@ describe('accepted Practice commands', () => {
       reviewedAt: '2026-01-10T10:00:00.000Z',
       rating: 'hard' as const,
     }
+    const legacyPreview = await previewPracticeReview(handle.db, {
+      mode: 'update',
+      problemSlug: update.problemSlug,
+      generation: update.generation,
+      targetAttemptId: update.targetAttemptId,
+      expectedRevision: update.expectedRevision,
+      reviewedAt: update.reviewedAt,
+    })
+    expect(legacyPreview.status).toBe('ready')
+    if (legacyPreview.status !== 'ready')
+      throw new Error('legacy preview unavailable')
+    expect(legacyPreview.evidence).toBe('legacy-derived')
     const first = await executePracticeReviewCommand(handle.db, update)
     if (first.status === 'conflict') throw new Error('unexpected conflict')
     const storage = await readPracticeStorageData(handle.db)
@@ -194,10 +378,23 @@ describe('accepted Practice commands', () => {
     expect(first.acknowledgement.card).toEqual(
       toSerializableFsrsCardSnapshot(expected.card),
     )
+    expect(legacyPreview.ratings.hard.dueAt).toBe(first.acknowledgement.dueAt)
     await createSettingsRepository(handle.db).updateSettings({
       review: { targetRetention: 0.95 },
     })
     const before = serializeDb(handle)
+    const repeatedPreview = await previewPracticeReview(handle.db, {
+      mode: 'update',
+      problemSlug: update.problemSlug,
+      generation: update.generation,
+      targetAttemptId: update.targetAttemptId,
+      expectedRevision: 1,
+      reviewedAt: update.reviewedAt,
+    })
+    expect(repeatedPreview).toMatchObject({
+      status: 'ready',
+      evidence: 'legacy-derived',
+    })
     const replay = await executePracticeReviewCommand(handle.db, update)
     if (replay.status === 'conflict') throw new Error('unexpected conflict')
     expect(replay.acknowledgement).toEqual(first.acknowledgement)

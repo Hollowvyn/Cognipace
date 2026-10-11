@@ -221,6 +221,39 @@ results before PR review or merge. Automated tests do not replace this proof.
    Repeat at both daylight saving transitions, and check popup/Overview and
    Analytics counts again after the service worker restarts.
 
+### Phase F Four-Rating Preview Smoke
+
+Human installed-extension happy-path and edge-case proof remains **pending**.
+Use a disposable Chrome profile and the built `dist/chrome-mv3` extension.
+Attach redacted screenshots or a recording of the expanded LeetCode Overlay
+for these flows before PR review or merge.
+
+1. On an unreviewed problem, open the expanded Solve rating controls. Confirm
+   Again, Hard, Good and Easy each show a local next-study date and day count.
+   Submit a selected grade and compare the saved due date with the estimate
+   when the clock and Settings have not changed. Repeat at 75% retention; a
+   mature boundary fixture may show native 181–183-day results despite the
+   configured 180-day maximum.
+2. On a reviewed problem, change retention and select a different grade for
+   Update. Confirm the four estimates use the original review date/profile and
+   the matching Update yields the same due date. Repeat Update and verify no
+   extra attempt, changed credit or changed log. A past estimate must say
+   **Past study date** rather than imply a future wait. Check a supported
+   legacy-derived estimate and an unavailable ambiguous legacy context.
+3. Check local midnight and both daylight saving transitions. A same-day raw
+   FSRS due instant becomes eligible on the next local study day; an Update's
+   day count starts at its original review date, not the correction time.
+4. While a preview loads or fails, Submit/Update must remain available when
+   their existing rules permit them. Confirm locked grades stay disabled,
+   selected draft survives a preview refetch and a stale Update conflict, and
+   pending Save/Update Retry keeps its accepted command locked. Restart or
+   navigate to another LeetCode problem while a read is pending; no old
+   estimate may appear on the new problem. A final AI effective grade may
+   differ from the selected preview without silently changing the command.
+5. Compare card, attempt, profile, receipt, track credit and sync state before
+   and after preview-only actions. Reopen the extension and confirm no preview
+   read created a review or altered a due date.
+
 ### FSRS Evidence And Recoverable Replacement
 
 Run these human happy-path and edge-case flows in a disposable installed

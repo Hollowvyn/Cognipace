@@ -30,6 +30,10 @@ import {
   type OverlayReviewActions,
 } from './use-overlay-review-actions'
 import { useLeetCodeSubmissionAutomation } from './use-leetcode-submission-automation'
+import {
+  useOverlayReviewPreview,
+  type OverlayReviewPreviewState,
+} from './use-overlay-review-preview'
 import { useOverlayTimer, type OverlayTimerStatus } from './use-overlay-timer'
 
 export type LeetCodeOverlaySession = {
@@ -39,6 +43,7 @@ export type LeetCodeOverlaySession = {
   status: OverlaySyncStatus
   feedback: string | null
   overlay: OverlaySessionState
+  preview: OverlayReviewPreviewState
   timer: {
     elapsedSeconds: number
     targetSeconds: number
@@ -86,6 +91,7 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
           nextContext.practice?.latestAttempt?.rating ??
           nextContext.practice?.practice?.lastRating ??
           'good',
+        previewGeneration: nextContext.practice?.generation ?? null,
       })
     },
     [],
@@ -105,6 +111,7 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
           nextContext.practice?.practice?.lastRating ??
           'good',
         submittedSession: null,
+        previewGeneration: nextContext.practice?.generation ?? null,
       })
     },
     [],
@@ -155,6 +162,10 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     },
   })
 
+  const preview = useOverlayReviewPreview({
+    overlay,
+  })
+
   useLeetCodeSubmissionAutomation({
     activeProblemSlug: overlay.activeProblemSlug,
     autoDetectSolved: pageSync.context?.automation.autoDetectSolved ?? false,
@@ -176,6 +187,7 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     status: pageSync.status,
     feedback: pageSync.feedback,
     overlay,
+    preview,
     timer: {
       elapsedSeconds,
       targetSeconds,

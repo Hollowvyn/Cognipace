@@ -9,6 +9,50 @@ import { initialOverlaySessionState } from '../../../domain'
 import { ExpandedOverlay } from './expanded-overlay'
 
 describe('ExpandedOverlay', () => {
+  it('shows an honest past Update study date without disabling review actions', () => {
+    const rating = {
+      dueAt: '2020-01-03T10:00:00.000Z',
+      eligibleOn: '2020-01-03',
+      studyDays: 2,
+      scheduledDays: 2,
+    }
+    const props = createProps({
+      view: {
+        preview: {
+          status: 'ready',
+          result: {
+            status: 'ready',
+            identity: {
+              mode: 'update',
+              problemSlug: 'two-sum',
+              generation: {
+                localGenerationToken: 'local',
+                problemGenerationToken: 'problem',
+              },
+              targetAttemptId: 'attempt',
+              expectedRevision: 0,
+              reviewedAt: '2020-01-01T10:00:00.000Z',
+            },
+            evidence: 'legacy-derived',
+            ratings: {
+              again: rating,
+              hard: rating,
+              good: rating,
+              easy: rating,
+            },
+          },
+        },
+      },
+    })
+    render(<ExpandedOverlay {...props} />)
+    expect(
+      screen.getByRole('button', { name: /Easy, Fast.*Past study date/ }),
+    ).toBeEnabled()
+    expect(screen.getAllByText(/Past Jan 3 · 2d/)).toHaveLength(4)
+    expect(
+      screen.getByText(/Compatibility estimate from verified legacy evidence/),
+    ).toBeInTheDocument()
+  })
   it('presents hints in Solve Help and hands off reveal and toggle actions', async () => {
     const props = createProps({
       view: {
@@ -73,10 +117,10 @@ describe('ExpandedOverlay', () => {
       const user = userEvent.setup()
       expect(screen.getByRole('button', { name: 'Restart' })).toBeDisabled()
       for (const name of [
-        'EasyFast',
-        'GoodStable',
-        'HardLagging',
-        'AgainFailed',
+        /^Easy, Fast/,
+        /^Good, Stable/,
+        /^Hard, Lagging/,
+        /^Again, Failed/,
       ])
         expect(screen.getByRole('button', { name })).toBeDisabled()
       await user.click(screen.getByRole('button', { name: 'Retry review' }))
@@ -451,6 +495,7 @@ function createProps(
         activeProblemSlug: 'two-sum',
         visualMode: 'expanded',
       },
+      preview: { status: 'loading' },
       problemTitle: 'Two Sum',
       syncFeedback: null,
       syncStatus: 'ready',

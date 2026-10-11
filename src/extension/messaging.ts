@@ -92,6 +92,8 @@ import type {
 import {
   normalizedPracticeStateSchema,
   type PracticeDetailsRequest,
+  type PracticePreviewRequest,
+  type PracticePreviewResponse,
   type PracticeReviewCommandResult,
   type PracticeOverrideLastReviewResultRequest,
   type PracticeResetScheduleRequest,
@@ -421,6 +423,9 @@ export interface ProtocolMap {
   'practice.getDetails'(
     request: PracticeDetailsRequest,
   ): SerializedPracticeDetails
+  'practice.previewReview'(
+    request: PracticePreviewRequest,
+  ): PracticePreviewResponse
   'practice.overrideLastReviewResult'(
     request: PracticeOverrideLastReviewResultRequest,
   ): PracticeReviewCommandResult
@@ -509,6 +514,7 @@ export const protocolMethodNames = [
   'problems.bulkDelete',
   'practice.saveReviewResult',
   'practice.getDetails',
+  'practice.previewReview',
   'practice.overrideLastReviewResult',
   'practice.setSuspended',
   'practice.resetSchedule',

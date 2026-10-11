@@ -322,6 +322,7 @@ function createSession(
     location: null,
     metadata: null,
     overlay: initialOverlaySessionState,
+    preview: { status: 'loading' },
     status: 'ready',
     timer: {
       elapsedSeconds: 0,

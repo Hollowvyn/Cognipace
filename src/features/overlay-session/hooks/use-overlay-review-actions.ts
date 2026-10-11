@@ -416,7 +416,11 @@ export function useOverlayReviewActions({
         contextRef.current = { ...contextRef.current, practice: result.current }
       if (result.status === 'conflict') {
         acceptedRef.current = null
-        dispatch({ type: 'command-conflicted', message: result.message })
+        dispatch({
+          type: 'command-conflicted',
+          message: result.message,
+          previewGeneration: result.current.generation,
+        })
         return false
       }
       if (result.status === 'persistence-pending') {

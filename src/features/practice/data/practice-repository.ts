@@ -13,6 +13,8 @@ import {
   parseSerializedFsrsCardSnapshot,
   parseSerializedFsrsSchedulerProfile,
   scheduleReviewWithProfile,
+  previewReviewWithProfile,
+  reviewRatings,
   serializeFsrsCardSnapshot,
   serializeFsrsSchedulerProfile,
   toSerializableFsrsCardSnapshot,
@@ -21,6 +23,7 @@ import {
   type FsrsCardSnapshot,
   type FsrsReviewLogSnapshot,
   type FsrsReviewContext,
+  type ReviewRating,
 } from '@/lib/fsrs'
 import type { Db } from '@/platform/db'
 import {
@@ -41,6 +44,7 @@ import {
   buildPracticeProgressSummary,
   derivePracticeSummary,
   deriveNormalizedPracticeState,
+  derivePracticeScheduleTiming,
   normalizeReviewLogFields,
   parsePracticeStatus,
   reviewModes,
@@ -55,6 +59,8 @@ import {
   type PracticeProgressSummaryInput,
   type PracticeReviewAttemptSnapshot,
   type PracticeReadOptions,
+  type PracticePreviewInput,
+  type PracticePreviewResult,
   type PracticeStateSnapshot,
   type ReviewMode,
   type ReviewResult,
@@ -62,6 +68,7 @@ import {
   type SaveReviewResultInput,
   type SetPracticeSuspendedInput,
 } from '../domain'
+import { countPracticeStudyDays } from '../domain/practice-schedule'
 
 import {
   ensurePracticeGenerationsInTransaction,
@@ -74,6 +81,160 @@ export function createPracticeRepository(db: Db) {
 
 export class PracticeRepository {
   constructor(private readonly db: Db) {}
+
+  /** Read-only scheduling estimate. Caller supplies one consistent read transaction. */
+  async previewReview(
+    input: PracticePreviewInput,
+    targetRetention: number,
+  ): Promise<PracticePreviewResult> {
+    const identity = input
+    const generations = await this.db
+      .select()
+      .from(practiceGenerations)
+      .where(
+        or(
+          eq(practiceGenerations.scopeId, 'local'),
+          eq(practiceGenerations.scopeId, `problem:${input.problemSlug}`),
+        ),
+      )
+    const local = generations.find((row) => row.scopeId === 'local')
+    const problem = generations.find(
+      (row) => row.scopeId === `problem:${input.problemSlug}`,
+    )
+    if (
+      !local ||
+      local.generationToken !== input.generation.localGenerationToken ||
+      (problem?.generationToken ?? null) !==
+        input.generation.problemGenerationToken
+    ) {
+      return { status: 'conflict', identity, reason: 'stale-generation' }
+    }
+
+    const cardRecord = await this.getCardRecord(
+      input.problemSlug,
+      defaultFsrsCardKind,
+      this.db,
+    )
+    let card: FsrsCardSnapshot
+    let eventAt: Date
+    let profile: FsrsReviewContext['profile']
+    let evidence: 'active' | 'captured' | 'legacy-derived'
+
+    if (input.mode === 'submit') {
+      eventAt = new Date(input.previewedAt)
+      card = cardRecord?.card ?? createInitialFsrsCard(eventAt)
+      profile = createActiveDailyProfile(targetRetention)
+      evidence = 'active'
+      const attempts = cardRecord
+        ? await this.readReviewAttempts(this.db, {
+            problemSlug: input.problemSlug,
+            cardId: cardRecord.id,
+          })
+        : []
+      if (
+        (attempts.at(-1)?.reviewedAt.getTime() ?? -Infinity) >
+          eventAt.getTime() ||
+        (card.lastReviewAt?.getTime() ?? -Infinity) > eventAt.getTime()
+      ) {
+        return { status: 'conflict', identity, reason: 'backdated' }
+      }
+    } else {
+      if (!cardRecord) {
+        return { status: 'unavailable', identity, reason: 'missing-context' }
+      }
+      const attempts = await this.readReviewAttempts(this.db, {
+        problemSlug: input.problemSlug,
+        cardId: cardRecord.id,
+      })
+      const evidenceRows = await this.db
+        .select()
+        .from(practiceReviewEvidence)
+        .where(eq(practiceReviewEvidence.cardId, cardRecord.id))
+      const target = this.requireCorrectionTarget(
+        cardRecord.id,
+        attempts,
+        evidenceRows,
+        input,
+      )
+      if (!target) {
+        return { status: 'conflict', identity, reason: 'stale-review' }
+      }
+      const evidenceById = new Map(
+        evidenceRows.map((row) => [row.reviewAttemptId, row]),
+      )
+      try {
+        const context = await this.getCorrectionContext(
+          this.db,
+          cardRecord.card,
+          attempts,
+          evidenceById,
+          targetRetention,
+        )
+        card = parseSerializedFsrsCardSnapshot(JSON.stringify(context.preCard))
+        eventAt = new Date(context.reviewedAt)
+        profile = context.profile
+        evidence =
+          target.schedulingEvidenceKind === 'captured'
+            ? 'captured'
+            : 'legacy-derived'
+      } catch (error) {
+        if (
+          error instanceof ReviewCommandConflictError &&
+          error.reason === 'unsupported-legacy'
+        ) {
+          return {
+            status: 'unavailable',
+            identity,
+            reason: 'unsupported-legacy',
+          }
+        }
+        if (
+          error instanceof Error &&
+          error.message ===
+            'Captured Practice correction context is incomplete.'
+        ) {
+          return { status: 'unavailable', identity, reason: 'missing-context' }
+        }
+        if (error instanceof ReviewCommandConflictError) {
+          return { status: 'conflict', identity, reason: 'stale-review' }
+        }
+        throw error
+      }
+    }
+
+    const results = previewReviewWithProfile(card, eventAt, profile)
+    const ratings = Object.fromEntries(
+      reviewRatings.map((rating) => {
+        const scheduled = results[rating]
+        const timing = derivePracticeScheduleTiming({
+          dueAt: scheduled.card.dueAt,
+          lastReviewedAt: eventAt,
+          isStarted: true,
+          isSuspended: false,
+          now: eventAt,
+        })
+        if (!timing.eligibleOn) throw new Error('Missing preview study date.')
+        return [
+          rating,
+          {
+            dueAt: scheduled.card.dueAt.toISOString(),
+            eligibleOn: timing.eligibleOn,
+            studyDays: countPracticeStudyDays(eventAt, timing.eligibleOn),
+            scheduledDays: scheduled.card.scheduledDays,
+          },
+        ]
+      }),
+    ) as Record<
+      ReviewRating,
+      {
+        dueAt: string
+        eligibleOn: string
+        studyDays: number
+        scheduledDays: number
+      }
+    >
+    return { status: 'ready', identity, evidence, ratings }
+  }
 
   async saveReviewResult(input: SaveReviewResultInput): Promise<ReviewResult> {
     return this.db.transaction((transactionDb) =>
@@ -270,22 +431,16 @@ export class PracticeRepository {
     const evidenceById = new Map(
       evidenceRows.map((row) => [row.reviewAttemptId, row]),
     )
-    const targetEvidence = evidenceById.get(input.targetAttemptId)
-    if (
-      !currentCardRecord ||
-      !latestAttempt ||
-      latestAttempt.id !== input.targetAttemptId ||
-      !targetEvidence ||
-      targetEvidence.cardId !== cardId ||
-      targetEvidence.applicationSequence !==
-        evidenceRows.reduce(
-          (max, row) => Math.max(max, row.applicationSequence),
-          0,
-        ) ||
-      targetEvidence.revision !== input.expectedRevision ||
-      (input.reviewedAt !== undefined &&
-        input.reviewedAt.getTime() !== latestAttempt.reviewedAt.getTime())
-    ) {
+    const targetEvidence = currentCardRecord
+      ? this.requireCorrectionTarget(cardId, attempts, evidenceRows, {
+          targetAttemptId: input.targetAttemptId,
+          expectedRevision: input.expectedRevision,
+          ...(input.reviewedAt === undefined
+            ? {}
+            : { reviewedAt: input.reviewedAt.toISOString() }),
+        })
+      : null
+    if (!targetEvidence || !latestAttempt || !currentCardRecord) {
       throw new ReviewCommandConflictError(
         'stale-review',
         'This review changed. Refresh before updating; your draft is preserved.',
@@ -696,6 +851,40 @@ export class PracticeRepository {
       .insert(fsrsSchedulerProfiles)
       .values({ id, profileJson, createdAt: now.getTime() })
     return id
+  }
+
+  /** Shared exact latest-target guard for Update and its read-only preview. */
+  private requireCorrectionTarget(
+    cardId: string,
+    attempts: StoredPracticeReviewAttempt[],
+    evidenceRows: PracticeReviewEvidenceRow[],
+    input: {
+      targetAttemptId: string
+      expectedRevision: number
+      reviewedAt?: string
+    },
+  ): PracticeReviewEvidenceRow | null {
+    const latest = attempts.at(-1)
+    const target = evidenceRows.find(
+      (row) => row.reviewAttemptId === input.targetAttemptId,
+    )
+    if (
+      !latest ||
+      latest.id !== input.targetAttemptId ||
+      !target ||
+      target.cardId !== cardId ||
+      target.applicationSequence !==
+        evidenceRows.reduce(
+          (max, row) => Math.max(max, row.applicationSequence),
+          0,
+        ) ||
+      target.revision !== input.expectedRevision ||
+      (input.reviewedAt !== undefined &&
+        latest.reviewedAt.toISOString() !== input.reviewedAt)
+    ) {
+      return null
+    }
+    return target
   }
 
   /** Reads and verifies the exact same context used by Update availability. */

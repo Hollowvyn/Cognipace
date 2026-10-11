@@ -15,6 +15,7 @@ import {
   calculateCardRetrievability,
   calculateCardTargetRetentionDuration,
   createEmptyCardSnapshot,
+  previewCardReviewWithProfile,
   resolveFsrsSchedulerProfile,
   scheduleCardReview,
   scheduleCardReviewWithProfile,
@@ -134,6 +135,27 @@ export function scheduleReviewWithProfile(
     reviewedAt: new Date(context.reviewedAt),
     context,
   }
+}
+
+/** Estimates every native rating from one immutable card, time and profile. */
+export function previewReviewWithProfile(
+  card: FsrsCardSnapshot,
+  reviewedAt: Date,
+  inputProfile: FsrsSchedulerProfile,
+): Record<ReviewRating, Pick<FsrsScheduledReview, 'card' | 'log'>> {
+  const preCard = toSerializableFsrsCardSnapshot(card)
+  if (!(reviewedAt instanceof Date) || !Number.isFinite(reviewedAt.getTime())) {
+    throw new Error('Invalid FSRS review time.')
+  }
+  if (card.lastReviewAt && reviewedAt.getTime() < card.lastReviewAt.getTime()) {
+    throw new Error('FSRS review time precedes the captured last review.')
+  }
+  const profile = parseFsrsSchedulerProfile(inputProfile)
+  return previewCardReviewWithProfile(
+    parseFsrsCardSnapshot(preCard),
+    new Date(reviewedAt),
+    profile,
+  )
 }
 
 /** Calculates card retrievability at a point in time. */

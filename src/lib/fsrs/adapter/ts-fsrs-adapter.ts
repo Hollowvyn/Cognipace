@@ -146,6 +146,34 @@ export function scheduleCardReviewWithProfile(
   }
 }
 
+/** Native four-rating result from the exact effective profile. */
+export function previewCardReviewWithProfile(
+  card: FsrsCardSnapshot,
+  reviewedAt: Date,
+  profile: FsrsSchedulerProfile,
+): Record<ReviewRating, TsFsrsScheduledReview> {
+  const canonical = readFsrsSchedulerProfile(profile)
+  assertExactFsrsSchedulerProfile(canonical)
+  const result = fsrs(nativeProfileParameters(canonical.parameters)).repeat(
+    toTsFsrsCard(card),
+    reviewedAt,
+  )
+  const outcome = (rating: ReviewRating): TsFsrsScheduledReview => {
+    const native = result[toTsFsrsRating(rating)]
+    return {
+      card: fromTsFsrsCard(native.card),
+      log: fromTsFsrsReviewLog(native.log),
+    }
+  }
+
+  return {
+    again: outcome('again'),
+    hard: outcome('hard'),
+    good: outcome('good'),
+    easy: outcome('easy'),
+  }
+}
+
 export function rollbackCardReview(
   card: FsrsCardSnapshot,
   log: FsrsReviewLogSnapshot,

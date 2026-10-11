@@ -8,6 +8,7 @@ import { ReviewCommandConflictError } from '@/features/practice/domain'
 import { readPracticeStorageData } from '@/features/practice/data/practice-storage-repository'
 import {
   overrideLastReviewResultWithTrackProgress,
+  previewPracticeReview,
   resetPracticeSchedule,
   saveReviewResultWithTrackProgress,
 } from '@/features/practice/server/practice-service'
@@ -211,6 +212,36 @@ describe('practice core', () => {
       .where(eq(fsrsCards.id, original.cardId))
     expect(afterSettings).toEqual(beforeRead)
 
+    const previewInput = {
+      mode: 'update' as const,
+      problemSlug: 'two-sum',
+      generation: (await repository.getPracticeDetails('two-sum')).generation!,
+      targetAttemptId: original.reviewAttemptId,
+      expectedRevision: 0,
+      reviewedAt: reviewedAt.toISOString(),
+    }
+    const beforePreview = serializeDb(handle)
+    const preview = await previewPracticeReview(handle.db, previewInput)
+    expect(Buffer.from(serializeDb(handle)).equals(beforePreview)).toBe(true)
+    expect(preview.status).toBe('ready')
+    if (preview.status !== 'ready') throw new Error('preview unavailable')
+    expect(preview.evidence).toBe('captured')
+    for (const rating of ['again', 'hard', 'good', 'easy'] as const) {
+      const expected = scheduleReviewWithProfile(
+        preCard,
+        rating,
+        reviewedAt,
+        oldProfile,
+      )
+      expect(preview.ratings[rating].dueAt).toBe(
+        expected.card.dueAt.toISOString(),
+      )
+      expect(preview.ratings[rating].scheduledDays).toBe(
+        expected.card.scheduledDays,
+      )
+    }
+    expect(preview.ratings.easy.scheduledDays).toBeGreaterThan(180)
+
     const updatedToEasy = await repository.overrideLastReviewResult({
       problemSlug: 'two-sum',
       targetAttemptId: original.reviewAttemptId,
@@ -315,7 +346,7 @@ describe('practice core', () => {
         (await repository.getPracticeDetails('two-sum'))
           .canOverrideLatestReview,
       ).toBe(false)
-      expect(serializeDb(handle)).toEqual(before)
+      expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
       const rejected = repository.overrideLastReviewResult({
         problemSlug: 'two-sum',
         targetAttemptId: 'missing-log-latest',
@@ -337,7 +368,7 @@ describe('practice core', () => {
           'Invalid FSRS review log snapshot.',
         )
       }
-      expect(serializeDb(handle)).toEqual(before)
+      expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
     },
   )
 
@@ -348,13 +379,13 @@ describe('practice core', () => {
     const initial = await repository.getPracticeDetails('two-sum')
     expect(initial.generation).toBeNull()
     expect(initial.latestReview).toBeNull()
-    expect(serializeDb(handle)).toEqual(unprepared)
+    expect(Buffer.from(serializeDb(handle)).equals(unprepared)).toBe(true)
     await preparePracticeStorage(handle.db)
     const prepared = serializeDb(handle)
     const details = await repository.getPracticeDetails('two-sum')
     expect(details.generation?.localGenerationToken).toBeTypeOf('string')
     expect(details.generation?.problemGenerationToken).toBeNull()
-    expect(serializeDb(handle)).toEqual(prepared)
+    expect(Buffer.from(serializeDb(handle)).equals(prepared)).toBe(true)
   })
 
   it('captures validated assessment evidence and rejects mismatched final ratings without writes', async () => {
@@ -387,7 +418,7 @@ describe('practice core', () => {
         assessmentEvidence: evidence,
       }),
     ).rejects.toThrow(/effective rating/)
-    expect(serializeDb(handle)).toEqual(before)
+    expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
     await expect(
       repository.overrideLastReviewResult({
         problemSlug: 'two-sum',
@@ -397,7 +428,7 @@ describe('practice core', () => {
         assessmentEvidence: evidence,
       }),
     ).rejects.toThrow(/effective rating/)
-    expect(serializeDb(handle)).toEqual(before)
+    expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
     await validatePracticeStorage(handle.db)
   })
 
@@ -525,7 +556,7 @@ describe('practice core', () => {
         reviewedAt: new Date('2026-01-01T00:00:00.000Z'),
       }),
     ).rejects.toThrow(/precede|before/i)
-    expect(serializeDb(handle)).toEqual(before)
+    expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
     await handle.db
       .update(fsrsCards)
       .set({ lastReviewAt: new Date('2026-01-04T00:00:00.000Z').getTime() })
@@ -537,7 +568,7 @@ describe('practice core', () => {
         reviewedAt: new Date('2026-01-03T00:00:00.000Z'),
       }),
     ).rejects.toThrow(/precede|before/i)
-    expect(serializeDb(handle)).toEqual(laterCard)
+    expect(Buffer.from(serializeDb(handle)).equals(laterCard)).toBe(true)
   })
 
   it('rejects stale targets and revisions without changing any event or scheduling data', async () => {
@@ -617,7 +648,7 @@ describe('practice core', () => {
         await expect(
           repository.overrideLastReviewResult(request),
         ).rejects.toThrow(/ambiguous|unsupported/i)
-        expect(serializeDb(handle)).toEqual(before)
+        expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
       } else {
         await repository.overrideLastReviewResult(request)
         const evidence = (

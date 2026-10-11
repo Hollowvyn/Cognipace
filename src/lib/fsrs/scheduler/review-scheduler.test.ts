@@ -6,15 +6,73 @@ import {
   getTargetRetentionDuration,
   getRetrievability,
   projectReviewSchedule,
+  previewReviewWithProfile,
   replayReviewHistory,
   replayReviewHistorySequence,
   scheduleReview,
+  scheduleReviewWithProfile,
 } from './review-scheduler'
 import { assertFsrsReviewLogMatchesPreCard } from '../domain/review-log-snapshot'
 import { reviewRatings, type ReviewRating } from '../domain/review-rating'
 import type { FsrsCardSnapshot, FsrsCardState } from '../domain/card-snapshot'
 
 describe('fsrs scheduler wrapper', () => {
+  it.each([0.75, 0.9])(
+    'matches native next for four ratings across daily card states at %s retention',
+    (retention) => {
+      const profile = createDailyProfile(retention)
+      for (const state of [
+        'new',
+        'learning',
+        'relearning',
+        'review',
+      ] as const) {
+        const card = createDailyInputCard(state)
+        const preview = previewReviewWithProfile(card, dailyReviewedAt, profile)
+        for (const rating of reviewRatings) {
+          const saved = scheduleReviewWithProfile(
+            card,
+            rating,
+            dailyReviewedAt,
+            profile,
+          )
+          expect(preview[rating]).toEqual({ card: saved.card, log: saved.log })
+        }
+      }
+    },
+  )
+
+  it('preserves native 183-day ordering and older larger profile intervals', () => {
+    const card = createDailyInputCard('review', 180)
+    const boundary = createDailyProfile(0.000001)
+    const preview = previewReviewWithProfile(card, dailyReviewedAt, boundary)
+    expect(
+      reviewRatings.map((rating) => preview[rating].card.scheduledDays),
+    ).toEqual([180, 181, 182, 183])
+    const olderProfile = createFsrsSchedulerProfile({
+      targetRetention: 0.75,
+      maximumInterval: 36_500,
+      enableFuzz: false,
+      enableShortTerm: true,
+      learningSteps: ['12h', '23h'],
+      relearningSteps: ['23h'],
+    })
+    const historical = previewReviewWithProfile(
+      card,
+      dailyReviewedAt,
+      olderProfile,
+    )
+    for (const rating of reviewRatings) {
+      const saved = scheduleReviewWithProfile(
+        card,
+        rating,
+        dailyReviewedAt,
+        olderProfile,
+      )
+      expect(historical[rating]).toEqual({ card: saved.card, log: saved.log })
+    }
+    expect(historical.easy.card.scheduledDays).toBeGreaterThan(183)
+  })
   it.each([
     [0.75, 'new', [1, 7, 13, 46]],
     [0.75, 'learning', [1, 20, 32, 59]],

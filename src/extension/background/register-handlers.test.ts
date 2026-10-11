@@ -130,6 +130,7 @@ const backgroundMocks = vi.hoisted(() => {
     deleteTrack: vi.fn(),
     bulkUpdateProblems: vi.fn(),
     getPracticeDetails: vi.fn(),
+    previewPracticeReview: vi.fn(),
     executePracticeReviewCommand: vi.fn(),
     getTrackForEdit: vi.fn(),
     getWorkspace: vi.fn(),
@@ -280,6 +281,7 @@ vi.mock(
     return {
       ...actual,
       getPracticeDetails: backgroundMocks.getPracticeDetails,
+      previewPracticeReview: backgroundMocks.previewPracticeReview,
       executePracticeReviewCommand:
         backgroundMocks.executePracticeReviewCommand,
       overrideLastReviewResultWithTrackProgress:
@@ -3045,6 +3047,67 @@ describe('background handler registration', () => {
     expect(
       backgroundMocks.markSyncLocalDataChanged.mock.invocationCallOrder[0],
     ).toBeLessThan(backgroundMocks.flushDbSnapshot.mock.invocationCallOrder[0]!)
+  })
+
+  it('validates a preview sender and serializes its read before a review save without publication', async () => {
+    const previewRequest = {
+      surface: 'content-script' as const,
+      mode: 'submit' as const,
+      problemSlug: 'two-sum',
+      generation: saveCommandRequest.generation,
+      previewedAt: '2026-01-01T00:00:00.000Z',
+    }
+    const { surface: _surface, ...identity } = previewRequest
+    void _surface
+    const estimate = {
+      dueAt: '2026-01-02T00:00:00.000Z',
+      eligibleOn: '2026-01-02',
+      studyDays: 1,
+      scheduledDays: 1,
+    }
+    const response = {
+      status: 'ready' as const,
+      identity,
+      evidence: 'active' as const,
+      ratings: {
+        again: estimate,
+        hard: estimate,
+        good: estimate,
+        easy: estimate,
+      },
+    }
+    const gate = createDeferred<typeof response>()
+    backgroundMocks.previewPracticeReview.mockReturnValueOnce(gate.promise)
+    const preview = sendRuntimeMessage('practice.previewReview', previewRequest)
+    await waitUntil(() =>
+      expect(backgroundMocks.previewPracticeReview).toHaveBeenCalledTimes(1),
+    )
+    expectRuntimePolicy('practice.previewReview', 'content-script')
+    const save = sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
+    gate.resolve(response)
+    await expect(preview).resolves.toEqual(response)
+    await expect(save).resolves.toEqual(commandResult)
+    expect(backgroundMocks.previewPracticeReview).toHaveBeenCalledWith(
+      backgroundMocks.db,
+      identity,
+    )
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
+
+    backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementationOnce(
+      () => {
+        throw new Error('forged sender')
+      },
+    )
+    expect(() =>
+      sendRuntimeMessage('practice.previewReview', previewRequest, {}),
+    ).toThrow('forged sender')
+    expect(backgroundMocks.previewPracticeReview).toHaveBeenCalledTimes(1)
   })
 
   it('returns persistence pending without publication and retries the same executor command', async () => {

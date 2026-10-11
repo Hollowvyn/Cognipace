@@ -112,6 +112,8 @@ import { generateLeetCodeHintsInBackground } from '@/features/leetcode-review-as
 import { analyzeLeetCodeSubmissionInBackground } from '@/features/leetcode-review-assistant/server/analysis-runtime-service'
 import {
   practiceDetailsRequestSchema,
+  practicePreviewRequestSchema,
+  practicePreviewResponseSchema,
   practiceReviewCommandResultSchema,
   practiceOverrideLastReviewResultRequestSchema,
   practiceResetScheduleRequestSchema,
@@ -128,6 +130,7 @@ import {
 } from '@/features/practice/api/practice-serializers'
 import {
   getPracticeDetails,
+  previewPracticeReview,
   executePracticeReviewCommand,
   resetPracticeSchedule,
   setPracticeSuspended,
@@ -811,6 +814,23 @@ export function registerBackgroundHandlers() {
       })
 
       return serializePracticeDetails(details)
+    })
+  })
+
+  onMessage('practice.previewReview', ({ data, sender }) => {
+    const request = practicePreviewRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'practice.previewReview',
+      request.surface,
+      sender,
+    )
+    const { surface: _surface, ...input } = request
+    void _surface
+    return runGatedMutationQueue(async () => {
+      const { db } = await getAppDb()
+      return practicePreviewResponseSchema.parse(
+        await previewPracticeReview(db, input),
+      )
     })
   })
 

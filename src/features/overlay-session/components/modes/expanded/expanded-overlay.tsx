@@ -16,6 +16,7 @@ import {
   type OverlaySessionState,
 } from '../../../domain'
 import type { OverlayTimerStatus } from '../../../hooks/use-overlay-timer'
+import type { OverlayReviewPreviewState } from '../../../hooks/use-overlay-review-preview'
 import { OverlayActions } from './overlay-actions'
 import { OverlayCodeAnalysis } from './overlay-code-analysis'
 import { OverlayAssessmentRail } from './overlay-assessment-rail'
@@ -37,6 +38,7 @@ type ExpandedOverlayViewModel = {
   hints: OverlayHintState
   isOverTarget: boolean
   overlay: OverlaySessionState
+  preview: OverlayReviewPreviewState
   problemTitle: string
   syncFeedback: string | null
   syncStatus: string
@@ -83,6 +85,7 @@ export function ExpandedOverlay({
     hints,
     isOverTarget,
     overlay,
+    preview,
     problemTitle,
     syncFeedback,
     syncStatus,
@@ -225,6 +228,7 @@ export function ExpandedOverlay({
                 isDisabled={isMutating}
                 lockReason={overlay.ratingLockReason}
                 onSelectRating={onSelectRating}
+                preview={preview}
                 selectedRating={overlay.selectedRating}
               />
 

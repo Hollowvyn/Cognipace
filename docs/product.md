@@ -86,6 +86,8 @@ Current behavior:
 - target-time awareness
 - quick submit preparation from the collapsed state
 - expanded submit, fail, update, restart, and rating controls
+- native FSRS next-study estimates for Again, Hard, Good, and Easy in the
+  expanded rating controls, with a local study date and calendar-day count
 - focused Solve, AI, and reserved Notes tabs in expanded mode
 - timer, assessment, submission dates, Help, review actions, feedback, and
   next-step guidance in Solve; the full review footer appears only in Solve
@@ -292,6 +294,19 @@ of the time of day, and overdue on a later local date. A same-day correction
 uses the original review time, not the correction time. Suspended and unstarted
 problems are not due. The raw `dueAt` remains available as the exact saved FSRS
 result.
+
+Expanded Overlay rating buttons preview all four native FSRS outcomes before
+Submit or Update. A Submit estimate reads the current card, current retention
+and preview time; Save still uses the accepted rating and actual review time.
+An Update estimate reuses the exact latest attempt's original pre-card, event
+time and captured profile, even after Settings changes. Verified older evidence
+is labeled legacy-derived, and ambiguous older context is unavailable. The
+displayed day count measures local calendar dates from the simulated review to
+the eligible study date; the raw native due instant remains separate. A past
+Update study date is labeled as past rather than promised as a future wait.
+Loading, unavailable and failed estimates do not disable an otherwise valid
+review action, and refetches do not change the selected rating or accepted
+command. Preview reads do not write review or sync data.
 
 ### Queue
 

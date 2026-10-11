@@ -5,10 +5,60 @@ import {
   practiceOverrideLastReviewResultRequestSchema,
   practiceSaveReviewResultRequestSchema,
   practiceReviewResultSchema,
+  practicePreviewRequestSchema,
+  practicePreviewResponseSchema,
 } from './practice-contracts'
 import { serializeNormalizedPracticeState } from './practice-serializers'
 
 describe('practice runtime contracts', () => {
+  it('requires exact preview identity, all four ratings, and valid study dates', () => {
+    const identity = {
+      mode: 'submit' as const,
+      problemSlug: 'two-sum',
+      generation: {
+        localGenerationToken: 'local',
+        problemGenerationToken: null,
+      },
+      previewedAt: '2026-01-01T10:00:00.000Z',
+    }
+    expect(
+      practicePreviewRequestSchema.parse({
+        ...identity,
+        surface: 'content-script',
+      }),
+    ).toMatchObject(identity)
+    expect(
+      practicePreviewRequestSchema.safeParse({
+        ...identity,
+        surface: 'dashboard',
+      }).success,
+    ).toBe(false)
+    const item = {
+      dueAt: '2026-01-02T10:00:00.000Z',
+      eligibleOn: '2026-01-02',
+      studyDays: 1,
+      scheduledDays: 1,
+    }
+    const ready = {
+      status: 'ready',
+      identity,
+      evidence: 'active',
+      ratings: { again: item, hard: item, good: item, easy: item },
+    }
+    expect(practicePreviewResponseSchema.parse(ready)).toEqual(ready)
+    expect(
+      practicePreviewResponseSchema.safeParse({
+        ...ready,
+        ratings: { ...ready.ratings, easy: { ...item, studyDays: NaN } },
+      }).success,
+    ).toBe(false)
+    expect(
+      practicePreviewResponseSchema.safeParse({
+        ...ready,
+        ratings: { again: item, hard: item, good: item },
+      }).success,
+    ).toBe(false)
+  })
   it('serializes and validates the derived eligible local day', () => {
     const state = {
       problemSlug: 'two-sum',
