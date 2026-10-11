@@ -3,10 +3,113 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   computeNotificationDryRun,
   createDevSmokeService,
+  readChromeStorageCapacity,
   type DevSmokeDeps,
 } from './dev-smoke-service'
 
 describe('createDevSmokeService', () => {
+  it('reads capacity only on request and reports numeric storage usage', async () => {
+    const deps = createDeps()
+    deps.readCapacityStorage = vi.fn().mockResolvedValue({
+      totalBytes: 900,
+      quotaBytes: 1000,
+      headroomBytes: 100,
+      activeSnapshotBytes: 500,
+      activeFingerprintBytes: 20,
+      recoveryTopicsBytes: 100,
+      recoveryTracksBytes: 80,
+      recoveryFsrsBytes: 60,
+    })
+    const service = createDevSmokeService(deps)
+
+    expect((await service.run({})).capacity).toBeUndefined()
+    expect(deps.readCapacityStorage).not.toHaveBeenCalled()
+    expect((await service.run({ includeCapacity: true })).capacity).toEqual({
+      status: 'available',
+      storage: {
+        totalBytes: 900,
+        quotaBytes: 1000,
+        headroomBytes: 100,
+        activeSnapshotBytes: 500,
+        activeFingerprintBytes: 20,
+        recoveryTopicsBytes: 100,
+        recoveryTracksBytes: 80,
+        recoveryFsrsBytes: 60,
+      },
+    })
+  })
+
+  it('keeps storage failures free of raw error contents', async () => {
+    const deps = createDeps()
+    deps.readCapacityStorage = vi
+      .fn()
+      .mockRejectedValue(new Error('Storage failed with sk-sensitive-secret'))
+
+    const report = await createDevSmokeService(deps).run({
+      includeCapacity: true,
+    })
+
+    expect(report.capacity).toEqual({ status: 'unavailable' })
+    expect(JSON.stringify(report)).not.toContain('sk-sensitive-secret')
+  })
+
+  it('does not call live GenAI when capacity and live flags are both set', async () => {
+    const deps = createDeps()
+
+    await createDevSmokeService(deps).run({
+      includeCapacity: true,
+      runLiveGenAi: true,
+    })
+
+    expect(deps.runLiveGenAi).not.toHaveBeenCalled()
+  })
+  it('samples gated Queue and Analytics service reads only when capacity is requested', async () => {
+    const deps = createDeps()
+    const service = createDevSmokeService(deps)
+
+    expect((await service.run({})).readTimings).toBeUndefined()
+    expect(deps.readAnalyticsSummary).toHaveBeenCalledTimes(1)
+    expect(deps.readQueueSummary).toHaveBeenCalledTimes(1)
+
+    const report = await service.run({ includeCapacity: true })
+
+    expect(deps.readAnalyticsSummary).toHaveBeenCalledTimes(8)
+    expect(deps.readQueueSummary).toHaveBeenCalledTimes(8)
+    expect(report.readTimings).toMatchObject({
+      status: 'available',
+      method: 'sequential-background-service-reads',
+      warmups: 1,
+    })
+    if (report.readTimings?.status !== 'available')
+      throw new Error('Read timings were unavailable.')
+    for (const operation of [
+      report.readTimings.analytics,
+      report.readTimings.queue,
+    ]) {
+      expect(operation.samplesMs).toHaveLength(5)
+      expect(
+        operation.samplesMs.every(
+          (sample) => Number.isFinite(sample) && sample >= 0,
+        ),
+      ).toBe(true)
+      expect(operation.p50Ms).toBeGreaterThanOrEqual(0)
+      expect(operation.p95Ms).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('keeps read timing failures free of raw error contents', async () => {
+    const deps = createDeps()
+    vi.mocked(deps.readAnalyticsSummary)
+      .mockResolvedValueOnce({ views: {} })
+      .mockRejectedValue(new Error('Sensitive review notes'))
+
+    const report = await createDevSmokeService(deps).run({
+      includeCapacity: true,
+    })
+
+    expect(report.readTimings).toEqual({ status: 'unavailable' })
+    expect(JSON.stringify(report)).not.toContain('Sensitive review notes')
+  })
   it('returns ordered pass checks for reachable dependencies', async () => {
     const deps = createDeps()
     vi.mocked(deps.runLiveGenAi).mockResolvedValue({
@@ -164,6 +267,48 @@ describe('createDevSmokeService', () => {
   })
 })
 
+describe('readChromeStorageCapacity', () => {
+  it('reads byte counts without retrieving stored values', async () => {
+    const sizes = new Map<unknown, number>([
+      [null, 900],
+      ['cognipace_db_snapshot_v1', 500],
+      ['cognipace_db_snapshot_fingerprint_v1', 20],
+      ['cognipace_db_recovery_topics_v1', 100],
+      ['cognipace_db_recovery_tracks_v1', 80],
+      ['cognipace_db_recovery_fsrs_v1', 60],
+    ])
+    const getBytesInUse = vi.fn((key: string | null) =>
+      Promise.resolve(sizes.get(key) ?? 0),
+    )
+
+    const result = await readChromeStorageCapacity({
+      QUOTA_BYTES: 1000,
+      getBytesInUse,
+    })
+
+    expect(result).toEqual({
+      totalBytes: 900,
+      quotaBytes: 1000,
+      headroomBytes: 100,
+      activeSnapshotBytes: 500,
+      activeFingerprintBytes: 20,
+      recoveryTopicsBytes: 100,
+      recoveryTracksBytes: 80,
+      recoveryFsrsBytes: 60,
+    })
+    expect(getBytesInUse).toHaveBeenCalledTimes(6)
+  })
+
+  it('reports unknown quota without inventing headroom', async () => {
+    const result = await readChromeStorageCapacity({
+      getBytesInUse: vi.fn(() => Promise.resolve(0)),
+    })
+
+    expect(result.quotaBytes).toBeNull()
+    expect(result.headroomBytes).toBeNull()
+  })
+})
+
 describe('computeNotificationDryRun', () => {
   it('skips when daily reminders are disabled', () => {
     expect(
@@ -275,6 +420,18 @@ function createDeps(): DevSmokeDeps {
       Promise.resolve({
         status: 'skip' as const,
         detail: 'Live GenAI was not requested.',
+      }),
+    ),
+    readCapacityStorage: vi.fn(() =>
+      Promise.resolve({
+        totalBytes: 0,
+        quotaBytes: null,
+        headroomBytes: null,
+        activeSnapshotBytes: 0,
+        activeFingerprintBytes: 0,
+        recoveryTopicsBytes: 0,
+        recoveryTracksBytes: 0,
+        recoveryFsrsBytes: 0,
       }),
     ),
   }

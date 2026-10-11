@@ -6,6 +6,7 @@ import {
 import {
   resolveHistoricalSchedulingEvidence,
   summarizeHistoricalSchedulingProvenance,
+  type HistoricalSchedulingEvidenceResolver,
   type HistoricalSchedulingProvenance,
 } from './historical-scheduling-evidence'
 import {
@@ -84,6 +85,7 @@ export interface HistoricalPresentationOptions {
   pairedReviews?: readonly RepeatReviewPair[]
   analyticsTargets?: AnalyticsTargets
   timeTargetsMinutes?: UserSettings['assessment']['timeTargetsMinutes']
+  resolveEvidence?: HistoricalSchedulingEvidenceResolver
 }
 
 export interface HistoricalPresentationScale {
@@ -367,7 +369,9 @@ export function buildHistoricalAnalyticsViews(
     )
     const modelProvenance = summarizeHistoricalSchedulingProvenance(
       observed.map((event) => {
-        const evidence = resolveHistoricalSchedulingEvidence(event)
+        const evidence = (
+          options.resolveEvidence ?? resolveHistoricalSchedulingEvidence
+        )(event)
         return evidence.postCard?.stability &&
           Number.isFinite(evidence.postCard.stability)
           ? evidence.kind
@@ -1023,7 +1027,9 @@ function buildStabilityObservations(
   for (const event of events) {
     if (event.reviewedAt < options.start || event.reviewedAt > options.end)
       continue
-    const evidence = resolveHistoricalSchedulingEvidence(event)
+    const evidence = (
+      options.resolveEvidence ?? resolveHistoricalSchedulingEvidence
+    )(event)
     const postReviewStability = evidence.postCard?.stability
     if (!postReviewStability || !Number.isFinite(postReviewStability)) continue
     const preReviewStability = evidence.preCard?.stability

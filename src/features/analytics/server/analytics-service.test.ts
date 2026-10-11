@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { describe, expect, it } from 'vitest'
 
 import { eq } from 'drizzle-orm'
@@ -32,6 +34,7 @@ import { updateSettings } from '@/features/settings/server/settings-service'
 import { getTodayQueue } from '@/features/queue/server/queue-service'
 import { analyticsSummarySchema } from '../api/analytics-contracts'
 import { createTopicRatingCountMatrix } from '@/testing/analytics-fixtures'
+import { createFsrsScalingFixture } from '@/testing/fsrs-scaling-fixtures'
 import { calculateAnalyticsReadiness } from '../domain/analytics-readiness'
 import { getAnalyticsSummary } from './analytics-service'
 
@@ -1798,6 +1801,32 @@ describe('getAnalyticsSummary dashboard views', () => {
     const second = await getAnalyticsSummary(handle.db, { range: 90, now })
 
     expect(second).toEqual(first)
+  })
+
+  it('matches the frozen full-summary reference for corrected, tied, legacy and unknown reviews', async () => {
+    const fixture = await createFsrsScalingFixture('standard')
+    try {
+      const evidence = fixture.backup.data.practice.reviewEvidence
+      const reviewedAt = fixture.backup.data.practice.reviewAttempts.map(
+        (row) => row.reviewedAt,
+      )
+      expect(
+        new Set(evidence.map((row) => row.schedulingEvidenceKind)),
+      ).toEqual(new Set(['captured', 'legacy-derived', 'unknown']))
+      expect(evidence.some((row) => row.revision > 0)).toBe(true)
+      expect(new Set(reviewedAt).size).toBeLessThan(reviewedAt.length)
+
+      const summary = await getAnalyticsSummary(fixture.handle.db, {
+        range: 'all',
+        now: new Date('2026-10-10T12:00:00.000Z'),
+        timeZone: 'UTC',
+      })
+      expect(
+        createHash('sha256').update(JSON.stringify(summary)).digest('hex'),
+      ).toBe('65e87aaa707bbcc08f6925e9ef7bddd6ee68eb8371f97b6173eedd301428b161')
+    } finally {
+      fixture.handle.rawDb.close()
+    }
   })
 
   it('uses one requested timezone for bucket rows and forecast grouping', async () => {

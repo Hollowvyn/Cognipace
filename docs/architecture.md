@@ -241,7 +241,11 @@ background work.
 - Feature repositories and persistence adapters live in `src/features/*/data`.
 - The hidden dashboard smoke route at `/dev/smoke` calls dashboard-only
   `devSmoke.run` for local extension development checks; it is not part of
-  primary dashboard navigation.
+  primary dashboard navigation. Its opt-in Phase G capacity view reads Chrome's
+  actual storage usage and quota, reports active/recovery key byte counts, and
+  samples sequential Queue/Analytics service reads through the existing
+  database gate. It neither loads fixtures nor runs live AI with capacity
+  sampling enabled.
 
 The normal request path is:
 
@@ -359,7 +363,11 @@ screenshot or recording proof remains required before PR review or merge.
 The background Analytics
 service reads the full review history once for a request, together with the
 current FSRS cards and supporting local state; chart components do not make
-per-chart database calls. Its data flow is:
+per-chart database calls. Within that one summary request, Analytics reuses
+resolved historical scheduling evidence by attempt ID and exact resolver
+inputs across cohorts, stability, memory and backlog calculations. The cache
+dies with the request; correction inputs and the pure domain resolver remain
+unchanged. Its data flow is:
 
 ```text
 review and FSRS inputs
@@ -1011,6 +1019,17 @@ preserves base rows and metadata, discards imported active tokens and creates
 fresh local/applicable problem scopes atomically. Targeted reset rotates only
 its problem scope and removes its own receipts; sibling scopes and immutable
 profiles remain intact.
+
+Full-backup replacement inserts each table and Practice sidecar in ordered
+25-row statements inside its existing outer transaction. This bounds SQLite
+statement variables for larger histories while retaining the same complete
+data, foreign-key order, validation and all-or-nothing rollback. It adds no
+schema, migration or backup version. The deterministic Phase G fixtures under
+`src/testing` cover 250/5,000, 2,500/50,000 and one-card/10,000 workloads;
+their local Vitest timings describe an in-process SQLite handle. The packaged
+Chrome driver in `scripts/fsrs-scaling-chrome.mjs` uses a fresh disposable
+profile and records runtime message-to-response and actual Chrome storage
+measurements separately. These workloads do not define supported capacity.
 
 Background owns one replacement coordinator behind the existing mutation queue.
 It retains only the committed summary and publication/metadata continuations.

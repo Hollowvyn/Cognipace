@@ -308,6 +308,13 @@ Loading, unavailable and failed estimates do not disable an otherwise valid
 review action, and refetches do not change the selected rating or accepted
 command. Preview reads do not write review or sync data.
 
+Large local histories remain complete. Full-backup restore inserts historical
+rows in bounded statements within one transaction, so a failed later batch
+rolls back the replacement. This changes neither review scheduling nor the
+backup format. Synthetic scaling workloads are measurement fixtures, not
+promised extension capacities; actual usable size depends on the installed
+Chrome storage quota and the other values already stored in that profile.
+
 ### Queue
 
 The automatic Today Queue composes recommendations from local practice state and

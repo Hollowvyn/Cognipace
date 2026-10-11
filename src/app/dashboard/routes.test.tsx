@@ -395,6 +395,7 @@ describe('dashboard routes', () => {
     expect(sendMessage).toHaveBeenCalledWith('devSmoke.run', {
       surface: 'dashboard',
       runLiveGenAi: false,
+      includeCapacity: false,
     })
   })
 

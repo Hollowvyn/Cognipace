@@ -1,0 +1,592 @@
+{
+  "schemaVersion": 1,
+  "status": "pending",
+  "startedAt": "2026-10-11T04:09:29.270Z",
+  "dataset": "standard",
+  "probe": "preview-only",
+  "fixture": {
+    "seed": 20261010,
+    "inputBytes": 7644369,
+    "inputDataDigest": "1f11affd87241fe1b98ec8b319eca3f9732b03c15d837cd494fe8db2f2a862dc",
+    "counts": {
+      "problems": 250,
+      "reviewAttempts": 5000,
+      "fsrsCards": 250,
+      "reviewEvidence": 5000,
+      "commandReceipts": 1,
+      "schedulerProfiles": 2,
+      "generationScopes": 251
+    },
+    "installedDataDigest": "bbd598cdb52854faeeddad941d1eefef9471cee3101ddc34429f8e46752677e7",
+    "observedDataDigests": [
+      "bbd598cdb52854faeeddad941d1eefef9471cee3101ddc34429f8e46752677e7"
+    ],
+    "installedCounts": {
+      "problems": 351,
+      "reviewAttempts": 5000,
+      "fsrsCards": 250,
+      "reviewEvidence": 5000,
+      "commandReceipts": 1
+    },
+    "protectedFixtureDigest": "b87ef6d42de727f6d5f37495c55829e0a6589f4a5d75a6a3cd6b7ede383ad659",
+    "presentFixtureSlugs": 250,
+    "seededCatalogRows": 101,
+    "installedDataBytes": 7701890,
+    "asOf": "2026-10-10T12:00:00.000Z"
+  },
+  "environment": {
+    "commit": "ae45ceab3ed804cffcb676954a02e9c6426768e4",
+    "node": "v24.20.0",
+    "chrome": "Google Chrome for Testing 151.0.7922.47",
+    "os": "darwin 27.0.0 arm64",
+    "cpu": "Apple M2 Pro",
+    "memoryBytes": 34359738368,
+    "extensionVersion": "2.2.0",
+    "extensionBuild": "chrome-mv3",
+    "extensionBuildSha256": "04f3e137b2e3e7ce039452322f192f20649d80b05bfaaae32b3db8028ad241a8",
+    "dependencies": {
+      "source": "installed node_modules package.json versions",
+      "wxt": "0.21.4",
+      "sqliteWasm": "3.53.0-build1",
+      "drizzle": "0.45.2",
+      "fsrs": "5.4.0",
+      "messaging": "2.3.0"
+    },
+    "profile": "unique disposable /private/tmp directory; removed after run",
+    "definition": "Warm: same opened Chrome worker and persisted database. Request duration is performance.now() around dashboard chrome.runtime.sendMessage to response. Restore/reset and setup are outside warm operation timers.",
+    "extensionId": "dfbkgmdabfhpgkffliobdankjbfipflg",
+    "workerUint8ArrayToBase64": true
+  },
+  "requested": {
+    "samples": 20,
+    "warmups": 3
+  },
+  "operations": {
+    "queue": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "practiceDetails": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "analytics30": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "analytics90": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "analyticsall": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "backupExport": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "backupValidation": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "save": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "sameCommandRetry": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "update": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "backupRestore": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "serviceWorkerReopen": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "fullBrowserRestart": {
+      "status": "pending",
+      "reason": "Preview-only probe",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    }
+  },
+  "memory": {
+    "method": "Sampled dashboard performance.memory.usedJSHeapSize where Chrome exposes it; not a continuous peak or service-worker heap",
+    "observations": [],
+    "maxObservedBytes": null
+  },
+  "contentScriptPreview": {
+    "status": "measured",
+    "sender": "installed content-script isolated world on HTTPS LeetCode problem tab",
+    "submit": {
+      "samples": [
+        {
+          "status": "ok",
+          "ms": 1.465000033378601
+        },
+        {
+          "status": "ok",
+          "ms": 1.4199999570846558
+        },
+        {
+          "status": "ok",
+          "ms": 1.3300000429153442
+        },
+        {
+          "status": "ok",
+          "ms": 1.5199999809265137
+        },
+        {
+          "status": "ok",
+          "ms": 1.2649999856948853
+        },
+        {
+          "status": "ok",
+          "ms": 1.1799999475479126
+        },
+        {
+          "status": "ok",
+          "ms": 1.2649999856948853
+        },
+        {
+          "status": "ok",
+          "ms": 1.25
+        },
+        {
+          "status": "ok",
+          "ms": 1.3199999332427979
+        },
+        {
+          "status": "ok",
+          "ms": 1.1799999475479126
+        },
+        {
+          "status": "ok",
+          "ms": 1.1750000715255737
+        },
+        {
+          "status": "ok",
+          "ms": 1.2450000047683716
+        },
+        {
+          "status": "ok",
+          "ms": 1.340000033378601
+        },
+        {
+          "status": "ok",
+          "ms": 1.4250000715255737
+        },
+        {
+          "status": "ok",
+          "ms": 1.3899999856948853
+        },
+        {
+          "status": "ok",
+          "ms": 1.3100000619888306
+        },
+        {
+          "status": "ok",
+          "ms": 1.1100000143051147
+        },
+        {
+          "status": "ok",
+          "ms": 1.415000081062317
+        },
+        {
+          "status": "ok",
+          "ms": 1.3799999952316284
+        },
+        {
+          "status": "ok",
+          "ms": 1.2949999570846558
+        }
+      ],
+      "summary": {
+        "attempted": 20,
+        "succeeded": 20,
+        "p50Ms": 1.3100000619888306,
+        "p95Ms": 1.465000033378601
+      }
+    },
+    "update": {
+      "status": "measured",
+      "samples": [
+        {
+          "status": "ok",
+          "ms": 1.6150000095367432
+        },
+        {
+          "status": "ok",
+          "ms": 1.6700000762939453
+        },
+        {
+          "status": "ok",
+          "ms": 1.649999976158142
+        },
+        {
+          "status": "ok",
+          "ms": 1.715000033378601
+        },
+        {
+          "status": "ok",
+          "ms": 1.4449999332427979
+        },
+        {
+          "status": "ok",
+          "ms": 1.5850000381469727
+        },
+        {
+          "status": "ok",
+          "ms": 4.584999918937683
+        },
+        {
+          "status": "ok",
+          "ms": 271.47000002861023
+        },
+        {
+          "status": "ok",
+          "ms": 18.669999957084656
+        },
+        {
+          "status": "ok",
+          "ms": 1.6099998950958252
+        },
+        {
+          "status": "ok",
+          "ms": 2.0149999856948853
+        },
+        {
+          "status": "ok",
+          "ms": 1.4850000143051147
+        },
+        {
+          "status": "ok",
+          "ms": 1.3849999904632568
+        },
+        {
+          "status": "ok",
+          "ms": 1.8250000476837158
+        },
+        {
+          "status": "ok",
+          "ms": 1.4700000286102295
+        },
+        {
+          "status": "ok",
+          "ms": 1.7700001001358032
+        },
+        {
+          "status": "ok",
+          "ms": 1.5099999904632568
+        },
+        {
+          "status": "ok",
+          "ms": 1.5500000715255737
+        },
+        {
+          "status": "ok",
+          "ms": 1.4149999618530273
+        },
+        {
+          "status": "ok",
+          "ms": 1.4300000667572021
+        }
+      ],
+      "summary": {
+        "attempted": 20,
+        "succeeded": 20,
+        "p50Ms": 1.6099998950958252,
+        "p95Ms": 18.669999957084656
+      }
+    },
+    "concurrentSave": {
+      "status": "measured",
+      "samples": [
+        {
+          "status": "ok",
+          "previewMs": 282.36500000953674,
+          "saveMs": 282.3000000715256,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 282.36500000953674
+        },
+        {
+          "status": "ok",
+          "previewMs": 268.7300000190735,
+          "saveMs": 267.89999997615814,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 268.7300000190735
+        },
+        {
+          "status": "ok",
+          "previewMs": 269.66999995708466,
+          "saveMs": 268.7999999523163,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 269.66999995708466
+        },
+        {
+          "status": "ok",
+          "previewMs": 1.4449999332427979,
+          "saveMs": 266.7000000476837,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 1.4449999332427979
+        },
+        {
+          "status": "ok",
+          "previewMs": 270.63499999046326,
+          "saveMs": 269.7000000476837,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 270.63499999046326
+        },
+        {
+          "status": "ok",
+          "previewMs": 270.50999999046326,
+          "saveMs": 269.5,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 270.50999999046326
+        },
+        {
+          "status": "ok",
+          "previewMs": 275.4850000143051,
+          "saveMs": 274.7999999523163,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 275.4850000143051
+        },
+        {
+          "status": "ok",
+          "previewMs": 1.3350000381469727,
+          "saveMs": 269.2000000476837,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 1.3350000381469727
+        },
+        {
+          "status": "ok",
+          "previewMs": 263.58000004291534,
+          "saveMs": 262.7999999523163,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 263.58000004291534
+        },
+        {
+          "status": "ok",
+          "previewMs": 264.57999992370605,
+          "saveMs": 263.59999990463257,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 264.57999992370605
+        },
+        {
+          "status": "ok",
+          "previewMs": 265.77499997615814,
+          "saveMs": 265,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 265.77499997615814
+        },
+        {
+          "status": "ok",
+          "previewMs": 267.33000004291534,
+          "saveMs": 266.60000002384186,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 267.33000004291534
+        },
+        {
+          "status": "ok",
+          "previewMs": 279.75999999046326,
+          "saveMs": 278.89999997615814,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 279.75999999046326
+        },
+        {
+          "status": "ok",
+          "previewMs": 271.65000009536743,
+          "saveMs": 270.60000002384186,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 271.65000009536743
+        },
+        {
+          "status": "ok",
+          "previewMs": 279.94000005722046,
+          "saveMs": 279.10000002384186,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 279.94000005722046
+        },
+        {
+          "status": "ok",
+          "previewMs": 2.3550000190734863,
+          "saveMs": 279.2999999523163,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 2.3550000190734863
+        },
+        {
+          "status": "ok",
+          "previewMs": 270.6200000047684,
+          "saveMs": 269.7000000476837,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 270.6200000047684
+        },
+        {
+          "status": "ok",
+          "previewMs": 266.89999997615814,
+          "saveMs": 265.89999997615814,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 266.89999997615814
+        },
+        {
+          "status": "ok",
+          "previewMs": 270.2649999856949,
+          "saveMs": 269.2999999523163,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 270.2649999856949
+        },
+        {
+          "status": "ok",
+          "previewMs": 281.22500002384186,
+          "saveMs": 280.3000000715256,
+          "previewStatus": "ready",
+          "previewReason": null,
+          "ms": 281.22500002384186
+        }
+      ],
+      "summary": {
+        "attempted": 20,
+        "succeeded": 20,
+        "p50Ms": 269.66999995708466,
+        "p95Ms": 281.22500002384186
+      }
+    }
+  },
+  "storageBeforeRestore": {
+    "bytesInUse": 786504,
+    "quotaBytes": 10485760,
+    "headroomBytes": 9699256,
+    "keyBytes": {
+      "cognipace_db_snapshot_v1": 786458,
+      "cognipace_db_snapshot_fingerprint_v1": 46,
+      "cognipace_db_recovery_topics_v1": 0,
+      "cognipace_db_recovery_tracks_v1": 0,
+      "cognipace_db_recovery_fsrs_v1": 0
+    },
+    "keyDigests": {
+      "cognipace_db_snapshot_v1": "52c690dcbb51da8c2fa1df37f9bb5379324fabbffc32350990be870c6f3152cc",
+      "cognipace_db_snapshot_fingerprint_v1": "f17b398220f3f9f12fb6c5ea26aa6d8e4ded28661f21a7b1cbb471ce09df08f8",
+      "cognipace_db_recovery_topics_v1": null,
+      "cognipace_db_recovery_tracks_v1": null,
+      "cognipace_db_recovery_fsrs_v1": null
+    },
+    "heapUsedBytes": 15968080,
+    "heapMethod": "Chrome performance.memory.usedJSHeapSize (nonstandard estimate)"
+  },
+  "completedAt": "2026-10-11T04:10:30.565Z"
+}

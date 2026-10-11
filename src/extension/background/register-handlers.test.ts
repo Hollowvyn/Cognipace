@@ -1432,12 +1432,80 @@ describe('background handler registration', () => {
       'genai.config',
       'genai.live',
     ])
+    expect(report.capacity).toBeUndefined()
     expect(
       report.checks.find((check) => check.id === 'notifications'),
     ).toMatchObject({
       status: 'pass',
       detail: 'Would send a 09:00 reminder for 1 due review.',
     })
+  })
+
+  it('returns storage byte counts only when capacity is requested', async () => {
+    const getBytesInUse = vi.fn((key: string | null) =>
+      Promise.resolve(
+        key === null ? 900 : key === 'cognipace_db_snapshot_v1' ? 500 : 20,
+      ),
+    )
+    const set = vi.fn()
+    vi.stubGlobal('chrome', {
+      storage: { local: { QUOTA_BYTES: 1000, getBytesInUse, set } },
+    })
+
+    const response = await sendRuntimeMessage('devSmoke.run', {
+      surface: 'dashboard',
+      includeCapacity: true,
+      runLiveGenAi: false,
+    })
+    const report = devSmokeReportSchema.parse(response)
+
+    expect(report.capacity).toMatchObject({
+      status: 'available',
+      storage: {
+        totalBytes: 900,
+        quotaBytes: 1000,
+        headroomBytes: 100,
+        activeSnapshotBytes: 500,
+      },
+    })
+    expect(getBytesInUse).toHaveBeenCalledTimes(6)
+    expect(set).not.toHaveBeenCalled()
+    expect(backgroundMocks.generateJson).not.toHaveBeenCalled()
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('keeps a capacity read on the shared gate before a review save', async () => {
+    let finishStorageRead: ((bytes: number) => void) | undefined
+    const pendingStorageRead = new Promise<number>((resolve) => {
+      finishStorageRead = resolve
+    })
+    const getBytesInUse = vi.fn((key: string | null) =>
+      key === null ? pendingStorageRead : Promise.resolve(0),
+    )
+    vi.stubGlobal('chrome', {
+      storage: { local: { QUOTA_BYTES: 1000, getBytesInUse } },
+    })
+
+    const smoke = sendRuntimeMessage('devSmoke.run', {
+      surface: 'dashboard',
+      includeCapacity: true,
+    })
+    await vi.waitFor(() => expect(getBytesInUse).toHaveBeenCalled())
+    const save = sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    await Promise.resolve()
+
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
+    finishStorageRead?.(100)
+    await smoke
+    await save
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
   })
 
   it('reports the selected GenAI provider and model when the secret is missing', async () => {

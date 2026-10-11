@@ -65,6 +65,40 @@ const settingsValue = JSON.stringify({
 })
 
 describe('backup service', () => {
+  it('rolls back earlier insert batches when a later restore batch fails', async () => {
+    const source = await createTestDb({ now })
+    await source.db.insert(problems).values(
+      Array.from({ length: 30 }, (_, index) => ({
+        slug: `batch-problem-${index}`,
+        title: `Batch Problem ${index}`,
+        difficulty: 'medium' as const,
+        isPremium: false,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      })),
+    )
+    const backup = await exportFullBackup(source.db, { exportedAt: now })
+    const target = await createTestDb({ now })
+    await insertOtherState(target.db)
+    const before = await target.db.select().from(problems)
+    target.rawDb.exec(`
+      CREATE TRIGGER reject_late_restore_batch
+      BEFORE INSERT ON problems
+      WHEN NEW.slug = 'batch-problem-29'
+      BEGIN SELECT RAISE(ABORT, 'late restore batch rejected'); END
+    `)
+
+    await expect(restoreFullBackup(target.db, backup)).rejects.toThrow()
+
+    expect(await target.db.select().from(problems)).toEqual(before)
+    expect(
+      target.rawDb.exec({
+        sql: 'PRAGMA foreign_key_check',
+        returnValue: 'resultRows',
+      }),
+    ).toEqual([])
+  })
+
   it('retains opaque card IDs for Save and Update after export and restore', async () => {
     const source = await createTestDb({ now })
     await insertCustomState(source.db)

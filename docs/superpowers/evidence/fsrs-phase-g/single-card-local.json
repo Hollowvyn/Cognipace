@@ -1,0 +1,1580 @@
+{
+  "source": "node-vitest-supporting-evidence",
+  "commit": "ae45ceab3ed804cffcb676954a02e9c6426768e4",
+  "dataset": "single-card",
+  "seed": 20261010,
+  "counts": {
+    "problems": 1,
+    "reviews": 10000
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "27.0.0",
+    "cpu": "Apple M2 Pro",
+    "logicalCpus": 12,
+    "totalMemoryBytes": 34359738368,
+    "node": "v24.20.0",
+    "dependencyVersions": {
+      "@sqlite.org/sqlite-wasm": "3.53.0-build1",
+      "ts-fsrs": "5.4.0",
+      "drizzle-orm": "0.45.2",
+      "@webext-core/messaging": "2.3.0",
+      "wxt": "0.21.4"
+    },
+    "chrome": null,
+    "extensionBuild": null
+  },
+  "method": {
+    "readWarmups": 3,
+    "warmSamples": 20,
+    "mutationSamples": 20,
+    "mutationReset": "fresh deserialized fixture outside each timer",
+    "coldReopen": "Fresh in-process SQLite WASM handle deserializing the same fixture snapshot; no Chrome worker restart",
+    "percentile": "nearest-rank",
+    "note": "In-memory SQLite and synthetic storage; not installed Chrome capacity.",
+    "peakHeapBytes": null,
+    "peakHeapMethod": "Not sampled in shared Vitest process"
+  },
+  "sizes": {
+    "sqliteBytes": 13983744,
+    "base64Characters": 18644992,
+    "backupUtf8Bytes": 14868605
+  },
+  "referenceDigests": {
+    "queue": "bfeade169c228f2f00a2e8974d24b6c7f3f8ea64c930ad4e17e1ac288bd230f4",
+    "details": "d06347a74e0890b4c291e9943176dbe075e96fda0ca19d74156b904069751ebe",
+    "analytics30": "03003afed48e0d7bb78d46ce88424803b9fb850f8977aa5b388f860e7be5c2d7",
+    "analytics90": "4e2b84fc742f5a70f9db8e438c68c7bbc4f72d2e22df6275027be5edf0099254",
+    "analyticsAll": "b534ca21920c6fd3f73f903b8e339c1e2779a0f12c37e7bd35133444a1b50be9",
+    "analyticsHistory": "9ba33f60d5a2e801c83573866133ec44b1cee178df1bc0437d90e65cf39b840b",
+    "analyticsCurrentCards": "d2fc33c430decaae42d8b1ce9bc71352e8b256c0db53b83c3f6e037d2715da5a",
+    "backup": "620a3fe3c5bde760e8487f084e56844188251d00400241774cba86126ae8b1a6",
+    "sqliteSnapshot": "a23f8dbf1d6d6fa2dc986212fee4bf63409e9c9f159c7ea8af3f460ab6db8512"
+  },
+  "operations": {
+    "queue": {
+      "samples": [
+        {
+          "elapsedMs": 0.531542000000627,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.46370800000113377,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.4254579999997077,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.3463339999998425,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.32770800000071176,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.3553749999991851,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.32833300000129384,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.5045420000005834,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.4156670000011218,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.3004579999997077,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.28000000000065484,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.27520800000093004,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.2704169999997248,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.3047919999989972,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.30987499999901047,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.2799159999995027,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.28700000000026193,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.28087500000037835,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.2804999999989377,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.2671669999999722,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 0.3047919999989972,
+      "p95Ms": 0.5045420000005834
+    },
+    "details": {
+      "samples": [
+        {
+          "elapsedMs": 368.48383300000023,
+          "error": null
+        },
+        {
+          "elapsedMs": 374.94808399999965,
+          "error": null
+        },
+        {
+          "elapsedMs": 369.2540420000005,
+          "error": null
+        },
+        {
+          "elapsedMs": 369.36045899999954,
+          "error": null
+        },
+        {
+          "elapsedMs": 372.93412499999977,
+          "error": null
+        },
+        {
+          "elapsedMs": 369.36029100000087,
+          "error": null
+        },
+        {
+          "elapsedMs": 374.1337500000009,
+          "error": null
+        },
+        {
+          "elapsedMs": 386.9517500000002,
+          "error": null
+        },
+        {
+          "elapsedMs": 366.5932500000017,
+          "error": null
+        },
+        {
+          "elapsedMs": 364.26354199999696,
+          "error": null
+        },
+        {
+          "elapsedMs": 364.327916000002,
+          "error": null
+        },
+        {
+          "elapsedMs": 370.9215409999997,
+          "error": null
+        },
+        {
+          "elapsedMs": 382.07266700000037,
+          "error": null
+        },
+        {
+          "elapsedMs": 370.8287080000009,
+          "error": null
+        },
+        {
+          "elapsedMs": 371.9750419999982,
+          "error": null
+        },
+        {
+          "elapsedMs": 372.8061250000028,
+          "error": null
+        },
+        {
+          "elapsedMs": 372.47000000000116,
+          "error": null
+        },
+        {
+          "elapsedMs": 392.09729199999856,
+          "error": null
+        },
+        {
+          "elapsedMs": 375.67212500000096,
+          "error": null
+        },
+        {
+          "elapsedMs": 376.50770900000134,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 371.9750419999982,
+      "p95Ms": 386.9517500000002
+    },
+    "analytics30": {
+      "samples": [
+        {
+          "elapsedMs": 995.965957999997,
+          "error": null
+        },
+        {
+          "elapsedMs": 999.4883330000011,
+          "error": null
+        },
+        {
+          "elapsedMs": 1001.6937500000022,
+          "error": null
+        },
+        {
+          "elapsedMs": 993.6779589999969,
+          "error": null
+        },
+        {
+          "elapsedMs": 997.502542000002,
+          "error": null
+        },
+        {
+          "elapsedMs": 991.5609580000018,
+          "error": null
+        },
+        {
+          "elapsedMs": 996.075708999997,
+          "error": null
+        },
+        {
+          "elapsedMs": 998.4243339999957,
+          "error": null
+        },
+        {
+          "elapsedMs": 1005.3029999999999,
+          "error": null
+        },
+        {
+          "elapsedMs": 1007.5143330000064,
+          "error": null
+        },
+        {
+          "elapsedMs": 1025.8186249999999,
+          "error": null
+        },
+        {
+          "elapsedMs": 1014.4388330000002,
+          "error": null
+        },
+        {
+          "elapsedMs": 994.3667090000017,
+          "error": null
+        },
+        {
+          "elapsedMs": 1000.5062079999989,
+          "error": null
+        },
+        {
+          "elapsedMs": 1015.0579579999976,
+          "error": null
+        },
+        {
+          "elapsedMs": 1005.6582079999935,
+          "error": null
+        },
+        {
+          "elapsedMs": 991.4827500000029,
+          "error": null
+        },
+        {
+          "elapsedMs": 994.0298750000002,
+          "error": null
+        },
+        {
+          "elapsedMs": 995.145792000003,
+          "error": null
+        },
+        {
+          "elapsedMs": 1001.580833,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 998.4243339999957,
+      "p95Ms": 1015.0579579999976
+    },
+    "analytics90": {
+      "samples": [
+        {
+          "elapsedMs": 2413.4184160000004,
+          "error": null
+        },
+        {
+          "elapsedMs": 2465.404999999999,
+          "error": null
+        },
+        {
+          "elapsedMs": 2447.592082999996,
+          "error": null
+        },
+        {
+          "elapsedMs": 2406.880916999995,
+          "error": null
+        },
+        {
+          "elapsedMs": 2410.2048340000038,
+          "error": null
+        },
+        {
+          "elapsedMs": 2408.5969579999946,
+          "error": null
+        },
+        {
+          "elapsedMs": 2462.852291000003,
+          "error": null
+        },
+        {
+          "elapsedMs": 2409.3847090000054,
+          "error": null
+        },
+        {
+          "elapsedMs": 2404.9979999999923,
+          "error": null
+        },
+        {
+          "elapsedMs": 2425.3322920000064,
+          "error": null
+        },
+        {
+          "elapsedMs": 2411.7599999999948,
+          "error": null
+        },
+        {
+          "elapsedMs": 2501.8233749999927,
+          "error": null
+        },
+        {
+          "elapsedMs": 2673.4929580000025,
+          "error": null
+        },
+        {
+          "elapsedMs": 2533.225292000003,
+          "error": null
+        },
+        {
+          "elapsedMs": 2440.267040999999,
+          "error": null
+        },
+        {
+          "elapsedMs": 2441.2652919999964,
+          "error": null
+        },
+        {
+          "elapsedMs": 2436.1512079999957,
+          "error": null
+        },
+        {
+          "elapsedMs": 2436.556291999994,
+          "error": null
+        },
+        {
+          "elapsedMs": 2426.164374999993,
+          "error": null
+        },
+        {
+          "elapsedMs": 2417.4472499999974,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 2426.164374999993,
+      "p95Ms": 2533.225292000003
+    },
+    "analyticsAll": {
+      "samples": [
+        {
+          "elapsedMs": 4584.524541999999,
+          "error": null
+        },
+        {
+          "elapsedMs": 4611.527332999991,
+          "error": null
+        },
+        {
+          "elapsedMs": 4616.687417000008,
+          "error": null
+        },
+        {
+          "elapsedMs": 4568.5916660000075,
+          "error": null
+        },
+        {
+          "elapsedMs": 4612.252750000014,
+          "error": null
+        },
+        {
+          "elapsedMs": 4578.922874999989,
+          "error": null
+        },
+        {
+          "elapsedMs": 4595.6150420000195,
+          "error": null
+        },
+        {
+          "elapsedMs": 4645.4480419999745,
+          "error": null
+        },
+        {
+          "elapsedMs": 4575.558916999988,
+          "error": null
+        },
+        {
+          "elapsedMs": 4588.397208000009,
+          "error": null
+        },
+        {
+          "elapsedMs": 4570.455790999986,
+          "error": null
+        },
+        {
+          "elapsedMs": 4539.321457999991,
+          "error": null
+        },
+        {
+          "elapsedMs": 4532.014082999987,
+          "error": null
+        },
+        {
+          "elapsedMs": 4535.479541000008,
+          "error": null
+        },
+        {
+          "elapsedMs": 4537.427666000003,
+          "error": null
+        },
+        {
+          "elapsedMs": 4568.772749999975,
+          "error": null
+        },
+        {
+          "elapsedMs": 4549.705500000011,
+          "error": null
+        },
+        {
+          "elapsedMs": 4543.538291000004,
+          "error": null
+        },
+        {
+          "elapsedMs": 4914.964749999985,
+          "error": null
+        },
+        {
+          "elapsedMs": 4559.005417000008,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 4570.455790999986,
+      "p95Ms": 4645.4480419999745
+    },
+    "analyticsHistoryQuery": {
+      "samples": [
+        {
+          "elapsedMs": 176.85591700000805,
+          "error": null
+        },
+        {
+          "elapsedMs": 177.54966700001387,
+          "error": null
+        },
+        {
+          "elapsedMs": 174.41270799998892,
+          "error": null
+        },
+        {
+          "elapsedMs": 176.04604099999415,
+          "error": null
+        },
+        {
+          "elapsedMs": 175.59929099999135,
+          "error": null
+        },
+        {
+          "elapsedMs": 174.6083749999816,
+          "error": null
+        },
+        {
+          "elapsedMs": 175.09075000000303,
+          "error": null
+        },
+        {
+          "elapsedMs": 178.8217500000028,
+          "error": null
+        },
+        {
+          "elapsedMs": 175.16016699999454,
+          "error": null
+        },
+        {
+          "elapsedMs": 177.16312499999185,
+          "error": null
+        },
+        {
+          "elapsedMs": 174.33887499998673,
+          "error": null
+        },
+        {
+          "elapsedMs": 174.22075000000768,
+          "error": null
+        },
+        {
+          "elapsedMs": 176.60379100000137,
+          "error": null
+        },
+        {
+          "elapsedMs": 177.66224999999395,
+          "error": null
+        },
+        {
+          "elapsedMs": 177.12625000000116,
+          "error": null
+        },
+        {
+          "elapsedMs": 175.55387499998324,
+          "error": null
+        },
+        {
+          "elapsedMs": 176.92900000000373,
+          "error": null
+        },
+        {
+          "elapsedMs": 191.6442500000121,
+          "error": null
+        },
+        {
+          "elapsedMs": 177.83679199998733,
+          "error": null
+        },
+        {
+          "elapsedMs": 177.29866699999548,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 176.60379100000137,
+      "p95Ms": 178.8217500000028
+    },
+    "analyticsCurrentCardsQuery": {
+      "samples": [
+        {
+          "elapsedMs": 47.211375000013504,
+          "error": null
+        },
+        {
+          "elapsedMs": 49.24291699999594,
+          "error": null
+        },
+        {
+          "elapsedMs": 47.59079200000269,
+          "error": null
+        },
+        {
+          "elapsedMs": 47.24129100001301,
+          "error": null
+        },
+        {
+          "elapsedMs": 48.80570799999987,
+          "error": null
+        },
+        {
+          "elapsedMs": 50.42345800000476,
+          "error": null
+        },
+        {
+          "elapsedMs": 50.21087500001886,
+          "error": null
+        },
+        {
+          "elapsedMs": 48.327499999984866,
+          "error": null
+        },
+        {
+          "elapsedMs": 48.84466599998996,
+          "error": null
+        },
+        {
+          "elapsedMs": 49.95891699998174,
+          "error": null
+        },
+        {
+          "elapsedMs": 48.06204099999741,
+          "error": null
+        },
+        {
+          "elapsedMs": 49.53370899998117,
+          "error": null
+        },
+        {
+          "elapsedMs": 47.59549999999581,
+          "error": null
+        },
+        {
+          "elapsedMs": 47.74870799999917,
+          "error": null
+        },
+        {
+          "elapsedMs": 47.28049999999348,
+          "error": null
+        },
+        {
+          "elapsedMs": 48.048374999983935,
+          "error": null
+        },
+        {
+          "elapsedMs": 48.05000000001746,
+          "error": null
+        },
+        {
+          "elapsedMs": 48.0537909999839,
+          "error": null
+        },
+        {
+          "elapsedMs": 46.55945800000336,
+          "error": null
+        },
+        {
+          "elapsedMs": 47.86795799998799,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 48.05000000001746,
+      "p95Ms": 50.21087500001886
+    },
+    "submitPreview": {
+      "samples": [
+        {
+          "elapsedMs": 280.9090000000142,
+          "error": null
+        },
+        {
+          "elapsedMs": 285.69483299998683,
+          "error": null
+        },
+        {
+          "elapsedMs": 290.50445899998886,
+          "error": null
+        },
+        {
+          "elapsedMs": 295.6872919999878,
+          "error": null
+        },
+        {
+          "elapsedMs": 291.8917499999807,
+          "error": null
+        },
+        {
+          "elapsedMs": 294.72254200000316,
+          "error": null
+        },
+        {
+          "elapsedMs": 281.2020419999899,
+          "error": null
+        },
+        {
+          "elapsedMs": 280.06929200000013,
+          "error": null
+        },
+        {
+          "elapsedMs": 280.675041999988,
+          "error": null
+        },
+        {
+          "elapsedMs": 278.26458300001104,
+          "error": null
+        },
+        {
+          "elapsedMs": 281.00191699998686,
+          "error": null
+        },
+        {
+          "elapsedMs": 277.4747090000019,
+          "error": null
+        },
+        {
+          "elapsedMs": 277.98308299999917,
+          "error": null
+        },
+        {
+          "elapsedMs": 282.0324580000015,
+          "error": null
+        },
+        {
+          "elapsedMs": 278.33454100001836,
+          "error": null
+        },
+        {
+          "elapsedMs": 281.2782920000027,
+          "error": null
+        },
+        {
+          "elapsedMs": 281.0243329999794,
+          "error": null
+        },
+        {
+          "elapsedMs": 286.95395799999824,
+          "error": null
+        },
+        {
+          "elapsedMs": 283.14695900000515,
+          "error": null
+        },
+        {
+          "elapsedMs": 285.68779199998244,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 281.2020419999899,
+      "p95Ms": 294.72254200000316
+    },
+    "updatePreview": {
+      "samples": [
+        {
+          "elapsedMs": 378.14079199999105,
+          "error": null
+        },
+        {
+          "elapsedMs": 374.8116250000021,
+          "error": null
+        },
+        {
+          "elapsedMs": 374.0375420000055,
+          "error": null
+        },
+        {
+          "elapsedMs": 374.0340830000059,
+          "error": null
+        },
+        {
+          "elapsedMs": 372.88737499999115,
+          "error": null
+        },
+        {
+          "elapsedMs": 374.45624999998836,
+          "error": null
+        },
+        {
+          "elapsedMs": 374.47154100000625,
+          "error": null
+        },
+        {
+          "elapsedMs": 377.6257920000062,
+          "error": null
+        },
+        {
+          "elapsedMs": 374.24620900000446,
+          "error": null
+        },
+        {
+          "elapsedMs": 373.085625000007,
+          "error": null
+        },
+        {
+          "elapsedMs": 375.2809999999881,
+          "error": null
+        },
+        {
+          "elapsedMs": 387.0708750000049,
+          "error": null
+        },
+        {
+          "elapsedMs": 376.99683299998287,
+          "error": null
+        },
+        {
+          "elapsedMs": 376.83345799997915,
+          "error": null
+        },
+        {
+          "elapsedMs": 374.1831249999814,
+          "error": null
+        },
+        {
+          "elapsedMs": 373.93183300000965,
+          "error": null
+        },
+        {
+          "elapsedMs": 377.5129999999772,
+          "error": null
+        },
+        {
+          "elapsedMs": 378.17674999998417,
+          "error": null
+        },
+        {
+          "elapsedMs": 391.27766699998756,
+          "error": null
+        },
+        {
+          "elapsedMs": 376.831165999989,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 374.8116250000021,
+      "p95Ms": 387.0708750000049
+    },
+    "backupExport": {
+      "samples": [
+        {
+          "elapsedMs": 490.7657500000205,
+          "error": null
+        },
+        {
+          "elapsedMs": 478.74454099999275,
+          "error": null
+        },
+        {
+          "elapsedMs": 478.66608300001826,
+          "error": null
+        },
+        {
+          "elapsedMs": 478.81241600000067,
+          "error": null
+        },
+        {
+          "elapsedMs": 494.9812919999822,
+          "error": null
+        },
+        {
+          "elapsedMs": 497.6509579999838,
+          "error": null
+        },
+        {
+          "elapsedMs": 485.41787500001374,
+          "error": null
+        },
+        {
+          "elapsedMs": 472.3377920000057,
+          "error": null
+        },
+        {
+          "elapsedMs": 471.83641600000556,
+          "error": null
+        },
+        {
+          "elapsedMs": 470.30650000000605,
+          "error": null
+        },
+        {
+          "elapsedMs": 489.7383329999866,
+          "error": null
+        },
+        {
+          "elapsedMs": 487.809333000012,
+          "error": null
+        },
+        {
+          "elapsedMs": 483.26316699999734,
+          "error": null
+        },
+        {
+          "elapsedMs": 477.8061250000028,
+          "error": null
+        },
+        {
+          "elapsedMs": 474.51004100000137,
+          "error": null
+        },
+        {
+          "elapsedMs": 480.78241699998034,
+          "error": null
+        },
+        {
+          "elapsedMs": 487.88583300000755,
+          "error": null
+        },
+        {
+          "elapsedMs": 500.54154099998414,
+          "error": null
+        },
+        {
+          "elapsedMs": 475.2880839999998,
+          "error": null
+        },
+        {
+          "elapsedMs": 471.51345800000126,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 478.81241600000067,
+      "p95Ms": 497.6509579999838
+    },
+    "backupValidation": {
+      "samples": [
+        {
+          "elapsedMs": 407.8736670000071,
+          "error": null
+        },
+        {
+          "elapsedMs": 415.41104199999245,
+          "error": null
+        },
+        {
+          "elapsedMs": 427.4351660000102,
+          "error": null
+        },
+        {
+          "elapsedMs": 415.4820419999887,
+          "error": null
+        },
+        {
+          "elapsedMs": 415.0042919999978,
+          "error": null
+        },
+        {
+          "elapsedMs": 414.65179099998204,
+          "error": null
+        },
+        {
+          "elapsedMs": 427.2205419999955,
+          "error": null
+        },
+        {
+          "elapsedMs": 471.9207919999899,
+          "error": null
+        },
+        {
+          "elapsedMs": 479.06312499998603,
+          "error": null
+        },
+        {
+          "elapsedMs": 415.64199999999255,
+          "error": null
+        },
+        {
+          "elapsedMs": 424.39970800001174,
+          "error": null
+        },
+        {
+          "elapsedMs": 420.57983400000376,
+          "error": null
+        },
+        {
+          "elapsedMs": 411.6496669999906,
+          "error": null
+        },
+        {
+          "elapsedMs": 427.57287499998347,
+          "error": null
+        },
+        {
+          "elapsedMs": 412.5197920000064,
+          "error": null
+        },
+        {
+          "elapsedMs": 416.13979099999415,
+          "error": null
+        },
+        {
+          "elapsedMs": 414.61216699998477,
+          "error": null
+        },
+        {
+          "elapsedMs": 434.04683300000033,
+          "error": null
+        },
+        {
+          "elapsedMs": 423.03329099999974,
+          "error": null
+        },
+        {
+          "elapsedMs": 416.18083399999887,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 416.13979099999415,
+      "p95Ms": 471.9207919999899
+    },
+    "sqliteExport": {
+      "samples": [
+        {
+          "elapsedMs": 2.3994579999998678,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.8849999999802094,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.1934999999939464,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.2538749999948777,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.10466599999927,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.1929159999999683,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.1827500000072177,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.1462500000197906,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.2815409999748226,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.1590829999768175,
+          "error": null
+        },
+        {
+          "elapsedMs": 6.458249999996042,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.188625000009779,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.112790999992285,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.6479579999868292,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.0785000000032596,
+          "error": null
+        },
+        {
+          "elapsedMs": 3.633750000008149,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.4079170000040904,
+          "error": null
+        },
+        {
+          "elapsedMs": 4.935291000001598,
+          "error": null
+        },
+        {
+          "elapsedMs": 2.5830839999835007,
+          "error": null
+        },
+        {
+          "elapsedMs": 3.252208000019891,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 2.2538749999948777,
+      "p95Ms": 4.935291000001598
+    },
+    "base64Encoding": {
+      "samples": [
+        {
+          "elapsedMs": 313.3240839999926,
+          "error": null
+        },
+        {
+          "elapsedMs": 316.2128340000054,
+          "error": null
+        },
+        {
+          "elapsedMs": 314.5450830000045,
+          "error": null
+        },
+        {
+          "elapsedMs": 324.929999999993,
+          "error": null
+        },
+        {
+          "elapsedMs": 322.86891699998523,
+          "error": null
+        },
+        {
+          "elapsedMs": 324.50820799998473,
+          "error": null
+        },
+        {
+          "elapsedMs": 317.07687499999884,
+          "error": null
+        },
+        {
+          "elapsedMs": 314.69733300001826,
+          "error": null
+        },
+        {
+          "elapsedMs": 309.11758300001384,
+          "error": null
+        },
+        {
+          "elapsedMs": 313.7974160000158,
+          "error": null
+        },
+        {
+          "elapsedMs": 332.38858299999265,
+          "error": null
+        },
+        {
+          "elapsedMs": 311.0711659999797,
+          "error": null
+        },
+        {
+          "elapsedMs": 310.8142499999958,
+          "error": null
+        },
+        {
+          "elapsedMs": 309.32224999999744,
+          "error": null
+        },
+        {
+          "elapsedMs": 310.32829200002016,
+          "error": null
+        },
+        {
+          "elapsedMs": 314.30549999998766,
+          "error": null
+        },
+        {
+          "elapsedMs": 313.5663329999952,
+          "error": null
+        },
+        {
+          "elapsedMs": 313.877416000003,
+          "error": null
+        },
+        {
+          "elapsedMs": 314.3266660000081,
+          "error": null
+        },
+        {
+          "elapsedMs": 316.1650420000078,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 314.30549999998766,
+      "p95Ms": 324.929999999993
+    },
+    "saveAndSyntheticPublication": {
+      "samples": [
+        {
+          "elapsedMs": 1846.299250000011,
+          "error": null
+        },
+        {
+          "elapsedMs": 1792.8632080000243,
+          "error": null
+        },
+        {
+          "elapsedMs": 1770.3492499999993,
+          "error": null
+        },
+        {
+          "elapsedMs": 1812.4316659999895,
+          "error": null
+        },
+        {
+          "elapsedMs": 1766.9736249999842,
+          "error": null
+        },
+        {
+          "elapsedMs": 1817.407957999967,
+          "error": null
+        },
+        {
+          "elapsedMs": 1784.5174170000246,
+          "error": null
+        },
+        {
+          "elapsedMs": 1754.7592909999657,
+          "error": null
+        },
+        {
+          "elapsedMs": 1782.4152089999989,
+          "error": null
+        },
+        {
+          "elapsedMs": 1766.6824580000248,
+          "error": null
+        },
+        {
+          "elapsedMs": 1755.9688329999917,
+          "error": null
+        },
+        {
+          "elapsedMs": 1783.2853749999776,
+          "error": null
+        },
+        {
+          "elapsedMs": 1785.654332999955,
+          "error": null
+        },
+        {
+          "elapsedMs": 1756.587332999974,
+          "error": null
+        },
+        {
+          "elapsedMs": 1774.2604589999537,
+          "error": null
+        },
+        {
+          "elapsedMs": 1776.1104580000392,
+          "error": null
+        },
+        {
+          "elapsedMs": 1754.9627079999773,
+          "error": null
+        },
+        {
+          "elapsedMs": 1777.983166000049,
+          "error": null
+        },
+        {
+          "elapsedMs": 1787.4988749999902,
+          "error": null
+        },
+        {
+          "elapsedMs": 1776.3198749999865,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 1776.3198749999865,
+      "p95Ms": 1817.407957999967
+    },
+    "updateAndSyntheticPublication": {
+      "samples": [
+        {
+          "elapsedMs": 1499.1816249999683,
+          "error": null
+        },
+        {
+          "elapsedMs": 1477.1575420000008,
+          "error": null
+        },
+        {
+          "elapsedMs": 1672.0192079999833,
+          "error": null
+        },
+        {
+          "elapsedMs": 1551.9251659999718,
+          "error": null
+        },
+        {
+          "elapsedMs": 1487.5625419999706,
+          "error": null
+        },
+        {
+          "elapsedMs": 1486.5858330000192,
+          "error": null
+        },
+        {
+          "elapsedMs": 1472.7085840000072,
+          "error": null
+        },
+        {
+          "elapsedMs": 1493.9189999999944,
+          "error": null
+        },
+        {
+          "elapsedMs": 1463.0854160000454,
+          "error": null
+        },
+        {
+          "elapsedMs": 1464.425958000007,
+          "error": null
+        },
+        {
+          "elapsedMs": 1471.506250000035,
+          "error": null
+        },
+        {
+          "elapsedMs": 1489.5936249999795,
+          "error": null
+        },
+        {
+          "elapsedMs": 1492.9670000000042,
+          "error": null
+        },
+        {
+          "elapsedMs": 1479.969000000041,
+          "error": null
+        },
+        {
+          "elapsedMs": 1522.2063750000088,
+          "error": null
+        },
+        {
+          "elapsedMs": 1490.5015830000048,
+          "error": null
+        },
+        {
+          "elapsedMs": 1489.4590000000317,
+          "error": null
+        },
+        {
+          "elapsedMs": 1494.6490839999751,
+          "error": null
+        },
+        {
+          "elapsedMs": 1546.5190409999923,
+          "error": null
+        },
+        {
+          "elapsedMs": 1649.7664999999688,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 1489.5936249999795,
+      "p95Ms": 1649.7664999999688
+    },
+    "sameCommandRetry": {
+      "samples": [
+        {
+          "elapsedMs": 400.6525000000256,
+          "error": null
+        },
+        {
+          "elapsedMs": 457.48487500002375,
+          "error": null
+        },
+        {
+          "elapsedMs": 404.7128329999978,
+          "error": null
+        },
+        {
+          "elapsedMs": 416.3539579999633,
+          "error": null
+        },
+        {
+          "elapsedMs": 405.7642910000286,
+          "error": null
+        },
+        {
+          "elapsedMs": 411.2413339999621,
+          "error": null
+        },
+        {
+          "elapsedMs": 412.47791600000346,
+          "error": null
+        },
+        {
+          "elapsedMs": 442.17270799999824,
+          "error": null
+        },
+        {
+          "elapsedMs": 433.5459170000395,
+          "error": null
+        },
+        {
+          "elapsedMs": 413.8487089999835,
+          "error": null
+        },
+        {
+          "elapsedMs": 407.0278330000001,
+          "error": null
+        },
+        {
+          "elapsedMs": 409.2538339999737,
+          "error": null
+        },
+        {
+          "elapsedMs": 405.11262500000885,
+          "error": null
+        },
+        {
+          "elapsedMs": 438.6274589999812,
+          "error": null
+        },
+        {
+          "elapsedMs": 455.7247920000227,
+          "error": null
+        },
+        {
+          "elapsedMs": 424.59358300000895,
+          "error": null
+        },
+        {
+          "elapsedMs": 443.1883749999688,
+          "error": null
+        },
+        {
+          "elapsedMs": 444.6022080000257,
+          "error": null
+        },
+        {
+          "elapsedMs": 405.6572079999605,
+          "error": null
+        },
+        {
+          "elapsedMs": 413.64962500002,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 413.64962500002,
+      "p95Ms": 455.7247920000227
+    },
+    "restore": {
+      "samples": [
+        {
+          "elapsedMs": 2087.5172500000335,
+          "error": null
+        },
+        {
+          "elapsedMs": 2128.1931670000195,
+          "error": null
+        },
+        {
+          "elapsedMs": 2354.0572500000126,
+          "error": null
+        },
+        {
+          "elapsedMs": 2084.6883329999982,
+          "error": null
+        },
+        {
+          "elapsedMs": 2086.415500000003,
+          "error": null
+        },
+        {
+          "elapsedMs": 2078.2306659999886,
+          "error": null
+        },
+        {
+          "elapsedMs": 2096.7037080000155,
+          "error": null
+        },
+        {
+          "elapsedMs": 2068.1846249999944,
+          "error": null
+        },
+        {
+          "elapsedMs": 2095.230332999956,
+          "error": null
+        },
+        {
+          "elapsedMs": 2077.552916000015,
+          "error": null
+        },
+        {
+          "elapsedMs": 2086.3952500000014,
+          "error": null
+        },
+        {
+          "elapsedMs": 2102.573000000033,
+          "error": null
+        },
+        {
+          "elapsedMs": 2106.090666000033,
+          "error": null
+        },
+        {
+          "elapsedMs": 2081.1735409999965,
+          "error": null
+        },
+        {
+          "elapsedMs": 2076.812708000012,
+          "error": null
+        },
+        {
+          "elapsedMs": 2065.501499999955,
+          "error": null
+        },
+        {
+          "elapsedMs": 2078.2584590000333,
+          "error": null
+        },
+        {
+          "elapsedMs": 2103.6667080000043,
+          "error": null
+        },
+        {
+          "elapsedMs": 2076.0298750000075,
+          "error": null
+        },
+        {
+          "elapsedMs": 2074.683458000014,
+          "error": null
+        }
+      ],
+      "successes": 20,
+      "failures": 0,
+      "p50Ms": 2084.6883329999982,
+      "p95Ms": 2128.1931670000195
+    },
+    "reopen": {
+      "samples": [
+        {
+          "elapsedMs": 0.6953750000102445,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.7030420000082813,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.6757920000236481,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.6218750000116415,
+          "error": null
+        },
+        {
+          "elapsedMs": 0.6402499999967404,
+          "error": null
+        }
+      ],
+      "successes": 5,
+      "failures": 0,
+      "p50Ms": 0.6757920000236481,
+      "p95Ms": 0.7030420000082813
+    }
+  }
+}

@@ -191,6 +191,7 @@ import { broadcastCacheInvalidation } from './cache-invalidation-broadcaster'
 import {
   computeNotificationDryRun,
   createDevSmokeService,
+  readChromeStorageCapacity,
 } from './dev-smoke-service'
 import { registerImportHandlers } from './import-handlers'
 import { createBackupReplacementCoordinator } from './backup-replacement'
@@ -957,47 +958,58 @@ export function registerBackgroundHandlers() {
     return getAppDb().then(async ({ db }) => {
       const smoke = createDevSmokeService({
         now: () => new Date(),
-        readAnalyticsSummary: () => getAnalyticsSummary(db),
-        readQueueSummary: async () => {
-          const queue = await getTodayQueue(db, new Date())
+        readAnalyticsSummary: () =>
+          runGatedMutationQueue(() => getAnalyticsSummary(db)),
+        readQueueSummary: () =>
+          runGatedMutationQueue(async () => {
+            const queue = await getTodayQueue(db, new Date())
 
-          return {
-            dueToday: queue.dueToday,
-            newAvailable: queue.newAvailable,
-            queueLoad: queue.queueLoad,
-            recommendationReason: queue.recommendationReason,
-          }
-        },
-        readGenAiConfig: async () => {
-          const settings = await getSettings(db)
-          const ai = settings.aiAssessment
-          const secretPresence = await getAiProviderSecretPresence()
-          const hasConfiguredModel = ai.model.trim() !== ''
-
-          if (!ai.enabled || !hasConfiguredModel) {
             return {
-              enabled: false,
+              dueToday: queue.dueToday,
+              newAvailable: queue.newAvailable,
+              queueLoad: queue.queueLoad,
+              recommendationReason: queue.recommendationReason,
+            }
+          }),
+        readGenAiConfig: () =>
+          runGatedMutationQueue(async () => {
+            const settings = await getSettings(db)
+            const ai = settings.aiAssessment
+            const secretPresence = await getAiProviderSecretPresence()
+            const hasConfiguredModel = ai.model.trim() !== ''
+
+            if (!ai.enabled || !hasConfiguredModel) {
+              return {
+                enabled: false,
+                provider: ai.provider,
+                model: hasConfiguredModel ? ai.model : 'not-configured',
+                hasSecret: secretPresence[ai.provider],
+              }
+            }
+
+            return {
+              enabled: true,
               provider: ai.provider,
-              model: hasConfiguredModel ? ai.model : 'not-configured',
+              model: ai.model,
               hasSecret: secretPresence[ai.provider],
             }
-          }
-
-          return {
-            enabled: true,
-            provider: ai.provider,
-            model: ai.model,
-            hasSecret: secretPresence[ai.provider],
-          }
-        },
-        runNotificationDryRun: () => runNotificationSmokeDryRun(db),
+          }),
+        runNotificationDryRun: () =>
+          runGatedMutationQueue(() => runNotificationSmokeDryRun(db)),
         runLiveGenAi: () => runLiveGenAiSmoke(db),
+        readCapacityStorage: () =>
+          runGatedMutationQueue(() =>
+            readChromeStorageCapacity(chrome.storage.local),
+          ),
       })
 
       return devSmokeReportSchema.parse(
         await smoke.run({
           ...(request.runLiveGenAi !== undefined
             ? { runLiveGenAi: request.runLiveGenAi }
+            : {}),
+          ...(request.includeCapacity !== undefined
+            ? { includeCapacity: request.includeCapacity }
             : {}),
         }),
       )
@@ -1478,7 +1490,7 @@ async function runNotificationSmokeDryRun(db: Db) {
 }
 
 async function runLiveGenAiSmoke(db: Db) {
-  const config = await loadActiveProviderConfig(db)
+  const config = await runGatedMutationQueue(() => loadActiveProviderConfig(db))
 
   if (!config) {
     return {

@@ -5,6 +5,7 @@ import {
 } from '@/lib/fsrs'
 import {
   resolveHistoricalSchedulingEvidence,
+  type HistoricalSchedulingEvidenceResolver,
   type HistoricalSchedulingEvidenceInput,
 } from './historical-scheduling-evidence'
 
@@ -65,6 +66,7 @@ export function buildRepeatReviewPairs(
     start: Date
     end: Date
     fsrsOptions: NormalizedFsrsSchedulingOptions
+    resolveEvidence?: HistoricalSchedulingEvidenceResolver
   },
 ): RepeatReviewPair[] {
   const byCard = new Map<
@@ -85,7 +87,9 @@ export function buildRepeatReviewPairs(
       const event = ordered[index]!
       if (event.reviewedAt < options.start || event.reviewedAt > options.end)
         continue
-      const evidence = resolveHistoricalSchedulingEvidence(event)
+      const evidence = (
+        options.resolveEvidence ?? resolveHistoricalSchedulingEvidence
+      )(event)
       pairs.push({
         id: event.id,
         cardId: event.cardId,
