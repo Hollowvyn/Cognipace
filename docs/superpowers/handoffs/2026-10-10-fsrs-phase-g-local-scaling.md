@@ -2,7 +2,8 @@
 
 Status: implementation and automated measurement complete on
 `codex/fsrs-phase-g-scaling`, based on the Phase F merge `c4ce5d95` from
-`origin/main`. The [reviewed plan](../plans/2026-10-10-fsrs-phase-g-local-scaling.md)
+`origin/main`. [Draft PR #209](https://github.com/Hollowvyn/Cognipace/pull/209)
+contains the change. The [reviewed plan](../plans/2026-10-10-fsrs-phase-g-local-scaling.md)
 defines the workloads and acceptance gate. This handoff records completed
 evidence and unresolved proof; the PR must remain draft while required
 human installed-extension smoke and screenshots or a recording are pending.
