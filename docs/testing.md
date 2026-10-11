@@ -304,6 +304,21 @@ the human proof below.
 Attach redacted screen proof for the human flows before PR review or merge.
 The predecessor Phase F human preview proof remains a separate pending gate.
 
+### Phase H Local Personalization Feasibility
+
+Phase H ended with a documented defaults-retained decision; no optimizer,
+training, activation UI or storage change ships. The [Phase H handoff](./superpowers/handoffs/2026-10-11-fsrs-phase-h-personalization.md)
+links the official-package audit, sanitized disposable packaged Chrome report,
+probe source and deliberately failing same-day parity reproduction. The small
+synthetic run proved packaged WASI startup on the measured build, while the
+same-day Again model mismatch and ordinary `npm ci` platform rejection failed
+the reviewed feasibility gate. The cancellation probe was inconclusive due to
+a harness error. It did not train on
+real user data, establish personalized benefit or measure installed capacity
+for larger histories. Human smoke/visual proof is not applicable to H's final
+docs-only change; the A–G installed-extension checklists above remain pending
+until their required happy-path, edge-case and redacted visual evidence exists.
+
 ### FSRS Evidence And Recoverable Replacement
 
 Run these human happy-path and edge-case flows in a disposable installed

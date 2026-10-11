@@ -87,3 +87,7 @@
 ## Pre-implementation review
 
 Independent SPEC and Ponytail plan reviews found and resolved three blocking sequencing/data issues: the held-out benefit decision now happens per user-started run, ordinary Save/Update require a real history mutation version before chunk consistency can be claimed, and ambiguous earlier observations exclude a card's later primary-cohort predictions rather than being silently skipped. Ponytail also found a WXT lockfile/local-install mismatch; reproducible packaged proof now requires `rtk npm ci` and a recorded installed version. The approved master design already establishes the conditional pilot and defaults-retained result.
+
+## Execution outcome
+
+The disposable official-binding probe reached Task 1's decision gate and failed on same-day scheduler parity and ordinary clean installation. Its cancellation measurement was inconclusive because the harness error path was defective. Tasks 2–5 were not started; Task 6's final documentation review and Task 7's handoff/PR record complete the defaults-retained branch. No optimizer dependency, worker or product behavior remains. The [Phase H handoff](../handoffs/2026-10-11-fsrs-phase-h-personalization.md) and [sanitized evidence](../evidence/fsrs-phase-h/official-package-audit.md) record the exact outcomes. A future pilot needs a separate approved plan.

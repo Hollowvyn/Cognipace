@@ -1,0 +1,97 @@
+{
+  "stage": "feasibility",
+  "createdAt": "2026-10-11T05:21:31.983Z",
+  "chrome": "Google Chrome for Testing 151.0.7922.47",
+  "buildHash": "ab2bd768ca1180d6254c6c1af5cb1a548470e4cdc2277a78fec7ea859fc8055f",
+  "manifest": {
+    "manifest_version": 3,
+    "permissions": [
+      "storage",
+      "alarms",
+      "notifications"
+    ],
+    "content_security_policy": {
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+    }
+  },
+  "assets": {
+    "fsrs-binding.wasm32-wasi-BCb3XNhu.wasm": 598176,
+    "wasi-worker-browser-DOKMTETy.js": 191014
+  },
+  "observations": [
+    {
+      "kind": "exception",
+      "text": "Uncaught (in promise)"
+    }
+  ],
+  "crossOriginIsolated": false,
+  "sharedArrayBuffer": "function",
+  "heapBefore": 16717445,
+  "result": {
+    "status": "ok",
+    "initializedMs": 7.799999952316284,
+    "wallMs": 34.5,
+    "workerCount": 5,
+    "itemCount": 400,
+    "progress": [
+      {
+        "current": 0,
+        "total": 800,
+        "ms": 33.39999997615814
+      }
+    ],
+    "weights": [
+      13.831600189208984,
+      23.438077926635742,
+      33.81364059448242,
+      46.204166412353516,
+      6.445772171020508,
+      0.8058061599731445,
+      3.019399881362915,
+      0.0010000000474974513,
+      1.8415918350219727,
+      0.19654500484466553,
+      0.7652567028999329,
+      1.4835000038146973,
+      0.061400000005960464,
+      0.2628999948501587,
+      1.648300051689148,
+      0.5768350958824158,
+      1.8729000091552734,
+      0,
+      0,
+      0,
+      0.1269873082637787
+    ]
+  },
+  "timerTicks": 2,
+  "heapAfter": 16745100,
+  "workerTargets": 0,
+  "repeatedRuns": [
+    {
+      "status": "ok",
+      "wallMs": 16.399999976158142,
+      "workerCount": 5,
+      "workerTargetsAfter": 0,
+      "heap": 18959472,
+      "errorMessage": null
+    },
+    {
+      "status": "ok",
+      "wallMs": 18.899999976158142,
+      "workerCount": 5,
+      "workerTargetsAfter": 0,
+      "heap": 17620393,
+      "errorMessage": null
+    }
+  ],
+  "workerTargetsDuringCancel": 0,
+  "workersAtCancelRequest": 5,
+  "cancelResult": {
+    "status": "unsettled",
+    "error": "Probe timed out"
+  },
+  "workerTargetsAfterCancel": 0,
+  "heapAfterCancel": 18999670,
+  "workerTargetsAfterClose": 0
+}

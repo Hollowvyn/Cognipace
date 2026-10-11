@@ -260,6 +260,12 @@ native configuration, not a strict due-date ceiling.
 The persisted FSRS `card.due` value, stored locally as `dueAt`, is the authority
 for the next review date. Current retrievability is a separate FSRS estimate for
 display and queue ranking; it does not replace or cancel the persisted due date.
+The scheduler already adapts stability and difficulty per card. A local
+personal-weight optimizer was evaluated in Phase H, but no training or model
+activation is available: the official binding's same-day Again prediction did
+not match the authoritative scheduler, and the direct WASI dependency failed
+an ordinary clean install. The cancellation probe was inconclusive. Default weights remain active with the saved
+retention and existing daily policy; no cards or history were rescheduled.
 
 Database upgrades preserve existing history, due dates, settings and earned
 progress. Older reviews have unknown scheduling provenance rather than an
