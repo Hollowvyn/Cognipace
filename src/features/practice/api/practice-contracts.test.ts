@@ -1,12 +1,50 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  normalizedPracticeStateSchema,
   practiceOverrideLastReviewResultRequestSchema,
   practiceSaveReviewResultRequestSchema,
   practiceReviewResultSchema,
 } from './practice-contracts'
+import { serializeNormalizedPracticeState } from './practice-serializers'
 
 describe('practice runtime contracts', () => {
+  it('serializes and validates the derived eligible local day', () => {
+    const state = {
+      problemSlug: 'two-sum',
+      cardId: 'two-sum:default',
+      status: 'review' as const,
+      isSuspended: false,
+      phase: 'review' as const,
+      isStarted: true,
+      isDue: false,
+      isOverdue: false,
+      overdueDays: 0,
+      dueAt: new Date('2026-09-13T22:00:00.000Z'),
+      eligibleOn: '2026-09-14',
+      lastReviewedAt: new Date('2026-09-13T01:00:00.000Z'),
+      retrievability: 1,
+      stability: 2,
+      difficulty: 5,
+      scheduledDays: 1,
+      lapses: 0,
+      reviewCount: 1,
+      reviewHistory: [],
+      recentAttempts: [],
+      latestAttempt: null,
+    }
+
+    expect(serializeNormalizedPracticeState(state).eligibleOn).toBe(
+      '2026-09-14',
+    )
+    expect(
+      normalizedPracticeStateSchema.safeParse({
+        ...serializeNormalizedPracticeState(state),
+        eligibleOn: undefined,
+      }).success,
+    ).toBe(false)
+  })
+
   it('accepts serialized review results with a review attempt id', () => {
     expect(
       practiceReviewResultSchema.parse({
@@ -20,6 +58,7 @@ describe('practice runtime contracts', () => {
         summary: {
           phase: 'review',
           nextReviewAt: '2026-01-02T10:00:00.000Z',
+          eligibleOn: '2026-01-02',
           lastReviewedAt: '2026-01-01T10:00:00.000Z',
           reviewCount: 1,
           lapses: 0,
@@ -51,6 +90,7 @@ describe('practice runtime contracts', () => {
       summary: {
         phase: 'review',
         nextReviewAt: '2026-01-02T10:00:00.000Z',
+        eligibleOn: '2026-01-02',
         lastReviewedAt: '2026-01-01T10:00:00.000Z',
         reviewCount: 1,
         lapses: 0,

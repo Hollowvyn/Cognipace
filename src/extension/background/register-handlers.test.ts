@@ -3455,9 +3455,42 @@ describe('background handler registration', () => {
       backgroundMocks.readLeetCodeSubmissionResultInBackground,
     ).toHaveBeenCalledWith(submissionRequest)
   })
+  it('authorizes and forwards explicit extra practice without changing the response contract', async () => {
+    backgroundMocks.getTodayQueue.mockResolvedValueOnce({
+      ...todayQueue,
+      generatedAt: new Date(todayQueue.generatedAt),
+    })
+    const response = await sendRuntimeMessage('queue.getTodayQueue', {
+      surface: 'popup',
+      intent: 'extra-practice',
+    })
+
+    expectRuntimePolicy('queue.getTodayQueue', 'popup')
+    expect(backgroundMocks.getTodayQueue).toHaveBeenCalledWith(
+      backgroundMocks.db,
+      undefined,
+      'extra-practice',
+    )
+    expect(todayQueueSchema.parse(response)).toEqual(response)
+  })
 })
 
 describe('background handler serializers', () => {
+  it('defaults queue intent to automatic and rejects unknown intents', () => {
+    expect(queueRequestSchema.parse({ surface: 'popup' }).intent).toBe(
+      'automatic',
+    )
+    expect(
+      queueRequestSchema.parse({
+        surface: 'dashboard',
+        intent: 'extra-practice',
+      }).intent,
+    ).toBe('extra-practice')
+    expect(() =>
+      queueRequestSchema.parse({ surface: 'popup', intent: 'all' }),
+    ).toThrow()
+  })
+
   it('validates queue request timestamps at the runtime boundary', () => {
     expect(() =>
       queueRequestSchema.parse({

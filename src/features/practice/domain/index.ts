@@ -32,5 +32,7 @@ export {
   type PracticeProgressSummaryInput,
 } from './practice-progress'
 
+export { derivePracticeScheduleTiming } from './practice-schedule'
+
 export * from './practice-storage'
 export * from './practice-command'

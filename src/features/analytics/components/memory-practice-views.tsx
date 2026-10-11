@@ -24,9 +24,24 @@ type MemoryRow = AnalyticsViews['memoryStrength']['rows'][number]
 
 /** Shared supported-edge window; preserve every unavailable interval inside it. */
 export function memoryStrengthRows(source: readonly MemoryRow[]) {
-  return trimHistoricalEmptyEdges(source, (row) =>
-    isFiniteValue(row.medianStrengthDays),
+  return trimHistoricalEmptyEdges(
+    source,
+    (row) =>
+      isFiniteValue(row.medianStrengthDays) || (row.observedReviews ?? 0) > 0,
   )
+}
+
+export function memoryModelProvenanceText(row: MemoryRow) {
+  switch (row.modelProvenance) {
+    case 'captured':
+      return 'Recorded scheduling evidence'
+    case 'legacy-derived':
+      return 'Legacy-derived compatibility'
+    case 'mixed':
+      return 'Mixed scheduling evidence'
+    default:
+      return 'Unavailable · insufficient scheduling evidence'
+  }
 }
 
 export function MemoryStrengthView({
@@ -70,8 +85,9 @@ export function MemoryStrengthView({
                 formatDays(row.medianStrengthDays),
                 memoryRangeText(row),
                 row.eligibleReviews,
+                row.observedReviews ?? row.eligibleReviews,
                 formatSignedDays(row.medianChangeDays),
-                'Reconstructed',
+                memoryModelProvenanceText(row),
                 evidenceText(row.evidence),
                 historicalIntervalContext(row, timeFrame),
               ]}
@@ -80,8 +96,9 @@ export function MemoryStrengthView({
                 'Median strength',
                 'Middle 50%',
                 'Eligible reviews',
+                'Observed reviews',
                 'Median change',
-                'Provenance',
+                'Model provenance',
                 'Evidence',
                 'Period context',
               ]}
@@ -277,8 +294,9 @@ function MemoryTooltip({
         `Q1: ${hasSupportedRange(row) ? formatDays(row.q1) : 'Unavailable'}`,
         `Q3: ${hasSupportedRange(row) ? formatDays(row.q3) : 'Unavailable'}`,
         `Eligible reviews: ${formatCount(row.eligibleReviews)}`,
+        `Observed reviews: ${formatCount(row.observedReviews ?? row.eligibleReviews)}`,
         `Median change: ${formatSignedDays(row.medianChangeDays)}`,
-        'Provenance: Reconstructed',
+        `Model provenance: ${memoryModelProvenanceText(row)}`,
         `Evidence: ${evidenceText(row.evidence)}`,
       ]}
     />

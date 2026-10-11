@@ -1,4 +1,5 @@
 import type { DevSmokeReport } from '@/features/dev-smoke'
+import { toPracticeDateKey } from '@/features/practice'
 
 export type SmokeStatus = DevSmokeReport['checks'][number]['status']
 
@@ -87,7 +88,7 @@ export function computeNotificationDryRun(input: NotificationDryRunInput): {
     }
   }
 
-  if (input.lastNotifiedDate === toDateString(input.now)) {
+  if (input.lastNotifiedDate === toPracticeDateKey(input.now)) {
     return {
       status: 'skip',
       detail: 'A due-review reminder was already sent today.',
@@ -217,8 +218,4 @@ function redactSecrets(value: string) {
     .replace(/\bsk-ant-[A-Za-z0-9_-]+\b/g, '[redacted-secret]')
     .replace(/\bsk-[A-Za-z0-9_-]+\b/g, '[redacted-secret]')
     .replace(/\bAIza[A-Za-z0-9_-]+\b/g, '[redacted-secret]')
-}
-
-function toDateString(date: Date): string {
-  return date.toISOString().slice(0, 10)
 }

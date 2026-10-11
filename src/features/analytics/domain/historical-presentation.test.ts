@@ -5,7 +5,13 @@ import { aggregatePerformance } from './performance-presentation'
 
 import {
   normalizeFsrsSchedulingOptions,
-  replayReviewHistorySequence,
+  createFsrsSchedulerProfile,
+  createInitialFsrsCard,
+  isReviewRating,
+  scheduleReviewWithProfile,
+  serializeFsrsCardSnapshot,
+  serializeFsrsReviewLogSnapshot,
+  serializeFsrsSchedulerProfile,
 } from '@/lib/fsrs'
 
 import {
@@ -53,7 +59,7 @@ const options: HistoricalPresentationOptions = {
 function event(
   overrides: Partial<HistoricalAnalyticsReviewEvent> = {},
 ): HistoricalAnalyticsReviewEvent {
-  return {
+  const row: HistoricalAnalyticsReviewEvent = {
     cardId: 'card-1',
     fsrsReviewLog: JSON.stringify({
       rating: 'good',
@@ -73,6 +79,23 @@ function event(
     reviewedAt: new Date('2026-08-01T12:00:00.000Z'),
     topicLabels: [],
     ...overrides,
+  }
+  if (!isReviewRating(row.rating) || Object.hasOwn(overrides, 'fsrsReviewLog'))
+    return row
+  const profile = createFsrsSchedulerProfile(options.fsrsOptions)
+  const preCard = createInitialFsrsCard(row.reviewedAt)
+  const scheduled = scheduleReviewWithProfile(
+    preCard,
+    row.rating,
+    row.reviewedAt,
+    profile,
+  )
+  return {
+    ...row,
+    schedulingEvidenceKind: row.schedulingEvidenceKind ?? 'captured',
+    schedulerProfileJson: serializeFsrsSchedulerProfile(profile),
+    preCardJson: serializeFsrsCardSnapshot(preCard),
+    fsrsReviewLog: serializeFsrsReviewLogSnapshot(scheduled.log),
   }
 }
 
@@ -419,7 +442,29 @@ describe('buildHistoricalAnalyticsViews', () => {
       id: 'initial',
       reviewedAt: new Date('2026-07-31T12:00:00Z'),
     })
-    const repeat = event({ id: 'repeat', rating: 'again' })
+    const profile = createFsrsSchedulerProfile(options.fsrsOptions)
+    const preCard = scheduleReviewWithProfile(
+      createInitialFsrsCard(initial.reviewedAt),
+      'good',
+      initial.reviewedAt,
+      profile,
+    ).card
+    const repeatAt = new Date('2026-08-01T12:00:00.000Z')
+    const scheduled = scheduleReviewWithProfile(
+      preCard,
+      'again',
+      repeatAt,
+      profile,
+    )
+    const repeat = event({
+      id: 'repeat',
+      rating: 'again',
+      reviewedAt: repeatAt,
+      schedulingEvidenceKind: 'captured',
+      schedulerProfileJson: serializeFsrsSchedulerProfile(profile),
+      preCardJson: serializeFsrsCardSnapshot(preCard),
+      fsrsReviewLog: serializeFsrsReviewLogSnapshot(scheduled.log),
+    })
     const views = buildHistoricalAnalyticsViews([repeat, initial], options)
     expect(views.observedRecallVsFsrs.rows[0]).toMatchObject({
       pairedReviews: 1,
@@ -428,6 +473,75 @@ describe('buildHistoricalAnalyticsViews', () => {
       evidence: 'measured',
     })
     expect(views.observedRecallVsFsrs.rows[0]?.fsrsEstimate).toBeGreaterThan(0)
+  })
+
+  it('labels captured, legacy compatibility, mixed, and unavailable memory evidence without losing observed reviews', () => {
+    const legacy = event({
+      id: 'legacy',
+      cardId: 'legacy-card',
+      schedulingEvidenceKind: 'legacy-derived',
+    })
+    const captured = event({ id: 'captured', cardId: 'captured-card' })
+    const unknown = event({
+      id: 'unknown',
+      cardId: 'unknown-card',
+      fsrsReviewLog: null,
+    })
+    const view = (events: HistoricalAnalyticsReviewEvent[]) =>
+      buildHistoricalAnalyticsViews(events, options).memoryStrength.rows[0]
+
+    expect(view([captured])).toMatchObject({
+      modelProvenance: 'captured',
+      observedReviews: 1,
+      eligibleReviews: 1,
+    })
+    expect(view([legacy])).toMatchObject({
+      modelProvenance: 'legacy-derived',
+      observedReviews: 1,
+      eligibleReviews: 1,
+    })
+    expect(view([captured, legacy, unknown])).toMatchObject({
+      modelProvenance: 'mixed',
+      observedReviews: 3,
+      eligibleReviews: 2,
+    })
+    expect(view([unknown])).toMatchObject({
+      modelProvenance: 'unknown',
+      observedReviews: 1,
+      eligibleReviews: 0,
+    })
+  })
+
+  it('does not subtract a partial model cohort from the full observed repeat rate', () => {
+    const events = [
+      event({
+        id: 'captured-first',
+        cardId: 'captured-card',
+        reviewedAt: new Date('2026-07-31T12:00:00Z'),
+      }),
+      event({ id: 'captured-repeat', cardId: 'captured-card', rating: 'good' }),
+      event({
+        id: 'unknown-first',
+        cardId: 'unknown-card',
+        reviewedAt: new Date('2026-07-31T12:00:00Z'),
+        fsrsReviewLog: null,
+      }),
+      event({
+        id: 'unknown-repeat',
+        cardId: 'unknown-card',
+        rating: 'again',
+        fsrsReviewLog: null,
+      }),
+    ]
+    const row = buildHistoricalAnalyticsViews(events, options)
+      .observedRecallVsFsrs.rows[0]
+    expect(row).toMatchObject({
+      pairedReviews: 2,
+      modelSampleSize: 1,
+      observedRecall: 0.5,
+      modelProvenance: 'mixed',
+      difference: null,
+    })
   })
 
   it.each([0, 1])('fits both personal percentage targets at %s', (target) => {
@@ -583,12 +697,8 @@ describe('buildHistoricalAnalyticsViews', () => {
     expect(withFour.memoryStrength.rows[0]?.q3).not.toBeNull()
   })
 
-  it('derives post-review Memory Strength from the replayed post-review card rather than the stored log snapshot', () => {
+  it('does not treat a detached log as a post-review memory estimate', () => {
     const reviewedAt = new Date('2026-08-01T12:00:00.000Z')
-    const replayedPostReview = replayReviewHistorySequence(
-      [{ rating: 'good', reviewedAt }],
-      options.fsrsOptions,
-    )[0]!.card.stability
     const views = buildHistoricalAnalyticsViews(
       [
         event({
@@ -610,10 +720,7 @@ describe('buildHistoricalAnalyticsViews', () => {
       options,
     )
 
-    expect(views.memoryStrength.rows[0]?.medianStrengthDays).toBeCloseTo(
-      replayedPostReview,
-    )
-    expect(views.memoryStrength.rows[0]?.medianStrengthDays).not.toBe(999)
+    expect(views.memoryStrength.rows[0]?.medianStrengthDays).toBeNull()
   })
 
   it('builds valid-rating composition rows with zero categories and no invented empty stack', () => {

@@ -141,7 +141,7 @@ export class PracticeRepository {
       currentCard,
       input.rating,
       reviewedAt,
-      createFsrsSchedulerProfile({ targetRetention: input.targetRetention }),
+      createActiveDailyProfile(input.targetRetention),
     )
     const assessmentEvidenceJson = serializeAssessmentEvidence(
       input.assessmentEvidence,
@@ -969,6 +969,17 @@ export class PracticeRepository {
         },
       })
   }
+}
+
+function createActiveDailyProfile(targetRetention: number | undefined) {
+  return createFsrsSchedulerProfile({
+    ...(targetRetention === undefined ? {} : { targetRetention }),
+    maximumInterval: 180,
+    enableShortTerm: false,
+    learningSteps: [],
+    relearningSteps: [],
+    enableFuzz: false,
+  })
 }
 
 type PracticeReadDb = Pick<Db, 'select'>

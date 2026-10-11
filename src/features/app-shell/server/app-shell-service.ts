@@ -87,7 +87,7 @@ async function getMainAppShellData(db: Db, now: Date) {
     generatedAt: now.toISOString(),
     status: {
       label: 'Practice ready',
-      detail: `${queue.dueCount} due, ${queue.newCount} new, ${queue.reinforcementCount} reinforcement available.`,
+      detail: `${queue.dueCount} due, ${queue.newCount} new.`,
     },
     metrics: createAppShellMetrics({
       dueCount: queue.dueCount,

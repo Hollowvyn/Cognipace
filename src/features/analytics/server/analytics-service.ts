@@ -3,11 +3,13 @@ import {
   getTargetRetentionDuration,
   normalizeFsrsSchedulingOptions,
   parseFsrsCardState,
+  parseSerializedFsrsSchedulerProfile,
   type FsrsCardSnapshot,
 } from '@/lib/fsrs'
 
 import type { Db } from '@/platform/db'
 
+import { derivePracticeScheduleTiming } from '@/features/practice'
 import { getPracticeProgressSummary } from '@/features/practice/server/practice-service'
 import { getSettings } from '@/features/settings/server/settings-service'
 import type { AnalyticsRange } from '../api/analytics-contracts'
@@ -16,7 +18,6 @@ import {
   getReviewDayStats,
   getReviewHistory,
   getCurrentFsrsCards,
-  getUpcomingCards,
   type CurrentFsrsCard,
 } from '../data/analytics-repository'
 
@@ -44,7 +45,6 @@ import {
   buildAnalyticsBucketsFromTimeFrame,
   type AnalyticsBucket,
 } from '../domain/analytics-range-policy'
-import { buildForecastBounds } from '../domain/analytics-time'
 import { buildAnalyticsHistoryTimeFrame } from '../domain/analytics-history-frame'
 import { buildAnalyticsBacklogTimeFrame } from '../domain/analytics-history-window'
 import type { AnalyticsTimeFrame } from '../domain/analytics-time'
@@ -73,15 +73,12 @@ export async function getAnalyticsSummary(
   const range = nowOrOptions instanceof Date ? 30 : nowOrOptions.range
   const timeZone =
     nowOrOptions instanceof Date ? 'UTC' : (nowOrOptions.timeZone ?? 'UTC')
-  const forecastBounds = buildForecastBounds({ asOf: now, timeZone })
-  const fourteenDaysLater = new Date(forecastBounds.end)
 
-  const [dayStats, reviewHistory, currentFsrsCards, upcomingCards, settings] =
+  const [dayStats, reviewHistory, currentFsrsCards, settings] =
     await Promise.all([
       getReviewDayStats(db),
       getReviewHistory(db),
       getCurrentFsrsCards(db),
-      getUpcomingCards(db, fourteenDaysLater),
       getSettings(db),
     ])
 
@@ -110,6 +107,7 @@ export async function getAnalyticsSummary(
 
   const practiceProgress = await getPracticeProgressSummary(db, {
     dailyGoal: settings.practice.dailyGoal,
+    now,
   })
 
   // Step 4: build domain objects
@@ -166,11 +164,14 @@ export async function getAnalyticsSummary(
       slug: card.slug,
       title: card.title,
       retrievability: card.retrievability,
+      ...(card.modelProvenance
+        ? { modelProvenance: card.modelProvenance }
+        : {}),
       targetDurationDays: card.fsrsCard
         ? getTargetRetentionDuration(
             card.fsrsCard,
             fsrsOptions.targetRetention,
-            fsrsOptions,
+            card.modelOptions ?? fsrsOptions,
           )
         : null,
       dueAt: card.dueAt,
@@ -251,7 +252,9 @@ export async function getAnalyticsSummary(
     }),
   )
   const predictedRecall = buildMetricSummary(
-    pairedReviews.map((pair) => pair.estimate),
+    pairedReviews.flatMap((pair) =>
+      pair.estimate === null ? [] : [pair.estimate],
+    ),
   )
   const practiceRhythm = buildPracticeRhythmPoints(
     analyticsReviewHistory,
@@ -323,7 +326,26 @@ export async function getAnalyticsSummary(
         ),
   }
   const upcomingLoad = buildUpcomingLoadPoints(
-    upcomingCards.map((card) => card.dueAt),
+    currentFsrsCards.flatMap((card) => {
+      if (
+        card.isSuspended ||
+        card.practiceStatus === 'suspended' ||
+        (settings.practice.problemFilters.skipPremium && card.isPremium)
+      )
+        return []
+      const timing = derivePracticeScheduleTiming({
+        dueAt: card.dueAt,
+        lastReviewedAt: card.lastReviewAt ?? card.practiceLastReviewedAt,
+        isStarted:
+          card.reps > 0 ||
+          card.lastReviewAt !== null ||
+          card.practiceLastReviewedAt !== null,
+        isSuspended: false,
+        now,
+        timeZone: presentationTimeFrame.timeZone,
+      })
+      return timing.eligibleOn ? [timing.eligibleOn] : []
+    }),
     now,
     presentationTimeFrame.timeZone,
   )
@@ -363,20 +385,40 @@ function buildCurrentAnalyticsCards(
 ): AnalyticsCurrentCard[] {
   return cards.map((card) => {
     const fsrsCard = buildCurrentCard(card)
+    let cardOptions:
+      | ReturnType<typeof normalizeFsrsSchedulingOptions>
+      | import('@/lib/fsrs').FsrsEffectiveParameters = fsrsOptions
+    let modelProvenance: AnalyticsCurrentCard['modelProvenance'] =
+      'compatibility'
+    if (
+      card.lastSchedulerProfileJson &&
+      card.lastSchedulingEvidenceKind !== 'unknown'
+    ) {
+      try {
+        cardOptions = parseSerializedFsrsSchedulerProfile(
+          card.lastSchedulerProfileJson,
+        ).parameters
+        modelProvenance = card.lastSchedulingEvidenceKind
+      } catch {
+        // Explicit compatibility estimate retains the visible current card.
+      }
+    }
     return {
       fsrsCard,
+      modelOptions: cardOptions,
+      modelProvenance,
       cardId: card.cardId,
       slug: card.problemSlug,
       title: card.title,
       topics: card.topics,
-      retrievability: getRetrievability(fsrsCard, now, fsrsOptions),
+      retrievability: getRetrievability(fsrsCard, now, cardOptions),
       targetRetention: fsrsOptions.targetRetention,
       stabilityDays: card.stability,
       difficulty: card.difficulty,
       lapseCount: card.lapses,
       dueAt: card.dueAt,
       createdAt: card.createdAt,
-      lastReviewAt: card.lastReviewAt,
+      lastReviewAt: card.lastReviewAt ?? card.practiceLastReviewedAt,
       suspended: card.isSuspended || card.practiceStatus === 'suspended',
     }
   })
@@ -393,7 +435,7 @@ function buildCurrentCard(card: CurrentFsrsCard): FsrsCardSnapshot {
     reps: card.reps,
     lapses: card.lapses,
     state: parseFsrsCardState(card.state),
-    lastReviewAt: card.lastReviewAt,
+    lastReviewAt: card.lastReviewAt ?? card.practiceLastReviewedAt,
   }
 }
 

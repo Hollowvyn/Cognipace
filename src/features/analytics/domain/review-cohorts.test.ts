@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import * as fsrs from '@/lib/fsrs'
 
 import type { AnalyticsReviewEvent } from './chart-data'
@@ -30,8 +30,6 @@ function event(
     ...overrides,
   }
 }
-
-afterEach(() => vi.restoreAllMocks())
 
 describe('selectFirstRecordedAttempts', () => {
   it('selects one raw chronological record per problem across modes, cards, and topics without mutating input', () => {
@@ -83,7 +81,34 @@ describe('selectFirstRecordedAttempts', () => {
 })
 
 describe('buildRepeatReviewPairs', () => {
-  it('replays full per-card valid history and pairs only repeats inside the selected range', () => {
+  it('keeps observed repeats when recorded scheduling evidence is missing', () => {
+    const pairs = buildRepeatReviewPairs(
+      [event(), event({ id: 'repeat', rating: 'again' })],
+      options,
+    )
+    expect(pairs).toMatchObject([
+      { id: 'repeat', rating: 'again', estimate: null, provenance: 'unknown' },
+    ])
+  })
+
+  it('uses observed chronology for repeat eligibility despite a different application sequence', () => {
+    const firstApplied = event({
+      id: 'z-first',
+      applicationSequence: 1,
+      reviewedAt: new Date('2026-08-02T12:00:00Z'),
+    })
+    const secondApplied = event({
+      id: 'a-second',
+      applicationSequence: 2,
+      reviewedAt: new Date('2026-08-01T12:00:00Z'),
+    })
+    expect(
+      buildRepeatReviewPairs([secondApplied, firstApplied], options).map(
+        (pair) => pair.id,
+      ),
+    ).toEqual(['z-first'])
+  })
+  it('keeps full per-card observed history and pairs only repeats inside the selected range', () => {
     const initial = event({
       reviewedAt: new Date('2026-07-31T12:00:00Z'),
       rating: 'again',
@@ -96,21 +121,14 @@ describe('buildRepeatReviewPairs', () => {
       initial,
     ]
     const pairs = buildRepeatReviewPairs(rows, options)
-    const priorCard = fsrs.replayReviewHistorySequence(
-      [{ rating: 'again', reviewedAt: initial.reviewedAt }],
-      options.fsrsOptions,
-    )[0]!.card
     expect(pairs).toEqual([
       {
         id: 'repeat',
         cardId: 'card',
         reviewedAt: repeat.reviewedAt,
         rating: 'hard',
-        estimate: fsrs.getRetrievability(
-          priorCard,
-          repeat.reviewedAt,
-          options.fsrsOptions,
-        ),
+        estimate: null,
+        provenance: 'unknown',
       },
     ])
     expect(buildRepeatReviewPairs([repeat], options)).toEqual([])
@@ -128,23 +146,44 @@ describe('buildRepeatReviewPairs', () => {
     expect(pairs.map((pair) => pair.id)).toEqual(['b-good'])
   })
 
-  it.each([0, 1])(
-    'keeps an actual repeat estimate at the probability endpoint %s',
-    (estimate) => {
-      vi.spyOn(fsrs, 'getRetrievability').mockReturnValue(estimate)
-      expect(
-        buildRepeatReviewPairs([event(), event({ id: 'repeat' })], options),
-      ).toMatchObject([{ estimate }])
-    },
-  )
-
-  it.each([Number.NaN, Number.POSITIVE_INFINITY, -0.1, 1.1])(
-    'excludes unavailable repeat estimates %s',
-    (estimate) => {
-      vi.spyOn(fsrs, 'getRetrievability').mockReturnValue(estimate)
-      expect(
-        buildRepeatReviewPairs([event(), event({ id: 'repeat' })], options),
-      ).toEqual([])
-    },
-  )
+  it('uses a recorded custom profile for a captured repeat instead of current options', () => {
+    const profile = fsrs.createFsrsSchedulerProfile({ targetRetention: 0.75 })
+    const firstAt = new Date('2026-08-01T12:00:00Z')
+    const repeatAt = new Date('2026-08-02T12:00:00Z')
+    const preCard = fsrs.scheduleReviewWithProfile(
+      fsrs.createInitialFsrsCard(firstAt),
+      'good',
+      firstAt,
+      profile,
+    ).card
+    const scheduled = fsrs.scheduleReviewWithProfile(
+      preCard,
+      'hard',
+      repeatAt,
+      profile,
+    )
+    const pairs = buildRepeatReviewPairs(
+      [
+        event({ id: 'initial', reviewedAt: firstAt, applicationSequence: 1 }),
+        event({
+          id: 'repeat',
+          rating: 'hard',
+          reviewedAt: repeatAt,
+          applicationSequence: 2,
+          schedulingEvidenceKind: 'captured',
+          schedulerProfileJson: fsrs.serializeFsrsSchedulerProfile(profile),
+          preCardJson: fsrs.serializeFsrsCardSnapshot(preCard),
+          fsrsReviewLog: fsrs.serializeFsrsReviewLogSnapshot(scheduled.log),
+        }),
+      ],
+      options,
+    )
+    expect(pairs).toMatchObject([
+      {
+        id: 'repeat',
+        provenance: 'captured',
+        estimate: fsrs.getRetrievability(preCard, repeatAt, profile.parameters),
+      },
+    ])
+  })
 })

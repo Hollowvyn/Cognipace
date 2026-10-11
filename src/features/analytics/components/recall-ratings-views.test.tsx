@@ -29,6 +29,8 @@ function recallRow(
     observedRecall: 5 / 6,
     fsrsEstimate: 0.9,
     difference: -0.0664,
+    modelSampleSize: 6,
+    modelProvenance: 'captured',
     provenance: 'reconstructed',
     evidence: 'measured',
     ...overrides,
@@ -40,6 +42,8 @@ const missing: Partial<RecallRow> = {
   fsrsEstimate: null,
   difference: null,
   pairedReviews: 0,
+  modelSampleSize: 0,
+  modelProvenance: 'unknown',
   recalledCount: 0,
   evidence: 'not-measured',
 }
@@ -151,7 +155,7 @@ describe('Recall historical view composition', () => {
       '83.3%',
       '−6.6 pp',
       'Target Recall87%',
-      'Reconstructed',
+      'Historical model estimate from recorded inputs',
     ])
       expect(tooltip()).toHaveTextContent(value)
     fireEvent.keyDown(inspect(), {
@@ -170,14 +174,15 @@ describe('Recall historical view composition', () => {
       within(row)
         .getAllByRole('cell')
         .map((cell) => cell.textContent)
-        .slice(0, 7),
+        .slice(0, 8),
     ).toEqual([
       '5',
       '6',
       '83.3%',
       '90%',
       '−6.6 pp',
-      'Reconstructed',
+      '6',
+      'Historical model estimate from recorded inputs',
       'Measured',
     ])
     await user.click(screen.getByRole('button', { name: 'Next' }))

@@ -37,8 +37,10 @@ export const queryKeys = {
   },
   queue: {
     all: ['today-queue'] as const,
-    today: (at?: string | null) =>
-      [...queryKeys.queue.all, at ?? 'now'] as const,
+    today: (
+      at?: string | null,
+      intent: 'automatic' | 'extra-practice' = 'automatic',
+    ) => [...queryKeys.queue.all, at ?? 'now', intent] as const,
   },
   settings: {
     all: ['settings'] as const,

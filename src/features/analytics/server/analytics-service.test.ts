@@ -4,8 +4,13 @@ import { eq } from 'drizzle-orm'
 
 import {
   createInitialFsrsCard,
+  createFsrsSchedulerProfile,
+  getRetrievability,
+  parseFsrsCardState,
   defaultFsrsCardKind,
-  scheduleReview,
+  scheduleReviewWithProfile,
+  serializeFsrsCardSnapshot,
+  serializeFsrsSchedulerProfile,
   serializeFsrsReviewLogSnapshot,
   type ReviewRating,
 } from '@/lib/fsrs'
@@ -14,6 +19,8 @@ import type { Db } from '@/platform/db'
 import { createTestDb } from '@/platform/db/test-db'
 import {
   fsrsCards,
+  fsrsSchedulerProfiles,
+  practiceReviewEvidence,
   problemPractice,
   problemTopics,
   problems,
@@ -22,12 +29,65 @@ import {
 } from '@/platform/db/schema'
 
 import { updateSettings } from '@/features/settings/server/settings-service'
+import { getTodayQueue } from '@/features/queue/server/queue-service'
 import { analyticsSummarySchema } from '../api/analytics-contracts'
 import { createTopicRatingCountMatrix } from '@/testing/analytics-fixtures'
 import { calculateAnalyticsReadiness } from '../domain/analytics-readiness'
 import { getAnalyticsSummary } from './analytics-service'
 
 describe('getAnalyticsSummary dashboard views', () => {
+  it('uses the latest recorded card profile after Settings change while keeping the saved target visible', async () => {
+    const handle = await createTestDb({ seed: false })
+    const slug = 'profiled-future'
+    const lastReviewAt = new Date('2026-08-10T12:00:00.000Z')
+    const now = new Date('2026-08-20T12:00:00.000Z')
+    const dueAt = new Date('2026-08-30T12:00:00.000Z')
+    await insertAnalyticsProblem(handle.db, slug, 'Profiled future', [])
+    await insertAnalyticsHistory(handle.db, slug, {
+      id: `${slug}:default`,
+      dates: [lastReviewAt],
+      ratings: ['good'],
+      correct: [true],
+      dueAt,
+      stability: 1,
+      difficulty: 5,
+    })
+    await updateSettings(handle.db, { review: { targetRetention: 0.9 } })
+    const [savedCard] = await handle.db
+      .select()
+      .from(fsrsCards)
+      .where(eq(fsrsCards.id, `${slug}:default`))
+    const card = {
+      dueAt: new Date(savedCard!.dueAt),
+      stability: savedCard!.stability,
+      difficulty: savedCard!.difficulty,
+      elapsedDays: savedCard!.elapsedDays,
+      scheduledDays: savedCard!.scheduledDays,
+      learningSteps: savedCard!.learningSteps,
+      reps: savedCard!.reps,
+      lapses: savedCard!.lapses,
+      state: parseFsrsCardState(savedCard!.state),
+      lastReviewAt,
+    }
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
+    const row = summary.views.retentionMap.rows.find(
+      (candidate) => candidate.slug === slug,
+    )
+    expect(row).toMatchObject({
+      modelProvenance: 'captured',
+      targetRetention: 0.9,
+      dueAt: dueAt.toISOString(),
+    })
+    expect(row!.retrievability).toBeCloseTo(
+      getRetrievability(
+        card,
+        now,
+        createFsrsSchedulerProfile({ targetRetention: 0.85 }).parameters,
+      ),
+    )
+    expect(row!.retrievability).toBeLessThan(0.9)
+  })
+
   it.each([30, 90, 'all'] as const)(
     'aggregates truthful raw selected activity for %s before chart eligibility and serializes it',
     async (range) => {
@@ -891,7 +951,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     ).toEqual(summary.views.topicPerformance.rows)
   })
 
-  it('keeps never-reviewed cards in tracked and workload metrics, not fragile knowledge', async () => {
+  it('excludes never-reviewed cards from the review forecast', async () => {
     const handle = await createTestDb({ seed: false })
     const now = new Date('2026-01-31T12:00:00.000Z')
 
@@ -901,6 +961,15 @@ describe('getAnalyticsSummary dashboard views', () => {
     await insertNeverReviewedCard(handle.db, 'new-problem', {
       dueAt: new Date('2026-02-01T12:00:00.000Z'),
     })
+    await handle.db
+      .update(problemPractice)
+      .set({
+        status: 'new',
+        lastReviewedAt: null,
+        attemptCount: 0,
+        solvedCount: 0,
+      })
+      .where(eq(problemPractice.problemSlug, 'new-problem'))
 
     const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
 
@@ -909,7 +978,90 @@ describe('getAnalyticsSummary dashboard views', () => {
         (sum, point) => sum + point.dueCount,
         0,
       ),
-    ).toBe(1)
+    ).toBe(0)
+  })
+
+  it('postpones a legacy card with only a Practice review time in both Queue and Analytics', async () => {
+    const handle = await createTestDb({ seed: false })
+    const slug = 'legacy-reviewed-today'
+    const now = new Date('2026-01-31T12:00:00.000Z')
+    const reviewedAt = new Date('2026-01-31T10:00:00.000Z')
+    await insertAnalyticsProblem(handle.db, slug, 'Legacy Reviewed Today', [])
+    await insertAnalyticsHistory(handle.db, slug, {
+      id: `${slug}:default`,
+      dates: [reviewedAt],
+      ratings: ['good'],
+      correct: [true],
+      dueAt: now,
+      stability: 4,
+      difficulty: 5,
+    })
+    await handle.db
+      .update(problemPractice)
+      .set({ lastReviewedAt: reviewedAt.getTime() })
+      .where(eq(problemPractice.problemSlug, slug))
+    await handle.db
+      .update(fsrsCards)
+      .set({ lastReviewAt: null })
+      .where(eq(fsrsCards.id, `${slug}:default`))
+
+    const queue = await getTodayQueue(handle.db, now)
+    const summary = await getAnalyticsSummary(handle.db, {
+      range: 30,
+      now,
+      timeZone: 'UTC',
+    })
+    const forecast = summary.views.upcomingReviewLoad.rows
+
+    expect(queue.dueToday).toBe(0)
+    expect(queue.items).toEqual([])
+    expect(forecast[0]).toMatchObject({
+      date: '2026-01-31',
+      dueCount: 0,
+      overdueCount: 0,
+    })
+    expect(forecast[1]).toMatchObject({
+      date: '2026-02-01',
+      dueCount: 1,
+      overdueCount: 0,
+    })
+    expect(forecast.reduce((total, day) => total + day.dueCount, 0)).toBe(1)
+  })
+
+  it('matches the filtered Queue due count for a premium reviewed card', async () => {
+    const handle = await createTestDb({ seed: false })
+    const now = new Date('2026-01-31T12:00:00.000Z')
+    const slug = 'premium-due'
+    await insertAnalyticsProblem(handle.db, slug, 'Premium Due', [])
+    await handle.db
+      .update(problems)
+      .set({ isPremium: true })
+      .where(eq(problems.slug, slug))
+    await insertAnalyticsHistory(handle.db, slug, {
+      id: `${slug}:default`,
+      dates: [new Date('2026-01-01T12:00:00.000Z')],
+      ratings: ['good'],
+      correct: [true],
+      dueAt: new Date('2026-01-30T12:00:00.000Z'),
+      stability: 10,
+      difficulty: 5,
+    })
+    await updateSettings(handle.db, {
+      practice: { problemFilters: { skipPremium: true } },
+    })
+
+    const queue = await getTodayQueue(handle.db, now)
+    const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
+
+    expect(queue.dueToday).toBe(0)
+    expect(summary.views.upcomingReviewLoad.rows[0]).toMatchObject({
+      dueCount: 0,
+      overdueCount: queue.dueToday,
+    })
+    expect(summary.views.retentionMap.rows).toEqual(
+      expect.arrayContaining([expect.objectContaining({ slug })]),
+    )
+    expect(summary.views.memorySignals.totalQualifying).toBeGreaterThan(0)
   })
 
   it('derives chart metrics from full history and current FSRS state', async () => {
@@ -1032,7 +1184,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     },
   )
 
-  it('keeps sparse reconstructed overdue history unready and preserves null bucket gaps', async () => {
+  it('stops overdue reconstruction at an evidence gap and resumes at later captured reviews', async () => {
     const handle = await createTestDb({ seed: false })
     const now = new Date('2026-08-13T12:00:00.000Z')
     const dates = Array.from({ length: 30 }, (_, index) => {
@@ -1064,8 +1216,8 @@ describe('getAnalyticsSummary dashboard views', () => {
     const summary = await getAnalyticsSummary(handle.db, { range: 30, now })
 
     expect(summary.historicalReadiness.overdueBacklog).toMatchObject({
-      ready: false,
-      assessments: 3,
+      ready: true,
+      assessments: 29,
     })
     expect(
       summary.views.overdueBacklog.rows.some(
@@ -1798,12 +1950,28 @@ async function insertAnalyticsHistory(
   },
 ) {
   const initialCard = createInitialFsrsCard(input.dates[0])
+  const profile = createFsrsSchedulerProfile({ targetRetention: 0.85 })
   let card = initialCard
   const rows = []
+  const evidenceRows = []
 
   for (const [index, reviewedAt] of input.dates.entries()) {
-    const scheduled = scheduleReview(card, input.ratings[index]!, reviewedAt, {
-      targetRetention: 0.85,
+    const preCard = card
+    const scheduled = scheduleReviewWithProfile(
+      card,
+      input.ratings[index]!,
+      reviewedAt,
+      profile,
+    )
+    evidenceRows.push({
+      reviewAttemptId: `${input.id}:${index}`,
+      cardId: input.id,
+      applicationSequence: index + 1,
+      revision: 0,
+      sequenceSource: 'applied',
+      schedulingEvidenceKind: 'captured',
+      schedulerProfileId: 'analytics-test:profile:85',
+      preCardJson: serializeFsrsCardSnapshot(preCard),
     })
     rows.push({
       id: `${input.id}:${index}`,
@@ -1839,6 +2007,15 @@ async function insertAnalyticsHistory(
     updatedAt: input.dates.at(-1)!.getTime(),
   })
   await db.insert(reviewAttempts).values(rows)
+  await db
+    .insert(fsrsSchedulerProfiles)
+    .values({
+      id: 'analytics-test:profile:85',
+      profileJson: serializeFsrsSchedulerProfile(profile),
+      createdAt: input.dates[0]!.getTime(),
+    })
+    .onConflictDoNothing()
+  await db.insert(practiceReviewEvidence).values(evidenceRows)
 }
 
 async function insertNeverReviewedCard(

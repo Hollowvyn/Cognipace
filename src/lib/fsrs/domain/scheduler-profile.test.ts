@@ -8,10 +8,42 @@ import {
   parseSerializedFsrsSchedulerProfile,
   projectReviewSchedule,
   scheduleReview,
+  scheduleReviewWithProfile,
   serializeFsrsSchedulerProfile,
 } from '..'
 
 describe('effective FSRS profiles', () => {
+  it.each([0.75, 0.9])(
+    'round-trips the %s daily profile without changing scheduling',
+    (targetRetention) => {
+      const options = {
+        targetRetention,
+        maximumInterval: 180,
+        enableShortTerm: false,
+        learningSteps: [],
+        relearningSteps: [],
+        enableFuzz: false,
+      } as const
+      const profile = createFsrsSchedulerProfile(options)
+      const restored = parseSerializedFsrsSchedulerProfile(
+        serializeFsrsSchedulerProfile(profile),
+      )
+      const initial = createInitialFsrsCard(at)
+      const direct = scheduleReview(initial, 'good', at, options)
+      const captured = scheduleReviewWithProfile(initial, 'good', at, restored)
+
+      expect(profile.parameters).toMatchObject(options)
+      expect(restored).toEqual(profile)
+      expect(captured.card).toEqual(direct.card)
+      expect(captured.log).toEqual(direct.log)
+      expect(captured.context.profile).toEqual(profile)
+      expect(captured.card.state).toBe('review')
+      expect(captured.card.dueAt).toEqual(
+        new Date(at.getTime() + captured.card.scheduledDays * dayMs),
+      )
+    },
+  )
+
   it('records the installed engine and round-trips a detached effective profile', () => {
     const weights = [...default_w]
     const learningSteps = ['12h', '23h'] as const
@@ -279,3 +311,4 @@ describe('effective FSRS profiles', () => {
 })
 
 const at = new Date('2026-10-04T10:00:00.000Z')
+const dayMs = 86_400_000

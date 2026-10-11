@@ -1,9 +1,10 @@
+import { derivePracticeScheduleTiming } from '@/features/practice'
+
 import {
   buildAdaptivePercentageDomain,
   buildLogDurationDomain,
   type AnalyticsScale,
 } from './analytics-scales'
-import { getAnalyticsDateKey } from './analytics-time'
 
 export type RetentionMapStatus = 'on-target' | 'watch' | 'needs-attention'
 export interface RetentionMapStatusCounts {
@@ -24,6 +25,7 @@ export interface CurrentStateAnalyticsInput {
   slug: string
   title: string
   retrievability: number
+  modelProvenance?: 'captured' | 'legacy-derived' | 'compatibility'
   targetDurationDays: number | null
   dueAt: Date
   difficulty: number
@@ -58,6 +60,7 @@ export interface RetentionMapRow {
   slug: string
   title: string
   retrievability: number
+  modelProvenance?: 'captured' | 'legacy-derived' | 'compatibility'
   targetRetention: number
   targetGap: number
   targetDurationDays: number
@@ -102,6 +105,9 @@ export function buildCurrentStateAnalyticsViews(
         slug: input.slug,
         title: input.title,
         retrievability: input.retrievability,
+        ...(input.modelProvenance
+          ? { modelProvenance: input.modelProvenance }
+          : {}),
         targetRetention: options.targetRetention,
         targetGap: input.retrievability - options.targetRetention,
         targetDurationDays,
@@ -238,20 +244,15 @@ function buildMemorySignalCandidate(
   const belowRecall =
     Number.isFinite(input.retrievability) &&
     input.retrievability < options.targetRetention
-  const overdue = isOverdueOnCalendarDate(
-    input.dueAt,
-    options.asOf,
-    options.timeZone,
-  )
+  const timing = deriveCurrentStudyTiming(input, options)
+  const overdue = timing.isOverdue
   const lowDurability =
     input.targetDurationDays !== null &&
     Number.isFinite(input.targetDurationDays) &&
     input.targetDurationDays < 7
   if (!belowRecall && !overdue && !lowDurability) return []
 
-  const overdueDays = overdue
-    ? crossedLocalDays(input.dueAt, options.asOf, options.timeZone)
-    : 0
+  const overdueDays = timing.overdueDays
   const reasons: MemorySignalReason[] = []
   if (belowRecall) {
     reasons.push({
@@ -294,7 +295,7 @@ function hasMemorySignal(
   return (
     (Number.isFinite(input.retrievability) &&
       input.retrievability < options.targetRetention) ||
-    isOverdueOnCalendarDate(input.dueAt, options.asOf, options.timeZone) ||
+    deriveCurrentStudyTiming(input, options).isOverdue ||
     (input.targetDurationDays !== null &&
       Number.isFinite(input.targetDurationDays) &&
       input.targetDurationDays < 7)
@@ -346,27 +347,18 @@ function logScale(values: readonly number[]): AnalyticsScale {
   return { domain, ticks }
 }
 
-function crossedLocalDays(start: Date, end: Date, timeZone: string): number {
-  const startKey = getAnalyticsDateKey(start, timeZone)
-  const endKey = getAnalyticsDateKey(end, timeZone)
-  return Math.max(
-    0,
-    Math.round(
-      (Date.parse(`${endKey}T00:00:00.000Z`) -
-        Date.parse(`${startKey}T00:00:00.000Z`)) /
-        86_400_000,
-    ),
-  )
-}
-
-function isOverdueOnCalendarDate(
-  dueAt: Date,
-  asOf: Date,
-  timeZone: string,
-): boolean {
-  return (
-    getAnalyticsDateKey(dueAt, timeZone) < getAnalyticsDateKey(asOf, timeZone)
-  )
+function deriveCurrentStudyTiming(
+  input: CurrentStateAnalyticsInput,
+  options: CurrentStatePresentationOptions,
+) {
+  return derivePracticeScheduleTiming({
+    dueAt: input.dueAt,
+    lastReviewedAt: input.lastReviewAt,
+    isStarted: input.lastReviewAt !== null,
+    isSuspended: input.suspended,
+    now: options.asOf,
+    timeZone: options.timeZone,
+  })
 }
 
 function normalizedTitle(title: string): string {

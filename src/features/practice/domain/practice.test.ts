@@ -26,6 +26,7 @@ describe('practice domain', () => {
     ).toEqual({
       phase: 'new',
       nextReviewAt: null,
+      eligibleOn: null,
       lastReviewedAt: null,
       reviewCount: 0,
       lapses: 0,
@@ -81,6 +82,36 @@ describe('practice domain', () => {
       overdueDays: 0,
     })
     expect(summary.retrievability).toBeLessThan(0.9)
+  })
+
+  it('uses actual last review time rather than a corrected attempt update time', () => {
+    const actualReviewAt = new Date(2026, 8, 12, 12)
+    const rawDueAt = new Date(2026, 8, 13, 2)
+    const card = reviewedFsrsCard({
+      lastReviewAt: actualReviewAt,
+      dueAt: rawDueAt,
+    })
+    const attempt = {
+      ...makeAttempt('corrected'),
+      reviewedAt: actualReviewAt,
+      updatedAt: new Date(2026, 8, 13, 21),
+    }
+
+    const state = deriveNormalizedPracticeState({
+      problemSlug: 'two-sum',
+      cardId: 'two-sum:default',
+      practice: practiceState({ lastReviewedAt: actualReviewAt }),
+      card,
+      attempts: [attempt],
+      now: new Date(2026, 8, 13, 22),
+    })
+
+    expect(state).toMatchObject({
+      dueAt: rawDueAt,
+      eligibleOn: '2026-09-13',
+      lastReviewedAt: actualReviewAt,
+      isDue: true,
+    })
   })
 
   it('falls back to practice status when an aggregate exists before a card is available', () => {
@@ -201,6 +232,7 @@ describe('deriveNormalizedPracticeState', () => {
       isOverdue: false,
       overdueDays: 0,
       dueAt: null,
+      eligibleOn: null,
       lastReviewedAt: null,
       retrievability: null,
       stability: null,

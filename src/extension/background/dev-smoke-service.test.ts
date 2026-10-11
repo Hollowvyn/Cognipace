@@ -207,6 +207,25 @@ describe('computeNotificationDryRun', () => {
     })
   })
 
+  it('uses the browser-local day for the notification dry run', () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    try {
+      expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe(
+        'America/New_York',
+      )
+      expect(
+        computeNotificationDryRun({
+          now: new Date('2026-05-30T01:00:00.000Z'),
+          reminders: { daily: { enabled: true, time: '09:00' } },
+          dueToday: 1,
+          lastNotifiedDate: '2026-05-29',
+        }),
+      ).toMatchObject({ status: 'skip' })
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('passes when a reminder would be sent without mutating state', () => {
     expect(
       computeNotificationDryRun({

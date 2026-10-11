@@ -1,4 +1,5 @@
 import type { AnalyticsOverdueSnapshot, UpcomingLoadPoint } from './chart-data'
+import type { HistoricalSchedulingProvenance } from './historical-scheduling-evidence'
 import { buildMagnitudeScale, type AnalyticsScale } from './analytics-scales'
 import {
   addAnalyticsCalendarDays,
@@ -27,6 +28,7 @@ export interface WorkloadAnalyticsViews {
 export interface OverdueBacklogRow {
   date: string
   overdueCount: number | null
+  schedulingProvenance?: HistoricalSchedulingProvenance | undefined
   inProgress: boolean
 }
 
@@ -85,7 +87,7 @@ function buildOverdueBacklogRows(
   const snapshotsByDate = new Map(
     snapshots.map((snapshot) => [
       getAnalyticsDateKey(snapshot.date, timeFrame.timeZone),
-      snapshot.overdueCount,
+      snapshot,
     ]),
   )
   const rows: OverdueBacklogRow[] = []
@@ -94,9 +96,11 @@ function buildOverdueBacklogRows(
     date <= lastKey;
     date = addAnalyticsCalendarDays(date, 1)
   ) {
+    const snapshot = snapshotsByDate.get(date)
     rows.push({
       date,
-      overdueCount: snapshotsByDate.get(date) ?? null,
+      overdueCount: snapshot?.overdueCount ?? null,
+      schedulingProvenance: snapshot?.schedulingProvenance ?? 'unknown',
       inProgress: date === lastKey,
     })
   }

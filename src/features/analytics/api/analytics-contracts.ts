@@ -363,6 +363,10 @@ export const observedRecallVsFsrsRowSchema = historicalRowBaseSchema
     observedRecall: nullablePercentageSchema,
     fsrsEstimate: nullablePercentageSchema,
     difference: z.number().min(-1).max(1).nullable(),
+    modelSampleSize: countSchema.optional(),
+    modelProvenance: z
+      .enum(['captured', 'legacy-derived', 'mixed', 'unknown'])
+      .optional(),
     provenance: z.literal('reconstructed'),
     evidence: z.enum(['measured', 'not-measured']),
   })
@@ -370,6 +374,11 @@ export const observedRecallVsFsrsRowSchema = historicalRowBaseSchema
     const empty = row.pairedReviews === 0
     if (
       row.recalledCount > row.pairedReviews ||
+      (row.modelSampleSize !== undefined &&
+        row.modelSampleSize > row.pairedReviews) ||
+      (row.modelSampleSize !== undefined &&
+        (row.modelSampleSize === 0) !== (row.fsrsEstimate === null)) ||
+      (row.modelSampleSize === 0 && row.modelProvenance !== 'unknown') ||
       (empty
         ? row.recalledCount !== 0 ||
           row.observedRecall !== null ||
@@ -377,8 +386,12 @@ export const observedRecallVsFsrsRowSchema = historicalRowBaseSchema
           row.difference !== null ||
           row.evidence !== 'not-measured'
         : row.observedRecall !== row.recalledCount / row.pairedReviews ||
-          row.fsrsEstimate === null ||
-          row.difference !== row.observedRecall - row.fsrsEstimate ||
+          row.difference !==
+            (row.fsrsEstimate === null ||
+            (row.modelSampleSize !== undefined &&
+              row.modelSampleSize !== row.pairedReviews)
+              ? null
+              : row.observedRecall - row.fsrsEstimate) ||
           row.evidence !== 'measured')
     )
       context.addIssue({
@@ -656,6 +669,10 @@ export const memoryStrengthRowSchema = historicalRowBaseSchema.extend({
   q1: z.number().positive().nullable(),
   q3: z.number().positive().nullable(),
   eligibleReviews: countSchema,
+  observedReviews: countSchema.optional(),
+  modelProvenance: z
+    .enum(['captured', 'legacy-derived', 'mixed', 'unknown'])
+    .optional(),
   medianChangeDays: z.number().nullable(),
   provenance: z.literal('reconstructed'),
   evidence: z.enum(['measured', 'not-measured']),
@@ -777,6 +794,9 @@ const retentionMapRowSchema = z.object({
   slug: z.string(),
   title: z.string(),
   retrievability: percentageSchema,
+  modelProvenance: z
+    .enum(['captured', 'legacy-derived', 'compatibility'])
+    .optional(),
   targetRetention: percentageSchema,
   targetGap: z.number().min(-1).max(1),
   targetDurationDays: z.number().positive(),
@@ -802,10 +822,13 @@ const memorySignalRowSchema = z.object({
   title: z.string(),
   reasons: z.array(memorySignalReasonSchema).min(1).max(3),
 })
-const overdueBacklogViewRowSchema = z.object({
+export const overdueBacklogViewRowSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   overdueCount: countSchema.nullable(),
   inProgress: z.boolean(),
+  schedulingProvenance: z
+    .enum(['captured', 'legacy-derived', 'mixed', 'unknown'])
+    .optional(),
 })
 const upcomingReviewLoadViewRowSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

@@ -208,7 +208,7 @@ export function ObservedRecallVsFsrsView({
               />
             </div>
           ) : (
-            <Empty message="No repeat reviews in this period have both a valid rating and an FSRS estimate. First recorded reviews build memory for later comparisons." />
+            <Empty message="No repeat reviews in this period. First recorded reviews build memory for later comparisons." />
           )
         }
         table={
@@ -221,7 +221,10 @@ export function ObservedRecallVsFsrsView({
               percent(row.observedRecall),
               percent(row.fsrsEstimate),
               difference(row.difference),
-              'Reconstructed',
+              row.modelSampleSize === undefined
+                ? '—'
+                : formatCount(row.modelSampleSize),
+              modelProvenanceText(row.modelProvenance),
               evidenceText(row.evidence),
               periodContext(row, timeFrame),
             ]}
@@ -232,6 +235,7 @@ export function ObservedRecallVsFsrsView({
               'Observed recall',
               'FSRS estimate',
               'Difference',
+              'Modeled reviews',
               'Provenance',
               'Evidence',
               'Period context',
@@ -452,7 +456,13 @@ function RecallTooltip({
           ? [['Observed − estimate', difference(row.difference)] as const]
           : []),
         ['Target Recall', percent(target)],
-        ['Provenance', 'Reconstructed'],
+        [
+          'Modeled reviews',
+          row.modelSampleSize === undefined
+            ? '—'
+            : formatCount(row.modelSampleSize),
+        ],
+        ['Provenance', modelProvenanceText(row.modelProvenance)],
         ['Evidence', evidenceText(row.evidence)],
       ]}
     >
@@ -463,6 +473,19 @@ function RecallTooltip({
       ) : null}
     </HistoricalTooltip>
   )
+}
+
+function modelProvenanceText(provenance: RecallRow['modelProvenance']): string {
+  switch (provenance) {
+    case 'captured':
+      return 'Historical model estimate from recorded inputs'
+    case 'legacy-derived':
+      return 'Legacy compatibility estimate'
+    case 'mixed':
+      return 'Mixed recorded and insufficient model evidence'
+    default:
+      return 'Unavailable · insufficient scheduling evidence'
+  }
 }
 
 function HistoricalTooltip({

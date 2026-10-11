@@ -5,7 +5,7 @@ import { AnalyticsCardPager } from '../analytics-card-controls'
 import { AnalyticsChartPanel } from '../analytics-chart-panel'
 import { AnalyticsExactTable } from '../analytics-exact-table'
 import { historicalReportContext } from '../charts/historical-chart-model'
-import { OverdueBacklogChart } from '../workload-views'
+import { backlogProvenanceText, OverdueBacklogChart } from '../workload-views'
 export interface BacklogCardProps {
   view: AnalyticsViews['overdueBacklog']
 }
@@ -109,6 +109,7 @@ export function BacklogCard({ view }: BacklogCardProps) {
             'Observation context': row.inProgress
               ? 'Reconstructed through as of; In progress'
               : 'Reconstructed at local day end',
+            'Scheduling provenance': backlogProvenanceText(row),
             'Report as of': view.timeFrame.asOf,
             Timezone: view.timeFrame.timeZone,
             'Timezone fallback': String(view.timeFrame.timeZoneFallback),

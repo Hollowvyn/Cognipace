@@ -44,6 +44,7 @@ export {
 } from './api/practice-serializers'
 export {
   buildPracticeProgressSummary,
+  derivePracticeScheduleTiming,
   deriveNormalizedPracticeState,
   normalizeReviewLogFields,
   practiceStatuses,

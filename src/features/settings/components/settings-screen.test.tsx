@@ -76,6 +76,12 @@ describe('SettingsScreen', () => {
     expect(
       screen.getByRole('heading', { name: 'Review & Timing' }),
     ).toBeVisible()
+    await user.click(
+      screen.getByRole('button', { name: 'Target retention details' }),
+    )
+    expect(
+      await screen.findByText(/This is an FSRS model target/),
+    ).toHaveTextContent('native 181–183-day intervals')
     expect(screen.queryByText('Review order')).not.toBeInTheDocument()
     expect(screen.queryByRole('radio', { name: 'Due first' })).toBeNull()
     expect(screen.queryByRole('radio', { name: 'Weakest first' })).toBeNull()

@@ -44,6 +44,242 @@ import {
 } from './server/practice-storage-service'
 
 describe('practice core', () => {
+  it.each([0.75, 0.9])(
+    'captures the prospective daily profile on a genuine Save at %s retention',
+    async (targetRetention) => {
+      const { db } = await createTestDb()
+      const repository = createPracticeRepository(db)
+      const reviewedAt = new Date('2026-01-01T10:00:00.000Z')
+      const saved = await repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'good',
+        reviewedAt,
+        targetRetention,
+      })
+      const storage = await readPracticeStorageData(db)
+      const expectedProfile = createFsrsSchedulerProfile({
+        targetRetention,
+        maximumInterval: 180,
+        enableShortTerm: false,
+        learningSteps: [],
+        relearningSteps: [],
+        enableFuzz: false,
+      })
+
+      expect(storage.schedulerProfiles).toHaveLength(1)
+      expect(storage.schedulerProfiles[0]?.profileJson).toBe(
+        serializeFsrsSchedulerProfile(expectedProfile),
+      )
+      expect(storage.reviewEvidence[0]?.schedulerProfileId).toBe(
+        storage.schedulerProfiles[0]?.id,
+      )
+      expect(saved.card).toEqual(
+        scheduleReviewWithProfile(
+          createInitialFsrsCard(reviewedAt),
+          'good',
+          reviewedAt,
+          expectedProfile,
+        ).card,
+      )
+    },
+  )
+
+  it('preserves a captured long-interval profile through repeated Update until a genuine Save', async () => {
+    const handle = await createTestDb()
+    const repository = createPracticeRepository(handle.db)
+    const settingsRepository = createSettingsRepository(handle.db)
+    const oldProfile = createFsrsSchedulerProfile({ targetRetention: 0.75 })
+    const dailyProfile = createFsrsSchedulerProfile({
+      targetRetention: 0.9,
+      maximumInterval: 180,
+      enableShortTerm: false,
+      learningSteps: [],
+      relearningSteps: [],
+      enableFuzz: false,
+    })
+    expect(oldProfile.parameters.maximumInterval).toBeGreaterThan(180)
+
+    let reviewedAt = new Date('2020-01-01T10:00:00.000Z')
+    let preCard = (
+      await repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'easy',
+        reviewedAt,
+        targetRetention: 0.75,
+        reviewAttemptId: 'long-interval-prior-0',
+      })
+    ).card
+    let oldGood = scheduleReviewWithProfile(
+      preCard,
+      'good',
+      reviewedAt,
+      oldProfile,
+    )
+    let oldEasy = scheduleReviewWithProfile(
+      preCard,
+      'easy',
+      reviewedAt,
+      oldProfile,
+    )
+    for (
+      let index = 1;
+      index <= 12 &&
+      (oldGood.card.scheduledDays <= 180 || oldEasy.card.scheduledDays <= 180);
+      index += 1
+    ) {
+      reviewedAt = new Date(reviewedAt.getTime() + 365 * 24 * 60 * 60 * 1000)
+      oldGood = scheduleReviewWithProfile(
+        preCard,
+        'good',
+        reviewedAt,
+        oldProfile,
+      )
+      oldEasy = scheduleReviewWithProfile(
+        preCard,
+        'easy',
+        reviewedAt,
+        oldProfile,
+      )
+      if (oldGood.card.scheduledDays > 180 && oldEasy.card.scheduledDays > 180)
+        break
+      preCard = (
+        await repository.saveReviewResult({
+          problemSlug: 'two-sum',
+          rating: 'easy',
+          reviewedAt,
+          targetRetention: 0.75,
+          reviewAttemptId: `long-interval-prior-${index}`,
+        })
+      ).card
+    }
+    expect(oldGood.card.scheduledDays).toBeGreaterThan(180)
+    expect(oldEasy.card.scheduledDays).toBeGreaterThan(180)
+
+    const original = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt,
+      targetRetention: 0.75,
+      reviewAttemptId: 'old-profile-latest',
+    })
+    await handle.db.insert(fsrsSchedulerProfiles).values({
+      id: 'old-maximum-profile',
+      profileJson: serializeFsrsSchedulerProfile(oldProfile),
+      createdAt: reviewedAt.getTime(),
+    })
+    await handle.db
+      .update(practiceReviewEvidence)
+      .set({
+        schedulerProfileId: 'old-maximum-profile',
+        preCardJson: serializeFsrsCardSnapshot(preCard),
+      })
+      .where(
+        eq(practiceReviewEvidence.reviewAttemptId, original.reviewAttemptId),
+      )
+    await handle.db
+      .update(reviewAttempts)
+      .set({ fsrsReviewLog: serializeFsrsReviewLogSnapshot(oldGood.log) })
+      .where(eq(reviewAttempts.id, original.reviewAttemptId))
+    await handle.db
+      .update(fsrsCards)
+      .set({
+        dueAt: oldGood.card.dueAt.getTime(),
+        stability: oldGood.card.stability,
+        difficulty: oldGood.card.difficulty,
+        elapsedDays: oldGood.card.elapsedDays,
+        scheduledDays: oldGood.card.scheduledDays,
+        learningSteps: oldGood.card.learningSteps,
+        reps: oldGood.card.reps,
+        lapses: oldGood.card.lapses,
+        state: oldGood.card.state,
+        lastReviewAt: oldGood.card.lastReviewAt!.getTime(),
+      })
+      .where(eq(fsrsCards.id, original.cardId))
+
+    const [beforeRead] = await handle.db
+      .select()
+      .from(fsrsCards)
+      .where(eq(fsrsCards.id, original.cardId))
+    expect(beforeRead?.dueAt).toBe(oldGood.card.dueAt.getTime())
+    await repository.getPracticeDetails('two-sum')
+    await settingsRepository.updateSettings({
+      review: { targetRetention: 0.9 },
+    })
+    const [afterSettings] = await handle.db
+      .select()
+      .from(fsrsCards)
+      .where(eq(fsrsCards.id, original.cardId))
+    expect(afterSettings).toEqual(beforeRead)
+
+    const updatedToEasy = await repository.overrideLastReviewResult({
+      problemSlug: 'two-sum',
+      targetAttemptId: original.reviewAttemptId,
+      expectedRevision: 0,
+      rating: 'easy',
+      targetRetention: 0.9,
+    })
+    expect(updatedToEasy.card).toEqual(oldEasy.card)
+    expect(updatedToEasy.reviewedAt).toEqual(reviewedAt)
+    expect(updatedToEasy.card.scheduledDays).toBeGreaterThan(180)
+
+    const updatedToGood = await repository.overrideLastReviewResult({
+      problemSlug: 'two-sum',
+      targetAttemptId: original.reviewAttemptId,
+      expectedRevision: 1,
+      rating: 'good',
+      targetRetention: 0.9,
+    })
+    expect(updatedToGood.card).toEqual(oldGood.card)
+    expect(updatedToGood.reviewedAt).toEqual(reviewedAt)
+    expect(updatedToGood.card.scheduledDays).toBeGreaterThan(180)
+    const beforeNewSave = await readPracticeStorageData(handle.db)
+    const oldEvidence = beforeNewSave.reviewEvidence.find(
+      (row) => row.reviewAttemptId === original.reviewAttemptId,
+    )
+    expect(oldEvidence).toMatchObject({
+      revision: 2,
+      schedulerProfileId: 'old-maximum-profile',
+      preCardJson: serializeFsrsCardSnapshot(preCard),
+    })
+    expect(
+      (await handle.db.select().from(reviewAttempts)).find(
+        (row) => row.id === original.reviewAttemptId,
+      ),
+    ).toMatchObject({ reviewedAt: reviewedAt.getTime(), rating: 'good' })
+
+    const nextReviewAt = new Date(reviewedAt.getTime() + 24 * 60 * 60 * 1000)
+    const next = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt: nextReviewAt,
+      targetRetention: 0.9,
+      reviewAttemptId: 'new-profile-next',
+    })
+    expect(next.card).toEqual(
+      scheduleReviewWithProfile(
+        oldGood.card,
+        'good',
+        nextReviewAt,
+        dailyProfile,
+      ).card,
+    )
+    const afterNewSave = await readPracticeStorageData(handle.db)
+    const newEvidence = afterNewSave.reviewEvidence.find(
+      (row) => row.reviewAttemptId === next.reviewAttemptId,
+    )
+    expect(newEvidence?.schedulerProfileId).not.toBe('old-maximum-profile')
+    expect(
+      afterNewSave.schedulerProfiles.find(
+        (row) => row.id === newEvidence?.schedulerProfileId,
+      )?.profileJson,
+    ).toBe(serializeFsrsSchedulerProfile(dailyProfile))
+    expect(
+      afterNewSave.reviewEvidence.find(
+        (row) => row.reviewAttemptId === original.reviewAttemptId,
+      ),
+    ).toEqual(oldEvidence)
+  })
+
   it.each([
     { label: 'missing', rawLog: null },
     { label: 'malformed', rawLog: '{invalid-json' },
@@ -956,7 +1192,14 @@ describe('practice core', () => {
       createInitialFsrsCard(firstReviewedAt),
       'good',
       firstReviewedAt,
-      { targetRetention: 0.9 },
+      {
+        targetRetention: 0.9,
+        maximumInterval: 180,
+        enableShortTerm: false,
+        learningSteps: [],
+        relearningSteps: [],
+        enableFuzz: false,
+      },
     ).card
 
     await practiceRepository.saveReviewResult({
@@ -998,7 +1241,14 @@ describe('practice core', () => {
       firstCard,
       'good',
       secondReviewedAt,
-      { targetRetention: 0.85 },
+      {
+        targetRetention: 0.85,
+        maximumInterval: 180,
+        enableShortTerm: false,
+        learningSteps: [],
+        relearningSteps: [],
+        enableFuzz: false,
+      },
     ).card
 
     expect(secondReview.card).toEqual(expectedSecondCard)
@@ -1325,7 +1575,7 @@ describe('practice core', () => {
       ),
     ).toMatchObject({
       rating: 'again',
-      state: 'learning',
+      state: 'review',
     })
     expect(practice).toMatchObject({
       attemptCount: 2,
@@ -1492,7 +1742,7 @@ describe('practice core', () => {
       practice: {
         attemptCount: 1,
         isSuspended: true,
-        status: 'learning',
+        status: 'review',
       },
       phase: 'suspended',
       isSuspended: true,

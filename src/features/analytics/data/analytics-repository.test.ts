@@ -6,6 +6,8 @@ import type { Db } from '@/platform/db'
 import { createTestDb } from '@/platform/db/test-db'
 import {
   fsrsCards,
+  fsrsSchedulerProfiles,
+  practiceReviewEvidence,
   problemPractice,
   problemTopics,
   problems,
@@ -17,7 +19,6 @@ import {
   getReviewDayStats,
   getRecentRatings,
   getCurrentFsrsCards,
-  getUpcomingCards,
   getReviewEvents,
   getReviewHistory,
 } from './analytics-repository'
@@ -211,6 +212,46 @@ describe('getRecentRatings', () => {
 // ---------------------------------------------------------------------------
 
 describe('review history reads', () => {
+  it('joins the exact profile and pre-card for each captured attempt', async () => {
+    const { db } = await createTestDb({ seed: false })
+    await insertProblemWithTopics(db, 'profiled', 'Profiled')
+    const cardId = await insertCard(db, 'profiled')
+    const reviewedAt = new Date('2026-01-15T12:00:00.000Z')
+    await insertAttempt(
+      db,
+      'profiled:1',
+      'profiled',
+      cardId,
+      'good',
+      reviewedAt,
+    )
+    await db.insert(fsrsSchedulerProfiles).values({
+      id: 'profile:75',
+      profileJson: '{"target":0.75}',
+      createdAt: BASE_TS,
+    })
+    await db.insert(practiceReviewEvidence).values({
+      reviewAttemptId: 'profiled:1',
+      cardId,
+      applicationSequence: 2,
+      revision: 0,
+      sequenceSource: 'applied',
+      schedulingEvidenceKind: 'captured',
+      schedulerProfileId: 'profile:75',
+      preCardJson: '{"card":"before"}',
+    })
+
+    expect(await getReviewHistory(db)).toMatchObject([
+      {
+        id: 'profiled:1',
+        applicationSequence: 2,
+        schedulingEvidenceKind: 'captured',
+        schedulerProfileJson: '{"target":0.75}',
+        preCardJson: '{"card":"before"}',
+      },
+    ])
+  })
+
   it.each(problemDifficulties)('reads %s metadata', async (difficulty) => {
     const { db } = await createTestDb({ seed: false })
     const first = new Date('2026-01-10T09:00:00.000Z')
@@ -285,6 +326,10 @@ describe('review history reads', () => {
         isCorrect: true,
         reviewMode: 'manual',
         fsrsReviewLog: '{"rating":"good"}',
+        applicationSequence: null,
+        schedulingEvidenceKind: 'unknown',
+        schedulerProfileJson: null,
+        preCardJson: null,
       },
       {
         id: 'later',
@@ -299,6 +344,10 @@ describe('review history reads', () => {
         isCorrect: null,
         reviewMode: 'leetcode',
         fsrsReviewLog: null,
+        applicationSequence: null,
+        schedulingEvidenceKind: 'unknown',
+        schedulerProfileJson: null,
+        preCardJson: null,
       },
     ])
   })
@@ -340,57 +389,6 @@ describe('review history reads', () => {
 
     expect(result.map((event) => event.id)).toEqual(['a-review', 'z-review'])
     expect(result[0]?.reviewedAt).toEqual(reviewedAt)
-  })
-})
-
-// ---------------------------------------------------------------------------
-
-describe('getUpcomingCards', () => {
-  it('returns empty when no cards exist', async () => {
-    const { db } = await createTestDb()
-    const until = new Date('2026-02-01T00:00:00.000Z')
-    const result = await getUpcomingCards(db, until)
-    expect(result).toEqual([])
-  })
-
-  it('keeps the forecast end exclusive so the fixed 14-day window has no fifteenth-day card', async () => {
-    const { db } = await createTestDb()
-    const before = new Date('2026-01-15T00:00:00.000Z')
-    const exactly = new Date('2026-01-20T00:00:00.000Z')
-
-    await insertPractice(db, 'two-sum')
-    await insertPractice(db, 'valid-parentheses')
-
-    await insertCard(db, 'two-sum', { dueAt: ts(before) })
-    await insertCard(db, 'valid-parentheses', { dueAt: ts(exactly) })
-
-    const result = await getUpcomingCards(db, exactly)
-    expect(result).toHaveLength(1)
-    expect(result[0]?.dueAt.getTime()).toBe(ts(before))
-  })
-
-  it('excludes cards belonging to suspended problems', async () => {
-    const { db } = await createTestDb()
-    const until = new Date('2026-01-20T00:00:00.000Z')
-    const due = new Date('2026-01-15T00:00:00.000Z')
-
-    await insertPractice(db, 'two-sum', { isSuspended: true })
-    await insertCard(db, 'two-sum', { dueAt: ts(due) })
-
-    const result = await getUpcomingCards(db, until)
-    expect(result).toEqual([])
-  })
-
-  it('excludes cards whose practice status is suspended', async () => {
-    const { db } = await createTestDb()
-    const until = new Date('2026-01-20T00:00:00.000Z')
-
-    await insertPractice(db, 'two-sum', { status: 'suspended' })
-    await insertCard(db, 'two-sum', {
-      dueAt: ts(new Date('2026-01-15T00:00:00.000Z')),
-    })
-
-    await expect(getUpcomingCards(db, until)).resolves.toEqual([])
   })
 })
 
@@ -440,6 +438,7 @@ describe('getCurrentFsrsCards', () => {
         cardId: 'alpha-problem:default',
         problemSlug: 'alpha-problem',
         title: 'Alpha Problem',
+        isPremium: false,
         topics: ['Arrays', 'Graphs'],
         stability: 12.5,
         difficulty: 3.75,
@@ -451,14 +450,18 @@ describe('getCurrentFsrsCards', () => {
         dueAt: laterDue,
         createdAt: new Date(BASE_TS),
         lastReviewAt: lastReview,
+        practiceLastReviewedAt: new Date(BASE_TS),
         state: 'review',
         practiceStatus: 'review',
         isSuspended: false,
+        lastSchedulingEvidenceKind: 'unknown',
+        lastSchedulerProfileJson: null,
       },
       {
         cardId: 'beta-problem:default',
         problemSlug: 'beta-problem',
         title: 'Beta Problem',
+        isPremium: false,
         topics: ['Trees'],
         stability: 4.5,
         difficulty: 7.25,
@@ -470,9 +473,12 @@ describe('getCurrentFsrsCards', () => {
         dueAt: earlierDue,
         createdAt: new Date(BASE_TS),
         lastReviewAt: null,
+        practiceLastReviewedAt: new Date(BASE_TS),
         state: 'review',
         practiceStatus: 'learning',
         isSuspended: true,
+        lastSchedulingEvidenceKind: 'unknown',
+        lastSchedulerProfileJson: null,
       },
     ])
   })

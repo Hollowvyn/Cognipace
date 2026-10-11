@@ -490,7 +490,7 @@ describe('app-shell service', () => {
     expect(payload.overlay.automation.autoDetectSolved).toBe(false)
   })
 
-  it('reflects saved reviews in overlay practice details and queue categories', async () => {
+  it('keeps a future reviewed card out of the automatic shell recommendation', async () => {
     const handle = await createTestDb()
     const practiceRepository = createPracticeRepository(handle.db)
 
@@ -510,7 +510,12 @@ describe('app-shell service', () => {
       newCount: 100,
       reinforcementCount: 1,
     })
-    expect(popupPayload.recommendation.category).toBe('reinforcement')
+    expect(
+      popupPayload.queue.items.every(
+        (item) => item.category !== 'reinforcement',
+      ),
+    ).toBe(true)
+    expect(popupPayload.recommendation.category).toBe('new')
     expect(overlayPayload.overlay.practice?.latestAttempt).toMatchObject({
       rating: 'good',
       reviewMode: 'leetcode',

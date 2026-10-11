@@ -38,6 +38,19 @@ type ReportTimeFrame = SerializedAnalyticsSummary['timeFrame']
 type BacklogRow = AnalyticsViews['overdueBacklog']['rows'][number]
 type UpcomingRow = AnalyticsViews['upcomingReviewLoad']['rows'][number]
 
+export function backlogProvenanceText(row: BacklogRow) {
+  switch (row.schedulingProvenance) {
+    case 'captured':
+      return 'Recorded scheduling evidence'
+    case 'legacy-derived':
+      return 'Legacy-derived compatibility'
+    case 'mixed':
+      return 'Mixed scheduling evidence'
+    default:
+      return 'Unavailable · insufficient scheduling evidence'
+  }
+}
+
 export function RecentOverdueBacklogView({
   view,
   timeFrame = view.timeFrame,
@@ -153,10 +166,12 @@ export function OverdueBacklogChart({
         days; unknown days are not measured and break the line. The y-axis is
         overdue problems from zero to {formatCount(view.scale.domain[1])}. Green
         is below five problems; amber is at or above five. Today is measured
-        through as of time and is in progress.
+        through as of time and is in progress. Each inspected day identifies
+        recorded, legacy compatibility, mixed, or insufficient scheduling
+        evidence.
       </p>
       <ChartContainer
-        accessibleDescription="Daily summaries over the last 30 days. Reconstructed overdue backlog; unknown days break the line."
+        accessibleDescription="Daily summaries over the last 30 days. Historical scheduling provenance is available for each day; unknown days break the line."
         accessibleName="Recent Overdue Backlog chart"
         aria-describedby={summaryId}
         aria-label="Recent Overdue Backlog chart"
@@ -239,7 +254,7 @@ export function OverdueBacklogChart({
             name="Recent Overdue Backlog chart"
             rows={view.rows}
             describe={(row) =>
-              `${formatDate(row.date)}. ${row.overdueCount === null ? 'Not measured. Watch status unknown' : `${formatCount(row.overdueCount)} overdue problems. ${row.overdueCount < watchZone ? 'Below 5; green' : 'At or above 5; amber'} watch zone`}${row.inProgress ? '. In progress' : ''}`
+              `${formatDate(row.date)}. ${row.overdueCount === null ? 'Not measured. Watch status unknown' : `${formatCount(row.overdueCount)} overdue problems. ${row.overdueCount < watchZone ? 'Below 5; green' : 'At or above 5; amber'} watch zone`}. ${backlogProvenanceText(row)}${row.inProgress ? '. In progress' : ''}`
             }
             tooltip={(row) => (
               <BacklogTooltip row={row} timeFrame={timeFrame} />
@@ -940,7 +955,7 @@ function BacklogTooltip({
             : 'At or above 5 (≥5)'}
       </p>
       <p className="m-0 text-muted-foreground">
-        Daily summaries · Last 30 days · Reconstructed{' '}
+        Daily summaries · Last 30 days · {backlogProvenanceText(row)} ·{' '}
         {row.inProgress ? 'through as of · In progress' : 'at local day end'}
       </p>
       <ReportContext timeFrame={timeFrame} />
@@ -994,7 +1009,7 @@ function OverdueBacklogTable({
   return (
     <PaginatedTable
       caption="Recent Overdue Backlog data table · Daily summaries · Last 30 days"
-      columns={['Date', 'Overdue problems']}
+      columns={['Date', 'Overdue problems', 'Scheduling provenance']}
       page={page}
       rows={page.visibleRows.map((row) => (
         <tr key={row.date}>
@@ -1007,6 +1022,7 @@ function OverdueBacklogTable({
               ? 'Not measured'
               : formatCount(row.overdueCount)}
           </td>
+          <td className="px-2 py-2 text-right">{backlogProvenanceText(row)}</td>
         </tr>
       ))}
     />
