@@ -180,23 +180,37 @@ ends. Explicit flush rejects an open transaction instead of claiming durable
 success. No second mutation queue, generic outbox or worker-local identity is
 introduced. Overlay accepted state freezes command ID/time/effective rating and
 original target/revision, retains pending/error retry, and preserves a draft on
-stale conflict. Day policy, 180-day cap, previews and optimizer remain E–H work.
+stale conflict. Phase E adds the prospective daily long-term profile, shared
+study-day eligibility and separate automatic/Extra Practice queue intent.
+Rating previews and optimizer work remain in later phases.
 
 The persisted `ts-fsrs` `card.due` value is stored as `FsrsCardSnapshot.dueAt`
-and is the sole authority for a reviewed card's schedule. Read models derive
-overdue and due-today state from that date using the browser's local calendar;
-retrievability remains an independent estimate used for presentation and
-future-card reinforcement ranking. Target retention is a scheduling input on
-review writes only. Updating it does not rewrite existing cards or reschedule
-their persisted due dates.
+and remains the raw authority for a reviewed card's schedule. Practice derives
+`eligibleOn` as the later of its raw due local day and the next browser-local
+day after its actual last review; same-day corrections retain that event time.
+Practice, Queue, current Analytics, Upcoming and reminders use this derived
+eligibility for due/overdue presentation. Suspended and unstarted cards are not
+due. The read rule never rewrites `dueAt`. Current retrievability remains an
+independent estimate for presentation and explicit future-card practice ranking.
+Target retention is a scheduling input on genuine review writes only. The
+active Save profile uses native `maximum_interval: 180`, long-term mode, empty
+step arrays and fuzz disabled. Native rating ordering can return 181–183-day
+intervals. Existing longer due dates remain intact until genuine Save; Update
+uses its captured original profile and can still return a longer interval.
 
-The queue feature owns a deterministic, daily-goal-capped waterfall:
+The queue feature owns a deterministic automatic waterfall capped at the full
+daily goal:
 
-1. overdue FSRS cards, oldest `dueAt` first;
-2. FSRS cards due on the local calendar date, earliest `dueAt` first;
-3. future-scheduled reviewed cards, lowest current retrievability first, as
-   optional reinforcement; and
-4. eligible new Library problems.
+1. overdue FSRS cards, earliest eligibility date then raw `dueAt` first;
+2. FSRS cards eligible on the local calendar date, earliest raw `dueAt` first;
+3. eligible new Library problems.
+
+An explicit `extra-practice` read intent separately returns future reviewed,
+filter-compliant cards ranked by current retrievability with deterministic
+ties. Popup and Overview request it on user action and display its loading,
+empty and error states. That response does not enter the automatic queue or
+change track credit. The intent is Zod-validated at the runtime boundary and
+included in the client query key.
 
 Queue code does not import `ts-fsrs` or own an alternate due threshold. The
 Review Order setting is no longer user-facing and is ignored by queue logic;
@@ -375,13 +389,21 @@ The owners in that flow are:
   evidence counts, or mixing all-time totals into finite ranges.
 - `src/features/analytics/data/analytics-repository.ts` reads current catalog
   `problemDifficulty` and persisted `elapsedSeconds`, preserving attempt-ID
-  deduplication across topic joins. Numeric FSRS difficulty remains separate.
+  deduplication across topic joins. It joins per-attempt scheduling evidence and
+  effective profiles for historical model calculations. Current cards use their
+  last recorded profile when available; unknown older cards retain a labeled
+  compatibility estimate under current saved options. Numeric FSRS difficulty
+  remains separate.
 - `src/features/analytics/domain/review-cohorts.ts` selects earliest raw events
   per problem and complementary later records across cards/modes before
   validity, report-period, timing, or difficulty filters. An invalid first event
-  is never promoted. Its separate per-card valid-rating replay constructs
-  repeat-only FSRS pairs; replay index zero never enters Recall. Both legacy
-  and historical Recall builders/readiness consume those same pairs.
+  is never promoted. Its separate per-card valid-rating ordering constructs
+  repeat-only pairs; the first valid event never enters Recall. Observed
+  outcomes remain in the cohort when an event lacks model evidence. Historical
+  model estimates use exact recorded pre-card/profile inputs, distinguish
+  captured and legacy-derived compatibility evidence, and leave unknown
+  estimates null. Both legacy and historical Recall builders/readiness consume
+  those pairs.
   `historical-presentation.ts` supplies both raw problem-solving cohorts with
   bucket and period/prior outcome counts, positive-time distributions, Unknown
   accounting, current targets, and fitted scales. Period rates use summed
@@ -398,9 +420,10 @@ The owners in that flow are:
 - `src/features/analytics/api/analytics-contracts.ts` validates the serialized
   read model with Zod before it crosses the extension runtime boundary. Paired
   Recall requires recalled count no greater than pairs; zero pairs have null
-  rates/difference and unmeasured evidence, while positive pairs have finite
-  rates, observed = recalled/pairs, and an exact observed-minus-estimate
-  difference. Genuine zero estimates remain valid.
+  rates/difference and unmeasured evidence. Positive observed pairs retain
+  observed = recalled/pairs even with insufficient scheduling evidence; the
+  modeled sample count and provenance expose that gap. A difference requires
+  both observed and estimated values. Genuine zero estimates remain valid.
 - Settings owns defaulted `analytics.targetRecall` and
   `analytics.targetReviewSuccess` fractions in its existing JSON preferences,
   both 0.9 by default. Full-pair validation requires finite values from 0
@@ -543,14 +566,15 @@ The owners in that flow are:
   supplied count, remaining unavailable if that day is unknown; no earlier
   observation is carried forward. Known peak excludes unknown days, and its
   strict below-five/at-or-above-five counts conserve known days. Upcoming uses
-  the fixed Today-plus-thirteen-local-dates schedule snapshot, without future
+  the fixed Today-plus-thirteen-local-dates eligibility snapshot, without future
   reviews or rescheduling. Its bars fill actual projected date slots minus
   bounded gaps, preserving all fourteen slots and zero geometry. Upcoming
   labels original positive stack components without minimum bar heights or
   duplicate totals. Workload inspection uses supplied dates/counts
   and the report context for pointer, tap and keyboard. The reconstructed
-  backlog timestamp rule remains distinct from Upcoming's local-date overdue
-  classification. Upcoming retains only as-of/timezone/fallback report context,
+  backlog timestamp rule remains distinct from Upcoming's Practice-derived
+  local-date overdue classification. Upcoming retains only
+  as-of/timezone/fallback report context,
   not the historical page range, and preserves pages for equivalent current
   reports under historical selection alone.
 - Retention Map returns every eligible current-state row. Its Zod contract keeps
@@ -609,9 +633,10 @@ aliases while preserving legacy queue fields for existing consumers.
 
 Due-review notifications are local background work. The extension declares the
 Chrome `notifications` permission so `src/extension/background/due-notification.ts`
-can create one due-review reminder per day when enabled. Notification scheduling
-uses Chrome alarms, local dedup state, and the queue summary `dueToday`
-semantics; React components must not call `chrome.notifications` directly.
+can create one due-review reminder per browser-local day when enabled.
+Notification scheduling uses Chrome alarms, local-calendar dedup state, and the
+queue summary `dueToday` semantics derived from Practice eligibility; React
+components must not call `chrome.notifications` directly.
 
 Automatic Gist sync is orchestrated in the background layer. After a local
 mutation commits, sync metadata is marked dirty, the database snapshot is

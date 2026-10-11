@@ -249,8 +249,12 @@ streak.
 
 Practice state is local and FSRS-backed. The persisted database owns practice
 facts, and UI surfaces read them through feature services and runtime messages.
-On each saved review, CogniPace passes the rating, review time, and configured
-target retention to `ts-fsrs`, then persists the returned card and review log.
+On each genuine saved review, CogniPace passes the rating, review time, and
+configured target retention to `ts-fsrs` with its daily long-term profile, then
+persists the returned card and review log. The profile uses no learning or
+relearning steps or interval fuzz and configures a 180-day maximum. The pinned
+library can return 181–183 days after ordering the four ratings; 180 is the
+native configuration, not a strict due-date ceiling.
 The persisted FSRS `card.due` value, stored locally as `dueAt`, is the authority
 for the next review date. Current retrievability is a separate FSRS estimate for
 display and queue ranking; it does not replace or cancel the persisted due date.
@@ -277,22 +281,30 @@ corrections retain the selected draft for deliberate refresh/reselect. Restart
 after success creates a genuine new review. Reset and full restore rotate live
 generations so old accepted commands cannot mutate replacement data.
 
-Target-retention changes are prospective. They are used by `ts-fsrs` on the
-next saved review and do not reschedule existing cards or rewrite their due
-dates. Reviewed cards are classified against the browser's local calendar:
-cards due before today are overdue, cards due today are due today regardless of
-the time of day, and later cards remain scheduled. Suspended and unstarted
-problems are not due.
+Target-retention and daily-profile changes are prospective. Existing raw due
+dates, including dates more than 180 days away, remain unchanged until a
+genuine review. Update reconstructs its original event profile, so a corrected
+older review may still have an interval above 180 days. No bulk catch-up
+rescheduling changes existing cards. The study-day eligibility date is the later
+of the raw FSRS due date's browser-local day and the local day after the actual
+last review. A reviewed card becomes due on that eligibility date, regardless
+of the time of day, and overdue on a later local date. A same-day correction
+uses the original review time, not the correction time. Suspended and unstarted
+problems are not due. The raw `dueAt` remains available as the exact saved FSRS
+result.
 
 ### Queue
 
-The Today Queue composes recommendations from local practice state and problem
-data using a fixed waterfall, capped at the configured daily goal: overdue FSRS
-cards first, then cards due today, then future-scheduled reviewed cards with the
-lowest current retrievability for optional reinforcement, and finally eligible
-new Library problems. Overdue and due-today cards are ordered by their FSRS due
-date; reinforcement uses retrievability with deterministic ties. Popup guidance
-should keep queue recommendation and track progression visibly separate.
+The automatic Today Queue composes recommendations from local practice state and
+problem data using a fixed waterfall, capped at the full configured daily goal:
+overdue FSRS cards first, then cards due today, then eligible new Library
+problems. Due cards are ordered by eligibility date, raw FSRS due date, and
+deterministic ties. Future-scheduled reviewed cards are never automatic
+recommendations. Popup and Overview offer an explicit **Extra Practice** action
+that requests a future reviewed card, ranked by lowest current retrievability
+with deterministic ties. This request does not change the automatic queue or
+track credit. Popup guidance keeps queue recommendation and track progression
+visibly separate.
 User-facing labels reserve Overdue for prior local dates and Due today for the
 current local date. Aggregate counts that include both use Reviews due.
 
@@ -397,7 +409,8 @@ Settings owns persisted preferences, defaults, validation, and the dashboard
 settings form. Changes should flow through the settings feature API and
 invalidate affected query families.
 
-Review settings expose the FSRS target-retention input. Review Order is not a
+Review settings expose the FSRS target-retention input as a model target, not a
+guarantee of coding success or interview readiness. Review Order is not a
 user-facing setting: queue ordering follows the fixed waterfall, while the
 legacy stored `review.order` value is retained only for settings schema-v1
 compatibility. Changing target retention never rewrites existing schedules.
@@ -592,7 +605,7 @@ Historical Analytics uses adaptive presentation buckets and evidence gates:
   comparisons retain the complete nominal window and matched as-of cutoff.
   Global origin is the earliest retained nonfuture raw review before metric
   filters. The sixty-interval bound limits chart output, not the complete-history
-  read or FSRS replay. Every eligible record remains in totals; grouping never
+  read or recorded FSRS evidence. Every eligible record remains in totals; grouping never
   averages bucket percentages, scores, or medians.
 - Recall's supplied display frame begins at its first eligible selected pair
   and ends at the report as-of. Long genuinely paired history remains long;
@@ -674,22 +687,25 @@ The advanced measurements remain available within the ten-card composition:
   known-difficulty activity window for their local cohort, preserving internal gaps independently
   of visibility, measure, or timing subset. Exact tables and inspection retain
   counts, timing coverage, full intervals, partial status, and timezone/as-of.
-- **Recall** pairs valid rating-derived outcomes with reconstructed FSRS
-  retrievability immediately before the same repeat reviews. Again remains a
-  paired failure in the denominator; only Hard, Good, and Easy contribute to
-  recalled counts. Each card's complete valid-rating history is replayed,
-  including initial and pre-range records for state; its first replayed
-  assessment is never emitted. Both curves, compatible summary series, and
-  Recall readiness use the exact same eligible pairs. Null or conflicting
-  correctness flags do not change this rating-derived population; a genuine
-  zero FSRS estimate remains valid. Initial-only history leaves Recall empty
-  while First attempts can remain available.
+- **Recall** keeps valid rating-derived outcomes from repeat reviews and pairs
+  them with FSRS retrievability when that event has sufficient scheduling
+  evidence. Again remains a paired failure in the denominator; only Hard, Good,
+  and Easy contribute to recalled counts. Each card's first recorded valid
+  review is never a repeat pair. Recorded pre-card and profile inputs produce
+  historical model estimates; legacy-derived evidence is labeled as a
+  compatibility estimate. Missing or invalid scheduling evidence leaves the
+  model estimate unavailable without removing the observed repeat outcome.
+  Recall readiness and observed counts use the same repeat cohort. Null or
+  conflicting correctness flags do not change this rating-derived population;
+  a genuine zero FSRS estimate remains valid. Initial-only history leaves
+  Recall empty while First attempts can remain available.
   Through each bucket, observed recall is cumulative recalled/cumulative pairs;
-  FSRS is the pair-weighted mean of unrounded bucket estimates. Latest values
-  equal selected-period totals and Recall has no difficulty weights. Zero pairs
-  means both rates and their difference are unavailable. Positive pairs require
-  finite rates, recalled no greater than paired, observed = recalled/paired,
-  and the exact observed-minus-estimate difference.
+  FSRS averages only modeled pairs and shows their count and evidence provenance
+  in inspection and Table. Latest values equal selected-period totals and Recall
+  has no difficulty weights. Zero pairs means both rates and their difference
+  are unavailable. Positive pairs retain their observed rate even when no model
+  estimate is available; the difference is available only when both values are
+  known.
   Observed recall uses a solid line and circles; the estimate uses short dashes
   and diamonds. Long horizontal dashes mean no new paired reviews, preserving
   cumulative counts and last update through report as-of. Series toggles hide
@@ -707,13 +723,14 @@ The advanced measurements remain available within the ten-card composition:
   as-of; a singleton retains its interval domain and centered marker. True date
   ticks and full intervals remain available. One update plus holds is still
   not enough for a trend.
-- **Memory strength** shows median reconstructed post-review FSRS stability in
+- **Memory strength** shows median post-review FSRS stability from sufficient
+  recorded scheduling evidence in
   days. Discrete Q1–Q3 whiskers show the middle 50% only when the bucket has at
   least four eligible reviews and known quartiles. The duration scale fits all
   finite median and quartile values with padding and a minimum two-day window;
   it preserves the observed extrema rather than forcing a broad fixed scale.
   Tooltip and Table retain eligible counts, median change, evidence, and
-  reconstruction provenance. A finite median supports the retained activity
+  evidence provenance. A finite median supports the retained activity
   window, including zero and sub-day values, without requiring quartiles or
   four eligible reviews. The four-review requirement applies only to whiskers.
 - **Practice** combines exact rating composition and completed-review
@@ -789,10 +806,11 @@ is not an additional observation. The current value is the last supplied day's
 count; an unknown last day stays unavailable without carrying an earlier count.
 Known peak and below-five/at-or-above-five day totals exclude unknown days, and
 the two threshold totals sum to known days. Upcoming reviews retains its fixed
-Next 14 days schedule snapshot, Today plus thirteen local dates, with separate
+Next 14 days eligibility snapshot, Today plus thirteen local dates, with separate
 exact Due and Overdue segment counts. It does not simulate future reviews or
-rescheduling. Only Today includes cards due before today's local date; an earlier
-time today remains Due. Labels sit inside
+rescheduling. Only Today includes cards eligible before today's local date; an
+earlier time today remains Due, while a same-day review cannot become due again
+until the next local day. Labels sit inside
 when they fit, with readable outside fallbacks for tiny segments. Zero segments
 stay zero-height and receive no label; Table and inspection retain their zeros.
 
@@ -801,8 +819,11 @@ Recall, Practice, Memory strength, and Overdue backlog keep showing available po
 one-point series says that it is not enough for a trend yet. Retention map,
 Memory signals, and the fixed Next 14 days Upcoming reviews remain
 available as current or forecast views. Retention Map shows every eligible active,
-non-suspended reviewed problem, with no 30-question cutoff, at its exact current FSRS
-retrievability and total modeled durability. Durability is the interval from
+non-suspended reviewed problem, with no 30-question cutoff, at its current FSRS
+retrievability and total modeled durability. Captured cards use their last
+recorded profile; older cards show a labeled compatibility estimate. A future
+card with low estimated retrievability can appear here without becoming due.
+Durability is the interval from
 the latest review until recall crosses the scheduling target, not remaining
 time or time until due. The FSRS target is independent of personal chart goals.
 All/Below target filters preserve full-cohort counts and fitted domains. Three
@@ -834,9 +855,10 @@ Predicted recall and current retrievability are FSRS estimates, not guaranteed
 outcomes. The memory profile is based on tracked local FSRS cards and includes
 due today, overdue, learning, review, average retrievability, and low-sample
 messaging when local data is sparse. Live Analytics due state and the current
-day of Upcoming Review Load use the same selected-timezone calendar boundary as
+day of Upcoming Review Load use the same browser-local study-day eligibility as
 the practice read model: an earlier time today remains due today, while a prior
-local date is overdue.
+eligible local date is overdue. Historical Overdue Backlog retains its separate
+reporting-timezone snapshot definition.
 
 ### Sync
 

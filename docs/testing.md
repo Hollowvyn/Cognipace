@@ -154,6 +154,73 @@ unflushed bootstrap retry, historical correction replay, populated C/v6
 compatibility, reset/restore rotation and stalled transaction rollback/commit.
 Runtime/overlay suites separately cover pending UI, authentication and locks.
 
+### Phase E Daily Scheduling And Study-Day Smoke
+
+Human installed-extension happy-path and edge-case proof is pending. Use a
+disposable Chrome profile with a populated pre-E backup and a local timezone
+that observes daylight saving time. Reload the built `dist/chrome-mv3` extension
+from `chrome://extensions` after each build. Record the local timezone, wall
+clock, and representative raw FSRS due instants; attach redacted screenshots or
+a recording of Settings, Practice, popup/Overview, Analytics and reminder
+results before PR review or merge. Automated tests do not replace this proof.
+
+1. Preserve a history with a future raw due date more than 180 days away,
+   suspension, an active track and earned Daily Goal/streak credit. Upgrade and
+   reopen without reviewing it. Confirm its raw due date, history, card ID,
+   settings, credit and suspension are unchanged. A restore/reopen must preserve
+   the same facts.
+2. Set FSRS target retention to 75%, save, reload Settings and confirm it stays
+   75% while the independent Analytics chart goals remain unchanged. Submit a
+   genuine review and inspect its captured long-term profile: 180-day native
+   maximum, empty steps and fuzz off. Verify the returned card/log agree, and
+   do not interpret 180 as a strict ceiling: a mature-card boundary fixture may
+   return Good/Easy at 181–183 days. A low-retrievability future card must stay
+   future-scheduled.
+3. Reselect and Update the latest older review after changing Settings. Verify
+   the original event time, profile, count, identity, log and track credit are
+   retained; its original maximum can still produce a due date beyond 180 days.
+   Repeating Update must not create another review. Restart then Submit must
+   create one genuine new review under the current daily profile. Confirm
+   assessment rating locks still work.
+4. Around local midnight, review a card whose raw `dueAt` still falls on the
+   review's local date. Confirm Practice, Library, popup, Overview and current
+   Analytics do not reoffer it that day; it becomes eligible no earlier than
+   the next local day. Repeat at spring and autumn daylight saving transitions,
+   and after changing the browser's timezone. A same-day Update must use the
+   original review time rather than its later correction time. Keep the raw
+   `dueAt` unchanged throughout these read checks.
+5. Fill the automatic queue with overdue, due-today, New, future low-recall,
+   suspended and premium-filtered cards. Confirm only overdue, due-today and
+   eligible New cards enter automatic recommendations, in that order and within
+   the full Daily Goal count. A future card never becomes the automatic top
+   recommendation. Check the popup and Overview separately, including empty
+   and fully met-goal states; track progression remains separate.
+6. Click **Extra Practice** in popup and Overview. Confirm it requests a future
+   reviewed card only after the click, opens the selected problem, and leaves
+   automatic items and Daily Goal/track credit unchanged until an actual
+   review. Verify loading, no-future-card and read-error states. Suspended and
+   filtered premium cards must not be offered.
+7. Compare Practice's due-today/overdue values, the automatic queue, current
+   Analytics memory signals, Retention Map and Today's Upcoming Review Load
+   around local midnight. For cards included by the saved Queue filters,
+   eligibility and due counts should agree. Retention Map and Memory Signals
+   still show unsuspended reviewed premium cards when the queue's premium
+   filter is on; a future low-retrievability card can appear without being due. Check
+   Upcoming's Today plus thirteen dates and that historical Overdue Backlog
+   remains a separate historical snapshot.
+8. Open historical Recall and Memory strength with captured reviews,
+   legacy-derived reviews and an event missing scheduling evidence. Observed
+   repeat outcomes must remain counted; modeled values use recorded inputs,
+   legacy estimates are labeled compatibility, and missing model evidence is
+   shown as unavailable with modeled sample counts. Change current retention
+   and confirm it does not rewrite those historical estimates. Confirm current
+   Retention Map identifies the recorded or compatibility profile used.
+9. Enable local due reminders and compare their due count with the automatic
+   queue's `dueToday`. Two checks on the same local day must notify at most
+   once; crossing local midnight permits the next eligible day's reminder.
+   Repeat at both daylight saving transitions, and check popup/Overview and
+   Analytics counts again after the service worker restarts.
+
 ### FSRS Evidence And Recoverable Replacement
 
 Run these human happy-path and edge-case flows in a disposable installed
