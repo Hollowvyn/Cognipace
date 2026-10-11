@@ -7,6 +7,7 @@ import {
 import {
   resolveHistoricalSchedulingEvidence,
   summarizeHistoricalSchedulingProvenance,
+  type HistoricalSchedulingEvidenceResolver,
   type HistoricalSchedulingProvenance,
 } from './historical-scheduling-evidence'
 
@@ -144,6 +145,7 @@ export interface AnalyticsRangeOptions {
   timeZone?: string
   timeFrame?: AnalyticsTimeFrame
   lowSampleThreshold?: number
+  resolveEvidence?: HistoricalSchedulingEvidenceResolver
 }
 
 export function toAnalyticsDateKey(date: Date, timeZone?: string): string {
@@ -177,8 +179,9 @@ export function hasTopicRecallEvidence(
 
 export function getValidStabilitySample(
   event: AnalyticsReviewEvent,
+  resolveEvidence: HistoricalSchedulingEvidenceResolver = resolveHistoricalSchedulingEvidence,
 ): number | null {
-  return resolveHistoricalSchedulingEvidence(event).postCard?.stability ?? null
+  return resolveEvidence(event).postCard?.stability ?? null
 }
 
 export function buildRecallQualityPoints(
@@ -403,7 +406,7 @@ export function buildStabilityPoints(
   for (const event of events) {
     if (!isWithinRange(event.reviewedAt, options)) continue
     const point = findBucketPoint(points, event.reviewedAt)
-    const stability = getValidStabilitySample(event)
+    const stability = getValidStabilitySample(event, options.resolveEvidence)
     if (!point || stability === null) continue
 
     point.values.push(stability)
@@ -611,7 +614,9 @@ function buildKnownOverdueIntervals(
   let currentProvenance: 'captured' | 'legacy-derived' | 'unknown' = 'unknown'
 
   for (const [index, event] of ordered.entries()) {
-    const evidence = resolveHistoricalSchedulingEvidence(event)
+    const evidence = (
+      options.resolveEvidence ?? resolveHistoricalSchedulingEvidence
+    )(event)
     if (currentCard && segmentStart && segmentStart <= event.reviewedAt) {
       intervals.push({
         start: segmentStart,

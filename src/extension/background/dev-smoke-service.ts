@@ -1,7 +1,70 @@
-import type { DevSmokeReport } from '@/features/dev-smoke'
+import type {
+  DevSmokeCapacityStorage,
+  DevSmokeReport,
+} from '@/features/dev-smoke'
 import { toPracticeDateKey } from '@/features/practice'
+import { FINGERPRINT_KEY, SNAPSHOT_KEY } from '@/platform/db/snapshot'
+import {
+  FSRS_RECOVERY_KEY,
+  RECOVERY_KEY,
+  TRACK_RECOVERY_KEY,
+} from '@/platform/db/snapshot-state'
 
 export type SmokeStatus = DevSmokeReport['checks'][number]['status']
+
+export interface StorageUsageReader {
+  QUOTA_BYTES?: number
+  getBytesInUse: (keys: string | null) => Promise<number>
+}
+
+export async function readChromeStorageCapacity(
+  storage: StorageUsageReader,
+): Promise<DevSmokeCapacityStorage> {
+  const [
+    totalBytes,
+    activeSnapshotBytes,
+    activeFingerprintBytes,
+    recoveryTopicsBytes,
+    recoveryTracksBytes,
+    recoveryFsrsBytes,
+  ] = await Promise.all([
+    storage.getBytesInUse(null),
+    storage.getBytesInUse(SNAPSHOT_KEY),
+    storage.getBytesInUse(FINGERPRINT_KEY),
+    storage.getBytesInUse(RECOVERY_KEY),
+    storage.getBytesInUse(TRACK_RECOVERY_KEY),
+    storage.getBytesInUse(FSRS_RECOVERY_KEY),
+  ])
+  const counts = [
+    totalBytes,
+    activeSnapshotBytes,
+    activeFingerprintBytes,
+    recoveryTopicsBytes,
+    recoveryTracksBytes,
+    recoveryFsrsBytes,
+  ]
+  if (counts.some((count) => !Number.isSafeInteger(count) || count < 0)) {
+    throw new Error('Storage usage is unavailable.')
+  }
+  const quotaBytes =
+    Number.isSafeInteger(storage.QUOTA_BYTES) &&
+    storage.QUOTA_BYTES !== undefined &&
+    storage.QUOTA_BYTES >= 0
+      ? storage.QUOTA_BYTES
+      : null
+
+  return {
+    totalBytes,
+    quotaBytes,
+    headroomBytes:
+      quotaBytes === null ? null : Math.max(0, quotaBytes - totalBytes),
+    activeSnapshotBytes,
+    activeFingerprintBytes,
+    recoveryTopicsBytes,
+    recoveryTracksBytes,
+    recoveryFsrsBytes,
+  }
+}
 
 export interface DevSmokeDeps {
   now: () => Date
@@ -24,6 +87,7 @@ export interface DevSmokeDeps {
     detail: string
     latencyMs?: number
   }>
+  readCapacityStorage: () => Promise<DevSmokeCapacityStorage>
 }
 
 export type NotificationDryRunInput = {
@@ -42,7 +106,10 @@ type SmokeCheck = DevSmokeReport['checks'][number]
 
 export function createDevSmokeService(deps: DevSmokeDeps) {
   return {
-    async run(input: { runLiveGenAi?: boolean }): Promise<DevSmokeReport> {
+    async run(input: {
+      runLiveGenAi?: boolean
+      includeCapacity?: boolean
+    }): Promise<DevSmokeReport> {
       const generatedAt = deps.now().toISOString()
       const checks: SmokeCheck[] = [
         createCheck({
@@ -55,19 +122,65 @@ export function createDevSmokeService(deps: DevSmokeDeps) {
         await runQueueCheck(deps),
         await runNotificationCheck(deps),
         await runGenAiConfigCheck(deps),
-        input.runLiveGenAi
+        input.runLiveGenAi && !input.includeCapacity
           ? await runLiveGenAiCheck(deps)
           : createCheck({
               id: 'genai.live',
               label: 'Live GenAI',
               status: 'skip',
-              detail: 'Live GenAI was not requested.',
+              detail: input.includeCapacity
+                ? 'Live GenAI is disabled during capacity measurement.'
+                : 'Live GenAI was not requested.',
             }),
       ]
 
-      return { generatedAt, checks }
+      let capacity: DevSmokeReport['capacity']
+      let readTimings: DevSmokeReport['readTimings']
+      if (input.includeCapacity) {
+        try {
+          capacity = {
+            status: 'available',
+            storage: await deps.readCapacityStorage(),
+          }
+        } catch {
+          capacity = { status: 'unavailable' }
+        }
+        try {
+          readTimings = {
+            status: 'available',
+            method: 'sequential-background-service-reads',
+            warmups: 1,
+            analytics: await measureRead(deps.readAnalyticsSummary),
+            queue: await measureRead(deps.readQueueSummary),
+          }
+        } catch {
+          readTimings = { status: 'unavailable' }
+        }
+      }
+
+      return {
+        generatedAt,
+        checks,
+        ...(capacity ? { capacity } : {}),
+        ...(readTimings ? { readTimings } : {}),
+      }
     },
   }
+}
+
+async function measureRead(read: () => Promise<unknown>) {
+  await read()
+  const samplesMs: number[] = []
+  for (let index = 0; index < 5; index += 1) {
+    const started = performance.now()
+    await read()
+    const elapsed = performance.now() - started
+    if (!Number.isFinite(elapsed) || elapsed < 0)
+      throw new Error('Read timing is unavailable.')
+    samplesMs.push(elapsed)
+  }
+  const sorted = [...samplesMs].sort((left, right) => left - right)
+  return { samplesMs, p50Ms: sorted[2]!, p95Ms: sorted[4]! }
 }
 
 export function computeNotificationDryRun(input: NotificationDryRunInput): {

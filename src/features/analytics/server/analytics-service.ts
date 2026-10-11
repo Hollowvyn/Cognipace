@@ -52,6 +52,11 @@ import { buildHistoricalAnalyticsViews } from '../domain/historical-presentation
 import { buildRepeatReviewPairs } from '../domain/review-cohorts'
 import { buildCurrentStateAnalyticsViews } from '../domain/current-state-presentation'
 import { buildWorkloadAnalyticsViews } from '../domain/workload-presentation'
+import {
+  resolveHistoricalSchedulingEvidence,
+  type HistoricalSchedulingEvidenceResolver,
+  type ResolvedHistoricalSchedulingEvidence,
+} from '../domain/historical-scheduling-evidence'
 
 import {
   buildObservedRatingQuality,
@@ -81,6 +86,7 @@ export async function getAnalyticsSummary(
       getCurrentFsrsCards(db),
       getSettings(db),
     ])
+  const resolveEvidence = createRequestEvidenceResolver()
 
   const presentationTimeFrame = buildAnalyticsHistoryTimeFrame({
     selection: range,
@@ -127,6 +133,7 @@ export async function getAnalyticsSummary(
     fsrsOptions,
     timeZone: presentationTimeFrame.timeZone,
     timeFrame: presentationTimeFrame,
+    resolveEvidence,
   }
   const analyticsReviewHistory = reviewHistory satisfies AnalyticsReviewEvent[]
   const activity = buildSelectedActivity(analyticsReviewHistory, {
@@ -138,6 +145,7 @@ export async function getAnalyticsSummary(
     start: new Date(presentationTimeFrame.history?.nominalStart ?? periodStart),
     end: periodEnd,
     fsrsOptions,
+    resolveEvidence,
   })
   const analyticsCurrentCards = buildCurrentAnalyticsCards(
     currentFsrsCards,
@@ -156,6 +164,7 @@ export async function getAnalyticsSummary(
       pairedReviews,
       analyticsTargets: settings.analytics,
       timeTargetsMinutes: settings.assessment.timeTargetsMinutes,
+      resolveEvidence,
     },
   )
   const currentStateViews = buildCurrentStateAnalyticsViews(
@@ -284,7 +293,7 @@ export async function getAnalyticsSummary(
       analyticsReviewHistory,
       buckets,
       periodEnd,
-      (event) => getValidStabilitySample(event) !== null,
+      (event) => getValidStabilitySample(event, resolveEvidence) !== null,
     ),
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
@@ -376,6 +385,48 @@ export async function getAnalyticsSummary(
     topics,
     stability,
   })
+}
+
+function createRequestEvidenceResolver(): HistoricalSchedulingEvidenceResolver {
+  const byAttemptId = new Map<
+    string,
+    {
+      rating: string
+      reviewedAt: number
+      fsrsReviewLog: string | null
+      schedulingEvidenceKind: string | undefined
+      schedulerProfileJson: string | null | undefined
+      preCardJson: string | null | undefined
+      value: ResolvedHistoricalSchedulingEvidence
+    }
+  >()
+
+  return (event) => {
+    const reviewedAt = event.reviewedAt.getTime()
+    const cached = byAttemptId.get(event.id)
+    if (
+      cached &&
+      cached.rating === event.rating &&
+      cached.reviewedAt === reviewedAt &&
+      cached.fsrsReviewLog === event.fsrsReviewLog &&
+      cached.schedulingEvidenceKind === event.schedulingEvidenceKind &&
+      cached.schedulerProfileJson === event.schedulerProfileJson &&
+      cached.preCardJson === event.preCardJson
+    )
+      return cached.value
+
+    const value = resolveHistoricalSchedulingEvidence(event)
+    byAttemptId.set(event.id, {
+      rating: event.rating,
+      reviewedAt,
+      fsrsReviewLog: event.fsrsReviewLog,
+      schedulingEvidenceKind: event.schedulingEvidenceKind,
+      schedulerProfileJson: event.schedulerProfileJson,
+      preCardJson: event.preCardJson,
+      value,
+    })
+    return value
+  }
 }
 
 function buildCurrentAnalyticsCards(

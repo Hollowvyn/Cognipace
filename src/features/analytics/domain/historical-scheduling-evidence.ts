@@ -27,6 +27,10 @@ export interface ResolvedHistoricalSchedulingEvidence {
   estimate: number | null
 }
 
+export type HistoricalSchedulingEvidenceResolver = (
+  event: HistoricalSchedulingEvidenceInput & { id: string },
+) => ResolvedHistoricalSchedulingEvidence
+
 export type HistoricalSchedulingProvenance =
   | 'captured'
   | 'legacy-derived'

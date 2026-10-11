@@ -98,10 +98,9 @@ export async function preparePracticeStorage(
       if (covered === 0) inferredAttempts.push(...attempts)
     }
     const inferred = normalizeLegacyPracticeStorage(inferredAttempts)
-    if (inferred.reviewEvidence.length > 0)
-      await writeDb
-        .insert(practiceReviewEvidence)
-        .values(inferred.reviewEvidence)
+    await insertRowsInBatches(inferred.reviewEvidence, (batch) =>
+      writeDb.insert(practiceReviewEvidence).values(batch),
+    )
     await ensurePracticeGenerationsInTransaction(
       writeDb,
       applicableProblemSlugs(references),
@@ -133,28 +132,40 @@ export async function replacePracticeStorageDataInTransaction(
   const references = await readPracticeStorageReferences(tx)
   const storage = validatePracticeStorageData(input, references)
   await clearPracticeStorageDataInTransaction(tx)
-  if (storage.schedulerProfiles.length > 0)
-    await tx.insert(fsrsSchedulerProfiles).values(
-      storage.schedulerProfiles.map((row) => ({
-        ...row,
-        createdAt: new Date(row.createdAt).getTime(),
-      })),
-    )
-  if (storage.reviewEvidence.length > 0)
-    await tx.insert(practiceReviewEvidence).values(storage.reviewEvidence)
-  if (storage.commandReceipts.length > 0)
-    await tx.insert(practiceCommandReceipts).values(
-      storage.commandReceipts.map((row) => ({
-        ...row,
-        acceptedAt: new Date(row.acceptedAt).getTime(),
-      })),
-    )
+  await insertRowsInBatches(
+    storage.schedulerProfiles.map((row) => ({
+      ...row,
+      createdAt: new Date(row.createdAt).getTime(),
+    })),
+    (batch) => tx.insert(fsrsSchedulerProfiles).values(batch),
+  )
+  await insertRowsInBatches(storage.reviewEvidence, (batch) =>
+    tx.insert(practiceReviewEvidence).values(batch),
+  )
+  await insertRowsInBatches(
+    storage.commandReceipts.map((row) => ({
+      ...row,
+      acceptedAt: new Date(row.acceptedAt).getTime(),
+    })),
+    (batch) => tx.insert(practiceCommandReceipts).values(batch),
+  )
   await ensurePracticeGenerationsInTransaction(
     tx,
     applicableProblemSlugs(references),
     now,
   )
   await validatePracticeStorage(tx)
+}
+
+const restoreInsertBatchSize = 25
+
+async function insertRowsInBatches<Row>(
+  rows: readonly Row[],
+  insert: (batch: Row[]) => unknown,
+): Promise<void> {
+  for (let offset = 0; offset < rows.length; offset += restoreInsertBatchSize) {
+    await insert(rows.slice(offset, offset + restoreInsertBatchSize))
+  }
 }
 
 export async function clearPracticeStorageDataInTransaction(

@@ -254,6 +254,56 @@ for these flows before PR review or merge.
    and after preview-only actions. Reopen the extension and confirm no preview
    read created a review or altered a due date.
 
+### Phase G Local Scaling Smoke
+
+Human installed-extension happy-path and edge-case proof, with redacted
+screenshots or a recording, remains **pending**. Use only a disposable Chrome
+profile and synthetic history. Never import a scaling fixture into a personal
+profile. Build `dist/chrome-mv3`, then run the disposable packaged driver with
+`rtk proxy node scripts/fsrs-scaling-chrome.mjs --backup
+test-results/fsrs-phase-g/standard-backup.json --dataset standard`. Generate the
+backup first with `rtk proxy env COGNIPACE_SCALING=standard npm run test --
+src/testing/fsrs-scaling-benchmark.test.ts`; repeat for `stress` and
+`single-card` only when the previous workload leaves the last durable state
+intact. The driver creates and removes a unique `/private/tmp` profile and
+writes sanitized samples under `docs/superpowers/evidence/`. A failed or
+unmeasured operation stays pending. Its automated results are separate from
+the human proof below.
+
+1. With sync and live AI disabled, restore the synthetic v6 backup through
+   Data Management. Verify the fixture problem slugs, full attempt/log history,
+   profiles, corrected evidence, suspension, track progress and Settings. Export
+   and reopen the same profile; compare counts and representative original
+   review times, raw due dates, logs and earned credit.
+2. Review an eligible fixture card, wait for Saved, then reload and verify one
+   new attempt and durable card/track effects. Update its latest rating twice;
+   verify the same event time, one attempt, incrementing revision and original
+   scheduling context. Retry the same accepted command after a delayed response
+   and verify its original acknowledgement and no duplicate effect.
+3. Compare Queue, recent Practice details and Analytics 30/90/All with the
+   exported full history, including pre-window reviews, first/repeat cohorts,
+   tied timestamps, suspended and premium-filtered cards. On a real LeetCode
+   problem page, request Submit and Update previews while a Save is pending in
+   another surface. Confirm the shared database gate serializes work, the
+   preview stays read-only, and either a current result or a stale-context
+   conflict appears without changing the draft.
+4. On the hidden dashboard `/dev/smoke` route, opt into **Measure storage and
+   read timings**. Record the displayed total, quota/headroom, active snapshot and
+   recovery-copy byte counts with Chrome version and loaded build. Keep live
+   GenAI unchecked. Check the read-operation samples separately from the
+   sequential health checks. If Chrome omits quota or a workload fails, record
+   the API result and last durable snapshot; do not infer a supported capacity.
+5. Use the disposable-profile failure harness below to reject local snapshot
+   publication after a review or restore. Confirm `persistence-pending`, no
+   false Saved acknowledgement, unchanged active and recovery bytes, and
+   successful same-command Retry while the worker still retains it. Restart
+   before publication and verify the last durable snapshot; repeat after a
+   successful publication and verify the new state. Record the existing
+   sync-metadata best-effort limitation separately.
+
+Attach redacted screen proof for the human flows before PR review or merge.
+The predecessor Phase F human preview proof remains a separate pending gate.
+
 ### FSRS Evidence And Recoverable Replacement
 
 Run these human happy-path and edge-case flows in a disposable installed
