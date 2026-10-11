@@ -7,6 +7,7 @@ import { type NormalizedPracticeState } from '@/features/practice'
 import type { UserSettings } from '@/features/settings'
 
 export type QueueItemCategory = 'due' | 'new' | 'reinforcement'
+export type QueueIntent = 'automatic' | 'extra-practice'
 
 export type RecommendationReason =
   | 'overdue'
@@ -47,6 +48,7 @@ export function buildTodayQueue(
   candidates: QueueCandidate[],
   settings: UserSettings,
   generatedAt = new Date(),
+  intent: QueueIntent = 'automatic',
 ): TodayQueue {
   const dailyGoal = Math.max(0, Math.round(settings.practice.dailyGoal))
   const { partitions, excludedCount } = partitionQueueCandidates(
@@ -57,13 +59,10 @@ export function buildTodayQueue(
   const dueTodayItems = sortByDueDate(partitions.dueToday)
   const reinforcementItems = sortByRetrievability(partitions.reinforcement)
   const newItems = [...partitions.new].sort(compareNewProblemIdentity)
-  const allItems = [
-    ...overdueItems,
-    ...dueTodayItems,
-    ...reinforcementItems,
-    ...newItems,
-  ]
-  const items = allItems.slice(0, dailyGoal)
+  const items =
+    intent === 'extra-practice'
+      ? reinforcementItems.slice(0, 1)
+      : [...overdueItems, ...dueTodayItems, ...newItems].slice(0, dailyGoal)
   const dueCount = overdueItems.length + dueTodayItems.length
 
   return {
@@ -117,7 +116,9 @@ function partitionQueueCandidates(
       continue
     }
 
-    partitions.reinforcement.push(mapQueueItem(candidate, 'reinforcement'))
+    if (candidate.state.dueAt !== null) {
+      partitions.reinforcement.push(mapQueueItem(candidate, 'reinforcement'))
+    }
   }
 
   return { partitions, excludedCount }
@@ -129,7 +130,7 @@ function isEffectivelySuspended(
 ) {
   return (
     candidate.state.isSuspended === true ||
-    candidate.state.status === 'mastered' ||
+    (candidate.state.status === 'mastered' && candidate.state.dueAt === null) ||
     candidate.state.status === 'suspended' ||
     (settings.practice.problemFilters.skipPremium &&
       candidate.problem.isPremium)
@@ -162,6 +163,13 @@ function mapQueueItem(
 
 function sortByDueDate(items: QueueItem[]) {
   return [...items].sort((left, right) => {
+    const eligibleComparison = (left.state.eligibleOn ?? '').localeCompare(
+      right.state.eligibleOn ?? '',
+    )
+    if (eligibleComparison !== 0) {
+      return eligibleComparison
+    }
+
     const dueComparison = compareDates(left.state.dueAt, right.state.dueAt)
 
     if (dueComparison !== 0) {

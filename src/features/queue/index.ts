@@ -6,3 +6,4 @@ export {
   type TodayQueue,
   type RecommendationReason,
 } from './domain'
+export { useExtraPractice } from './api/queue-api'

@@ -129,7 +129,7 @@ describe('current-state Analytics presentation', () => {
       },
     ])
     expect(views.memorySignals.rows[1]?.reasons).toEqual([
-      { kind: 'overdue', label: 'Overdue · 2d' },
+      { kind: 'overdue', label: 'Overdue · 1d' },
     ])
     expect(views.memorySignals.rows[2]?.reasons).toEqual([
       { kind: 'low-durability', label: 'Low durability · 3d' },
@@ -176,12 +176,40 @@ describe('current-state Analytics presentation', () => {
       { kind: 'overdue', label: 'Overdue · 1d' },
     ])
   })
+
+  it('keeps a low-recall same-day review visible without an overdue reason', () => {
+    const views = buildCurrentStateAnalyticsViews(
+      [
+        input('reviewed-today', {
+          dueAt: new Date('2026-08-21T12:00:00.000Z'),
+          lastReviewAt: new Date('2026-08-22T12:00:00.000Z'),
+          retrievability: 0.7,
+        }),
+      ],
+      {
+        asOf: new Date('2026-08-22T16:00:00.000Z'),
+        targetRetention: 0.9,
+        timeZone: 'America/New_York',
+      },
+    )
+
+    expect(views.retentionMap.rows.map((row) => row.slug)).toContain(
+      'reviewed-today',
+    )
+    expect(views.memorySignals.rows[0]?.reasons).toEqual([
+      {
+        kind: 'below-recall',
+        label: 'Estimated recall 70% · below FSRS target',
+      },
+    ])
+  })
 })
 
 function input(
   slug: string,
   overrides: Partial<{
     dueAt: Date
+    lastReviewAt: Date
     retrievability: number
     targetDurationDays: number
   }> = {},

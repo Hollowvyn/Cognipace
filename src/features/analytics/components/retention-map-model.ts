@@ -2,6 +2,17 @@ import type { AnalyticsViews } from '../api/analytics-contracts'
 import { sparseHistoricalYTicks } from './charts/historical-chart-model'
 
 export type RetentionRow = AnalyticsViews['retentionMap']['rows'][number]
+
+export function retentionModelProvenance(row: RetentionRow): string {
+  switch (row.modelProvenance) {
+    case 'captured':
+      return 'Recorded card profile'
+    case 'legacy-derived':
+      return 'Legacy compatibility profile'
+    default:
+      return 'Compatibility estimate using current saved target'
+  }
+}
 export interface RetentionViewport {
   duration: [number, number]
   recall: [number, number]

@@ -17,6 +17,14 @@ const overdueBacklog: AnalyticsViews['overdueBacklog'] = {
     date: `2026-08-${String(index + 9).padStart(2, '0')}`,
     overdueCount: index === 2 ? null : index,
     inProgress: index === 7,
+    schedulingProvenance:
+      index === 2
+        ? 'unknown'
+        : index === 1
+          ? 'legacy-derived'
+          : index === 7
+            ? 'mixed'
+            : 'captured',
   })),
   knownDays: 7,
   withinWatchDays: 5,
@@ -118,10 +126,16 @@ describe('workload analytics views', () => {
     })
     fireEvent.keyDown(inspect, { key: 'ArrowRight' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('Overdue problems: 1')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Legacy-derived compatibility',
+    )
     expect(screen.getByRole('status')).toHaveClass('sr-only')
     fireEvent.keyDown(inspect, { key: 'ArrowRight' })
     expect(screen.getByRole('tooltip')).toHaveTextContent(
       'Watch status: Unknown',
+    )
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Unavailable · insufficient scheduling evidence',
     )
     fireEvent.keyDown(inspect, { key: 'End' })
     expect(
@@ -137,6 +151,12 @@ describe('workload analytics views', () => {
       name: 'Recent Overdue Backlog data table · Daily summaries · Last 30 days',
     })
     expect(within(table).getByText('Not measured')).toBeVisible()
+    expect(
+      within(table).getByText('Legacy-derived compatibility'),
+    ).toBeVisible()
+    expect(
+      within(table).getByText('Unavailable · insufficient scheduling evidence'),
+    ).toBeVisible()
     expect(screen.getByRole('status')).toHaveTextContent('Showing 1–7 of 8')
     await user.click(screen.getByRole('button', { name: 'Next page' }))
     expect(within(table).getByText('08/16/26 · In progress')).toBeVisible()

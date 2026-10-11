@@ -642,7 +642,7 @@ describe('db foundation', () => {
     )
   })
 
-  it('saves a review result and updates the queue from data state', async () => {
+  it('keeps a saved future review out of the automatic queue and available for Extra Practice', async () => {
     const handle = await createTestDb()
     const problemsRepository = createProblemsRepository(handle.db)
     const twoSum = await problemsRepository.getBySlug('two-sum')
@@ -660,12 +660,21 @@ describe('db foundation', () => {
       handle.db,
       new Date('2026-01-01T10:01:00.000Z'),
     )
+    const extra = await getTodayQueue(
+      handle.db,
+      new Date('2026-01-01T10:01:00.000Z'),
+      'extra-practice',
+    )
 
     expect(review.problemSlug).toBe('two-sum')
     expect(review.dueAt.getTime()).toBeGreaterThan(
       new Date('2026-01-01T10:00:00.000Z').getTime(),
     )
-    expect(queue.items[0]?.problemSlug).toBe('two-sum')
+    expect(queue.items.some((item) => item.problemSlug === 'two-sum')).toBe(
+      false,
+    )
+    expect(extra.topRecommendation?.problemSlug).toBe('two-sum')
+    expect(extra.reinforcementCount).toBe(1)
   })
 
   it('rolls back practice state when review history cannot be written', async () => {

@@ -116,6 +116,45 @@ describe('derivePracticeScheduleTiming', () => {
     })
   })
 
+  it('uses an explicit New York study timezone even when the process runs in UTC', () => {
+    withTimezone('UTC', () => {
+      const input = {
+        dueAt: new Date('2026-03-09T04:30:00.000Z'),
+        lastReviewedAt: new Date('2026-03-08T04:30:00.000Z'),
+        isStarted: true,
+        isSuspended: false,
+        now: new Date('2026-03-09T03:59:59.000Z'),
+      }
+
+      expect(derivePracticeScheduleTiming(input)).toMatchObject({
+        eligibleOn: '2026-03-09',
+        isDue: true,
+      })
+      expect(
+        derivePracticeScheduleTiming({
+          ...input,
+          timeZone: 'America/New_York',
+        }),
+      ).toMatchObject({
+        eligibleOn: '2026-03-09',
+        isDue: false,
+      })
+    })
+  })
+
+  it('rejects an invalid explicit study timezone', () => {
+    expect(() =>
+      derivePracticeScheduleTiming({
+        dueAt: new Date('2026-03-09T04:30:00.000Z'),
+        lastReviewedAt: new Date('2026-03-08T04:30:00.000Z'),
+        isStarted: true,
+        isSuspended: false,
+        now: new Date('2026-03-09T03:59:59.000Z'),
+        timeZone: 'Mars/Olympus_Mons',
+      }),
+    ).toThrow(RangeError)
+  })
+
   it('uses the next local day across the autumn clock change', () => {
     withTimezone('America/New_York', () => {
       expect(

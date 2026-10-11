@@ -228,6 +228,16 @@ describe('runtime-policy', () => {
     }
   })
 
+  it('keeps queue reads on popup and dashboard surfaces for either intent', () => {
+    expect(canCallExtensionMethod('queue.getTodayQueue', 'popup')).toBe(true)
+    expect(canCallExtensionMethod('queue.getTodayQueue', 'dashboard')).toBe(
+      true,
+    )
+    expect(
+      canCallExtensionMethod('queue.getTodayQueue', 'content-script'),
+    ).toBe(false)
+  })
+
   it('allows safe sync open checks from every UI surface', () => {
     for (const method of [
       'sync.checkRemoteOnOpen',

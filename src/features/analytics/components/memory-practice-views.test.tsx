@@ -23,6 +23,8 @@ function memoryRow(index = 0, overrides: Partial<MemoryRow> = {}): MemoryRow {
     q1: 4,
     q3: 8,
     eligibleReviews: 4,
+    observedReviews: 4,
+    modelProvenance: 'captured',
     medianChangeDays: 2,
     provenance: 'reconstructed',
     evidence: 'measured',
@@ -100,7 +102,8 @@ describe('Memory Strength view composition', () => {
       'Q3: 8.0d',
       'Eligible reviews: 4',
       'Median change: +2.0d',
-      'Provenance: Reconstructed',
+      'Observed reviews: 4',
+      'Model provenance: Recorded scheduling evidence',
       'In progress',
       '2:44 AM (America/New_York)',
     ])
@@ -117,17 +120,49 @@ describe('Memory Strength view composition', () => {
       '6.0d',
       '4.0d–8.0d',
       '4',
+      '4',
       '+2.0d',
-      'Reconstructed',
+      'Recorded scheduling evidence',
       'Measured',
       '3-day summaries · In progress',
     ])
+  })
+
+  it('keeps observed memory cohorts visible when model evidence is unavailable', async () => {
+    const rows = [
+      memoryRow(0, { modelProvenance: 'legacy-derived' }),
+      memoryRow(1, { modelProvenance: 'mixed' }),
+      memoryRow(2, {
+        medianStrengthDays: null,
+        q1: null,
+        q3: null,
+        eligibleReviews: 0,
+        observedReviews: 3,
+        modelProvenance: 'unknown',
+        evidence: 'not-measured',
+      }),
+    ]
+    render(<MemoryStrengthView timeFrame={timeFrame} view={{ rows, scale }} />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Table' }))
+    const table = screen.getByRole('table', {
+      name: 'Memory Strength exact values',
+    })
+    expect(
+      within(table).getByText('Legacy-derived compatibility'),
+    ).toBeVisible()
+    expect(within(table).getByText('Mixed scheduling evidence')).toBeVisible()
+    expect(
+      within(table).getByText('Unavailable · insufficient scheduling evidence'),
+    ).toBeVisible()
+    expect(within(table).getByText('3')).toBeVisible()
   })
 
   it('uses medians to trim edges while keeping measured zero and an unavailable internal bucket', async () => {
     const user = userEvent.setup()
     const missing = {
       medianStrengthDays: null,
+      observedReviews: 0,
+      modelProvenance: 'unknown' as const,
       evidence: 'not-measured' as const,
     }
     const rows = [
@@ -171,7 +206,7 @@ describe('Memory Strength view composition', () => {
 
   it.each([
     { rows: [] },
-    { rows: [memoryRow(0, { medianStrengthDays: null })] },
+    { rows: [memoryRow(0, { medianStrengthDays: null, observedReviews: 0 })] },
   ])('reports absent median history without observations', async ({ rows }) => {
     const user = userEvent.setup()
     render(<MemoryStrengthView timeFrame={timeFrame} view={{ rows, scale }} />)

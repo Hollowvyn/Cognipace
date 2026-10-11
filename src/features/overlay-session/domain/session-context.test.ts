@@ -45,6 +45,7 @@ function makePractice(
     isOverdue: false,
     overdueDays: 0,
     dueAt: null,
+    eligibleOn: null,
     lastReviewedAt: null,
     retrievability: null,
     stability: null,

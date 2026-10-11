@@ -9,6 +9,8 @@ import {
 import {
   analyticsTimeFrameSchema,
   observedRecallVsFsrsRowSchema,
+  memoryStrengthRowSchema,
+  overdueBacklogViewRowSchema,
   analyticsReadinessSchema,
   analyticsRangeSchema,
   analyticsSummaryRequestSchema,
@@ -382,6 +384,72 @@ describe('history frame and paired Recall invariants', () => {
         evidence: 'not-measured',
       }).success,
     ).toBe(true)
+  })
+
+  it('preserves observed repeats when their scheduling model evidence is unavailable', () => {
+    expect(
+      observedRecallVsFsrsRowSchema.safeParse({
+        ...pair,
+        fsrsEstimate: null,
+        difference: null,
+        modelSampleSize: 0,
+        modelProvenance: 'unknown',
+      }).success,
+    ).toBe(true)
+  })
+  it('allows a partial model cohort only with no compared difference', () => {
+    expect(
+      observedRecallVsFsrsRowSchema.safeParse({
+        ...pair,
+        modelSampleSize: 1,
+        modelProvenance: 'mixed',
+        difference: null,
+      }).success,
+    ).toBe(true)
+    expect(
+      observedRecallVsFsrsRowSchema.safeParse({
+        ...pair,
+        modelSampleSize: 1,
+        modelProvenance: 'mixed',
+      }).success,
+    ).toBe(false)
+  })
+  it('accepts explicit historical scheduling provenance on memory and backlog rows', () => {
+    const memory = {
+      id: 'memory',
+      bucketStart: '2026-10-02',
+      bucketEnd: '2026-10-02',
+      isPartial: false,
+      medianStrengthDays: null,
+      q1: null,
+      q3: null,
+      eligibleReviews: 0,
+      observedReviews: 2,
+      medianChangeDays: null,
+      modelProvenance: 'unknown',
+      provenance: 'reconstructed',
+      evidence: 'not-measured',
+    }
+    expect(memoryStrengthRowSchema.safeParse(memory).success).toBe(true)
+    expect(
+      memoryStrengthRowSchema.safeParse({
+        ...memory,
+        modelProvenance: 'invented',
+      }).success,
+    ).toBe(false)
+    const backlog = {
+      date: '2026-10-02',
+      overdueCount: null,
+      inProgress: false,
+      schedulingProvenance: 'unknown',
+    }
+    expect(overdueBacklogViewRowSchema.safeParse(backlog).success).toBe(true)
+    expect(
+      overdueBacklogViewRowSchema.safeParse({
+        ...backlog,
+        schedulingProvenance: 'invented',
+      }).success,
+    ).toBe(false)
   })
 })
 

@@ -6,6 +6,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import { Surface } from '@/components/ui/surface'
 import type {
   AppShellProblemSummary,
+  PopupAppShellController,
   PopupControllerStatus,
   PopupRecommendationView,
 } from '@/features/app-shell'
@@ -15,18 +16,22 @@ import { ScopedStatus } from './scoped-status'
 
 type RecommendationCardProps = {
   canShuffle: boolean
+  extraPractice: PopupAppShellController['extraPractice']
   onOpenProblem: (
     problem: AppShellProblemSummary,
     scope: 'recommendation' | 'track',
   ) => void
   onShuffle: () => void
+  onRequestExtraPractice: () => void
   status: Exclude<PopupControllerStatus, null> | null
   view: PopupRecommendationView
 }
 
 export function RecommendationCard({
   canShuffle,
+  extraPractice,
   onOpenProblem,
+  onRequestExtraPractice,
   onShuffle,
   status,
   view,
@@ -99,6 +104,45 @@ export function RecommendationCard({
       </div>
 
       <ScopedStatus status={status} />
+
+      <div className="mt-4 grid gap-2 border-t border-border pt-4">
+        <Button
+          disabled={extraPractice.isLoading}
+          onClick={onRequestExtraPractice}
+          variant="outline"
+        >
+          Extra Practice
+        </Button>
+        {extraPractice.isLoading ? (
+          <p role="status">Finding extra practice...</p>
+        ) : extraPractice.error ? (
+          <p role="alert">{extraPractice.error}</p>
+        ) : extraPractice.item ? (
+          <div className="grid gap-2">
+            <p className="m-0 font-semibold">{extraPractice.item.title}</p>
+            <Button
+              onClick={() =>
+                onOpenProblem(
+                  {
+                    problemSlug: extraPractice.item!.problemSlug,
+                    title: extraPractice.item!.title,
+                    difficulty: extraPractice.item!.difficulty,
+                    isPremium: extraPractice.item!.isPremium,
+                  },
+                  'recommendation',
+                )
+              }
+              variant="outline"
+            >
+              Open Extra Practice
+            </Button>
+          </div>
+        ) : extraPractice.hasRequested ? (
+          <p role="status">
+            No future review cards available for extra practice.
+          </p>
+        ) : null}
+      </div>
     </Surface>
   )
 }

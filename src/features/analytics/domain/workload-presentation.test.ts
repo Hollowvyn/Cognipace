@@ -22,6 +22,34 @@ const timeFrame = {
 }
 
 describe('workload analytics presentation', () => {
+  it('preserves scheduling provenance on measured and unavailable backlog days', () => {
+    const { overdueBacklog } = buildWorkloadAnalyticsViews({
+      overdueSnapshots: [
+        {
+          date: new Date('2026-08-10T03:59:59.999Z'),
+          overdueCount: 1,
+          schedulingProvenance: 'captured',
+        },
+        {
+          date: new Date('2026-08-11T03:59:59.999Z'),
+          overdueCount: 2,
+          schedulingProvenance: 'legacy-derived',
+        },
+        {
+          date: new Date('2026-08-13T03:59:59.999Z'),
+          overdueCount: 3,
+          schedulingProvenance: 'mixed',
+        },
+      ],
+      timeFrame,
+      upcomingLoad: upcomingRows(),
+    })
+    expect(
+      overdueBacklog.rows.slice(0, 5).map((row) => row.schedulingProvenance),
+    ).toEqual(['captured', 'legacy-derived', 'unknown', 'mixed', 'unknown'])
+    expect(overdueBacklog.rows[2]?.overdueCount).toBeNull()
+  })
+
   it('counts exactly five as at or above watch and never carries through an unknown current day', () => {
     const { overdueBacklog } = buildWorkloadAnalyticsViews({
       overdueSnapshots: [

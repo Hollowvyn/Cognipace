@@ -20,8 +20,11 @@ import {
   problemPractice,
 } from '@/platform/db/schema'
 import {
+  createInitialFsrsCard,
   createFsrsSchedulerProfile,
+  scheduleReviewWithProfile,
   serializeFsrsSchedulerProfile,
+  serializeFsrsReviewLogSnapshot,
   toSerializableFsrsCardSnapshot,
   parseSerializedFsrsReviewLogSnapshot,
 } from '@/lib/fsrs'
@@ -31,11 +34,40 @@ describe('Practice additive storage', () => {
   it('clears imported assessment context on the selected unknown correction so current metadata stays valid', async () => {
     const { db } = await createTestDb()
     const repository = createPracticeRepository(db)
+    const reviewedAt = new Date('2026-01-01T12:00:00.000Z')
+    const legacyScheduled = scheduleReviewWithProfile(
+      createInitialFsrsCard(reviewedAt),
+      'good',
+      reviewedAt,
+      createFsrsSchedulerProfile(),
+    )
     await repository.saveReviewResult({
       problemSlug: 'two-sum',
       rating: 'good',
       reviewAttemptId: 'assessment-unknown',
+      reviewedAt,
     })
+    await db
+      .update(fsrsCards)
+      .set({
+        dueAt: legacyScheduled.card.dueAt.getTime(),
+        stability: legacyScheduled.card.stability,
+        difficulty: legacyScheduled.card.difficulty,
+        elapsedDays: legacyScheduled.card.elapsedDays,
+        scheduledDays: legacyScheduled.card.scheduledDays,
+        learningSteps: legacyScheduled.card.learningSteps,
+        reps: legacyScheduled.card.reps,
+        lapses: legacyScheduled.card.lapses,
+        state: legacyScheduled.card.state,
+        lastReviewAt: legacyScheduled.card.lastReviewAt!.getTime(),
+      })
+      .where(eq(fsrsCards.problemSlug, 'two-sum'))
+    await db
+      .update(reviewAttempts)
+      .set({
+        fsrsReviewLog: serializeFsrsReviewLogSnapshot(legacyScheduled.log),
+      })
+      .where(eq(reviewAttempts.id, 'assessment-unknown'))
     await db
       .update(practiceReviewEvidence)
       .set({
@@ -290,9 +322,9 @@ describe('Practice additive storage', () => {
         .set({ applicationSequence: evidence!.applicationSequence })
         .where(eq(practiceReviewEvidence.reviewAttemptId, 'two')),
     ).rejects.toThrow()
-    const profileJson = serializeFsrsSchedulerProfile(
-      createFsrsSchedulerProfile(),
-    )
+    const savedProfiles = await db.select().from(fsrsSchedulerProfiles)
+    expect(savedProfiles).toHaveLength(1)
+    const profileJson = savedProfiles[0]!.profileJson
     await expect(
       db
         .insert(fsrsSchedulerProfiles)

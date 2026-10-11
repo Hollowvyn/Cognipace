@@ -12,6 +12,7 @@ import {
   formatDate,
   formatDuration,
   formatGap,
+  retentionModelProvenance,
   statusColor,
   statusLabel,
   type RetentionRow,
@@ -27,6 +28,11 @@ export function retentionProblemFields(
       key: 'recall',
       label: 'Estimated recall now',
       value: (row) => formatPercent(row.retrievability),
+    },
+    {
+      key: 'modelProvenance',
+      label: 'Model evidence',
+      value: retentionModelProvenance,
     },
     {
       key: 'target',
@@ -222,6 +228,7 @@ function RetentionMapTable({
                 <td className="px-2 py-2 text-right tabular-nums">
                   {formatPercent(row.retrievability)}
                 </td>
+                <td className="px-2 py-2">{retentionModelProvenance(row)}</td>
                 <td className="px-2 py-2 text-right tabular-nums">
                   {formatPercent(row.targetRetention)}
                 </td>

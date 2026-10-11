@@ -439,7 +439,7 @@ describe('compact Retention card', () => {
       if (next.hasAttribute('disabled')) break
       await user.click(next)
     }
-    expect(headers.size).toBe(12)
+    expect(headers.size).toBe(13)
     expect(screen.getByRole('table')).toHaveAttribute('data-value-columns', '1')
   })
 

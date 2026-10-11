@@ -8,6 +8,7 @@ import type {
   PopupAppShellController,
   PopupAppShellData,
 } from '@/features/app-shell'
+import { createSerializedNormalizedPracticeState } from '@/testing/practice-fixtures'
 
 import { PopupShell } from './popup-shell'
 
@@ -83,6 +84,7 @@ const shellData = {
           status: 'review',
           phase: 'review',
           dueAt: '2025-12-31T00:00:00.000Z',
+          eligibleOn: '2025-12-31',
           lastReviewedAt: '2025-12-01T00:00:00.000Z',
           reviewCount: 1,
           lapses: 0,
@@ -134,6 +136,64 @@ const shellData = {
 } satisfies PopupAppShellData
 
 describe('PopupShell', () => {
+  it('offers Extra Practice separately from the automatic recommendation', async () => {
+    const user = userEvent.setup()
+    const controller = createController({
+      extraPractice: {
+        item: {
+          category: 'reinforcement',
+          reason: 'reinforcement',
+          problemSlug: 'future-card',
+          title: 'Future Card',
+          difficulty: 'easy',
+          isPremium: false,
+          state: createSerializedNormalizedPracticeState({
+            problemSlug: 'future-card',
+            status: 'review',
+            phase: 'review',
+            isStarted: true,
+            dueAt: '2026-01-10T00:00:00.000Z',
+            eligibleOn: '2026-01-10',
+          }),
+        },
+        isLoading: false,
+        hasRequested: true,
+        error: null,
+      },
+    })
+
+    render(<PopupShell controller={controller} />)
+    expect(screen.getByText('Valid Parentheses')).toBeVisible()
+    expect(screen.getByText('Future Card')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Extra Practice' }))
+    expect(controller.actions.requestExtraPractice).toHaveBeenCalledOnce()
+    await user.click(
+      screen.getByRole('button', { name: 'Open Extra Practice' }),
+    )
+    expect(controller.actions.openProblem).toHaveBeenCalledWith(
+      expect.objectContaining({ problemSlug: 'future-card' }),
+      'recommendation',
+    )
+  })
+
+  it.each([
+    [true, false, null, 'Finding extra practice...'],
+    [false, true, null, 'No future review cards available for extra practice.'],
+    [false, false, 'Queue read failed', 'Queue read failed'],
+  ] as const)(
+    'shows Extra Practice loading, empty, and error states',
+    (isLoading, hasRequested, error, message) => {
+      render(
+        <PopupShell
+          controller={createController({
+            extraPractice: { item: null, isLoading, hasRequested, error },
+          })}
+        />,
+      )
+      expect(screen.getByText(message)).toBeVisible()
+    },
+  )
+
   it('applies the saved appearance theme to the popup surface', () => {
     render(
       <PopupShell
@@ -473,12 +533,19 @@ function createController(
     isUpdatingStudyMode: false,
     canToggleStudyMode: true,
     canShuffleRecommendation: false,
+    extraPractice: {
+      item: null,
+      isLoading: false,
+      hasRequested: false,
+      error: null,
+    },
     actions: {
       openOverview: vi.fn(),
       openSettings: vi.fn(),
       openTracks: vi.fn(),
       openProblem: vi.fn(),
       shuffleRecommendation: vi.fn(),
+      requestExtraPractice: vi.fn(),
       toggleStudyMode: vi.fn(),
     },
     ...overrides,

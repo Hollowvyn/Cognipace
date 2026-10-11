@@ -19,6 +19,7 @@ export function PopupShell({
     canShuffleRecommendation,
     canToggleStudyMode,
     data,
+    extraPractice,
     isUpdatingStudyMode,
     status,
     view,
@@ -64,7 +65,9 @@ export function PopupShell({
 
       <RecommendationCard
         canShuffle={canShuffleRecommendation}
+        extraPractice={extraPractice}
         onOpenProblem={actions.openProblem}
+        onRequestExtraPractice={actions.requestExtraPractice}
         onShuffle={actions.shuffleRecommendation}
         status={status?.scope === 'recommendation' ? status : null}
         view={view.recommendation}

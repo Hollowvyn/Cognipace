@@ -625,13 +625,16 @@ describe('ProblemsRepository library data', () => {
 
     expect(rowAtReviewTime[0]?.status).toBe('scheduled')
     expect(rowAfterRetentionChange[0]).toMatchObject({
-      status: 'due',
+      status: 'scheduled',
       state: {
-        isDue: true,
+        isDue: false,
       },
     })
     expect(rowAfterRetentionChange[0]?.state.dueAt).toEqual(
       rowAtReviewTime[0]?.state.dueAt,
+    )
+    expect(rowAfterRetentionChange[0]?.state.eligibleOn).toBe(
+      rowAtReviewTime[0]?.state.eligibleOn,
     )
     expect(rowAfterRetentionChange[0]?.state.retrievability).toBeGreaterThan(
       0.9,

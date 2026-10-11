@@ -994,7 +994,11 @@ export function registerBackgroundHandlers() {
     )
     return getAppDb().then(async ({ db }) =>
       serializeTodayQueue(
-        await getTodayQueue(db, request.at ? new Date(request.at) : undefined),
+        await getTodayQueue(
+          db,
+          request.at ? new Date(request.at) : undefined,
+          request.intent,
+        ),
       ),
     )
   })

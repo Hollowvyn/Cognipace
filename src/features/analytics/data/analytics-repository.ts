@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gte, lt, lte, ne, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gte, lte, sql } from 'drizzle-orm'
 
 import type { ProblemDifficulty } from '@/features/problems/domain'
 import { defaultFsrsCardKind } from '@/lib/fsrs'
@@ -7,6 +7,8 @@ import type { Db } from '@/platform/db'
 
 import {
   fsrsCards,
+  fsrsSchedulerProfiles,
+  practiceReviewEvidence,
   problemPractice,
   problems,
   problemTopics,
@@ -37,6 +39,10 @@ export interface ReviewEvent {
   isCorrect: boolean | null
   reviewMode: string
   fsrsReviewLog: string | null
+  applicationSequence: number | null
+  schedulingEvidenceKind: 'captured' | 'legacy-derived' | 'unknown'
+  schedulerProfileJson: string | null
+  preCardJson: string | null
 }
 
 export interface ReviewEventRange {
@@ -44,14 +50,11 @@ export interface ReviewEventRange {
   until: Date
 }
 
-export interface UpcomingCard {
-  dueAt: Date
-}
-
 export interface CurrentFsrsCard {
   cardId: string
   problemSlug: string
   title: string
+  isPremium: boolean
   topics: string[]
   stability: number
   difficulty: number
@@ -63,9 +66,12 @@ export interface CurrentFsrsCard {
   dueAt: Date
   createdAt: Date
   lastReviewAt: Date | null
+  practiceLastReviewedAt: Date | null
   state: string
   practiceStatus: string
   isSuspended: boolean
+  lastSchedulingEvidenceKind: 'captured' | 'legacy-derived' | 'unknown'
+  lastSchedulerProfileJson: string | null
 }
 
 export async function getReviewDayStats(db: Db): Promise<ReviewDayStats> {
@@ -131,9 +137,21 @@ export async function getReviewEvents(
       isCorrect: reviewAttempts.isCorrect,
       reviewMode: reviewAttempts.reviewMode,
       fsrsReviewLog: reviewAttempts.fsrsReviewLog,
+      applicationSequence: practiceReviewEvidence.applicationSequence,
+      schedulingEvidenceKind: practiceReviewEvidence.schedulingEvidenceKind,
+      schedulerProfileJson: fsrsSchedulerProfiles.profileJson,
+      preCardJson: practiceReviewEvidence.preCardJson,
     })
     .from(reviewAttempts)
     .innerJoin(problems, eq(problems.slug, reviewAttempts.problemSlug))
+    .leftJoin(
+      practiceReviewEvidence,
+      eq(practiceReviewEvidence.reviewAttemptId, reviewAttempts.id),
+    )
+    .leftJoin(
+      fsrsSchedulerProfiles,
+      eq(fsrsSchedulerProfiles.id, practiceReviewEvidence.schedulerProfileId),
+    )
     .leftJoin(
       problemTopics,
       eq(problemTopics.problemSlug, reviewAttempts.problemSlug),
@@ -175,42 +193,49 @@ export async function getReviewEvents(
       isCorrect: row.isCorrect,
       reviewMode: row.reviewMode,
       fsrsReviewLog: row.fsrsReviewLog,
+      applicationSequence: row.applicationSequence,
+      schedulingEvidenceKind:
+        row.schedulingEvidenceKind === 'captured' ||
+        row.schedulingEvidenceKind === 'legacy-derived'
+          ? row.schedulingEvidenceKind
+          : 'unknown',
+      schedulerProfileJson: row.schedulerProfileJson,
+      preCardJson: row.preCardJson,
     })
   }
 
   return [...events.values()]
 }
 
-export async function getUpcomingCards(
-  db: Db,
-  until: Date,
-): Promise<UpcomingCard[]> {
-  const rows = await db
-    .select({ dueAt: fsrsCards.dueAt })
-    .from(fsrsCards)
-    .innerJoin(
-      problemPractice,
-      eq(problemPractice.problemSlug, fsrsCards.problemSlug),
-    )
-    .where(
-      and(
-        eq(fsrsCards.cardKind, defaultFsrsCardKind),
-        lt(fsrsCards.dueAt, until.getTime()),
-        eq(problemPractice.isSuspended, false),
-        ne(problemPractice.status, 'suspended'),
-      ),
-    )
-    .orderBy(asc(fsrsCards.dueAt), asc(fsrsCards.problemSlug))
-
-  return rows.map((row) => ({ dueAt: new Date(row.dueAt) }))
-}
-
 export async function getCurrentFsrsCards(db: Db): Promise<CurrentFsrsCard[]> {
+  const recordedProfiles = await db
+    .select({
+      cardId: practiceReviewEvidence.cardId,
+      applicationSequence: practiceReviewEvidence.applicationSequence,
+      schedulingEvidenceKind: practiceReviewEvidence.schedulingEvidenceKind,
+      schedulerProfileJson: fsrsSchedulerProfiles.profileJson,
+    })
+    .from(practiceReviewEvidence)
+    .leftJoin(
+      fsrsSchedulerProfiles,
+      eq(fsrsSchedulerProfiles.id, practiceReviewEvidence.schedulerProfileId),
+    )
+    .orderBy(asc(practiceReviewEvidence.applicationSequence))
+  const latestProfileByCard = new Map<
+    string,
+    (typeof recordedProfiles)[number]
+  >()
+  for (const profile of recordedProfiles) {
+    const prior = latestProfileByCard.get(profile.cardId)
+    if (!prior || prior.applicationSequence < profile.applicationSequence)
+      latestProfileByCard.set(profile.cardId, profile)
+  }
   const rows = await db
     .select({
       cardId: fsrsCards.id,
       problemSlug: fsrsCards.problemSlug,
       title: problems.title,
+      isPremium: problems.isPremium,
       topicLabel: topics.label,
       stability: fsrsCards.stability,
       difficulty: fsrsCards.difficulty,
@@ -222,6 +247,7 @@ export async function getCurrentFsrsCards(db: Db): Promise<CurrentFsrsCard[]> {
       dueAt: fsrsCards.dueAt,
       createdAt: fsrsCards.createdAt,
       lastReviewAt: fsrsCards.lastReviewAt,
+      practiceLastReviewedAt: problemPractice.lastReviewedAt,
       state: fsrsCards.state,
       practiceStatus: problemPractice.status,
       isSuspended: problemPractice.isSuspended,
@@ -253,6 +279,7 @@ export async function getCurrentFsrsCards(db: Db): Promise<CurrentFsrsCard[]> {
       cardId: row.cardId,
       problemSlug: row.problemSlug,
       title: row.title,
+      isPremium: row.isPremium,
       topics: row.topicLabel === null ? [] : [row.topicLabel],
       stability: row.stability,
       difficulty: row.difficulty,
@@ -265,14 +292,31 @@ export async function getCurrentFsrsCards(db: Db): Promise<CurrentFsrsCard[]> {
       createdAt: new Date(row.createdAt),
       lastReviewAt:
         row.lastReviewAt === null ? null : new Date(row.lastReviewAt),
+      practiceLastReviewedAt:
+        row.practiceLastReviewedAt === null
+          ? null
+          : new Date(row.practiceLastReviewedAt),
       state: row.state,
       practiceStatus: row.practiceStatus,
       isSuspended: row.isSuspended,
+      lastSchedulingEvidenceKind: 'unknown',
+      lastSchedulerProfileJson: null,
     })
   }
 
   return [...cards.values()].map((card) => ({
     ...card,
+    lastSchedulingEvidenceKind:
+      latestProfileByCard.get(card.cardId)?.schedulingEvidenceKind ===
+        'captured' ||
+      latestProfileByCard.get(card.cardId)?.schedulingEvidenceKind ===
+        'legacy-derived'
+        ? (latestProfileByCard.get(card.cardId)!.schedulingEvidenceKind as
+            | 'captured'
+            | 'legacy-derived')
+        : 'unknown',
+    lastSchedulerProfileJson:
+      latestProfileByCard.get(card.cardId)?.schedulerProfileJson ?? null,
     topics: [...new Set(card.topics)].sort((a, b) => a.localeCompare(b)),
   }))
 }

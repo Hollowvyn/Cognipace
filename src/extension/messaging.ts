@@ -294,9 +294,10 @@ export type PingResponse = {
 export const queueRequestSchema = z.object({
   surface: z.enum(['popup', 'dashboard']),
   at: z.iso.datetime().optional(),
+  intent: z.enum(['automatic', 'extra-practice']).default('automatic'),
 })
 
-export type QueueRequest = z.infer<typeof queueRequestSchema>
+export type QueueRequest = z.input<typeof queueRequestSchema>
 
 export const openDashboardRequestSchema = z.object({
   surface: z.literal('content-script'),

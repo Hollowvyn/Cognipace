@@ -15,6 +15,7 @@ import {
   MemoryLegend,
   MemoryStrengthPlot,
   memoryStrengthRows,
+  memoryModelProvenanceText,
 } from '../memory-practice-views'
 import {
   formatHistoricalBucket,
@@ -89,10 +90,11 @@ export function MemoryStrengthCard({
                 ? `${days(row.q1)}–${days(row.q3)}`
                 : 'Unavailable',
               'Eligible reviews': row.eligibleReviews,
+              'Observed reviews': row.observedReviews ?? row.eligibleReviews,
               'Median change': finite(row.medianChangeDays)
                 ? `${row.medianChangeDays >= 0 ? '+' : ''}${days(row.medianChangeDays)}`
                 : 'Unavailable',
-              Provenance: 'Reconstructed',
+              'Model provenance': memoryModelProvenanceText(row),
               Evidence: row.evidence,
               'Period context': historicalIntervalContext(row, timeFrame),
               'Raw Q1': days(row.q1),

@@ -6,6 +6,11 @@ import {
   serializeFsrsReviewLogSnapshot,
   scheduleReview,
   createInitialFsrsCard,
+  createFsrsSchedulerProfile,
+  scheduleReviewWithProfile,
+  serializeFsrsCardSnapshot,
+  serializeFsrsSchedulerProfile,
+  isReviewRating,
 } from '@/lib/fsrs'
 
 import {
@@ -103,7 +108,7 @@ const validLog = (stability: number) =>
 function event(
   overrides: Partial<AnalyticsReviewEvent> = {},
 ): AnalyticsReviewEvent {
-  return {
+  const row: AnalyticsReviewEvent = {
     id: '1',
     cardId: 'card-1',
     problemSlug: 'two-sum',
@@ -115,6 +120,48 @@ function event(
     fsrsReviewLog: validLog(4),
     ...overrides,
   }
+  if (!isReviewRating(row.rating) || Object.hasOwn(overrides, 'fsrsReviewLog'))
+    return row
+  const profile = createFsrsSchedulerProfile(options.fsrsOptions)
+  const preCard = createInitialFsrsCard(row.reviewedAt)
+  const scheduled = scheduleReviewWithProfile(
+    preCard,
+    row.rating,
+    row.reviewedAt,
+    profile,
+  )
+  return {
+    ...row,
+    schedulingEvidenceKind: overrides.schedulingEvidenceKind ?? 'captured',
+    schedulerProfileJson: serializeFsrsSchedulerProfile(profile),
+    preCardJson: serializeFsrsCardSnapshot(preCard),
+    fsrsReviewLog: serializeFsrsReviewLogSnapshot(scheduled.log),
+  }
+}
+
+function recordedEvent(
+  overrides: Partial<AnalyticsReviewEvent>,
+  preCard: ReturnType<typeof createInitialFsrsCard>,
+  fsrsOptions = options.fsrsOptions,
+): AnalyticsReviewEvent {
+  const rating = overrides.rating ?? 'good'
+  const reviewedAt =
+    overrides.reviewedAt ?? new Date('2026-08-01T12:00:00.000Z')
+  if (!isReviewRating(rating)) throw new Error('Test rating must be valid')
+  const profile = createFsrsSchedulerProfile(fsrsOptions)
+  const scheduled = scheduleReviewWithProfile(
+    preCard,
+    rating,
+    reviewedAt,
+    profile,
+  )
+  return event({
+    ...overrides,
+    schedulingEvidenceKind: overrides.schedulingEvidenceKind ?? 'captured',
+    schedulerProfileJson: serializeFsrsSchedulerProfile(profile),
+    preCardJson: serializeFsrsCardSnapshot(preCard),
+    fsrsReviewLog: serializeFsrsReviewLogSnapshot(scheduled.log),
+  })
 }
 
 describe('analytics chart-data builders', () => {
@@ -245,7 +292,7 @@ describe('analytics chart-data builders', () => {
   })
 
   it('excludes invalid ratings from mixed observed metric aggregations', () => {
-    const validReview = event({ fsrsReviewLog: validLog(4) })
+    const validReview = event()
     const invalidRating = event({
       id: 'invalid-rating',
       cardId: 'invalid-rating-card',
@@ -285,11 +332,13 @@ describe('analytics chart-data builders', () => {
       },
     ])
     expect(
-      buildStabilityPoints([validReview, invalidRating], options)[0],
-    ).toMatchObject({
-      medianStabilityDays: 4,
-      sampleSize: 1,
-    })
+      buildStabilityPoints([validReview, invalidRating], options)[0]
+        ?.sampleSize,
+    ).toBe(1)
+    expect(
+      buildStabilityPoints([validReview, invalidRating], options)[0]
+        ?.medianStabilityDays,
+    ).toBeGreaterThan(0)
   })
 
   it('keeps no eligible assessments unknown and handles zero-review days', () => {
@@ -315,7 +364,7 @@ describe('analytics chart-data builders', () => {
     ])
   })
 
-  it('changes predicted recall when pre-range history is included', () => {
+  it('keeps a recorded prediction stable when earlier retained history changes', () => {
     const inRangeEvents = [
       event({
         reviewedAt: new Date('2026-08-02T12:00:00.000Z'),
@@ -342,13 +391,13 @@ describe('analytics chart-data builders', () => {
     expect(
       replayed.find((point) => point.bucketStart === '2026-08-03')
         ?.predictedRecall,
-    ).not.toBe(
+    ).toBe(
       inRangeOnly.find((point) => point.bucketStart === '2026-08-03')
         ?.predictedRecall,
     )
   })
 
-  it('replays multiple cards with the configured normalized FSRS options', () => {
+  it('uses the recorded profile across multiple cards', () => {
     const fsrsOptions = normalizeFsrsSchedulingOptions({
       targetRetention: 0.75,
       enableShortTerm: false,
@@ -365,16 +414,6 @@ describe('analytics chart-data builders', () => {
       reviewedAt: new Date('2026-08-02T12:00:00.000Z'),
       rating: 'easy',
     })
-    const repeatReview = event({
-      id: '3',
-      cardId: 'card-1',
-      reviewedAt: new Date('2026-08-03T12:00:00.000Z'),
-      rating: 'again',
-    })
-    const points = buildRecallQualityPoints(
-      [firstReview, secondCardReview, repeatReview],
-      configuredOptions,
-    )
     let card = createInitialFsrsCard(firstReview.reviewedAt)
     card = scheduleReview(
       card,
@@ -382,6 +421,20 @@ describe('analytics chart-data builders', () => {
       firstReview.reviewedAt,
       fsrsOptions,
     ).card
+    const repeatReview = recordedEvent(
+      {
+        id: '3',
+        cardId: 'card-1',
+        reviewedAt: new Date('2026-08-03T12:00:00.000Z'),
+        rating: 'again',
+      },
+      card,
+      fsrsOptions,
+    )
+    const points = buildRecallQualityPoints(
+      [firstReview, secondCardReview, repeatReview],
+      configuredOptions,
+    )
     const expectedBeforeRepeat = getRetrievability(
       card,
       repeatReview.reviewedAt,
@@ -784,38 +837,27 @@ describe('analytics chart-data builders', () => {
     })
   })
 
-  it('uses only valid stored stability logs in every generated bucket', () => {
+  it('uses only recorded scheduling evidence for stability in every generated bucket', () => {
     const points = buildStabilityPoints(
       [
-        event({ fsrsReviewLog: validLog(2) }),
+        event(),
         event({ id: '2', fsrsReviewLog: 'bad' }),
         event({
           id: '3',
           reviewedAt: new Date('2026-08-03T12:00:00.000Z'),
-          fsrsReviewLog: validLog(6),
         }),
       ],
       options,
     )
-    expect(points).toEqual([
-      {
-        bucketStart: '2026-08-01',
-        bucketEnd: '2026-08-01',
-        medianStabilityDays: 2,
-        sampleSize: 1,
-      },
+    expect(points).toMatchObject([
+      { bucketStart: '2026-08-01', sampleSize: 1 },
       {
         bucketStart: '2026-08-02',
         bucketEnd: '2026-08-02',
         medianStabilityDays: null,
         sampleSize: 0,
       },
-      {
-        bucketStart: '2026-08-03',
-        bucketEnd: '2026-08-03',
-        medianStabilityDays: 6,
-        sampleSize: 1,
-      },
+      { bucketStart: '2026-08-03', sampleSize: 1 },
     ])
   })
 
@@ -837,17 +879,13 @@ describe('analytics chart-data builders', () => {
     }
     const snapshots = reconstructOverdueBacklogSnapshots(
       [
-        event({
-          cardId: 'card-1',
-          reviewedAt: reviewAt,
-          fsrsReviewLog: serializeFsrsReviewLogSnapshot(
-            scheduleReview(
-              createInitialFsrsCard(new Date('2026-08-01T00:00:00.000Z')),
-              'good',
-              reviewAt,
-            ).log,
-          ),
-        }),
+        recordedEvent(
+          {
+            cardId: 'card-1',
+            reviewedAt: reviewAt,
+          },
+          createInitialFsrsCard(new Date('2026-08-01T00:00:00.000Z')),
+        ),
       ],
       [card],
       options,
@@ -863,6 +901,97 @@ describe('analytics chart-data builders', () => {
       ['2026-08-02', 1],
       ['2026-08-03', 0],
     ])
+    expect(snapshots.map((snapshot) => snapshot.schedulingProvenance)).toEqual([
+      'captured',
+      'captured',
+      'captured',
+    ])
+    const legacy = recordedEvent(
+      {
+        cardId: 'card-2',
+        reviewedAt: reviewAt,
+        schedulingEvidenceKind: 'legacy-derived',
+      },
+      createInitialFsrsCard(card.createdAt),
+    )
+    const mixed = reconstructOverdueBacklogSnapshots(
+      [
+        recordedEvent(
+          { cardId: 'card-1', reviewedAt: reviewAt },
+          createInitialFsrsCard(card.createdAt),
+        ),
+        legacy,
+      ],
+      [card, { ...card, cardId: 'card-2' }],
+      options,
+    )
+    expect(mixed.map((snapshot) => snapshot.schedulingProvenance)).toEqual([
+      'mixed',
+      'mixed',
+      'mixed',
+    ])
+  })
+
+  it('uses stable chronology for mixed sequenced and legacy overdue evidence', () => {
+    const createdAt = new Date('2026-08-01T00:00:00.000Z')
+    const firstAt = new Date('2026-08-01T12:00:00.000Z')
+    const gapAt = new Date('2026-08-02T12:00:00.000Z')
+    const resumedAt = new Date('2026-08-03T12:00:00.000Z')
+    const first = recordedEvent(
+      { id: 'first', applicationSequence: 2, reviewedAt: firstAt },
+      createInitialFsrsCard(createdAt),
+    )
+    const gap = event({
+      id: 'gap',
+      applicationSequence: null,
+      reviewedAt: gapAt,
+      schedulingEvidenceKind: 'unknown',
+      fsrsReviewLog: null,
+    })
+    const resumedPreCard = createInitialFsrsCard(resumedAt)
+    const resumed = recordedEvent(
+      { id: 'resumed', applicationSequence: 1, reviewedAt: resumedAt },
+      resumedPreCard,
+    )
+    const resumedCard = scheduleReviewWithProfile(
+      resumedPreCard,
+      'good',
+      resumedAt,
+      createFsrsSchedulerProfile(options.fsrsOptions),
+    ).card
+    const current: AnalyticsCurrentCard = {
+      cardId: 'card-1',
+      slug: 'two-sum',
+      title: 'Two Sum',
+      topics: ['Array'],
+      retrievability: 0.8,
+      targetRetention: 0.9,
+      stabilityDays: resumedCard.stability,
+      difficulty: resumedCard.difficulty,
+      lapseCount: resumedCard.lapses,
+      dueAt: resumedCard.dueAt,
+      createdAt,
+      lastReviewAt: resumedAt,
+    }
+    const frame = {
+      ...options,
+      start: createdAt,
+      end: new Date('2026-08-04T23:59:59.999Z'),
+    }
+
+    expect(
+      reconstructOverdueBacklogSnapshots(
+        [first, gap, resumed],
+        [current],
+        frame,
+      ),
+    ).toEqual(
+      reconstructOverdueBacklogSnapshots(
+        [resumed, gap, first],
+        [current],
+        frame,
+      ),
+    )
   })
 
   it('uses the initial card due date for the interval before its first review', () => {
@@ -881,11 +1010,14 @@ describe('analytics chart-data builders', () => {
     )
     const snapshots = reconstructOverdueBacklogSnapshots(
       [
-        event({
-          id: 'first-review',
-          reviewedAt,
-          fsrsReviewLog: serializeFsrsReviewLogSnapshot(scheduled.log),
-        }),
+        recordedEvent(
+          {
+            id: 'first-review',
+            reviewedAt,
+          },
+          createInitialFsrsCard(createdAt),
+          fsrsOptions,
+        ),
       ],
       [
         {
@@ -939,17 +1071,23 @@ describe('analytics chart-data builders', () => {
     )
     const snapshots = reconstructOverdueBacklogSnapshots(
       [
-        event({
-          id: 'first-review',
-          reviewedAt: firstReviewedAt,
-          fsrsReviewLog: serializeFsrsReviewLogSnapshot(firstReview.log),
-        }),
-        event({
-          id: 'second-review',
-          reviewedAt: secondReviewedAt,
-          rating: 'again',
-          fsrsReviewLog: serializeFsrsReviewLogSnapshot(secondReview.log),
-        }),
+        recordedEvent(
+          {
+            id: 'first-review',
+            reviewedAt: firstReviewedAt,
+          },
+          createInitialFsrsCard(createdAt),
+          fsrsOptions,
+        ),
+        recordedEvent(
+          {
+            id: 'second-review',
+            reviewedAt: secondReviewedAt,
+            rating: 'again',
+          },
+          firstReview.card,
+          fsrsOptions,
+        ),
       ],
       [
         {
@@ -1005,11 +1143,14 @@ describe('analytics chart-data builders', () => {
     )
     const snapshots = reconstructOverdueBacklogSnapshots(
       [
-        event({
-          id: 'first-review',
-          reviewedAt: firstReviewedAt,
-          fsrsReviewLog: serializeFsrsReviewLogSnapshot(firstReview.log),
-        }),
+        recordedEvent(
+          {
+            id: 'first-review',
+            reviewedAt: firstReviewedAt,
+          },
+          createInitialFsrsCard(createdAt),
+          fsrsOptions,
+        ),
         event({
           id: 'invalid-review',
           reviewedAt: invalidReviewedAt,
@@ -1047,10 +1188,7 @@ describe('analytics chart-data builders', () => {
 
   it('separates overdue and upcoming due load across the 14-day range', () => {
     const points = buildUpcomingLoadPoints(
-      [
-        new Date('2026-08-12T00:00:00.000Z'),
-        new Date('2026-08-20T00:00:00.000Z'),
-      ],
+      ['2026-08-12', '2026-08-20'],
       new Date('2026-08-13T12:00:00.000Z'),
     )
     expect(points[0]).toMatchObject({
@@ -1061,20 +1199,30 @@ describe('analytics chart-data builders', () => {
     expect(points[7]).toMatchObject({ dueCount: 1 })
   })
 
-  it('keeps a card due exactly at as-of in today due rather than overdue', () => {
+  it('buckets a raw-due-today card on its later study eligibility day', () => {
+    const points = buildUpcomingLoadPoints(
+      ['2026-08-14'],
+      new Date('2026-08-13T12:00:00.000Z'),
+    )
+
+    expect(points[0]).toMatchObject({ dueCount: 0, overdueCount: 0 })
+    expect(points[1]).toMatchObject({ date: '2026-08-14', dueCount: 1 })
+  })
+
+  it('keeps a card eligible today in today due rather than overdue', () => {
     const now = new Date('2026-08-13T12:00:00.000Z')
 
-    expect(buildUpcomingLoadPoints([now], now)[0]).toMatchObject({
+    expect(buildUpcomingLoadPoints(['2026-08-13'], now)[0]).toMatchObject({
       dueCount: 1,
       overdueCount: 0,
       today: true,
     })
   })
 
-  it('counts an earlier due time today as due today in the selected timezone', () => {
+  it('counts the current study date as due today in the supplied timezone', () => {
     const now = new Date('2026-08-22T16:00:00.000Z')
     const points = buildUpcomingLoadPoints(
-      [new Date('2026-08-22T14:00:00.000Z')],
+      ['2026-08-22'],
       now,
       'America/New_York',
     )
@@ -1082,10 +1230,10 @@ describe('analytics chart-data builders', () => {
     expect(points[0]).toMatchObject({ dueCount: 1, overdueCount: 0 })
   })
 
-  it('counts a prior local date as overdue across a sub-24-hour boundary', () => {
+  it('counts a prior study date as overdue across a sub-24-hour boundary', () => {
     const now = new Date('2026-08-22T16:00:00.000Z')
     const points = buildUpcomingLoadPoints(
-      [new Date('2026-08-22T03:30:00.000Z')],
+      ['2026-08-21'],
       now,
       'America/New_York',
     )

@@ -36,6 +36,7 @@ import {
   fullViewport,
   panViewport,
   recallTicks,
+  retentionModelProvenance,
   revealRow,
   statusColor,
   statusLabel,
@@ -1106,6 +1107,7 @@ function RetentionDetails({
   const details = [
     ['Status', statusLabel(row.status)],
     ['Estimated recall now', formatPercent(row.retrievability)],
+    ['Model evidence', retentionModelProvenance(row)],
     ['FSRS scheduling target', formatPercent(row.targetRetention)],
     ['Target gap', formatGap(row.targetGap)],
     ['Memory durability', formatDuration(row.targetDurationDays)],

@@ -2,6 +2,7 @@ import {
   getRetrievability,
   type FsrsCardKind,
   type FsrsCardSnapshot,
+  type FsrsSchedulingOptions,
   type ReviewRating,
 } from '@/lib/fsrs'
 import type { ProblemSlug } from '@/features/problems/domain'
@@ -219,11 +220,13 @@ export function deriveNormalizedPracticeState(input: {
   card: FsrsCardSnapshot | null
   attempts: PracticeReviewAttemptSnapshot[]
   now?: Date
+  retrievabilityOptions?: FsrsSchedulingOptions | undefined
 }): NormalizedPracticeState {
   const summary = derivePracticeSummary({
     practice: input.practice,
     card: input.card,
     now: input.now,
+    retrievabilityOptions: input.retrievabilityOptions,
   })
 
   return {
@@ -274,6 +277,7 @@ export function derivePracticeSummary(input: {
   practice: PracticeStateSnapshot | null
   card: FsrsCardSnapshot | null
   now?: Date | undefined
+  retrievabilityOptions?: FsrsSchedulingOptions | undefined
 }): PracticeSummary {
   const now = input.now ?? new Date()
   const suspended =
@@ -288,7 +292,7 @@ export function derivePracticeSummary(input: {
     (input.practice?.attemptCount ?? 0) > 0
   const retrievability =
     input.card && input.card.lastReviewAt
-      ? getRetrievability(input.card, now)
+      ? getRetrievability(input.card, now, input.retrievabilityOptions)
       : null
   const timing = derivePracticeScheduleTiming({
     dueAt: input.card?.dueAt ?? null,

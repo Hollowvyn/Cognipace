@@ -1,12 +1,14 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-import { sendMessage } from '@/extension/messaging'
+import { sendMessage, type SerializedTodayQueue } from '@/extension/messaging'
 import {
   type AppShellProblemSummary,
   type PopupAppShellData,
 } from '@/features/app-shell'
 import { defaultUserSettings } from '@/features/settings/domain'
+import { invalidateTaggedQueries } from '@/platform/query/cache-invalidation'
+import { queryKeys } from '@/platform/query/query-keys'
 import { createSerializedNormalizedPracticeState } from '@/testing/practice-fixtures'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
 
@@ -24,7 +26,8 @@ vi.mock('wxt/browser', () => ({
   },
 }))
 
-vi.mock('@/extension/messaging', () => ({
+vi.mock('@/extension/messaging', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/extension/messaging')>()),
   sendMessage: vi.fn(),
 }))
 
@@ -332,7 +335,142 @@ describe('usePopupAppShellController', () => {
       'valid-parentheses',
     )
   })
+
+  it('loads future extra practice only after an explicit action', async () => {
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'app.getShellData') return Promise.resolve(popupData)
+      if (method === 'queue.getTodayQueue') return Promise.resolve(extraQueue)
+      return Promise.reject(new Error('Unexpected method'))
+    })
+    const { wrapper } = createQueryTestHarness()
+    const { result } = renderHook(() => usePopupAppShellController(), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.data.surface).toBe('popup'))
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'queue.getTodayQueue',
+      expect.anything(),
+    )
+
+    act(() => result.current.actions.requestExtraPractice())
+
+    await waitFor(() =>
+      expect(result.current.extraPractice.item?.problemSlug).toBe(
+        'future-card',
+      ),
+    )
+    expect(sendMessage).toHaveBeenCalledWith('queue.getTodayQueue', {
+      surface: 'popup',
+      intent: 'extra-practice',
+    })
+    expect(result.current.data.recommendation.problem?.problemSlug).toBe(
+      'two-sum',
+    )
+  })
+
+  it('refreshes an opened extra-practice card after queue invalidation', async () => {
+    let queueReads = 0
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'app.getShellData') return Promise.resolve(popupData)
+      if (method === 'queue.getTodayQueue') {
+        queueReads += 1
+        return Promise.resolve(
+          queueReads === 1
+            ? extraQueue
+            : {
+                ...extraQueue,
+                items: [
+                  {
+                    ...extraQueue.items[0]!,
+                    problemSlug: 'changed-future-card',
+                    title: 'Changed Future Card',
+                  },
+                ],
+              },
+        )
+      }
+      return Promise.reject(new Error('Unexpected method'))
+    })
+    const { queryClient, wrapper } = createQueryTestHarness()
+    const { result } = renderHook(() => usePopupAppShellController(), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.data.surface).toBe('popup'))
+    expect(queueReads).toBe(0)
+    act(() => result.current.actions.requestExtraPractice())
+    await waitFor(() =>
+      expect(result.current.extraPractice.item?.problemSlug).toBe(
+        'future-card',
+      ),
+    )
+
+    await act(async () => {
+      await invalidateTaggedQueries(queryClient, ['practice'])
+    })
+
+    await waitFor(() =>
+      expect(result.current.extraPractice.item?.problemSlug).toBe(
+        'changed-future-card',
+      ),
+    )
+    expect(queueReads).toBe(2)
+  })
+
+  it('keeps cached extra practice hidden until this popup requests it', async () => {
+    vi.mocked(sendMessage).mockImplementation(readRuntimeResponse)
+    const { queryClient, wrapper } = createQueryTestHarness()
+    queryClient.setQueryData(
+      queryKeys.queue.today(undefined, 'extra-practice'),
+      extraQueue,
+    )
+
+    const { result } = renderHook(() => usePopupAppShellController(), {
+      wrapper,
+    })
+    await waitFor(() => expect(result.current.data.surface).toBe('popup'))
+
+    expect(result.current.extraPractice.item).toBeNull()
+    expect(result.current.extraPractice.hasRequested).toBe(false)
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'queue.getTodayQueue',
+      expect.anything(),
+    )
+  })
 })
+
+const extraQueue = {
+  generatedAt: '2026-01-01T00:00:00.000Z',
+  dueCount: 0,
+  dueToday: 0,
+  newCount: 0,
+  newAvailable: 0,
+  queueLoad: 1,
+  reinforcementCount: 1,
+  excludedCount: 0,
+  recommendationReason: 'reinforcement',
+  items: [
+    {
+      category: 'reinforcement',
+      reason: 'reinforcement',
+      problemSlug: 'future-card',
+      title: 'Future Card',
+      difficulty: 'easy',
+      isPremium: false,
+      state: createSerializedNormalizedPracticeState({
+        problemSlug: 'future-card',
+        cardId: 'future-card:default',
+        status: 'review',
+        phase: 'review',
+        isStarted: true,
+        dueAt: '2026-01-10T00:00:00.000Z',
+        eligibleOn: '2026-01-10',
+      }),
+    },
+  ],
+  topRecommendation: null,
+} satisfies SerializedTodayQueue
 
 function readRuntimeResponse(method: string, request: unknown) {
   if (method === 'app.getShellData') {

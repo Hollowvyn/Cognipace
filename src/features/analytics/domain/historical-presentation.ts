@@ -1,9 +1,13 @@
 import {
   isReviewRating,
-  replayReviewHistorySequence,
   type NormalizedFsrsSchedulingOptions,
   type ReviewRating,
 } from '@/lib/fsrs'
+import {
+  resolveHistoricalSchedulingEvidence,
+  summarizeHistoricalSchedulingProvenance,
+  type HistoricalSchedulingProvenance,
+} from './historical-scheduling-evidence'
 import {
   normalizeTopicLabelList,
   normalizeTopicLookupKey,
@@ -62,12 +66,12 @@ export interface HistoricalAnalyticsReviewEvent {
   rating: string
   reviewedAt: Date
   fsrsReviewLog: string | null
+  applicationSequence?: number | null
+  schedulingEvidenceKind?: 'captured' | 'legacy-derived' | 'unknown'
+  schedulerProfileJson?: string | null
+  preCardJson?: string | null
   problemDifficulty?: ProblemDifficulty | undefined
   elapsedSeconds?: number | null | undefined
-}
-
-type ValidHistoricalReviewEvent = HistoricalAnalyticsReviewEvent & {
-  rating: ReviewRating
 }
 
 export interface HistoricalPresentationOptions {
@@ -169,6 +173,13 @@ export interface ObservedRecallVsFsrsRow {
   observedRecall: number | null
   fsrsEstimate: number | null
   difference: number | null
+  modelSampleSize?: number | undefined
+  modelProvenance?:
+    | 'captured'
+    | 'legacy-derived'
+    | 'mixed'
+    | 'unknown'
+    | undefined
   provenance: 'reconstructed'
   evidence: 'measured' | 'not-measured'
 }
@@ -182,6 +193,8 @@ export interface MemoryStrengthRow {
   q1: number | null
   q3: number | null
   eligibleReviews: number
+  observedReviews?: number | undefined
+  modelProvenance?: HistoricalSchedulingProvenance | undefined
   medianChangeDays: number | null
   provenance: 'reconstructed'
   evidence: 'measured' | 'not-measured'
@@ -312,8 +325,15 @@ export function buildHistoricalAnalyticsViews(
     const recalledCount = pairs.filter((pair) => pair.rating !== 'again').length
     const observedRecall =
       pairedReviews === 0 ? null : recalledCount / pairedReviews
-    const fsrsEstimate =
-      pairedReviews === 0 ? null : mean(pairs.map((pair) => pair.estimate))
+    const modeledPairs = pairs.filter((pair) => pair.estimate !== null)
+    const fsrsEstimate = mean(modeledPairs.map((pair) => pair.estimate!))
+    const knownKinds = new Set(modeledPairs.map((pair) => pair.provenance))
+    const provenance =
+      modeledPairs.length === 0
+        ? ('unknown' as const)
+        : modeledPairs.length < pairedReviews || knownKinds.size > 1
+          ? ('mixed' as const)
+          : modeledPairs[0]!.provenance
 
     return {
       ...bucketRow(bucket, options.end),
@@ -321,18 +341,38 @@ export function buildHistoricalAnalyticsViews(
       pairedReviews,
       observedRecall,
       fsrsEstimate,
+      modelSampleSize: modeledPairs.length,
       difference:
-        observedRecall === null || fsrsEstimate === null
+        observedRecall === null ||
+        fsrsEstimate === null ||
+        modeledPairs.length !== pairedReviews
           ? null
           : observedRecall - fsrsEstimate,
+      modelProvenance: provenance,
       provenance: 'reconstructed' as const,
       evidence:
         pairedReviews === 0 ? ('not-measured' as const) : ('measured' as const),
     }
   })
   const memoryRows = options.buckets.map((bucket) => {
+    const observed = events.filter(
+      (event) =>
+        isReviewRating(event.rating) &&
+        event.reviewedAt >= options.start &&
+        event.reviewedAt <= options.end &&
+        inBucket(event.reviewedAt, bucket),
+    )
     const observations = stabilityByEvent.filter((sample) =>
       inBucket(sample.reviewedAt, bucket),
+    )
+    const modelProvenance = summarizeHistoricalSchedulingProvenance(
+      observed.map((event) => {
+        const evidence = resolveHistoricalSchedulingEvidence(event)
+        return evidence.postCard?.stability &&
+          Number.isFinite(evidence.postCard.stability)
+          ? evidence.kind
+          : 'unknown'
+      }),
     )
     const strengths = observations.map((sample) => sample.postReviewStability)
     const changes = observations.flatMap((sample) =>
@@ -349,6 +389,8 @@ export function buildHistoricalAnalyticsViews(
       q1,
       q3,
       eligibleReviews: strengths.length,
+      observedReviews: observed.length,
+      modelProvenance,
       medianChangeDays: median(changes),
       provenance: 'reconstructed' as const,
       evidence:
@@ -978,44 +1020,21 @@ function buildStabilityObservations(
     postReviewStability: number
     preReviewStability: number | null
   }> = []
-  const byCard = new Map<string, ValidHistoricalReviewEvent[]>()
   for (const event of events) {
-    if (!hasValidRating(event)) continue
-    const cardEvents = byCard.get(event.cardId) ?? []
-    cardEvents.push(event)
-    byCard.set(event.cardId, cardEvents)
-  }
-  for (const cardEvents of byCard.values()) {
-    const ordered = [...cardEvents].sort(compareEvents)
-    const replayed = replayReviewHistorySequence(
-      ordered.map((event) => ({
-        rating: event.rating,
-        reviewedAt: event.reviewedAt,
-      })),
-      options.fsrsOptions,
-    )
-    for (const [index, event] of ordered.entries()) {
-      if (event.reviewedAt < options.start || event.reviewedAt > options.end)
-        continue
-      const postReviewStability = replayed[index]?.card.stability
-      if (
-        postReviewStability === undefined ||
-        !Number.isFinite(postReviewStability) ||
-        postReviewStability <= 0
-      )
-        continue
-      const preReviewStability = replayed[index - 1]?.card.stability
-      observations.push({
-        reviewedAt: event.reviewedAt,
-        postReviewStability,
-        preReviewStability:
-          preReviewStability !== undefined &&
-          Number.isFinite(preReviewStability) &&
-          preReviewStability > 0
-            ? preReviewStability
-            : null,
-      })
-    }
+    if (event.reviewedAt < options.start || event.reviewedAt > options.end)
+      continue
+    const evidence = resolveHistoricalSchedulingEvidence(event)
+    const postReviewStability = evidence.postCard?.stability
+    if (!postReviewStability || !Number.isFinite(postReviewStability)) continue
+    const preReviewStability = evidence.preCard?.stability
+    observations.push({
+      reviewedAt: event.reviewedAt,
+      postReviewStability,
+      preReviewStability:
+        preReviewStability && Number.isFinite(preReviewStability)
+          ? preReviewStability
+          : null,
+    })
   }
   return observations
 }
@@ -1052,22 +1071,6 @@ function toPresentationScale(
 
 function inBucket(date: Date, bucket: AnalyticsBucket): boolean {
   return date >= bucket.start && date <= bucket.end
-}
-
-function compareEvents(
-  left: HistoricalAnalyticsReviewEvent,
-  right: HistoricalAnalyticsReviewEvent,
-): number {
-  return (
-    left.reviewedAt.getTime() - right.reviewedAt.getTime() ||
-    left.id.localeCompare(right.id)
-  )
-}
-
-function hasValidRating(
-  event: HistoricalAnalyticsReviewEvent,
-): event is ValidHistoricalReviewEvent {
-  return isReviewRating(event.rating)
 }
 
 function mean(values: readonly number[]): number | null {
