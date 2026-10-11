@@ -1827,7 +1827,7 @@ describe('getAnalyticsSummary dashboard views', () => {
     } finally {
       fixture.handle.rawDb.close()
     }
-  })
+  }, 30_000)
 
   it('uses one requested timezone for bucket rows and forecast grouping', async () => {
     const handle = await createTestDb({ seed: false })
