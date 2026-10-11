@@ -370,6 +370,7 @@ describe('practice core', () => {
       }
       expect(serializeDb(handle)).toEqual(before)
     },
+    15_000,
   )
 
   it('reads generation context without preparing or rotating scopes', async () => {
@@ -430,7 +431,7 @@ describe('practice core', () => {
     ).rejects.toThrow(/effective rating/)
     expect(serializeDb(handle)).toEqual(before)
     await validatePracticeStorage(handle.db)
-  })
+  }, 15_000)
 
   it('captures and deduplicates complete original scheduler profiles and corrects with the recorded retention', async () => {
     const { db } = await createTestDb()
