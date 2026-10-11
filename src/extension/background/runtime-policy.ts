@@ -47,6 +47,7 @@ const methodSurfaceAccess = {
   'problems.bulkUpdateProblems': ['dashboard'],
   'problems.bulkDelete': ['dashboard'],
   'practice.getDetails': ['popup', 'dashboard', 'content-script'],
+  'practice.previewReview': ['content-script'],
   'practice.saveReviewResult': ['popup', 'dashboard', 'content-script'],
   'practice.overrideLastReviewResult': ['popup', 'dashboard', 'content-script'],
   'practice.setSuspended': ['popup', 'dashboard', 'content-script'],

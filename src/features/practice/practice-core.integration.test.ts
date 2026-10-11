@@ -8,6 +8,7 @@ import { ReviewCommandConflictError } from '@/features/practice/domain'
 import { readPracticeStorageData } from '@/features/practice/data/practice-storage-repository'
 import {
   overrideLastReviewResultWithTrackProgress,
+  previewPracticeReview,
   resetPracticeSchedule,
   saveReviewResultWithTrackProgress,
 } from '@/features/practice/server/practice-service'
@@ -210,6 +211,36 @@ describe('practice core', () => {
       .from(fsrsCards)
       .where(eq(fsrsCards.id, original.cardId))
     expect(afterSettings).toEqual(beforeRead)
+
+    const previewInput = {
+      mode: 'update' as const,
+      problemSlug: 'two-sum',
+      generation: (await repository.getPracticeDetails('two-sum')).generation!,
+      targetAttemptId: original.reviewAttemptId,
+      expectedRevision: 0,
+      reviewedAt: reviewedAt.toISOString(),
+    }
+    const beforePreview = serializeDb(handle)
+    const preview = await previewPracticeReview(handle.db, previewInput)
+    expect(serializeDb(handle)).toEqual(beforePreview)
+    expect(preview.status).toBe('ready')
+    if (preview.status !== 'ready') throw new Error('preview unavailable')
+    expect(preview.evidence).toBe('captured')
+    for (const rating of ['again', 'hard', 'good', 'easy'] as const) {
+      const expected = scheduleReviewWithProfile(
+        preCard,
+        rating,
+        reviewedAt,
+        oldProfile,
+      )
+      expect(preview.ratings[rating].dueAt).toBe(
+        expected.card.dueAt.toISOString(),
+      )
+      expect(preview.ratings[rating].scheduledDays).toBe(
+        expected.card.scheduledDays,
+      )
+    }
+    expect(preview.ratings.easy.scheduledDays).toBeGreaterThan(180)
 
     const updatedToEasy = await repository.overrideLastReviewResult({
       problemSlug: 'two-sum',

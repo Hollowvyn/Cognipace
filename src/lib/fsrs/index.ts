@@ -49,6 +49,7 @@ export {
   getTargetRetentionDuration,
   parseFsrsSchedulerProfile,
   parseSerializedFsrsSchedulerProfile,
+  previewReviewWithProfile,
   projectReviewSchedule,
   replayReviewHistory,
   replayReviewHistorySequence,

@@ -9,6 +9,7 @@ import {
   acceptedPracticeSaveCommandSchema,
   acceptedPracticeUpdateCommandSchema,
   practiceReceiptAcknowledgementSchema,
+  practiceGenerationContextSchema,
 } from '../domain'
 
 export const practiceRuntimeSurfaceSchema = z.enum([
@@ -161,6 +162,64 @@ export const practiceDetailsRequestSchema = z.object({
 
 export type PracticeDetailsRequest = z.infer<
   typeof practiceDetailsRequestSchema
+>
+
+const practiceSubmitPreviewIdentitySchema = z.strictObject({
+  mode: z.literal('submit'),
+  problemSlug: z.string().min(1),
+  generation: practiceGenerationContextSchema,
+  previewedAt: z.iso.datetime(),
+})
+const practiceUpdatePreviewIdentitySchema = z.strictObject({
+  mode: z.literal('update'),
+  problemSlug: z.string().min(1),
+  generation: practiceGenerationContextSchema,
+  targetAttemptId: z.string().min(1),
+  expectedRevision: z.number().int().nonnegative().refine(Number.isSafeInteger),
+  reviewedAt: z.iso.datetime(),
+})
+export const practicePreviewIdentitySchema = z.discriminatedUnion('mode', [
+  practiceSubmitPreviewIdentitySchema,
+  practiceUpdatePreviewIdentitySchema,
+])
+export const practicePreviewRequestSchema = z.discriminatedUnion('mode', [
+  practiceSubmitPreviewIdentitySchema.extend({
+    surface: z.literal('content-script'),
+  }),
+  practiceUpdatePreviewIdentitySchema.extend({
+    surface: z.literal('content-script'),
+  }),
+])
+export type PracticePreviewRequest = z.infer<
+  typeof practicePreviewRequestSchema
+>
+
+const practicePreviewRatingSchema = z.strictObject({
+  dueAt: z.iso.datetime(),
+  eligibleOn: z.iso.date(),
+  studyDays: z.number().int().nonnegative(),
+  scheduledDays: z.number().int().nonnegative(),
+})
+export const practicePreviewResponseSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('ready'),
+    identity: practicePreviewIdentitySchema,
+    evidence: z.enum(['active', 'captured', 'legacy-derived']),
+    ratings: z.record(z.enum(reviewRatings), practicePreviewRatingSchema),
+  }),
+  z.strictObject({
+    status: z.literal('unavailable'),
+    identity: practicePreviewIdentitySchema,
+    reason: z.enum(['unsupported-legacy', 'missing-context']),
+  }),
+  z.strictObject({
+    status: z.literal('conflict'),
+    identity: practicePreviewIdentitySchema,
+    reason: z.enum(['stale-generation', 'stale-review', 'backdated']),
+  }),
+])
+export type PracticePreviewResponse = z.infer<
+  typeof practicePreviewResponseSchema
 >
 
 export const practiceSaveReviewResultRequestSchema =

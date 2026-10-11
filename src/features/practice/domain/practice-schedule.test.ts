@@ -1,8 +1,48 @@
 import { describe, expect, it } from 'vitest'
 
-import { derivePracticeScheduleTiming } from './practice-schedule'
+import {
+  countPracticeStudyDays,
+  derivePracticeScheduleTiming,
+} from './practice-schedule'
 
 describe('derivePracticeScheduleTiming', () => {
+  it.each([
+    [
+      'midnight',
+      '2026-09-13T03:59:00.000Z',
+      '2026-09-13T04:01:00.000Z',
+      '2026-09-13',
+    ],
+    [
+      'spring DST',
+      '2026-03-08T06:30:00.000Z',
+      '2026-03-09T06:30:00.000Z',
+      '2026-03-09',
+    ],
+    [
+      'autumn DST',
+      '2026-11-01T05:30:00.000Z',
+      '2026-11-02T05:30:00.000Z',
+      '2026-11-02',
+    ],
+  ])(
+    'counts preview calendar days across %s',
+    (_name, eventIso, dueIso, eligibleOn) => {
+      const eventAt = new Date(eventIso)
+      const timing = derivePracticeScheduleTiming({
+        dueAt: new Date(dueIso),
+        lastReviewedAt: eventAt,
+        now: eventAt,
+        isStarted: true,
+        isSuspended: false,
+        timeZone: 'America/New_York',
+      })
+      expect(timing.eligibleOn).toBe(eligibleOn)
+      expect(
+        countPracticeStudyDays(eventAt, eligibleOn, 'America/New_York'),
+      ).toBe(1)
+    },
+  )
   const now = new Date(2026, 8, 13, 2, 11, 31)
 
   it('marks a prior local date overdue even when less than 24 hours elapsed', () => {

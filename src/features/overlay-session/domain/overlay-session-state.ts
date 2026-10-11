@@ -60,6 +60,8 @@ export type OverlaySessionState = {
   expandedTab: OverlayExpandedTab
   reviewStatus: OverlayReviewStatus
   selectedRating: ReviewRating
+  previewEpoch: number
+  previewGeneration: SerializedPracticeDetails['generation']
   ratingLockReason: AssessmentLockReason | null
   submittedSession: OverlaySubmittedSession | null
   acceptedCommand: OverlayAcceptedCommand | null
@@ -73,12 +75,14 @@ export type OverlaySessionAction =
       type: 'problem-loaded'
       problemSlug: string
       selectedRating: ReviewRating
+      previewGeneration?: SerializedPracticeDetails['generation']
     }
   | {
       type: 'problem-context-refreshed'
       problemSlug: string
       selectedRating: ReviewRating
       submittedSession: OverlaySubmittedSession | null
+      previewGeneration?: SerializedPracticeDetails['generation']
     }
   | { type: 'page-changed' }
   | { type: 'set-visual-mode'; visualMode: OverlayVisualMode }
@@ -86,7 +90,11 @@ export type OverlaySessionAction =
   | { type: 'set-selected-rating'; rating: ReviewRating }
   | { type: 'command-started'; command: OverlayAcceptedCommand }
   | { type: 'command-pending' }
-  | { type: 'command-conflicted'; message: string }
+  | {
+      type: 'command-conflicted'
+      message: string
+      previewGeneration?: SerializedPracticeDetails['generation']
+    }
   | {
       type: 'submit-succeeded'
       snapshot: OverlaySubmittedSession
@@ -115,6 +123,8 @@ export const initialOverlaySessionState: OverlaySessionState = {
   expandedTab: 'solve',
   reviewStatus: 'draft',
   selectedRating: 'good',
+  previewEpoch: 0,
+  previewGeneration: null,
   ratingLockReason: null,
   submittedSession: null,
   acceptedCommand: null,
@@ -133,13 +143,31 @@ export function overlaySessionReducer(
         ...initialOverlaySessionState,
         activeProblemSlug: action.problemSlug,
         selectedRating: action.selectedRating,
+        previewEpoch: state.previewEpoch + 1,
+        previewGeneration: action.previewGeneration ?? null,
       }
     case 'problem-context-refreshed':
       // Fresh Practice context belongs to the page-sync controller. It cannot
       // retarget this session's draft or acknowledged review.
-      return state
+      if (
+        state.submittedSession ||
+        action.previewGeneration === undefined ||
+        ((action.previewGeneration?.localGenerationToken ?? null) ===
+          (state.previewGeneration?.localGenerationToken ?? null) &&
+          (action.previewGeneration?.problemGenerationToken ?? null) ===
+            (state.previewGeneration?.problemGenerationToken ?? null))
+      ) {
+        return state
+      }
+      return {
+        ...state,
+        previewGeneration: action.previewGeneration,
+      }
     case 'page-changed':
-      return initialOverlaySessionState
+      return {
+        ...initialOverlaySessionState,
+        previewEpoch: state.previewEpoch + 1,
+      }
     case 'set-visual-mode':
       return {
         ...state,
@@ -183,6 +211,11 @@ export function overlaySessionReducer(
     case 'command-conflicted':
       return {
         ...state,
+        previewEpoch: state.previewEpoch + 1,
+        previewGeneration:
+          action.previewGeneration === undefined
+            ? state.previewGeneration
+            : action.previewGeneration,
         acceptedCommand: null,
         commandStatus: null,
         reviewStatus: state.submittedSession ? 'submitted-dirty' : 'draft',
@@ -198,6 +231,7 @@ export function overlaySessionReducer(
         selectedRating: action.snapshot.rating,
         ratingLockReason: action.snapshot.lockReason,
         submittedSession: action.snapshot,
+        previewGeneration: action.snapshot.generation,
         acceptedCommand: null,
         commandStatus: null,
         nextStep: nextStepStateFromValue(action.nextStep),
@@ -210,6 +244,7 @@ export function overlaySessionReducer(
         selectedRating: action.snapshot.rating,
         ratingLockReason: action.snapshot.lockReason,
         submittedSession: action.snapshot,
+        previewGeneration: action.snapshot.generation,
         acceptedCommand: null,
         commandStatus: null,
         nextStep: nextStepStateFromValue(action.nextStep),
@@ -255,6 +290,7 @@ export function overlaySessionReducer(
         expandedTab: 'solve',
         reviewStatus: 'draft',
         selectedRating: action.selectedRating,
+        previewEpoch: state.previewEpoch + 1,
         ratingLockReason: null,
         submittedSession: null,
         nextStep: createHiddenNextStepState(),

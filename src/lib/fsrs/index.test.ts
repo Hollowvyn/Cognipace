@@ -32,6 +32,7 @@ describe('FSRS public API facade', () => {
         'parseSerializedFsrsSchedulerProfile',
         'parseFsrsStepUnit',
         'parseReviewRating',
+        'previewReviewWithProfile',
         'projectReviewSchedule',
         'replayReviewHistory',
         'replayReviewHistorySequence',

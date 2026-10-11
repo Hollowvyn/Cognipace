@@ -33,6 +33,11 @@ export {
 } from './practice-progress'
 
 export { derivePracticeScheduleTiming } from './practice-schedule'
+export {
+  type PracticePreviewInput,
+  type PracticePreviewIdentity,
+  type PracticePreviewResult,
+} from './practice-preview'
 
 export * from './practice-storage'
 export * from './practice-command'

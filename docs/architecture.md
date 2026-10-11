@@ -182,7 +182,17 @@ introduced. Overlay accepted state freezes command ID/time/effective rating and
 original target/revision, retains pending/error retry, and preserves a draft on
 stale conflict. Phase E adds the prospective daily long-term profile, shared
 study-day eligibility and separate automatic/Extra Practice queue intent.
-Rating previews and optimizer work remain in later phases.
+Phase F adds native four-rating previews through `src/lib/fsrs` `repeat()`;
+authoritative Save and Update keep `next()`. Practice resolves a Submit against
+the current card and active profile or an Update against the guarded original
+event context in one read transaction. The content-script-only runtime method
+`practice.previewReview` validates both directions with Zod and serializes its
+read through the background database gate on the shared SQLite connection.
+It creates no command receipt, mutation, flush, dirty sync marker or
+invalidation. The Overlay preview query keys include the problem, generation,
+session epoch and original Update target; Practice/Settings invalidation
+refreshes estimates without changing a draft or accepted command. Optimizer
+work remains in later phases.
 
 The persisted `ts-fsrs` `card.due` value is stored as `FsrsCardSnapshot.dueAt`
 and remains the raw authority for a reviewed card's schedule. Practice derives

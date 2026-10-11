@@ -25,6 +25,8 @@ export const queryKeys = {
   },
   practice: {
     all: ['practice-details'] as const,
+    preview: (identity: string) =>
+      [...queryKeys.practice.all, 'preview', identity] as const,
     details: (problemSlug: string, at?: string | null) =>
       [...queryKeys.practice.all, problemSlug, at ?? null] as const,
   },
