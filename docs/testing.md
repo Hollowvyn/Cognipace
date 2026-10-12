@@ -302,8 +302,11 @@ what happens and any failure; do not grade it against the progressive startup
 behavior planned for Phases 2 and 3.
 
 - [ ] With the installed packaged extension, open a fixture-known problem warm
-      and after a full browser restart. Repeat both openings on a problem absent
-      from the fixture. Record mount-to-usable-timer and saved-context timing,
+      and after a full browser restart. For the new-problem cases, use two
+      distinct valid LeetCode slugs confirmed absent from the installed
+      disposable database (including seeded catalog rows):
+      one for the warm open and another, still unseen slug after the full browser
+      restart for the cold open. Record mount-to-usable-timer and saved-context timing,
       displayed identity, loading/error state and when the timer becomes
       responsive. Note whether the new problem is upserted and whether its
       saved history is empty after context loads.
