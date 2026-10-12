@@ -264,6 +264,7 @@ export function createLeetCodePageWatcher(
 
       if (readySlug !== location.slug) {
         readySlug = location.slug
+        markOverlayStartup('page-ready')
         options.onEvent({
           type: 'page-ready',
           location,
@@ -271,7 +272,6 @@ export function createLeetCodePageWatcher(
           metadata: problemMetadata,
           pageReadyAt: now(),
         })
-        markOverlayStartup('page-ready')
       }
 
       emitProblemMetadataIfUseful(location, problemMetadata)
@@ -323,24 +323,30 @@ export function createLeetCodePageWatcher(
   }
 
   function handleClick(event: MouseEvent) {
-    timeOverlayStartupSync('page.submit-event', () => {
-      const location = activeLocation
+    const start = performance.now()
+    const location = activeLocation
 
-      if (!location) {
-        return
-      }
+    if (!location) {
+      return
+    }
 
-      const click = readLeetCodeSubmissionClickFromMouseEvent(event, {
-        location,
-        now,
-      })
-
-      if (!click) {
-        return
-      }
-
-      handleSubmission(click)
+    const click = readLeetCodeSubmissionClickFromMouseEvent(event, {
+      location,
+      now,
     })
+
+    if (!click) {
+      return
+    }
+
+    try {
+      handleSubmission(click)
+    } finally {
+      performance.measure('cognipace.overlay.page.submit-event', {
+        start,
+        end: performance.now(),
+      })
+    }
   }
 
   function handleKeyDown(event: KeyboardEvent) {

@@ -117,6 +117,76 @@ describe('OverlayShell', () => {
     ).toHaveLength(1)
   })
 
+  it.each(['ai', 'notes'] as const)(
+    'waits for expanded Solve before marking timer readiness from %s',
+    (expandedTab) => {
+      const mark = vi.spyOn(performance, 'mark')
+      mark.mockClear()
+      const session = createSession({
+        location: {
+          host: 'leetcode.com',
+          slug: 'two-sum',
+          url: 'https://leetcode.com/problems/two-sum/',
+        },
+        overlay: {
+          ...initialOverlaySessionState,
+          visualMode: 'expanded',
+          expandedTab,
+        },
+      })
+      const { rerender } = render(<OverlayShell {...session} />)
+      expect(mark).not.toHaveBeenCalledWith('cognipace.overlay.timer-ready')
+
+      rerender(
+        <OverlayShell
+          {...session}
+          overlay={{ ...session.overlay, expandedTab: 'solve' }}
+        />,
+      )
+      expect(mark).toHaveBeenCalledWith('cognipace.overlay.timer-ready')
+    },
+  )
+
+  it.each(['locked', 'submitted'] as const)(
+    'does not mark disabled %s timer readiness',
+    (reason) => {
+      const mark = vi.spyOn(performance, 'mark')
+      mark.mockClear()
+      const session = createSession({
+        location: {
+          host: 'leetcode.com',
+          slug: 'two-sum',
+          url: 'https://leetcode.com/problems/two-sum/',
+        },
+        ...(reason === 'locked'
+          ? { timer: { ...createSession().timer, status: 'locked' as const } }
+          : {}),
+        ...(reason === 'submitted'
+          ? {
+              overlay: {
+                ...initialOverlaySessionState,
+                submittedSession: {
+                  reviewAttemptId: 'attempt-1',
+                  revision: 0,
+                  reviewedAt: '2026-01-01T10:00:00.000Z',
+                  generation: {
+                    localGenerationToken: 'local-1',
+                    problemGenerationToken: 'problem-1',
+                  },
+                  elapsedSeconds: 95,
+                  isCorrect: true,
+                  lockReason: null,
+                  rating: 'good',
+                },
+              },
+            }
+          : {}),
+      })
+      render(<OverlayShell {...session} />)
+      expect(mark).not.toHaveBeenCalledWith('cognipace.overlay.timer-ready')
+    },
+  )
+
   it('passes session hints and their commands to expanded Help', async () => {
     const user = userEvent.setup()
     const session = createSession({

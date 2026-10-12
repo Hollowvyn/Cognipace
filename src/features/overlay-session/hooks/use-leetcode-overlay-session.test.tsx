@@ -744,7 +744,14 @@ describe('useLeetCodeOverlaySession', () => {
   })
 
   it('refreshes live overlay context after cross-surface cache invalidation', async () => {
+    const mark = vi.spyOn(performance, 'mark')
+    mark.mockClear()
     const { queryClient, result } = await renderReadySession()
+    const readyMarks = () =>
+      mark.mock.calls.filter(
+        ([name]) => name === 'cognipace.overlay.context-ready',
+      )
+    expect(readyMarks()).toHaveLength(1)
     loadOverlayData.mockResolvedValueOnce(
       createOverlayData({ timing: { strictTiming: true } }),
     )
@@ -759,6 +766,7 @@ describe('useLeetCodeOverlaySession', () => {
       expect(result.current.context?.timing.strictTiming).toBe(true)
     })
     expect(loadOverlayData).toHaveBeenLastCalledWith('two-sum')
+    expect(readyMarks()).toHaveLength(1)
   })
 
   it('sends captured topic labels when syncing the LeetCode page', async () => {

@@ -61,6 +61,7 @@ export function useLeetCodePageSync({
     initialLocation ? null : 'CogniPace only runs on LeetCode problem pages.',
   )
   const syncTokenRef = useRef(0)
+  const contextReadyTokenRef = useRef<number | null>(null)
   const requestedMetadataFingerprintRef = useRef<string | null>(null)
   const syncedMetadataFingerprintRef = useRef<string | null>(null)
   const latestContextRef = useRef<LeetCodeOverlayContext | null>(null)
@@ -102,7 +103,14 @@ export function useLeetCodePageSync({
       return
     }
 
-    markOverlayStartup('context-ready')
+    if (
+      syncedProblemSlug === problem.problemSlug &&
+      captureRef.current.location?.slug === problem.problemSlug &&
+      contextReadyTokenRef.current !== syncTokenRef.current
+    ) {
+      contextReadyTokenRef.current = syncTokenRef.current
+      markOverlayStartup('context-ready')
+    }
 
     if (activeProblemSlugRef.current === problem.problemSlug) {
       onProblemContextRefreshed(context)
@@ -110,7 +118,7 @@ export function useLeetCodePageSync({
     }
 
     onProblemLoaded(context)
-  }, [context, onProblemContextRefreshed, onProblemLoaded])
+  }, [context, onProblemContextRefreshed, onProblemLoaded, syncedProblemSlug])
 
   const syncProblem = useCallback(
     async (

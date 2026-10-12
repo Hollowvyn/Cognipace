@@ -88,6 +88,46 @@ describe('createLeetCodePageWatcher', () => {
     )
   })
 
+  it('marks page readiness before notifying the consumer', async () => {
+    renderProblemHeader()
+    const mark = vi.spyOn(performance, 'mark')
+    let markedAtEmission = false
+    const watcher = createLeetCodePageWatcher({
+      getCurrentUrl: () => problemUrl,
+      hydrationDelays: [0],
+      fetch: createQuestionMetadataFetcher(),
+      onEvent: (event) => {
+        if (event.type === 'page-ready') {
+          markedAtEmission = mark.mock.calls.some(
+            ([name]) => name === 'cognipace.overlay.page-ready',
+          )
+        }
+      },
+    })
+
+    watcher.start()
+    await vi.runAllTimersAsync()
+    watcher.stop()
+    expect(markedAtEmission).toBe(true)
+  })
+
+  it('does not measure unrelated page clicks as Submit work', () => {
+    renderProblemEditorPage()
+    const measure = vi.spyOn(performance, 'measure')
+    measure.mockClear()
+    const { watcher } = createWatcherTestHarness()
+    watcher.start()
+
+    document
+      .querySelector('h1')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    watcher.stop()
+    expect(measure).not.toHaveBeenCalledWith(
+      'cognipace.overlay.page.submit-event',
+      expect.any(Object),
+    )
+  })
+
   it('emits problem content when LeetCode content is readable', async () => {
     renderProblemHeader()
     const { events, watcher } = createWatcherTestHarness({

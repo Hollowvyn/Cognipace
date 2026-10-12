@@ -36,6 +36,12 @@ export function OverlayShell({
     problemSlug: location?.slug,
   })
   const canUseProblem = Boolean(context?.problem) && status === 'ready'
+  const timerControlEnabled =
+    canUseProblem &&
+    timer.status !== 'locked' &&
+    !overlay.submittedSession &&
+    (overlay.visualMode === 'collapsed' ||
+      (overlay.visualMode === 'expanded' && overlay.expandedTab === 'solve'))
   const themeMode: ThemeMode = context?.appearance.themeMode ?? 'system'
   const timerReadySlugRef = useRef<string | null>(null)
 
@@ -44,15 +50,11 @@ export function OverlayShell({
       timerReadySlugRef.current = null
       return
     }
-    if (
-      canUseProblem &&
-      overlay.visualMode !== 'docked' &&
-      timerReadySlugRef.current !== location.slug
-    ) {
+    if (timerControlEnabled && timerReadySlugRef.current !== location.slug) {
       timerReadySlugRef.current = location.slug
       markOverlayStartup('timer-ready')
     }
-  }, [canUseProblem, location?.slug, overlay.visualMode])
+  }, [location?.slug, timerControlEnabled])
 
   if (overlay.visualMode === 'docked') {
     return <DockedOverlay onRestore={actions.restore} themeMode={themeMode} />
