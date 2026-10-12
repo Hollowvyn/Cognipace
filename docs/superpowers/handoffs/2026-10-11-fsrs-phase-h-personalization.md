@@ -4,6 +4,8 @@
 
 Phase H is the final **evaluation** phase of the approved [A–H roadmap](../plans/2026-10-03-fsrs-remediation.md). Its acceptance allowed a documented defaults-retained result. This handoff does not claim that trained weights cannot ever be useful; it records why this binding/release and current authorized build are not ready for the planned local pilot.
 
+Owner approval, October 12, 2026: leave the optimizer out and close Phase H with default weights. H's evaluation/product decision is complete; integrating this documentation and completing the A–G proof below remain separate audit-closure work. Any future optimizer pilot needs a new approved plan.
+
 ## Baseline and method
 
 The branch `codex/fsrs-phase-h-personalization` started from `origin/main` at Phase G merge `ef14c1a5` (PR #209). The older Phase E worktree was not used. `rtk npm ci` restored Node 24.20.0/npm 11.19.0 lockfile dependencies, including WXT 0.21.3 and `ts-fsrs` 5.4.0. The clean pre-probe `rtk npm run check` passed database check, typecheck, lint, and 3,844 tests, with 10 existing/opt-in skips across 251 files.
@@ -52,6 +54,28 @@ Exact skipped or incomplete validation:
 - Human installed-extension happy-path/edge-case smoke and screenshots are not applicable to H's final **docs-only** decision because no behavior changed. This does not close the pending human proof for A–G.
 
 ## A–H traceability and remaining proof
+
+October 12 closure update: the owner's defaults-retained approval and the consolidated checklist below were added. The first fresh whole-repo format check reproduced PR #210's failing Format job on `packaged-chrome-synthetic.json`; Prettier repaired that file, and a parsed deep-equality comparison against its prior Git version proved every evidence value unchanged. Whole-repo format and diff checks then passed. Commands used the pinned Node 24.20.0 PATH:
+
+```sh
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin /opt/homebrew/bin/rtk npx prettier --ignore-path /dev/null --write docs/superpowers/plans/2026-10-03-fsrs-remediation.md docs/superpowers/handoffs/2026-10-11-fsrs-phase-h-personalization.md docs/superpowers/evidence/fsrs-phase-h/packaged-chrome-synthetic.json
+rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin /opt/homebrew/bin/rtk npm run format
+rtk git diff --check
+```
+
+For this docs/evidence-formatting update, `rtk npm run lint`, `rtk npm run check`, `rtk npm run build`, `rtk npm run db:check`, `rtk npm run db:generate` and `rtk npm run zip` were not rerun locally: application code, dependencies, schema and packaging were unchanged. Before this update PR #210's remote Check and Build had passed; Format and Required Checks had failed. New remote checks must be read after publishing rather than inferred from these local results. No human smoke was performed in this closure update.
+
+### Final audit closure checklist
+
+Use the final integrated production build and a disposable Chrome profile. Reuse the detailed [installed-extension flows](../../testing.md) and link dated, redacted proof here; a consolidated run may cover multiple phases without repeating identical scenarios. Record the build/commit, Chrome version, local timezone and backup fixture. Existing private smoke evidence may satisfy a row when its build and coverage can be verified; pending documentation does not establish that no private test happened.
+
+- [ ] Integrate the defaults-retained H documentation with passing checks. Confirm product code, dependencies, permissions and stored scheduling behavior remain unchanged from G. Retain exact final-build automated validation evidence and reasons for skipped commands.
+- [ ] Preservation and recovery (A–C): populated supported upgrade, original due/history/settings/opaque IDs/earned progress, recovery copies, old supported backups, v6 export/restore and reopen. Invalid or failed replacement must retain the last durable state. Verify captured and legacy-derived profile/evidence round trips.
+- [ ] Reliable commands (D): one durable Save, repeated Update of one original event, genuine Restart, two-tab conflict with draft retained, failed publication then same-command Retry, lost acknowledgement/worker restart, reset/restore rejecting an old generation, and configured Gist overwrite protection where applicable. Record the existing best-effort sync-metadata limitation separately.
+- [ ] Daily policy and presentation (E): saved 75% retention, prospective daily profile, unchanged existing long schedules, original-profile Update, midnight/DST/timezone eligibility, overdue/due/New automatic order and full rolling goal, explicit Extra Practice, suspension/premium filtering, assessment locks and reminder deduplication. Current due consumers agree; low estimated recall alone does not make a future card due. Historical Analytics keeps observed outcomes and recorded/compatibility/unknown provenance after Settings changes.
+- [ ] Preview interaction (F): four native outcomes for Submit and original-profile Update, honest past/legacy dates and native 181–183-day boundaries, no writes, usable Save after preview error, locked grades, retained drafts, pending Retry, and navigation/Restart superseding old responses.
+- [ ] Packaged growth and failure handling (G): standard fixture Save/Update/read/backup/reopen smoke, sampled storage/headroom and gate contention, publication failure retaining durable active/recovery bytes, and restart/retry. Larger failed workloads remain measured limits rather than supported capacities. No continuous peak/service-worker-memory or universal capacity claim is made from sampled dashboard heap.
+- [ ] Final traceability: attach proof or explain each unresolved row, update stale phase/PR statuses without erasing historical validation, and retain limitations and separately scoped follow-ups. Only then record full-audit sign-off; H's closed decision alone does not close the A–G proof gates.
 
 | Phase | Implemented behavior or H decision                                                            | Verified proof                                                                                                                        | Pending human installed-extension proof                                       |
 | ----- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
