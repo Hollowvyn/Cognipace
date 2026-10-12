@@ -34,8 +34,8 @@
     "installedDataBytes": 7701890
   },
   "environment": {
-    "commit": "af80c53eaa6cdab97a544f9f34df20bdad99fcaa",
-    "commitRole": "source commit used for the packaged extension build; collector and evidence commit may be later",
+    "observedGitHeadAtRun": "af80c53eaa6cdab97a544f9f34df20bdad99fcaa",
+    "gitHeadRole": "Observed checkout HEAD only; the packaged build is identified by extensionBuildSha256 and may contain uncommitted source.",
     "node": "v24.20.0",
     "chrome": "Google Chrome for Testing 151.0.7922.47",
     "os": "darwin 27.0.0 arm64",

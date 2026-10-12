@@ -3,6 +3,8 @@ import {
   projectStartupOpening,
   projectUnattributedWorkerEntries,
   isTraceTaskEvent,
+  fillFailedStartupOpenings,
+  startupOpeningStatus,
   summarizeStartupSamples,
   summarizeTraceEvidence,
 } from './overlay-startup-samples.mjs'
@@ -176,5 +178,61 @@ test('trace task detection accepts current toplevel RunTask names', () => {
   assert.equal(
     isTraceTaskEvent({ name: 'EvaluateScript', ph: 'X', dur: 51_000 }),
     false,
+  )
+})
+
+test('duplicate timer mark makes both timer stage and opening ambiguous', () => {
+  const samples = projectStartupOpening({
+    navigationStart: 0,
+    entries: [
+      { stage: 'content-mount', kind: 'mark', startTime: 10, duration: 0 },
+      { stage: 'timer-ready', kind: 'mark', startTime: 20, duration: 0 },
+      { stage: 'timer-ready', kind: 'mark', startTime: 30, duration: 0 },
+    ],
+  })
+  assert.deepEqual(
+    samples.find((sample) => sample.stage === 'content-mount-to-timer-ready'),
+    {
+      stage: 'content-mount-to-timer-ready',
+      status: 'error',
+      ms: null,
+    },
+  )
+  assert.equal(startupOpeningStatus(samples), 'error')
+})
+
+test('cold restart failure fills the requested slots with explicit statuses', () => {
+  const existing = [
+    {
+      mode: 'cold',
+      index: 0,
+      status: 'ok',
+      samples: projectStartupOpening({}),
+    },
+  ]
+  const filled = fillFailedStartupOpenings(existing, 4, {
+    mode: 'cold',
+    failureStage: 'extension-discovery',
+    failureCode: 'service-worker-unavailable',
+  })
+  assert.deepEqual(
+    filled.map((opening) => opening.status),
+    ['ok', 'error', 'pending', 'pending'],
+  )
+  assert.deepEqual(
+    filled.map((opening) => opening.index),
+    [0, 1, 2, 3],
+  )
+  assert.ok(filled.slice(1).every((opening) => opening.samples.length === 17))
+  assert.equal(filled[1].failureCode, 'service-worker-unavailable')
+  assert.equal(
+    summarizeStartupSamples(
+      filled.map((opening) =>
+        opening.samples.find(
+          (sample) => sample.stage === 'content-mount-to-timer-ready',
+        ),
+      ),
+    ).samples.length,
+    4,
   )
 })

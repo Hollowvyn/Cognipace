@@ -27,11 +27,13 @@ import { basename, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import {
   STARTUP_OPENING_STAGES,
+  fillFailedStartupOpenings,
   isTraceTaskEvent,
   projectStartupOpening,
   projectUnattributedWorkerEntries,
   summarizeStartupSamples,
   summarizeTraceEvidence,
+  startupOpeningStatus,
 } from './overlay-startup-samples.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -141,6 +143,12 @@ function parseArgs(argv) {
     throw new Error('--backup and --dataset are required')
   if (!Object.hasOwn(DATASET_COUNTS, args.dataset))
     throw new Error('Dataset must be standard, stress, or single-card')
+  if (
+    [args.initialRestoreOnly, args.previewOnly, args.startupOnly].filter(
+      Boolean,
+    ).length > 1
+  )
+    throw new Error('Choose only one probe mode')
   args.samples =
     args.samples === null
       ? args.dataset === 'stress'
@@ -466,6 +474,8 @@ function statSyncSafe(path) {
 
 function safeError(error) {
   const message = String(error?.message ?? error).toLowerCase()
+  if (message.includes('choose only one probe mode'))
+    return { code: 'conflicting-probe-mode', message: 'conflicting-probe-mode' }
   const code = message.includes('invalid-read-response')
     ? 'invalid-read-response'
     : message.includes('sqlite') && message.includes('variable')
@@ -1292,9 +1302,6 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
       await new Promise((resolveWait) => setTimeout(resolveWait, 100))
     }
     const entries = projectStartupEntries(rawEntries, 'page')
-    const timer = entries.find(
-      (entry) => entry.stage === 'timer-ready' && entry.kind === 'mark',
-    )
     // Page and Node clocks are independent. The navigation baseline comes from the page context.
     const navigation = await evaluate(
       chrome.cdp,
@@ -1315,7 +1322,7 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
     return {
       mode,
       index,
-      status: timer ? 'ok' : 'timeout',
+      status: startupOpeningStatus(samples),
       isolatedContext: true,
       wallMs: performance.now() - navigationStart,
       workerObservations: projectUnattributedWorkerEntries(workerEntries),
@@ -1442,23 +1449,46 @@ async function collectStartup(
       report.startup.warmSameWorker = false
   }
   for (let index = 0; index < args.coldsamples; index++) {
-    await stopChrome(chrome)
-    chrome = await launchChrome(chromePath, args.dist, profile)
-    id = await extensionId(chrome.cdp)
-    if (index === 0) {
-      let result
-      report.startup.traces.cold = await traceStartup(
-        chrome.cdp,
-        async () => {
-          result = await sampleStartupOpen(chrome, id, url.href, 'cold', index)
+    let coldStage = 'browser-restart'
+    try {
+      await stopChrome(chrome)
+      chrome = null
+      chrome = await launchChrome(chromePath, args.dist, profile)
+      coldStage = 'extension-discovery'
+      id = await extensionId(chrome.cdp)
+      coldStage = 'target-open'
+      if (index === 0) {
+        let result
+        report.startup.traces.cold = await traceStartup(
+          chrome.cdp,
+          async () => {
+            result = await sampleStartupOpen(
+              chrome,
+              id,
+              url.href,
+              'cold',
+              index,
+            )
+          },
+          id,
+        )
+        report.startup.cold.push(result)
+      } else
+        report.startup.cold.push(
+          await sampleStartupOpen(chrome, id, url.href, 'cold', index),
+        )
+    } catch (error) {
+      report.startup.cold = fillFailedStartupOpenings(
+        report.startup.cold,
+        args.coldsamples,
+        {
+          mode: 'cold',
+          failureStage: coldStage,
+          failureCode: safeError(error).code,
         },
-        id,
       )
-      report.startup.cold.push(result)
-    } else
-      report.startup.cold.push(
-        await sampleStartupOpen(chrome, id, url.href, 'cold', index),
-      )
+      break
+    }
   }
   report.startup.summary = Object.fromEntries(
     ['warm', 'cold'].map((mode) => [
@@ -1858,6 +1888,10 @@ async function main(args) {
   const chromeVersion = execFileSync(chromePath, ['--version'], {
     encoding: 'utf8',
   }).trim()
+  const observedGitHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  }).trim()
   const report = {
     schemaVersion: 1,
     status: 'pending',
@@ -1877,16 +1911,13 @@ async function main(args) {
       counts: expected,
     },
     environment: {
-      commit: execFileSync('git', ['rev-parse', 'HEAD'], {
-        cwd: ROOT,
-        encoding: 'utf8',
-      }).trim(),
       ...(args.startupOnly
         ? {
-            commitRole:
-              'source commit used for the packaged extension build; collector and evidence commit may be later',
+            observedGitHeadAtRun: observedGitHead,
+            gitHeadRole:
+              'Observed checkout HEAD only; the packaged build is identified by extensionBuildSha256 and may contain uncommitted source.',
           }
-        : {}),
+        : { commit: observedGitHead }),
       node: process.version,
       chrome: chromeVersion,
       os: `${platform()} ${release()} ${arch()}`,

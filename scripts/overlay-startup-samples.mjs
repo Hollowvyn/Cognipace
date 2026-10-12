@@ -43,19 +43,23 @@ export function projectStartupOpening({
   if (failureStatus)
     return STARTUP_OPENING_STAGES.map((stage) => sample(stage, failureStatus))
 
+  const matches = (stage, kind) =>
+    entries.filter((entry) => entry.stage === stage && entry.kind === kind)
   const one = (stage, kind) => {
-    const matches = entries.filter(
-      (entry) => entry.stage === stage && entry.kind === kind,
-    )
-    return matches.length === 1 ? matches[0] : null
+    const found = matches(stage, kind)
+    return found.length === 1 ? found[0] : null
   }
-  const mount = one('content-mount', 'mark')
+  const mountMatches = matches('content-mount', 'mark')
+  const mount = mountMatches.length === 1 ? mountMatches[0] : null
   const markDuration = (stage, mark, missingStatus = 'pending') => {
-    const end = one(mark, 'mark')
+    const endMatches = matches(mark, 'mark')
+    if (mountMatches.length > 1 || endMatches.length > 1)
+      return sample(stage, 'error')
+    const end = endMatches[0]
     const ms = mount && end ? end.startTime - mount.startTime : null
     return sample(
       stage,
-      ms !== null && ms >= 0 ? 'ok' : missingStatus,
+      ms !== null ? (ms >= 0 ? 'ok' : 'error') : missingStatus,
       ms !== null && ms >= 0 ? ms : null,
     )
   }
@@ -63,7 +67,11 @@ export function projectStartupOpening({
   const marks = [
     sample(
       'navigation-to-content-mount',
-      navigationMs !== null && navigationMs >= 0 ? 'ok' : 'pending',
+      mountMatches.length > 1
+        ? 'error'
+        : navigationMs !== null && navigationMs >= 0
+          ? 'ok'
+          : 'pending',
       navigationMs !== null && navigationMs >= 0 ? navigationMs : null,
     ),
     markDuration('content-mount-to-url-ready', 'url-ready'),
@@ -81,6 +89,43 @@ export function projectStartupOpening({
     stage.startsWith('worker.'),
   ).map((stage) => sample(stage, 'pending'))
   return [...marks, ...page, ...worker]
+}
+
+export function startupOpeningStatus(samples) {
+  const timer = samples.find(
+    (entry) => entry.stage === 'content-mount-to-timer-ready',
+  )
+  return timer?.status === 'ok'
+    ? 'ok'
+    : timer?.status === 'timeout'
+      ? 'timeout'
+      : 'error'
+}
+
+export function fillFailedStartupOpenings(
+  existing,
+  requested,
+  { mode, failureStage, failureCode },
+) {
+  const openings = [...existing]
+  for (let index = openings.length; index < requested; index++) {
+    const failed = index === existing.length
+    const status = failed
+      ? failureCode === 'timeout'
+        ? 'timeout'
+        : 'error'
+      : 'pending'
+    openings.push({
+      mode,
+      index,
+      status,
+      isolatedContext: false,
+      failureStage: failed ? failureStage : 'skipped-after-restart-failure',
+      failureCode: failed ? failureCode : 'prior-restart-failure',
+      samples: projectStartupOpening({ failureStatus: status }),
+    })
+  }
+  return openings
 }
 
 export function summarizeTraceEvidence({
