@@ -1,0 +1,5418 @@
+{
+  "schemaVersion": 1,
+  "status": "measured",
+  "startedAt": "2026-10-12T06:21:40.472Z",
+  "dataset": "standard",
+  "probe": "startup-only",
+  "fixture": {
+    "seed": 20261010,
+    "inputBytes": 7644369,
+    "inputDataDigest": "1f11affd87241fe1b98ec8b319eca3f9732b03c15d837cd494fe8db2f2a862dc",
+    "counts": {
+      "problems": 250,
+      "reviewAttempts": 5000,
+      "fsrsCards": 250,
+      "reviewEvidence": 5000,
+      "commandReceipts": 1,
+      "schedulerProfiles": 2,
+      "generationScopes": 251
+    },
+    "installedDataDigest": "48a861990667df412049c4cbea4c37d94224779618db5cbebd919c1189b246b9",
+    "observedDataDigests": [
+      "48a861990667df412049c4cbea4c37d94224779618db5cbebd919c1189b246b9"
+    ],
+    "installedCounts": {
+      "problems": 351,
+      "reviewAttempts": 5000,
+      "fsrsCards": 250,
+      "reviewEvidence": 5000,
+      "commandReceipts": 1
+    },
+    "protectedFixtureDigest": "b87ef6d42de727f6d5f37495c55829e0a6589f4a5d75a6a3cd6b7ede383ad659",
+    "presentFixtureSlugs": 250,
+    "seededCatalogRows": 101,
+    "installedDataBytes": 7701890
+  },
+  "environment": {
+    "commit": "49424aa9cc9ab95485c387023c9a8119add1c30b",
+    "node": "v24.20.0",
+    "chrome": "Google Chrome for Testing 151.0.7922.47",
+    "os": "darwin 27.0.0 arm64",
+    "cpu": "Apple M2 Pro",
+    "memoryBytes": 34359738368,
+    "extensionVersion": "2.2.0",
+    "extensionBuild": "chrome-mv3",
+    "extensionBuildSha256": "683030a5dab9765c63886cc0e7a57f02b4c775d3ff446efc23a4a92737ede512",
+    "dependencies": {
+      "source": "installed node_modules package.json versions",
+      "wxt": "0.21.3",
+      "sqliteWasm": "3.53.0-build1",
+      "drizzle": "0.45.2",
+      "fsrs": "5.4.0",
+      "messaging": "2.3.0"
+    },
+    "profile": "unique disposable /private/tmp directory; removed after run",
+    "definition": "Warm: fresh LeetCode tab in the same browser and worker. Cold: full browser restart with the same persisted disposable profile, then a fresh tab. Page marks and measures use their isolated-context clock; worker measures use the worker clock. Fixture restore and known-slug setup are untimed.",
+    "extensionId": "dfbkgmdabfhpgkffliobdankjbfipflg",
+    "workerUint8ArrayToBase64": true
+  },
+  "requested": {
+    "samples": 20,
+    "coldSamples": 10,
+    "untimedKnownSlugOpens": 1
+  },
+  "operations": {},
+  "storageBeforeRestore": {
+    "bytesInUse": 786504,
+    "quotaBytes": 10485760,
+    "headroomBytes": 9699256,
+    "keyBytes": {
+      "cognipace_db_snapshot_v1": 786458,
+      "cognipace_db_snapshot_fingerprint_v1": 46,
+      "cognipace_db_recovery_topics_v1": 0,
+      "cognipace_db_recovery_tracks_v1": 0,
+      "cognipace_db_recovery_fsrs_v1": 0
+    },
+    "keyDigests": {
+      "cognipace_db_snapshot_v1": "113807d03c908b160e9e5525c395ef73ddba3f1fe3bc2f84cb5fd2f6fd9d6205",
+      "cognipace_db_snapshot_fingerprint_v1": "f17b398220f3f9f12fb6c5ea26aa6d8e4ded28661f21a7b1cbb471ce09df08f8",
+      "cognipace_db_recovery_topics_v1": null,
+      "cognipace_db_recovery_tracks_v1": null,
+      "cognipace_db_recovery_fsrs_v1": null
+    },
+    "heapUsedBytes": 15844648,
+    "heapMethod": "Chrome performance.memory.usedJSHeapSize (nonstandard estimate)"
+  },
+  "startup": {
+    "status": "measured",
+    "knownSlugVerified": true,
+    "warmSameWorker": true,
+    "warm": [
+      {
+        "mode": "warm",
+        "index": 0,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 600.0785419999993,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 191.24000000953674
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 314.375
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 314.40499997138977
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.27500009536743164
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 0.7899999618530273
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 275.65499997138977
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 15.389999985694885
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 3.200000047683716
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0.09999990463256836
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 275.10000002384186
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 242.70000004768372
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 28.799999952316284
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 14.599999904632568
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.299999952316284
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.299999952316284
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 14
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 1,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 671.1245420000005,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 250.3550000190735
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 319.585000038147
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 319.61500000953674
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.2850000858306885
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 0.8650000095367432
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 280.24000000953674
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 15.184999942779541
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 2.809999942779541
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0.10000002384185791
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 279.7000000476837
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 250.5
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 25.300000071525574
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 14.5
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.5
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.5
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 14
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 2,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 671.7551670000003,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 261.8249999284744
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 312.35000002384186
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 312.3949999809265
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.375
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 0.9049999713897705
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 272.0049999952316
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 15.415000081062317
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 2.9850000143051147
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0.10000002384185791
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 271.59999990463257
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 241.79999995231628
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 26.200000047683716
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 14.700000047683716
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.400000095367432
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.400000095367432
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 14.300000071525574
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 3,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 581.3728750000009,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 173.86500000953674
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 326.47000002861023
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 326.4950000047684
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.23000001907348633
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 5.525000095367432
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 289.72499990463257
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.730000019073486
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 3.190000057220459
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 289.09999990463257
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 257.7000000476837
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 26
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.899999976158142
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 7.700000047683716
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 7.700000047683716
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.600000023841858
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 4,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 981.7684160000008,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 173.61000001430511
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 321.6200000047684
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 321.64999997615814
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.25
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 4.395000100135803
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 283.9250000715256
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.504999995231628
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 3.1850000619888306
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 283.5
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 254
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 25.800000071525574
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.799999952316284
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 7.900000095367432
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 7.800000071525574
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.300000071525574
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 5,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 584.1282499999998,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 173.4299999475479
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 308.2150000333786
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 308.24000000953674
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.24000000953674316
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 5.895000100135803
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 271.2699999809265
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.725000023841858
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 3.100000023841858
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 270.7000000476837
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 240.29999995231628
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 27
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 14.099999904632568
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.199999928474426
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.199999928474426
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.5
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 6,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 586.4795419999991,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 175.25499999523163
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 302.44000005722046
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 302.4800000190735
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.3400000333786011
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 8.320000052452087
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 256.0049999952316
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 15.110000014305115
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 2.8550000190734863
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 255.29999995231628
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 226.60000002384186
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 24.5
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 14.399999976158142
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.100000023841858
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.100000023841858
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.899999976158142
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 7,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 560.7304160000003,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 250.625
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 296.99000000953674
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 297.02999997138977
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.22499990463256836
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 5.419999957084656
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 258.960000038147
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.100000023841858
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 258.39999997615814
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 229.70000004768372
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 25.100000023841858
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.399999976158142
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 7.700000047683716
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 7.700000047683716
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 8,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 609.4963329999991,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 195.93499994277954
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 352.5900000333786
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 352.6299999952316
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.31000006198883057
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 7.825000047683716
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 306.7549999952316
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 15.014999985694885
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 3.365000009536743
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0.09999990463256836
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 306
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 272.39999997615814
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 29.399999976158142
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 14.200000047683716
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.199999928474426
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.199999928474426
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.899999976158142
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 9,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 690.1591669999998,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 255.90499997138977
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 333.8200000524521
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 333.875
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.309999942779541
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 7.955000042915344
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 287.93499994277954
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.245000004768372
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 3.0700000524520874
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 287.39999997615814
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 257
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 26.399999976158142
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.600000023841858
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.100000023841858
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.100000023841858
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.100000023841858
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 10,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 518.589833,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 185.97000002861023
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 318.9650000333786
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 318.9950000047684
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.3399999141693115
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 7.539999961853027
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 273.43499994277954
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 15.139999985694885
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0.10000002384185791
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 272.89999997615814
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 242.59999990463257
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 26.299999952316284
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 14.199999928474426
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.5
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.5
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 14
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 11,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 607.877625000001,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 192.24000000953674
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 315.7699999809265
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 315.79499995708466
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.2749999761581421
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 0.8799999952316284
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 278.06499993801117
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 13.955000042915344
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 2.909999966621399
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0.10000002384185791
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 277.60000002384186
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 246
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 27.600000023841858
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.200000047683716
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 7.699999928474426
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 7.699999928474426
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 12.699999928474426
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 12,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 584.6029579999995,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 268.9650000333786
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 295.7549999952316
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 295.7849999666214
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.2749999761581421
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 0.7549999952316284
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 258.22000002861023
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.34500002861023
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 2.7350000143051147
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 257.8000000715256
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 229.79999995231628
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 24.600000023841858
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.600000023841858
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.199999928474426
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 13,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 557.0560839999998,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 224.26499998569489
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 299.7850000858307
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 299.8200000524521
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.25
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 4.59499990940094
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 261.6650000810623
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.389999985694885
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 2.9000000953674316
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 261.09999990463257
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 232.90000009536743
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 24.40000009536743
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.600000023841858
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.200000047683716
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.200000047683716
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.200000047683716
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 14,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 588.5499999999993,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 177.02499997615814
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 308.50999999046326
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 308.54499995708466
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.2749999761581421
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 4.664999961853027
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 270.9950000047684
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 13.759999990463257
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 2.9649999141693115
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 270.3000000715256
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 241.20000004768372
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 25
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.100000023841858
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 7.699999928474426
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 7.699999928474426
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 12.799999952316284
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 15,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 568.7754160000004,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 254.43499994277954
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 301.4450000524521
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 301.4850000143051
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.3700000047683716
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 7.119999885559082
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 255.66999995708466
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.059999942779541
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 255
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 226.09999990463257
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 24.800000071525574
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.399999976158142
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 7.900000095367432
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 7.900000095367432
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 16,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 622.0787090000013,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 211.67500007152557
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 301.5
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 301.5349999666214
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.2850000858306885
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 0.809999942779541
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 263.18499994277954
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.170000076293945
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 2.9199999570846558
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 262.7000000476837
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 234
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 24.899999976158142
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.400000095367432
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.100000023841858
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.100000023841858
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.100000023841858
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 17,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 585.6131249999999,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 174.72500002384186
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 309.93999993801117
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 309.97499990463257
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.2999999523162842
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 0.7850000858306885
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 270.27499997615814
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 15.84500002861023
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 3.4299999475479126
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0.10000002384185791
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 269.89999997615814
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 241.70000004768372
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 24.299999952316284
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.899999976158142
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.100000023841858
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.100000023841858
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.100000023841858
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 18,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 584.0297080000018,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 177.4300000667572
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 305.5899999141693
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 305.625
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.25
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 5.370000004768372
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 266.5149999856949
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.81499993801117
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 3.125
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 266
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 234.60000002384186
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 27.600000023841858
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 14
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.300000071525574
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.300000071525574
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13.600000023841858
+          }
+        ]
+      },
+      {
+        "mode": "warm",
+        "index": 19,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 665.2995420000007,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 255.36500000953674
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 300.93500006198883
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 300.97500002384186
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.31000006198883057
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 0.8199999332427979
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 262.335000038147
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 14.15499997138977
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 2.625
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 261.7999999523163
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 233.39999997615814
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 25
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 13.400000095367432
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.199999928474426
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.199999928474426
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 13
+          }
+        ]
+      }
+    ],
+    "cold": [
+      {
+        "mode": "cold",
+        "index": 0,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 1581.247041999999,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 299.1799999475479
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 1198.8400000333786
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 1198.875
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.30500006675720215
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 533.0499999523163
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 623.7850000858307
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 18.509999990463257
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 5.575000047683716
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 37.799999952316284
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 532.2000000476837
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 622.7999999523163
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 544.3999999761581
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 29
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 17.300000071525574
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 9.600000023841858
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 9.5
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 16.299999952316284
+          }
+        ]
+      },
+      {
+        "mode": "cold",
+        "index": 1,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 921.2589999999982,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 299.1949999332428
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 550.7749999761581
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 550.8000000715256
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.23000001907348633
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 225.7300000190735
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 282.47500002384186
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 24.399999976158142
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 4.045000076293945
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 188.29999995231628
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 281.60000002384186
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 230
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 23.200000047683716
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 13.5
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 13.299999952316284
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 21.899999976158142
+          }
+        ]
+      },
+      {
+        "mode": "cold",
+        "index": 2,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 1370.2992090000007,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 361.54500007629395
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 529.5649999380112
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 529.5849999189377
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.2999999523162842
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 148.81000006198883
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 342.375
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 16.37000000476837
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 5.085000038146973
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 143.60000002384186
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 340.3000000715256
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 257.7000000476837
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 35.200000047683716
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 28.399999976158142
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 15.5
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.700000047683716
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.700000047683716
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 14.700000047683716
+          }
+        ]
+      },
+      {
+        "mode": "cold",
+        "index": 3,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 988.7298339999979,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 371.5149999856949
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 541.875
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 541.914999961853
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.31999993324279785
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 180.40499997138977
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 283.35000002384186
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 53.294999957084656
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 58.980000019073486
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 179.69999992847443
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 282.8000000715256
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 229.80000007152557
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 22.09999990463257
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 12.100000023841858
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 11.899999976158142
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 20.59999990463257
+          }
+        ]
+      },
+      {
+        "mode": "cold",
+        "index": 4,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 1488.3717499999984,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 328.2849999666214
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 1074.7350000143051
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 1074.7699999809265
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.309999942779541
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 245.23500001430511
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 777.9500000476837
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 28.33999991416931
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 4.995000004768372
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 238.5
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 377.60000002384186
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 232.89999997615814
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 25.299999952316284
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 14.600000023841858
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 14.599999904632568
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 23.5
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 30.399999976158142
+          }
+        ]
+      },
+      {
+        "mode": "cold",
+        "index": 5,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 1590.5543749999997,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 376.3949999809265
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 1147.1449999809265
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 1147.1849999427795
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.2749999761581421
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 448.3199999332428
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 657.6850000619888
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 17.024999976158142
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 4.090000033378601
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 447.60000002384186
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 656.7000000476837
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 502
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 40.199999928474426
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 30.09999990463257
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 16.200000047683716
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 8.899999976158142
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 8.899999976158142
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 15.299999952316284
+          }
+        ]
+      },
+      {
+        "mode": "cold",
+        "index": 6,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 985.3107080000045,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 301.02499997615814
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 563.0499999523163
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 563.0750000476837
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.25999999046325684
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 232.75499999523163
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 287.875
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 23.365000009536743
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 4.125
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 197.80000007152557
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 287
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 233.5
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 22.100000023841858
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 12.200000047683716
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 12
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 20.600000023841858
+          }
+        ]
+      },
+      {
+        "mode": "cold",
+        "index": 7,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 1962.3886249999996,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 251.47500002384186
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 1532.0349999666214
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 1532.0900000333786
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.23500001430511475
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 1115.945000052452
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 376.52999997138977
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 20.575000047683716
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 785.3000000715256
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 652.3000000715256
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 41.60000002384186
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 334.39999997615814
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 243.80000007152557
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 30.600000023841858
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 17.5
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 10.099999904632568
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 10.099999904632568
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 16.5
+          }
+        ]
+      },
+      {
+        "mode": "cold",
+        "index": 8,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 1786.851042000002,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 411.66999995708466
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 1172.1800000667572
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 1172.2200000286102
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.2549999952316284
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 354.03000009059906
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 779.8600000143051
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 18.304999947547913
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 4.634999990463257
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 352.5
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 779.0999999046326
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 301.5
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 44.799999952316284
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 30.399999976158142
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 17
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 9.699999928474426
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 9.699999928474426
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 16
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0
+          }
+        ]
+      },
+      {
+        "mode": "cold",
+        "index": 9,
+        "status": "ok",
+        "isolatedContext": true,
+        "wallMs": 1776.169750000001,
+        "samples": [
+          {
+            "stage": "navigation-to-content-mount",
+            "status": "ok",
+            "ms": 415.25
+          },
+          {
+            "stage": "content-mount-to-timer-ready",
+            "status": "ok",
+            "ms": 1162.6150000095367
+          },
+          {
+            "stage": "content-mount-to-context-ready",
+            "status": "ok",
+            "ms": 1162.6499999761581
+          },
+          {
+            "stage": "page.snapshot",
+            "status": "ok",
+            "ms": 0.31000006198883057
+          },
+          {
+            "stage": "page.metadata",
+            "status": "ok",
+            "ms": 259.7350000143051
+          },
+          {
+            "stage": "page.upsert",
+            "status": "ok",
+            "ms": 859.164999961853
+          },
+          {
+            "stage": "page.app-shell",
+            "status": "ok",
+            "ms": 20.00499999523163
+          },
+          {
+            "stage": "page.preview",
+            "status": "ok",
+            "ms": 4.085000038146973
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 258.89999997615814
+          },
+          {
+            "stage": "worker.upsert",
+            "status": "ok",
+            "ms": 858.1000000238419
+          },
+          {
+            "stage": "worker.snapshot-publish",
+            "status": "ok",
+            "ms": 346.39999997615814
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 40.10000002384186
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 29.299999952316284
+          },
+          {
+            "stage": "worker.app-shell",
+            "status": "ok",
+            "ms": 18.700000047683716
+          },
+          {
+            "stage": "worker.overlay-practice",
+            "status": "ok",
+            "ms": 10.5
+          },
+          {
+            "stage": "worker.overlay-queue",
+            "status": "ok",
+            "ms": 10.399999976158142
+          },
+          {
+            "stage": "worker.overlay-track",
+            "status": "ok",
+            "ms": 17.5
+          },
+          {
+            "stage": "worker.metadata",
+            "status": "ok",
+            "ms": 0.09999990463256836
+          }
+        ]
+      }
+    ],
+    "traces": {
+      "warm": {
+        "status": "captured",
+        "cogniPaceLongTasks": [],
+        "attributionNote": "Only RunTask records whose arguments identify the packaged extension are attributed; unattributed renderer tasks are excluded. Raw trace discarded."
+      },
+      "cold": {
+        "status": "captured",
+        "cogniPaceLongTasks": [],
+        "attributionNote": "Only RunTask records whose arguments identify the packaged extension are attributed; unattributed renderer tasks are excluded. Raw trace discarded."
+      }
+    },
+    "submit": {
+      "status": "pending",
+      "reason": "Disposable profile has no authenticated LeetCode session; real Submit and disabled-extension comparison were not sampled. No code was submitted."
+    },
+    "summary": {
+      "warm": {
+        "navigation-to-content-mount": {
+          "samples": [
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 191.24000000953674
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 250.3550000190735
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 261.8249999284744
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 173.86500000953674
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 173.61000001430511
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 173.4299999475479
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 175.25499999523163
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 250.625
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 195.93499994277954
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 255.90499997138977
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 185.97000002861023
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 192.24000000953674
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 268.9650000333786
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 224.26499998569489
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 177.02499997615814
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 254.43499994277954
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 211.67500007152557
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 174.72500002384186
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 177.4300000667572
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 255.36500000953674
+            }
+          ],
+          "count": 20,
+          "p50": 192.24000000953674,
+          "p95": 261.8249999284744
+        },
+        "content-mount-to-timer-ready": {
+          "samples": [
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 314.375
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 319.585000038147
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 312.35000002384186
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 326.47000002861023
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 321.6200000047684
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 308.2150000333786
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 302.44000005722046
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 296.99000000953674
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 352.5900000333786
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 333.8200000524521
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 318.9650000333786
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 315.7699999809265
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 295.7549999952316
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 299.7850000858307
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 308.50999999046326
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 301.4450000524521
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 301.5
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 309.93999993801117
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 305.5899999141693
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 300.93500006198883
+            }
+          ],
+          "count": 20,
+          "p50": 308.50999999046326,
+          "p95": 333.8200000524521
+        },
+        "content-mount-to-context-ready": {
+          "samples": [
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 314.40499997138977
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 319.61500000953674
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 312.3949999809265
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 326.4950000047684
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 321.64999997615814
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 308.24000000953674
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 302.4800000190735
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 297.02999997138977
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 352.6299999952316
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 333.875
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 318.9950000047684
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 315.79499995708466
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 295.7849999666214
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 299.8200000524521
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 308.54499995708466
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 301.4850000143051
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 301.5349999666214
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 309.97499990463257
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 305.625
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 300.97500002384186
+            }
+          ],
+          "count": 20,
+          "p50": 308.54499995708466,
+          "p95": 333.875
+        },
+        "page.snapshot": {
+          "samples": [
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.27500009536743164
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.2850000858306885
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.375
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.23000001907348633
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.25
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.24000000953674316
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.3400000333786011
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.22499990463256836
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.31000006198883057
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.309999942779541
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.3399999141693115
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.2749999761581421
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.2749999761581421
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.25
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.2749999761581421
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.3700000047683716
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.2850000858306885
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.2999999523162842
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.25
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.31000006198883057
+            }
+          ],
+          "count": 20,
+          "p50": 0.27500009536743164,
+          "p95": 0.3700000047683716
+        },
+        "page.metadata": {
+          "samples": [
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 0.7899999618530273
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 0.8650000095367432
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 0.9049999713897705
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 5.525000095367432
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 4.395000100135803
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 5.895000100135803
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 8.320000052452087
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 5.419999957084656
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 7.825000047683716
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 7.955000042915344
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 7.539999961853027
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 0.8799999952316284
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 0.7549999952316284
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 4.59499990940094
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 4.664999961853027
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 7.119999885559082
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 0.809999942779541
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 0.7850000858306885
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 5.370000004768372
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 0.8199999332427979
+            }
+          ],
+          "count": 20,
+          "p50": 4.59499990940094,
+          "p95": 7.955000042915344
+        },
+        "page.upsert": {
+          "samples": [
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 275.65499997138977
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 280.24000000953674
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 272.0049999952316
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 289.72499990463257
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 283.9250000715256
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 271.2699999809265
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 256.0049999952316
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 258.960000038147
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 306.7549999952316
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 287.93499994277954
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 273.43499994277954
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 278.06499993801117
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 258.22000002861023
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 261.6650000810623
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 270.9950000047684
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 255.66999995708466
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 263.18499994277954
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 270.27499997615814
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 266.5149999856949
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 262.335000038147
+            }
+          ],
+          "count": 20,
+          "p50": 270.9950000047684,
+          "p95": 289.72499990463257
+        },
+        "page.app-shell": {
+          "samples": [
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 15.389999985694885
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 15.184999942779541
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 15.415000081062317
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.730000019073486
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.504999995231628
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.725000023841858
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 15.110000014305115
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.100000023841858
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 15.014999985694885
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.245000004768372
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 15.139999985694885
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 13.955000042915344
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.34500002861023
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.389999985694885
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 13.759999990463257
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.059999942779541
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.170000076293945
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 15.84500002861023
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.81499993801117
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 14.15499997138977
+            }
+          ],
+          "count": 20,
+          "p50": 14.504999995231628,
+          "p95": 15.415000081062317
+        },
+        "page.preview": {
+          "samples": [
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 3.200000047683716
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 2.809999942779541
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 2.9850000143051147
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 3.190000057220459
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 3.1850000619888306
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 3.100000023841858
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 2.8550000190734863
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 3.365000009536743
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 3.0700000524520874
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 2.909999966621399
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 2.7350000143051147
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 2.9000000953674316
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 2.9649999141693115
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 2.9199999570846558
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 3.4299999475479126
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 3.125
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 2.625
+            }
+          ],
+          "count": 17,
+          "p50": 2.9850000143051147,
+          "p95": 3.4299999475479126
+        },
+        "worker.metadata": {
+          "samples": [
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0.09999990463256836
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0.10000002384185791
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0.10000002384185791
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0.09999990463256836
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0.10000002384185791
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0.10000002384185791
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0.10000002384185791
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            }
+          ],
+          "count": 20,
+          "p50": 0,
+          "p95": 0.10000002384185791
+        },
+        "worker.upsert": {
+          "samples": [
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 275.10000002384186
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 279.7000000476837
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 271.59999990463257
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 289.09999990463257
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 283.5
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 270.7000000476837
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 255.29999995231628
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 258.39999997615814
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 306
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 287.39999997615814
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 272.89999997615814
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 277.60000002384186
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 257.8000000715256
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 261.09999990463257
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 270.3000000715256
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 255
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 262.7000000476837
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 269.89999997615814
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 266
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 261.7999999523163
+            }
+          ],
+          "count": 20,
+          "p50": 270.3000000715256,
+          "p95": 289.09999990463257
+        },
+        "worker.snapshot-publish": {
+          "samples": [
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 242.70000004768372
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 250.5
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 241.79999995231628
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 257.7000000476837
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 254
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 240.29999995231628
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 226.60000002384186
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 229.70000004768372
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 272.39999997615814
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 257
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 242.59999990463257
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 246
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 229.79999995231628
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 232.90000009536743
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 241.20000004768372
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 226.09999990463257
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 234
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 241.70000004768372
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 234.60000002384186
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 233.39999997615814
+            }
+          ],
+          "count": 20,
+          "p50": 241.20000004768372,
+          "p95": 257.7000000476837
+        },
+        "worker.app-shell": {
+          "samples": [
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 28.799999952316284
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 14.599999904632568
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 25.300000071525574
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 14.5
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 26.200000047683716
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 14.700000047683716
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 26
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.899999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 25.800000071525574
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.799999952316284
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 27
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 14.099999904632568
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 24.5
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 14.399999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 25.100000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.399999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 29.399999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 14.200000047683716
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 26.399999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.600000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 26.299999952316284
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 14.199999928474426
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 27.600000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.200000047683716
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 24.600000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.600000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 24.40000009536743
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.600000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 25
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.100000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 24.800000071525574
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.399999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 24.899999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.400000095367432
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 24.299999952316284
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.899999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 27.600000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 14
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 25
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 13.400000095367432
+            }
+          ],
+          "count": 40,
+          "p50": 14.700000047683716,
+          "p95": 27.600000023841858
+        },
+        "worker.overlay-practice": {
+          "samples": [
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.299999952316284
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.5
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.400000095367432
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 7.700000047683716
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 7.900000095367432
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.199999928474426
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.100000023841858
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 7.700000047683716
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.199999928474426
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.100000023841858
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.5
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 7.699999928474426
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.200000047683716
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 7.699999928474426
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 7.900000095367432
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.100000023841858
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.100000023841858
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.300000071525574
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.199999928474426
+            }
+          ],
+          "count": 20,
+          "p50": 8.100000023841858,
+          "p95": 8.5
+        },
+        "worker.overlay-queue": {
+          "samples": [
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.299999952316284
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.5
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.400000095367432
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 7.700000047683716
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 7.800000071525574
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.199999928474426
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.100000023841858
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 7.700000047683716
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.199999928474426
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.100000023841858
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.5
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 7.699999928474426
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.200000047683716
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 7.699999928474426
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 7.900000095367432
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.100000023841858
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.100000023841858
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.300000071525574
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.199999928474426
+            }
+          ],
+          "count": 20,
+          "p50": 8.100000023841858,
+          "p95": 8.5
+        },
+        "worker.overlay-track": {
+          "samples": [
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 14
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 14
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 14.300000071525574
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.600000023841858
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.300000071525574
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.5
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.899999976158142
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.899999976158142
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.100000023841858
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 14
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 12.699999928474426
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.199999928474426
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.200000047683716
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 12.799999952316284
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.100000023841858
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.100000023841858
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13.600000023841858
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 13
+            }
+          ],
+          "count": 20,
+          "p50": 13.200000047683716,
+          "p95": 14
+        }
+      },
+      "cold": {
+        "navigation-to-content-mount": {
+          "samples": [
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 299.1799999475479
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 299.1949999332428
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 361.54500007629395
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 371.5149999856949
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 328.2849999666214
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 376.3949999809265
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 301.02499997615814
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 251.47500002384186
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 411.66999995708466
+            },
+            {
+              "stage": "navigation-to-content-mount",
+              "status": "ok",
+              "ms": 415.25
+            }
+          ],
+          "count": 10,
+          "p50": 328.2849999666214,
+          "p95": 415.25
+        },
+        "content-mount-to-timer-ready": {
+          "samples": [
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 1198.8400000333786
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 550.7749999761581
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 529.5649999380112
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 541.875
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 1074.7350000143051
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 1147.1449999809265
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 563.0499999523163
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 1532.0349999666214
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 1172.1800000667572
+            },
+            {
+              "stage": "content-mount-to-timer-ready",
+              "status": "ok",
+              "ms": 1162.6150000095367
+            }
+          ],
+          "count": 10,
+          "p50": 1074.7350000143051,
+          "p95": 1532.0349999666214
+        },
+        "content-mount-to-context-ready": {
+          "samples": [
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 1198.875
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 550.8000000715256
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 529.5849999189377
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 541.914999961853
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 1074.7699999809265
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 1147.1849999427795
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 563.0750000476837
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 1532.0900000333786
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 1172.2200000286102
+            },
+            {
+              "stage": "content-mount-to-context-ready",
+              "status": "ok",
+              "ms": 1162.6499999761581
+            }
+          ],
+          "count": 10,
+          "p50": 1074.7699999809265,
+          "p95": 1532.0900000333786
+        },
+        "page.snapshot": {
+          "samples": [
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.30500006675720215
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.23000001907348633
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.2999999523162842
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.31999993324279785
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.309999942779541
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.2749999761581421
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.25999999046325684
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.23500001430511475
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.2549999952316284
+            },
+            {
+              "stage": "page.snapshot",
+              "status": "ok",
+              "ms": 0.31000006198883057
+            }
+          ],
+          "count": 10,
+          "p50": 0.2749999761581421,
+          "p95": 0.31999993324279785
+        },
+        "page.metadata": {
+          "samples": [
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 533.0499999523163
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 225.7300000190735
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 148.81000006198883
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 180.40499997138977
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 245.23500001430511
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 448.3199999332428
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 232.75499999523163
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 1115.945000052452
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 354.03000009059906
+            },
+            {
+              "stage": "page.metadata",
+              "status": "ok",
+              "ms": 259.7350000143051
+            }
+          ],
+          "count": 10,
+          "p50": 245.23500001430511,
+          "p95": 1115.945000052452
+        },
+        "page.upsert": {
+          "samples": [
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 623.7850000858307
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 282.47500002384186
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 342.375
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 283.35000002384186
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 777.9500000476837
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 657.6850000619888
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 287.875
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 376.52999997138977
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 779.8600000143051
+            },
+            {
+              "stage": "page.upsert",
+              "status": "ok",
+              "ms": 859.164999961853
+            }
+          ],
+          "count": 10,
+          "p50": 376.52999997138977,
+          "p95": 859.164999961853
+        },
+        "page.app-shell": {
+          "samples": [
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 18.509999990463257
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 24.399999976158142
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 16.37000000476837
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 53.294999957084656
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 28.33999991416931
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 17.024999976158142
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 23.365000009536743
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 20.575000047683716
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 18.304999947547913
+            },
+            {
+              "stage": "page.app-shell",
+              "status": "ok",
+              "ms": 20.00499999523163
+            }
+          ],
+          "count": 10,
+          "p50": 20.00499999523163,
+          "p95": 53.294999957084656
+        },
+        "page.preview": {
+          "samples": [
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 5.575000047683716
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 4.045000076293945
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 5.085000038146973
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 58.980000019073486
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 4.995000004768372
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 4.090000033378601
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 4.125
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 4.634999990463257
+            },
+            {
+              "stage": "page.preview",
+              "status": "ok",
+              "ms": 4.085000038146973
+            }
+          ],
+          "count": 9,
+          "p50": 4.634999990463257,
+          "p95": 58.980000019073486
+        },
+        "worker.app-shell": {
+          "samples": [
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 37.799999952316284
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 29
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 17.300000071525574
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 23.200000047683716
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 35.200000047683716
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 28.399999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 15.5
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 22.09999990463257
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 25.299999952316284
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 30.399999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 40.199999928474426
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 30.09999990463257
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 16.200000047683716
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 22.100000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 41.60000002384186
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 30.600000023841858
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 17.5
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 44.799999952316284
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 30.399999976158142
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 17
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 40.10000002384186
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 29.299999952316284
+            },
+            {
+              "stage": "worker.app-shell",
+              "status": "ok",
+              "ms": 18.700000047683716
+            }
+          ],
+          "count": 23,
+          "p50": 29,
+          "p95": 41.60000002384186
+        },
+        "worker.metadata": {
+          "samples": [
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 532.2000000476837
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 188.29999995231628
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 143.60000002384186
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 179.69999992847443
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 238.5
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 447.60000002384186
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 197.80000007152557
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 785.3000000715256
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 652.3000000715256
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 352.5
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 258.89999997615814
+            },
+            {
+              "stage": "worker.metadata",
+              "status": "ok",
+              "ms": 0.09999990463256836
+            }
+          ],
+          "count": 13,
+          "p50": 238.5,
+          "p95": 785.3000000715256
+        },
+        "worker.upsert": {
+          "samples": [
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 622.7999999523163
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 281.60000002384186
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 340.3000000715256
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 282.8000000715256
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 377.60000002384186
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 656.7000000476837
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 287
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 334.39999997615814
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 779.0999999046326
+            },
+            {
+              "stage": "worker.upsert",
+              "status": "ok",
+              "ms": 858.1000000238419
+            }
+          ],
+          "count": 10,
+          "p50": 340.3000000715256,
+          "p95": 858.1000000238419
+        },
+        "worker.snapshot-publish": {
+          "samples": [
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 544.3999999761581
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 230
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 257.7000000476837
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 229.80000007152557
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 232.89999997615814
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 502
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 233.5
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 243.80000007152557
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 301.5
+            },
+            {
+              "stage": "worker.snapshot-publish",
+              "status": "ok",
+              "ms": 346.39999997615814
+            }
+          ],
+          "count": 10,
+          "p50": 243.80000007152557,
+          "p95": 544.3999999761581
+        },
+        "worker.overlay-practice": {
+          "samples": [
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 9.600000023841858
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 13.5
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.700000047683716
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 12.100000023841858
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 14.600000023841858
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 8.899999976158142
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 12.200000047683716
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 10.099999904632568
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 9.699999928474426
+            },
+            {
+              "stage": "worker.overlay-practice",
+              "status": "ok",
+              "ms": 10.5
+            }
+          ],
+          "count": 10,
+          "p50": 10.099999904632568,
+          "p95": 14.600000023841858
+        },
+        "worker.overlay-queue": {
+          "samples": [
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 9.5
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 13.299999952316284
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.700000047683716
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 11.899999976158142
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 14.599999904632568
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 8.899999976158142
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 12
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 10.099999904632568
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 9.699999928474426
+            },
+            {
+              "stage": "worker.overlay-queue",
+              "status": "ok",
+              "ms": 10.399999976158142
+            }
+          ],
+          "count": 10,
+          "p50": 10.099999904632568,
+          "p95": 14.599999904632568
+        },
+        "worker.overlay-track": {
+          "samples": [
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 16.299999952316284
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 21.899999976158142
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 14.700000047683716
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 20.59999990463257
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 23.5
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 15.299999952316284
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 20.600000023841858
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 16.5
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 16
+            },
+            {
+              "stage": "worker.overlay-track",
+              "status": "ok",
+              "ms": 17.5
+            }
+          ],
+          "count": 10,
+          "p50": 16.5,
+          "p95": 23.5
+        }
+      }
+    }
+  },
+  "completedAt": "2026-10-12T06:22:37.141Z"
+}

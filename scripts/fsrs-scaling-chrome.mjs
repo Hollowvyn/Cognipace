@@ -25,6 +25,7 @@ import {
 import { platform, release, arch, cpus, totalmem, homedir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
+import { summarizeStartupSamples } from './overlay-startup-samples.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_DIST = join(ROOT, 'dist', 'chrome-mv3')
@@ -35,6 +36,37 @@ const DEFAULT_OUT = join(
   'evidence',
   'fsrs-phase-g',
 )
+const STARTUP_OUT = join(
+  ROOT,
+  'docs',
+  'superpowers',
+  'evidence',
+  'responsive-overlay',
+)
+const STARTUP_PREFIX = 'cognipace.overlay.'
+const STARTUP_MARKS = new Set([
+  'content-mount',
+  'url-ready',
+  'page-ready',
+  'context-ready',
+  'timer-ready',
+])
+const STARTUP_MEASURES = new Set([
+  'page.snapshot',
+  'page.metadata',
+  'page.upsert',
+  'page.app-shell',
+  'page.preview',
+  'page.submit-event',
+  'page.submit-capture',
+  'worker.metadata',
+  'worker.app-shell',
+  'worker.overlay-practice',
+  'worker.overlay-queue',
+  'worker.overlay-track',
+  'worker.upsert',
+  'worker.snapshot-publish',
+])
 const DATASET_COUNTS = {
   standard: { problems: 250, reviewAttempts: 5_000 },
   stress: { problems: 2_500, reviewAttempts: 50_000 },
@@ -75,6 +107,10 @@ function parseArgs(argv) {
       args.previewOnly = true
       continue
     }
+    if (flag === '--startup-only') {
+      args.startupOnly = true
+      continue
+    }
     if (
       ![
         '--backup',
@@ -84,6 +120,7 @@ function parseArgs(argv) {
         '--out',
         '--samples',
         '--warmups',
+        '--cold-samples',
         '--problem-url',
       ].includes(flag)
     )
@@ -104,10 +141,15 @@ function parseArgs(argv) {
         : 20
       : Number(args.samples)
   args.warmups = Number(args.warmups)
+  args.coldsamples =
+    args.coldsamples === undefined ? 10 : Number(args.coldsamples)
   if (
-    ![args.samples, args.warmups].every(Number.isSafeInteger) ||
+    ![args.samples, args.warmups, args.coldsamples].every(
+      Number.isSafeInteger,
+    ) ||
     args.samples < 1 ||
-    args.warmups < 0
+    args.warmups < 0 ||
+    args.coldsamples < 1
   )
     throw new Error(
       '--samples must be positive and --warmups must be nonnegative integers',
@@ -115,6 +157,7 @@ function parseArgs(argv) {
   args.backup = resolve(args.backup)
   args.dist = resolve(args.dist)
   args.out = resolve(args.out)
+  if (args.startupOnly && args.out === DEFAULT_OUT) args.out = STARTUP_OUT
   if (args.chrome) args.chrome = resolve(args.chrome)
   return args
 }
@@ -129,6 +172,8 @@ Options:
   --samples <n>        Timed samples (default: 20, stress: 10)
   --warmups <n>        Untimed warmups (default: 3)
   --problem-url <url>  HTTPS LeetCode problem URL for content-script preview attempt
+  --startup-only       Sample fresh LeetCode tabs after verified fixture restore
+  --cold-samples <n>   Full-browser restarts in startup-only mode (default: 10)
   --initial-restore-only  Bounded setup/quota probe; no operation timings
   --preview-only    Bounded proper-sender content preview probe
 
@@ -1043,6 +1088,386 @@ async function assertProtectedFixtureRows(cdp, page, backup, expected) {
   return protectedRows
 }
 
+function startupEntriesExpression() {
+  return `performance.getEntries().filter(e => e.name.startsWith('${STARTUP_PREFIX}')).map(e => ({name:e.name,kind:e.entryType,startTime:e.startTime,duration:e.duration}))`
+}
+
+function projectStartupEntries(entries, scope) {
+  return entries.flatMap((entry) => {
+    const stage = entry.name?.startsWith(STARTUP_PREFIX)
+      ? entry.name.slice(STARTUP_PREFIX.length)
+      : null
+    const allowed = entry.kind === 'mark' ? STARTUP_MARKS : STARTUP_MEASURES
+    if (
+      !allowed.has(stage) ||
+      !Number.isFinite(entry.startTime) ||
+      !Number.isFinite(entry.duration)
+    )
+      return []
+    if (scope === 'worker' && !stage.startsWith('worker.')) return []
+    if (scope === 'page' && stage.startsWith('worker.')) return []
+    return [
+      {
+        stage,
+        kind: entry.kind,
+        startTime: entry.startTime,
+        duration: entry.duration,
+      },
+    ]
+  })
+}
+
+async function readWorkerEntries(cdp, id, clear = false) {
+  const { targetInfos } = await cdp.send('Target.getTargets')
+  const worker = targetInfos.find(
+    (target) =>
+      target.type === 'service_worker' &&
+      target.url.startsWith(`chrome-extension://${id}/`),
+  )
+  if (!worker) return []
+  const { sessionId } = await cdp.send('Target.attachToTarget', {
+    targetId: worker.targetId,
+    flatten: true,
+  })
+  try {
+    const expression = clear
+      ? `performance.clearMarks(); performance.clearMeasures(); true`
+      : startupEntriesExpression()
+    const response = await cdp.send(
+      'Runtime.evaluate',
+      { expression, returnByValue: true },
+      sessionId,
+      30_000,
+    )
+    return clear
+      ? []
+      : projectStartupEntries(response.result?.value ?? [], 'worker')
+  } finally {
+    await cdp
+      .send('Target.detachFromTarget', { sessionId })
+      .catch(() => undefined)
+  }
+}
+
+async function workerTargetId(cdp, id) {
+  const { targetInfos } = await cdp.send('Target.getTargets')
+  return (
+    targetInfos.find(
+      (target) =>
+        target.type === 'service_worker' &&
+        target.url.startsWith(`chrome-extension://${id}/`),
+    )?.targetId ?? null
+  )
+}
+
+async function knownProblemPresent(cdp, dashboard, slug, expectedReviews) {
+  return evaluate(
+    cdp,
+    dashboard,
+    `(async () => {
+    const wire = await chrome.runtime.sendMessage({ id: Math.floor(Math.random() * 1e9), type: 'backup.exportFullBackup', data: { surface: 'dashboard' }, timestamp: Date.now() });
+    if (!wire || wire.err) return false;
+    return wire.res.data.problems.some(row => row.slug === ${JSON.stringify(slug)}) && wire.res.data.practice.reviewAttempts.length === ${expectedReviews};
+  })()`,
+    30_000,
+  )
+}
+
+async function traceStartup(cdp, work, extensionId) {
+  const longTasks = []
+  let completed
+  const complete = new Promise((resolveComplete) => {
+    completed = resolveComplete
+  })
+  const remove = cdp.on((event) => {
+    if (event.method === 'Tracing.dataCollected') {
+      for (const entry of event.params.value ?? []) {
+        if (entry.name !== 'RunTask' || entry.ph !== 'X' || entry.dur <= 50_000)
+          continue
+        const attributed = JSON.stringify(entry.args ?? {}).includes(
+          `chrome-extension://${extensionId}/`,
+        )
+        if (attributed)
+          longTasks.push({
+            attribution: 'CogniPace extension',
+            ms: entry.dur / 1000,
+          })
+      }
+    }
+    if (event.method === 'Tracing.tracingComplete') completed()
+  })
+  let started = false
+  try {
+    await cdp.send(
+      'Tracing.start',
+      {
+        categories: 'devtools.timeline,blink.user_timing',
+        transferMode: 'ReportEvents',
+      },
+      undefined,
+      30_000,
+    )
+    started = true
+    await work()
+  } finally {
+    if (started) {
+      await cdp
+        .send('Tracing.end', {}, undefined, 30_000)
+        .catch(() => undefined)
+      await Promise.race([
+        complete,
+        new Promise((resolveWait) => setTimeout(resolveWait, 5_000)),
+      ])
+    }
+    remove()
+  }
+  return {
+    status: 'captured',
+    cogniPaceLongTasks: longTasks,
+    attributionNote:
+      'Only RunTask records whose arguments identify the packaged extension are attributed; unattributed renderer tasks are excluded. Raw trace discarded.',
+  }
+}
+
+async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
+  const samples = []
+  let tab
+  let stage = 'target-open'
+  const contexts = []
+  try {
+    await readWorkerEntries(chrome.cdp, id, true)
+    const navigationStart = performance.now()
+    tab = await openTarget(chrome.cdp, problemUrl, (context) =>
+      contexts.push(context),
+    )
+    stage = 'isolated-context'
+    const deadline = performance.now() + 30_000
+    let isolated
+    while (performance.now() < deadline) {
+      isolated = contexts.find(
+        (context) =>
+          context.origin === `chrome-extension://${id}` &&
+          context.auxData?.isDefault === false,
+      )
+      if (isolated) break
+      await new Promise((resolveWait) => setTimeout(resolveWait, 100))
+    }
+    if (!isolated) throw new Error('Fresh isolated context timed out')
+    stage = 'timer-ready'
+    let rawEntries = []
+    while (performance.now() < deadline) {
+      rawEntries = await evaluate(
+        chrome.cdp,
+        tab,
+        startupEntriesExpression(),
+        30_000,
+        isolated.id,
+      )
+      if (
+        rawEntries.some(
+          (entry) => entry.name === `${STARTUP_PREFIX}timer-ready`,
+        )
+      )
+        break
+      await new Promise((resolveWait) => setTimeout(resolveWait, 100))
+    }
+    const entries = projectStartupEntries(rawEntries, 'page')
+    const mount = entries.find(
+      (entry) => entry.stage === 'content-mount' && entry.kind === 'mark',
+    )
+    const timer = entries.find(
+      (entry) => entry.stage === 'timer-ready' && entry.kind === 'mark',
+    )
+    const context = entries.find(
+      (entry) => entry.stage === 'context-ready' && entry.kind === 'mark',
+    )
+    // Page and Node clocks are independent. The navigation baseline comes from the page context.
+    const navigation = await evaluate(
+      chrome.cdp,
+      tab,
+      'performance.getEntriesByType("navigation")[0]?.startTime ?? 0',
+      30_000,
+      isolated.id,
+    )
+    samples.push({
+      stage: 'navigation-to-content-mount',
+      status: mount ? 'ok' : 'error',
+      ms: mount ? mount.startTime - navigation : null,
+    })
+    samples.push({
+      stage: 'content-mount-to-timer-ready',
+      status: mount && timer ? 'ok' : 'timeout',
+      ms: mount && timer ? timer.startTime - mount.startTime : null,
+    })
+    samples.push({
+      stage: 'content-mount-to-context-ready',
+      status: mount && context ? 'ok' : 'timeout',
+      ms: mount && context ? context.startTime - mount.startTime : null,
+    })
+    for (const entry of entries.filter((entry) => entry.kind === 'measure'))
+      samples.push({ stage: entry.stage, status: 'ok', ms: entry.duration })
+    const workerEntries = await readWorkerEntries(chrome.cdp, id)
+    for (const entry of workerEntries.filter(
+      (entry) => entry.kind === 'measure',
+    ))
+      samples.push({ stage: entry.stage, status: 'ok', ms: entry.duration })
+    return {
+      mode,
+      index,
+      status: timer ? 'ok' : 'timeout',
+      isolatedContext: true,
+      wallMs: performance.now() - navigationStart,
+      samples,
+    }
+  } catch (error) {
+    return {
+      mode,
+      index,
+      status: safeError(error).code,
+      failureStage: stage,
+      isolatedContext: false,
+      samples: [{ stage, status: safeError(error).code, ms: null }],
+    }
+  } finally {
+    if (tab) {
+      tab.removeListener?.()
+      await chrome.cdp
+        .send('Target.closeTarget', { targetId: tab.targetId })
+        .catch(() => undefined)
+    }
+  }
+}
+
+async function collectStartup(
+  report,
+  args,
+  chrome,
+  dashboard,
+  id,
+  backup,
+  expected,
+  chromePath,
+  profile,
+) {
+  const url = new URL(
+    args.problemurl ?? 'https://leetcode.com/problems/two-sum/',
+  )
+  if (
+    url.protocol !== 'https:' ||
+    !['leetcode.com', 'www.leetcode.com'].includes(url.hostname) ||
+    !/^\/problems\/[^/]+\/?$/.test(url.pathname)
+  )
+    throw new Error('Startup URL must be an HTTPS LeetCode problem page')
+  const slug = url.pathname.split('/')[2]
+  report.startup = {
+    status: 'pending',
+    knownSlugVerified: false,
+    warmSameWorker: true,
+    warm: [],
+    cold: [],
+    traces: {},
+    submit: {
+      status: 'pending',
+      reason:
+        'Disposable profile has no authenticated LeetCode session; real Submit and disabled-extension comparison were not sampled. No code was submitted.',
+    },
+  }
+  const opening = await sampleStartupOpen(
+    chrome,
+    id,
+    url.href,
+    'untimed-setup',
+    0,
+  )
+  if (!opening.isolatedContext)
+    throw new Error('Untimed LeetCode setup did not reach an isolated context')
+  const deadline = performance.now() + 30_000
+  while (performance.now() < deadline) {
+    if (
+      await knownProblemPresent(
+        chrome.cdp,
+        dashboard,
+        slug,
+        expected.reviewAttempts,
+      )
+    ) {
+      report.startup.knownSlugVerified = true
+      break
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 300))
+  }
+  if (!report.startup.knownSlugVerified)
+    throw new Error('Known LeetCode problem was not saved after untimed open')
+  await assertProtectedFixtureRows(chrome.cdp, dashboard, backup, expected)
+  const warmWorkerId = await workerTargetId(chrome.cdp, id)
+  if (!warmWorkerId) throw new Error('Warm service worker was not available')
+  for (let index = 0; index < args.samples; index++) {
+    if (index === 0) {
+      let result
+      report.startup.traces.warm = await traceStartup(
+        chrome.cdp,
+        async () => {
+          result = await sampleStartupOpen(chrome, id, url.href, 'warm', index)
+        },
+        id,
+      )
+      report.startup.warm.push(result)
+    } else
+      report.startup.warm.push(
+        await sampleStartupOpen(chrome, id, url.href, 'warm', index),
+      )
+    if ((await workerTargetId(chrome.cdp, id)) !== warmWorkerId)
+      report.startup.warmSameWorker = false
+  }
+  for (let index = 0; index < args.coldsamples; index++) {
+    await stopChrome(chrome)
+    chrome = await launchChrome(chromePath, args.dist, profile)
+    id = await extensionId(chrome.cdp)
+    if (index === 0) {
+      let result
+      report.startup.traces.cold = await traceStartup(
+        chrome.cdp,
+        async () => {
+          result = await sampleStartupOpen(chrome, id, url.href, 'cold', index)
+        },
+        id,
+      )
+      report.startup.cold.push(result)
+    } else
+      report.startup.cold.push(
+        await sampleStartupOpen(chrome, id, url.href, 'cold', index),
+      )
+  }
+  report.startup.summary = Object.fromEntries(
+    ['warm', 'cold'].map((mode) => [
+      mode,
+      Object.fromEntries(
+        [
+          ...new Set(
+            report.startup[mode].flatMap((open) =>
+              open.samples.map((sample) => sample.stage),
+            ),
+          ),
+        ].map((stage) => [
+          stage,
+          summarizeStartupSamples(
+            report.startup[mode].flatMap((open) =>
+              open.samples.filter((sample) => sample.stage === stage),
+            ),
+          ),
+        ]),
+      ),
+    ]),
+  )
+  report.startup.status =
+    report.startup.warmSameWorker &&
+    report.startup.warm.every((open) => open.status === 'ok') &&
+    report.startup.cold.every((open) => open.status === 'ok')
+      ? 'measured'
+      : 'pending'
+  return chrome
+}
+
 async function sampleOperation(report, name, count, warmups, fn) {
   const entry = { status: 'measured', warmups, samples: [], summary: null }
   report.operations[name] = entry
@@ -1415,7 +1840,9 @@ async function main(args) {
       ? { probe: 'initial-restore-only' }
       : args.previewOnly
         ? { probe: 'preview-only' }
-        : {}),
+        : args.startupOnly
+          ? { probe: 'startup-only' }
+          : {}),
     fixture: {
       seed: 20261010,
       inputBytes: Buffer.byteLength(raw),
@@ -1444,21 +1871,32 @@ async function main(args) {
         messaging: messagingVersion,
       },
       profile: 'unique disposable /private/tmp directory; removed after run',
-      definition:
-        'Warm: same opened Chrome worker and persisted database. Request duration is performance.now() around dashboard chrome.runtime.sendMessage to response. Restore/reset and setup are outside warm operation timers.',
+      definition: args.startupOnly
+        ? 'Warm: fresh LeetCode tab in the same browser and worker. Cold: full browser restart with the same persisted disposable profile, then a fresh tab. Page marks and measures use their isolated-context clock; worker measures use the worker clock. Fixture restore and known-slug setup are untimed.'
+        : 'Warm: same opened Chrome worker and persisted database. Request duration is performance.now() around dashboard chrome.runtime.sendMessage to response. Restore/reset and setup are outside warm operation timers.',
     },
-    requested: { samples: args.samples, warmups: args.warmups },
+    requested: args.startupOnly
+      ? {
+          samples: args.samples,
+          coldSamples: args.coldsamples,
+          untimedKnownSlugOpens: 1,
+        }
+      : { samples: args.samples, warmups: args.warmups },
     operations: {},
-    memory: {
-      method:
-        'Sampled dashboard performance.memory.usedJSHeapSize where Chrome exposes it; not a continuous peak or service-worker heap',
-      observations: [],
-      maxObservedBytes: null,
-    },
-    contentScriptPreview: {
-      status: 'pending',
-      reason: 'No valid content-script execution context measured yet',
-    },
+    ...(args.startupOnly
+      ? {}
+      : {
+          memory: {
+            method:
+              'Sampled dashboard performance.memory.usedJSHeapSize where Chrome exposes it; not a continuous peak or service-worker heap',
+            observations: [],
+            maxObservedBytes: null,
+          },
+          contentScriptPreview: {
+            status: 'pending',
+            reason: 'No valid content-script execution context measured yet',
+          },
+        }),
   }
   const profile = await mkdtemp('/private/tmp/cognipace-fsrs-phase-g-')
   let chrome
@@ -1519,6 +1957,22 @@ async function main(args) {
     report.fixture.seededCatalogRows =
       initial.protectedRows.totalProblems - expected.problems
     report.fixture.installedDataBytes = initial.exported.dataBytes
+    if (args.startupOnly) {
+      stage = 'startupSamples'
+      chrome = await collectStartup(
+        report,
+        args,
+        chrome,
+        dashboard,
+        id,
+        backup,
+        expected,
+        chromePath,
+        profile,
+      )
+      report.status = report.startup.status
+      return
+    }
     if (args.initialRestoreOnly) {
       try {
         report.storage = await readStorageMetrics(chrome.cdp, dashboard)
@@ -2013,6 +2467,7 @@ async function main(args) {
   } catch (error) {
     report.failure = safeError(error)
     report.failureStage = stage
+    if (args.startupOnly && report.startup) report.startup.status = 'pending'
     if (stage === 'initialRestore' && chrome && dashboard) {
       try {
         report.storageAfterFailedRestore = await readStorageMetrics(
@@ -2056,9 +2511,10 @@ async function main(args) {
         }
       }
     }
-    for (const name of OPERATION_NAMES)
-      if (!report.operations[name])
-        pending(report, name, 'Packaged Chrome setup or verification failed')
+    if (!args.startupOnly)
+      for (const name of OPERATION_NAMES)
+        if (!report.operations[name])
+          pending(report, name, 'Packaged Chrome setup or verification failed')
   } finally {
     await stopChrome(chrome)
     await rm(profile, { recursive: true, force: true })
@@ -2066,13 +2522,18 @@ async function main(args) {
     await mkdir(args.out, { recursive: true })
     const file = join(
       args.out,
-      `fsrs-phase-g-chrome-${args.dataset}-${new Date().toISOString().replaceAll(':', '-')}.json`,
+      `${args.startupOnly ? 'overlay-startup' : 'fsrs-phase-g-chrome'}-${args.dataset}-${new Date().toISOString().replaceAll(':', '-')}.json`,
     )
     await writeFile(file, `${JSON.stringify(report, null, 2)}\n`)
     process.stdout.write(`${file}\n`)
-    process.stdout.write(
-      `${report.status}: ${Object.values(report.operations).filter((entry) => entry.status === 'measured').length} operations measured\n`,
-    )
+    if (args.startupOnly)
+      process.stdout.write(
+        `${report.status}: ${report.startup?.warm.length ?? 0} warm, ${report.startup?.cold.length ?? 0} cold openings\n`,
+      )
+    else
+      process.stdout.write(
+        `${report.status}: ${Object.values(report.operations).filter((entry) => entry.status === 'measured').length} operations measured\n`,
+      )
   }
   if (report.status !== 'measured') process.exitCode = 1
 }
