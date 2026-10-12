@@ -22,13 +22,14 @@ describe('overlay startup timing', () => {
     const measure = vi.spyOn(performance, 'measure')
 
     expect(timeOverlayStartupSync('page.snapshot', () => 7)).toBe(7)
-    expect(measure).toHaveBeenCalledWith(
-      'cognipace.overlay.page.snapshot',
-      expect.objectContaining({
-        start: expect.any(Number),
-        end: expect.any(Number),
-      }),
-    )
+    expect(measure).toHaveBeenCalledOnce()
+    expect(measure.mock.calls[0]?.[0]).toBe('cognipace.overlay.page.snapshot')
+    const options = measure.mock.calls[0]?.[1]
+    expect(typeof options).toBe('object')
+    if (typeof options !== 'object' || options === null)
+      throw new Error('Missing timing options')
+    expect(typeof options.start).toBe('number')
+    expect(typeof options.end).toBe('number')
   })
 
   it('measures synchronous work when it throws and propagates the error', () => {
@@ -40,28 +41,30 @@ describe('overlay startup timing', () => {
         throw error
       }),
     ).toThrow(error)
-    expect(measure).toHaveBeenCalledWith(
-      'cognipace.overlay.page.metadata',
-      expect.objectContaining({
-        start: expect.any(Number),
-        end: expect.any(Number),
-      }),
-    )
+    expect(measure).toHaveBeenCalledOnce()
+    expect(measure.mock.calls[0]?.[0]).toBe('cognipace.overlay.page.metadata')
+    const options = measure.mock.calls[0]?.[1]
+    expect(typeof options).toBe('object')
+    if (typeof options !== 'object' || options === null)
+      throw new Error('Missing timing options')
+    expect(typeof options.start).toBe('number')
+    expect(typeof options.end).toBe('number')
   })
 
   it('returns asynchronous work and measures its elapsed time', async () => {
     const measure = vi.spyOn(performance, 'measure')
 
     await expect(
-      timeOverlayStartup('page.preview', async () => 7),
+      timeOverlayStartup('page.preview', () => Promise.resolve(7)),
     ).resolves.toBe(7)
-    expect(measure).toHaveBeenCalledWith(
-      'cognipace.overlay.page.preview',
-      expect.objectContaining({
-        start: expect.any(Number),
-        end: expect.any(Number),
-      }),
-    )
+    expect(measure).toHaveBeenCalledOnce()
+    expect(measure.mock.calls[0]?.[0]).toBe('cognipace.overlay.page.preview')
+    const options = measure.mock.calls[0]?.[1]
+    expect(typeof options).toBe('object')
+    if (typeof options !== 'object' || options === null)
+      throw new Error('Missing timing options')
+    expect(typeof options.start).toBe('number')
+    expect(typeof options.end).toBe('number')
   })
 
   it('measures asynchronous work when it rejects and propagates the error', async () => {
@@ -69,16 +72,15 @@ describe('overlay startup timing', () => {
     const error = new Error('offline')
 
     await expect(
-      timeOverlayStartup('page.upsert', async () => {
-        throw error
-      }),
+      timeOverlayStartup('page.upsert', () => Promise.reject(error)),
     ).rejects.toThrow(error)
-    expect(measure).toHaveBeenCalledWith(
-      'cognipace.overlay.page.upsert',
-      expect.objectContaining({
-        start: expect.any(Number),
-        end: expect.any(Number),
-      }),
-    )
+    expect(measure).toHaveBeenCalledOnce()
+    expect(measure.mock.calls[0]?.[0]).toBe('cognipace.overlay.page.upsert')
+    const options = measure.mock.calls[0]?.[1]
+    expect(typeof options).toBe('object')
+    if (typeof options !== 'object' || options === null)
+      throw new Error('Missing timing options')
+    expect(typeof options.start).toBe('number')
+    expect(typeof options.end).toBe('number')
   })
 })
