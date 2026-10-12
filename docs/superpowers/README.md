@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-12-responsive-leetcode-overlay-startup-design.md`](./specs/2026-10-12-responsive-leetcode-overlay-startup-design.md): approved progressive overlay startup with early manual timing, concurrent local context and remote metadata reads, deferred secondary data, measured latency targets, and unchanged review and upsert durability; written-spec review and phase plans remain pending.
+- [`specs/2026-10-12-responsive-leetcode-overlay-startup-design.md`](./specs/2026-10-12-responsive-leetcode-overlay-startup-design.md): approved progressive overlay startup with early manual timing, concurrent local context and remote metadata reads, deferred secondary data, measured latency targets, and unchanged review and upsert durability. Phase-sized planning is in progress.
 
 - [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall, ten equal cards in Overview and Details, target-relative timing, strict backlog color boundary, and 30/90/All time with available young history. The final prototype adds four selected-period activity totals and quiet fixed card states. Backlog stays Last 30 days, Upcoming Next 14 days, and tooltip cleanup is deferred. Implementation, independent reviews, automated gates and desktop state proof are complete; human installed-extension smoke/proof remains pending before PR review or merge. See the dated handoff.
 
@@ -77,6 +77,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-12-responsive-overlay-phase-1-baseline.md`](./plans/2026-10-12-responsive-overlay-phase-1-baseline.md): Phase 1 plan for low-overhead stage timing, a disposable packaged 5,000-review startup baseline, and renderer work attribution before behavior changes.
 - [`plans/2026-10-05-analytics-history-window-foundation.md`](./plans/2026-10-05-analytics-history-window-foundation.md): implemented and independently reviewed pure selection, raw-history bounds, bounded calendar intervals and fixed daily backlog foundation; 69 focused tests and the required full check pass. Runtime/service/route/readiness integration is implemented in the following phase.
 - [`plans/2026-10-05-analytics-history-runtime-integration.md`](./plans/2026-10-05-analytics-history-runtime-integration.md): implemented and independently reviewed public selections, explicit report frames, paired Recall dates with shared-calendar readiness, nominal comparisons, independent workload frames, and truthful selected activity through validated messages; 3,172 tests and build pass. Weighted models and compact UI are implemented in the following completed phases.
 - [`plans/2026-10-05-analytics-weighted-presentation.md`](./plans/2026-10-05-analytics-weighted-presentation.md): shared weighted Performance, cumulative paired Recall, normalized Time, sixteen-cell topic evidence, and natural cumulative trend geometry before compact production composition.

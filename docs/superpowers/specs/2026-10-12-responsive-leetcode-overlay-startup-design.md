@@ -2,7 +2,7 @@
 
 Date: 2026-10-12
 
-Status: Conversational design approved; awaiting written-spec review before implementation planning.
+Status: Written design approved; phase-sized implementation planning in progress.
 
 ## Problem and evidence
 
