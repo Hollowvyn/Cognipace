@@ -295,13 +295,34 @@ statuses, and redacted trace or screenshot paths. Keep submitted code, full
 trace payloads, storage snapshots, credentials, and personal history out of
 shared evidence.
 
-- [ ] Happy path: open a fixture-known problem with the extension installed;
-      start/pause/reset the timer immediately, then confirm saved context,
-      review controls, preview and Submit/Update still work after context loads.
-- [ ] Edge path: open a new problem absent from the fixture, then navigate
-      between known and new problems while metadata or local context is slow.
-      Check the timer and identity, loading/error states, no stale context,
-      preserved review durability and no duplicate attempt.
+- [ ] With the installed packaged extension, open a fixture-known problem warm
+      and after a full browser restart. Repeat both openings on a problem absent
+      from the fixture. Record mount-to-usable-timer and saved-context timing,
+      provisional identity, loading/error state and whether the timer is
+      responsive. Do not treat a new problem as a saved review history.
+- [ ] On known and new problems, start, pause and reset the manual timer as
+      soon as it is usable. Enable the saved automatic timing setting and repeat
+      warm and cold opens; verify automatic start waits for the verified
+      setting, does not backdate elapsed time, and preserves pause/reset and
+      navigation reset rules. Check that an unknown target time is shown as
+      pending rather than a false `00:00`.
+- [ ] Throttle and then fail remote metadata in the disposable profile; repeat
+      on known and new problems. Verify known saved context remains available,
+      the new problem keeps its page identity and timer, and review controls
+      stay pending or show a retryable error until valid saved context exists.
+      Repeat with a slow or failed local context read. Check no premature empty
+      history, stale late response, wrong-slug context or disabled valid review
+      due only to a preview/next-step failure.
+- [ ] Navigate between known and new problems while metadata or local context
+      is pending. Verify the old result cannot replace the active session, the
+      timer resets for the new problem, and no duplicate attempt is created.
+- [ ] Once valid saved context loads, save a review and wait for durable Saved
+      acknowledgement; reload and verify one attempt and correct timer, rating,
+      FSRS and track effects. Update its rating and verify no extra attempt.
+      Induce a recoverable Save failure in the disposable profile and use Retry;
+      confirm the accepted command stays locked, success is not shown early,
+      and Retry preserves one durable attempt. Repeat a valid review while
+      preview or next-step data is unavailable.
 - [ ] In an authenticated, disposable LeetCode profile, capture a real code
       Submit click and Command/Ctrl+Enter path with the extension enabled.
       Repeat comparable submissions with the extension disabled and compare
