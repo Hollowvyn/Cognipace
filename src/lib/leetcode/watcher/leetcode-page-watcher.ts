@@ -12,6 +12,11 @@ import { createLeetCodeFetchRemoteClient } from '../remote/leetcode-fetch-remote
 import { readLeetCodeRemoteAuthFromDocument } from '../remote/leetcode-remote-auth'
 import type { LeetCodeRemoteClient } from '../remote/leetcode-remote-client'
 import { readLeetCodeSubmissionAttempt } from '../submission/submission-attempt-reader'
+import {
+  markOverlayStartup,
+  timeOverlayStartup,
+  timeOverlayStartupSync,
+} from '@/lib/performance/overlay-startup-timing'
 import { createLeetCodeHydrationScheduler } from './hydration-scheduler'
 import { createLeetCodeNavigationObserver } from './navigation-observer'
 import { createLeetCodeSubmissionResultWatch } from './submission-result-watch'
@@ -180,6 +185,7 @@ export function createLeetCodePageWatcher(
 
     const previousLocation = activeLocation
     activeLocation = location
+    markOverlayStartup('url-ready')
     activeToken += 1
     readySlug = null
     latestProblemMetadataFingerprint = null
@@ -234,14 +240,15 @@ export function createLeetCodePageWatcher(
     location: LeetCodeProblemLocation,
   ) {
     try {
-      const pageSnapshot = readLeetCodePageSnapshot(documentRef, {
-        location,
-        now,
-      })
-      const metadataReadResult = await remoteClient.readProblemMetadata({
-        location,
-        auth: readLeetCodeRemoteAuthFromDocument(documentRef),
-      })
+      const pageSnapshot = timeOverlayStartupSync('page.snapshot', () =>
+        readLeetCodePageSnapshot(documentRef, { location, now }),
+      )
+      const metadataReadResult = await timeOverlayStartup('page.metadata', () =>
+        remoteClient.readProblemMetadata({
+          location,
+          auth: readLeetCodeRemoteAuthFromDocument(documentRef),
+        }),
+      )
 
       if (isStaleSnapshotRefresh(token, location)) {
         return
@@ -264,6 +271,7 @@ export function createLeetCodePageWatcher(
           metadata: problemMetadata,
           pageReadyAt: now(),
         })
+        markOverlayStartup('page-ready')
       }
 
       emitProblemMetadataIfUseful(location, problemMetadata)
@@ -315,22 +323,24 @@ export function createLeetCodePageWatcher(
   }
 
   function handleClick(event: MouseEvent) {
-    const location = activeLocation
+    timeOverlayStartupSync('page.submit-event', () => {
+      const location = activeLocation
 
-    if (!location) {
-      return
-    }
+      if (!location) {
+        return
+      }
 
-    const click = readLeetCodeSubmissionClickFromMouseEvent(event, {
-      location,
-      now,
+      const click = readLeetCodeSubmissionClickFromMouseEvent(event, {
+        location,
+        now,
+      })
+
+      if (!click) {
+        return
+      }
+
+      handleSubmission(click)
     })
-
-    if (!click) {
-      return
-    }
-
-    handleSubmission(click)
   }
 
   function handleKeyDown(event: KeyboardEvent) {
@@ -348,20 +358,25 @@ export function createLeetCodePageWatcher(
       return
     }
 
-    handleSubmission({
-      location: activeLocation,
-      clickedAt: now(),
-      buttonText: 'Submit',
+    const location = activeLocation
+    timeOverlayStartupSync('page.submit-event', () => {
+      handleSubmission({
+        location,
+        clickedAt: now(),
+        buttonText: 'Submit',
+      })
     })
   }
 
   function handleSubmission(click: LeetCodeSubmissionClick) {
     options.onEvent({ type: 'submit-clicked', click })
-    const attempt = readLeetCodeSubmissionAttempt({
-      attemptId: crypto.randomUUID(),
-      click,
-      editorRoot: documentRef,
-    })
+    const attempt = timeOverlayStartupSync('page.submit-capture', () =>
+      readLeetCodeSubmissionAttempt({
+        attemptId: crypto.randomUUID(),
+        click,
+        editorRoot: documentRef,
+      }),
+    )
 
     options.onEvent({
       type: 'submission-started',

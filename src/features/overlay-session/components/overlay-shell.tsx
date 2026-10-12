@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react'
+
 import type { ThemeMode } from '@/features/settings'
+import { markOverlayStartup } from '@/lib/performance/overlay-startup-timing'
 
 import { selectOverlayHelpSearchQuery } from '../domain'
 import type { LeetCodeOverlaySession } from '../hooks/use-leetcode-overlay-session'
@@ -34,6 +37,18 @@ export function OverlayShell({
   })
   const canUseProblem = Boolean(context?.problem) && status === 'ready'
   const themeMode: ThemeMode = context?.appearance.themeMode ?? 'system'
+  const timerReadySlugRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!location?.slug) {
+      timerReadySlugRef.current = null
+      return
+    }
+    if (canUseProblem && timerReadySlugRef.current !== location.slug) {
+      timerReadySlugRef.current = location.slug
+      markOverlayStartup('timer-ready')
+    }
+  }, [canUseProblem, location?.slug])
 
   if (overlay.visualMode === 'docked') {
     return <DockedOverlay onRestore={actions.restore} themeMode={themeMode} />

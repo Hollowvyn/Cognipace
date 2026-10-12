@@ -59,6 +59,35 @@ describe('createLeetCodePageWatcher', () => {
     })
   })
 
+  it('finishes the DOM snapshot measure while metadata remains pending', async () => {
+    renderProblemHeader()
+    const measure = vi.spyOn(performance, 'measure')
+    let finishMetadata!: (response: Response) => void
+    const metadata = new Promise<Response>((resolve) => {
+      finishMetadata = resolve
+    })
+    const { watcher } = createWatcherTestHarness({ fetch: () => metadata })
+
+    watcher.start()
+    vi.advanceTimersByTime(0)
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.snapshot',
+      expect.any(Object),
+    )
+    expect(measure).not.toHaveBeenCalledWith(
+      'cognipace.overlay.page.metadata',
+      expect.any(Object),
+    )
+
+    finishMetadata(createQuestionMetadataResponse())
+    await vi.runAllTimersAsync()
+    watcher.stop()
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.metadata',
+      expect.any(Object),
+    )
+  })
+
   it('emits problem content when LeetCode content is readable', async () => {
     renderProblemHeader()
     const { events, watcher } = createWatcherTestHarness({
@@ -213,6 +242,7 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('emits submit-clicked without saving a review', async () => {
+    const measure = vi.spyOn(performance, 'measure')
     renderProblemEditorPage()
     const { events, watcher } = createWatcherTestHarness({
       now: () => 2000,
@@ -222,6 +252,15 @@ describe('createLeetCodePageWatcher', () => {
     await vi.runAllTimersAsync()
     dispatchSubmitClick()
     watcher.stop()
+
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.submit-capture',
+      expect.any(Object),
+    )
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.submit-event',
+      expect.any(Object),
+    )
 
     expect(events).toContainEqual({
       type: 'submit-clicked',

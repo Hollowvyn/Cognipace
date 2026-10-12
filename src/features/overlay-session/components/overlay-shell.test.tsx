@@ -66,6 +66,29 @@ vi.mock('./modes/expanded/expanded-overlay', () => ({
 }))
 
 describe('OverlayShell', () => {
+  it('marks timer readiness once per active slug after ready render', () => {
+    const mark = vi.spyOn(performance, 'mark')
+    const session = createSession({
+      location: {
+        host: 'leetcode.com',
+        slug: 'two-sum',
+        url: 'https://leetcode.com/problems/two-sum/',
+      },
+      status: 'reading-page',
+    })
+    const { rerender } = render(<OverlayShell {...session} />)
+    expect(mark).not.toHaveBeenCalledWith('cognipace.overlay.timer-ready')
+
+    rerender(<OverlayShell {...session} status="ready" />)
+    expect(mark).toHaveBeenCalledWith('cognipace.overlay.timer-ready')
+    rerender(<OverlayShell {...session} status="ready" />)
+    expect(
+      mark.mock.calls.filter(
+        ([name]) => name === 'cognipace.overlay.timer-ready',
+      ),
+    ).toHaveLength(1)
+  })
+
   it('passes session hints and their commands to expanded Help', async () => {
     const user = userEvent.setup()
     const session = createSession({

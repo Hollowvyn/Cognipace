@@ -1,3 +1,5 @@
+import { timeOverlayStartup } from '@/lib/performance/overlay-startup-timing'
+
 import {
   analyticsSummaryRequestSchema,
   analyticsSummarySchema,
@@ -312,7 +314,11 @@ export function registerBackgroundHandlers() {
       sender,
     )
     return getAppDb().then(async ({ db }) =>
-      appShellDataSchema.parse(await getAppShellData(db, request)),
+      appShellDataSchema.parse(
+        await timeOverlayStartup('worker.app-shell', () =>
+          getAppShellData(db, request),
+        ),
+      ),
     )
   })
 
@@ -666,13 +672,15 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      (db) => upsertProblemFromPage(db, request),
-      (problem) =>
-        broadcastProblemCatalogInvalidation({
-          problemSlug: problem.slug,
-          source: request.surface,
-        }),
+    return timeOverlayStartup('worker.upsert', () =>
+      runDbMutation(
+        (db) => upsertProblemFromPage(db, request),
+        (problem) =>
+          broadcastProblemCatalogInvalidation({
+            problemSlug: problem.slug,
+            source: request.surface,
+          }),
+      ),
     )
   })
 
@@ -1442,7 +1450,9 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return readLeetCodeProblemMetadataInBackground(request)
+    return timeOverlayStartup('worker.metadata', () =>
+      readLeetCodeProblemMetadataInBackground(request),
+    )
   })
 
   onMessage('leetcode.readProblemContent', ({ data, sender }) => {
@@ -1667,7 +1677,7 @@ function runDbMutation<T>(
       await markSyncLocalDataChangedBestEffort()
     }
 
-    await flushDbSnapshot()
+    await timeOverlayStartup('worker.snapshot-publish', () => flushDbSnapshot())
     await afterFlush?.(result)
 
     if (syncMode === 'mark-dirty') {

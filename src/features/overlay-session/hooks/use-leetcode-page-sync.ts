@@ -19,6 +19,10 @@ import {
   type LeetCodePageEvent,
 } from '@/lib/leetcode'
 import { readErrorMessage } from '@/utils/errors'
+import {
+  markOverlayStartup,
+  timeOverlayStartup,
+} from '@/lib/performance/overlay-startup-timing'
 
 export type OverlaySyncStatus =
   | 'booting'
@@ -98,6 +102,8 @@ export function useLeetCodePageSync({
       return
     }
 
+    markOverlayStartup('context-ready')
+
     if (activeProblemSlugRef.current === problem.problemSlug) {
       onProblemContextRefreshed(context)
       return
@@ -125,15 +131,17 @@ export function useLeetCodePageSync({
       setStatus('syncing-problem')
 
       try {
-        await upsertProblemFromPageViaRuntime({
-          surface: 'content-script',
-          url: nextMetadata.location.url,
-          slug: nextMetadata.location.slug,
-          title: nextMetadata.title,
-          difficulty: nextMetadata.difficulty,
-          isPremium: nextMetadata.isPremium,
-          topicLabels: nextMetadata.topics.map((topic) => topic.name),
-        })
+        await timeOverlayStartup('page.upsert', () =>
+          upsertProblemFromPageViaRuntime({
+            surface: 'content-script',
+            url: nextMetadata.location.url,
+            slug: nextMetadata.location.slug,
+            title: nextMetadata.title,
+            difficulty: nextMetadata.difficulty,
+            isPremium: nextMetadata.isPremium,
+            topicLabels: nextMetadata.topics.map((topic) => topic.name),
+          }),
+        )
         if (syncTokenRef.current !== syncToken) {
           return
         }
