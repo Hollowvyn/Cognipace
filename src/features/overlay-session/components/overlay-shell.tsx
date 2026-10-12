@@ -44,11 +44,15 @@ export function OverlayShell({
       timerReadySlugRef.current = null
       return
     }
-    if (canUseProblem && timerReadySlugRef.current !== location.slug) {
+    if (
+      canUseProblem &&
+      overlay.visualMode !== 'docked' &&
+      timerReadySlugRef.current !== location.slug
+    ) {
       timerReadySlugRef.current = location.slug
       markOverlayStartup('timer-ready')
     }
-  }, [canUseProblem, location?.slug])
+  }, [canUseProblem, location?.slug, overlay.visualMode])
 
   if (overlay.visualMode === 'docked') {
     return <DockedOverlay onRestore={actions.restore} themeMode={themeMode} />
