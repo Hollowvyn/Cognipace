@@ -295,27 +295,33 @@ statuses, and redacted trace or screenshot paths. Keep submitted code, full
 trace payloads, storage snapshots, credentials, and personal history out of
 shared evidence.
 
+#### Phase 1 human smoke: observe current behavior
+
+These checks describe the installed extension as it works in Phase 1. Record
+what happens and any failure; do not grade it against the progressive startup
+behavior planned for Phases 2 and 3.
+
 - [ ] With the installed packaged extension, open a fixture-known problem warm
       and after a full browser restart. Repeat both openings on a problem absent
       from the fixture. Record mount-to-usable-timer and saved-context timing,
-      provisional identity, loading/error state and whether the timer is
-      responsive. Do not treat a new problem as a saved review history.
+      displayed identity, loading/error state and when the timer becomes
+      responsive. Note whether the new problem is upserted and whether its
+      saved history is empty after context loads.
 - [ ] On known and new problems, start, pause and reset the manual timer as
       soon as it is usable. Enable the saved automatic timing setting and repeat
-      warm and cold opens; verify automatic start waits for the verified
-      setting, does not backdate elapsed time, and preserves pause/reset and
-      navigation reset rules. Check that an unknown target time is shown as
-      pending rather than a false `00:00`.
+      warm and cold opens. Record when automatic start occurs relative to
+      context arrival and verify the current elapsed-time, pause/reset and
+      navigation reset rules. Record the target-time display before and after
+      difficulty and settings arrive.
 - [ ] Throttle and then fail remote metadata in the disposable profile; repeat
-      on known and new problems. Verify known saved context remains available,
-      the new problem keeps its page identity and timer, and review controls
-      stay pending or show a retryable error until valid saved context exists.
-      Repeat with a slow or failed local context read. Check no premature empty
-      history, stale late response, wrong-slug context or disabled valid review
-      due only to a preview/next-step failure.
+      on known and new problems. Record page identity, timer availability,
+      saved context, loading/error treatment and recovery; a failed metadata
+      request may prevent current Phase 1 startup from reaching usable context.
+      Repeat with a slow or failed local read where reproducible, and record
+      whether empty history or review controls appear before valid context.
 - [ ] Navigate between known and new problems while metadata or local context
-      is pending. Verify the old result cannot replace the active session, the
-      timer resets for the new problem, and no duplicate attempt is created.
+      is pending. Check for an old result replacing the active session, timer
+      reset, wrong-slug context and duplicate attempts; record any failure.
 - [ ] Once valid saved context loads, save a review and wait for durable Saved
       acknowledgement; reload and verify one attempt and correct timer, rating,
       FSRS and track effects. Update its rating and verify no extra attempt.
@@ -337,6 +343,21 @@ shared evidence.
 - [ ] Attach redacted screenshots or a screen recording of the installed
       extension happy path and edge cases, with exact flows, version, date and
       result, before PR review or merge.
+
+#### Future progressive-startup acceptance (Phases 2 and 3)
+
+These are acceptance checks for later behavior-changing phases, **not Phase 1
+PR gates**. Their separate plans must specify implementation and proof. Repeat
+warm/cold known and new opens and require manual timer access without waiting
+for metadata, upsert or local context; automatic start only after verified
+settings, without backdating; and a pending target label while timing inputs
+are unknown. With slow/failed metadata, known saved context must remain usable
+and a new problem must retain identity and manual timer access. With slow/failed
+local context, keep the timer usable and show pending/error review context,
+never a false empty history. Check retryable new-problem upsert failure,
+slug/epoch supersession, independent preview/next-step failure, and exact
+Save/Update/Retry durability. Human installed-extension smoke and visual proof
+will be required for those phases when implemented.
 
 ### Phase G Local Scaling Smoke
 

@@ -97,8 +97,10 @@ startup design and plan.
       exited 1 because its overall status was `partial`. It did not pass end to end.
 - [ ] Human installed-extension happy-path and edge-case smoke, authenticated
       code Submit and disabled-extension comparison, affected live-profile trace,
-      and screenshot or recording proof remain pending. Use the exact checklist
-      in [Testing](../../testing.md#responsive-overlay-startup-baseline-and-smoke).
+      and screenshot or recording proof remain pending. Use the
+      [Phase 1 observation checklist](../../testing.md#phase-1-human-smoke-observe-current-behavior).
+      The [progressive-startup acceptance checks](../../testing.md#future-progressive-startup-acceptance-phases-2-and-3)
+      belong to later behavior phases and are not gates for this Phase 1 PR.
 - Skipped `rtk npm run db:generate`: no schema change. A separate
   `rtk npm run db:check` is skipped because `rtk npm run check` includes it.
   Skipped `rtk npm run zip`: extension artifact behavior is unchanged.
