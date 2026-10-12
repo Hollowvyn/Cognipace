@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import {
   projectStartupOpening,
+  projectUnattributedWorkerEntries,
+  isTraceTaskEvent,
   summarizeStartupSamples,
   summarizeTraceEvidence,
 } from './overlay-startup-samples.mjs'
@@ -137,5 +139,42 @@ test('trace status requires completion and usable events before attribution', ()
       attributedLongTasks: [],
     }).status,
     'attribution-unproven',
+  )
+})
+
+test('worker observations retain only fixed stage and duration without attributing an opening', () => {
+  assert.deepEqual(
+    projectUnattributedWorkerEntries([
+      { stage: 'worker.upsert', kind: 'measure', duration: 12, url: 'private' },
+      { stage: 'worker.upsert', kind: 'measure', duration: 14 },
+      { stage: 'page.upsert', kind: 'measure', duration: 8 },
+    ]),
+    [
+      { stage: 'worker.upsert', status: 'unattributed', ms: 12 },
+      { stage: 'worker.upsert', status: 'unattributed', ms: 14 },
+    ],
+  )
+})
+
+test('trace task detection accepts current toplevel RunTask names', () => {
+  assert.equal(
+    isTraceTaskEvent({ name: 'RunTask', ph: 'X', dur: 51_000 }),
+    true,
+  )
+  assert.equal(
+    isTraceTaskEvent({
+      name: 'ThreadControllerImpl::RunTask',
+      ph: 'X',
+      dur: 51_000,
+    }),
+    true,
+  )
+  assert.equal(
+    isTraceTaskEvent({ name: 'RunTask', ph: 'B', dur: 51_000 }),
+    false,
+  )
+  assert.equal(
+    isTraceTaskEvent({ name: 'EvaluateScript', ph: 'X', dur: 51_000 }),
+    false,
   )
 })

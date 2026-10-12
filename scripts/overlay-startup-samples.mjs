@@ -101,6 +101,27 @@ export function summarizeTraceEvidence({
     runTaskCount,
     cogniPaceLongTasks: attributedLongTasks,
     attributionNote:
-      'Only RunTask records whose arguments identify the packaged extension are attributed. Raw trace discarded.',
+      'Task candidates cover all traced processes. CogniPace attribution requires an extension URL in the task arguments; absence of one does not prove no extension long task. Raw trace discarded.',
   }
+}
+
+export function projectUnattributedWorkerEntries(entries) {
+  const allowed = new Set(
+    STARTUP_OPENING_STAGES.filter((stage) => stage.startsWith('worker.')),
+  )
+  return entries.flatMap((entry) =>
+    entry.kind === 'measure' &&
+    allowed.has(entry.stage) &&
+    Number.isFinite(entry.duration)
+      ? [sample(entry.stage, 'unattributed', entry.duration)]
+      : [],
+  )
+}
+
+export function isTraceTaskEvent(entry) {
+  return (
+    entry?.ph === 'X' &&
+    Number.isFinite(entry.dur) &&
+    /(?:^|::)RunTask$/.test(entry.name ?? '')
+  )
 }

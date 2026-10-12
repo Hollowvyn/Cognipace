@@ -27,7 +27,9 @@ import { basename, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import {
   STARTUP_OPENING_STAGES,
+  isTraceTaskEvent,
   projectStartupOpening,
+  projectUnattributedWorkerEntries,
   summarizeStartupSamples,
   summarizeTraceEvidence,
 } from './overlay-startup-samples.mjs'
@@ -1182,6 +1184,7 @@ async function traceStartup(cdp, work, extensionId) {
   const longTasks = []
   let eventCount = 0
   let runTaskCount = 0
+  let allProcessLongTaskCandidateCount = 0
   let traceCompleted = false
   let completed
   const complete = new Promise((resolveComplete) => {
@@ -1191,9 +1194,10 @@ async function traceStartup(cdp, work, extensionId) {
     if (event.method === 'Tracing.dataCollected') {
       for (const entry of event.params.value ?? []) {
         eventCount++
-        if (entry.name === 'RunTask' && entry.ph === 'X') runTaskCount++
-        if (entry.name !== 'RunTask' || entry.ph !== 'X' || entry.dur <= 50_000)
-          continue
+        if (!isTraceTaskEvent(entry)) continue
+        runTaskCount++
+        if (entry.dur <= 50_000) continue
+        allProcessLongTaskCandidateCount++
         const attributed = JSON.stringify(entry.args ?? {}).includes(
           `chrome-extension://${extensionId}/`,
         )
@@ -1214,7 +1218,7 @@ async function traceStartup(cdp, work, extensionId) {
     await cdp.send(
       'Tracing.start',
       {
-        categories: 'devtools.timeline,blink.user_timing',
+        categories: 'toplevel,devtools.timeline,blink.user_timing',
         transferMode: 'ReportEvents',
       },
       undefined,
@@ -1234,12 +1238,16 @@ async function traceStartup(cdp, work, extensionId) {
     }
     remove()
   }
-  return summarizeTraceEvidence({
-    completed: traceCompleted,
-    eventCount,
-    runTaskCount,
-    attributedLongTasks: longTasks,
-  })
+  return {
+    ...summarizeTraceEvidence({
+      completed: traceCompleted,
+      eventCount,
+      runTaskCount,
+      attributedLongTasks: longTasks,
+    }),
+    allProcessLongTaskCandidateCount,
+    taskNamesChecked: ['RunTask', 'ThreadControllerImpl::RunTask'],
+  }
 }
 
 async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
@@ -1310,7 +1318,7 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
       status: timer ? 'ok' : 'timeout',
       isolatedContext: true,
       wallMs: performance.now() - navigationStart,
-      workerEntriesObserved: workerEntries.length,
+      workerObservations: projectUnattributedWorkerEntries(workerEntries),
       samples,
     }
   } catch (error) {
@@ -1363,6 +1371,20 @@ async function collectStartup(
     warmSameWorker: true,
     workerAttribution:
       'pending: worker performance entries have no request identity; per-open worker durations and percentiles are unavailable',
+    limitations: {
+      worker:
+        'Worker measures have fixed stage names but no page-open or request identifier. A read window may contain duplicate or delayed work, so worker durations remain unattributed.',
+      rendererTrace:
+        'Chrome toplevel tasks require extension and renderer attribution. All-process >50 ms counts alone do not establish either.',
+      traceOverhead:
+        'The first warm and first cold opening include trace collection overhead.',
+    },
+    unattributedWorker: {
+      clock: 'service-worker performance clock',
+      note: 'Observed in a read window after each tab; entries may include delayed work from another opening. These durations are not per-open samples and have no percentiles.',
+      warm: [],
+      cold: [],
+    },
     warm: [],
     cold: [],
     traces: {},
@@ -1453,12 +1475,23 @@ async function collectStartup(
       ),
     ]),
   )
-  report.startup.status =
+  for (const mode of ['warm', 'cold']) {
+    report.startup.unattributedWorker[mode] = report.startup[mode].map(
+      (open) => ({
+        captureWindow: open.index,
+        samples: open.workerObservations ?? [],
+      }),
+    )
+    for (const open of report.startup[mode]) delete open.workerObservations
+  }
+  report.startup.pageReadinessStatus =
     report.startup.warmSameWorker &&
     report.startup.warm.every((open) => open.status === 'ok') &&
     report.startup.cold.every((open) => open.status === 'ok')
       ? 'measured'
       : 'pending'
+  report.startup.status =
+    report.startup.pageReadinessStatus === 'measured' ? 'partial' : 'pending'
   return chrome
 }
 
@@ -1971,6 +2004,7 @@ async function main(args) {
         profile,
       )
       report.status = report.startup.status
+      if (report.status !== 'measured') process.exitCode = 1
       return
     }
     if (args.initialRestoreOnly) {
