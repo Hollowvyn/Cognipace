@@ -12,7 +12,7 @@
 
 **Approved design:** [Responsive LeetCode overlay startup](../specs/2026-10-12-responsive-leetcode-overlay-startup-design.md), Phase 1 only. Phase 2 (early identity and timer), Phase 3 (narrow local core read), and any measured repair require their own implementation plans. This phase is complete even if the user's 30-second live-profile delay cannot be reproduced; record that gap explicitly.
 
-**Plan status:** Proposed for review; implementation has not started.
+**Plan status:** Phase 1 measurement and Task 4 documentation implemented on `codex/overlay-startup-baseline`. The packaged baseline is partial: page-stage samples are complete, but worker attribution, renderer attribution, real Submit comparison and human installed-extension proof remain pending. See the [handoff](../handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md). Phase 2 and later plans remain separate.
 
 ## File map
 

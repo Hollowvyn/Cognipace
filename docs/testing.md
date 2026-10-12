@@ -254,6 +254,69 @@ for these flows before PR review or merge.
    and after preview-only actions. Reopen the extension and confirm no preview
    read created a review or altered a due date.
 
+### Responsive Overlay Startup Baseline And Smoke
+
+Status: the packaged disposable-profile page-stage baseline is **partial**;
+worker/renderer attribution and real Submit comparison are pending. Human
+installed-extension happy-path and edge-case smoke with screenshots or a
+recording is **pending** before PR review or merge. See the [Phase 1
+handoff](superpowers/handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md)
+and [sanitized raw report](superpowers/evidence/responsive-overlay/overlay-startup-standard-2026-10-12T06-38-38.694Z.json).
+
+To reproduce the automated page baseline, use the pinned Node/npm versions in
+Local Setup, install dependencies, and run from the repository root:
+
+```sh
+rtk proxy env COGNIPACE_SCALING=standard npm run test -- src/testing/fsrs-scaling-benchmark.test.ts
+rtk npm run build
+rtk proxy node scripts/fsrs-scaling-chrome.mjs --backup test-results/fsrs-phase-g/standard-backup.json --dataset standard --problem-url https://leetcode.com/problems/two-sum/ --startup-only --samples 20 --cold-samples 10
+```
+
+The driver loads `dist/chrome-mv3` into a unique `/private/tmp` Chrome profile,
+restores the synthetic v6 fixture there, verifies the real Two Sum slug, and
+removes that profile afterward. Never restore the scaling backup in a personal
+profile. It opens 20 fresh tabs in the same browser and worker for warm samples;
+each of 10 cold samples restarts the entire browser with the same persisted
+disposable profile before opening a fresh tab. Fixture restore and known-slug
+setup are untimed. It writes sanitized raw samples and trace metadata under
+`docs/superpowers/evidence/responsive-overlay/`. The first warm and cold opens
+include trace collection overhead. A partial report makes the command exit 1;
+read the JSON statuses rather than interpreting that exit as a complete pass.
+
+For a human Performance trace, use a separate disposable Chrome profile with
+the packaged extension loaded, restore the synthetic backup only in that
+profile, and open a verified known LeetCode problem. Capture one warm and one
+full-browser-restart cold opening with DevTools Performance recording. Inspect
+the page's User Timing marks, extension service-worker work, renderer tasks
+over 50 ms, and the timer's first usable state. Attribute a task to CogniPace
+only when the trace identifies its extension or script context. Record Chrome
+version, extension build, fixture counts, profile type, raw durations, failure
+statuses, and redacted trace or screenshot paths. Keep submitted code, full
+trace payloads, storage snapshots, credentials, and personal history out of
+shared evidence.
+
+- [ ] Happy path: open a fixture-known problem with the extension installed;
+      start/pause/reset the timer immediately, then confirm saved context,
+      review controls, preview and Submit/Update still work after context loads.
+- [ ] Edge path: open a new problem absent from the fixture, then navigate
+      between known and new problems while metadata or local context is slow.
+      Check the timer and identity, loading/error states, no stale context,
+      preserved review durability and no duplicate attempt.
+- [ ] In an authenticated, disposable LeetCode profile, capture a real code
+      Submit click and Command/Ctrl+Enter path with the extension enabled.
+      Repeat comparable submissions with the extension disabled and compare
+      click-to-LeetCode response and renderer work. Verify CogniPace captures
+      the matching submission and does not change LeetCode's submission result.
+      This comparison was unavailable in the automated unauthenticated run;
+      no code was submitted there.
+- [ ] On the user's affected installed profile, reproduce or rule out the
+      reported approximately 30-second delay with a redacted Performance trace.
+      Record extensions and profile conditions relevant to the delay without
+      sharing personal data. The disposable fixture did not reproduce it.
+- [ ] Attach redacted screenshots or a screen recording of the installed
+      extension happy path and edge cases, with exact flows, version, date and
+      result, before PR review or merge.
+
 ### Phase G Local Scaling Smoke
 
 Human installed-extension happy-path and edge-case proof, with redacted
