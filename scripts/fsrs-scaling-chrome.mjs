@@ -25,7 +25,12 @@ import {
 import { platform, release, arch, cpus, totalmem, homedir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
-import { summarizeStartupSamples } from './overlay-startup-samples.mjs'
+import {
+  STARTUP_OPENING_STAGES,
+  projectStartupOpening,
+  summarizeStartupSamples,
+  summarizeTraceEvidence,
+} from './overlay-startup-samples.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_DIST = join(ROOT, 'dist', 'chrome-mv3')
@@ -1175,6 +1180,9 @@ async function knownProblemPresent(cdp, dashboard, slug, expectedReviews) {
 
 async function traceStartup(cdp, work, extensionId) {
   const longTasks = []
+  let eventCount = 0
+  let runTaskCount = 0
+  let traceCompleted = false
   let completed
   const complete = new Promise((resolveComplete) => {
     completed = resolveComplete
@@ -1182,6 +1190,8 @@ async function traceStartup(cdp, work, extensionId) {
   const remove = cdp.on((event) => {
     if (event.method === 'Tracing.dataCollected') {
       for (const entry of event.params.value ?? []) {
+        eventCount++
+        if (entry.name === 'RunTask' && entry.ph === 'X') runTaskCount++
         if (entry.name !== 'RunTask' || entry.ph !== 'X' || entry.dur <= 50_000)
           continue
         const attributed = JSON.stringify(entry.args ?? {}).includes(
@@ -1194,7 +1204,10 @@ async function traceStartup(cdp, work, extensionId) {
           })
       }
     }
-    if (event.method === 'Tracing.tracingComplete') completed()
+    if (event.method === 'Tracing.tracingComplete') {
+      traceCompleted = true
+      completed()
+    }
   })
   let started = false
   try {
@@ -1221,16 +1234,15 @@ async function traceStartup(cdp, work, extensionId) {
     }
     remove()
   }
-  return {
-    status: 'captured',
-    cogniPaceLongTasks: longTasks,
-    attributionNote:
-      'Only RunTask records whose arguments identify the packaged extension are attributed; unattributed renderer tasks are excluded. Raw trace discarded.',
-  }
+  return summarizeTraceEvidence({
+    completed: traceCompleted,
+    eventCount,
+    runTaskCount,
+    attributedLongTasks: longTasks,
+  })
 }
 
 async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
-  const samples = []
   let tab
   let stage = 'target-open'
   const contexts = []
@@ -1272,14 +1284,8 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
       await new Promise((resolveWait) => setTimeout(resolveWait, 100))
     }
     const entries = projectStartupEntries(rawEntries, 'page')
-    const mount = entries.find(
-      (entry) => entry.stage === 'content-mount' && entry.kind === 'mark',
-    )
     const timer = entries.find(
       (entry) => entry.stage === 'timer-ready' && entry.kind === 'mark',
-    )
-    const context = entries.find(
-      (entry) => entry.stage === 'context-ready' && entry.kind === 'mark',
     )
     // Page and Node clocks are independent. The navigation baseline comes from the page context.
     const navigation = await evaluate(
@@ -1289,44 +1295,36 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
       30_000,
       isolated.id,
     )
-    samples.push({
-      stage: 'navigation-to-content-mount',
-      status: mount ? 'ok' : 'error',
-      ms: mount ? mount.startTime - navigation : null,
+    const samples = projectStartupOpening({
+      entries,
+      navigationStart: navigation,
     })
-    samples.push({
-      stage: 'content-mount-to-timer-ready',
-      status: mount && timer ? 'ok' : 'timeout',
-      ms: mount && timer ? timer.startTime - mount.startTime : null,
-    })
-    samples.push({
-      stage: 'content-mount-to-context-ready',
-      status: mount && context ? 'ok' : 'timeout',
-      ms: mount && context ? context.startTime - mount.startTime : null,
-    })
-    for (const entry of entries.filter((entry) => entry.kind === 'measure'))
-      samples.push({ stage: entry.stage, status: 'ok', ms: entry.duration })
-    const workerEntries = await readWorkerEntries(chrome.cdp, id)
-    for (const entry of workerEntries.filter(
-      (entry) => entry.kind === 'measure',
-    ))
-      samples.push({ stage: entry.stage, status: 'ok', ms: entry.duration })
+    // Worker entries lack request identity. Reading them confirms instrumentation
+    // ran, but they cannot be attributed to this opening or summarized as latency.
+    const workerEntries = await readWorkerEntries(chrome.cdp, id).catch(
+      () => [],
+    )
     return {
       mode,
       index,
       status: timer ? 'ok' : 'timeout',
       isolatedContext: true,
       wallMs: performance.now() - navigationStart,
+      workerEntriesObserved: workerEntries.length,
       samples,
     }
   } catch (error) {
     return {
       mode,
       index,
-      status: safeError(error).code,
+      status: safeError(error).code === 'timeout' ? 'timeout' : 'error',
       failureStage: stage,
       isolatedContext: false,
-      samples: [{ stage, status: safeError(error).code, ms: null }],
+      failureCode: safeError(error).code,
+      samples: projectStartupOpening({
+        failureStatus:
+          safeError(error).code === 'timeout' ? 'timeout' : 'error',
+      }),
     }
   } finally {
     if (tab) {
@@ -1363,6 +1361,8 @@ async function collectStartup(
     status: 'pending',
     knownSlugVerified: false,
     warmSameWorker: true,
+    workerAttribution:
+      'pending: worker performance entries have no request identity; per-open worker durations and percentiles are unavailable',
     warm: [],
     cold: [],
     traces: {},
@@ -1442,17 +1442,11 @@ async function collectStartup(
     ['warm', 'cold'].map((mode) => [
       mode,
       Object.fromEntries(
-        [
-          ...new Set(
-            report.startup[mode].flatMap((open) =>
-              open.samples.map((sample) => sample.stage),
-            ),
-          ),
-        ].map((stage) => [
+        STARTUP_OPENING_STAGES.map((stage) => [
           stage,
           summarizeStartupSamples(
-            report.startup[mode].flatMap((open) =>
-              open.samples.filter((sample) => sample.stage === stage),
+            report.startup[mode].map((open) =>
+              open.samples.find((sample) => sample.stage === stage),
             ),
           ),
         ]),
@@ -1854,6 +1848,12 @@ async function main(args) {
         cwd: ROOT,
         encoding: 'utf8',
       }).trim(),
+      ...(args.startupOnly
+        ? {
+            commitRole:
+              'source commit used for the packaged extension build; collector and evidence commit may be later',
+          }
+        : {}),
       node: process.version,
       chrome: chromeVersion,
       os: `${platform()} ${release()} ${arch()}`,
