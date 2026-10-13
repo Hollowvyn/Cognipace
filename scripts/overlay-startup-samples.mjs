@@ -6,7 +6,6 @@ export function summarizeStartupSamples(samples) {
   const rank = (fraction) =>
     successful[Math.ceil(successful.length * fraction) - 1] ?? null
   return {
-    samples: samples.map(({ stage, status, ms }) => ({ stage, status, ms })),
     count: successful.length,
     p50: successful.length >= 5 ? rank(0.5) : null,
     p95: successful.length >= 5 ? rank(0.95) : null,
@@ -33,6 +32,68 @@ export const STARTUP_OPENING_STAGES = [
   'worker.overlay-track',
 ]
 
+const SAMPLE_STATUSES = new Set(['pending', 'timeout', 'error'])
+const OPENING_FIELDS = [
+  'mode',
+  'index',
+  'status',
+  'timerStatus',
+  'contextStatus',
+  'isolatedContext',
+  'wallMs',
+  'failureStage',
+  'failureCode',
+]
+
+export function encodeStartupOpening(opening) {
+  if (
+    !Array.isArray(opening.samples) ||
+    opening.samples.length !== STARTUP_OPENING_STAGES.length
+  )
+    throw new Error('Startup opening has the wrong stage count')
+  const values = opening.samples.map((entry, index) => {
+    if (entry?.stage !== STARTUP_OPENING_STAGES[index])
+      throw new Error('Startup opening stage order differs')
+    if (entry.status === 'ok' && Number.isFinite(entry.ms) && entry.ms >= 0)
+      return entry.ms
+    if (SAMPLE_STATUSES.has(entry.status) && entry.ms == null)
+      return entry.status
+    throw new Error('Startup opening has an invalid sample')
+  })
+  const result = Object.fromEntries(
+    OPENING_FIELDS.filter((field) => Object.hasOwn(opening, field)).map(
+      (field) => [field, opening[field]],
+    ),
+  )
+  for (const field of ['failureStage', 'failureCode'])
+    if (field in result && !/^[a-z0-9-]{1,64}$/.test(result[field]))
+      throw new Error(`Startup opening has an unsafe ${field}`)
+  return { ...result, values }
+}
+
+export function decodeStartupOpening(opening) {
+  if (
+    !Array.isArray(opening?.values) ||
+    opening.values.length !== STARTUP_OPENING_STAGES.length
+  )
+    throw new Error('Startup opening has the wrong value count')
+  const samples = opening.values.map((value, index) => {
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0)
+      return sample(STARTUP_OPENING_STAGES[index], 'ok', value)
+    if (SAMPLE_STATUSES.has(value))
+      return sample(STARTUP_OPENING_STAGES[index], value)
+    throw new Error('Startup opening has an invalid value')
+  })
+  return {
+    ...Object.fromEntries(
+      OPENING_FIELDS.filter((field) => Object.hasOwn(opening, field)).map(
+        (field) => [field, opening[field]],
+      ),
+    ),
+    samples,
+  }
+}
+
 const sample = (stage, status, ms = null) => ({ stage, status, ms })
 
 export function projectStartupOpening({
@@ -45,10 +106,6 @@ export function projectStartupOpening({
 
   const matches = (stage, kind) =>
     entries.filter((entry) => entry.stage === stage && entry.kind === kind)
-  const one = (stage, kind) => {
-    const found = matches(stage, kind)
-    return found.length === 1 ? found[0] : null
-  }
   const mountMatches = matches('content-mount', 'mark')
   const mount = mountMatches.length === 1 ? mountMatches[0] : null
   const markDuration = (stage, mark, missingStatus = 'pending') => {
@@ -59,8 +116,12 @@ export function projectStartupOpening({
     const ms = mount && end ? end.startTime - mount.startTime : null
     return sample(
       stage,
-      ms !== null ? (ms >= 0 ? 'ok' : 'error') : missingStatus,
-      ms !== null && ms >= 0 ? ms : null,
+      ms !== null
+        ? Number.isFinite(ms) && ms >= 0
+          ? 'ok'
+          : 'error'
+        : missingStatus,
+      ms !== null && Number.isFinite(ms) && ms >= 0 ? ms : null,
     )
   }
   const navigationMs = mount ? mount.startTime - navigationStart : null
@@ -69,10 +130,16 @@ export function projectStartupOpening({
       'navigation-to-content-mount',
       mountMatches.length > 1
         ? 'error'
-        : navigationMs !== null && navigationMs >= 0
+        : navigationMs !== null &&
+            Number.isFinite(navigationMs) &&
+            navigationMs >= 0
           ? 'ok'
           : 'pending',
-      navigationMs !== null && navigationMs >= 0 ? navigationMs : null,
+      navigationMs !== null &&
+        Number.isFinite(navigationMs) &&
+        navigationMs >= 0
+        ? navigationMs
+        : null,
     ),
     markDuration('content-mount-to-url-ready', 'url-ready'),
     markDuration('content-mount-to-page-ready', 'page-ready'),
@@ -82,8 +149,12 @@ export function projectStartupOpening({
   const page = STARTUP_OPENING_STAGES.filter((stage) =>
     stage.startsWith('page.'),
   ).map((stage) => {
-    const entry = one(stage, 'measure')
-    return sample(stage, entry ? 'ok' : 'pending', entry?.duration ?? null)
+    const found = matches(stage, 'measure')
+    if (found.length > 1) return sample(stage, 'error')
+    const duration = found[0]?.duration
+    return Number.isFinite(duration) && duration >= 0
+      ? sample(stage, 'ok', duration)
+      : sample(stage, found.length ? 'error' : 'pending')
   })
   const worker = STARTUP_OPENING_STAGES.filter((stage) =>
     stage.startsWith('worker.'),
@@ -92,14 +163,29 @@ export function projectStartupOpening({
 }
 
 export function startupOpeningStatus(samples) {
-  const timer = samples.find(
-    (entry) => entry.stage === 'content-mount-to-timer-ready',
-  )
-  return timer?.status === 'ok'
-    ? 'ok'
-    : timer?.status === 'timeout'
-      ? 'timeout'
-      : 'error'
+  const statusFor = (stages) => {
+    const statuses = stages.map(
+      (stage) =>
+        samples.find((entry) => entry.stage === stage)?.status ?? 'pending',
+    )
+    if (statuses.includes('error')) return 'error'
+    if (statuses.includes('timeout')) return 'timeout'
+    if (statuses.every((status) => status === 'ok')) return 'ok'
+    return 'pending'
+  }
+  const timerStage = 'content-mount-to-timer-ready'
+  const contextStage = 'content-mount-to-context-ready'
+  return {
+    timer: statusFor([timerStage]),
+    context: statusFor([contextStage]),
+    page: statusFor([
+      timerStage,
+      contextStage,
+      'page.metadata',
+      'page.upsert',
+      'page.app-shell',
+    ]),
+  }
 }
 
 export function fillFailedStartupOpenings(
@@ -119,6 +205,8 @@ export function fillFailedStartupOpenings(
       mode,
       index,
       status,
+      timerStatus: status,
+      contextStatus: status,
       isolatedContext: false,
       failureStage: failed ? failureStage : 'skipped-after-restart-failure',
       failureCode: failed ? failureCode : 'prior-restart-failure',
@@ -157,8 +245,9 @@ export function projectUnattributedWorkerEntries(entries) {
   return entries.flatMap((entry) =>
     entry.kind === 'measure' &&
     allowed.has(entry.stage) &&
-    Number.isFinite(entry.duration)
-      ? [sample(entry.stage, 'unattributed', entry.duration)]
+    Number.isFinite(entry.duration) &&
+    entry.duration >= 0
+      ? [[STARTUP_OPENING_STAGES.indexOf(entry.stage), entry.duration]]
       : [],
   )
 }

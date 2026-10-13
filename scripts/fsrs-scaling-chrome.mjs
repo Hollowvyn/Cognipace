@@ -27,6 +27,7 @@ import { basename, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import {
   STARTUP_OPENING_STAGES,
+  encodeStartupOpening,
   fillFailedStartupOpenings,
   isTraceTaskEvent,
   projectStartupOpening,
@@ -35,6 +36,7 @@ import {
   summarizeTraceEvidence,
   startupOpeningStatus,
 } from './overlay-startup-samples.mjs'
+import { validateStartupReport } from './validate-overlay-startup-report.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_DIST = join(ROOT, 'dist', 'chrome-mv3')
@@ -172,7 +174,11 @@ function parseArgs(argv) {
   args.backup = resolve(args.backup)
   args.dist = resolve(args.dist)
   args.out = resolve(args.out)
-  if (args.startupOnly && args.out === DEFAULT_OUT) args.out = STARTUP_OUT
+  if (args.startupOnly) {
+    if (argv.includes('--out'))
+      throw new Error('--out is unavailable for the fixed startup report path')
+    args.out = STARTUP_OUT
+  }
   if (args.chrome) args.chrome = resolve(args.chrome)
   return args
 }
@@ -187,7 +193,7 @@ Options:
   --samples <n>        Timed samples (default: 20, stress: 10)
   --warmups <n>        Untimed warmups (default: 3)
   --problem-url <url>  HTTPS LeetCode problem URL for content-script preview attempt
-  --startup-only       Sample fresh LeetCode tabs after verified fixture restore
+  --startup-only       Sample fresh LeetCode tabs; writes docs/superpowers/evidence/responsive-overlay/overlay-startup-standard.json
   --cold-samples <n>   Full-browser restarts in startup-only mode (default: 10)
   --initial-restore-only  Bounded setup/quota probe; no operation timings
   --preview-only    Bounded proper-sender content preview probe
@@ -1263,10 +1269,12 @@ async function traceStartup(cdp, work, extensionId) {
 async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
   let tab
   let stage = 'target-open'
+  let navigationStart
+  let isolatedContext = false
   const contexts = []
   try {
     await readWorkerEntries(chrome.cdp, id, true)
-    const navigationStart = performance.now()
+    navigationStart = performance.now()
     tab = await openTarget(chrome.cdp, problemUrl, (context) =>
       contexts.push(context),
     )
@@ -1283,6 +1291,7 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
       await new Promise((resolveWait) => setTimeout(resolveWait, 100))
     }
     if (!isolated) throw new Error('Fresh isolated context timed out')
+    isolatedContext = true
     stage = 'timer-ready'
     let rawEntries = []
     while (performance.now() < deadline) {
@@ -1319,27 +1328,34 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
     const workerEntries = await readWorkerEntries(chrome.cdp, id).catch(
       () => [],
     )
+    const readiness = startupOpeningStatus(samples)
     return {
       mode,
       index,
-      status: startupOpeningStatus(samples),
-      isolatedContext: true,
+      status: readiness.page,
+      timerStatus: readiness.timer,
+      contextStatus: readiness.context,
+      isolatedContext,
       wallMs: performance.now() - navigationStart,
       workerObservations: projectUnattributedWorkerEntries(workerEntries),
       samples,
     }
   } catch (error) {
+    const failureCode = safeError(error).code
+    const status = failureCode === 'timeout' ? 'timeout' : 'error'
     return {
       mode,
       index,
-      status: safeError(error).code === 'timeout' ? 'timeout' : 'error',
+      status,
+      timerStatus: status,
+      contextStatus: status,
       failureStage: stage,
-      isolatedContext: false,
-      failureCode: safeError(error).code,
-      samples: projectStartupOpening({
-        failureStatus:
-          safeError(error).code === 'timeout' ? 'timeout' : 'error',
-      }),
+      isolatedContext,
+      ...(navigationStart === undefined
+        ? {}
+        : { wallMs: performance.now() - navigationStart }),
+      failureCode,
+      samples: projectStartupOpening({ failureStatus: status }),
     }
   } finally {
     if (tab) {
@@ -1373,6 +1389,8 @@ async function collectStartup(
     throw new Error('Startup URL must be an HTTPS LeetCode problem page')
   const slug = url.pathname.split('/')[2]
   report.startup = {
+    schemaVersion: 2,
+    stages: STARTUP_OPENING_STAGES,
     status: 'pending',
     knownSlugVerified: false,
     warmSameWorker: true,
@@ -1509,13 +1527,14 @@ async function collectStartup(
     report.startup.unattributedWorker[mode] = report.startup[mode].map(
       (open) => ({
         captureWindow: open.index,
-        samples: open.workerObservations ?? [],
+        values: open.workerObservations ?? [],
       }),
     )
-    for (const open of report.startup[mode]) delete open.workerObservations
+    report.startup[mode] = report.startup[mode].map((open) =>
+      encodeStartupOpening(open),
+    )
   }
   report.startup.pageReadinessStatus =
-    report.startup.warmSameWorker &&
     report.startup.warm.every((open) => open.status === 'ok') &&
     report.startup.cold.every((open) => open.status === 'ok')
       ? 'measured'
@@ -1913,9 +1932,9 @@ async function main(args) {
     environment: {
       ...(args.startupOnly
         ? {
-            observedGitHeadAtRun: observedGitHead,
-            gitHeadRole:
-              'Observed checkout HEAD only; the packaged build is identified by extensionBuildSha256 and may contain uncommitted source.',
+            sourceCommit: observedGitHead,
+            sourceCommitRole:
+              'Checkout source revision; packaged build separately identified by extensionBuildSha256.',
           }
         : { commit: observedGitHead }),
       node: process.version,
@@ -2587,8 +2606,12 @@ async function main(args) {
     await mkdir(args.out, { recursive: true })
     const file = join(
       args.out,
-      `${args.startupOnly ? 'overlay-startup' : 'fsrs-phase-g-chrome'}-${args.dataset}-${new Date().toISOString().replaceAll(':', '-')}.json`,
+      args.startupOnly
+        ? 'overlay-startup-standard.json'
+        : `fsrs-phase-g-chrome-${args.dataset}-${new Date().toISOString().replaceAll(':', '-')}.json`,
     )
+    if (args.startupOnly && report.startup?.summary)
+      validateStartupReport(report)
     await writeFile(file, `${JSON.stringify(report, null, 2)}\n`)
     process.stdout.write(`${file}\n`)
     if (args.startupOnly)
