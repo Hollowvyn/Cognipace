@@ -108,6 +108,20 @@ For this committed-source recollection:
       recorded build digest. An independent recursive string scan found no
       actual URL, problem slug, code, credential pattern, or backup payload;
       the report contains approved descriptive status and limitation strings.
+- [x] `rtk npm run test -- src/lib/performance/overlay-startup-timing.test.ts src/lib/leetcode/watcher/leetcode-page-watcher.test.ts`
+      passed: 2 files, 52 tests.
+- [x] `rtk proxy node --test scripts/overlay-startup-samples.test.mjs`
+      passed: 16 tests.
+- [x] `rtk npm run lint` passed.
+- [x] `rtk npm run check` passed: database check, typecheck, lint, and Vitest
+      (250 files passed, 3 skipped; 3,886 tests passed, 10 skipped).
+- [x] `rtk npm run build` passed in the PR worktree with the existing large
+      chunk warning. The clean committed-source build above is the one used
+      for the recorded baseline.
+- [x] `rtk proxy ./node_modules/.bin/prettier --ignore-path /dev/null --check docs/superpowers/specs/2026-10-12-overlay-baseline-pr-cleanup-design.md docs/superpowers/plans/2026-10-12-overlay-baseline-pr-cleanup.md docs/superpowers/handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md docs/testing.md docs/superpowers/README.md`
+      passed.
+- [x] `rtk git diff --check` and `rtk git diff --check origin/main...HEAD`
+      passed.
 - [ ] Human installed-extension happy-path and edge-case smoke, authenticated
       code Submit and disabled-extension comparison, affected live-profile trace,
       and screenshot or recording proof remain pending. Use the
@@ -115,10 +129,10 @@ For this committed-source recollection:
       The [progressive-startup acceptance checks](../../testing.md#future-progressive-startup-acceptance-phases-2-and-3)
       belong to later behavior phases and are not gates for this Phase 1 PR.
 - Skipped `rtk npm run db:generate`: no schema change. Skipped
-  `rtk npm run zip`: extension artifact behavior is unchanged. The full
-  `rtk npm run check` and `rtk npm run lint` gates for the combined PR remain
-  with the final validation task; this evidence-only pass used the clean
-  checkout build and focused fixture test.
+  `rtk npm run zip`: extension artifact behavior is unchanged. The local
+  package and lockfile have unrelated uncommitted edits, so the PR-worktree
+  build is less representative than the clean committed-source build recorded
+  above; those edits are excluded from this PR.
 
 Remaining validation risk: the disposable run does not identify per-opening
 worker cost, renderer ownership, real Submit latency or the reported
