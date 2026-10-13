@@ -173,6 +173,57 @@ describe('overlay startup timing', () => {
     expect(entries).toContain(otherName)
   })
 
+  it('keeps synchronous work successful when clearing the 65th measure throws', async () => {
+    vi.resetModules()
+    const { timeOverlayStartupSync: time } =
+      await import('./overlay-startup-timing')
+    const measure = vi
+      .spyOn(performance, 'measure')
+      .mockImplementation(() => ({}) as PerformanceMeasure)
+    const clearMeasures = vi
+      .spyOn(performance, 'clearMeasures')
+      .mockImplementation(() => {
+        throw new Error('timing unavailable')
+      })
+
+    for (let index = 0; index < 64; index += 1) {
+      time('page.upsert', () => undefined)
+    }
+
+    expect(time('page.upsert', () => 7)).toBe(7)
+    expect(clearMeasures).toHaveBeenCalledOnce()
+    expect(clearMeasures).toHaveBeenCalledWith('cognipace.overlay.page.upsert')
+    expect(measure).toHaveBeenCalledTimes(64)
+  })
+
+  it('keeps the original asynchronous work error when clearing the 65th measure throws', async () => {
+    vi.resetModules()
+    const { timeOverlayStartup: time } =
+      await import('./overlay-startup-timing')
+    const error = new Error('work failed')
+    const measure = vi
+      .spyOn(performance, 'measure')
+      .mockImplementation(() => ({}) as PerformanceMeasure)
+    const clearMeasures = vi
+      .spyOn(performance, 'clearMeasures')
+      .mockImplementation(() => {
+        throw new Error('timing unavailable')
+      })
+
+    for (let index = 0; index < 64; index += 1) {
+      await time('worker.upsert', () => undefined)
+    }
+
+    await expect(
+      time('worker.upsert', () => Promise.reject(error)),
+    ).rejects.toBe(error)
+    expect(clearMeasures).toHaveBeenCalledOnce()
+    expect(clearMeasures).toHaveBeenCalledWith(
+      'cognipace.overlay.worker.upsert',
+    )
+    expect(measure).toHaveBeenCalledTimes(64)
+  })
+
   it('clears only a full mark stage before its 65th entry', async () => {
     vi.resetModules()
     const { markOverlayStartup: mark } =
@@ -208,5 +259,26 @@ describe('overlay startup timing', () => {
     )
     expect(entries.filter((entry) => entry === name)).toHaveLength(1)
     expect(entries).toContain(otherName)
+  })
+
+  it('ignores a failure while clearing the 65th mark', async () => {
+    vi.resetModules()
+    const { markOverlayStartup: mark } =
+      await import('./overlay-startup-timing')
+    const markEntry = vi
+      .spyOn(performance, 'mark')
+      .mockImplementation(() => ({}) as PerformanceMark)
+    const clearMarks = vi
+      .spyOn(performance, 'clearMarks')
+      .mockImplementation(() => {
+        throw new Error('timing unavailable')
+      })
+
+    for (let index = 0; index < 64; index += 1) mark('url-ready')
+
+    expect(() => mark('url-ready')).not.toThrow()
+    expect(clearMarks).toHaveBeenCalledOnce()
+    expect(clearMarks).toHaveBeenCalledWith('cognipace.overlay.url-ready')
+    expect(markEntry).toHaveBeenCalledTimes(64)
   })
 })
