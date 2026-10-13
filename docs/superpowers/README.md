@@ -79,6 +79,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-12-overlay-baseline-pr-cleanup.md`](./plans/2026-10-12-overlay-baseline-pr-cleanup.md): phase-sized plan to compact PR #211 startup evidence, repair classification and timing retention, rerun the packaged baseline, and update the draft PR.
+
 - [`plans/2026-10-12-responsive-overlay-phase-1-baseline.md`](./plans/2026-10-12-responsive-overlay-phase-1-baseline.md): Phase 1 timing and disposable packaged 5,000-review baseline implemented. Page-stage results are measured; worker/renderer attribution and live Submit comparison remain pending. See the [handoff](./handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md).
 - [`plans/2026-10-05-analytics-history-window-foundation.md`](./plans/2026-10-05-analytics-history-window-foundation.md): implemented and independently reviewed pure selection, raw-history bounds, bounded calendar intervals and fixed daily backlog foundation; 69 focused tests and the required full check pass. Runtime/service/route/readiness integration is implemented in the following phase.
 - [`plans/2026-10-05-analytics-history-runtime-integration.md`](./plans/2026-10-05-analytics-history-runtime-integration.md): implemented and independently reviewed public selections, explicit report frames, paired Recall dates with shared-calendar readiness, nominal comparisons, independent workload frames, and truthful selected activity through validated messages; 3,172 tests and build pass. Weighted models and compact UI are implemented in the following completed phases.
