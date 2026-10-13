@@ -267,8 +267,8 @@ To reproduce the automated page baseline, use the pinned Node/npm versions in
 Local Setup, install dependencies, and run from the repository root:
 
 ```sh
-rtk proxy env COGNIPACE_SCALING=standard npm run test -- src/testing/fsrs-scaling-benchmark.test.ts
 rtk npm run build
+rtk proxy env COGNIPACE_SCALING=standard npm run test -- src/testing/fsrs-scaling-benchmark.test.ts
 rtk proxy node scripts/fsrs-scaling-chrome.mjs --backup test-results/fsrs-phase-g/standard-backup.json --dataset standard --problem-url https://leetcode.com/problems/two-sum/ --startup-only --samples 20 --cold-samples 10
 rtk proxy node scripts/validate-overlay-startup-report.mjs docs/superpowers/evidence/responsive-overlay/overlay-startup-standard.json
 ```
