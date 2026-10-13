@@ -32,6 +32,8 @@ export const STARTUP_OPENING_STAGES = [
   'worker.overlay-track',
 ]
 
+export const STARTUP_REPORT_GENERATOR_VERSION = 'overlay-startup-report/2.1'
+
 const SAMPLE_STATUSES = new Set(['pending', 'timeout', 'error'])
 const OPENING_FIELDS = [
   'mode',
@@ -323,6 +325,18 @@ function plainObject(value) {
 
 export function validateStartupReport(report) {
   requireShape(report?.probe === 'startup-only', 'wrong probe')
+  requireShape(
+    report.environment?.generatorVersion === STARTUP_REPORT_GENERATOR_VERSION,
+    'generator version missing or unsupported',
+  )
+  requireShape(
+    ['chrome', 'extensionVersion', 'os', 'cpu'].every(
+      (field) =>
+        typeof report.environment?.[field] === 'string' &&
+        report.environment[field].trim().length > 0,
+    ),
+    'browser, extension, or machine metadata missing',
+  )
   requireShape(
     /^[a-f0-9]{40}$/.test(report.environment?.sourceCommit),
     'source commit missing',

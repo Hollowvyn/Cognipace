@@ -27,6 +27,7 @@ import { basename, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import {
   STARTUP_OPENING_STAGES,
+  STARTUP_REPORT_GENERATOR_VERSION,
   fillFailedStartupOpenings,
   finalizeStartupReport,
   isTraceTaskEvent,
@@ -1901,6 +1902,7 @@ async function main(args) {
     environment: {
       ...(args.startupOnly
         ? {
+            generatorVersion: STARTUP_REPORT_GENERATOR_VERSION,
             sourceCommit: observedGitHead,
             sourceCommitRole:
               'Checkout source revision; packaged build separately identified by extensionBuildSha256.',
@@ -1909,7 +1911,7 @@ async function main(args) {
       node: process.version,
       chrome: chromeVersion,
       os: `${platform()} ${release()} ${arch()}`,
-      cpu: cpus()[0]?.model ?? null,
+      cpu: cpus()[0]?.model ?? (args.startupOnly ? 'unknown' : null),
       memoryBytes: totalmem(),
       extensionVersion: distManifest.version,
       extensionBuild: basename(args.dist),
