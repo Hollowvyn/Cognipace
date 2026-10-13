@@ -35,6 +35,8 @@ import {
   projectUnattributedWorkerEntries,
   summarizeTraceEvidence,
   startupOpeningStatus,
+  startupReportFilename,
+  startupRequiredEntriesResolved,
   validateStartupReport,
 } from './overlay-startup-samples.mjs'
 
@@ -175,6 +177,7 @@ function parseArgs(argv) {
   args.dist = resolve(args.dist)
   args.out = resolve(args.out)
   if (args.startupOnly) {
+    startupReportFilename(args.dataset)
     if (argv.includes('--out'))
       throw new Error('--out is unavailable for the fixed startup report path')
     args.out = STARTUP_OUT
@@ -1292,7 +1295,7 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
     }
     if (!isolated) throw new Error('Fresh isolated context timed out')
     isolatedContext = true
-    stage = 'timer-ready'
+    stage = 'page-readiness'
     let rawEntries = []
     while (performance.now() < deadline) {
       rawEntries = await evaluate(
@@ -1303,8 +1306,8 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
         isolated.id,
       )
       if (
-        rawEntries.some(
-          (entry) => entry.name === `${STARTUP_PREFIX}timer-ready`,
+        startupRequiredEntriesResolved(
+          projectStartupEntries(rawEntries, 'page'),
         )
       )
         break
@@ -2575,7 +2578,7 @@ async function main(args) {
     const file = join(
       args.out,
       args.startupOnly
-        ? 'overlay-startup-standard.json'
+        ? startupReportFilename(args.dataset)
         : `fsrs-phase-g-chrome-${args.dataset}-${new Date().toISOString().replaceAll(':', '-')}.json`,
     )
     if (args.startupOnly) {

@@ -11,6 +11,8 @@ import {
   finalizeStartupReport,
   projectStartupOpening,
   projectUnattributedWorkerEntries,
+  startupRequiredEntriesResolved,
+  startupReportFilename,
   isTraceTaskEvent,
   fillFailedStartupOpenings,
   startupOpeningStatus,
@@ -229,6 +231,52 @@ test('timer readiness does not imply context or full page readiness', () => {
   })
 })
 
+test('startup polling waits for context and required page work after timer mark', () => {
+  const entries = [
+    { stage: 'content-mount', kind: 'mark' },
+    { stage: 'timer-ready', kind: 'mark' },
+    { stage: 'page.metadata', kind: 'measure' },
+    { stage: 'page.app-shell', kind: 'measure' },
+  ]
+  assert.equal(startupRequiredEntriesResolved(entries), false)
+  entries.push({ stage: 'context-ready', kind: 'mark' })
+  assert.equal(startupRequiredEntriesResolved(entries), false)
+  entries.push({ stage: 'page.upsert', kind: 'measure' })
+  assert.equal(startupRequiredEntriesResolved(entries), true)
+  const samples = projectStartupOpening({
+    entries: entries.map((entry, index) => ({
+      ...entry,
+      startTime: index * 10,
+      duration: index + 1,
+    })),
+  })
+  assert.equal(
+    samples.find((entry) => entry.stage === 'content-mount-to-timer-ready').ms,
+    10,
+  )
+})
+
+test('startup report path only accepts the standard dataset', () => {
+  assert.equal(
+    startupReportFilename('standard'),
+    'overlay-startup-standard.json',
+  )
+  assert.throws(() => startupReportFilename('stress'))
+  assert.throws(() => startupReportFilename('single-card'))
+  const collector = join(import.meta.dirname, 'fsrs-scaling-chrome.mjs')
+  for (const dataset of ['stress', 'single-card']) {
+    const result = spawnSync(process.execPath, [
+      collector,
+      '--backup',
+      'ignored.json',
+      '--dataset',
+      dataset,
+      '--startup-only',
+    ])
+    assert.notEqual(result.status, 0)
+  }
+})
+
 test('compact opening round trips all 17 ordered stages and exact durations', () => {
   const statuses = ['pending', 'timeout', 'error']
   const samples = STARTUP_OPENING_STAGES.map((stage, index) => ({
@@ -407,6 +455,7 @@ test('report validator recomputes nearest-rank summaries and rejects tampering',
       stages: STARTUP_OPENING_STAGES,
       status: 'partial',
       pageReadinessStatus: 'measured',
+      warmSameWorker: true,
       warm,
       cold,
       summary,
@@ -452,6 +501,7 @@ test('report validator recomputes nearest-rank summaries and rejects tampering',
   report.startup.unattributedWorker.warm.push(missingWindow)
   for (const [target, key, replacement] of [
     [report.startup, 'pageReadinessStatus', 'pending'],
+    [report.startup, 'warmSameWorker', false],
     [report.startup, 'status', 'pending'],
     [report, 'status', 'pending'],
     [report.environment, 'sourceCommit', undefined],
@@ -468,6 +518,28 @@ test('report validator recomputes nearest-rank summaries and rejects tampering',
     [report.startup.traces, 'warm', undefined],
     [report.startup, 'submit', undefined],
     [report.startup.submit, 'code', 'secret code'],
+    [report, 'privateUrl', 'https://leetcode.com/problems/private/'],
+    [report.environment, 'code', 'secret code'],
+    [report.environment, 'chrome', { url: 'https://private.example' }],
+    [report.startup, 'backupPayload', { private: true }],
+    [report.startup, 'knownSlugVerified', { slug: 'private' }],
+    [report.fixture, 'slug', 'private'],
+    [report.fixture, 'observedDataDigests', [{ backupPayload: 'private' }]],
+    [report.requested, 'backupPayload', { private: true }],
+    [
+      report,
+      'storageBeforeRestore',
+      { bytesInUse: 1, backupPayload: 'private' },
+    ],
+    [
+      report,
+      'failure',
+      {
+        code: 'unexpected-error',
+        message: 'unexpected-error',
+        components: [{ code: 'private' }],
+      },
+    ],
   ]) {
     const hadKey = Object.hasOwn(target, key)
     const original = target[key]
@@ -480,18 +552,55 @@ test('report validator recomputes nearest-rank summaries and rejects tampering',
     if (hadKey) target[key] = original
     else delete target[key]
   }
+  report.status = 'pending'
+  report.startup.status = 'pending'
+  report.failure = {
+    code: 'unexpected-error',
+    message: 'https://private.example/problem/slug',
+  }
+  assert.throws(() => validateStartupReport(report), /failure code/i)
+  delete report.failure
+  report.status = 'partial'
+  report.startup.status = 'partial'
   report.startup.traces.warm = {
     status: 'captured',
     traceCompleted: true,
     eventCount: 3,
     runTaskCount: 1,
     cogniPaceLongTasks: [],
+    attributionNote: 'fixed attribution note',
+    allProcessLongTaskCandidateCount: 1,
+    taskNamesChecked: ['RunTask', 'ThreadControllerImpl::RunTask'],
+    code: 'secret code',
   }
-  assert.throws(() => validateStartupReport(report), /trace metadata/i)
+  assert.throws(
+    () => validateStartupReport(report),
+    /trace metadata|unapproved field/i,
+  )
+  delete report.startup.traces.warm.code
+  report.startup.traces.warm.cogniPaceLongTasks = [
+    { attribution: 'CogniPace extension', ms: 4, url: 'private' },
+  ]
+  assert.throws(
+    () => validateStartupReport(report),
+    /trace metadata|unapproved field/i,
+  )
   report.startup.traces.warm = {
     status: 'pending',
     reason: 'not-collected',
   }
+  assert.equal(
+    finalizeStartupReport(
+      {
+        ...report.startup,
+        warmSameWorker: false,
+        warm: report.startup.warm.map(decodeStartupOpening),
+        cold: report.startup.cold.map(decodeStartupOpening),
+      },
+      report.requested,
+    ).pageReadinessStatus,
+    'pending',
+  )
   report.startup.summary.warm['page.upsert'].p95 = 4
   assert.throws(() => validateStartupReport(report), /summary/i)
   report.startup.summary.warm['page.upsert'].p95 = 5
@@ -516,6 +625,7 @@ test('failed startup setup finalizes every requested slot and worker window', ()
       stages: STARTUP_OPENING_STAGES,
       warm: [],
       cold: [],
+      warmSameWorker: true,
       unattributedWorker: { warm: [], cold: [] },
       traces: {},
       submit: { status: 'pending', reason: 'not-authenticated' },

@@ -34,6 +34,27 @@ export const STARTUP_OPENING_STAGES = [
 
 export const STARTUP_REPORT_GENERATOR_VERSION = 'overlay-startup-report/2.1'
 
+const REQUIRED_PAGE_ENTRIES = [
+  ['content-mount', 'mark'],
+  ['timer-ready', 'mark'],
+  ['context-ready', 'mark'],
+  ['page.metadata', 'measure'],
+  ['page.upsert', 'measure'],
+  ['page.app-shell', 'measure'],
+]
+
+export function startupRequiredEntriesResolved(entries) {
+  return REQUIRED_PAGE_ENTRIES.every(([stage, kind]) =>
+    entries.some((entry) => entry.stage === stage && entry.kind === kind),
+  )
+}
+
+export function startupReportFilename(dataset) {
+  if (dataset !== 'standard')
+    throw new Error('Startup-only report requires the standard dataset')
+  return 'overlay-startup-standard.json'
+}
+
 const SAMPLE_STATUSES = new Set(['pending', 'timeout', 'error'])
 const OPENING_FIELDS = [
   'mode',
@@ -263,6 +284,7 @@ export function finalizeStartupReport(
     ]),
   )
   const pageReadinessStatus =
+    startup.warmSameWorker === true &&
     warm.every((opening) => opening.status === 'ok') &&
     cold.every((opening) => opening.status === 'ok')
       ? 'measured'
@@ -296,6 +318,114 @@ export function finalizeStartupReport(
 
 const REPORT_STATUSES = new Set(['ok', 'pending', 'timeout', 'error'])
 const OPENING_KEYS = new Set([...OPENING_FIELDS, 'values'])
+const REPORT_KEYS = new Set([
+  'schemaVersion',
+  'status',
+  'startedAt',
+  'dataset',
+  'probe',
+  'fixture',
+  'environment',
+  'requested',
+  'operations',
+  'storageBeforeRestore',
+  'startup',
+  'completedAt',
+  'failure',
+  'failureStage',
+  'storageAfterFailedRestore',
+  'durableSnapshotUnchanged',
+  'reachedAfterFailedRestore',
+])
+const ENVIRONMENT_KEYS = new Set([
+  'generatorVersion',
+  'sourceCommit',
+  'sourceCommitRole',
+  'node',
+  'chrome',
+  'os',
+  'cpu',
+  'memoryBytes',
+  'extensionVersion',
+  'extensionBuild',
+  'extensionBuildSha256',
+  'dependencies',
+  'profile',
+  'definition',
+  'extensionId',
+  'workerUint8ArrayToBase64',
+])
+const FIXTURE_KEYS = new Set([
+  'seed',
+  'inputBytes',
+  'inputDataDigest',
+  'counts',
+  'installedDataDigest',
+  'observedDataDigests',
+  'installedCounts',
+  'protectedFixtureDigest',
+  'presentFixtureSlugs',
+  'seededCatalogRows',
+  'installedDataBytes',
+])
+const STARTUP_KEYS = new Set([
+  'schemaVersion',
+  'stages',
+  'status',
+  'knownSlugVerified',
+  'warmSameWorker',
+  'workerAttribution',
+  'limitations',
+  'unattributedWorker',
+  'warm',
+  'cold',
+  'traces',
+  'submit',
+  'summary',
+  'pageReadinessStatus',
+])
+const TRACE_KEYS = new Set([
+  'status',
+  'traceCompleted',
+  'eventCount',
+  'runTaskCount',
+  'cogniPaceLongTasks',
+  'attributionNote',
+  'allProcessLongTaskCandidateCount',
+  'taskNamesChecked',
+])
+const REQUESTED_KEYS = new Set([
+  'samples',
+  'coldSamples',
+  'untimedKnownSlugOpens',
+])
+const STORAGE_KEYS = new Set([
+  'bytesInUse',
+  'quotaBytes',
+  'headroomBytes',
+  'keyBytes',
+  'keyDigests',
+  'heapUsedBytes',
+  'heapMethod',
+  'status',
+  'error',
+])
+const STORAGE_KEY_NAMES = new Set([
+  'cognipace_db_snapshot_v1',
+  'cognipace_db_snapshot_fingerprint_v1',
+  'cognipace_db_recovery_topics_v1',
+  'cognipace_db_recovery_tracks_v1',
+  'cognipace_db_recovery_fsrs_v1',
+])
+const ERROR_KEYS = new Set(['code', 'message', 'previewStage', 'components'])
+const REACHED_KEYS = new Set([
+  'interpretation',
+  'counts',
+  'dataBytes',
+  'dataDigest',
+  'status',
+  'error',
+])
 const DATASET_FIXTURE_COUNTS = Object.fromEntries(
   [
     ['standard', 250, 5_000],
@@ -323,8 +453,195 @@ function plainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+function requireAllowedKeys(value, allowed, name) {
+  requireShape(
+    plainObject(value) && Object.keys(value).every((key) => allowed.has(key)),
+    `${name} contains an unapproved field`,
+  )
+}
+
+function requireScalarFields(value, nestedKeys, name) {
+  requireShape(
+    Object.entries(value).every(
+      ([key, entry]) =>
+        nestedKeys.has(key) ||
+        entry === null ||
+        typeof entry === 'string' ||
+        typeof entry === 'boolean' ||
+        (typeof entry === 'number' && Number.isFinite(entry)),
+    ),
+    `${name} contains an unapproved nested value`,
+  )
+}
+
+function requireSafeError(error, name) {
+  requireAllowedKeys(error, ERROR_KEYS, name)
+  requireScalarFields(error, new Set(['components']), name)
+  requireShape(
+    typeof error.code === 'string' &&
+      /^[a-z0-9-]{1,64}$/.test(error.code) &&
+      error.message === error.code,
+    `${name} code invalid`,
+  )
+  if (Object.hasOwn(error, 'previewStage'))
+    requireShape(
+      typeof error.previewStage === 'string' &&
+        /^[A-Za-z0-9-]{1,64}$/.test(error.previewStage),
+      `${name} preview stage invalid`,
+    )
+  if (Object.hasOwn(error, 'components'))
+    requireShape(
+      Array.isArray(error.components) &&
+        error.components.every(
+          (component) =>
+            typeof component === 'string' &&
+            /^[A-Za-z0-9-]{1,64}$/.test(component),
+        ),
+      `${name} components invalid`,
+    )
+}
+
 export function validateStartupReport(report) {
+  requireAllowedKeys(report, REPORT_KEYS, 'report')
+  requireScalarFields(
+    report,
+    new Set([
+      'fixture',
+      'environment',
+      'requested',
+      'operations',
+      'storageBeforeRestore',
+      'startup',
+      'failure',
+      'storageAfterFailedRestore',
+      'reachedAfterFailedRestore',
+    ]),
+    'report',
+  )
   requireShape(report?.probe === 'startup-only', 'wrong probe')
+  requireAllowedKeys(report.environment, ENVIRONMENT_KEYS, 'environment')
+  requireAllowedKeys(report.fixture, FIXTURE_KEYS, 'fixture')
+  requireAllowedKeys(report.requested, REQUESTED_KEYS, 'requested')
+  requireScalarFields(
+    report.environment,
+    new Set(['dependencies']),
+    'environment',
+  )
+  requireScalarFields(
+    report.fixture,
+    new Set(['counts', 'installedCounts', 'observedDataDigests']),
+    'fixture',
+  )
+  requireScalarFields(report.requested, new Set(), 'requested')
+  if (Object.hasOwn(report.fixture, 'observedDataDigests'))
+    requireShape(
+      Array.isArray(report.fixture.observedDataDigests) &&
+        report.fixture.observedDataDigests.every(
+          (digest) =>
+            typeof digest === 'string' && /^[a-f0-9]{64}$/.test(digest),
+        ),
+      'observed fixture digests invalid',
+    )
+  if (Object.hasOwn(report, 'operations'))
+    requireAllowedKeys(report.operations, new Set(), 'operations')
+  requireAllowedKeys(
+    report.fixture.counts,
+    new Set(Object.keys(DATASET_FIXTURE_COUNTS.standard)),
+    'fixture counts',
+  )
+  requireScalarFields(report.fixture.counts, new Set(), 'fixture counts')
+  if (report.fixture.installedCounts)
+    requireAllowedKeys(
+      report.fixture.installedCounts,
+      new Set([
+        'problems',
+        'reviewAttempts',
+        'fsrsCards',
+        'reviewEvidence',
+        'commandReceipts',
+      ]),
+      'installed counts',
+    )
+  if (report.fixture.installedCounts)
+    requireScalarFields(
+      report.fixture.installedCounts,
+      new Set(),
+      'installed counts',
+    )
+  for (const field of ['storageBeforeRestore', 'storageAfterFailedRestore']) {
+    if (!Object.hasOwn(report, field)) continue
+    const storage = report[field]
+    requireAllowedKeys(storage, STORAGE_KEYS, field)
+    requireScalarFields(
+      storage,
+      new Set(['keyBytes', 'keyDigests', 'error']),
+      field,
+    )
+    if (Object.hasOwn(storage, 'keyBytes'))
+      requireAllowedKeys(
+        storage.keyBytes,
+        STORAGE_KEY_NAMES,
+        `${field} key bytes`,
+      )
+    if (Object.hasOwn(storage, 'keyBytes'))
+      requireScalarFields(storage.keyBytes, new Set(), `${field} key bytes`)
+    if (Object.hasOwn(storage, 'keyDigests'))
+      requireAllowedKeys(
+        storage.keyDigests,
+        STORAGE_KEY_NAMES,
+        `${field} key digests`,
+      )
+    if (Object.hasOwn(storage, 'keyDigests'))
+      requireScalarFields(storage.keyDigests, new Set(), `${field} key digests`)
+    if (Object.hasOwn(storage, 'error'))
+      requireSafeError(storage.error, `${field} error`)
+  }
+  if (Object.hasOwn(report, 'reachedAfterFailedRestore')) {
+    requireAllowedKeys(
+      report.reachedAfterFailedRestore,
+      REACHED_KEYS,
+      'readback',
+    )
+    requireScalarFields(
+      report.reachedAfterFailedRestore,
+      new Set(['counts', 'error']),
+      'readback',
+    )
+    if (Object.hasOwn(report.reachedAfterFailedRestore, 'counts'))
+      requireAllowedKeys(
+        report.reachedAfterFailedRestore.counts,
+        new Set([
+          'problems',
+          'reviewAttempts',
+          'fsrsCards',
+          'reviewEvidence',
+          'commandReceipts',
+        ]),
+        'readback counts',
+      )
+    if (Object.hasOwn(report.reachedAfterFailedRestore, 'counts'))
+      requireScalarFields(
+        report.reachedAfterFailedRestore.counts,
+        new Set(),
+        'readback counts',
+      )
+    if (Object.hasOwn(report.reachedAfterFailedRestore, 'error'))
+      requireSafeError(report.reachedAfterFailedRestore.error, 'readback error')
+  }
+  if (Object.hasOwn(report, 'failure'))
+    requireSafeError(report.failure, 'failure')
+  if (report.environment.dependencies)
+    requireAllowedKeys(
+      report.environment.dependencies,
+      new Set(['source', 'wxt', 'sqliteWasm', 'drizzle', 'fsrs', 'messaging']),
+      'dependencies',
+    )
+  if (report.environment.dependencies)
+    requireScalarFields(
+      report.environment.dependencies,
+      new Set(),
+      'dependencies',
+    )
   requireShape(
     report.environment?.generatorVersion === STARTUP_REPORT_GENERATOR_VERSION,
     'generator version missing or unsupported',
@@ -355,7 +672,44 @@ export function validateStartupReport(report) {
     'fixture digest or counts missing',
   )
   const startup = report.startup
-  requireShape(plainObject(startup), 'missing startup section')
+  requireAllowedKeys(startup, STARTUP_KEYS, 'startup')
+  requireScalarFields(
+    startup,
+    new Set([
+      'stages',
+      'limitations',
+      'unattributedWorker',
+      'warm',
+      'cold',
+      'traces',
+      'submit',
+      'summary',
+    ]),
+    'startup',
+  )
+  if (startup.limitations)
+    requireAllowedKeys(
+      startup.limitations,
+      new Set(['worker', 'rendererTrace', 'traceOverhead']),
+      'startup limitations',
+    )
+  if (startup.limitations)
+    requireScalarFields(startup.limitations, new Set(), 'startup limitations')
+  requireAllowedKeys(
+    startup.unattributedWorker,
+    new Set(['clock', 'note', 'warm', 'cold']),
+    'worker observations',
+  )
+  requireScalarFields(
+    startup.unattributedWorker,
+    new Set(['warm', 'cold']),
+    'worker observations',
+  )
+  requireAllowedKeys(startup.traces, new Set(['warm', 'cold']), 'traces')
+  requireShape(
+    typeof startup.warmSameWorker === 'boolean',
+    'warm worker continuity missing',
+  )
   requireShape(startup.schemaVersion === 2, 'wrong startup schema version')
   requireShape(
     isDeepStrictEqual(startup.stages, STARTUP_OPENING_STAGES),
@@ -490,9 +844,10 @@ export function validateStartupReport(report) {
       )
     else
       requireShape(
-        ['captured', 'unavailable', 'attribution-unproven'].includes(
-          trace.status,
-        ) &&
+        Object.keys(trace).every((key) => TRACE_KEYS.has(key)) &&
+          ['captured', 'unavailable', 'attribution-unproven'].includes(
+            trace.status,
+          ) &&
           typeof trace.traceCompleted === 'boolean' &&
           Number.isSafeInteger(trace.eventCount) &&
           trace.eventCount >= 0 &&
@@ -511,12 +866,27 @@ export function validateStartupReport(report) {
           Array.isArray(trace.cogniPaceLongTasks),
         `${mode} trace metadata invalid`,
       )
+    if (trace.status !== 'pending')
+      for (const task of trace.cogniPaceLongTasks) {
+        requireAllowedKeys(
+          task,
+          new Set(['attribution', 'ms']),
+          `${mode} trace task`,
+        )
+        requireShape(
+          task.attribution === 'CogniPace extension' &&
+            Number.isFinite(task.ms) &&
+            task.ms >= 0,
+          `${mode} trace task invalid`,
+        )
+      }
   }
   requireShape(
     isDeepStrictEqual(Object.keys(startup.summary).sort(), ['cold', 'warm']),
     'summary modes differ',
   )
   const pageReadinessStatus =
+    startup.warmSameWorker &&
     startup.warm.every((opening) => opening.status === 'ok') &&
     startup.cold.every((opening) => opening.status === 'ok')
       ? 'measured'
