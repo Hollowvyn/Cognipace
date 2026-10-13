@@ -261,7 +261,7 @@ worker/renderer attribution and real Submit comparison are pending. Human
 installed-extension happy-path and edge-case smoke with screenshots or a
 recording is **pending** before PR review or merge. See the [Phase 1
 handoff](superpowers/handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md)
-and [sanitized raw report](superpowers/evidence/responsive-overlay/overlay-startup-standard-2026-10-12T06-38-38.694Z.json).
+and [validated compact report](superpowers/evidence/responsive-overlay/overlay-startup-standard.json).
 
 To reproduce the automated page baseline, use the pinned Node/npm versions in
 Local Setup, install dependencies, and run from the repository root:
@@ -270,18 +270,24 @@ Local Setup, install dependencies, and run from the repository root:
 rtk proxy env COGNIPACE_SCALING=standard npm run test -- src/testing/fsrs-scaling-benchmark.test.ts
 rtk npm run build
 rtk proxy node scripts/fsrs-scaling-chrome.mjs --backup test-results/fsrs-phase-g/standard-backup.json --dataset standard --problem-url https://leetcode.com/problems/two-sum/ --startup-only --samples 20 --cold-samples 10
+rtk proxy node scripts/validate-overlay-startup-report.mjs docs/superpowers/evidence/responsive-overlay/overlay-startup-standard.json
 ```
 
 The driver loads `dist/chrome-mv3` into a unique `/private/tmp` Chrome profile,
 restores the synthetic v6 fixture there, verifies the real Two Sum slug, and
-removes that profile afterward. Never restore the scaling backup in a personal
+removes that profile afterward. Run this from a clean checkout of committed
+source and record its commit and packaged build SHA-256 with the report. Never restore the scaling backup in a personal
 profile. It opens 20 fresh tabs in the same browser and worker for warm samples;
 each of 10 cold samples restarts the entire browser with the same persisted
 disposable profile before opening a fresh tab. Fixture restore and known-slug
-setup are untimed. It writes sanitized raw samples and trace metadata under
-`docs/superpowers/evidence/responsive-overlay/`. The first warm and cold opens
+setup are untimed. It writes compact, sanitized raw stage cells and trace metadata
+to the fixed report path above. The validator independently recalculates stage
+counts and nearest-rank percentiles from those cells. Timer and saved-context
+readiness have separate per-opening statuses. The first warm and cold opens
 include trace collection overhead. A partial report makes the command exit 1;
-read the JSON statuses rather than interpreting that exit as a complete pass.
+read its statuses rather than interpreting that exit as a complete pass. The
+current report has 20/20 warm and 10/10 cold page readiness samples; worker
+attribution, renderer attribution, cold trace, and real Submit remain pending.
 
 For a human Performance trace, use a separate disposable Chrome profile with
 the packaged extension loaded, restore the synthetic backup only in that

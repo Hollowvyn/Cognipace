@@ -172,7 +172,7 @@ Use these files to understand why work was shaped a certain way. Before changing
 
 ## Handoffs
 
-- [`handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md`](./handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md): packaged warm/cold startup measurements, attribution limits, reproducible smoke steps, validation and pending human installed-extension proof.
+- [`handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md`](./handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md): committed-source packaged warm/cold startup measurements, [validated compact evidence](./evidence/responsive-overlay/overlay-startup-standard.json), attribution limits, reproducible smoke steps and pending human installed-extension proof.
 
 - [`handoffs/2026-10-05-analytics-performance-layout.md`](./handoffs/2026-10-05-analytics-performance-layout.md): completed Analytics implementation, exact final checks, production-component proof, and required pending human extension smoke.
 - [`handoffs/2026-10-04-fsrs-phase-c-storage-restore.md`](./handoffs/2026-10-04-fsrs-phase-c-storage-restore.md): reviewed evidence storage, v6 backup and recoverable replacement with real preserving migration, repaired collision/cache/import-boundary findings, exact validation and a runnable human fault-smoke procedure; installed-extension proof remains pending with the owner's October 5 decision to merge then test after backing up.
