@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -100,6 +101,7 @@ export function ProblemBulkMetadataDialog({
       }}
     >
       <section
+        aria-busy={pending || undefined}
         aria-describedby="problem-bulk-metadata-description"
         aria-labelledby="problem-bulk-metadata-title"
         aria-modal="true"
@@ -224,6 +226,12 @@ export function ProblemBulkMetadataDialog({
             Cancel
           </Button>
           <Button disabled={!canSubmit || pending} onClick={submit} size="sm">
+            {pending ? (
+              <Loader2
+                aria-hidden="true"
+                className="animate-spin motion-reduce:animate-none"
+              />
+            ) : null}
             Update Problems
           </Button>
         </div>
