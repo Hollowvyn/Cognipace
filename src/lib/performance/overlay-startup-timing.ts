@@ -21,8 +21,42 @@ export type OverlayStartupMeasure =
   | 'worker.upsert'
   | 'worker.snapshot-publish'
 
+const MAX_ENTRIES_PER_STAGE = 64
+const markCounts = new Map<string, number>()
+const measureCounts = new Map<string, number>()
+
 export function markOverlayStartup(stage: OverlayStartupMark): void {
-  performance.mark(`cognipace.overlay.${stage}`)
+  const name = `cognipace.overlay.${stage}`
+  try {
+    const count = markCounts.get(name) ?? 0
+    if (count >= MAX_ENTRIES_PER_STAGE) {
+      performance.clearMarks(name)
+      markCounts.set(name, 0)
+    }
+    performance.mark(name)
+    markCounts.set(name, (markCounts.get(name) ?? 0) + 1)
+  } catch {
+    // Timing must not affect the operation being observed.
+  }
+}
+
+export function recordOverlayStartupMeasure(
+  stage: OverlayStartupMeasure,
+  start: number,
+  end: number,
+): void {
+  const name = `cognipace.overlay.${stage}`
+  try {
+    const count = measureCounts.get(name) ?? 0
+    if (count >= MAX_ENTRIES_PER_STAGE) {
+      performance.clearMeasures(name)
+      measureCounts.set(name, 0)
+    }
+    performance.measure(name, { start, end })
+    measureCounts.set(name, (measureCounts.get(name) ?? 0) + 1)
+  } catch {
+    // Timing must not affect the operation being observed.
+  }
 }
 
 export function timeOverlayStartupSync<T>(
@@ -33,10 +67,7 @@ export function timeOverlayStartupSync<T>(
   try {
     return work()
   } finally {
-    performance.measure(`cognipace.overlay.${stage}`, {
-      start,
-      end: performance.now(),
-    })
+    recordOverlayStartupMeasure(stage, start, performance.now())
   }
 }
 
@@ -48,9 +79,6 @@ export async function timeOverlayStartup<T>(
   try {
     return await work()
   } finally {
-    performance.measure(`cognipace.overlay.${stage}`, {
-      start,
-      end: performance.now(),
-    })
+    recordOverlayStartupMeasure(stage, start, performance.now())
   }
 }

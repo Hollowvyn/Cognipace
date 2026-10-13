@@ -14,6 +14,7 @@ import type { LeetCodeRemoteClient } from '../remote/leetcode-remote-client'
 import { readLeetCodeSubmissionAttempt } from '../submission/submission-attempt-reader'
 import {
   markOverlayStartup,
+  recordOverlayStartupMeasure,
   timeOverlayStartup,
   timeOverlayStartupSync,
 } from '@/lib/performance/overlay-startup-timing'
@@ -342,10 +343,7 @@ export function createLeetCodePageWatcher(
     try {
       handleSubmission(click)
     } finally {
-      performance.measure('cognipace.overlay.page.submit-event', {
-        start,
-        end: performance.now(),
-      })
+      recordOverlayStartupMeasure('page.submit-event', start, performance.now())
     }
   }
 

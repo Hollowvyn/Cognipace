@@ -33,6 +33,7 @@ describe('createLeetCodePageWatcher', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('emits page and metadata events for a LeetCode problem page', async () => {
@@ -324,6 +325,35 @@ describe('createLeetCodePageWatcher', () => {
           completeness: 'partial',
           capturedAt: 2000,
         },
+      },
+    })
+  })
+
+  it('emits a recognized Submit click and captured attempt when timing throws', () => {
+    renderProblemEditorPage()
+    vi.spyOn(performance, 'measure').mockImplementation(() => {
+      throw new Error('timing unavailable')
+    })
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [],
+      now: () => 2000,
+    })
+
+    watcher.start()
+    dispatchSubmitClick()
+    watcher.stop()
+
+    expect(readEventTypes(events)).toEqual([
+      'page-changed',
+      'submit-clicked',
+      'submission-started',
+    ])
+    expect(findEvent(events, 'submission-started')?.attempt).toMatchObject({
+      location: problemLocation,
+      clickedAt: 2000,
+      submittedCodeSnapshot: {
+        code: 'class Solution:\n    pass',
       },
     })
   })
