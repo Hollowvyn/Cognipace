@@ -27,16 +27,15 @@ import { basename, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import {
   STARTUP_OPENING_STAGES,
-  encodeStartupOpening,
   fillFailedStartupOpenings,
+  finalizeStartupReport,
   isTraceTaskEvent,
   projectStartupOpening,
   projectUnattributedWorkerEntries,
-  summarizeStartupSamples,
   summarizeTraceEvidence,
   startupOpeningStatus,
+  validateStartupReport,
 } from './overlay-startup-samples.mjs'
-import { validateStartupReport } from './validate-overlay-startup-report.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_DIST = join(ROOT, 'dist', 'chrome-mv3')
@@ -1367,28 +1366,8 @@ async function sampleStartupOpen(chrome, id, problemUrl, mode, index) {
   }
 }
 
-async function collectStartup(
-  report,
-  args,
-  chrome,
-  dashboard,
-  id,
-  backup,
-  expected,
-  chromePath,
-  profile,
-) {
-  const url = new URL(
-    args.problemurl ?? 'https://leetcode.com/problems/two-sum/',
-  )
-  if (
-    url.protocol !== 'https:' ||
-    !['leetcode.com', 'www.leetcode.com'].includes(url.hostname) ||
-    !/^\/problems\/[^/]+\/?$/.test(url.pathname)
-  )
-    throw new Error('Startup URL must be an HTTPS LeetCode problem page')
-  const slug = url.pathname.split('/')[2]
-  report.startup = {
+function createStartupSection() {
+  return {
     schemaVersion: 2,
     stages: STARTUP_OPENING_STAGES,
     status: 'pending',
@@ -1419,6 +1398,29 @@ async function collectStartup(
         'Disposable profile has no authenticated LeetCode session; real Submit and disabled-extension comparison were not sampled. No code was submitted.',
     },
   }
+}
+
+async function collectStartup(
+  report,
+  args,
+  chrome,
+  dashboard,
+  id,
+  backup,
+  expected,
+  chromePath,
+  profile,
+) {
+  const url = new URL(
+    args.problemurl ?? 'https://leetcode.com/problems/two-sum/',
+  )
+  if (
+    url.protocol !== 'https:' ||
+    !['leetcode.com', 'www.leetcode.com'].includes(url.hostname) ||
+    !/^\/problems\/[^/]+\/?$/.test(url.pathname)
+  )
+    throw new Error('Startup URL must be an HTTPS LeetCode problem page')
+  const slug = url.pathname.split('/')[2]
   const opening = await sampleStartupOpen(
     chrome,
     id,
@@ -1508,39 +1510,6 @@ async function collectStartup(
       break
     }
   }
-  report.startup.summary = Object.fromEntries(
-    ['warm', 'cold'].map((mode) => [
-      mode,
-      Object.fromEntries(
-        STARTUP_OPENING_STAGES.map((stage) => [
-          stage,
-          summarizeStartupSamples(
-            report.startup[mode].map((open) =>
-              open.samples.find((sample) => sample.stage === stage),
-            ),
-          ),
-        ]),
-      ),
-    ]),
-  )
-  for (const mode of ['warm', 'cold']) {
-    report.startup.unattributedWorker[mode] = report.startup[mode].map(
-      (open) => ({
-        captureWindow: open.index,
-        values: open.workerObservations ?? [],
-      }),
-    )
-    report.startup[mode] = report.startup[mode].map((open) =>
-      encodeStartupOpening(open),
-    )
-  }
-  report.startup.pageReadinessStatus =
-    report.startup.warm.every((open) => open.status === 'ok') &&
-    report.startup.cold.every((open) => open.status === 'ok')
-      ? 'measured'
-      : 'pending'
-  report.startup.status =
-    report.startup.pageReadinessStatus === 'measured' ? 'partial' : 'pending'
   return chrome
 }
 
@@ -1967,7 +1936,7 @@ async function main(args) {
       : { samples: args.samples, warmups: args.warmups },
     operations: {},
     ...(args.startupOnly
-      ? {}
+      ? { startup: createStartupSection() }
       : {
           memory: {
             method:
@@ -2053,8 +2022,6 @@ async function main(args) {
         chromePath,
         profile,
       )
-      report.status = report.startup.status
-      if (report.status !== 'measured') process.exitCode = 1
       return
     }
     if (args.initialRestoreOnly) {
@@ -2551,7 +2518,6 @@ async function main(args) {
   } catch (error) {
     report.failure = safeError(error)
     report.failureStage = stage
-    if (args.startupOnly && report.startup) report.startup.status = 'pending'
     if (stage === 'initialRestore' && chrome && dashboard) {
       try {
         report.storageAfterFailedRestore = await readStorageMetrics(
@@ -2610,8 +2576,19 @@ async function main(args) {
         ? 'overlay-startup-standard.json'
         : `fsrs-phase-g-chrome-${args.dataset}-${new Date().toISOString().replaceAll(':', '-')}.json`,
     )
-    if (args.startupOnly && report.startup?.summary)
+    if (args.startupOnly) {
+      report.startup = finalizeStartupReport(report.startup, report.requested, {
+        failureStage:
+          report.failureStage === 'startupSamples'
+            ? 'startup-samples'
+            : 'startup-setup',
+        failureCode: report.failure?.code ?? 'incomplete-collection',
+        failed: Boolean(report.failure),
+      })
+      report.status = report.startup.status
       validateStartupReport(report)
+      process.exitCode = 1
+    }
     await writeFile(file, `${JSON.stringify(report, null, 2)}\n`)
     process.stdout.write(`${file}\n`)
     if (args.startupOnly)

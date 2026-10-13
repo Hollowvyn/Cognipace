@@ -7,6 +7,7 @@ import {
   STARTUP_OPENING_STAGES,
   decodeStartupOpening,
   encodeStartupOpening,
+  finalizeStartupReport,
   projectStartupOpening,
   projectUnattributedWorkerEntries,
   isTraceTaskEvent,
@@ -14,8 +15,8 @@ import {
   startupOpeningStatus,
   summarizeStartupSamples,
   summarizeTraceEvidence,
+  validateStartupReport,
 } from './overlay-startup-samples.mjs'
-import { validateStartupReport } from './validate-overlay-startup-report.mjs'
 
 const { test } = process.env.VITEST
   ? await import('vitest')
@@ -375,14 +376,39 @@ test('report validator recomputes nearest-rank summaries and rejects tampering',
     ]),
   )
   const report = {
+    status: 'partial',
     probe: 'startup-only',
+    dataset: 'standard',
     requested: { samples: 5, coldSamples: 5 },
+    environment: {
+      sourceCommit: 'a'.repeat(40),
+      extensionBuildSha256: 'b'.repeat(64),
+    },
+    fixture: {
+      inputDataDigest: 'c'.repeat(64),
+      counts: {
+        problems: 250,
+        reviewAttempts: 5_000,
+        fsrsCards: 250,
+        reviewEvidence: 5_000,
+        commandReceipts: 1,
+        schedulerProfiles: 2,
+        generationScopes: 251,
+      },
+    },
     startup: {
       schemaVersion: 2,
       stages: STARTUP_OPENING_STAGES,
+      status: 'partial',
+      pageReadinessStatus: 'measured',
       warm,
       cold,
       summary,
+      traces: {
+        warm: { status: 'pending', reason: 'not-collected' },
+        cold: { status: 'pending', reason: 'not-collected' },
+      },
+      submit: { status: 'pending', reason: 'not-authenticated' },
       unattributedWorker: {
         warm: Array.from({ length: 5 }, (_, captureWindow) => ({
           captureWindow,
@@ -418,6 +444,42 @@ test('report validator recomputes nearest-rank summaries and rejects tampering',
   const missingWindow = report.startup.unattributedWorker.warm.pop()
   assert.throws(() => validateStartupReport(report), /worker window/i)
   report.startup.unattributedWorker.warm.push(missingWindow)
+  for (const [target, key, replacement] of [
+    [report.startup, 'pageReadinessStatus', 'pending'],
+    [report.startup, 'status', 'pending'],
+    [report, 'status', 'pending'],
+    [report.environment, 'sourceCommit', undefined],
+    [report.environment, 'extensionBuildSha256', undefined],
+    [report.fixture, 'inputDataDigest', undefined],
+    [report.fixture, 'counts', undefined],
+    [report.fixture.counts, 'problems', 251],
+    [report.startup.traces, 'warm', undefined],
+    [report.startup, 'submit', undefined],
+    [report.startup.submit, 'code', 'secret code'],
+  ]) {
+    const hadKey = Object.hasOwn(target, key)
+    const original = target[key]
+    if (replacement === undefined) delete target[key]
+    else target[key] = replacement
+    assert.throws(
+      () => validateStartupReport(report),
+      /invalid startup report/i,
+    )
+    if (hadKey) target[key] = original
+    else delete target[key]
+  }
+  report.startup.traces.warm = {
+    status: 'captured',
+    traceCompleted: true,
+    eventCount: 3,
+    runTaskCount: 1,
+    cogniPaceLongTasks: [],
+  }
+  assert.throws(() => validateStartupReport(report), /trace metadata/i)
+  report.startup.traces.warm = {
+    status: 'pending',
+    reason: 'not-collected',
+  }
   report.startup.summary.warm['page.upsert'].p95 = 4
   assert.throws(() => validateStartupReport(report), /summary/i)
   report.startup.summary.warm['page.upsert'].p95 = 5
@@ -433,4 +495,65 @@ test('report validator recomputes nearest-rank summaries and rejects tampering',
   } finally {
     rmSync(invalidDir, { recursive: true, force: true })
   }
+})
+
+test('failed startup setup finalizes every requested slot and worker window', () => {
+  const startup = finalizeStartupReport(
+    {
+      schemaVersion: 2,
+      stages: STARTUP_OPENING_STAGES,
+      warm: [],
+      cold: [],
+      unattributedWorker: { warm: [], cold: [] },
+      traces: {},
+      submit: { status: 'pending', reason: 'not-authenticated' },
+    },
+    { samples: 2, coldSamples: 2 },
+    { failureStage: 'chrome-launch', failureCode: 'chrome-exited' },
+  )
+  assert.deepEqual(
+    startup.warm.map((opening) => opening.status),
+    ['error', 'pending'],
+  )
+  assert.deepEqual(
+    startup.cold.map((opening) => opening.status),
+    ['pending', 'pending'],
+  )
+  assert.equal(startup.warm[0].values.length, 17)
+  assert.equal(startup.summary.warm['page.upsert'].count, 0)
+  assert.equal(startup.unattributedWorker.warm.length, 2)
+  assert.equal(startup.unattributedWorker.cold.length, 2)
+  assert.deepEqual(startup.traces.warm, {
+    status: 'pending',
+    reason: 'not-collected',
+  })
+  assert.equal(startup.pageReadinessStatus, 'pending')
+  assert.equal(startup.status, 'pending')
+  assert.equal(
+    validateStartupReport({
+      probe: 'startup-only',
+      status: 'pending',
+      dataset: 'standard',
+      requested: { samples: 2, coldSamples: 2 },
+      environment: {
+        sourceCommit: 'a'.repeat(40),
+        extensionBuildSha256: 'b'.repeat(64),
+      },
+      fixture: {
+        inputDataDigest: 'c'.repeat(64),
+        counts: {
+          problems: 250,
+          reviewAttempts: 5_000,
+          fsrsCards: 250,
+          reviewEvidence: 5_000,
+          commandReceipts: 1,
+          schedulerProfiles: 2,
+          generationScopes: 251,
+        },
+      },
+      startup,
+      failure: { code: 'chrome-exited', message: 'chrome-exited' },
+    }),
+    true,
+  )
 })
