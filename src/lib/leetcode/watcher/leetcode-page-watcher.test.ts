@@ -33,6 +33,7 @@ describe('createLeetCodePageWatcher', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('emits page and metadata events for a LeetCode problem page', async () => {
@@ -57,6 +58,75 @@ describe('createLeetCodePageWatcher', () => {
       pageReadyAt: 1000,
       metadata: { title: 'Two Sum', source: 'graphql' },
     })
+  })
+
+  it('finishes the DOM snapshot measure while metadata remains pending', async () => {
+    renderProblemHeader()
+    const measure = vi.spyOn(performance, 'measure')
+    let finishMetadata!: (response: Response) => void
+    const metadata = new Promise<Response>((resolve) => {
+      finishMetadata = resolve
+    })
+    const { watcher } = createWatcherTestHarness({ fetch: () => metadata })
+
+    watcher.start()
+    vi.advanceTimersByTime(0)
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.snapshot',
+      expect.any(Object),
+    )
+    expect(measure).not.toHaveBeenCalledWith(
+      'cognipace.overlay.page.metadata',
+      expect.any(Object),
+    )
+
+    finishMetadata(createQuestionMetadataResponse())
+    await vi.runAllTimersAsync()
+    watcher.stop()
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.metadata',
+      expect.any(Object),
+    )
+  })
+
+  it('marks page readiness before notifying the consumer', async () => {
+    renderProblemHeader()
+    const mark = vi.spyOn(performance, 'mark')
+    let markedAtEmission = false
+    const watcher = createLeetCodePageWatcher({
+      getCurrentUrl: () => problemUrl,
+      hydrationDelays: [0],
+      fetch: createQuestionMetadataFetcher(),
+      onEvent: (event) => {
+        if (event.type === 'page-ready') {
+          markedAtEmission = mark.mock.calls.some(
+            ([name]) => name === 'cognipace.overlay.page-ready',
+          )
+        }
+      },
+    })
+
+    watcher.start()
+    await vi.runAllTimersAsync()
+    watcher.stop()
+    expect(markedAtEmission).toBe(true)
+  })
+
+  it('does not measure unrelated page clicks as Submit work', () => {
+    renderProblemEditorPage()
+    const measure = vi.spyOn(performance, 'measure')
+    measure.mockClear()
+    const { watcher } = createWatcherTestHarness()
+    watcher.start()
+
+    document
+      .querySelector('h1')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    watcher.stop()
+    expect(measure).not.toHaveBeenCalledWith(
+      'cognipace.overlay.page.submit-event',
+      expect.any(Object),
+    )
   })
 
   it('emits problem content when LeetCode content is readable', async () => {
@@ -213,6 +283,7 @@ describe('createLeetCodePageWatcher', () => {
   })
 
   it('emits submit-clicked without saving a review', async () => {
+    const measure = vi.spyOn(performance, 'measure')
     renderProblemEditorPage()
     const { events, watcher } = createWatcherTestHarness({
       now: () => 2000,
@@ -222,6 +293,15 @@ describe('createLeetCodePageWatcher', () => {
     await vi.runAllTimersAsync()
     dispatchSubmitClick()
     watcher.stop()
+
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.submit-capture',
+      expect.any(Object),
+    )
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.submit-event',
+      expect.any(Object),
+    )
 
     expect(events).toContainEqual({
       type: 'submit-clicked',
@@ -245,6 +325,35 @@ describe('createLeetCodePageWatcher', () => {
           completeness: 'partial',
           capturedAt: 2000,
         },
+      },
+    })
+  })
+
+  it('emits a recognized Submit click and captured attempt when timing throws', () => {
+    renderProblemEditorPage()
+    vi.spyOn(performance, 'measure').mockImplementation(() => {
+      throw new Error('timing unavailable')
+    })
+    const { events, watcher } = createWatcherTestHarness({
+      hydrationDelays: [],
+      submissionResultReadDelays: [],
+      now: () => 2000,
+    })
+
+    watcher.start()
+    dispatchSubmitClick()
+    watcher.stop()
+
+    expect(readEventTypes(events)).toEqual([
+      'page-changed',
+      'submit-clicked',
+      'submission-started',
+    ])
+    expect(findEvent(events, 'submission-started')?.attempt).toMatchObject({
+      location: problemLocation,
+      clickedAt: 2000,
+      submittedCodeSnapshot: {
+        code: 'class Solution:\n    pass',
       },
     })
   })

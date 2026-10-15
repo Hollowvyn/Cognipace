@@ -744,7 +744,14 @@ describe('useLeetCodeOverlaySession', () => {
   })
 
   it('refreshes live overlay context after cross-surface cache invalidation', async () => {
+    const mark = vi.spyOn(performance, 'mark')
+    mark.mockClear()
     const { queryClient, result } = await renderReadySession()
+    const readyMarks = () =>
+      mark.mock.calls.filter(
+        ([name]) => name === 'cognipace.overlay.context-ready',
+      )
+    expect(readyMarks()).toHaveLength(1)
     loadOverlayData.mockResolvedValueOnce(
       createOverlayData({ timing: { strictTiming: true } }),
     )
@@ -759,6 +766,7 @@ describe('useLeetCodeOverlaySession', () => {
       expect(result.current.context?.timing.strictTiming).toBe(true)
     })
     expect(loadOverlayData).toHaveBeenLastCalledWith('two-sum')
+    expect(readyMarks()).toHaveLength(1)
   })
 
   it('sends captured topic labels when syncing the LeetCode page', async () => {
@@ -773,6 +781,32 @@ describe('useLeetCodeOverlaySession', () => {
         }),
       ),
     )
+  })
+
+  it('finishes page upsert timing before a valid context becomes ready', async () => {
+    const measure = vi.spyOn(performance, 'measure')
+    const mark = vi.spyOn(performance, 'mark')
+    const pending = createDeferred<typeof problemRecord>()
+    vi.mocked(upsertProblemFromPageViaRuntime).mockReturnValue(pending.promise)
+    const { result } = renderOverlaySession()
+
+    emitPageReady()
+    expect(measure).not.toHaveBeenCalledWith(
+      'cognipace.overlay.page.upsert',
+      expect.any(Object),
+    )
+    expect(mark).not.toHaveBeenCalledWith('cognipace.overlay.context-ready')
+
+    await act(async () => {
+      pending.resolve(problemRecord)
+      await pending.promise
+    })
+    await waitFor(() => expect(result.current.context?.problem).toBeTruthy())
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.upsert',
+      expect.any(Object),
+    )
+    expect(mark).toHaveBeenCalledWith('cognipace.overlay.context-ready')
   })
 
   it.each([

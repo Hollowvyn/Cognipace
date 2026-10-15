@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { sendMessage } from '@/extension/messaging'
 import type { DashboardRoute } from '@/platform/chrome/extension-pages'
 import { queryKeys } from '@/platform/query/query-keys'
+import { timeOverlayStartup } from '@/lib/performance/overlay-startup-timing'
 
 import { type AppShellData, type AppShellRequest } from './app-shell-contracts'
 
@@ -29,12 +30,14 @@ export async function getDashboardAppShellDataViaRuntime() {
 export async function getOverlayAppShellDataViaRuntime(
   problemSlug?: string | null,
 ) {
-  return readAppShellSurface(
-    await getAppShellDataViaRuntime({
-      surface: 'overlay',
-      ...(problemSlug ? { problemSlug } : {}),
-    }),
-    'overlay',
+  return timeOverlayStartup('page.app-shell', async () =>
+    readAppShellSurface(
+      await getAppShellDataViaRuntime({
+        surface: 'overlay',
+        ...(problemSlug ? { problemSlug } : {}),
+      }),
+      'overlay',
+    ),
   )
 }
 

@@ -19,6 +19,10 @@ import {
   type LeetCodePageEvent,
 } from '@/lib/leetcode'
 import { readErrorMessage } from '@/utils/errors'
+import {
+  markOverlayStartup,
+  timeOverlayStartup,
+} from '@/lib/performance/overlay-startup-timing'
 
 export type OverlaySyncStatus =
   | 'booting'
@@ -57,6 +61,7 @@ export function useLeetCodePageSync({
     initialLocation ? null : 'CogniPace only runs on LeetCode problem pages.',
   )
   const syncTokenRef = useRef(0)
+  const contextReadyTokenRef = useRef<number | null>(null)
   const requestedMetadataFingerprintRef = useRef<string | null>(null)
   const syncedMetadataFingerprintRef = useRef<string | null>(null)
   const latestContextRef = useRef<LeetCodeOverlayContext | null>(null)
@@ -98,13 +103,22 @@ export function useLeetCodePageSync({
       return
     }
 
+    if (
+      syncedProblemSlug === problem.problemSlug &&
+      captureRef.current.location?.slug === problem.problemSlug &&
+      contextReadyTokenRef.current !== syncTokenRef.current
+    ) {
+      contextReadyTokenRef.current = syncTokenRef.current
+      markOverlayStartup('context-ready')
+    }
+
     if (activeProblemSlugRef.current === problem.problemSlug) {
       onProblemContextRefreshed(context)
       return
     }
 
     onProblemLoaded(context)
-  }, [context, onProblemContextRefreshed, onProblemLoaded])
+  }, [context, onProblemContextRefreshed, onProblemLoaded, syncedProblemSlug])
 
   const syncProblem = useCallback(
     async (
@@ -125,15 +139,17 @@ export function useLeetCodePageSync({
       setStatus('syncing-problem')
 
       try {
-        await upsertProblemFromPageViaRuntime({
-          surface: 'content-script',
-          url: nextMetadata.location.url,
-          slug: nextMetadata.location.slug,
-          title: nextMetadata.title,
-          difficulty: nextMetadata.difficulty,
-          isPremium: nextMetadata.isPremium,
-          topicLabels: nextMetadata.topics.map((topic) => topic.name),
-        })
+        await timeOverlayStartup('page.upsert', () =>
+          upsertProblemFromPageViaRuntime({
+            surface: 'content-script',
+            url: nextMetadata.location.url,
+            slug: nextMetadata.location.slug,
+            title: nextMetadata.title,
+            difficulty: nextMetadata.difficulty,
+            isPremium: nextMetadata.isPremium,
+            topicLabels: nextMetadata.topics.map((topic) => topic.name),
+          }),
+        )
         if (syncTokenRef.current !== syncToken) {
           return
         }

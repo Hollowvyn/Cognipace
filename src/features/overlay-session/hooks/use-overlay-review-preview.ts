@@ -6,6 +6,7 @@ import {
   type PracticePreviewRequest,
 } from '@/features/practice'
 import { queryKeys } from '@/platform/query/query-keys'
+import { timeOverlayStartup } from '@/lib/performance/overlay-startup-timing'
 import type { OverlaySessionState } from '../domain'
 
 export type OverlayReviewPreviewState =
@@ -59,7 +60,9 @@ export function useOverlayReviewPreview(options: {
             generation,
             previewedAt: new Date().toISOString(),
           }
-      const response = await previewPracticeReviewViaRuntime(request)
+      const response = await timeOverlayStartup('page.preview', () =>
+        previewPracticeReviewViaRuntime(request),
+      )
       const { surface: _surface, ...identity } = request
       void _surface
       if (JSON.stringify(response.identity) !== JSON.stringify(identity)) {

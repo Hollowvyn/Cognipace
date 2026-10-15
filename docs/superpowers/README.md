@@ -12,6 +12,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-12-overlay-baseline-pr-cleanup-design.md`](./specs/2026-10-12-overlay-baseline-pr-cleanup-design.md): approved design to compact PR #211's raw startup evidence, correct readiness classification, bound observational timing, and rerun a reproducible packaged baseline; written spec awaiting user review.
+
+- [`specs/2026-10-12-responsive-leetcode-overlay-startup-design.md`](./specs/2026-10-12-responsive-leetcode-overlay-startup-design.md): approved progressive overlay startup with early manual timing, concurrent local context and remote metadata reads, deferred secondary data, measured latency targets, and unchanged review and upsert durability. Phase 1 baseline is recorded; behavior phases still need separate plans.
+
 - [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall, ten equal cards in Overview and Details, target-relative timing, strict backlog color boundary, and 30/90/All time with available young history. The final prototype adds four selected-period activity totals and quiet fixed card states. Backlog stays Last 30 days, Upcoming Next 14 days, and tooltip cleanup is deferred. Implementation, independent reviews, automated gates and desktop state proof are complete; human installed-extension smoke/proof remains pending before PR review or merge. See the dated handoff.
 
 - [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
@@ -75,6 +79,9 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-12-overlay-baseline-pr-cleanup.md`](./plans/2026-10-12-overlay-baseline-pr-cleanup.md): phase-sized plan to compact PR #211 startup evidence, repair classification and timing retention, rerun the packaged baseline, and update the draft PR.
+
+- [`plans/2026-10-12-responsive-overlay-phase-1-baseline.md`](./plans/2026-10-12-responsive-overlay-phase-1-baseline.md): Phase 1 timing and disposable packaged 5,000-review baseline implemented. Page-stage results are measured; worker/renderer attribution and live Submit comparison remain pending. See the [handoff](./handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md).
 - [`plans/2026-10-05-analytics-history-window-foundation.md`](./plans/2026-10-05-analytics-history-window-foundation.md): implemented and independently reviewed pure selection, raw-history bounds, bounded calendar intervals and fixed daily backlog foundation; 69 focused tests and the required full check pass. Runtime/service/route/readiness integration is implemented in the following phase.
 - [`plans/2026-10-05-analytics-history-runtime-integration.md`](./plans/2026-10-05-analytics-history-runtime-integration.md): implemented and independently reviewed public selections, explicit report frames, paired Recall dates with shared-calendar readiness, nominal comparisons, independent workload frames, and truthful selected activity through validated messages; 3,172 tests and build pass. Weighted models and compact UI are implemented in the following completed phases.
 - [`plans/2026-10-05-analytics-weighted-presentation.md`](./plans/2026-10-05-analytics-weighted-presentation.md): shared weighted Performance, cumulative paired Recall, normalized Time, sixteen-cell topic evidence, and natural cumulative trend geometry before compact production composition.
@@ -164,6 +171,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md`](./handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md): committed-source packaged warm/cold startup measurements, [validated compact evidence](./evidence/responsive-overlay/overlay-startup-standard.json), attribution limits, reproducible smoke steps and pending human installed-extension proof.
 
 - [`handoffs/2026-10-05-analytics-performance-layout.md`](./handoffs/2026-10-05-analytics-performance-layout.md): completed Analytics implementation, exact final checks, production-component proof, and required pending human extension smoke.
 - [`handoffs/2026-10-04-fsrs-phase-c-storage-restore.md`](./handoffs/2026-10-04-fsrs-phase-c-storage-restore.md): reviewed evidence storage, v6 backup and recoverable replacement with real preserving migration, repaired collision/cache/import-boundary findings, exact validation and a runnable human fault-smoke procedure; installed-extension proof remains pending with the owner's October 5 decision to merge then test after backing up.

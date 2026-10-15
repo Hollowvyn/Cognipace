@@ -254,6 +254,120 @@ for these flows before PR review or merge.
    and after preview-only actions. Reopen the extension and confirm no preview
    read created a review or altered a due date.
 
+### Responsive Overlay Startup Baseline And Smoke
+
+Status: the packaged disposable-profile page-stage baseline is **partial**;
+worker/renderer attribution and real Submit comparison are pending. Human
+installed-extension happy-path and edge-case smoke with screenshots or a
+recording is **pending** before PR review or merge. See the [Phase 1
+handoff](superpowers/handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md)
+and [validated compact report](superpowers/evidence/responsive-overlay/overlay-startup-standard.json).
+
+To reproduce the automated page baseline, use the pinned Node/npm versions in
+Local Setup, install dependencies, and run from the repository root:
+
+```sh
+rtk npm run build
+rtk proxy env COGNIPACE_SCALING=standard npm run test -- src/testing/fsrs-scaling-benchmark.test.ts
+rtk proxy node scripts/fsrs-scaling-chrome.mjs --backup test-results/fsrs-phase-g/standard-backup.json --dataset standard --problem-url https://leetcode.com/problems/two-sum/ --startup-only --samples 20 --cold-samples 10
+rtk proxy node scripts/validate-overlay-startup-report.mjs docs/superpowers/evidence/responsive-overlay/overlay-startup-standard.json
+```
+
+The driver loads `dist/chrome-mv3` into a unique `/private/tmp` Chrome profile,
+restores the synthetic v6 fixture there, verifies the real Two Sum slug, and
+removes that profile afterward. Run this from a clean checkout of committed
+source and record its commit and packaged build SHA-256 with the report. Never restore the scaling backup in a personal
+profile. It opens 20 fresh tabs in the same browser and worker for warm samples;
+each of 10 cold samples restarts the entire browser with the same persisted
+disposable profile before opening a fresh tab. Fixture restore and known-slug
+setup are untimed. It writes compact, sanitized raw stage cells and trace metadata
+to the fixed report path above. The validator independently recalculates stage
+counts and nearest-rank percentiles from those cells. Timer and saved-context
+readiness have separate per-opening statuses. The first warm and cold opens
+include trace collection overhead. A partial report makes the command exit 1;
+read its statuses rather than interpreting that exit as a complete pass. The
+current report has 20/20 warm and 10/10 cold page readiness samples; worker
+attribution, renderer attribution, cold trace, and real Submit remain pending.
+
+For a human Performance trace, use a separate disposable Chrome profile with
+the packaged extension loaded, restore the synthetic backup only in that
+profile, and open a verified known LeetCode problem. Capture one warm and one
+full-browser-restart cold opening with DevTools Performance recording. Inspect
+the page's User Timing marks, extension service-worker work, renderer tasks
+over 50 ms, and the timer's first usable state. Attribute a task to CogniPace
+only when the trace identifies its extension or script context. Record Chrome
+version, extension build, fixture counts, profile type, raw durations, failure
+statuses, and redacted trace or screenshot paths. Keep submitted code, full
+trace payloads, storage snapshots, credentials, and personal history out of
+shared evidence.
+
+#### Phase 1 human smoke: observe current behavior
+
+These checks describe the installed extension as it works in Phase 1. Record
+what happens and any failure; do not grade it against the progressive startup
+behavior planned for Phases 2 and 3.
+
+- [ ] With the installed packaged extension, open a fixture-known problem warm
+      and after a full browser restart. For the new-problem cases, use two
+      distinct valid LeetCode slugs confirmed absent from the installed
+      disposable database (including seeded catalog rows):
+      one for the warm open and another, still unseen slug after the full browser
+      restart for the cold open. Record mount-to-usable-timer and saved-context timing,
+      displayed identity, loading/error state and when the timer becomes
+      responsive. Note whether the new problem is upserted and whether its
+      saved history is empty after context loads.
+- [ ] On known and new problems, start, pause and reset the manual timer as
+      soon as it is usable. Enable the saved automatic timing setting and repeat
+      warm and cold opens. Record when automatic start occurs relative to
+      context arrival and verify the current elapsed-time, pause/reset and
+      navigation reset rules. Record the target-time display before and after
+      difficulty and settings arrive.
+- [ ] Throttle and then fail remote metadata in the disposable profile; repeat
+      on known and new problems. Record page identity, timer availability,
+      saved context, loading/error treatment and recovery; a failed metadata
+      request may prevent current Phase 1 startup from reaching usable context.
+      Repeat with a slow or failed local read where reproducible, and record
+      whether empty history or review controls appear before valid context.
+- [ ] Navigate between known and new problems while metadata or local context
+      is pending. Check for an old result replacing the active session, timer
+      reset, wrong-slug context and duplicate attempts; record any failure.
+- [ ] Once valid saved context loads, save a review and wait for durable Saved
+      acknowledgement; reload and verify one attempt and correct timer, rating,
+      FSRS and track effects. Update its rating and verify no extra attempt.
+      Induce a recoverable Save failure in the disposable profile and use Retry;
+      confirm the accepted command stays locked, success is not shown early,
+      and Retry preserves one durable attempt. Repeat a valid review while
+      preview or next-step data is unavailable.
+- [ ] In an authenticated, disposable LeetCode profile, capture a real code
+      Submit click and Command/Ctrl+Enter path with the extension enabled.
+      Repeat comparable submissions with the extension disabled and compare
+      click-to-LeetCode response and renderer work. Verify CogniPace captures
+      the matching submission and does not change LeetCode's submission result.
+      This comparison was unavailable in the automated unauthenticated run;
+      no code was submitted there.
+- [ ] On the user's affected installed profile, reproduce or rule out the
+      reported approximately 30-second delay with a redacted Performance trace.
+      Record extensions and profile conditions relevant to the delay without
+      sharing personal data. The disposable fixture did not reproduce it.
+- [ ] Attach redacted screenshots or a screen recording of the installed
+      extension happy path and edge cases, with exact flows, version, date and
+      result, before PR review or merge.
+
+#### Future progressive-startup acceptance (Phases 2 and 3)
+
+These are acceptance checks for later behavior-changing phases, **not Phase 1
+PR gates**. Their separate plans must specify implementation and proof. Repeat
+warm/cold known and new opens and require manual timer access without waiting
+for metadata, upsert or local context; automatic start only after verified
+settings, without backdating; and a pending target label while timing inputs
+are unknown. With slow/failed metadata, known saved context must remain usable
+and a new problem must retain identity and manual timer access. With slow/failed
+local context, keep the timer usable and show pending/error review context,
+never a false empty history. Check retryable new-problem upsert failure,
+slug/epoch supersession, independent preview/next-step failure, and exact
+Save/Update/Retry durability. Human installed-extension smoke and visual proof
+will be required for those phases when implemented.
+
 ### Phase G Local Scaling Smoke
 
 Human installed-extension happy-path and edge-case proof, with redacted

@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react'
+
 import type { ThemeMode } from '@/features/settings'
+import { markOverlayStartup } from '@/lib/performance/overlay-startup-timing'
 
 import { selectOverlayHelpSearchQuery } from '../domain'
 import type { LeetCodeOverlaySession } from '../hooks/use-leetcode-overlay-session'
@@ -33,7 +36,25 @@ export function OverlayShell({
     problemSlug: location?.slug,
   })
   const canUseProblem = Boolean(context?.problem) && status === 'ready'
+  const timerControlEnabled =
+    canUseProblem &&
+    timer.status !== 'locked' &&
+    !overlay.submittedSession &&
+    (overlay.visualMode === 'collapsed' ||
+      (overlay.visualMode === 'expanded' && overlay.expandedTab === 'solve'))
   const themeMode: ThemeMode = context?.appearance.themeMode ?? 'system'
+  const timerReadySlugRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!location?.slug) {
+      timerReadySlugRef.current = null
+      return
+    }
+    if (timerControlEnabled && timerReadySlugRef.current !== location.slug) {
+      timerReadySlugRef.current = location.slug
+      markOverlayStartup('timer-ready')
+    }
+  }, [location?.slug, timerControlEnabled])
 
   if (overlay.visualMode === 'docked') {
     return <DockedOverlay onRestore={actions.restore} themeMode={themeMode} />

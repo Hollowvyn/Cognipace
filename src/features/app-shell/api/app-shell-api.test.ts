@@ -35,6 +35,7 @@ describe('app-shell runtime API', () => {
   })
 
   it('reads overlay app-shell data with the optional problem slug', async () => {
+    const measure = vi.spyOn(performance, 'measure')
     const payload = { surface: 'overlay' } as AppShellData
     vi.mocked(sendMessage).mockResolvedValueOnce(payload)
 
@@ -45,6 +46,10 @@ describe('app-shell runtime API', () => {
       surface: 'overlay',
       problemSlug: 'two-sum',
     })
+    expect(measure).toHaveBeenCalledWith(
+      'cognipace.overlay.page.app-shell',
+      expect.any(Object),
+    )
   })
 
   it('reads dashboard app-shell data through the dashboard surface request', async () => {
