@@ -2289,6 +2289,78 @@ describe('background handler registration', () => {
     expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(2)
   })
 
+  it.each(['settings.toggleStudyMode', 'settings.cycleThemeMode'] as const)(
+    'acknowledges a recovered %s retry without toggling again',
+    async (method) => {
+      backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+        new Error('IDB unavailable'),
+      )
+      await expect(
+        sendRuntimeMessage(method, { surface: 'popup' }),
+      ).rejects.toThrow('Local data still needs saving')
+      await expect(
+        sendRuntimeMessage(method, { surface: 'popup' }),
+      ).resolves.toBeNull()
+      const write =
+        method === 'settings.toggleStudyMode'
+          ? backgroundMocks.toggleStudyMode
+          : backgroundMocks.cycleThemeMode
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(
+        1,
+      )
+      expect(
+        backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+      ).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('acknowledges a recovered track creation without creating a duplicate', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('tracks.createTrack', createTrackRequest()),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      sendRuntimeMessage('tracks.createTrack', createTrackRequest()),
+    ).resolves.toEqual(parsedTrackForEditResponse)
+    expect(backgroundMocks.createTrack).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
+  })
+
+  it('retains a recovered toggle acknowledgment across a read-only export', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
+    ).rejects.toThrow('Local data still needs saving')
+    await sendRuntimeMessage('backup.exportFullBackup', {
+      surface: 'dashboard',
+    })
+    await expect(
+      sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
+    ).resolves.toBeNull()
+    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
+  })
+
+  it('executes a different generic action after recovering a failed toggle', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      sendRuntimeMessage('settings.cycleThemeMode', { surface: 'popup' }),
+    ).resolves.toBeNull()
+    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.cycleThemeMode).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(2)
+  })
+
   it('blocks restore, reset, and sync push while a failed settings snapshot remains unsaved', async () => {
     backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
       new Error('IDB unavailable'),
@@ -2331,6 +2403,11 @@ describe('background handler registration', () => {
     ).toBeLessThan(
       backgroundMocks.syncService.pushLocal.mock.invocationCallOrder[0]!,
     )
+    await sendRuntimeMessage('settings.updateSettings', {
+      surface: 'popup',
+      patch: { assessment: { strictTiming: true } },
+    })
+    expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(1)
   })
 
   it('publishes a failed settings mutation once before admitting a later practice review', async () => {

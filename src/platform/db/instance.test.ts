@@ -140,6 +140,31 @@ function readOwnedRows(db: Awaited<ReturnType<typeof getAppDb>>) {
 }
 
 describe('committed snapshot publication', () => {
+  it('rejects a mismatched IDB readback and retries the unacknowledged snapshot', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `readback-${crypto.randomUUID()}`,
+    )
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    const before = (await snapshotStore.readActive())!
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    const read = vi.spyOn(snapshotStore, 'readActive')
+    read.mockResolvedValueOnce(before)
+    await expect(flushDbSnapshot()).rejects.toThrow(
+      'IndexedDB snapshot readback did not match',
+    )
+    read.mockRestore()
+    const failedRevision = (await snapshotStore.readActive())!.revision
+    await flushDbSnapshot()
+    expect((await snapshotStore.readActive())?.revision).toBe(
+      failedRevision + 1,
+    )
+  })
   it('waits for the IDB commit, skips unchanged flushes, and reopens the last durable state after a failed commit', async () => {
     installStorage()
     const snapshotStore = createSnapshotIdbStore(

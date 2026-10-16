@@ -609,6 +609,7 @@ export function registerBackgroundHandlers() {
             const summary = await restorePreparedFullBackup(db, prepared)
             clearPendingImportPersistence()
             recoveredReviewRetry = null
+            recoveredGenericRetry = null
             return summary
           },
           ...createLocalReplacementContinuations(request.surface),
@@ -636,6 +637,7 @@ export function registerBackgroundHandlers() {
             await resetLocalData(db)
             clearPendingImportPersistence()
             recoveredReviewRetry = null
+            recoveredGenericRetry = null
             return null
           },
           ...createLocalReplacementContinuations(request.surface),
@@ -682,6 +684,7 @@ export function registerBackgroundHandlers() {
             problemSlug: problem.slug,
             source: request.surface,
           }),
+        { retryKey: mutationRetryKey('problems.upsertFromPage', request) },
       ),
     )
   })
@@ -728,6 +731,7 @@ export function registerBackgroundHandlers() {
           problemSlug: problemForEdit.problem.slug,
           source: request.surface,
         }),
+      { retryKey: mutationRetryKey('problems.createProblem', request) },
     )
   })
 
@@ -747,6 +751,7 @@ export function registerBackgroundHandlers() {
           problemSlug: problemForEdit.problem.slug,
           source: request.surface,
         }),
+      { retryKey: mutationRetryKey('problems.updateProblem', request) },
     )
   })
 
@@ -766,6 +771,7 @@ export function registerBackgroundHandlers() {
           problemSlug: request.problemSlug,
           source: request.surface,
         }),
+      { retryKey: mutationRetryKey('problems.deleteProblem', request) },
     )
   })
 
@@ -787,6 +793,7 @@ export function registerBackgroundHandlers() {
           problemSlug: readSingleChangedProblemSlug(request.problemSlugs),
           source: request.surface,
         }),
+      { retryKey: mutationRetryKey('problems.bulkUpdateProblems', request) },
     )
   })
 
@@ -808,6 +815,7 @@ export function registerBackgroundHandlers() {
           problemSlug: readSingleChangedProblemSlug(request.problemSlugs),
           source: request.surface,
         }),
+      { retryKey: mutationRetryKey('problems.bulkDelete', request) },
     )
   })
 
@@ -902,6 +910,7 @@ export function registerBackgroundHandlers() {
           problemSlug: request.problemSlug,
           source: request.surface,
         }),
+      { retryKey: mutationRetryKey('practice.setSuspended', request) },
     )
   })
 
@@ -927,6 +936,7 @@ export function registerBackgroundHandlers() {
           problemSlug: request.problemSlug,
           source: request.surface,
         }),
+      { retryKey: mutationRetryKey('practice.resetSchedule', request) },
     )
   })
 
@@ -1103,6 +1113,7 @@ export function registerBackgroundHandlers() {
           source: request.surface,
           tags: ['tracks'],
         }),
+      { retryKey: mutationRetryKey('tracks.setActiveTrack', request) },
     )
   })
 
@@ -1125,6 +1136,7 @@ export function registerBackgroundHandlers() {
           source: request.surface,
           tags: ['tracks'],
         }),
+      { retryKey: mutationRetryKey('tracks.clearActiveTrack', request) },
     )
   })
 
@@ -1144,6 +1156,7 @@ export function registerBackgroundHandlers() {
           source: request.surface,
           tags: ['tracks', 'problems'],
         }),
+      { retryKey: mutationRetryKey('tracks.createTrack', request) },
     )
   })
 
@@ -1163,6 +1176,7 @@ export function registerBackgroundHandlers() {
           source: request.surface,
           tags: ['tracks', 'problems'],
         }),
+      { retryKey: mutationRetryKey('tracks.updateTrack', request) },
     )
   })
 
@@ -1183,6 +1197,7 @@ export function registerBackgroundHandlers() {
           source: request.surface,
           tags: ['tracks', 'problems'],
         }),
+      { retryKey: mutationRetryKey('tracks.removeProblem', request) },
     )
   })
 
@@ -1205,6 +1220,7 @@ export function registerBackgroundHandlers() {
           source: request.surface,
           tags: ['tracks', 'problems'],
         }),
+      { retryKey: mutationRetryKey('tracks.deleteTrack', request) },
     )
   })
 
@@ -1227,6 +1243,7 @@ export function registerBackgroundHandlers() {
           source: request.surface,
           tags: ['tracks', 'problems'],
         }),
+      { retryKey: mutationRetryKey('tracks.resetTrackProgress', request) },
     )
   })
 
@@ -1253,6 +1270,7 @@ export function registerBackgroundHandlers() {
       sender,
     )
     return runSettingsMutation(
+      mutationRetryKey('settings.updateSettings', request),
       request.surface,
       (db) => updateSettings(db, request.patch),
       request.patch.aiAssessment !== undefined,
@@ -1267,8 +1285,10 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runSettingsMutation(request.surface, (db) =>
-      toggleStudyMode(db),
+    return runSettingsMutation(
+      mutationRetryKey('settings.toggleStudyMode', request),
+      request.surface,
+      (db) => toggleStudyMode(db),
     ).then(() => null)
   })
 
@@ -1280,8 +1300,10 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runSettingsMutation(request.surface, (db) =>
-      cycleThemeMode(db),
+    return runSettingsMutation(
+      mutationRetryKey('settings.cycleThemeMode', request),
+      request.surface,
+      (db) => cycleThemeMode(db),
     ).then(() => null)
   })
 
@@ -1544,6 +1566,7 @@ async function runLiveGenAiSmoke(db: Db) {
 }
 
 async function runSettingsMutation(
+  retryKey: string,
   source: 'popup' | 'dashboard',
   writeSettings: (db: Db) => Promise<UserSettings>,
   affectsGenAi = false,
@@ -1577,6 +1600,7 @@ async function runSettingsMutation(
         }
       }
     },
+    { retryKey },
   )
 }
 
@@ -1600,6 +1624,7 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
             const summary = await work.commit()
             clearPendingImportPersistence()
             recoveredReviewRetry = null
+            recoveredGenericRetry = null
             return summary
           },
         }),
@@ -1641,6 +1666,7 @@ let recoveredReviewRetry: {
   key: string
   result: ReturnType<typeof practiceReviewCommandResultSchema.parse>
 } | null = null
+let recoveredGenericRetry: { key: string; result: unknown } | null = null
 const localSaveError =
   'Local data still needs saving. Retry saving before editing.'
 
@@ -1691,11 +1717,16 @@ function runPracticeReviewCommand(
 
 function runDbMutation<T>(
   write: (db: Db) => Promise<T>,
-  afterFlush?: (result: T) => unknown,
-  options: { syncMode?: DbMutationSyncMode } = {},
+  afterFlush: ((result: T) => unknown) | undefined,
+  options: { retryKey: string; syncMode?: DbMutationSyncMode },
 ) {
   const syncMode = options.syncMode ?? 'mark-dirty'
   return runGatedMutationQueue(async () => {
+    if (recoveredGenericRetry?.key === options.retryKey) {
+      const saved = recoveredGenericRetry.result as T
+      recoveredGenericRetry = null
+      return saved
+    }
     const { db } = await getAppDb()
     const result = await write(db)
 
@@ -1715,13 +1746,20 @@ function runDbMutation<T>(
       )
     } catch (error) {
       hasPendingLocalSave = true
-      pendingLocalSaveContinuation = afterDurable
+      pendingLocalSaveContinuation = async () => {
+        await afterDurable()
+        recoveredGenericRetry = { key: options.retryKey, result }
+      }
       throw new Error(localSaveError, { cause: error })
     }
     await afterDurable()
 
     return result
-  })
+  }, options.retryKey)
+}
+
+function mutationRetryKey(method: string, request: unknown) {
+  return JSON.stringify([method, request])
 }
 
 function runInMutationQueue<T>(work: () => Promise<T>) {
@@ -1742,10 +1780,13 @@ function runInMutationQueue<T>(work: () => Promise<T>) {
   return queued
 }
 
-function runGatedMutationQueue<T>(work: () => Promise<T>) {
+function runGatedMutationQueue<T>(work: () => Promise<T>, retryKey?: string) {
   return runInMutationQueue(async () => {
     backupReplacement.assertIdle()
     await resumePendingLocalSave()
+    if (retryKey !== undefined && recoveredGenericRetry?.key !== retryKey) {
+      recoveredGenericRetry = null
+    }
     return work()
   })
 }
