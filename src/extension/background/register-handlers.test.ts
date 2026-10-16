@@ -2254,6 +2254,41 @@ describe('background handler registration', () => {
     expect(cycleResponse).toBeNull()
   })
 
+  it('acknowledges settings only after flush resolves and blocks later writes while local saving fails', async () => {
+    const gate = createDeferred<void>()
+    backgroundMocks.flushDbSnapshot.mockReturnValueOnce(gate.promise)
+    const first = sendRuntimeMessage('settings.updateSettings', {
+      surface: 'popup',
+      patch: { assessment: { strictTiming: true } },
+    })
+    await waitUntil(() =>
+      expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1),
+    )
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    gate.reject(new Error('IDB transaction aborted'))
+    await expect(first).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB still unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.updateSettings', {
+        surface: 'popup',
+        patch: { assessment: { strictTiming: false } },
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(1)
+
+    await expect(
+      sendRuntimeMessage('settings.updateSettings', {
+        surface: 'popup',
+        patch: { assessment: { strictTiming: false } },
+      }),
+    ).resolves.toBeDefined()
+    expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(2)
+  })
+
   it('reads settings through the runtime policy and DB boundary', async () => {
     const response = await sendRuntimeMessage('settings.getSettings', {
       surface: 'dashboard',
@@ -3201,7 +3236,7 @@ describe('background handler registration', () => {
     expect(backgroundMocks.executePracticeReviewCommand.mock.calls[0]).toEqual(
       backgroundMocks.executePracticeReviewCommand.mock.calls[1],
     )
-    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(2)
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(3)
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
     expect(
       backgroundMocks.saveReviewResultWithTrackProgress,

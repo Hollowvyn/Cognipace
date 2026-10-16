@@ -140,6 +140,59 @@ function readOwnedRows(db: Awaited<ReturnType<typeof getAppDb>>) {
 }
 
 describe('committed snapshot publication', () => {
+  it('waits for the IDB commit, skips unchanged flushes, and reopens the last durable state after a failed commit', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `durability-${crypto.randomUUID()}`,
+    )
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    const baseline = (await snapshotStore.readActive())!
+    await flushDbSnapshot()
+    expect((await snapshotStore.readActive())?.revision).toBe(baseline.revision)
+
+    const settings = createSettingsRepository(handle.db)
+    await settings.updateSettings({ appearance: { themeMode: 'dark' } }, now)
+    let releaseCommit!: () => void
+    const commitGate = new Promise<void>((resolve) => {
+      releaseCommit = resolve
+    })
+    const originalCommit = snapshotStore.commitSnapshot.bind(snapshotStore)
+    const commit = vi
+      .spyOn(snapshotStore, 'commitSnapshot')
+      .mockImplementation(async (...args) => {
+        await commitGate
+        return originalCommit(...args)
+      })
+    let settled = false
+    const pending = flushDbSnapshot().then(() => {
+      settled = true
+    })
+    await vi.waitFor(() => expect(commit).toHaveBeenCalledTimes(1))
+    expect(settled).toBe(false)
+    expect((await snapshotStore.readActive())?.revision).toBe(baseline.revision)
+    releaseCommit()
+    await pending
+    const durable = (await snapshotStore.readActive())!
+    expect(durable.revision).toBe(baseline.revision + 1)
+    await flushDbSnapshot()
+    expect((await snapshotStore.readActive())?.revision).toBe(durable.revision)
+
+    commit.mockRejectedValueOnce(new Error('IDB transaction aborted'))
+    await settings.updateSettings(
+      { appearance: { themeMode: 'light' } },
+      new Date(now.getTime() + 1_000),
+    )
+    await expect(flushDbSnapshot()).rejects.toThrow('IDB transaction aborted')
+    resetAppDbForTesting()
+    const reopened = await getAppDb({ snapshotStore })
+    openedHandles.push(reopened)
+    expect(
+      (await createSettingsRepository(reopened.db).getSettings()).appearance
+        .themeMode,
+    ).toBe('dark')
+  })
   it.each(['ROLLBACK', 'COMMIT'])(
     'defers automatic publication until a stalled transaction ends with %s',
     async (ending) => {

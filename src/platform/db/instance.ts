@@ -43,6 +43,7 @@ let activeSnapshotStore: SnapshotIdbStore | null = null
 let openGeneration = 0
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null
 let snapshotWriteChain: Promise<void> = Promise.resolve()
+let lastPersistedBytes: Uint8Array | null = null
 
 export interface AppDbOptions {
   beforePublish?: (handle: DbHandle, context: PublishContext) => Promise<void>
@@ -79,6 +80,7 @@ export function resetAppDbForTesting() {
   handlePromise = null
   activeHandle = null
   activeSnapshotStore = null
+  lastPersistedBytes = null
 
   if (snapshotTimer) {
     clearTimeout(snapshotTimer)
@@ -279,6 +281,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
 
   activeHandle = handle
   activeSnapshotStore = snapshotStore ?? null
+  lastPersistedBytes = serializeDb(handle)
   setOnMutationHook(() => scheduleSnapshot())
   return handle
 }
@@ -327,11 +330,12 @@ async function persistSnapshot(automatic: boolean) {
 
   const fingerprint = computeFingerprint(migrationSql)
   const bytes = serializeDb(activeHandle)
+  if (lastPersistedBytes && sameBytes(bytes, lastPersistedBytes)) return
   if (activeSnapshotStore) {
     await activeSnapshotStore.commitSnapshot(bytes, fingerprint, new Date())
     await assertIdbSnapshot(activeSnapshotStore, bytes, fingerprint)
   }
-  if (canUseChromeStorage()) {
+  if (!activeSnapshotStore && canUseChromeStorage()) {
     try {
       await writeSnapshotToStorage({ fingerprint, bytes })
     } catch (error) {
@@ -339,6 +343,14 @@ async function persistSnapshot(automatic: boolean) {
       throw error
     }
   }
+  lastPersistedBytes = bytes
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array) {
+  return (
+    left.length === right.length &&
+    left.every((byte, index) => byte === right[index])
+  )
 }
 
 function createSnapshotStorage(): SnapshotStorage {

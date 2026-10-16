@@ -1632,6 +1632,9 @@ type DbMutationSyncMode = 'mark-dirty' | 'none'
 let dbMutationQueue: Promise<void> = Promise.resolve()
 let dbMutationDepth = 0
 let hasPendingDirtyMarkRetry = false
+let hasPendingLocalSave = false
+const localSaveError =
+  'Local data still needs saving. Retry saving before editing.'
 
 function runPracticeReviewCommand(
   command: AcceptedPracticeReviewCommand,
@@ -1648,6 +1651,7 @@ function runPracticeReviewCommand(
     try {
       await flushDbSnapshot()
     } catch {
+      hasPendingLocalSave = true
       hasPendingDirtyMarkRetry = true
       return practiceReviewCommandResultSchema.parse({
         ...result,
@@ -1660,7 +1664,7 @@ function runPracticeReviewCommand(
     })
     await scheduleAutoPushAfterMutationBestEffort()
     return practiceReviewCommandResultSchema.parse(result)
-  })
+  }, true)
 }
 
 function runDbMutation<T>(
@@ -1677,7 +1681,14 @@ function runDbMutation<T>(
       await markSyncLocalDataChangedBestEffort()
     }
 
-    await timeOverlayStartup('worker.snapshot-publish', () => flushDbSnapshot())
+    try {
+      await timeOverlayStartup('worker.snapshot-publish', () =>
+        flushDbSnapshot(),
+      )
+    } catch (error) {
+      hasPendingLocalSave = true
+      throw new Error(localSaveError, { cause: error })
+    }
     await afterFlush?.(result)
 
     if (syncMode === 'mark-dirty') {
@@ -1685,7 +1696,7 @@ function runDbMutation<T>(
     }
 
     return result
-  })
+  }, true)
 }
 
 function runInMutationQueue<T>(work: () => Promise<T>) {
@@ -1706,9 +1717,20 @@ function runInMutationQueue<T>(work: () => Promise<T>) {
   return queued
 }
 
-function runGatedMutationQueue<T>(work: () => Promise<T>) {
+function runGatedMutationQueue<T>(
+  work: () => Promise<T>,
+  retryLocalSave = false,
+) {
   return runInMutationQueue(async () => {
     backupReplacement.assertIdle()
+    if (retryLocalSave && hasPendingLocalSave) {
+      try {
+        await flushDbSnapshot()
+        hasPendingLocalSave = false
+      } catch (error) {
+        throw new Error(localSaveError, { cause: error })
+      }
+    }
     return work()
   })
 }
@@ -1758,6 +1780,7 @@ async function retryPendingDirtyMark() {
 
   try {
     await flushDbSnapshot()
+    hasPendingLocalSave = false
     await markSyncLocalDataChanged()
     hasPendingDirtyMarkRetry = false
     return true
