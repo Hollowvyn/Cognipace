@@ -25,6 +25,193 @@ function work(): BackupReplacementWork {
 }
 
 describe('backup replacement coordinator', () => {
+  it('reports durable pending when the first continuation read fails after publication', async () => {
+    const databaseName = `replacement-read-${crypto.randomUUID()}`
+    const store = createSnapshotIdbStore(testIndexedDB, databaseName)
+    await store.commitSnapshot(new Uint8Array([1]), 'fingerprint', new Date())
+    vi.spyOn(store, 'readContinuation')
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error('readback unavailable'))
+    const replacement = work()
+    replacement.flush = (input) =>
+      store.commitReplacement(
+        new Uint8Array([2]),
+        'fingerprint',
+        new Date(),
+        input!,
+      )
+    const coordinator = createBackupReplacementCoordinator({
+      store,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    expect(await coordinator.run(replacement)).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: true,
+    })
+    expect(coordinator.getState().status).toBe('durable-sync-metadata-pending')
+    expect(replacement.onDurable).not.toHaveBeenCalled()
+    const reopenedStore = createSnapshotIdbStore(testIndexedDB, databaseName)
+    const reopened = createBackupReplacementCoordinator({
+      store: reopenedStore,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    await reopened.ready()
+    expect(await reopened.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    expect(replacement.commit).toHaveBeenCalledTimes(1)
+    expect((await reopenedStore.readActive())?.bytes[0]).toBe(2)
+  })
+  it('restarts after invalidation flag persistence fails without replaying the replacement', async () => {
+    const databaseName = `replacement-invalidation-${crypto.randomUUID()}`
+    const store = createSnapshotIdbStore(testIndexedDB, databaseName)
+    const direct = createSnapshotIdbStore(testIndexedDB, databaseName)
+    await store.commitSnapshot(new Uint8Array([1]), 'fingerprint', new Date())
+    const replacement = work()
+    replacement.flush = (input) =>
+      store.commitReplacement(
+        new Uint8Array([2]),
+        'fingerprint',
+        new Date(),
+        input!,
+      )
+    vi.spyOn(store, 'markInvalidated').mockImplementationOnce(async (id) => {
+      await direct.markInvalidated(id)
+      throw new Error('ack lost')
+    })
+    const initial = createBackupReplacementCoordinator({
+      store,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    expect(await initial.run(replacement)).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: true,
+    })
+    expect((await direct.readContinuation())?.needsInvalidation).toBe(false)
+    const reopened = createBackupReplacementCoordinator({
+      store: direct,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    await reopened.ready()
+    expect(await reopened.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    expect(replacement.commit).toHaveBeenCalledTimes(1)
+    expect(replacement.onDurable).toHaveBeenCalledTimes(1)
+    expect(replacement.finishSyncMetadata).toHaveBeenCalledTimes(1)
+  })
+
+  it('restarts after metadata flag persistence fails without repeating completed steps', async () => {
+    const databaseName = `replacement-metadata-${crypto.randomUUID()}`
+    const store = createSnapshotIdbStore(testIndexedDB, databaseName)
+    const direct = createSnapshotIdbStore(testIndexedDB, databaseName)
+    await store.commitSnapshot(new Uint8Array([1]), 'fingerprint', new Date())
+    const replacement = work()
+    replacement.flush = (input) =>
+      store.commitReplacement(
+        new Uint8Array([2]),
+        'fingerprint',
+        new Date(),
+        input!,
+      )
+    vi.spyOn(store, 'markSyncMetadataComplete').mockImplementationOnce(
+      async (id) => {
+        await direct.markSyncMetadataComplete(id)
+        throw new Error('ack lost')
+      },
+    )
+    const initial = createBackupReplacementCoordinator({
+      store,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    expect(await initial.run(replacement)).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: true,
+    })
+    expect((await direct.readContinuation())?.needsSyncMetadata).toBe(false)
+    const reopened = createBackupReplacementCoordinator({
+      store: direct,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    await reopened.ready()
+    expect(await reopened.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    expect(replacement.commit).toHaveBeenCalledTimes(1)
+    expect(replacement.onDurable).toHaveBeenCalledTimes(1)
+    expect(replacement.finishSyncMetadata).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports pending if completion acknowledgement and readback fail, then restarts idle', async () => {
+    const databaseName = `replacement-complete-${crypto.randomUUID()}`
+    const store = createSnapshotIdbStore(testIndexedDB, databaseName)
+    const direct = createSnapshotIdbStore(testIndexedDB, databaseName)
+    await store.commitSnapshot(new Uint8Array([1]), 'fingerprint', new Date())
+    const replacement = work()
+    replacement.flush = (input) =>
+      store.commitReplacement(
+        new Uint8Array([2]),
+        'fingerprint',
+        new Date(),
+        input!,
+      )
+    vi.spyOn(store, 'completeContinuation').mockImplementationOnce(
+      async (id) => {
+        await direct.completeContinuation(id)
+        throw new Error('ack lost')
+      },
+    )
+    vi.spyOn(store, 'readContinuation')
+      .mockResolvedValueOnce(null)
+      .mockImplementationOnce(() => direct.readContinuation())
+      .mockRejectedValueOnce(new Error('readback unavailable'))
+    const initial = createBackupReplacementCoordinator({
+      store,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    expect(await initial.run(replacement)).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: true,
+    })
+    expect(await direct.readContinuation()).toBeNull()
+    const reopened = createBackupReplacementCoordinator({
+      store: direct,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    await reopened.ready()
+    expect(reopened.getState()).toEqual({ status: 'idle' })
+    expect(await reopened.retry()).toEqual({ status: 'no-pending' })
+    expect(replacement.commit).toHaveBeenCalledTimes(1)
+    expect(replacement.onDurable).toHaveBeenCalledTimes(1)
+    expect(replacement.finishSyncMetadata).toHaveBeenCalledTimes(1)
+  })
   it('resumes a committed replacement after restart without replaying its commit', async () => {
     const databaseName = `replacement-${crypto.randomUUID()}`
     const store = createSnapshotIdbStore(testIndexedDB, databaseName)

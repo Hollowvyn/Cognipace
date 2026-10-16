@@ -14,6 +14,7 @@ const pendingMessage =
 type PendingWork = BackupReplacementPending &
   Pick<BackupReplacementWork, 'flush' | 'onDurable' | 'finishSyncMetadata'> & {
     durable: boolean
+    publicationAttempted: boolean
     invalidated: boolean
     replacementId?: string
     continuation: ReplacementContinuation | undefined
@@ -55,6 +56,7 @@ export function createBackupReplacementCoordinator(
               kind: record.kind,
               summary: null,
               durable: true,
+              publicationAttempted: true,
               invalidated: !record.needsInvalidation,
               replacementId: record.replacementId,
               continuation: record,
@@ -93,32 +95,51 @@ export function createBackupReplacementCoordinator(
     const current = pending
     const { kind, summary } = current
     if (!current.durable) {
-      try {
-        await current.flush(
-          current.replacementId
-            ? {
-                replacementId: current.replacementId,
-                kind: current.kind,
-                ...(current.syncMetadataPatch
-                  ? { syncMetadataPatch: current.syncMetadataPatch }
-                  : {}),
-              }
-            : undefined,
-        )
-      } catch {
-        const committed =
-          options.store && current.replacementId
-            ? await options.store.readContinuation().catch(() => null)
-            : null
-        if (!committed || committed.replacementId !== current.replacementId) {
+      if (current.publicationAttempted && options.store) {
+        const prior = await options.store
+          .readContinuation()
+          .catch(() => undefined)
+        if (prior === undefined)
           return { status: 'persistence-pending', kind, summary }
+        if (prior && prior.replacementId === current.replacementId) {
+          current.durable = true
+          current.continuation = prior
         }
-        current.continuation = committed
       }
-      current.durable = true
-      if (options.store)
-        current.continuation =
-          (await options.store.readContinuation()) ?? undefined
+      if (!current.durable) {
+        current.publicationAttempted = true
+        try {
+          await current.flush(
+            current.replacementId
+              ? {
+                  replacementId: current.replacementId,
+                  kind: current.kind,
+                  ...(current.syncMetadataPatch
+                    ? { syncMetadataPatch: current.syncMetadataPatch }
+                    : {}),
+                }
+              : undefined,
+          )
+          current.durable = true
+        } catch {
+          const committed =
+            options.store && current.replacementId
+              ? await options.store.readContinuation().catch(() => null)
+              : null
+          if (!committed || committed.replacementId !== current.replacementId) {
+            return { status: 'persistence-pending', kind, summary }
+          }
+          current.durable = true
+          current.continuation = committed
+        }
+      }
+    }
+    if (options.store) {
+      const persisted = await options.store.readContinuation().catch(() => null)
+      if (!persisted || persisted.replacementId !== current.replacementId)
+        return { status: 'durable', syncMetadataPending: true, kind, summary }
+      current.continuation = persisted
+      current.invalidated = !persisted.needsInvalidation
     }
     if (
       !current.invalidated &&
@@ -128,8 +149,10 @@ export function createBackupReplacementCoordinator(
         await current.onDurable()
         if (options.store && current.replacementId) {
           await options.store.markInvalidated(current.replacementId)
-          current.continuation =
-            (await options.store.readContinuation()) ?? undefined
+          current.continuation = current.continuation && {
+            ...current.continuation,
+            needsInvalidation: false,
+          }
         }
         current.invalidated = true
       } catch {
@@ -143,8 +166,10 @@ export function createBackupReplacementCoordinator(
         await current.finishSyncMetadata()
         if (options.store && current.replacementId) {
           await options.store.markSyncMetadataComplete(current.replacementId)
-          current.continuation =
-            (await options.store.readContinuation()) ?? undefined
+          current.continuation = current.continuation && {
+            ...current.continuation,
+            needsSyncMetadata: false,
+          }
         }
       }
     } catch {
@@ -189,6 +214,7 @@ export function createBackupReplacementCoordinator(
         onDurable,
         finishSyncMetadata,
         durable: false,
+        publicationAttempted: false,
         invalidated: false,
         continuation: undefined,
         ...(options.store ? { replacementId: crypto.randomUUID() } : {}),
