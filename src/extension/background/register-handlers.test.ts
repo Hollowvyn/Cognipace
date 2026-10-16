@@ -2329,7 +2329,7 @@ describe('background handler registration', () => {
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
   })
 
-  it('retains a recovered toggle acknowledgment across a read-only export', async () => {
+  it('expires a recovered toggle acknowledgment when an export intervenes', async () => {
     backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
       new Error('IDB unavailable'),
     )
@@ -2342,8 +2342,23 @@ describe('background handler registration', () => {
     await expect(
       sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
     ).resolves.toBeNull()
-    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(1)
-    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(2)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(2)
+  })
+
+  it('expires a recovered toggle acknowledgment when a practice review intervenes', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
+    ).rejects.toThrow('Local data still needs saving')
+    await sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest)
+    await sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' })
+    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(2)
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
   })
 
   it('executes a different generic action after recovering a failed toggle', async () => {
@@ -2407,7 +2422,7 @@ describe('background handler registration', () => {
       surface: 'popup',
       patch: { assessment: { strictTiming: true } },
     })
-    expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(2)
   })
 
   it('publishes a failed settings mutation once before admitting a later practice review', async () => {

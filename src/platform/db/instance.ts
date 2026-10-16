@@ -44,6 +44,7 @@ let openGeneration = 0
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null
 let snapshotWriteChain: Promise<void> = Promise.resolve()
 let lastPersistedBytes: Uint8Array | null = null
+let snapshotCommitNeedsReconciliation = false
 
 export interface AppDbOptions {
   beforePublish?: (handle: DbHandle, context: PublishContext) => Promise<void>
@@ -81,6 +82,7 @@ export function resetAppDbForTesting() {
   activeHandle = null
   activeSnapshotStore = null
   lastPersistedBytes = null
+  snapshotCommitNeedsReconciliation = false
 
   if (snapshotTimer) {
     clearTimeout(snapshotTimer)
@@ -282,6 +284,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
   activeHandle = handle
   activeSnapshotStore = snapshotStore ?? null
   lastPersistedBytes = serializeDb(handle)
+  snapshotCommitNeedsReconciliation = false
   setOnMutationHook(() => scheduleSnapshot())
   return handle
 }
@@ -330,10 +333,29 @@ async function persistSnapshot(automatic: boolean) {
 
   const fingerprint = computeFingerprint(migrationSql)
   const bytes = serializeDb(activeHandle)
-  if (lastPersistedBytes && sameBytes(bytes, lastPersistedBytes)) return
+  if (
+    !snapshotCommitNeedsReconciliation &&
+    lastPersistedBytes &&
+    sameBytes(bytes, lastPersistedBytes)
+  )
+    return
   if (activeSnapshotStore) {
+    if (snapshotCommitNeedsReconciliation) {
+      const active = await activeSnapshotStore.readActive()
+      if (
+        active?.fingerprint === fingerprint &&
+        sameBytes(active.bytes, bytes)
+      ) {
+        lastPersistedBytes = bytes
+        snapshotCommitNeedsReconciliation = false
+        return
+      }
+      throw new Error('IndexedDB snapshot readback did not match.')
+    }
     await activeSnapshotStore.commitSnapshot(bytes, fingerprint, new Date())
+    snapshotCommitNeedsReconciliation = true
     await assertIdbSnapshot(activeSnapshotStore, bytes, fingerprint)
+    snapshotCommitNeedsReconciliation = false
   }
   if (!activeSnapshotStore && canUseChromeStorage()) {
     try {

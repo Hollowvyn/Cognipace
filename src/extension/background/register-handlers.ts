@@ -663,9 +663,13 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runInMutationQueue(async () =>
-      backupReplacementResultSchema.parse(await backupReplacement.retry()),
-    )
+    return runInMutationQueue(async () => {
+      await resumePendingLocalSave()
+      recoveredGenericRetry = null
+      return backupReplacementResultSchema.parse(
+        await backupReplacement.retry(),
+      )
+    })
   })
 
   onMessage('problems.upsertFromPage', ({ data, sender }) => {
@@ -1784,9 +1788,7 @@ function runGatedMutationQueue<T>(work: () => Promise<T>, retryKey?: string) {
   return runInMutationQueue(async () => {
     backupReplacement.assertIdle()
     await resumePendingLocalSave()
-    if (retryKey !== undefined && recoveredGenericRetry?.key !== retryKey) {
-      recoveredGenericRetry = null
-    }
+    if (recoveredGenericRetry?.key !== retryKey) recoveredGenericRetry = null
     return work()
   })
 }

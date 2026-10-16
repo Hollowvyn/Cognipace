@@ -161,9 +161,34 @@ describe('committed snapshot publication', () => {
     read.mockRestore()
     const failedRevision = (await snapshotStore.readActive())!.revision
     await flushDbSnapshot()
-    expect((await snapshotStore.readActive())?.revision).toBe(
-      failedRevision + 1,
+    expect((await snapshotStore.readActive())?.revision).toBe(failedRevision)
+  })
+  it('does not acknowledge a retry when IDB still reads a different snapshot', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `readback-stale-${crypto.randomUUID()}`,
     )
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    const before = (await snapshotStore.readActive())!
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    const read = vi.spyOn(snapshotStore, 'readActive')
+    const commit = vi.spyOn(snapshotStore, 'commitSnapshot')
+    read.mockResolvedValueOnce(before)
+    await expect(flushDbSnapshot()).rejects.toThrow(
+      'IndexedDB snapshot readback did not match',
+    )
+    const firstRevision = (await snapshotStore.readActive())!.revision
+    read.mockResolvedValueOnce(before)
+    await expect(flushDbSnapshot()).rejects.toThrow(
+      'IndexedDB snapshot readback did not match',
+    )
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect((await snapshotStore.readActive())?.revision).toBe(firstRevision)
   })
   it('waits for the IDB commit, skips unchanged flushes, and reopens the last durable state after a failed commit', async () => {
     installStorage()
