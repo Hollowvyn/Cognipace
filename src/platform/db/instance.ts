@@ -6,6 +6,8 @@ import { seedInitialCatalog } from './seed'
 import {
   computeFingerprint,
   FINGERPRINT_KEY,
+  SNAPSHOT_KEY,
+  bytesToBase64,
   deserializeDb,
   serializeDb,
   writeSnapshotToStorage,
@@ -24,12 +26,16 @@ import {
   type SnapshotStorage,
   FSRS_RECOVERY_KEY,
   TRACK_RECOVERY_KEY,
+  SNAPSHOT_RECOVERY_KEYS,
+  sameRecoveryValue,
 } from './snapshot-state'
+import { createSnapshotIdbStore, type SnapshotIdbStore } from './snapshot-idb'
 
 const snapshotDebounceMs = 250
 
 let handlePromise: Promise<DbHandle> | null = null
 let activeHandle: DbHandle | null = null
+let activeSnapshotStore: SnapshotIdbStore | null = null
 let openGeneration = 0
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null
 let snapshotWriteChain: Promise<void> = Promise.resolve()
@@ -37,6 +43,7 @@ let snapshotWriteChain: Promise<void> = Promise.resolve()
 export interface AppDbOptions {
   beforePublish?: (handle: DbHandle, context: PublishContext) => Promise<void>
   validateCurrentData?: (handle: DbHandle) => Promise<void>
+  snapshotStore?: SnapshotIdbStore
 }
 
 export function getAppDb(options: AppDbOptions = {}) {
@@ -67,6 +74,7 @@ export function resetAppDbForTesting() {
   setOnMutationHook(null)
   handlePromise = null
   activeHandle = null
+  activeSnapshotStore = null
 
   if (snapshotTimer) {
     clearTimeout(snapshotTimer)
@@ -77,9 +85,53 @@ export function resetAppDbForTesting() {
 async function openAppDb(options: AppDbOptions, generation: number) {
   const fingerprint = computeFingerprint(migrationSql)
   const storage = createSnapshotStorage()
+  const snapshotStore =
+    options.snapshotStore ??
+    (typeof indexedDB === 'undefined'
+      ? undefined
+      : createSnapshotIdbStore(indexedDB))
+  const openingState: { source: 'idb' | 'legacy' | 'empty' } = {
+    source: 'empty',
+  }
+  let legacyBytes: Uint8Array | null = null
+  let legacyFingerprint: string | null = null
   const handle = await openSnapshot({
     currentFingerprint: fingerprint,
-    read: () => readSnapshotState(storage),
+    read: async () => {
+      if (snapshotStore) {
+        let active
+        try {
+          active = await snapshotStore.readActive()
+        } catch {
+          throw new Error(
+            'Database recovery required: IndexedDB snapshot cannot be read.',
+          )
+        }
+        if (active) {
+          openingState.source = 'idb'
+          const bytes = new Uint8Array(active.bytes)
+          return {
+            kind: 'stored',
+            raw:
+              active.fingerprint === fingerprint
+                ? {}
+                : {
+                    [SNAPSHOT_KEY]: bytesToBase64(bytes),
+                    [FINGERPRINT_KEY]: active.fingerprint,
+                  },
+            bytes,
+            fingerprint: active.fingerprint,
+          }
+        }
+      }
+      const state = await readSnapshotState(storage)
+      openingState.source = state.kind === 'empty' ? 'empty' : 'legacy'
+      if (state.kind === 'stored') {
+        legacyBytes = state.bytes
+        legacyFingerprint = state.fingerprint
+      }
+      return state
+    },
     preserve: (raw) =>
       preserveRecovery(
         storage,
@@ -137,7 +189,13 @@ async function openAppDb(options: AppDbOptions, generation: number) {
     publish: async (candidate) => {
       await enqueueSnapshotWrite(async () => {
         assertCurrentOpenGeneration(generation)
-        if (canUseChromeStorage()) {
+        if (snapshotStore) {
+          await snapshotStore.commitSnapshot(
+            serializeDb(candidate),
+            fingerprint,
+            new Date(),
+          )
+        } else if (canUseChromeStorage()) {
           await writeSnapshotToStorage({
             fingerprint,
             bytes: serializeDb(candidate),
@@ -145,7 +203,44 @@ async function openAppDb(options: AppDbOptions, generation: number) {
         }
       })
     },
+  }).catch((error: unknown) => {
+    if (openingState.source === 'idb') {
+      throw new Error(
+        'Database recovery required: IndexedDB snapshot is invalid.',
+        { cause: error },
+      )
+    }
+    throw error
   })
+
+  try {
+    if (snapshotStore) {
+      if (openingState.source === 'legacy') {
+        const expectedBytes =
+          legacyFingerprint === fingerprint && legacyBytes
+            ? legacyBytes
+            : serializeDb(handle)
+        if (!(await snapshotStore.readActive())) {
+          await snapshotStore.commitSnapshot(
+            expectedBytes,
+            fingerprint,
+            new Date(),
+          )
+        }
+        await assertIdbSnapshot(snapshotStore, expectedBytes, fingerprint)
+      }
+      await migrateRecoveryRecords(storage, snapshotStore)
+      if (openingState.source === 'legacy') {
+        await storage.remove?.([SNAPSHOT_KEY, FINGERPRINT_KEY])
+      }
+    }
+  } catch (error) {
+    closeFailedHandle(handle)
+    throw new Error(
+      'Database recovery required: snapshot migration could not be completed.',
+      { cause: error },
+    )
+  }
 
   if (generation !== openGeneration) {
     closeFailedHandle(handle)
@@ -153,12 +248,13 @@ async function openAppDb(options: AppDbOptions, generation: number) {
   }
 
   activeHandle = handle
+  activeSnapshotStore = snapshotStore ?? null
   setOnMutationHook(() => scheduleSnapshot())
   return handle
 }
 
 function scheduleSnapshot() {
-  if (!canUseChromeStorage()) {
+  if (!canUseChromeStorage() && !activeSnapshotStore) {
     return
   }
 
@@ -183,7 +279,7 @@ function enqueueSnapshotWrite(write: () => Promise<void>) {
 }
 
 async function persistSnapshot(automatic: boolean) {
-  if (!activeHandle || !canUseChromeStorage()) {
+  if (!activeHandle || (!canUseChromeStorage() && !activeSnapshotStore)) {
     return
   }
 
@@ -199,10 +295,12 @@ async function persistSnapshot(automatic: boolean) {
     )
   }
 
-  await writeSnapshotToStorage({
-    fingerprint: computeFingerprint(migrationSql),
-    bytes: serializeDb(activeHandle),
-  })
+  const fingerprint = computeFingerprint(migrationSql)
+  const bytes = serializeDb(activeHandle)
+  await activeSnapshotStore?.commitSnapshot(bytes, fingerprint, new Date())
+  if (canUseChromeStorage()) {
+    await writeSnapshotToStorage({ fingerprint, bytes })
+  }
 }
 
 function createSnapshotStorage(): SnapshotStorage {
@@ -210,12 +308,50 @@ function createSnapshotStorage(): SnapshotStorage {
     return {
       get: () => Promise.resolve({}),
       set: () => Promise.resolve(),
+      remove: () => Promise.resolve(),
     }
   }
 
   return {
     get: (keys) => chrome.storage.local.get(keys),
     set: (values) => chrome.storage.local.set(values),
+    remove: (keys) => chrome.storage.local.remove(keys),
+  }
+}
+
+async function assertIdbSnapshot(
+  store: SnapshotIdbStore,
+  bytes: Uint8Array,
+  fingerprint: string,
+) {
+  const persisted = await store.readActive()
+  if (
+    !persisted ||
+    persisted.fingerprint !== fingerprint ||
+    persisted.bytes.length !== bytes.length ||
+    persisted.bytes.some((value, index) => value !== bytes[index])
+  ) {
+    throw new Error('IndexedDB snapshot readback did not match.')
+  }
+}
+
+async function migrateRecoveryRecords(
+  storage: SnapshotStorage,
+  store: SnapshotIdbStore,
+) {
+  const values = await storage.get([...SNAPSHOT_RECOVERY_KEYS])
+  for (const key of SNAPSHOT_RECOVERY_KEYS) {
+    if (!Object.hasOwn(values, key)) continue
+    const current = await store.readRecovery(key)
+    if (current === null) await store.commitRecovery(key, values[key])
+    const persisted = await store.readRecovery(key)
+    if (
+      persisted === null ||
+      !sameRecoveryValue(persisted.value, values[key])
+    ) {
+      throw new Error('IndexedDB recovery readback did not match.')
+    }
+    await storage.remove?.([key])
   }
 }
 

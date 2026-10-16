@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm'
+import { indexedDB as testIndexedDB } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./proxy', async (importOriginal) => {
@@ -27,7 +28,11 @@ import {
   legacyTopicMigrationFingerprint,
   legacyTopicMigrationSql,
 } from './snapshot-upgrade'
-import { RECOVERY_KEY, TRACK_RECOVERY_KEY } from './snapshot-state'
+import {
+  RECOVERY_KEY,
+  TRACK_RECOVERY_KEY,
+  FSRS_RECOVERY_KEY,
+} from './snapshot-state'
 import {
   bytesToBase64,
   base64ToBytes,
@@ -38,6 +43,7 @@ import {
   serializeDb,
 } from './snapshot'
 import { setOnMutationHook } from './proxy'
+import { createSnapshotIdbStore } from './snapshot-idb'
 import {
   expectedV8MigrationFingerprint,
   frozenV8MigrationSql,
@@ -176,6 +182,196 @@ describe('committed snapshot publication', () => {
 })
 
 describe('app database startup', () => {
+  it('migrates a validated matching legacy snapshot before removing its pair', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    legacy.rawDb.exec(
+      "INSERT INTO settings_kv (key, value, updated_at) VALUES ('migration-proof', 'preserved', 1)",
+    )
+    const originalBytes = serializeDb(legacy)
+    legacy.rawDb.close()
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(originalBytes)
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    storage.remove.mockImplementation(async (keys) => {
+      const persisted = await snapshotStore.readActive()
+      expect(persisted?.fingerprint).toBe(computeFingerprint(migrationSql))
+      expect(
+        Buffer.compare(
+          Buffer.from(persisted!.bytes),
+          Buffer.from(originalBytes),
+        ),
+      ).toBe(0)
+      for (const key of keys) delete storage.values[key]
+    })
+
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    expect(readRows(handle, 'settings_kv')).toContainEqual([
+      'migration-proof',
+      'preserved',
+      1,
+    ])
+    expect(storage.values[SNAPSHOT_KEY]).toBeUndefined()
+    expect(storage.values[FINGERPRINT_KEY]).toBeUndefined()
+    expect(storage.remove).toHaveBeenCalledWith([SNAPSHOT_KEY, FINGERPRINT_KEY])
+  })
+
+  it('reopens the newest IDB data after migrating, mutating, and flushing', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await flushDbSnapshot()
+    resetAppDbForTesting()
+
+    const reopened = await getAppDb({ snapshotStore })
+    openedHandles.push(reopened)
+    expect(
+      (await createSettingsRepository(reopened.db).getSettings()).appearance
+        .themeMode,
+    ).toBe('dark')
+  })
+
+  it('keeps the legacy pair and fails recovery when IDB migration publication fails', async () => {
+    const storage = installStorage()
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    vi.spyOn(snapshotStore, 'commitSnapshot').mockRejectedValue(
+      new Error('IDB write failed'),
+    )
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'Database recovery required',
+    )
+    expect(storage.values[SNAPSHOT_KEY]).toEqual(expect.any(String))
+    expect(storage.values[FINGERPRINT_KEY]).toBe(
+      computeFingerprint(migrationSql),
+    )
+    expect(storage.remove).not.toHaveBeenCalled()
+  })
+
+  it('does not fall back to a valid legacy pair when IDB active is invalid', async () => {
+    const storage = installStorage()
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    vi.spyOn(snapshotStore, 'readActive').mockRejectedValue(
+      new Error('invalid active record'),
+    )
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'Database recovery required',
+    )
+    expect(storage.values[SNAPSHOT_KEY]).toEqual(expect.any(String))
+    expect(storage.remove).not.toHaveBeenCalled()
+  })
+
+  it('requires recovery for invalid IDB bytes even with a valid legacy pair', async () => {
+    const storage = installStorage()
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    await snapshotStore.commitSnapshot(
+      new Uint8Array([1, 2, 3]),
+      computeFingerprint(migrationSql),
+      now,
+    )
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'Database recovery required',
+    )
+    expect(storage.values[SNAPSHOT_KEY]).toEqual(expect.any(String))
+    expect(storage.remove).not.toHaveBeenCalled()
+  })
+
+  it('preserves all three legacy recovery records in IDB before removing old keys', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+    for (const key of [RECOVERY_KEY, TRACK_RECOVERY_KEY, FSRS_RECOVERY_KEY]) {
+      storage.values[key] = {
+        version: 1,
+        savedAt: now.toISOString(),
+        raw: { [SNAPSHOT_KEY]: key },
+      }
+    }
+    storage.remove.mockImplementation(async (keys) => {
+      for (const key of keys) {
+        if (
+          [RECOVERY_KEY, TRACK_RECOVERY_KEY, FSRS_RECOVERY_KEY].includes(key)
+        ) {
+          expect(await snapshotStore.readRecovery(key)).toEqual({
+            value: storage.values[key],
+          })
+        }
+        delete storage.values[key]
+      }
+    })
+
+    openedHandles.push(await getAppDb({ snapshotStore }))
+    for (const key of [RECOVERY_KEY, TRACK_RECOVERY_KEY, FSRS_RECOVERY_KEY]) {
+      expect(await snapshotStore.readRecovery(key)).toMatchObject({
+        value: { raw: { [SNAPSHOT_KEY]: key } },
+      })
+      expect(storage.values[key]).toBeUndefined()
+    }
+  })
   it.each([
     'missing-evidence',
     'partial-evidence',

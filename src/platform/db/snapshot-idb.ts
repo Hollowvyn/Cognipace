@@ -15,6 +15,8 @@ export interface SnapshotIdbStore {
     now: Date,
   ): Promise<ActiveSnapshotRecord>
   acknowledgeVerifiedRevision(revision: number): Promise<void>
+  readRecovery(key: string): Promise<{ value: unknown } | null>
+  commitRecovery(key: string, value: unknown): Promise<void>
 }
 
 function validateActive(value: unknown): ActiveSnapshotRecord {
@@ -141,6 +143,34 @@ export function createSnapshotIdbStore(
   }
 
   return {
+    readRecovery(key) {
+      return transact('readonly', (records, finish) => {
+        const request = records.get(`recovery:${key}`)
+        request.onsuccess = () =>
+          finish(
+            request.result === undefined ? null : { value: request.result },
+          )
+      })
+    },
+
+    commitRecovery(key, value) {
+      return transact('readwrite', (records, finish, fail) => {
+        const request = records.get(`recovery:${key}`)
+        request.onsuccess = () => {
+          if (request.result !== undefined) {
+            fail(
+              new Error(
+                'An earlier database recovery record must be exported before another upgrade.',
+              ),
+            )
+            return
+          }
+          records.put(value, `recovery:${key}`)
+          finish()
+        }
+      })
+    },
+
     readActive() {
       return transact('readonly', (records, finish, fail) => {
         const request = records.get('active')
