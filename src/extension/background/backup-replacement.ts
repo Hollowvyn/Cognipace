@@ -46,7 +46,12 @@ export function createBackupReplacementCoordinator(
         .then(async (record) => {
           if (record) {
             const active = await options.store?.readActive()
-            if (!active || active.revision !== record.committedRevision)
+            if (
+              !active ||
+              (active.revision !== record.committedRevision &&
+                (active.revision < record.committedRevision ||
+                  active.replacementId !== record.replacementId))
+            )
               throw new Error(
                 'Replacement continuation does not match the active snapshot.',
               )

@@ -17,6 +17,7 @@ import { saveReviewResult } from '@/features/practice/server/practice-service'
 // eslint-disable-next-line no-restricted-imports
 import { createSettingsRepository } from '@/features/settings/data/settings-repository'
 import { getBackgroundDb } from '@/extension/background/app-db'
+import { createBackupReplacementCoordinator } from '@/extension/background/backup-replacement'
 // eslint-disable-next-line no-restricted-imports
 import { createProblemsRepository } from '@/features/problems/data/problems-repository'
 // eslint-disable-next-line no-restricted-imports
@@ -146,6 +147,56 @@ function readOwnedRows(db: Awaited<ReturnType<typeof getAppDb>>) {
 }
 
 describe('committed snapshot publication', () => {
+  it('resumes replacement continuation after validated startup schema upgrade', async () => {
+    installStorage()
+    const store = createSnapshotIdbStore(
+      testIndexedDB,
+      `replacement-upgrade-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    const bytes = serializeDb(legacy)
+    await store.commitSnapshot(bytes, expectedV8MigrationFingerprint, now)
+    await store.commitReplacement(bytes, expectedV8MigrationFingerprint, now, {
+      replacementId: 'restore-before-upgrade',
+      kind: 'restore',
+    })
+    legacy.rawDb.close()
+    openedHandles.push(await getAppDb({ snapshotStore: store }))
+    const active = await store.readActive()
+    expect(active).toMatchObject({
+      revision: 3,
+      replacementId: 'restore-before-upgrade',
+      fingerprint: computeFingerprint(migrationSql),
+    })
+    expect(await store.readRecovery(TRACK_RECOVERY_KEY)).not.toBeNull()
+    expect(
+      Buffer.compare(
+        Buffer.from(
+          (await store.readReplacementRecovery('restore-before-upgrade'))!
+            .bytes,
+        ),
+        Buffer.from(bytes),
+      ),
+    ).toBe(0)
+    const onDurable = vi.fn().mockResolvedValue(undefined)
+    const finishSyncMetadata = vi.fn().mockResolvedValue(undefined)
+    const coordinator = createBackupReplacementCoordinator({
+      store,
+      resume: () => ({ onDurable, finishSyncMetadata }),
+    })
+    await coordinator.ready()
+    expect(coordinator.getState().status).toBe('durable-sync-metadata-pending')
+    expect(await coordinator.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    expect(onDurable).toHaveBeenCalledTimes(1)
+    expect(finishSyncMetadata).toHaveBeenCalledTimes(1)
+    expect((await store.readActive())?.revision).toBe(3)
+  })
   it('reopens the old durable data after replacement publication aborts', async () => {
     installStorage()
     const store = createSnapshotIdbStore(

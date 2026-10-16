@@ -17,6 +17,95 @@ function createStore() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('binary IndexedDB snapshot ledger', () => {
+  it('keeps one selectable latest replacement recovery through repeated replacements', async () => {
+    const store = createStore()
+    await store.commitSnapshot(new Uint8Array([1]), fingerprint, now)
+    await store.commitReplacement(new Uint8Array([2]), fingerprint, now, {
+      replacementId: 'first',
+      kind: 'restore',
+    })
+    expect(await store.listReplacementRecoveries()).toMatchObject([
+      { replacementId: 'first', revision: 1 },
+    ])
+    expect((await store.readReplacementRecovery('first'))?.bytes[0]).toBe(1)
+    await store.markInvalidated('first')
+    await store.markSyncMetadataComplete('first')
+    await store.completeContinuation('first')
+    await store.commitRecovery('replacement:legacy', {
+      bytes: new Uint8Array([0]),
+    })
+    await store.commitReplacement(new Uint8Array([3]), fingerprint, now, {
+      replacementId: 'second',
+      kind: 'reset',
+    })
+    expect(await store.listReplacementRecoveries()).toMatchObject([
+      { replacementId: 'second', revision: 2 },
+    ])
+    expect(await store.readReplacementRecovery('first')).toBeNull()
+    expect((await store.readReplacementRecovery('second'))?.bytes[0]).toBe(2)
+    expect(await store.readRecovery('replacement:first')).toBeNull()
+    expect(await store.readRecovery('replacement:second')).toBeNull()
+    expect(await store.readRecovery('replacement:legacy')).toBeNull()
+  })
+
+  it('preserves the latest recovery when a later replacement aborts', async () => {
+    const store = createStore()
+    await store.commitSnapshot(new Uint8Array([1]), fingerprint, now)
+    await store.commitReplacement(new Uint8Array([2]), fingerprint, now, {
+      replacementId: 'first',
+      kind: 'restore',
+    })
+    await store.markInvalidated('first')
+    await store.markSyncMetadataComplete('first')
+    await store.completeContinuation('first')
+    await store.commitRecovery('replacement:legacy', {
+      bytes: new Uint8Array([0]),
+    })
+    const originalPut = Object.getOwnPropertyDescriptor(
+      IDBObjectStore.prototype,
+      'put',
+    )!.value as typeof IDBObjectStore.prototype.put
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: globalThis.IDBObjectStore,
+      ...args
+    ) {
+      const request = originalPut.apply(this, args)
+      this.transaction.abort()
+      return request
+    })
+    await expect(
+      store.commitReplacement(new Uint8Array([3]), fingerprint, now, {
+        replacementId: 'second',
+        kind: 'reset',
+      }),
+    ).rejects.toThrow()
+    vi.restoreAllMocks()
+    expect((await store.readActive())?.bytes[0]).toBe(2)
+    expect((await store.readReplacementRecovery('first'))?.bytes[0]).toBe(1)
+    expect(await store.readReplacementRecovery('second')).toBeNull()
+    expect(await store.readRecovery('replacement:legacy')).not.toBeNull()
+  })
+
+  it('tracks a schema-upgraded descendant of a committed replacement', async () => {
+    const store = createStore()
+    await store.commitSnapshot(new Uint8Array([1]), 'old-schema', now)
+    const committed = await store.commitReplacement(
+      new Uint8Array([2]),
+      'old-schema',
+      now,
+      { replacementId: 'restore-1', kind: 'restore' },
+    )
+    const upgraded = await store.commitSnapshot(
+      new Uint8Array([3]),
+      'new-schema',
+      now,
+    )
+    expect(upgraded.revision).toBe(committed.revision + 1)
+    expect(upgraded.replacementId).toBe('restore-1')
+    await expect(
+      store.commitSnapshot(new Uint8Array([4]), 'new-schema', now),
+    ).rejects.toThrow()
+  })
   it('atomically replaces active data and retains recovery plus restart continuation', async () => {
     const store = createStore()
     await store.commitSnapshot(new Uint8Array([7]), fingerprint, now)
@@ -32,13 +121,7 @@ describe('binary IndexedDB snapshot ledger', () => {
     )
     expect(committed).toMatchObject({ revision: 2, lastVerifiedRevision: 0 })
     expect((await store.readActive())?.bytes[0]).toBe(8)
-    expect(
-      (
-        (await store.readRecovery('replacement:restore-1'))?.value as {
-          bytes: Uint8Array
-        }
-      ).bytes[0],
-    ).toBe(7)
+    expect((await store.readReplacementRecovery('restore-1'))?.bytes[0]).toBe(7)
     expect(await store.readContinuation()).toMatchObject({
       replacementId: 'restore-1',
       committedRevision: 2,

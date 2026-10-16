@@ -5,7 +5,22 @@ export interface ActiveSnapshotRecord {
   revision: number
   lastVerifiedRevision: number
   savedAt: string
+  replacementId?: string
 }
+
+export interface ReplacementRecoveryRecord {
+  key: 'replacement'
+  replacementId: string
+  revision: number
+  fingerprint: string
+  bytes: Uint8Array
+  savedAt: string
+}
+
+export type ReplacementRecoverySummary = Omit<
+  ReplacementRecoveryRecord,
+  'bytes'
+> & { byteLength: number }
 
 export type ReplacementKind = 'restore' | 'reset' | 'gist-pull'
 export interface ReplacementContinuation {
@@ -43,6 +58,34 @@ export interface SnapshotIdbStore {
   markInvalidated(replacementId: string): Promise<void>
   markSyncMetadataComplete(replacementId: string): Promise<void>
   completeContinuation(replacementId: string): Promise<void>
+  listReplacementRecoveries(): Promise<ReplacementRecoverySummary[]>
+  readReplacementRecovery(
+    replacementId: string,
+  ): Promise<ReplacementRecoveryRecord | null>
+}
+
+function readReplacementRecoveryRecord(
+  value: unknown,
+): ReplacementRecoveryRecord | null {
+  if (value === undefined) return null
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('key' in value) ||
+    value.key !== 'replacement' ||
+    !('replacementId' in value) ||
+    typeof value.replacementId !== 'string' ||
+    !('revision' in value) ||
+    !Number.isSafeInteger(value.revision) ||
+    !('fingerprint' in value) ||
+    typeof value.fingerprint !== 'string' ||
+    !('bytes' in value) ||
+    Object.prototype.toString.call(value.bytes) !== '[object Uint8Array]' ||
+    !('savedAt' in value) ||
+    typeof value.savedAt !== 'string'
+  )
+    throw new Error('The stored replacement recovery record is invalid.')
+  return value as ReplacementRecoveryRecord
 }
 
 function readContinuationRecord(
@@ -88,7 +131,10 @@ function validateActive(value: unknown): ActiveSnapshotRecord {
     (value.lastVerifiedRevision as number) < 0 ||
     (value.lastVerifiedRevision as number) > (value.revision as number) ||
     !('savedAt' in value) ||
-    typeof value.savedAt !== 'string'
+    typeof value.savedAt !== 'string' ||
+    ('replacementId' in value &&
+      (typeof value.replacementId !== 'string' ||
+        value.replacementId.length === 0))
   ) {
     throw new Error('The stored active snapshot record is invalid.')
   }
@@ -194,6 +240,45 @@ export function createSnapshotIdbStore(
   }
 
   return {
+    listReplacementRecoveries() {
+      return transact('readonly', (records, finish, fail) => {
+        const request = records.get('recovery')
+        request.onsuccess = () => {
+          try {
+            const record = readReplacementRecoveryRecord(request.result)
+            finish(
+              record
+                ? [
+                    {
+                      key: 'replacement',
+                      replacementId: record.replacementId,
+                      revision: record.revision,
+                      fingerprint: record.fingerprint,
+                      savedAt: record.savedAt,
+                      byteLength: record.bytes.byteLength,
+                    },
+                  ]
+                : [],
+            )
+          } catch (error) {
+            fail(error)
+          }
+        }
+      })
+    },
+    readReplacementRecovery(replacementId) {
+      return transact('readonly', (records, finish, fail) => {
+        const request = records.get('recovery')
+        request.onsuccess = () => {
+          try {
+            const record = readReplacementRecoveryRecord(request.result)
+            finish(record?.replacementId === replacementId ? record : null)
+          } catch (error) {
+            fail(error)
+          }
+        }
+      })
+    },
     readContinuation() {
       return transact('readonly', (records, finish, fail) => {
         const request = records.get('replacement-continuation')
@@ -226,47 +311,52 @@ export function createSnapshotIdbStore(
                   throw new Error('Cannot replace a missing active snapshot.')
                 if (previous.revision === Number.MAX_SAFE_INTEGER)
                   throw new Error('Snapshot revision limit reached.')
-                const recoveryKey = `recovery:replacement:${input.replacementId}`
-                const recoveryRequest = records.get(recoveryKey)
-                recoveryRequest.onsuccess = () => {
-                  try {
-                    if (recoveryRequest.result !== undefined)
-                      throw new Error('Replacement recovery already exists.')
-                    const next: ActiveSnapshotRecord = {
-                      key: 'active',
-                      fingerprint,
-                      bytes: savedBytes,
-                      revision: previous.revision + 1,
-                      lastVerifiedRevision: previous.lastVerifiedRevision,
-                      savedAt,
-                    }
-                    const continuation: ReplacementContinuation = {
-                      key: 'replacement-continuation',
-                      replacementId: input.replacementId,
-                      kind: input.kind,
-                      committedRevision: next.revision,
-                      needsInvalidation: true,
-                      needsSyncMetadata: true,
-                      ...(input.syncMetadataPatch
-                        ? { syncMetadataPatch: input.syncMetadataPatch }
-                        : {}),
-                    }
-                    records.put(
-                      {
-                        version: 2,
-                        fingerprint: previous.fingerprint,
-                        bytes: previous.bytes,
-                        savedAt: previous.savedAt,
-                      },
-                      recoveryKey,
-                    )
-                    records.put(next, 'active')
-                    records.put(continuation, 'replacement-continuation')
-                    finish(next)
-                  } catch (error) {
-                    fail(error)
-                  }
+                const next: ActiveSnapshotRecord = {
+                  key: 'active',
+                  fingerprint,
+                  bytes: savedBytes,
+                  revision: previous.revision + 1,
+                  lastVerifiedRevision: previous.lastVerifiedRevision,
+                  savedAt,
+                  replacementId: input.replacementId,
                 }
+                const continuation: ReplacementContinuation = {
+                  key: 'replacement-continuation',
+                  replacementId: input.replacementId,
+                  kind: input.kind,
+                  committedRevision: next.revision,
+                  needsInvalidation: true,
+                  needsSyncMetadata: true,
+                  ...(input.syncMetadataPatch
+                    ? { syncMetadataPatch: input.syncMetadataPatch }
+                    : {}),
+                }
+                records.put(
+                  {
+                    key: 'replacement',
+                    replacementId: input.replacementId,
+                    revision: previous.revision,
+                    fingerprint: previous.fingerprint,
+                    bytes: previous.bytes,
+                    savedAt: previous.savedAt,
+                  } satisfies ReplacementRecoveryRecord,
+                  'recovery',
+                )
+                records.put(next, 'active')
+                records.put(continuation, 'replacement-continuation')
+                const legacyCursor = records.openCursor()
+                legacyCursor.onsuccess = () => {
+                  const cursor = legacyCursor.result
+                  if (!cursor) return
+                  if (
+                    typeof cursor.key === 'string' &&
+                    (cursor.key === 'recovery:replacement' ||
+                      cursor.key.startsWith('recovery:replacement:'))
+                  )
+                    cursor.delete()
+                  cursor.continue()
+                }
+                finish(next)
               } catch (error) {
                 fail(error)
               }
@@ -350,23 +440,46 @@ export function createSnapshotIdbStore(
       const savedBytes = bytes.slice()
       const savedAt = now.toISOString()
       return transact('readwrite', (records, finish, fail) => {
-        const request = records.get('active')
-        request.onsuccess = () => {
+        const continuationRequest = records.get('replacement-continuation')
+        continuationRequest.onsuccess = () => {
           try {
-            const previous = readRecord(request.result)
-            if (previous?.revision === Number.MAX_SAFE_INTEGER) {
-              throw new Error('Snapshot revision limit reached.')
+            const continuation = readContinuationRecord(
+              continuationRequest.result,
+            )
+            const request = records.get('active')
+            request.onsuccess = () => {
+              try {
+                const previous = readRecord(request.result)
+                if (previous?.revision === Number.MAX_SAFE_INTEGER)
+                  throw new Error('Snapshot revision limit reached.')
+                if (
+                  continuation &&
+                  (!previous ||
+                    previous.revision < continuation.committedRevision ||
+                    (previous.revision > continuation.committedRevision &&
+                      previous.replacementId !== continuation.replacementId) ||
+                    previous.fingerprint === fingerprint)
+                )
+                  throw new Error(
+                    'Cannot publish unrelated data while a replacement continuation is unresolved.',
+                  )
+                const next: ActiveSnapshotRecord = {
+                  key: 'active',
+                  fingerprint,
+                  bytes: savedBytes,
+                  revision: (previous?.revision ?? 0) + 1,
+                  lastVerifiedRevision: previous?.lastVerifiedRevision ?? 0,
+                  savedAt,
+                  ...(continuation
+                    ? { replacementId: continuation.replacementId }
+                    : {}),
+                }
+                records.put(next, 'active')
+                finish(next)
+              } catch (error) {
+                fail(error)
+              }
             }
-            const next: ActiveSnapshotRecord = {
-              key: 'active',
-              fingerprint,
-              bytes: savedBytes,
-              revision: (previous?.revision ?? 0) + 1,
-              lastVerifiedRevision: previous?.lastVerifiedRevision ?? 0,
-              savedAt,
-            }
-            records.put(next, 'active')
-            finish(next)
           } catch (error) {
             fail(error)
           }

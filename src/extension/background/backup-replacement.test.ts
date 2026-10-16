@@ -25,6 +25,35 @@ function work(): BackupReplacementWork {
 }
 
 describe('backup replacement coordinator', () => {
+  it('resumes a pending replacement after a verified schema-upgrade publication', async () => {
+    const databaseName = `replacement-upgrade-${crypto.randomUUID()}`
+    const store = createSnapshotIdbStore(testIndexedDB, databaseName)
+    await store.commitSnapshot(new Uint8Array([1]), 'old-schema', new Date())
+    await store.commitReplacement(
+      new Uint8Array([2]),
+      'old-schema',
+      new Date(),
+      { replacementId: 'restore-1', kind: 'restore' },
+    )
+    await store.commitSnapshot(new Uint8Array([3]), 'new-schema', new Date())
+    const replacement = work()
+    const resumed = createBackupReplacementCoordinator({
+      store: createSnapshotIdbStore(testIndexedDB, databaseName),
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    await resumed.ready()
+    expect(resumed.getState().status).toBe('durable-sync-metadata-pending')
+    await expect(resumed.run(replacement)).rejects.toThrow('still needs saving')
+    expect(await resumed.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    expect(replacement.commit).not.toHaveBeenCalled()
+    expect((await store.readActive())?.bytes[0]).toBe(3)
+  })
   it('reports durable pending when the first continuation read fails after publication', async () => {
     const databaseName = `replacement-read-${crypto.randomUUID()}`
     const store = createSnapshotIdbStore(testIndexedDB, databaseName)
