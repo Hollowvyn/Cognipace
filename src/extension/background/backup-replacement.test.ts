@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { indexedDB as testIndexedDB } from 'fake-indexeddb'
+import { createSnapshotIdbStore } from '@/platform/db/snapshot-idb'
 
 import type { BackupReplacementWork } from '@/features/backup/server/backup-replacement-work'
 
@@ -23,6 +25,55 @@ function work(): BackupReplacementWork {
 }
 
 describe('backup replacement coordinator', () => {
+  it('resumes a committed replacement after restart without replaying its commit', async () => {
+    const databaseName = `replacement-${crypto.randomUUID()}`
+    const store = createSnapshotIdbStore(testIndexedDB, databaseName)
+    await store.commitSnapshot(new Uint8Array([1]), 'fingerprint', new Date())
+    const replacement = work()
+    replacement.syncMetadataPatch = { gistId: 'gist-1' }
+    replacement.flush = (input) =>
+      store.commitReplacement(
+        new Uint8Array([2]),
+        'fingerprint',
+        new Date(),
+        input!,
+      )
+    vi.mocked(replacement.onDurable).mockRejectedValueOnce(
+      new Error('transport'),
+    )
+    const initial = createBackupReplacementCoordinator({
+      store,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    expect(await initial.run(replacement)).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: true,
+    })
+    const continuation = await store.readContinuation()
+    expect(continuation?.syncMetadataPatch).toEqual({ gistId: 'gist-1' })
+    expect(continuation?.needsInvalidation).toBe(true)
+    const reopenedStore = createSnapshotIdbStore(testIndexedDB, databaseName)
+    const reopened = createBackupReplacementCoordinator({
+      store: reopenedStore,
+      resume: () => ({
+        onDurable: replacement.onDurable,
+        finishSyncMetadata: replacement.finishSyncMetadata,
+      }),
+    })
+    await reopened.ready()
+    expect(reopened.getState().status).toBe('durable-sync-metadata-pending')
+    await expect(reopened.run(work())).rejects.toThrow('still needs saving')
+    expect(await reopened.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    expect(replacement.commit).toHaveBeenCalledTimes(1)
+    expect((await reopenedStore.readActive())?.bytes[0]).toBe(2)
+    expect(await reopenedStore.readContinuation()).toBeNull()
+  })
   it('retains only publication work after flush failure and retries without committing again', async () => {
     const coordinator = createBackupReplacementCoordinator()
     const replacement = work()

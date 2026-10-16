@@ -94,7 +94,7 @@ const sharedSyncOperationCoordinator = createSyncOperationCoordinator({
   running: false,
 })
 
-const remoteReplacementMetadataSchema = z.strictObject({
+export const remoteReplacementMetadataSchema = z.strictObject({
   enabled: z.boolean(),
   gistId: z.string().min(1),
   lastSyncAt: z.iso.datetime(),
@@ -837,6 +837,7 @@ function createRemoteReplacementContinuations(
     flush: deps.flushDbSnapshot,
     onDurable: async () => deps.broadcastInvalidation(),
     finishSyncMetadata: () => deps.writeMetadata(frozenPatch),
+    syncMetadataPatch: frozenPatch,
   }
 }
 

@@ -7,6 +7,22 @@ export interface ActiveSnapshotRecord {
   savedAt: string
 }
 
+export type ReplacementKind = 'restore' | 'reset' | 'gist-pull'
+export interface ReplacementContinuation {
+  key: 'replacement-continuation'
+  replacementId: string
+  kind: ReplacementKind
+  committedRevision: number
+  needsInvalidation: boolean
+  needsSyncMetadata: boolean
+  syncMetadataPatch?: Record<string, unknown>
+}
+
+export type ReplacementInput = Pick<
+  ReplacementContinuation,
+  'replacementId' | 'kind' | 'syncMetadataPatch'
+>
+
 export interface SnapshotIdbStore {
   readActive(): Promise<ActiveSnapshotRecord | null>
   commitSnapshot(
@@ -17,6 +33,41 @@ export interface SnapshotIdbStore {
   acknowledgeVerifiedRevision(revision: number): Promise<void>
   readRecovery(key: string): Promise<{ value: unknown } | null>
   commitRecovery(key: string, value: unknown): Promise<void>
+  commitReplacement(
+    bytes: Uint8Array,
+    fingerprint: string,
+    now: Date,
+    input: ReplacementInput,
+  ): Promise<ActiveSnapshotRecord>
+  readContinuation(): Promise<ReplacementContinuation | null>
+  markInvalidated(replacementId: string): Promise<void>
+  markSyncMetadataComplete(replacementId: string): Promise<void>
+  completeContinuation(replacementId: string): Promise<void>
+}
+
+function readContinuationRecord(
+  value: unknown,
+): ReplacementContinuation | null {
+  if (value === undefined) return null
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('key' in value) ||
+    value.key !== 'replacement-continuation' ||
+    !('replacementId' in value) ||
+    typeof value.replacementId !== 'string' ||
+    !('kind' in value) ||
+    !['restore', 'reset', 'gist-pull'].includes(String(value.kind)) ||
+    !('committedRevision' in value) ||
+    !Number.isSafeInteger(value.committedRevision) ||
+    !('needsInvalidation' in value) ||
+    typeof value.needsInvalidation !== 'boolean' ||
+    !('needsSyncMetadata' in value) ||
+    typeof value.needsSyncMetadata !== 'boolean'
+  ) {
+    throw new Error('The stored replacement continuation is invalid.')
+  }
+  return value as ReplacementContinuation
 }
 
 function validateActive(value: unknown): ActiveSnapshotRecord {
@@ -143,6 +194,117 @@ export function createSnapshotIdbStore(
   }
 
   return {
+    readContinuation() {
+      return transact('readonly', (records, finish, fail) => {
+        const request = records.get('replacement-continuation')
+        request.onsuccess = () => {
+          try {
+            finish(readContinuationRecord(request.result))
+          } catch (error) {
+            fail(error)
+          }
+        }
+      })
+    },
+
+    commitReplacement(bytes, fingerprint, now, input) {
+      const savedBytes = bytes.slice()
+      const savedAt = now.toISOString()
+      return transact('readwrite', (records, finish, fail) => {
+        const continuationRequest = records.get('replacement-continuation')
+        continuationRequest.onsuccess = () => {
+          try {
+            if (readContinuationRecord(continuationRequest.result))
+              throw new Error(
+                'An earlier replacement continuation is unresolved.',
+              )
+            const activeRequest = records.get('active')
+            activeRequest.onsuccess = () => {
+              try {
+                const previous = readRecord(activeRequest.result)
+                if (!previous)
+                  throw new Error('Cannot replace a missing active snapshot.')
+                if (previous.revision === Number.MAX_SAFE_INTEGER)
+                  throw new Error('Snapshot revision limit reached.')
+                const recoveryKey = `recovery:replacement:${input.replacementId}`
+                const recoveryRequest = records.get(recoveryKey)
+                recoveryRequest.onsuccess = () => {
+                  try {
+                    if (recoveryRequest.result !== undefined)
+                      throw new Error('Replacement recovery already exists.')
+                    const next: ActiveSnapshotRecord = {
+                      key: 'active',
+                      fingerprint,
+                      bytes: savedBytes,
+                      revision: previous.revision + 1,
+                      lastVerifiedRevision: previous.lastVerifiedRevision,
+                      savedAt,
+                    }
+                    const continuation: ReplacementContinuation = {
+                      key: 'replacement-continuation',
+                      replacementId: input.replacementId,
+                      kind: input.kind,
+                      committedRevision: next.revision,
+                      needsInvalidation: true,
+                      needsSyncMetadata: true,
+                      ...(input.syncMetadataPatch
+                        ? { syncMetadataPatch: input.syncMetadataPatch }
+                        : {}),
+                    }
+                    records.put(
+                      {
+                        version: 2,
+                        fingerprint: previous.fingerprint,
+                        bytes: previous.bytes,
+                        savedAt: previous.savedAt,
+                      },
+                      recoveryKey,
+                    )
+                    records.put(next, 'active')
+                    records.put(continuation, 'replacement-continuation')
+                    finish(next)
+                  } catch (error) {
+                    fail(error)
+                  }
+                }
+              } catch (error) {
+                fail(error)
+              }
+            }
+          } catch (error) {
+            fail(error)
+          }
+        }
+      })
+    },
+
+    markInvalidated(replacementId) {
+      return updateContinuation(replacementId, 'needsInvalidation', false)
+    },
+    markSyncMetadataComplete(replacementId) {
+      return updateContinuation(replacementId, 'needsSyncMetadata', false)
+    },
+    completeContinuation(replacementId) {
+      return transact('readwrite', (records, finish, fail) => {
+        const request = records.get('replacement-continuation')
+        request.onsuccess = () => {
+          try {
+            const current = readContinuationRecord(request.result)
+            if (
+              !current ||
+              current.replacementId !== replacementId ||
+              current.needsInvalidation ||
+              current.needsSyncMetadata
+            )
+              throw new Error('Replacement continuation is not complete.')
+            records.delete('replacement-continuation')
+            finish()
+          } catch (error) {
+            fail(error)
+          }
+        }
+      })
+    },
     readRecovery(key) {
       return transact('readonly', (records, finish) => {
         const request = records.get(`recovery:${key}`)
@@ -246,5 +408,26 @@ export function createSnapshotIdbStore(
         }
       })
     },
+  }
+
+  function updateContinuation(
+    replacementId: string,
+    flag: 'needsInvalidation' | 'needsSyncMetadata',
+    value: false,
+  ): Promise<void> {
+    return transact('readwrite', (records, finish, fail) => {
+      const request = records.get('replacement-continuation')
+      request.onsuccess = () => {
+        try {
+          const current = readContinuationRecord(request.result)
+          if (!current || current.replacementId !== replacementId)
+            throw new Error('Replacement continuation does not match.')
+          records.put({ ...current, [flag]: value }, 'replacement-continuation')
+          finish()
+        } catch (error) {
+          fail(error)
+        }
+      }
+    })
   }
 }

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { indexedDB as testIndexedDB } from 'fake-indexeddb'
+import { IDBObjectStore, indexedDB as testIndexedDB } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./proxy', async (importOriginal) => {
@@ -22,7 +22,13 @@ import { createProblemsRepository } from '@/features/problems/data/problems-repo
 // eslint-disable-next-line no-restricted-imports
 import { buildTopicGraph } from '@/features/problems/domain/topic-graph'
 import { createDb, createSqliteWasmLocator } from './client'
-import { getAppDb, flushDbSnapshot, resetAppDbForTesting } from './instance'
+import {
+  getAppDb,
+  flushDbSnapshot,
+  resetAppDbForTesting,
+  beginDbReplacement,
+  commitDbReplacementSnapshot,
+} from './instance'
 import { migrationSql } from './migration-sql'
 import {
   legacyTopicMigrationFingerprint,
@@ -140,6 +146,46 @@ function readOwnedRows(db: Awaited<ReturnType<typeof getAppDb>>) {
 }
 
 describe('committed snapshot publication', () => {
+  it('reopens the old durable data after replacement publication aborts', async () => {
+    installStorage()
+    const store = createSnapshotIdbStore(
+      testIndexedDB,
+      `replacement-open-${crypto.randomUUID()}`,
+    )
+    const opened = await getAppDb({ snapshotStore: store })
+    openedHandles.push(opened)
+    const before = await store.readActive()
+    const oldSettings = readRows(opened, 'settings_kv')
+    beginDbReplacement()
+    await createSettingsRepository(opened.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    const originalPut = Object.getOwnPropertyDescriptor(
+      IDBObjectStore.prototype,
+      'put',
+    )!.value as typeof IDBObjectStore.prototype.put
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: globalThis.IDBObjectStore,
+      ...args
+    ) {
+      const request = originalPut.apply(this, args)
+      this.transaction.abort()
+      return request
+    })
+    await expect(
+      commitDbReplacementSnapshot({
+        replacementId: 'restore-1',
+        kind: 'restore',
+      }),
+    ).rejects.toThrow()
+    vi.restoreAllMocks()
+    expect((await store.readActive())?.bytes).toEqual(before?.bytes)
+    resetAppDbForTesting()
+    const reopened = await getAppDb({ snapshotStore: store })
+    openedHandles.push(reopened)
+    expect(readRows(reopened, 'settings_kv')).toEqual(oldSettings)
+  })
   it('rejects a mismatched IDB readback and retries the unacknowledged snapshot', async () => {
     installStorage()
     const snapshotStore = createSnapshotIdbStore(

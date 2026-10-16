@@ -33,6 +33,7 @@ import {
   createSnapshotIdbStore,
   type ActiveSnapshotRecord,
   type SnapshotIdbStore,
+  type ReplacementInput,
 } from './snapshot-idb'
 
 const snapshotDebounceMs = 250
@@ -45,6 +46,7 @@ let snapshotTimer: ReturnType<typeof setTimeout> | null = null
 let snapshotWriteChain: Promise<void> = Promise.resolve()
 let lastPersistedBytes: Uint8Array | null = null
 let snapshotCommitNeedsReconciliation = false
+let replacementPublicationPending = false
 
 export interface AppDbOptions {
   beforePublish?: (handle: DbHandle, context: PublishContext) => Promise<void>
@@ -75,6 +77,44 @@ export async function flushDbSnapshot() {
   await writeSnapshotAfterPending()
 }
 
+export function beginDbReplacement() {
+  if (replacementPublicationPending)
+    throw new Error('A database replacement is already pending.')
+  replacementPublicationPending = true
+  if (snapshotTimer) {
+    clearTimeout(snapshotTimer)
+    snapshotTimer = null
+  }
+}
+
+export function abortDbReplacement() {
+  replacementPublicationPending = false
+}
+
+export async function commitDbReplacementSnapshot(input: ReplacementInput) {
+  if (!replacementPublicationPending)
+    throw new Error('No database replacement is pending.')
+  await enqueueSnapshotWrite(async () => {
+    if (!activeHandle || !activeSnapshotStore)
+      throw new Error('IndexedDB replacement publication is unavailable.')
+    if (!activeHandle.sqlite3.capi.sqlite3_get_autocommit(activeHandle.rawDb))
+      throw new Error(
+        'Cannot publish a database snapshot during an open transaction.',
+      )
+    const bytes = serializeDb(activeHandle)
+    const fingerprint = computeFingerprint(migrationSql)
+    await activeSnapshotStore.commitReplacement(
+      bytes,
+      fingerprint,
+      new Date(),
+      input,
+    )
+    lastPersistedBytes = bytes
+    snapshotCommitNeedsReconciliation = false
+    replacementPublicationPending = false
+  })
+}
+
 export function resetAppDbForTesting() {
   openGeneration += 1
   setOnMutationHook(null)
@@ -83,6 +123,7 @@ export function resetAppDbForTesting() {
   activeSnapshotStore = null
   lastPersistedBytes = null
   snapshotCommitNeedsReconciliation = false
+  replacementPublicationPending = false
 
   if (snapshotTimer) {
     clearTimeout(snapshotTimer)
@@ -290,6 +331,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
 }
 
 function scheduleSnapshot() {
+  if (replacementPublicationPending) return
   if (!canUseChromeStorage() && !activeSnapshotStore) {
     return
   }
@@ -315,6 +357,10 @@ function enqueueSnapshotWrite(write: () => Promise<void>) {
 }
 
 async function persistSnapshot(automatic: boolean) {
+  if (replacementPublicationPending) {
+    if (automatic) return
+    throw new Error('Database replacement publication is pending.')
+  }
   if (!activeHandle || (!canUseChromeStorage() && !activeSnapshotStore)) {
     return
   }

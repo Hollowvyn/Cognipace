@@ -163,6 +163,7 @@ import {
 import {
   createBackgroundSyncService,
   markSyncLocalDataChanged,
+  remoteReplacementMetadataSchema,
 } from '@/features/sync/server/sync-service'
 import { serializeActiveTrack as serializeActiveTrackContract } from '@/features/tracks/api/tracks-serializers'
 import type { ActiveTrack } from '@/features/tracks/domain'
@@ -179,7 +180,17 @@ import {
   updateTrack,
 } from '@/features/tracks/server/tracks-service'
 import { getDashboardUrl } from '@/platform/chrome/extension-pages'
-import { flushDbSnapshot, type Db } from '@/platform/db'
+import {
+  flushDbSnapshot,
+  beginDbReplacement,
+  abortDbReplacement,
+  commitDbReplacementSnapshot,
+  type Db,
+} from '@/platform/db'
+import {
+  createSnapshotIdbStore,
+  type ReplacementContinuation,
+} from '@/platform/db/snapshot-idb'
 import { z } from 'zod'
 
 import {
@@ -211,7 +222,35 @@ import {
 } from './due-notification'
 
 const alarmScheduler = createAlarmScheduler()
-const backupReplacement = createBackupReplacementCoordinator()
+const replacementStore =
+  typeof indexedDB === 'undefined'
+    ? undefined
+    : createSnapshotIdbStore(indexedDB)
+const backupReplacement = createBackupReplacementCoordinator({
+  ...(replacementStore ? { store: replacementStore } : {}),
+  resume: (record: ReplacementContinuation) => ({
+    onDurable: () => broadcastDataManagementInvalidation('dashboard'),
+    finishSyncMetadata: async () => {
+      if (record.kind === 'gist-pull') {
+        const patch = remoteReplacementMetadataSchema.parse(
+          record.syncMetadataPatch,
+        )
+        const { autoSyncRetryAttempt, lastAutoSyncAt, ...required } = patch
+        await writeSyncMetadata({
+          ...required,
+          ...(autoSyncRetryAttempt === undefined
+            ? {}
+            : { autoSyncRetryAttempt }),
+          ...(lastAutoSyncAt === undefined ? {} : { lastAutoSyncAt }),
+        })
+      } else {
+        await markSyncLocalDataChanged()
+        hasPendingDirtyMarkRetry = false
+        await scheduleAutoPushAfterMutationBestEffort()
+      }
+    },
+  }),
+})
 let clearPendingImportPersistence = () => {}
 const syncAutoSync = createSyncAutoSync({
   scheduler: alarmScheduler,
@@ -273,6 +312,17 @@ const dueNotification = createDueNotification({
 })
 
 export function registerBackgroundHandlers() {
+  if (replacementStore) {
+    void backupReplacement
+      .ready()
+      .then(() => {
+        if (backupReplacement.getState().status === 'idle') return
+        return runInMutationQueue(() => backupReplacement.retry())
+      })
+      .catch(() => {
+        // A failed continuation remains gated for a later explicit retry.
+      })
+  }
   syncAutoSync.registerJobs()
   void syncAutoSync.repairStartupAlarms()
 
@@ -605,6 +655,12 @@ export function registerBackgroundHandlers() {
       return backupReplacementResultSchema.parse(
         await backupReplacement.run({
           kind: 'restore',
+          ...(replacementStore
+            ? {
+                beforeCommit: beginDbReplacement,
+                abortCommit: abortDbReplacement,
+              }
+            : {}),
           commit: async () => {
             const summary = await restorePreparedFullBackup(db, prepared)
             clearPendingImportPersistence()
@@ -633,6 +689,12 @@ export function registerBackgroundHandlers() {
       return backupReplacementResultSchema.parse(
         await backupReplacement.run({
           kind: 'reset',
+          ...(replacementStore
+            ? {
+                beforeCommit: beginDbReplacement,
+                abortCommit: abortDbReplacement,
+              }
+            : {}),
           commit: async () => {
             await resetLocalData(db)
             clearPendingImportPersistence()
@@ -653,7 +715,11 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return backupReplacementStateSchema.parse(backupReplacement.getState())
+    return backupReplacement
+      .ready()
+      .then(() =>
+        backupReplacementStateSchema.parse(backupReplacement.getState()),
+      )
   })
 
   onMessage('backup.retryPendingReplacement', ({ data, sender }) => {
@@ -664,6 +730,7 @@ export function registerBackgroundHandlers() {
       sender,
     )
     return runInMutationQueue(async () => {
+      await backupReplacement.ready()
       await resumePendingLocalSave()
       recoveredGenericRetry = null
       return backupReplacementResultSchema.parse(
@@ -1624,6 +1691,17 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
       runReplacement: (work) =>
         backupReplacement.run({
           ...work,
+          ...(replacementStore
+            ? {
+                beforeCommit: beginDbReplacement,
+                abortCommit: abortDbReplacement,
+                flush: (
+                  input:
+                    | Parameters<typeof commitDbReplacementSnapshot>[0]
+                    | undefined,
+                ) => commitDbReplacementSnapshot(input!),
+              }
+            : {}),
           commit: async () => {
             const summary = await work.commit()
             clearPendingImportPersistence()
@@ -1786,6 +1864,7 @@ function runInMutationQueue<T>(work: () => Promise<T>) {
 
 function runGatedMutationQueue<T>(work: () => Promise<T>, retryKey?: string) {
   return runInMutationQueue(async () => {
+    await backupReplacement.ready()
     backupReplacement.assertIdle()
     await resumePendingLocalSave()
     if (recoveredGenericRetry?.key !== retryKey) recoveredGenericRetry = null
@@ -1808,7 +1887,11 @@ async function resumePendingLocalSave() {
 
 function createLocalReplacementContinuations(surface: 'dashboard') {
   return {
-    flush: flushDbSnapshot,
+    flush: replacementStore
+      ? (
+          input: Parameters<typeof commitDbReplacementSnapshot>[0] | undefined,
+        ) => commitDbReplacementSnapshot(input!)
+      : flushDbSnapshot,
     onDurable: () => broadcastDataManagementInvalidation(surface),
     finishSyncMetadata: async () => {
       await markSyncLocalDataChanged()

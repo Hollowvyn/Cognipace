@@ -17,6 +17,71 @@ function createStore() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('binary IndexedDB snapshot ledger', () => {
+  it('atomically replaces active data and retains recovery plus restart continuation', async () => {
+    const store = createStore()
+    await store.commitSnapshot(new Uint8Array([7]), fingerprint, now)
+    const candidate = new Uint8Array([8])
+    const committed = await store.commitReplacement(
+      candidate,
+      fingerprint,
+      now,
+      {
+        replacementId: 'restore-1',
+        kind: 'restore',
+      },
+    )
+    expect(committed).toMatchObject({ revision: 2, lastVerifiedRevision: 0 })
+    expect((await store.readActive())?.bytes[0]).toBe(8)
+    expect(
+      (
+        (await store.readRecovery('replacement:restore-1'))?.value as {
+          bytes: Uint8Array
+        }
+      ).bytes[0],
+    ).toBe(7)
+    expect(await store.readContinuation()).toMatchObject({
+      replacementId: 'restore-1',
+      committedRevision: 2,
+      needsInvalidation: true,
+      needsSyncMetadata: true,
+    })
+    await expect(
+      store.commitReplacement(new Uint8Array([9]), fingerprint, now, {
+        replacementId: 'restore-2',
+        kind: 'reset',
+      }),
+    ).rejects.toThrow()
+    await store.markInvalidated('restore-1')
+    await store.markSyncMetadataComplete('restore-1')
+    await store.completeContinuation('restore-1')
+    expect(await store.readContinuation()).toBeNull()
+  })
+
+  it('keeps the old active snapshot after replacement publication aborts', async () => {
+    const store = createStore()
+    await store.commitSnapshot(new Uint8Array([7]), fingerprint, now)
+    const originalPut = Object.getOwnPropertyDescriptor(
+      IDBObjectStore.prototype,
+      'put',
+    )!.value as typeof IDBObjectStore.prototype.put
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: globalThis.IDBObjectStore,
+      ...args
+    ) {
+      const request = originalPut.apply(this, args)
+      this.transaction.abort()
+      return request
+    })
+    await expect(
+      store.commitReplacement(new Uint8Array([8]), fingerprint, now, {
+        replacementId: 'restore-1',
+        kind: 'restore',
+      }),
+    ).rejects.toThrow()
+    vi.restoreAllMocks()
+    expect((await store.readActive())?.bytes[0]).toBe(7)
+    expect(await store.readContinuation()).toBeNull()
+  })
   it('closes a late connection after a blocked open rejects', async () => {
     const databaseName = `test-${crypto.randomUUID()}`
     const request = testIndexedDB.open(databaseName, 1)
