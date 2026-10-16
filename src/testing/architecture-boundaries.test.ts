@@ -166,6 +166,22 @@ describe('architecture boundaries', () => {
     expect(config).toContain("'notifications'")
   })
 
+  it('requires unlimited local storage without adding Drive or Gist hosts', () => {
+    const config = readFileSync(join(repoRoot, 'wxt.config.ts'), 'utf8')
+    const permissions = config.match(/permissions:\s*\[([^\]]*)\]/)?.[1]
+    expect(permissions).toBeDefined()
+    expect(
+      Array.from(
+        permissions!.matchAll(/['"]([^'"]+)['"]/g),
+        ([, value]) => value,
+      ),
+    ).toEqual(['storage', 'alarms', 'notifications', 'unlimitedStorage'])
+    const hosts = extractHostPermissions(config)
+    expect(hosts).not.toContain('https://www.googleapis.com/*')
+    expect(hosts).not.toContain('https://drive.google.com/*')
+    expect(hosts).not.toContain('https://api.github.com/gists/*')
+  })
+
   it('keeps notification background code from importing FSRS internals directly', () => {
     const notificationFiles = sourceFiles(['extension']).filter(
       (file) =>
