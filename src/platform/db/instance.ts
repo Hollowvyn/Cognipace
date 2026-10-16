@@ -189,17 +189,15 @@ async function openAppDb(options: AppDbOptions, generation: number) {
     publish: async (candidate) => {
       await enqueueSnapshotWrite(async () => {
         assertCurrentOpenGeneration(generation)
+        const bytes = serializeDb(candidate)
         if (snapshotStore) {
-          await snapshotStore.commitSnapshot(
-            serializeDb(candidate),
-            fingerprint,
-            new Date(),
-          )
-        } else if (canUseChromeStorage()) {
-          await writeSnapshotToStorage({
-            fingerprint,
-            bytes: serializeDb(candidate),
-          })
+          await snapshotStore.commitSnapshot(bytes, fingerprint, new Date())
+        }
+        if (
+          canUseChromeStorage() &&
+          (openingState.source !== 'legacy' || !snapshotStore)
+        ) {
+          await writeSnapshotToStorage({ fingerprint, bytes })
         }
       })
     },

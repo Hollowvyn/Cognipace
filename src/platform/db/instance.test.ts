@@ -182,6 +182,56 @@ describe('committed snapshot publication', () => {
 })
 
 describe('app database startup', () => {
+  it('publishes a fresh startup snapshot to both IDB and Chrome storage', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `fresh-${crypto.randomUUID()}`,
+    )
+
+    openedHandles.push(await getAppDb({ snapshotStore }))
+
+    const active = await snapshotStore.readActive()
+    expect(active?.fingerprint).toBe(computeFingerprint(migrationSql))
+    expect(storage.values[FINGERPRINT_KEY]).toBe(active?.fingerprint)
+    expect(
+      Buffer.compare(
+        Buffer.from(base64ToBytes(String(storage.values[SNAPSHOT_KEY]))),
+        Buffer.from(active!.bytes),
+      ),
+    ).toBe(0)
+  })
+
+  it('publishes an IDB upgrade startup snapshot to Chrome storage', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `upgrade-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    await snapshotStore.commitSnapshot(
+      serializeDb(legacy),
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+
+    openedHandles.push(await getAppDb({ snapshotStore }))
+
+    const active = await snapshotStore.readActive()
+    expect(active?.fingerprint).toBe(computeFingerprint(migrationSql))
+    expect(storage.values[FINGERPRINT_KEY]).toBe(active?.fingerprint)
+    expect(
+      Buffer.compare(
+        Buffer.from(base64ToBytes(String(storage.values[SNAPSHOT_KEY]))),
+        Buffer.from(active!.bytes),
+      ),
+    ).toBe(0)
+  })
+
   it('migrates a validated matching legacy snapshot before removing its pair', async () => {
     const storage = installStorage()
     const snapshotStore = createSnapshotIdbStore(
