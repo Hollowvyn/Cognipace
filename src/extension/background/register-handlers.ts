@@ -1633,6 +1633,7 @@ let dbMutationQueue: Promise<void> = Promise.resolve()
 let dbMutationDepth = 0
 let hasPendingDirtyMarkRetry = false
 let hasPendingLocalSave = false
+let pendingLocalSaveContinuation: (() => Promise<void>) | null = null
 const localSaveError =
   'Local data still needs saving. Retry saving before editing.'
 
@@ -1664,7 +1665,7 @@ function runPracticeReviewCommand(
     })
     await scheduleAutoPushAfterMutationBestEffort()
     return practiceReviewCommandResultSchema.parse(result)
-  }, true)
+  })
 }
 
 function runDbMutation<T>(
@@ -1681,22 +1682,25 @@ function runDbMutation<T>(
       await markSyncLocalDataChangedBestEffort()
     }
 
+    const afterDurable = async () => {
+      await afterFlush?.(result)
+      if (syncMode === 'mark-dirty') {
+        await scheduleAutoPushAfterMutationBestEffort()
+      }
+    }
     try {
       await timeOverlayStartup('worker.snapshot-publish', () =>
         flushDbSnapshot(),
       )
     } catch (error) {
       hasPendingLocalSave = true
+      pendingLocalSaveContinuation = afterDurable
       throw new Error(localSaveError, { cause: error })
     }
-    await afterFlush?.(result)
-
-    if (syncMode === 'mark-dirty') {
-      await scheduleAutoPushAfterMutationBestEffort()
-    }
+    await afterDurable()
 
     return result
-  }, true)
+  })
 }
 
 function runInMutationQueue<T>(work: () => Promise<T>) {
@@ -1717,22 +1721,25 @@ function runInMutationQueue<T>(work: () => Promise<T>) {
   return queued
 }
 
-function runGatedMutationQueue<T>(
-  work: () => Promise<T>,
-  retryLocalSave = false,
-) {
+function runGatedMutationQueue<T>(work: () => Promise<T>) {
   return runInMutationQueue(async () => {
     backupReplacement.assertIdle()
-    if (retryLocalSave && hasPendingLocalSave) {
-      try {
-        await flushDbSnapshot()
-        hasPendingLocalSave = false
-      } catch (error) {
-        throw new Error(localSaveError, { cause: error })
-      }
-    }
+    await resumePendingLocalSave()
     return work()
   })
+}
+
+async function resumePendingLocalSave() {
+  if (!hasPendingLocalSave) return
+  try {
+    await flushDbSnapshot()
+  } catch (error) {
+    throw new Error(localSaveError, { cause: error })
+  }
+  hasPendingLocalSave = false
+  const continuation = pendingLocalSaveContinuation
+  pendingLocalSaveContinuation = null
+  await continuation?.()
 }
 
 function createLocalReplacementContinuations(surface: 'dashboard') {
@@ -1779,8 +1786,8 @@ async function retryPendingDirtyMark() {
   }
 
   try {
-    await flushDbSnapshot()
-    hasPendingLocalSave = false
+    if (hasPendingLocalSave) await resumePendingLocalSave()
+    else await flushDbSnapshot()
     await markSyncLocalDataChanged()
     hasPendingDirtyMarkRetry = false
     return true
@@ -1811,7 +1818,7 @@ function runRemoteRestoreInMutationQueue<T>(
     return guardedWork()
   }
 
-  return runInMutationQueue(guardedWork)
+  return runGatedMutationQueue(guardedWork)
 }
 
 function readSingleChangedProblemSlug(problemSlugs: readonly string[]) {

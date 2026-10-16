@@ -2289,6 +2289,84 @@ describe('background handler registration', () => {
     expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(2)
   })
 
+  it('blocks restore, reset, and sync push while a failed settings snapshot remains unsaved', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.updateSettings', {
+        surface: 'popup',
+        patch: { assessment: { strictTiming: true } },
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    backgroundMocks.flushDbSnapshot.mockRejectedValue(
+      new Error('IDB unavailable'),
+    )
+
+    await expect(
+      sendRuntimeMessage('backup.restoreFullBackup', {
+        surface: 'dashboard',
+        backup: validBackup,
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      sendRuntimeMessage('backup.resetLocalData', {
+        surface: 'dashboard',
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      sendRuntimeMessage('sync.pushLocal', {
+        surface: 'dashboard',
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.backupRestoreFullBackup).not.toHaveBeenCalled()
+    expect(backgroundMocks.backupResetLocalData).not.toHaveBeenCalled()
+    expect(backgroundMocks.syncService.pushLocal).not.toHaveBeenCalled()
+
+    backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
+    await sendRuntimeMessage('sync.pushLocal', { surface: 'dashboard' })
+    expect(backgroundMocks.syncService.pushLocal).toHaveBeenCalledTimes(1)
+    expect(
+      backgroundMocks.flushDbSnapshot.mock.invocationCallOrder.at(-1),
+    ).toBeLessThan(
+      backgroundMocks.syncService.pushLocal.mock.invocationCallOrder[0]!,
+    )
+  })
+
+  it('publishes a failed settings mutation once before admitting a later practice review', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.updateSettings', {
+        surface: 'popup',
+        patch: { assessment: { strictTiming: true } },
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).resolves.toEqual(commandResult)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      reason: 'settings-updated',
+      source: 'popup',
+      tags: ['settings'],
+    })
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).toHaveBeenCalledTimes(2)
+    expect(
+      backgroundMocks.broadcastCacheInvalidation.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      backgroundMocks.executePracticeReviewCommand.mock.invocationCallOrder[0]!,
+    )
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(2)
+  })
+
   it('reads settings through the runtime policy and DB boundary', async () => {
     const response = await sendRuntimeMessage('settings.getSettings', {
       surface: 'dashboard',
@@ -3349,7 +3427,7 @@ describe('background handler registration', () => {
       expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
       await expect(
         sendRuntimeMessage('sync.checkRemoteOnOpen', { surface: 'dashboard' }),
-      ).rejects.toThrow('sync metadata could not be saved')
+      ).rejects.toThrow('Local data still needs saving')
       expect(backgroundMocks.createBackgroundSyncService).not.toHaveBeenCalled()
       expect(getGist).not.toHaveBeenCalled()
       expect(restoreBackup).not.toHaveBeenCalled()
@@ -3367,7 +3445,7 @@ describe('background handler registration', () => {
       expect(
         await readLatestSyncAutoSyncDeps().runCleanPullCheck(),
       ).toMatchObject({ outcome: 'no-change', reason: 'local-dirty' })
-      expect(order).toEqual(['flush', 'dirty', 'sync'])
+      expect(order).toEqual(['flush', 'flush', 'dirty', 'sync'])
       expect(getGist).not.toHaveBeenCalled()
       expect(restoreBackup).not.toHaveBeenCalled()
       expect(await practice.getPracticeDetails(handle.db, 'two-sum')).toEqual(
