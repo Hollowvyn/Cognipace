@@ -12,6 +12,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md`](./specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md): approved design for durable local saves, versioned Google Drive data backups, explicit force and restore recovery, Gist migration, and separate Google-account-protected key recovery; written spec awaiting user review.
+
 - [`specs/2026-10-12-overlay-baseline-pr-cleanup-design.md`](./specs/2026-10-12-overlay-baseline-pr-cleanup-design.md): approved design to compact PR #211's raw startup evidence, correct readiness classification, bound observational timing, and rerun a reproducible packaged baseline; written spec awaiting user review.
 
 - [`specs/2026-10-12-responsive-leetcode-overlay-startup-design.md`](./specs/2026-10-12-responsive-leetcode-overlay-startup-design.md): approved progressive overlay startup with early manual timing, concurrent local context and remote metadata reads, deferred secondary data, measured latency targets, and unchanged review and upsert durability. Phase 1 baseline is recorded; behavior phases still need separate plans.
