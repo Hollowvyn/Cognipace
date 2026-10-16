@@ -7,7 +7,6 @@ import {
   computeFingerprint,
   FINGERPRINT_KEY,
   SNAPSHOT_KEY,
-  bytesToBase64,
   deserializeDb,
   serializeDb,
   writeSnapshotToStorage,
@@ -25,11 +24,16 @@ import {
   readSnapshotState,
   type SnapshotStorage,
   FSRS_RECOVERY_KEY,
+  RECOVERY_KEY,
   TRACK_RECOVERY_KEY,
   SNAPSHOT_RECOVERY_KEYS,
   sameRecoveryValue,
 } from './snapshot-state'
-import { createSnapshotIdbStore, type SnapshotIdbStore } from './snapshot-idb'
+import {
+  createSnapshotIdbStore,
+  type ActiveSnapshotRecord,
+  type SnapshotIdbStore,
+} from './snapshot-idb'
 
 const snapshotDebounceMs = 250
 
@@ -90,9 +94,20 @@ async function openAppDb(options: AppDbOptions, generation: number) {
     (typeof indexedDB === 'undefined'
       ? undefined
       : createSnapshotIdbStore(indexedDB))
-  const openingState: { source: 'idb' | 'legacy' | 'empty' } = {
+  const openingState: {
+    source: 'idb' | 'legacy' | 'empty'
+    stage:
+      | 'recovery preservation'
+      | 'restoration'
+      | 'validation'
+      | 'upgrade'
+      | 'preparation'
+      | 'publication'
+  } = {
     source: 'empty',
+    stage: 'restoration',
   }
+  let idbSource: ActiveSnapshotRecord | null = null
   let legacyBytes: Uint8Array | null = null
   let legacyFingerprint: string | null = null
   const handle = await openSnapshot({
@@ -109,16 +124,11 @@ async function openAppDb(options: AppDbOptions, generation: number) {
         }
         if (active) {
           openingState.source = 'idb'
+          idbSource = active
           const bytes = new Uint8Array(active.bytes)
           return {
             kind: 'stored',
-            raw:
-              active.fingerprint === fingerprint
-                ? {}
-                : {
-                    [SNAPSHOT_KEY]: bytesToBase64(bytes),
-                    [FINGERPRINT_KEY]: active.fingerprint,
-                  },
+            raw: {},
             bytes,
             fingerprint: active.fingerprint,
           }
@@ -132,17 +142,19 @@ async function openAppDb(options: AppDbOptions, generation: number) {
       }
       return state
     },
-    preserve: (raw) =>
-      preserveRecovery(
-        storage,
-        raw,
-        new Date(),
-        raw[FINGERPRINT_KEY] === legacyFsrsMigrationFingerprint
+    preserve: (raw) => {
+      openingState.stage = 'recovery preservation'
+      const sourceFingerprint = idbSource?.fingerprint ?? raw[FINGERPRINT_KEY]
+      const key =
+        sourceFingerprint === legacyFsrsMigrationFingerprint
           ? FSRS_RECOVERY_KEY
-          : raw[FINGERPRINT_KEY] === legacyTrackMigrationFingerprint
+          : sourceFingerprint === legacyTrackMigrationFingerprint
             ? TRACK_RECOVERY_KEY
-            : undefined,
-      ),
+            : RECOVERY_KEY
+      return idbSource && snapshotStore
+        ? preserveIdbRecovery(snapshotStore, key, idbSource)
+        : preserveRecovery(storage, raw, new Date(), key)
+    },
     fresh: async () => {
       const freshHandle = await createDb({
         migrationSql,
@@ -157,6 +169,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
       }
     },
     restore: async (bytes) => {
+      openingState.stage = 'restoration'
       const restoredHandle = await createDb({
         locateWasm: createSqliteWasmLocator(),
       })
@@ -169,6 +182,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
       }
     },
     validate: async (candidate, candidateFingerprint) => {
+      openingState.stage = 'validation'
       const expectedSql =
         candidateFingerprint === fingerprint
           ? migrationSql
@@ -179,14 +193,17 @@ async function openAppDb(options: AppDbOptions, generation: number) {
         await options.validateCurrentData?.(candidate)
     },
     upgrade: (candidate, fromFingerprint) => {
+      openingState.stage = 'upgrade'
       candidate.rawDb.exec(selectUpgradeSql(fromFingerprint, migrationEntries))
       return Promise.resolve()
     },
     prepare: async (candidate, context) => {
+      openingState.stage = 'preparation'
       await options.beforePublish?.(candidate, context)
       assertCurrentOpenGeneration(generation)
     },
     publish: async (candidate) => {
+      openingState.stage = 'publication'
       await enqueueSnapshotWrite(async () => {
         assertCurrentOpenGeneration(generation)
         const bytes = serializeDb(candidate)
@@ -197,14 +214,20 @@ async function openAppDb(options: AppDbOptions, generation: number) {
           canUseChromeStorage() &&
           (openingState.source !== 'legacy' || !snapshotStore)
         ) {
-          await writeSnapshotToStorage({ fingerprint, bytes })
+          try {
+            await writeSnapshotToStorage({ fingerprint, bytes })
+          } catch (error) {
+            if (openingState.source !== 'idb' || !isChromeQuotaError(error)) {
+              throw error
+            }
+          }
         }
       })
     },
   }).catch((error: unknown) => {
     if (openingState.source === 'idb') {
       throw new Error(
-        'Database recovery required: IndexedDB snapshot is invalid.',
+        `Database recovery required: IndexedDB ${openingState.stage} failed.`,
         { cause: error },
       )
     }
@@ -331,6 +354,56 @@ async function assertIdbSnapshot(
   ) {
     throw new Error('IndexedDB snapshot readback did not match.')
   }
+}
+
+async function preserveIdbRecovery(
+  store: SnapshotIdbStore,
+  key: string,
+  source: ActiveSnapshotRecord,
+) {
+  const existing = await store.readRecovery(key)
+  if (existing !== null) {
+    if (matchesIdbRecovery(existing.value, source)) return
+    throw new Error(
+      'An earlier database recovery record must be exported before another upgrade.',
+    )
+  }
+  await store.commitRecovery(key, {
+    version: 2,
+    fingerprint: source.fingerprint,
+    bytes: new Uint8Array(source.bytes),
+    savedAt: new Date().toISOString(),
+  })
+  const persisted = await store.readRecovery(key)
+  if (persisted === null || !matchesIdbRecovery(persisted.value, source)) {
+    throw new Error('IndexedDB recovery readback did not match.')
+  }
+}
+
+function matchesIdbRecovery(value: unknown, source: ActiveSnapshotRecord) {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('version' in value) ||
+    value.version !== 2 ||
+    !('fingerprint' in value) ||
+    value.fingerprint !== source.fingerprint ||
+    !('bytes' in value) ||
+    Object.prototype.toString.call(value.bytes) !== '[object Uint8Array]'
+  )
+    return false
+  const bytes = value.bytes as Uint8Array
+  return (
+    bytes.length === source.bytes.length &&
+    bytes.every((byte, index) => byte === source.bytes[index])
+  )
+}
+
+function isChromeQuotaError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.name === 'QuotaExceededError' || /quota/i.test(error.message))
+  )
 }
 
 async function migrateRecoveryRecords(

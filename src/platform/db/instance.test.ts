@@ -232,6 +232,126 @@ describe('app database startup', () => {
     ).toBe(0)
   })
 
+  it('upgrades an IDB snapshot larger than Chrome quota with a binary IDB recovery copy', async () => {
+    const storage = installStorage()
+    const originalSet = storage.set
+    storage.set = vi.fn(async (values) => {
+      if (JSON.stringify(values).length > 10 * 1024 * 1024) {
+        throw new Error('Chrome quota exceeded')
+      }
+      await originalSet(values)
+    })
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `large-upgrade-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    legacy.rawDb.exec(
+      `INSERT INTO settings_kv (key, value, updated_at) VALUES ('large-proof', '${'x'.repeat(11 * 1024 * 1024)}', 1)`,
+    )
+    const originalBytes = serializeDb(legacy)
+    expect(originalBytes.byteLength).toBeGreaterThan(10 * 1024 * 1024)
+    await snapshotStore.commitSnapshot(
+      originalBytes,
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+
+    const upgraded = await getAppDb({ snapshotStore })
+    openedHandles.push(upgraded)
+    expect(
+      upgraded.rawDb.exec({
+        sql: "SELECT length(value) FROM settings_kv WHERE key = 'large-proof'",
+        returnValue: 'resultRows',
+      }),
+    ).toEqual([[11 * 1024 * 1024]])
+    const recovery = await snapshotStore.readRecovery(TRACK_RECOVERY_KEY)
+    expect(recovery?.value).toMatchObject({
+      version: 2,
+      fingerprint: expectedV8MigrationFingerprint,
+    })
+    const recoveryBytes = (recovery?.value as { bytes: Uint8Array }).bytes
+    expect(
+      Buffer.compare(Buffer.from(recoveryBytes), Buffer.from(originalBytes)),
+    ).toBe(0)
+    expect(storage.values[TRACK_RECOVERY_KEY]).toBeUndefined()
+    expect(storage.values[SNAPSHOT_KEY]).toBeUndefined()
+
+    resetAppDbForTesting()
+    const reopened = await getAppDb({ snapshotStore })
+    openedHandles.push(reopened)
+    expect(
+      reopened.rawDb.exec({
+        sql: "SELECT length(value) FROM settings_kv WHERE key = 'large-proof'",
+        returnValue: 'resultRows',
+      }),
+    ).toEqual([[11 * 1024 * 1024]])
+  }, 45_000)
+
+  it('reports an IDB recovery collision separately from invalid snapshot data', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `collision-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    await snapshotStore.commitSnapshot(
+      serializeDb(legacy),
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+    await snapshotStore.commitRecovery(TRACK_RECOVERY_KEY, {
+      version: 2,
+      fingerprint: 'another',
+      bytes: new Uint8Array([1]),
+      savedAt: now.toISOString(),
+    })
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'IndexedDB recovery preservation failed',
+    )
+    expect((await snapshotStore.readActive())?.fingerprint).toBe(
+      expectedV8MigrationFingerprint,
+    )
+  })
+
+  it('reports an IDB upgrade publication failure without calling the source invalid', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `publication-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    await snapshotStore.commitSnapshot(
+      serializeDb(legacy),
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+    vi.spyOn(snapshotStore, 'commitSnapshot').mockRejectedValue(
+      new Error('IDB write failed'),
+    )
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'IndexedDB publication failed',
+    )
+    expect((await snapshotStore.readActive())?.fingerprint).toBe(
+      expectedV8MigrationFingerprint,
+    )
+    expect(await snapshotStore.readRecovery(TRACK_RECOVERY_KEY)).not.toBeNull()
+  })
+
   it('migrates a validated matching legacy snapshot before removing its pair', async () => {
     const storage = installStorage()
     const snapshotStore = createSnapshotIdbStore(
@@ -375,7 +495,7 @@ describe('app database startup', () => {
     )
 
     await expect(getAppDb({ snapshotStore })).rejects.toThrow(
-      'Database recovery required',
+      'IndexedDB validation failed',
     )
     expect(storage.values[SNAPSHOT_KEY]).toEqual(expect.any(String))
     expect(storage.remove).not.toHaveBeenCalled()
