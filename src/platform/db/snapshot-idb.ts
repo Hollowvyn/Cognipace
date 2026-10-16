@@ -57,13 +57,28 @@ export function createSnapshotIdbStore(
   function openDatabase(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
       const request = factory.open(databaseName, 1)
+      let settled = false
       request.onupgradeneeded = () => {
         request.result.createObjectStore('records')
       }
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(asError(request.error))
-      request.onblocked = () =>
+      request.onsuccess = () => {
+        if (settled) {
+          request.result.close()
+          return
+        }
+        settled = true
+        resolve(request.result)
+      }
+      request.onerror = () => {
+        if (settled) return
+        settled = true
+        reject(asError(request.error))
+      }
+      request.onblocked = () => {
+        if (settled) return
+        settled = true
         reject(new Error('The snapshot database is blocked.'))
+      }
     })
   }
 
@@ -147,6 +162,9 @@ export function createSnapshotIdbStore(
         request.onsuccess = () => {
           try {
             const previous = readRecord(request.result)
+            if (previous?.revision === Number.MAX_SAFE_INTEGER) {
+              throw new Error('Snapshot revision limit reached.')
+            }
             const next: ActiveSnapshotRecord = {
               key: 'active',
               fingerprint,
