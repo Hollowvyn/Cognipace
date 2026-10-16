@@ -96,6 +96,16 @@ describe('binary snapshot scaling proof', () => {
         )
       } finally {
         fixture.handle.rawDb.close()
+        await new Promise<void>((resolve, reject) => {
+          const request = indexedDB.deleteDatabase(databaseName)
+          request.onsuccess = () => resolve()
+          request.onerror = () =>
+            reject(
+              request.error ?? new Error('Scaling database deletion failed.'),
+            )
+          request.onblocked = () =>
+            reject(new Error('Scaling database deletion was blocked.'))
+        })
       }
     },
     1_800_000,
