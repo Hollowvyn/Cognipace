@@ -12,7 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md`](./specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md): approved design for durable local saves, versioned Google Drive data backups, explicit force and restore recovery, Gist migration, and separate Google-account-protected key recovery; written spec awaiting user review.
+- [`specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md`](./specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md): user-approved written design for durable local saves, versioned Google Drive data backups, explicit force and restore recovery, Gist migration, and separate Google-account-protected key recovery; covered by the three plans below.
 
 - [`specs/2026-10-12-overlay-baseline-pr-cleanup-design.md`](./specs/2026-10-12-overlay-baseline-pr-cleanup-design.md): approved design to compact PR #211's raw startup evidence, correct readiness classification, bound observational timing, and rerun a reproducible packaged baseline; written spec awaiting user review.
 
@@ -80,6 +80,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-16-reliable-backup-phase-1-local-durability.md`](./plans/2026-10-16-reliable-backup-phase-1-local-durability.md): implementation plan for durable binary local snapshots, interrupted migration, save acknowledgment, recoverable replacement, and scaling proof.
+- [`plans/2026-10-16-reliable-backup-phase-2-drive-data.md`](./plans/2026-10-16-reliable-backup-phase-2-drive-data.md): implementation plan for Google connection, versioned and verified one-way Drive data backup, restart-safe worker, force/restore actions, and Gist cutover.
+- [`plans/2026-10-16-reliable-backup-phase-3-key-recovery.md`](./plans/2026-10-16-reliable-backup-phase-3-key-recovery.md): implementation plan for separate opted-in key backup, startup reconciliation, owner checks, explicit recovery, cleanup, and deletion.
 
 - [`plans/2026-10-12-overlay-baseline-pr-cleanup.md`](./plans/2026-10-12-overlay-baseline-pr-cleanup.md): phase-sized plan to compact PR #211 startup evidence, repair classification and timing retention, rerun the packaged baseline, and update the draft PR.
 

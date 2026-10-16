@@ -2,7 +2,7 @@
 
 Date: 2026-10-16
 
-Status: Approved conversational design; written spec awaiting user review
+Status: Written spec approved by the user on 2026-10-16; phase plans follow
 
 ## Purpose and current evidence
 
