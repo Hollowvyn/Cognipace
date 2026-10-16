@@ -3291,7 +3291,7 @@ describe('background handler registration', () => {
     expect(backgroundMocks.previewPracticeReview).toHaveBeenCalledTimes(1)
   })
 
-  it('returns persistence pending without publication and retries the same executor command', async () => {
+  it('returns persistence pending and acknowledges the same review without applying it twice', async () => {
     backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
       new Error('disk failed'),
     )
@@ -3309,16 +3309,56 @@ describe('background handler registration', () => {
       await sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
     ).toEqual(commandResult)
     expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
-      2,
+      1,
     )
-    expect(backgroundMocks.executePracticeReviewCommand.mock.calls[0]).toEqual(
-      backgroundMocks.executePracticeReviewCommand.mock.calls[1],
-    )
-    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(3)
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(2)
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
     expect(
       backgroundMocks.saveReviewResultWithTrackProgress,
     ).not.toHaveBeenCalled()
+  })
+
+  it('publishes a pending review once when an unrelated export recovers its snapshot', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).resolves.toMatchObject({
+      status: 'persistence-pending',
+    })
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+
+    await sendRuntimeMessage('backup.exportFullBackup', {
+      surface: 'dashboard',
+    })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      problemSlug: 'two-sum',
+      reason: 'practice-updated',
+      source: 'dashboard',
+      tags: ['practice'],
+    })
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).toHaveBeenCalledTimes(1)
+    expect(
+      backgroundMocks.broadcastCacheInvalidation.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      backgroundMocks.backupExportFullBackup.mock.invocationCallOrder[0]!,
+    )
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).resolves.toEqual(commandResult)
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
   })
 
   it('protects a pending review from automatic remote replacement and recovers publication before sync admission', async () => {

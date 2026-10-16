@@ -608,6 +608,7 @@ export function registerBackgroundHandlers() {
           commit: async () => {
             const summary = await restorePreparedFullBackup(db, prepared)
             clearPendingImportPersistence()
+            recoveredReviewRetry = null
             return summary
           },
           ...createLocalReplacementContinuations(request.surface),
@@ -634,6 +635,7 @@ export function registerBackgroundHandlers() {
           commit: async () => {
             await resetLocalData(db)
             clearPendingImportPersistence()
+            recoveredReviewRetry = null
             return null
           },
           ...createLocalReplacementContinuations(request.surface),
@@ -1597,6 +1599,7 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
           commit: async () => {
             const summary = await work.commit()
             clearPendingImportPersistence()
+            recoveredReviewRetry = null
             return summary
           },
         }),
@@ -1634,6 +1637,10 @@ let dbMutationDepth = 0
 let hasPendingDirtyMarkRetry = false
 let hasPendingLocalSave = false
 let pendingLocalSaveContinuation: (() => Promise<void>) | null = null
+let recoveredReviewRetry: {
+  key: string
+  result: ReturnType<typeof practiceReviewCommandResultSchema.parse>
+} | null = null
 const localSaveError =
   'Local data still needs saving. Retry saving before editing.'
 
@@ -1642,6 +1649,13 @@ function runPracticeReviewCommand(
   source: UiSurface,
 ) {
   return runGatedMutationQueue(async () => {
+    const key = JSON.stringify([command, source])
+    if (recoveredReviewRetry?.key === key) {
+      const saved = recoveredReviewRetry.result
+      recoveredReviewRetry = null
+      return saved
+    }
+    recoveredReviewRetry = null
     const { db } = await getAppDb()
     const result = practiceReviewCommandResultSchema.parse(
       await executePracticeReviewCommand(db, command),
@@ -1649,21 +1663,28 @@ function runPracticeReviewCommand(
     if (result.status === 'conflict') return result
     // Persist the overwrite guard before a published review can outlive this worker.
     await markSyncLocalDataChangedBestEffort()
+    const afterDurable = async () => {
+      await broadcastPracticeInvalidation({
+        problemSlug: command.problemSlug,
+        source,
+      })
+      await scheduleAutoPushAfterMutationBestEffort()
+    }
     try {
       await flushDbSnapshot()
     } catch {
       hasPendingLocalSave = true
       hasPendingDirtyMarkRetry = true
+      pendingLocalSaveContinuation = async () => {
+        await afterDurable()
+        recoveredReviewRetry = { key, result }
+      }
       return practiceReviewCommandResultSchema.parse({
         ...result,
         status: 'persistence-pending',
       })
     }
-    await broadcastPracticeInvalidation({
-      problemSlug: command.problemSlug,
-      source,
-    })
-    await scheduleAutoPushAfterMutationBestEffort()
+    await afterDurable()
     return practiceReviewCommandResultSchema.parse(result)
   })
 }
