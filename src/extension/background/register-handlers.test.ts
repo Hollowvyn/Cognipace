@@ -2898,6 +2898,110 @@ describe('background handler registration', () => {
     ).toEqual({ status: 'saved' })
   })
 
+  it('gates settings and practice after a failed import, then publishes the import before editing', async () => {
+    registerBackgroundHandlers()
+    const handlers = new Map(backgroundMocks.handlers)
+    const message = (method: string, data: unknown) =>
+      handlers.get(method)!({ data, sender: extensionSender })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    expect(
+      await message('imports.apply', {
+        surface: 'dashboard',
+        fileText: '{}',
+        fingerprint: 'a'.repeat(64),
+      }),
+    ).toMatchObject({ status: 'persistence-error' })
+    backgroundMocks.flushDbSnapshot.mockRejectedValue(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      message('settings.toggleStudyMode', { surface: 'dashboard' }),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      message('practice.saveReviewResult', saveCommandRequest),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.toggleStudyMode).not.toHaveBeenCalled()
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
+
+    backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
+    await message('settings.toggleStudyMode', { surface: 'dashboard' })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      reason: 'problem-catalog-updated',
+      source: 'dashboard',
+      tags: ['problems', 'tracks', 'analytics'],
+    })
+    expect(
+      backgroundMocks.broadcastCacheInvalidation.mock.invocationCallOrder.at(
+        -2,
+      ),
+    ).toBeLessThan(backgroundMocks.toggleStudyMode.mock.invocationCallOrder[0]!)
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).toHaveBeenCalledTimes(2)
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'saved' })
+    expect(backgroundMocks.applyContentImport).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the import-specific retry result while sharing the local-save gate', async () => {
+    registerBackgroundHandlers()
+    const handlers = new Map(backgroundMocks.handlers)
+    const message = (method: string, data: unknown) =>
+      handlers.get(method)!({ data, sender: extensionSender })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    expect(
+      await message('imports.apply', {
+        surface: 'dashboard',
+        fileText: '{}',
+        fingerprint: 'a'.repeat(64),
+      }),
+    ).toMatchObject({ status: 'persistence-error' })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'persistence-error' })
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'saved' })
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'repreview' })
+    expect(backgroundMocks.applyContentImport).toHaveBeenCalledTimes(1)
+    await expect(
+      message('settings.toggleStudyMode', { surface: 'dashboard' }),
+    ).resolves.toBeNull()
+  })
+
+  it('does not let an import retry bypass a pending generic local save', async () => {
+    registerBackgroundHandlers()
+    const handlers = new Map(backgroundMocks.handlers)
+    const message = (method: string, data: unknown) =>
+      handlers.get(method)!({ data, sender: extensionSender })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      message('settings.toggleStudyMode', { surface: 'dashboard' }),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'repreview' })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      reason: 'settings-updated',
+      source: 'dashboard',
+      tags: ['settings'],
+    })
+    await message('settings.toggleStudyMode', { surface: 'dashboard' })
+    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(2)
+  })
+
   it('finishes replacement metadata inside the owned queue while automatic bookkeeping waits behind it', async () => {
     const finishGate = createDeferred<void>()
     const metadataStarted = vi.fn()

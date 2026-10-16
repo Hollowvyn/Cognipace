@@ -252,6 +252,7 @@ const backupReplacement = createBackupReplacementCoordinator({
   }),
 })
 let clearPendingImportPersistence = () => {}
+let hasPendingImportPersistence = () => false
 const syncAutoSync = createSyncAutoSync({
   scheduler: alarmScheduler,
   hasPendingDirtyMarkRetry: () => hasPendingDirtyMarkRetry,
@@ -330,9 +331,22 @@ export function registerBackgroundHandlers() {
   void dueNotification.handleStartup()
 
   const importHandlers = registerImportHandlers({
-    runInMutationQueue: runGatedMutationQueue,
+    runInMutationQueue: (work, retryPersistence) =>
+      retryPersistence
+        ? runInMutationQueue(async () => {
+            backupReplacement.assertIdle()
+            if (!hasPendingImportPersistence()) await resumePendingLocalSave()
+            recoveredGenericRetry = null
+            return work()
+          })
+        : runGatedMutationQueue(work),
     getDb: async () => (await getAppDb()).db,
     flush: flushDbSnapshot,
+    onPersistencePending: (onDurable) => {
+      hasPendingLocalSave = true
+      pendingLocalSaveContinuation = onDurable
+    },
+    retrySharedPendingPersistence: resumePendingLocalSave,
     markDirty: markSyncLocalDataChangedBestEffort,
     invalidate: async () =>
       broadcastCacheInvalidation({
@@ -343,6 +357,7 @@ export function registerBackgroundHandlers() {
     scheduleSync: scheduleAutoPushAfterMutationBestEffort,
   })
   clearPendingImportPersistence = importHandlers.clearPendingPersistence
+  hasPendingImportPersistence = importHandlers.hasPendingPersistence
 
   onMessage('runtime.ping', ({ data, sender }) => {
     const request = pingRequestSchema.parse(data)
