@@ -103,6 +103,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
       | 'upgrade'
       | 'preparation'
       | 'publication'
+      | 'Chrome snapshot mirror publication'
   } = {
     source: 'empty',
     stage: 'restoration',
@@ -215,17 +216,25 @@ async function openAppDb(options: AppDbOptions, generation: number) {
           (openingState.source !== 'legacy' || !snapshotStore)
         ) {
           try {
+            openingState.stage = 'Chrome snapshot mirror publication'
             await writeSnapshotToStorage({ fingerprint, bytes })
           } catch (error) {
             if (openingState.source !== 'idb' || !isChromeQuotaError(error)) {
               throw error
             }
           }
+          openingState.stage = 'publication'
         }
       })
     },
   }).catch((error: unknown) => {
     if (openingState.source === 'idb') {
+      if (openingState.stage === 'Chrome snapshot mirror publication') {
+        throw new Error(
+          'Database recovery required: Chrome snapshot mirror publication failed.',
+          { cause: error },
+        )
+      }
       throw new Error(
         `Database recovery required: IndexedDB ${openingState.stage} failed.`,
         { cause: error },
@@ -318,9 +327,17 @@ async function persistSnapshot(automatic: boolean) {
 
   const fingerprint = computeFingerprint(migrationSql)
   const bytes = serializeDb(activeHandle)
-  await activeSnapshotStore?.commitSnapshot(bytes, fingerprint, new Date())
+  if (activeSnapshotStore) {
+    await activeSnapshotStore.commitSnapshot(bytes, fingerprint, new Date())
+    await assertIdbSnapshot(activeSnapshotStore, bytes, fingerprint)
+  }
   if (canUseChromeStorage()) {
-    await writeSnapshotToStorage({ fingerprint, bytes })
+    try {
+      await writeSnapshotToStorage({ fingerprint, bytes })
+    } catch (error) {
+      if (activeSnapshotStore && isChromeQuotaError(error)) return
+      throw error
+    }
   }
 }
 

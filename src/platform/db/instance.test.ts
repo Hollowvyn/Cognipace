@@ -281,6 +281,12 @@ describe('app database startup', () => {
     expect(storage.values[TRACK_RECOVERY_KEY]).toBeUndefined()
     expect(storage.values[SNAPSHOT_KEY]).toBeUndefined()
 
+    await createSettingsRepository(upgraded.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await expect(flushDbSnapshot()).resolves.toBeUndefined()
+
     resetAppDbForTesting()
     const reopened = await getAppDb({ snapshotStore })
     openedHandles.push(reopened)
@@ -290,7 +296,37 @@ describe('app database startup', () => {
         returnValue: 'resultRows',
       }),
     ).toEqual([[11 * 1024 * 1024]])
+    expect(
+      (await createSettingsRepository(reopened.db).getSettings()).appearance
+        .themeMode,
+    ).toBe('dark')
   }, 45_000)
+
+  it('identifies a non-quota Chrome mirror failure after IDB upgrade publication', async () => {
+    const storage = installStorage()
+    storage.rejectActiveSnapshotWrite = true
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `mirror-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    await snapshotStore.commitSnapshot(
+      serializeDb(legacy),
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'Chrome snapshot mirror publication failed',
+    )
+    expect((await snapshotStore.readActive())?.fingerprint).toBe(
+      computeFingerprint(migrationSql),
+    )
+  })
 
   it('reports an IDB recovery collision separately from invalid snapshot data', async () => {
     installStorage()
