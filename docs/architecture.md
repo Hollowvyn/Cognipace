@@ -906,7 +906,10 @@ Database files live under `src/platform/db`:
 - `src/platform/db/seed.ts`: initial local catalog seed.
 - `src/platform/db/instance.ts`: app DB opening, migration, snapshot restore,
   snapshot scheduling, and snapshot flushing.
-- `src/platform/db/snapshot.ts`: Chrome storage snapshot serialization.
+- `src/platform/db/snapshot.ts`: SQLite binary serialization and legacy Chrome
+  storage snapshot compatibility.
+- `src/platform/db/snapshot-idb.ts`: active binary IndexedDB snapshot ledger,
+  recovery copies, and durable replacement continuation.
 
 Schema change rules:
 
@@ -916,6 +919,13 @@ Schema change rules:
 - Update repositories, serializers, feature contracts, and tests that touch the
   changed shape.
 - Keep database writes behind the owning feature repository or service.
+
+IndexedDB is the active snapshot store. On first open without an IndexedDB
+active record, the app reads an existing Chrome storage snapshot pair, validates
+or upgrades it, commits and verifies the binary IndexedDB record, migrates
+recovery copies, then removes the legacy active pair. A failed migration leaves
+the original available for recovery. Future Drive backup and user-held key
+behavior is planned and has no current runtime path or host permission.
 
 Snapshot compatibility is deliberately bounded. The app opens a snapshot when
 its fingerprint matches the current migration SQL. Only the exact through-0007,
@@ -1030,6 +1040,16 @@ their local Vitest timings describe an in-process SQLite handle. The packaged
 Chrome driver in `scripts/fsrs-scaling-chrome.mjs` uses a fresh disposable
 profile and records runtime message-to-response and actual Chrome storage
 measurements separately. These workloads do not define supported capacity.
+The focused IndexedDB fixture proof records binary snapshot size, synthetic
+transaction commit and reopen timings, and failed-publication atomicity.
+`fake-indexeddb` has no Chrome quota, so installed-extension quota/headroom
+and full snapshot commit latency remain human smoke requirements. The earlier
+50,000-review runtime-message failure occurred on the old whole-snapshot
+message path; it is not evidence of an IndexedDB quota failure. The current
+publication path serializes the full SQLite database for each changed snapshot,
+so accepted save latency at scale remains a release gate until measured in
+Chrome. `unlimitedStorage` reduces quota pressure but cannot prevent disk or
+IndexedDB write failures.
 
 Background owns one replacement coordinator behind the existing mutation queue.
 It retains only the committed summary and publication/metadata continuations.

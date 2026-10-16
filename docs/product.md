@@ -311,9 +311,18 @@ command. Preview reads do not write review or sync data.
 Large local histories remain complete. Full-backup restore inserts historical
 rows in bounded statements within one transaction, so a failed later batch
 rolls back the replacement. This changes neither review scheduling nor the
-backup format. Synthetic scaling workloads are measurement fixtures, not
-promised extension capacities; actual usable size depends on the installed
-Chrome storage quota and the other values already stored in that profile.
+backup format. The active complete SQLite snapshot is stored as binary bytes in
+IndexedDB; an existing Chrome storage snapshot migrates at open and its legacy
+recovery copies are preserved. The extension requests `unlimitedStorage` for
+local data, but disk exhaustion and other publication failures remain possible.
+A failed local review save must not show Saved: it stays pending and offers
+Retry review while that worker retains the command. Further edits receive
+"Local data still needs saving. Retry saving before editing." A restart before publication
+reopens the last durable snapshot. Replacement keeps one recovery copy of the
+previous active snapshot, and its pending state can be resumed after restart.
+Synthetic scaling workloads are measurement fixtures, not promised extension
+capacities. A future Drive backup and user-held encryption key remain planned,
+not part of current local storage or sync behavior.
 
 ### Queue
 
