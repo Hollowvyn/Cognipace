@@ -209,13 +209,16 @@ function ChartStyle({ config, id }: { config: ChartConfig; id: string }) {
     return null
   }
 
+  // Sanitize id to prevent CSS injection / XSS
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '')
+
   return (
     <style
       dangerouslySetInnerHTML={{
         __html: Object.entries(CHART_THEMES)
           .map(
             ([theme, selector]) => `
-${selector} [data-chart="${id}"] {
+${selector} [data-chart="${safeId}"] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color =
