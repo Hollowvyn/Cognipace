@@ -206,13 +206,23 @@ function createBucket(
   }
 }
 
+const dateKeyFormatters = new Map<string, Intl.DateTimeFormat>()
+function getDateKeyFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = dateKeyFormatters.get(timeZone)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    dateKeyFormatters.set(timeZone, formatter)
+  }
+  return formatter
+}
+
 export function getAnalyticsDateKey(date: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
+  const parts = getDateKeyFormatter(timeZone)
     .formatToParts(date)
     .reduce<Record<string, string>>((result, part) => {
       if (
@@ -247,18 +257,28 @@ export function getAnalyticsLocalDayStart(
   return new Date(instant).toISOString()
 }
 
+const offsetFormatters = new Map<string, Intl.DateTimeFormat>()
+function getOffsetFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = offsetFormatters.get(timeZone)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+    offsetFormatters.set(timeZone, formatter)
+  }
+  return formatter
+}
+
 function getTimeZoneOffsetMilliseconds(date: Date, timeZone: string): number {
   const wholeSecondDate = new Date(Math.floor(date.getTime() / 1000) * 1000)
-  const parts = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  })
+  const parts = getOffsetFormatter(timeZone)
     .formatToParts(wholeSecondDate)
     .reduce<Record<string, string>>((result, part) => {
       if (
@@ -306,16 +326,7 @@ export function shiftAnalyticsCalendarDays(
   days: number,
   timeZone: string,
 ): Date {
-  const localParts = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  })
+  const localParts = getOffsetFormatter(timeZone)
     .formatToParts(date)
     .reduce<Record<string, number>>((result, part) => {
       if (
