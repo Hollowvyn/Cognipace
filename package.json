@@ -11,12 +11,12 @@
     "runtime": {
       "name": "node",
       "version": "24.20.0",
-      "onFail": "error"
+      "onFail": "warn"
     },
     "packageManager": {
       "name": "npm",
       "version": "11.19.0",
-      "onFail": "error"
+      "onFail": "warn"
     }
   },
   "type": "module",
