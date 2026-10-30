@@ -108,7 +108,7 @@ describe('trusted background submission analysis', () => {
       request,
       config,
       expect.any(AbortSignal),
-      25_000,
+      55_000,
     )
     expect(analyzeMock).toHaveBeenCalledTimes(1)
   })
@@ -228,7 +228,7 @@ describe('trusted background submission analysis', () => {
           .mockReturnValueOnce(stalled.promise)
       const controller = new AbortController()
       const pending = runAnalysis(controller.signal)
-      await vi.advanceTimersByTimeAsync(code === 'timeout' ? 30_000 : 0)
+      await vi.advanceTimersByTimeAsync(code === 'timeout' ? 60_000 : 0)
       if (code === 'cancelled') controller.abort()
       const result = await pending
       expect(result).toMatchObject({ status: 'error', code })
@@ -329,3 +329,13 @@ it.each([
     expect(vi.getTimerCount()).toBe(0)
   },
 )
+
+it('accepts a complete assessment after the previous 30 second deadline', async () => {
+  analyzeMock.mockImplementation(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 35000))
+    return success()
+  })
+  const pending = runAnalysis()
+  await vi.advanceTimersByTimeAsync(35000)
+  expect(await pending).toMatchObject({ status: 'ready' })
+})

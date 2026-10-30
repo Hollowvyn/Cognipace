@@ -719,7 +719,12 @@ checks. Explicit model objects use controlled fetch with redirects rejected,
 SDK retries disabled, bounded output, and telemetry disabled. Strict SDK/Zod
 and report-consistency validation remain required. OpenRouter requests specify
 only the selected model, without paid fallback IDs or privacy overrides;
-OpenRouter can perform internal routing within CogniPace's single request.
+OpenRouter can perform internal routing within each request. Assessments alone
+opt into one application recovery attempt for free selections after a recognized
+transient upstream failure; SDK retries remain disabled. Recovery preserves the
+selected model, strict output and the shared whole-operation deadline. It uses
+abortable backoff, honors Retry-After, and returns the original error if the delay
+cannot fit. Quota, auth, billing, refusal and output errors do not trigger recovery.
 
 Metadata keeps requested `model` as configuration identity and optionally adds
 bounded `resolvedModel` for a successful OpenRouter response that identifies a
@@ -793,9 +798,12 @@ serialized problem context up to 24,000 characters. Optional diagnostics above
 2,000 characters are omitted and named explicitly. Code and problem content are
 never silently truncated. Preparation refreshes the immutable submission pin
 and has a 15-second deadline; the retained pin survives unavailable reads for
-Retry. A request has one SDK generation with an 8,192-token output budget and a
-30-second background deadline including database/configuration/secret loading.
-The controller bounds the complete client operation at 50 seconds. Retry makes
+Retry. A request has an 8,192-token output budget and a 60-second background
+deadline including database/configuration/secret loading and any recovery.
+The controller bounds the complete client operation at 80 seconds. Only free
+OpenRouter selections may retry a transient failure once; other calls keep one
+attempt. Reports request concise rationales and at most two high-value suggestions
+per list without shrinking the schema or dropping complete suggested code. Retry makes
 a fresh request identity for the same retained submission; repeated terminal
 events and disclosure/collapse/dock actions do not generate another request.
 
@@ -817,9 +825,13 @@ key-save transport and provider authentication still carry keys where required.
 
 Evaluation inputs live in the owning review-assistant testing folder, and the
 test-only private environment configuration lives in GenAI testing. The opt-in
-harness calls the real `analyzeCode` SDK path with six cases and stores only
-report, provider metadata, criterion, and checked date in
-`/private/tmp/cognipace-ai-evaluation`. Its environment option does not replace
+harness calls the real `analyzeCode` SDK path with six cases and writes controlled
+success and failure artifacts before asserting success. Successful cases include
+the validated report; failed cases include only the controlled error category.
+Artifacts retain fixture identity, allowlisted provider metadata and checked date;
+a current-run summary records counts, error categories and durations under
+`/private/tmp/cognipace-ai-evaluation`. Raw SDK messages, bodies and keys are never
+written. Its environment option does not replace
 or read the application's trusted secret store. Normal tests skip all six live
 cases before reading any evaluation provider/model/key values.
 

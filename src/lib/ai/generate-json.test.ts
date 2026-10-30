@@ -849,3 +849,249 @@ describe('generateJson actual SDK wire', () => {
     expectSafe(result)
   })
 })
+
+describe('opt-in transient free-model recovery', () => {
+  it.each([502, 503, 504, 'provider_unavailable', 'provider_overloaded'])(
+    'recovers once from %s with unchanged strict routing',
+    async (failure) => {
+      vi.useFakeTimers()
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(
+          jsonResponse(
+            errorBody(
+              'openrouter',
+              503,
+              typeof failure === 'string' ? failure : 'generic',
+            ),
+            typeof failure === 'number' ? failure : 200,
+          ),
+        )
+        .mockResolvedValueOnce(jsonResponse(successBody('openrouter')))
+      const pending = generateJson(
+        request('openrouter', { retryTransientFreeModel: true }),
+      )
+      await vi.advanceTimersByTimeAsync(999)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(await pending).toMatchObject({
+        status: 'success',
+        providerMetadata: { durationMs: 1000 },
+      })
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(
+        fetchMock.mock.calls[0]?.[1]?.body,
+      )
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
+
+  it('caps retry attempts at two', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() =>
+        Promise.resolve(jsonResponse(errorBody('openrouter', 503), 503)),
+      )
+    const pending = generateJson(
+      request('openrouter', { retryTransientFreeModel: true }),
+    )
+    await vi.advanceTimersByTimeAsync(2000)
+    const result = await pending
+    expect(result).toMatchObject({ status: 'error', code: 'network' })
+    expectSafe(result)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['2', 'Wed, 01 Jan 2031 00:00:02 GMT'])(
+    'honors Retry-After %s',
+    async (header) => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2031-01-01T00:00:00Z'))
+      const response = jsonResponse(errorBody('openrouter', 503), 503)
+      response.headers.set('Retry-After', header)
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(response)
+        .mockResolvedValueOnce(jsonResponse(successBody('openrouter')))
+      const pending = generateJson(
+        request('openrouter', { retryTransientFreeModel: true }),
+      )
+      await vi.advanceTimersByTimeAsync(1999)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(await pending).toMatchObject({ status: 'success' })
+    },
+  )
+
+  it('returns the original error immediately when the retry cannot fit', async () => {
+    const response = jsonResponse(errorBody('openrouter', 503), 503)
+    response.headers.set('Retry-After', '60')
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
+    expect(
+      await generateJson(
+        request('openrouter', {
+          retryTransientFreeModel: true,
+          timeoutMs: 60000,
+        }),
+      ),
+    ).toMatchObject({ status: 'error', code: 'network' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels during backoff without dispatching again', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(errorBody('openrouter', 503), 503))
+    const pending = generateJson(
+      request('openrouter', {
+        retryTransientFreeModel: true,
+        signal: controller.signal,
+      }),
+    )
+    await vi.advanceTimersByTimeAsync(100)
+    controller.abort()
+    expect(await pending).toMatchObject({ status: 'error', code: 'cancelled' })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('shares the deadline across preparation, retry and second transport', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        return jsonResponse(errorBody('openrouter', 503), 503)
+      })
+      .mockImplementationOnce(() => new Promise(() => {}))
+    const pending = generateJson(
+      request('openrouter', { retryTransientFreeModel: true, timeoutMs: 2000 }),
+    )
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(await pending).toMatchObject({
+      status: 'error',
+      code: 'timeout',
+      providerMetadata: { durationMs: 2000 },
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    {
+      provider: 'openrouter' as const,
+      model: 'paid/model',
+      retryTransientFreeModel: true,
+    },
+    { provider: 'openrouter' as const, model: 'openrouter/free' },
+    {
+      provider: 'openai' as const,
+      model: 'openrouter/free',
+      retryTransientFreeModel: true,
+    },
+  ])(
+    'requires explicit opt-in and a free OpenRouter model: %j',
+    async (overrides) => {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(() =>
+          Promise.resolve(
+            jsonResponse(errorBody(overrides.provider, 503), 503),
+          ),
+        )
+      expect(
+        await generateJson(request(overrides.provider, overrides)),
+      ).toMatchObject({ status: 'error', code: 'network' })
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it.each([401, 402, 403, 404, 408, 429, 500])(
+    'never retries HTTP %s',
+    async (status) => {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          jsonResponse(errorBody('openrouter', status), status),
+        )
+      const result = await generateJson(
+        request('openrouter', { retryTransientFreeModel: true }),
+      )
+      expect(result.status).toBe('error')
+      expectSafe(result)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it.each([
+    'payment_required',
+    'rate_limit_exceeded',
+    'refusal',
+    'timeout',
+    'max_tokens_exceeded',
+    'authentication',
+  ])('never retries machine error %s even with HTTP 503', async (tag) => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(errorBody('openrouter', 503, tag), 503))
+    expect(
+      (
+        await generateJson(
+          request('openrouter', { retryTransientFreeModel: true }),
+        )
+      ).status,
+    ).toBe('error')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+it.each(['refused', 'invalid-output', 'malformed'] as const)(
+  'never retries opt-in %s output',
+  async (kind) => {
+    const body =
+      kind === 'malformed'
+        ? { unrelated: API_KEY }
+        : {
+            ...successBody('openrouter'),
+            choices: [
+              {
+                index: 0,
+                message: { role: 'assistant', content: '{"ok":true}' },
+                finish_reason: kind === 'refused' ? 'content_filter' : 'length',
+              },
+            ],
+          }
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(body))
+    const result = await generateJson(
+      request('openrouter', { retryTransientFreeModel: true }),
+    )
+    expect(result).toMatchObject({
+      status: 'error',
+      code: kind === 'refused' ? 'refused' : 'invalid-output',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expectSafe(result)
+  },
+)
+
+it('resets transport status before the second attempt', async () => {
+  vi.useFakeTimers()
+  const fetchMock = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(jsonResponse(errorBody('openrouter', 503), 503))
+    .mockRejectedValueOnce(new Error('private provider diagnostic'))
+  const pending = generateJson(
+    request('openrouter', {
+      model: 'vendor/model:free',
+      retryTransientFreeModel: true,
+    }),
+  )
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(await pending).toMatchObject({ status: 'error', code: 'unknown' })
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+})

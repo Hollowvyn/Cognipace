@@ -40,7 +40,7 @@ change. Use one implementation worker, then independent spec and quality review.
 - `src/features/leetcode-review-assistant/testing/code-analysis-evaluation-results.ts`
   and its tests: test-only safe artifact projection and summary counts/timings.
 
-- [ ] Write failing tests and run them before production changes:
+- [x] Write failing tests and run them before production changes:
 
   ```ts
   // A transient 503 followed by a valid response succeeds on the second fetch.
@@ -60,7 +60,7 @@ change. Use one implementation worker, then independent spec and quality review.
   429/auth/billing/refusal/configuration/malformed output and consistency errors.
   Do not infer retries from arbitrary provider messages.
 
-- [ ] Implement the smallest retry policy. Keep `maxRetries: 0` and route the
+- [x] Implement the smallest retry policy. Keep `maxRetries: 0` and route the
       retry through the same SDK generation/validation path:
 
   ```ts
@@ -78,7 +78,7 @@ change. Use one implementation worker, then independent spec and quality review.
   output/refusal/validation failure. Successful metadata duration spans both
   attempts. No body, SDK error, prompt or key logging.
 
-- [ ] Add concise assessment instructions and update whole/client deadlines:
+- [x] Add concise assessment instructions and update whole/client deadlines:
 
   ```ts
   const analysisTimeoutMs = 60_000
@@ -92,7 +92,7 @@ change. Use one implementation worker, then independent spec and quality review.
   demonstrate success after 30 seconds, timeout at the new cap, cancellation
   and stale-connection rejection, without changing hints or connection testing.
 
-- [ ] Record evaluation outcomes using an explicit projection, never a spread
+- [x] Record evaluation outcomes using an explicit projection, never a spread
       of provider errors:
 
   ```ts
@@ -107,31 +107,35 @@ change. Use one implementation worker, then independent spec and quality review.
   none may appear in serialized artifacts. Ordinary tests must not read keys or
   call real providers. Keep the existing opt-in environment harness.
 
-- [ ] Run focused tests to GREEN:
+- [x] Run focused tests to GREEN:
 
   ```sh
   rtk proxy npm test -- src/lib/ai src/features/leetcode-review-assistant src/features/overlay-session/hooks/use-leetcode-code-analysis.test.tsx --run
   ```
 
-- [ ] Self-review, then independent spec review and quality review; address
+- [x] Self-review, then independent spec review and quality review; address
       findings before committing production changes.
 
 ## Task 2: Documentation, aggregate validation and draft PR
 
 Controller owns docs, aggregate validation and publication after Task 1 review.
 
-- [ ] Update `docs/product.md`, `docs/architecture.md`, `docs/testing.md` and
+- [x] Update `docs/product.md`, `docs/architecture.md`, `docs/testing.md` and
       `docs/superpowers/README.md` to describe bounded assessment recovery and safe
       evaluation artifacts. Keep user-facing copy free of transport details.
-- [ ] Run `rtk proxy npm run lint`, `rtk proxy npm run check`,
+- [x] Run `rtk proxy npm run lint`, `rtk proxy npm run check`,
       `rtk proxy npm run build`, `rtk proxy npm run format`, explicit Prettier on
       otherwise ignored planning files and `rtk proxy git diff --check`.
-- [ ] Record exact commands/results and skipped commands/reasons in
+- [x] Record exact commands/results and skipped commands/reasons in
       `docs/superpowers/handoffs/2026-10-30-free-model-assessments.md`.
-- [ ] Keep real-provider evaluation pending unless private test-only credentials
+- [x] Keep real-provider evaluation pending unless private test-only credentials
       are available. Do not use application secret storage. Require human realtime
       happy-path, slow-response, provider-error, quota, navigation and connection
       smoke with screenshot/recording proof before PR review/merge.
-- [ ] Commit Conventional Commit changes, push the verified repository branch
+- [x] Commit Conventional Commit changes, push the verified repository branch
       and open a separate draft PR using the current template. Include release
       impact, rollback, unchanged permissions/persistence and remaining proof gates.
+
+Implementation and automated review/validation completed on 2026-10-30.
+Live-provider evaluation and human realtime smoke/proof remain pending;
+publication uses a draft PR, with no merge or release authorized.

@@ -939,7 +939,10 @@ cannot validate a replacement key or model.
    unavailable free capacity or quota when available; distinguish 402 balance/key
    limit guidance from 429 quota guidance. Account privacy/capability restrictions
    may make a model unavailable; do not loosen privacy settings automatically.
-   Confirm no automatic retries or app-configured paid fallback requests.
+   Confirm no retries for quota/auth/billing/refusal/invalid reports and no
+   app-configured paid fallback requests. Free assessments may recover once from
+   a temporary upstream failure within the shared deadline. Connection tests and
+   hints retain their single-attempt behavior.
 7. Remove the OpenRouter key. Confirm unavailable analysis and that other saved
    provider keys remain. Assessment can be disabled after removal. Reset Defaults
    keeps saved keys, disables assessment, and restores the blank default model.
@@ -2051,10 +2054,31 @@ success or schema validity. Mocked wire tests are separate evidence. Capacity,
 account privacy settings, billing, or schema-support failures remain controlled
 and do not trigger app-configured paid fallback requests.
 
-Each case calls the actual `analyzeCode` service with a 30-second deadline and
-35-second test timeout, using the existing single 8,192-token SDK path. A
-successful case writes only report, providerMetadata, criterion, and checkedAt
-to `/private/tmp/cognipace-ai-evaluation/<fixture.id>.json`. It never writes raw
+Human assessment reliability smoke (attach screenshots or a recording):
+
+- Use `openrouter/free` and submit a valid solution; verify all scored sections,
+  concise guidance, complete suggested code and independent manual review saving.
+- Exercise a response taking more than 30 seconds; it may complete within the
+  60-second background deadline. A stalled worker must exit the client pending
+  state by its 80-second deadline and offer Retry.
+- In a test-only transport harness, fail once with a temporary upstream error,
+  then succeed. Verify at most two attempts, the same selected model and no
+  extra report/review writes. Honor Retry-After; an excessive delay returns the
+  controlled error. Capture evidence of the observed attempt count and timing.
+- Exercise quota, authentication and invalid-output errors; verify no automatic
+  recovery attempt. Navigate, cancel or change connection during backoff and
+  generation; obsolete work must not publish a report or begin another attempt.
+- Check a paid/custom model, connection test and hint request; their attempt
+  policy remains unchanged. Record extension version and requested/served model.
+
+Each case calls the actual `analyzeCode` service with a 60-second deadline and
+65-second test timeout, using the 8,192-token SDK path with bounded recovery for
+free OpenRouter selections. Every case writes a controlled outcome before the
+success assertion to `/private/tmp/cognipace-ai-evaluation/<fixture.id>.json`.
+Successful outcomes include the validated report; errors include only the
+controlled error category. Allowlisted provider identity, duration, fixture ID
+and checked date support comparison. A current-run summary records success/failure
+counts, errors by category and durations. It never writes raw
 requests, configuration, provider bodies, environments, or keys. Verify the
 current checkedAt, provider, and model before citing an artifact; an older file
 does not prove the latest run passed. Passing schema and consistency validation

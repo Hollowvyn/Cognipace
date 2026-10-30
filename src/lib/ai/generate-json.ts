@@ -77,6 +77,7 @@ export async function generateJson<T>(
   })
   let preparingSchema = false
   let transportStatus: number | undefined
+  let retryAfter: string | null = null
   try {
     return await withAiDeadline(
       {
@@ -110,6 +111,7 @@ export async function generateJson<T>(
           try {
             const response = await fetch(input, { ...init, redirect: 'error' })
             transportStatus = response.status
+            retryAfter = response.headers.get('retry-after')
             return response
           } catch (error) {
             if (error instanceof TypeError)
@@ -118,42 +120,65 @@ export async function generateJson<T>(
           }
         }
         const model = createModel(request, providerFetch)
-        const result = await generateText({
-          model,
-          output,
-          system: request.prompt.system,
-          prompt: request.prompt.user,
-          maxOutputTokens,
-          maxRetries: 0,
-          abortSignal: signal,
-          ...(request.temperature === undefined
-            ? {}
-            : { temperature: request.temperature }),
-          telemetry: {
-            isEnabled: false,
-            recordInputs: false,
-            recordOutputs: false,
-          },
-          ...(request.provider === 'openai'
-            ? { providerOptions: { openai: { store: false } } }
-            : {}),
-        })
-        signal.throwIfAborted()
-        if (result.finishReason === 'content-filter')
-          throw new ControlledAiError('refused')
-        if (result.finishReason === 'length')
-          throw new ControlledAiError('invalid-output')
-        const resolvedModel =
-          request.provider === 'openrouter'
-            ? validResolvedModel(result.response.modelId, request.model)
-            : undefined
-        return {
-          status: 'success' as const,
-          data: result.output,
-          providerMetadata: {
-            ...metadata(),
-            ...(resolvedModel === undefined ? {} : { resolvedModel }),
-          },
+        for (let attempt = 0; ; attempt++) {
+          transportStatus = undefined
+          retryAfter = null
+          try {
+            const result = await generateText({
+              model,
+              output,
+              system: request.prompt.system,
+              prompt: request.prompt.user,
+              maxOutputTokens,
+              maxRetries: 0,
+              abortSignal: signal,
+              ...(request.temperature === undefined
+                ? {}
+                : { temperature: request.temperature }),
+              telemetry: {
+                isEnabled: false,
+                recordInputs: false,
+                recordOutputs: false,
+              },
+              ...(request.provider === 'openai'
+                ? { providerOptions: { openai: { store: false } } }
+                : {}),
+            })
+            signal.throwIfAborted()
+            if (result.finishReason === 'content-filter')
+              throw new ControlledAiError('refused')
+            if (result.finishReason === 'length')
+              throw new ControlledAiError('invalid-output')
+            const resolvedModel =
+              request.provider === 'openrouter'
+                ? validResolvedModel(result.response.modelId, request.model)
+                : undefined
+            return {
+              status: 'success' as const,
+              data: result.output,
+              providerMetadata: {
+                ...metadata(),
+                ...(resolvedModel === undefined ? {} : { resolvedModel }),
+              },
+            }
+          } catch (error) {
+            signal.throwIfAborted()
+            const delayMs = retryDelayMs(retryAfter)
+            if (
+              attempt !== 0 ||
+              request.retryTransientFreeModel !== true ||
+              request.provider !== 'openrouter' ||
+              !(
+                request.model === 'openrouter/free' ||
+                request.model.endsWith(':free')
+              ) ||
+              !isTransientFreeModelError(error, transportStatus) ||
+              delayMs >=
+                (request.timeoutMs ?? 30_000) - (Date.now() - startedAt)
+            )
+              throw error
+            await waitForRetry(delayMs, signal)
+          }
         }
       },
     )
@@ -407,4 +432,50 @@ function isProviderRefusal(error: unknown, provider: AiProviderId): boolean {
       )
     })
   )
+}
+
+function isTransientFreeModelError(error: unknown, status?: number): boolean {
+  if (!APICallError.isInstance(error)) return false
+  if (normalizeError(error, 'openrouter', status) !== 'network') return false
+  // An HTTP auth/quota/billing failure cannot be overridden by embedded metadata.
+  if (
+    status !== undefined &&
+    status >= 400 &&
+    ![502, 503, 504].includes(status)
+  )
+    return false
+  if (status !== undefined && [502, 503, 504].includes(status)) return true
+  const record = asRecord(error.data)
+  const body = asRecord(record?.error) ?? record
+  const tag = asRecord(body?.metadata)?.error_type
+  return tag === 'provider_unavailable' || tag === 'provider_overloaded'
+}
+
+function retryDelayMs(header: string | null): number {
+  if (header === null || !header.trim()) return 1000
+  const seconds = Number(header)
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000
+  const date = Date.parse(header)
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : 1000
+}
+
+function waitForRetry(delayMs: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    signal.throwIfAborted()
+    const cleanup = () => signal.removeEventListener('abort', onAbort)
+    const onAbort = () => {
+      clearTimeout(timer)
+      cleanup()
+      reject(
+        signal.reason instanceof Error
+          ? signal.reason
+          : new AiDeadlineError('cancelled'),
+      )
+    }
+    const timer = setTimeout(() => {
+      cleanup()
+      resolve()
+    }, delayMs)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
 }

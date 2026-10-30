@@ -74,6 +74,7 @@ describe('analyzeCode', () => {
         signal,
         timeoutMs,
         maxOutputTokens: 8192,
+        retryTransientFreeModel: config.provider === 'openrouter',
       })
     },
   )
@@ -128,3 +129,28 @@ describe('analyzeCode', () => {
     },
   )
 })
+
+it.each([
+  ['openrouter', 'openrouter/free', true],
+  ['openrouter', 'vendor/model:free', true],
+  ['openrouter', 'vendor/paid', false],
+  ['gemini', 'vendor/model:free', false],
+] as const)(
+  'opts into retries only for %s/%s',
+  async (provider, model, expected) => {
+    vi.mocked(generateJson).mockResolvedValue({
+      status: 'success',
+      data: makeValidAnalysis(),
+      providerMetadata: metadata,
+    })
+    await analyzeCode(
+      makeAnalysisRequest(),
+      { ...config, provider, model },
+      new AbortController().signal,
+      60000,
+    )
+    expect(
+      vi.mocked(generateJson).mock.calls[0]?.[0].retryTransientFreeModel,
+    ).toBe(expected)
+  },
+)

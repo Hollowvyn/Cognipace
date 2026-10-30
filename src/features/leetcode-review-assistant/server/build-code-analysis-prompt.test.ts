@@ -119,3 +119,10 @@ describe('buildCodeAnalysisPrompt', () => {
       expect(system).toContain(rule)
   })
 })
+
+it('requests compact complete reports without reducing the rubric', () => {
+  const { system } = buildCodeAnalysisPrompt(makeAnalysisRequest())
+  expect(system).toContain('one sentence per rationale')
+  expect(system).toContain('at most two high-value items per suggestion list')
+  expect(system).toContain('compact complexity assumptions')
+})

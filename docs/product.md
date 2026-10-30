@@ -159,9 +159,13 @@ causes no review write. The former AI recall-rating override has been retired.
 
 The overlay distinguishes idle, capture preparation, generation, ready,
 unavailable, and controlled-error states, with Settings and Retry where useful.
-Capture preparation has a 15-second deadline, background analysis a 30-second
+Capture preparation has a 15-second deadline, background analysis a 60-second
 deadline including configuration loading, and the whole client operation a
-50-second deadline. There is one provider attempt per request. Explicit Retry
+80-second deadline. Free OpenRouter assessments may recover once from a temporary
+provider failure within that same deadline. Quota, authentication and invalid
+reports require an explicit recovery action. Assessment guidance stays concise
+while retaining all scored sections and the complete suggested implementation.
+Explicit Retry
 uses a new request identity for the retained submission. New attempts,
 configuration/key/model changes, navigation, restart, disable, and clear/reset
 cancel or invalidate stale work. Reset keeps the same handled attempt idle

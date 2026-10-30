@@ -287,7 +287,7 @@ export function useLeetCodeCodeAnalysis(
       }
 
       void withAiDeadline(
-        { timeoutMs: 50_000, signal: operation.controller.signal },
+        { timeoutMs: 80_000, signal: operation.controller.signal },
         async (signal) => {
           const prepared = await prepareLeetCodeAnalysisContext(
             selectedCapture,

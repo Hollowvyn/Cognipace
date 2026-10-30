@@ -426,7 +426,7 @@ describe('useLeetCodeCodeAnalysis', () => {
     expect(request.configurationRevision).toBe(1)
     expect(request.submissionId).toBe('1234567890')
   })
-  it('bounds hung messaging at 50000ms, cancels, and ignores its late result', async () => {
+  it('bounds hung messaging at 80000ms, cancels, and ignores its late result', async () => {
     vi.useFakeTimers()
     const pending = deferred<AnalyzeLeetCodeSubmissionResponse>()
     analyze.mockReturnValue(pending.promise)
@@ -438,7 +438,7 @@ describe('useLeetCodeCodeAnalysis', () => {
     })
     const request = analyze.mock.calls[0]![0]
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(49999)
+      await vi.advanceTimersByTimeAsync(79999)
     })
     expect(result.current.state.status).toBe('pending')
     await act(async () => {
