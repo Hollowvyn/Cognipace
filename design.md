@@ -213,7 +213,7 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 - Get next hint reads the complete current editor again and requests one new
   hint, keeping earlier hints visible during preparation, generation and errors.
   Show successful hints used out of three and label each Light, Medium or Heavy.
-  Strength adapts to progress independently of the count. Show an honest final
+  Strength always follows successful hint count: Light, Medium, then Heavy. Show an honest final
   state after three successful hints; failures do not consume a slot. Explain
   that hints use the code snapshot at request time.
   Folding and reopening the hint block does not regenerate it.

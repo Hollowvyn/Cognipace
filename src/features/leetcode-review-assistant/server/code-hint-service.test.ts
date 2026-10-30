@@ -85,6 +85,7 @@ describe('generateCodeHints', () => {
       'Light',
       'Medium',
       'Heavy',
+      'regardless of progress',
     ])
       expect(call.prompt.system).toContain(phrase)
     expect(call.prompt.user).not.toContain('private-key')
@@ -105,7 +106,7 @@ describe('generateCodeHints', () => {
     [
       'real progress',
       { ...input.snapshot, code: 'const seen = new Map()' },
-      'light',
+      'medium',
       'improved',
     ],
     [
@@ -117,7 +118,7 @@ describe('generateCodeHints', () => {
     [
       'changed language',
       { ...input.snapshot, language: 'typescript' },
-      'light',
+      'medium',
       'improved',
     ],
   ] as const)(
@@ -157,6 +158,44 @@ describe('generateCodeHints', () => {
         new AbortController().signal,
       ),
     ).toEqual(success(third))
+  })
+
+  it('requires heavy on the third turn even after meaningful progress', async () => {
+    const second = {
+      snapshot: { ...input.snapshot, code: 'const seen = new Map()' },
+      hint: {
+        text: 'Store indices.',
+        strength: 'medium' as const,
+        progress: 'improved' as const,
+      },
+    }
+    const turn = {
+      ...input,
+      snapshot: {
+        ...input.snapshot,
+        code: 'const seen = new Map(); seen.set(value, index)',
+      },
+      history: [prior, second],
+    }
+    for (const strength of ['light', 'medium', 'heavy'] as const) {
+      const hint = {
+        text: 'Check distinct indices.',
+        strength,
+        progress: 'improved' as const,
+      }
+      vi.mocked(generateJson).mockResolvedValue(success(hint))
+      const result = await generateCodeHints(
+        turn,
+        config,
+        new AbortController().signal,
+      )
+      if (strength === 'heavy') expect(result).toEqual(success(hint))
+      else
+        expect(result).toMatchObject({
+          status: 'error',
+          code: 'invalid-output',
+        })
+    }
   })
 
   it.each([

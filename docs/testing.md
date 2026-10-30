@@ -1360,7 +1360,8 @@ production-component fixtures do not complete these human or live gates.
       guidance related to the earlier hints and problem, and a final three-hint
       limit. Fold/reopen and switch modes/tabs without another request.
 - [ ] Restart. Act on the first hint and make meaningful progress, then request
-      another: expect Light focused on the next remaining gap. Rename variables
+      another: expect Medium focused on the next remaining gap, then Heavy on
+      the third successful request even after further progress. Rename variables
       or change formatting only and verify that does not masquerade as progress.
       Repeat with a regression and with almost-complete code: hints must target
       the real gap or suggest verification, never invent a defect.
@@ -1391,7 +1392,7 @@ production-component fixtures do not complete these human or live gates.
       retained earlier hints during pending/error, Get next hint, limit, Retry,
       Settings, focus and reachable immediate review controls.
 - [ ] Record extension version, provider/model and exact flows. Attach first,
-      stagnant escalation, progressing-light, final, later-pending/error,
+      stagnant escalation, progressing-medium/heavy, final, later-pending/error,
       retained-after-save and reset/navigation screenshots or recording.
 
 #### Adaptive hints provider evaluation

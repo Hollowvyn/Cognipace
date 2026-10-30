@@ -100,10 +100,10 @@ Current behavior:
 - one new code-aware hint per explicit request, with at most three successful
   hints per session; each request captures the complete current editor code and
   language and includes earlier hints with their code snapshots
-- a light first hint; unchanged code escalates to medium then heavy, while
-  meaningful progress gets a light nudge at the next gap; cosmetic edits,
-  irrelevant changes and regressions receive stronger guidance
-- Light, Medium and Heavy describe specificity independently of the hint count;
+- a fixed light → medium → heavy sequence for successful hints, including
+  after meaningful progress; every hint uses the latest snapshot and targets
+  the remaining gap
+- Light, Medium and Heavy describe the specificity of hints one, two and three;
   hints respect the learner's valid approach and focus on remaining logic or
   edge cases, rather than forcing a single reference solution
 - session-only hints that retain their history and disclosure

@@ -145,7 +145,7 @@ describe('trusted background hints', () => {
     }
     generateHints.mockResolvedValue({
       ...success,
-      data: { text: 'Next gap.', strength: 'light', progress: 'improved' },
+      data: { text: 'Next gap.', strength: 'medium', progress: 'improved' },
     })
     const result = await generateLeetCodeHintsInBackground(
       nextRequest,
@@ -154,7 +154,7 @@ describe('trusted background hints', () => {
     )
     expect(result).toMatchObject({
       status: 'ready',
-      hint: { strength: 'light', progress: 'improved' },
+      hint: { strength: 'medium', progress: 'improved' },
     })
     expect(generateHints).toHaveBeenCalledWith(
       { problem: request.problem, snapshot: nextRequest.snapshot, history },

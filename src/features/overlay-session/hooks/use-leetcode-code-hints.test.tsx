@@ -212,7 +212,7 @@ describe('explicit progressive hint sessions', () => {
     ).toEqual(['constraints', 'examples', 'host', 'slug', 'statement', 'title'])
     expect(hook.remote.readSubmissionResult).not.toHaveBeenCalled()
   })
-  it('requests three fresh snapshots with adaptive strengths and caps extra clicks', async () => {
+  it('requests three fresh snapshots with ordered strengths and caps extra clicks', async () => {
     const hook = mount()
     await requestHints(hook)
     for (const count of [2, 3]) {
@@ -240,7 +240,7 @@ describe('explicit progressive hint sessions', () => {
     act(() => hook.result.current.toggle())
     expect(mocks.generate).toHaveBeenCalledTimes(3)
   })
-  it('pins pending results to original code and captures changed code for an improved light next turn', async () => {
+  it('pins pending results to original code and captures changed code for an improved medium next turn', async () => {
     const pending = deferred<GenerateLeetCodeHintsResponse>()
     mocks.generate.mockReturnValueOnce(pending.promise)
     const hook = mount()
@@ -265,7 +265,7 @@ describe('explicit progressive hint sessions', () => {
         requestId: request.requestId,
         hint: {
           text: 'Finish the last gap.',
-          strength: 'light',
+          strength: 'medium',
           progress: 'improved',
         },
       }),
@@ -278,7 +278,7 @@ describe('explicit progressive hint sessions', () => {
           expect.anything(),
           {
             snapshot: { code: 'return correctAnswer' },
-            hint: { strength: 'light', progress: 'improved' },
+            hint: { strength: 'medium', progress: 'improved' },
           },
         ],
       }),

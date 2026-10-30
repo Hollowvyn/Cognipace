@@ -32,15 +32,16 @@ export function isCodeHintConsistent(
 ): boolean {
   if (input.history.some((turn) => turn.hint.text.trim() === hint.text.trim()))
     return false
+  const expectedStrength = (['light', 'medium', 'heavy'] as const)[
+    input.history.length
+  ]
+  if (!expectedStrength || hint.strength !== expectedStrength) return false
   const previous = input.history.at(-1)
-  if (!previous) return hint.progress === 'initial' && hint.strength === 'light'
+  if (!previous) return hint.progress === 'initial'
   if (hint.progress === 'initial') return false
-  if (hint.progress === 'improved')
-    return (
-      !sameCode(previous.snapshot, input.snapshot) && hint.strength === 'light'
-    )
-  const strength = previous.hint.strength === 'light' ? 'medium' : 'heavy'
-  return hint.strength === strength
+  return (
+    hint.progress !== 'improved' || !sameCode(previous.snapshot, input.snapshot)
+  )
 }
 
 export const codeHintHistorySchema = z
@@ -58,7 +59,7 @@ export const codeHintHistorySchema = z
         ctx.addIssue({
           code: 'custom',
           path: [index, 'hint'],
-          message: 'Hint history has an inconsistent adaptive transition.',
+          message: 'Hint history has an inconsistent ordered transition.',
         })
       }
     }

@@ -708,10 +708,11 @@ at most two previous `{ snapshot, hint }` turns alongside problem and connection
 revision/provider. One response contains `{ text, strength, progress }`. A hint
 is trimmed, nonblank, at most 600 characters and rendered as inert text.
 The first turn is light/initial. Identical code/language (normalizing only line
-endings) forces stuck and escalates light to medium to heavy. Changed code lets
-the model assess semantic progress: improved returns to light; cosmetic edits,
-irrelevant changes and regressions strengthen guidance. Heavy remains heavy if
-still stuck. Validation rejects inconsistent transitions and duplicate hints.
+endings) forces stuck. Strength always follows successful history length:
+light, medium, heavy, regardless of progress. Changed code lets the model assess
+semantic progress to target the next remaining gap; cosmetic edits, irrelevant
+changes and regressions do not count as improved. Validation rejects out-of-order
+strengths, inconsistent progress and duplicate hints.
 The prompt preserves valid strategies, targets the smallest remaining gap and
 avoids complete implementations or invented defects. A model progress judgment
 is not proof of correctness; live provider quality requires separate evaluation.

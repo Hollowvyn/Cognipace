@@ -98,3 +98,21 @@ Files: `docs/product.md`, `docs/architecture.md`, `docs/testing.md`, `design.md`
       and opted-in live quality stay pending until performed.
 - [x] Independently review final spec coverage then code quality, fix findings,
       record release/rollback and validation limits, and leave reviewable changes.
+
+## Approved correction — 2026-10-30
+
+The user's delayed clarification selects **always light → medium → heavy**,
+including after meaningful progress. This supersedes progress-dependent strength
+in the original plan/spec. Snapshot capture, progress assessment, remaining-gap
+focus, three successful turns and failure handling retain their current scope.
+
+Phase-sized correction:
+
+1. Change contract/service/hook regression tests to require medium for improved
+   second turns and heavy for improved third turns; reject returning to light.
+2. Enforce strength by successful history length, independently of progress;
+   update the provider prompt and authored evaluation expectations.
+3. Align product/architecture/testing/design/spec documentation, run focused
+   tests and full lint/check/build/format, then update draft PR #203. Prior visual
+   fixture proof is historical; human installed-extension and provider gates
+   remain pending.

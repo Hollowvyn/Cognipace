@@ -150,7 +150,7 @@ describe('code hint contracts', () => {
           hint: { ...second.hint, strength: 'light', progress: 'improved' },
         },
       ]),
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it.each(['code', 'diagnostics', 'auth', 'hints', 'followUps'])(

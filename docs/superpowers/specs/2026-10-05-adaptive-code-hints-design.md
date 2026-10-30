@@ -14,12 +14,13 @@ earlier hints with their pinned code snapshots. Failed capture or generation doe
 not consume a turn. Retry captures fresh code. Double activation coalesces into
 one request. Folding, mode/tab changes and review saves do not generate hints.
 
-The first hint is light. With identical code and language (normalizing only line
-endings), strengthen from light to medium to heavy. When code changes, the model
-must assess meaningful progress against the previous hint: real progress gets a
-light hint about the next remaining gap; cosmetic edits, irrelevant changes and
-regressions get a stronger hint. Heavy stays heavy if still stuck. Strength and
-turn count are independent; three progressing turns may all be light.
+The user clarified on 2026-10-30 that strength always advances by successful
+turn: first Light, second Medium, third Heavy, including after meaningful
+progress. This supersedes the original progress-dependent strength policy.
+Compare snapshots to assess progress and focus on the next remaining gap;
+progress never resets strength. Identical code and language (normalizing only
+line endings) must be stuck. Cosmetic edits, irrelevant changes and regressions
+do not count as improved.
 
 Light names an idea or asks a targeted question. Medium identifies the relevant
 logic and what needs to change. Heavy gives concrete steps for the remaining gap.
@@ -55,7 +56,7 @@ and local-data clear invalidate history and reject late output.
 
 `leetcode-review-assistant` owns strict Zod snapshot/history/request/response
 contracts and the single-turn prompt. History is bounded to two prior turns;
-validate turn order, first-light and adaptive transitions. Exactly unchanged
+validate turn order, first-light and fixed ordered strengths. Exactly unchanged
 snapshots must never be classified as progress. Model-classified progress is an
 assessment, not proof of correctness. Retain runtime sender authorization,
 independent hint/report cancellation, connection revision checks, deadlines,
@@ -74,8 +75,8 @@ cache, backup, sync, review, rating, timer, FSRS or Analytics writes.
 
 Prove full-model capture beyond visible lines, ambiguous/missing/oversized input,
 request correlation, cancellation/timeout cleanup and SPA navigation rejection.
-Prove three separate snapshot-bound turns; unchanged escalation; progress returning
-to light; cosmetic edits/regression; failures not consuming slots; retained prior
+Prove three separate snapshot-bound turns; unchanged escalation; progress retaining
+medium/heavy strength; cosmetic edits/regression; failures not consuming slots; retained prior
 hints; coalescing and stale-result rejection. Test contracts, service/prompt,
 runtime and hook/component behavior. Run focused tests, `npm run lint`,
 `npm run check`, `npm run build`, and Prettier on touched files.

@@ -97,9 +97,9 @@ export const codeHintEvaluationFixtures = [
   {
     id: 'real-progress',
     input: input(buggy, [{ snapshot: empty, hint: first }]),
-    expected: { strength: 'light', progress: 'improved' },
+    expected: { strength: 'medium', progress: 'improved' },
     criterion:
-      'Recognize meaningful reuse/lookup progress; ask a light question about the remaining same-index defect and preserve the map approach.',
+      'Recognize meaningful reuse/lookup progress; give medium guidance about the remaining same-index defect and preserve the map approach.',
   },
   {
     id: 'cosmetic-comment',
@@ -129,14 +129,14 @@ export const codeHintEvaluationFixtures = [
   {
     id: 'near-complete',
     input: input(complete, [{ snapshot: buggy, hint: distinct }]),
-    expected: { strength: 'light', progress: 'improved' },
+    expected: { strength: 'medium', progress: 'improved' },
     criterion:
       'Recognize the fixed distinct-index gap; offer a targeted verification check such as duplicate values, without inventing a defect or claiming executed correctness.',
   },
   {
     id: 'valid-alternative-progress',
     input: input(alternative, [{ snapshot: buggy, hint: distinct }]),
-    expected: { strength: 'light', progress: 'improved' },
+    expected: { strength: 'medium', progress: 'improved' },
     criterion:
       'Preserve the correct nested-loop alternative under the small constraints. A strategy switch solving the gap counts as progress without obeying an earlier algorithm. Offer verification, not a fabricated bug.',
   },

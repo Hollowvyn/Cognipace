@@ -9,11 +9,41 @@ Human and real-provider gates below remain pending; no merge readiness is claime
 
 Replace a problem-only precomputed batch with one hint per explicit request.
 Each request reads complete current editor code and includes earlier hint/code
-snapshots. Start light, strengthen when stuck, return to light after meaningful
-progress, and cap successful hints at three. Retain earlier hints during edits,
+snapshots. Always advance light → medium → heavy by successful turn count,
+including after meaningful progress, and cap successful hints at three. Retain earlier hints during edits,
 subsequent requests and failures. No hint-related persistence or review writes.
 
-## Validation record
+## Approved strength correction — 2026-10-30
+
+The user explicitly chose always advancing light → medium → heavy. Progress
+still determines the remaining gap to target; it no longer resets strength.
+Contracts reject out-of-order history and provider output. The generation
+prompt, evaluation fixtures, overlay tests and current authority docs use this
+policy. The capture path and visible component layout did not change.
+
+- `rtk proxy npm test -- src/features/leetcode-review-assistant/server/code-hint-service.test.ts src/features/leetcode-review-assistant/api/code-hint-contracts.test.ts src/features/overlay-session/hooks/use-leetcode-code-hints.test.tsx --run`:
+  initially produced five expected RED failures before the policy correction.
+- `rtk proxy npm test -- src/features/leetcode-review-assistant src/features/overlay-session --run`:
+  passed, 524 tests; 14 opt-in live cases skipped. Includes medium after progress
+  on turn two and heavy after progress on turn three, rejecting a return to light.
+- `rtk proxy npm run check`: passed database check, typecheck, lint and tests;
+  3,098 tests passed, 14 opt-in live cases skipped. Existing jsdom `scrollTo`
+  notices appeared.
+- `rtk proxy npm run lint`, `rtk proxy npm run build` and
+  `rtk proxy npm run format`: passed. Existing build chunk-size warning remains.
+- `rtk proxy npm test -- src/features/leetcode-review-assistant/server/hint-runtime-service.test.ts --run`:
+  passed, 23 tests after aligning the runtime's successful progress fixture.
+- `rtk proxy npx prettier --check --ignore-path /dev/null docs/superpowers/specs/2026-10-05-adaptive-code-hints-design.md docs/superpowers/plans/2026-10-05-adaptive-code-hints.md docs/superpowers/handoffs/2026-10-05-adaptive-code-hints.md`
+  and `rtk proxy git diff --check`: passed after the final documentation updates.
+
+The historical component proof below predates this clarification. Its
+progressing-light assertion is superseded and is not evidence for the current
+policy; the recorded screenshots still show the unchanged component layout.
+Fresh human happy-path and edge-case proof, live editor compatibility and live
+provider quality remain pending. The skipped commands and reasons below apply
+to this correction as well.
+
+## Original validation record — 2026-10-05
 
 Pinned toolchain: `rtk proxy node --version` returned `v24.20.0`;
 `rtk proxy npm --version` returned `11.19.0`.
@@ -55,7 +85,7 @@ Pinned toolchain: `rtk proxy node --version` returned `v24.20.0`;
   Interim typecheck had six expected obsolete overlay batch-consumer diagnostics;
   those are resolved in Task 3 before aggregate verification.
 
-## Final verification and review
+## Original final verification and review
 
 - Task 3 `rtk proxy npm test -- src/features/overlay-session --run`: passed,
   15 files and 230 tests; independent SPEC and QUALITY reviewers each repeated
@@ -77,7 +107,7 @@ Pinned toolchain: `rtk proxy node --version` returned `v24.20.0`;
   passed after final documentation updates.
 - `rtk git diff --check`: passed on the complete change.
 
-## Production-component fixture proof
+## Historical production-component fixture proof
 
 The Browser plugin was unavailable; used existing bundled Playwright with
 installed Google Chrome, with production `OverlayHelpSection`, production CSS,
@@ -98,7 +128,7 @@ medium/heavy progression, retained earlier hints while pending and after error,
 disabled pending action, retry preserving count, three-success cap, progressing
 light hints, no hint horizontal overflow, no page/console errors, expected page
 identity/content and no framework error overlay. Agent inspected the final
-screenshots. Ten screenshots remain in that temporary directory. Four selected screenshots and
+screenshots. The temporary fixture directory is no longer available. Four selected screenshots and
 `checks.json` are committed under `docs/superpowers/proof/2026-10-05-adaptive-code-hints`.
 
 - [392px dark final fixture](../proof/2026-10-05-adaptive-code-hints/final-dark-392.png)
@@ -120,7 +150,7 @@ screenshots. Ten screenshots remain in that temporary directory. Four selected s
 **HUMAN INSTALLED-EXTENSION SMOKE PENDING**, **LIVE EDITOR COMPATIBILITY
 PENDING**, and **LIVE PROVIDER QUALITY EVALUATION PENDING**. Follow the adaptive
 hints checklist in `docs/testing.md`. Verify full off-screen solution code,
-unchanged escalation, progressing-light guidance, cosmetic edits, regressions,
+unchanged escalation, progressing-medium/heavy guidance, cosmetic edits, regressions,
 near-complete code, later-turn retries, edited pending snapshots, immediate review
 saves and stale output after reset/navigation/connection changes. Attach human
 screenshots or a recording before PR review or merge. Agent fixtures and model
