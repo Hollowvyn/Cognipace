@@ -719,7 +719,12 @@ checks. Explicit model objects use controlled fetch with redirects rejected,
 SDK retries disabled, bounded output, and telemetry disabled. Strict SDK/Zod
 and report-consistency validation remain required. OpenRouter requests specify
 only the selected model, without paid fallback IDs or privacy overrides;
-OpenRouter can perform internal routing within CogniPace's single request.
+OpenRouter can perform internal routing within each request. Assessments alone
+opt into one application recovery attempt for any provider/model after a recognized
+transient upstream failure; SDK retries remain disabled. Recovery preserves the
+selected model, strict output and the shared whole-operation deadline. It uses
+abortable backoff, honors Retry-After, and returns the original error if the delay
+cannot fit. Quota, auth, billing, refusal and output errors do not trigger recovery.
 
 Metadata keeps requested `model` as configuration identity and optionally adds
 bounded `resolvedModel` for a successful OpenRouter response that identifies a
@@ -768,8 +773,8 @@ secret.
 Ownership follows the existing feature direction. `src/lib/ai` owns reusable
 structured SDK transport and the direct official provider adapters. GenAI owns
 saved configuration, availability, trusted credentials, and connection testing.
-`leetcode-review-assistant` owns the versioned report and request schemas,
-rubric, prompt, consistency checks, and analysis service.
+`leetcode-review-assistant` owns the separate versioned feedback and
+implementation schemas, requests, prompts, consistency checks and services.
 `leetcode-capture` and `src/lib/leetcode` own full matching submission and
 problem content, including follow-ups and refreshable capture caches.
 `overlay-session` owns the session controller and Option A presentation.
@@ -793,9 +798,13 @@ serialized problem context up to 24,000 characters. Optional diagnostics above
 2,000 characters are omitted and named explicitly. Code and problem content are
 never silently truncated. Preparation refreshes the immutable submission pin
 and has a 15-second deadline; the retained pin survives unavailable reads for
-Retry. A request has one SDK generation with an 8,192-token output budget and a
-30-second background deadline including database/configuration/secret loading.
-The controller bounds the complete client operation at 50 seconds. Retry makes
+Retry. A request has an 8,192-token output budget and a 60-second background
+deadline including database/configuration/secret loading and any recovery.
+The controller bounds the complete client operation at 80 seconds. All assessment providers/models may retry a transient failure once; hints and
+connection tests keep one attempt. Reports request concise rationales and at most two high-value suggestions
+per list. The initial provider schema excludes implementation fields; a separate
+explicit operation generates complete suggested code from the same assessed
+source and validated feedback. Retry makes
 a fresh request identity for the same retained submission; repeated terminal
 events and disclosure/collapse/dock actions do not generate another request.
 
@@ -807,6 +816,26 @@ correctness, human rubric quality, or universal optimality. Suggested code is
 rendered as text, labeled AI-generated and Untested, and is never executed or
 submitted by the product.
 
+The overlay retains the successful assessment request and feedback in session
+memory. On-demand implementation requests are self-contained strict envelopes
+with that original context and correlated identities. The background treats
+all supplied context as untrusted model data, authorizes the actual sender
+host/slug, and checks the trusted connection before publishing. Code generation
+does not depend on completed-result state surviving an MV3 worker restart.
+Its in-flight ownership/cancellation is independent of feedback and hints;
+navigation, reset, disable, a new attempt or configuration change rejects stale
+code. Both operations keep 60-second background and 80-second client bounds.
+
+Assessment generation explicitly opts into safe numeric measurements: outgoing
+request-body bytes, validated output JSON bytes, attempts, schema preparation,
+generation and validation durations, plus available normalized SDK usage.
+Generation timing excludes validation and backoff; missing tokens stay unknown,
+and usage does not claim unknown failed-attempt billing. No response body clone,
+extra measurement fetch or raw SDK metadata is retained. Provider input omits
+null optional metadata and empty diagnostics while preserving all populated
+evidence, exact source, language, examples, constraints and zero counts. Local
+runtime request contracts retain the complete typed context.
+
 Reports and in-flight operations stay in session/controller state, outside
 TanStack Query query and mutation caches and the database. Report completion
 causes no invalidation, sync, review write, or rating change. The retired
@@ -817,9 +846,13 @@ key-save transport and provider authentication still carry keys where required.
 
 Evaluation inputs live in the owning review-assistant testing folder, and the
 test-only private environment configuration lives in GenAI testing. The opt-in
-harness calls the real `analyzeCode` SDK path with six cases and stores only
-report, provider metadata, criterion, and checked date in
-`/private/tmp/cognipace-ai-evaluation`. Its environment option does not replace
+harness calls the real `analyzeCode` SDK path with six cases and writes controlled
+success and failure artifacts before asserting success. Successful cases include
+the validated report; failed cases include only the controlled error category.
+Artifacts retain fixture identity, allowlisted provider metadata and checked date;
+a current-run summary records counts, error categories and durations under
+`/private/tmp/cognipace-ai-evaluation`. Raw SDK messages, bodies and keys are never
+written. Its environment option does not replace
 or read the application's trusted secret store. Normal tests skip all six live
 cases before reading any evaluation provider/model/key values.
 

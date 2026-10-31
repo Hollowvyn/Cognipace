@@ -142,3 +142,19 @@ export function makeAnalysisRequest(): AnalyzeLeetCodeSubmissionRequest {
     },
   }
 }
+
+export function makeValidFeedback(
+  overrides: Partial<
+    import('../domain/code-feedback-schema').CodeFeedbackReport
+  > = {},
+): import('../domain/code-feedback-schema').CodeFeedbackReport {
+  const { summary, approach, efficiency, codeStyle } = makeValidAnalysis()
+  return {
+    version: 'leetcode-code-feedback-v1',
+    summary,
+    approach,
+    efficiency,
+    codeStyle,
+    ...overrides,
+  }
+}

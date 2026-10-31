@@ -3,6 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { makeValidAnalysis } from '@/features/leetcode-review-assistant/testing'
+import {
+  makeAnalysisRequest,
+  makeValidFeedback,
+} from '@/features/leetcode-review-assistant/testing/code-analysis-fixtures'
+import type { CodeImplementationState } from '../../../hooks/use-leetcode-code-implementation'
 
 import type { CodeAnalysisState } from '../../../hooks/use-leetcode-code-analysis'
 import { OverlayCodeAnalysis } from './overlay-code-analysis'
@@ -13,15 +18,31 @@ const ready = (
 ): CodeAnalysisState => ({
   status: 'ready',
   requestId,
-  report,
+  report: {
+    ...makeValidFeedback(),
+    summary: report.summary,
+    approach: report.approach,
+    efficiency: report.efficiency,
+    codeStyle: report.codeStyle,
+  },
+  assessment: makeAnalysisRequest(),
+  host: 'leetcode.com',
 })
 
-function mount(state: CodeAnalysisState = ready()) {
+function mount(
+  state: CodeAnalysisState = ready(),
+  implementationState: CodeImplementationState = {
+    status: 'ready',
+    implementation: makeValidAnalysis().suggestedImplementation!,
+  },
+) {
   const onRetry = vi.fn()
   const onSettings = vi.fn()
   const renderState = (next: CodeAnalysisState) => (
     <OverlayCodeAnalysis
       state={next}
+      implementationState={implementationState}
+      onGenerateImplementation={vi.fn()}
       onRetry={onRetry}
       onSettings={onSettings}
     />
@@ -62,7 +83,15 @@ describe('OverlayCodeAnalysis', () => {
   it('shows the factual summary, score chips, and four independent closed native disclosures', async () => {
     const user = userEvent.setup()
     const report = makeValidAnalysis()
-    const { onRetry } = mount(ready(report))
+    const { onRetry } = mount(
+      ready(report),
+      report.suggestedImplementation
+        ? { status: 'ready', implementation: report.suggestedImplementation }
+        : {
+            status: 'unavailable',
+            message: report.suggestedImplementationUnavailableReason!,
+          },
+    )
     expect(
       screen.getByRole('region', { name: 'AI assessment' }),
     ).toBeInTheDocument()
@@ -95,7 +124,15 @@ describe('OverlayCodeAnalysis', () => {
 
   it('renders all approach, efficiency, and style rows with independently colored resources', () => {
     const report = makeValidAnalysis()
-    mount(ready(report))
+    mount(
+      ready(report),
+      report.suggestedImplementation
+        ? { status: 'ready', implementation: report.suggestedImplementation }
+        : {
+            status: 'unavailable',
+            message: report.suggestedImplementationUnavailableReason!,
+          },
+    )
     const approach = within(disclosure('Approach'))
     for (const label of ['Current', 'Suggested', 'Key idea', 'Consider'])
       expect(approach.getByText(label)).toBeInTheDocument()
@@ -141,7 +178,15 @@ describe('OverlayCodeAnalysis', () => {
     const report = makeValidAnalysis()
     report.efficiency.timeComparison = 'equivalent'
     report.efficiency.spaceComparison = 'unknown'
-    mount(ready(report))
+    mount(
+      ready(report),
+      report.suggestedImplementation
+        ? { status: 'ready', implementation: report.suggestedImplementation }
+        : {
+            status: 'unavailable',
+            message: report.suggestedImplementationUnavailableReason!,
+          },
+    )
     const efficiency = within(disclosure('Efficiency'))
     expect(efficiency.getByText('Expected O(n)')).toHaveClass('text-foreground')
     expect(efficiency.getByText('O(n)')).toHaveClass('text-muted-foreground')
@@ -162,7 +207,10 @@ describe('OverlayCodeAnalysis', () => {
     report.suggestedImplementation = null
     report.suggestedImplementationUnavailableReason =
       'The full signature is unavailable.'
-    mount(ready(report))
+    mount(ready(report), {
+      status: 'unavailable',
+      message: report.suggestedImplementationUnavailableReason,
+    })
     for (const chip of [
       'Approach Unavailable',
       'Efficiency Unavailable',
@@ -191,7 +239,15 @@ describe('OverlayCodeAnalysis', () => {
     const report = makeValidAnalysis()
     report.suggestedImplementation!.code =
       '  class Solution {\n' + 'x'.repeat(1000) + '\n}\n'
-    mount(ready(report))
+    mount(
+      ready(report),
+      report.suggestedImplementation
+        ? { status: 'ready', implementation: report.suggestedImplementation }
+        : {
+            status: 'unavailable',
+            message: report.suggestedImplementationUnavailableReason!,
+          },
+    )
     const details = disclosure('Suggested implementation')
     expect(details).not.toHaveAttribute('open')
     const code = details.querySelector('pre > code')!
@@ -222,7 +278,15 @@ describe('OverlayCodeAnalysis', () => {
       const pending = deferred()
       const writeText = clipboard(pending.promise)
       const report = makeValidAnalysis()
-      mount(ready(report))
+      mount(
+        ready(report),
+        report.suggestedImplementation
+          ? { status: 'ready', implementation: report.suggestedImplementation }
+          : {
+              status: 'unavailable',
+              message: report.suggestedImplementationUnavailableReason!,
+            },
+      )
       await user.click(
         screen.getByText('Suggested implementation', { selector: 'summary' }),
       )
@@ -304,7 +368,15 @@ describe('OverlayCodeAnalysis', () => {
     const report = makeValidAnalysis({ summary: modelText })
     report.approach.rationale = 'x'.repeat(800)
     report.approach.keyIdea = modelText
-    mount(ready(report))
+    mount(
+      ready(report),
+      report.suggestedImplementation
+        ? { status: 'ready', implementation: report.suggestedImplementation }
+        : {
+            status: 'unavailable',
+            message: report.suggestedImplementationUnavailableReason!,
+          },
+    )
     expect(screen.getAllByText(modelText)).toHaveLength(2)
     expect(document.querySelector('script')).toBeNull()
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
@@ -408,3 +480,63 @@ describe('OverlayCodeAnalysis', () => {
     },
   )
 })
+
+it('opens suggested implementation without generating; only the native Generate button requests code', async () => {
+  const onGenerateImplementation = vi.fn()
+  const user = userEvent.setup()
+  render(
+    <OverlayCodeAnalysis
+      state={ready()}
+      onRetry={vi.fn()}
+      onSettings={vi.fn()}
+      implementationState={{ status: 'idle' }}
+      onGenerateImplementation={onGenerateImplementation}
+    />,
+  )
+  await user.click(
+    screen.getByText('Suggested implementation', { selector: 'summary' }),
+  )
+  expect(onGenerateImplementation).not.toHaveBeenCalled()
+  const button = screen.getByRole('button', { name: 'Generate suggested code' })
+  button.focus()
+  await user.keyboard('{Enter}')
+  expect(onGenerateImplementation).toHaveBeenCalledTimes(1)
+})
+
+it.each(['pending', 'error', 'unavailable'] as const)(
+  'keeps scored feedback visible while suggested code is %s',
+  async (status) => {
+    const user = userEvent.setup()
+    const onGenerateImplementation = vi.fn()
+    const onRetry = vi.fn()
+    render(
+      <OverlayCodeAnalysis
+        state={ready()}
+        onRetry={onRetry}
+        onSettings={vi.fn()}
+        implementationState={
+          status === 'pending'
+            ? { status }
+            : { status, message: 'Suggested code could not finish.' }
+        }
+        onGenerateImplementation={onGenerateImplementation}
+      />,
+    )
+    await user.click(
+      screen.getByText('Suggested implementation', { selector: 'summary' }),
+    )
+    expect(screen.getByText('Approach 3/5')).toBeVisible()
+    const button = screen.getByRole('button', {
+      name:
+        status === 'pending'
+          ? 'Generate suggested code'
+          : 'Retry suggested code',
+    })
+    if (status === 'pending') expect(button).toBeDisabled()
+    else {
+      await user.click(button)
+      expect(onGenerateImplementation).toHaveBeenCalledTimes(1)
+    }
+    expect(onRetry).not.toHaveBeenCalled()
+  },
+)

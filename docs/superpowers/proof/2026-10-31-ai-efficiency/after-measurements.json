@@ -1,0 +1,99 @@
+{
+  "kind": "offline synthetic fixture measurement; no real model calls or latency/token claims",
+  "wires": [
+    {
+      "provider": "openai",
+      "mockEnvelopeStatus": "success",
+      "requestBodyBytes": 7343,
+      "schemaBytes": 3198
+    },
+    {
+      "provider": "anthropic",
+      "mockEnvelopeStatus": "success",
+      "requestBodyBytes": 7756,
+      "schemaBytes": 3638
+    },
+    {
+      "provider": "gemini",
+      "mockEnvelopeStatus": "success",
+      "requestBodyBytes": 7297,
+      "schemaBytes": 3199
+    },
+    {
+      "provider": "openrouter",
+      "mockEnvelopeStatus": "success",
+      "requestBodyBytes": 7377,
+      "schemaBytes": 3198
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "brute-force-linear-goal",
+      "systemBytes": 3106,
+      "userBytes": 1074,
+      "submittedCodeBytes": 201
+    },
+    {
+      "id": "small-constant-space",
+      "systemBytes": 3106,
+      "userBytes": 1048,
+      "submittedCodeBytes": 201
+    },
+    {
+      "id": "sorted-one-based",
+      "systemBytes": 3106,
+      "userBytes": 1188,
+      "submittedCodeBytes": 258
+    },
+    {
+      "id": "insert-before-lookup",
+      "systemBytes": 3106,
+      "userBytes": 1249,
+      "submittedCodeBytes": 238
+    },
+    {
+      "id": "kotlin-inferred-int",
+      "systemBytes": 3106,
+      "userBytes": 1293,
+      "submittedCodeBytes": 338
+    },
+    {
+      "id": "kotlin-long-and-generic",
+      "systemBytes": 3106,
+      "userBytes": 1113,
+      "submittedCodeBytes": 289
+    }
+  ],
+  "report": {
+    "fullBytes": 2115,
+    "coreOnlyBytes": 1395,
+    "implementationFieldBytes": 721
+  },
+  "comparison": [
+    {
+      "provider": "openai",
+      "beforeRequestBodyBytes": 8641,
+      "afterRequestBodyBytes": 7343,
+      "requestReductionPercent": 15.02
+    },
+    {
+      "provider": "anthropic",
+      "beforeRequestBodyBytes": 9249,
+      "afterRequestBodyBytes": 7756,
+      "requestReductionPercent": 16.14
+    },
+    {
+      "provider": "gemini",
+      "beforeRequestBodyBytes": 8595,
+      "afterRequestBodyBytes": 7297,
+      "requestReductionPercent": 15.1
+    },
+    {
+      "provider": "openrouter",
+      "beforeRequestBodyBytes": 8675,
+      "afterRequestBodyBytes": 7377,
+      "requestReductionPercent": 14.96
+    }
+  ],
+  "scope": "Initial feedback only, authored fixture, mocked transport; code requests add a separate call. No measured latency/token/cost claim."
+}

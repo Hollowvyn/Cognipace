@@ -939,7 +939,10 @@ cannot validate a replacement key or model.
    unavailable free capacity or quota when available; distinguish 402 balance/key
    limit guidance from 429 quota guidance. Account privacy/capability restrictions
    may make a model unavailable; do not loosen privacy settings automatically.
-   Confirm no automatic retries or app-configured paid fallback requests.
+   Confirm no retries for quota/auth/billing/refusal/invalid reports and no
+   app-configured paid fallback requests. Assessments on any provider/model may recover once from
+   a temporary upstream failure within the shared deadline. Connection tests and
+   hints retain their single-attempt behavior.
 7. Remove the OpenRouter key. Confirm unavailable analysis and that other saved
    provider keys remain. Assessment can be disabled after removal. Reset Defaults
    keeps saved keys, disables assessment, and restores the blank default model.
@@ -2051,15 +2054,52 @@ success or schema validity. Mocked wire tests are separate evidence. Capacity,
 account privacy settings, billing, or schema-support failures remain controlled
 and do not trigger app-configured paid fallback requests.
 
-Each case calls the actual `analyzeCode` service with a 30-second deadline and
-35-second test timeout, using the existing single 8,192-token SDK path. A
-successful case writes only report, providerMetadata, criterion, and checkedAt
-to `/private/tmp/cognipace-ai-evaluation/<fixture.id>.json`. It never writes raw
+Human assessment reliability smoke (attach screenshots or a recording):
+
+- Use `openrouter/free` and submit a valid solution; verify all scored sections,
+  concise guidance, complete suggested code and independent manual review saving.
+- Exercise a response taking more than 30 seconds; it may complete within the
+  60-second background deadline. A stalled worker must exit the client pending
+  state by its 80-second deadline and offer Retry.
+- In a test-only transport harness, fail once with a temporary upstream error,
+  then succeed. Verify at most two attempts, the same selected model and no
+  extra report/review writes. Honor Retry-After; an excessive delay returns the
+  controlled error. Capture evidence of the observed attempt count and timing.
+- Exercise quota, authentication and invalid-output errors; verify no automatic
+  recovery attempt. Navigate, cancel or change connection during backoff and
+  generation; obsolete work must not publish a report or begin another attempt.
+- Repeat recovery with a paid/custom model and each supported provider.
+  Connection tests and hints retain their single-attempt policy. Record extension
+  version and requested/served model.
+
+Each case calls the actual `analyzeCode` service with a 60-second deadline and
+65-second test timeout, using the 8,192-token SDK path with bounded recovery for
+all supported provider/model selections. Every case writes a controlled outcome before the
+success assertion to `/private/tmp/cognipace-ai-evaluation/feedback/<fixture.id>.json`.
+Successful outcomes include the validated report; errors include only the
+controlled error category. Allowlisted provider identity, duration, fixture ID
+and checked date support comparison. A current-run summary records success/failure
+counts, errors by category and durations. It never writes raw
 requests, configuration, provider bodies, environments, or keys. Verify the
 current checkedAt, provider, and model before citing an artifact; an older file
 does not prove the latest run passed. Passing schema and consistency validation
 does not establish human rubric quality, compilation, test success, or
 optimality. Inspect each report and record provider/model/date and results:
+
+The initial assessment now returns feedback only. Complete generated-code checks
+require a separate explicit implementation evaluation, using authored assessment
+pins and feedback, the same private provider configuration, and both opt-ins:
+
+```sh
+rtk proxy env COGNIPACE_AI_EVAL=1 COGNIPACE_AI_IMPLEMENTATION_EVAL=1 npm test -- src/features/leetcode-review-assistant/server/code-implementation-provider-evaluation.test.ts --run
+```
+
+Implementation artifacts and their run summary are stored under
+`/private/tmp/cognipace-ai-evaluation/implementation`. Compare the `operation`
+labels, available numeric metrics and checked dates. Feedback-only success does
+not establish generated-code quality. When reviewing a full user journey,
+include both calls if code was requested; unknown failed-attempt usage remains
+unknown. Baseline/current wire sizes are bytes, never token estimates.
 
 - Brute force with the linear goal: a material hash-map replacement needs
   Approach below 5 without forcing a particular score; expected linear time is
@@ -2120,6 +2160,11 @@ reports supplement this proof and cannot replace it.
 2. Submit long/scrolled code and a problem with follow-ups. Verify complete
    input, three /5 scores, all selected rows, independent time-better /
    space-worse styling, and Kotlin Int, Long, generic types, and signatures.
+   Confirm initial feedback contains no generated code and makes one generation
+   request. Open Suggested implementation without another call, then activate
+   Generate suggested code. Verify it uses the original assessed submission and
+   feedback even after editing the live editor. Keep all scores visible while
+   code is pending, and preserve AI-generated/Untested labels and Copy.
 3. Make capture incomplete, then Retry after a newer submission exists.
    Confirm Retry targets the original submission. Exercise rapid consecutive
    submissions and ambiguous discovery; stale code/results must not attach to
@@ -2141,6 +2186,13 @@ reports supplement this proof and cannot replace it.
    model text stays inert, Copy success and failure feedback work, and 392px
    and 320px layouts retain all labels and content with horizontal scrolling
    confined to code.
+   Exercise Generate by keyboard, duplicate activation and a code-generation
+   error. Retry only code without regenerating scores. Reopen successful code
+   and save a review without another model call. Navigate, reset, change
+   connection, disable assessment or create a new attempt during code generation;
+   old code must not attach to the next assessment. Restart the background worker
+   after feedback, then request code; the self-contained request must not depend
+   on a retained completed-worker session.
 8. Record extension version, provider/model/date, happy and edge results, and
    screenshot/recording paths. Recovery is to turn AI assessment off; review
    saving and connection testing continue, with no migration or new permission.

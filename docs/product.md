@@ -147,6 +147,13 @@ Long initializer such as 0L, and a retained empty generic collection needs its
 type on either the annotation or initializer. A justified direct LongArray is
 also valid.
 
+The initial assessment generates scores and feedback only. Opening Suggested
+implementation does not call the provider. Its Generate suggested code action
+requests code separately using the original assessed submission and feedback.
+Feedback stays visible during code generation and after a code-generation error;
+Retry in that section retries only code. Successful code remains available for
+the session without regeneration when the disclosure is reopened.
+
 Suggested code is labeled AI-generated and Untested, with Copy feedback and
 complexity assumptions. CogniPace never executes or submits that code. A
 report may explain why no responsible implementation is available.
@@ -159,9 +166,14 @@ causes no review write. The former AI recall-rating override has been retired.
 
 The overlay distinguishes idle, capture preparation, generation, ready,
 unavailable, and controlled-error states, with Settings and Retry where useful.
-Capture preparation has a 15-second deadline, background analysis a 30-second
+Capture preparation has a 15-second deadline, background analysis a 60-second
 deadline including configuration loading, and the whole client operation a
-50-second deadline. There is one provider attempt per request. Explicit Retry
+80-second deadline. Assessments using any supported provider/model may recover once from a temporary
+provider failure within that same deadline. Quota, authentication and invalid
+reports require an explicit recovery action. Assessment guidance stays concise
+while retaining all scored sections. Full suggested code is generated only on
+explicit request and has the same bounded recovery/deadline policy.
+Explicit Retry
 uses a new request identity for the retained submission. New attempts,
 configuration/key/model changes, navigation, restart, disable, and clear/reset
 cancel or invalidate stale work. Reset keeps the same handled attempt idle

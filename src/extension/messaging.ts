@@ -1,3 +1,7 @@
+import type {
+  GenerateLeetCodeImplementationRequest,
+  GenerateLeetCodeImplementationResponse,
+} from '@/features/leetcode-review-assistant/api/code-implementation-contracts'
 import { defineExtensionMessaging } from '@webext-core/messaging'
 import { z } from 'zod'
 
@@ -360,6 +364,12 @@ export interface ProtocolMap {
   'genai.testConnection'(
     request: TestAiConnectionRequest,
   ): TestAiConnectionResponse
+  'genai.generateLeetCodeImplementation'(
+    request: GenerateLeetCodeImplementationRequest,
+  ): GenerateLeetCodeImplementationResponse
+  'genai.cancelLeetCodeImplementation'(
+    request: CancelLeetCodeAnalysisRequest,
+  ): CancelLeetCodeAnalysisResponse
   'genai.analyzeLeetCodeSubmission'(
     request: AnalyzeLeetCodeSubmissionRequest,
   ): AnalyzeLeetCodeSubmissionResponse
@@ -483,6 +493,8 @@ export const protocolMethodNames = [
   'genai.setAiProviderSecret',
   'genai.clearAiProviderSecret',
   'genai.testConnection',
+  'genai.generateLeetCodeImplementation',
+  'genai.cancelLeetCodeImplementation',
   'genai.analyzeLeetCodeSubmission',
   'genai.cancelLeetCodeAnalysis',
   'genai.getHintConnection',

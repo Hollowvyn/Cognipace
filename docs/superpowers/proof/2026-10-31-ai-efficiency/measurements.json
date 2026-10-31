@@ -1,0 +1,90 @@
+{
+  "kind": "offline synthetic fixture measurement; no real model calls or latency/token claims",
+  "wires": [
+    {
+      "provider": "openai",
+      "mockEnvelopeStatus": "success",
+      "requestBodyBytes": 8641,
+      "schemaBytes": 4210
+    },
+    {
+      "provider": "anthropic",
+      "mockEnvelopeStatus": "success",
+      "requestBodyBytes": 9249,
+      "schemaBytes": 4845
+    },
+    {
+      "provider": "gemini",
+      "mockEnvelopeStatus": "success",
+      "requestBodyBytes": 8595,
+      "schemaBytes": 4211
+    },
+    {
+      "provider": "openrouter",
+      "mockEnvelopeStatus": "success",
+      "requestBodyBytes": 8675,
+      "schemaBytes": 4210
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "brute-force-linear-goal",
+      "systemBytes": 3131,
+      "userBytes": 1371,
+      "nullOmittedUserBytes": 1091,
+      "submittedCodeBytes": 201
+    },
+    {
+      "id": "small-constant-space",
+      "systemBytes": 3131,
+      "userBytes": 1345,
+      "nullOmittedUserBytes": 1065,
+      "submittedCodeBytes": 201
+    },
+    {
+      "id": "sorted-one-based",
+      "systemBytes": 3131,
+      "userBytes": 1485,
+      "nullOmittedUserBytes": 1205,
+      "submittedCodeBytes": 258
+    },
+    {
+      "id": "insert-before-lookup",
+      "systemBytes": 3131,
+      "userBytes": 1467,
+      "nullOmittedUserBytes": 1249,
+      "submittedCodeBytes": 238
+    },
+    {
+      "id": "kotlin-inferred-int",
+      "systemBytes": 3131,
+      "userBytes": 1590,
+      "nullOmittedUserBytes": 1310,
+      "submittedCodeBytes": 338
+    },
+    {
+      "id": "kotlin-long-and-generic",
+      "systemBytes": 3131,
+      "userBytes": 1410,
+      "nullOmittedUserBytes": 1130,
+      "submittedCodeBytes": 289
+    }
+  ],
+  "report": {
+    "fullBytes": 2115,
+    "coreOnlyBytes": 1395,
+    "implementationFieldBytes": 721
+  },
+  "hints": [
+    {
+      "codeBytes": 1000,
+      "currentHintThreeUserBytes": 3725,
+      "exactSnapshotInternedUserBytes": 1635
+    },
+    {
+      "codeBytes": 32000,
+      "currentHintThreeUserBytes": 96725,
+      "exactSnapshotInternedUserBytes": 32635
+    }
+  ]
+}

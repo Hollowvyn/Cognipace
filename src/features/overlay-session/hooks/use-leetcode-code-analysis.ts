@@ -8,11 +8,12 @@ import {
 } from '@/features/leetcode-capture'
 import {
   analyzeLeetCodeSubmissionRequestSchema,
+  hintProblemSchema,
   analyzeLeetCodeSubmissionViaRuntime,
   cancelLeetCodeAnalysisViaRuntime,
   type AnalyzeLeetCodeSubmissionRequest,
   type CodeAnalysisErrorCode,
-  type CodeAnalysisReport,
+  type CodeFeedbackReport,
 } from '@/features/leetcode-review-assistant'
 import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
 import type { LeetCodeCaptureState } from '@/lib/leetcode'
@@ -20,7 +21,13 @@ import type { LeetCodeCaptureState } from '@/lib/leetcode'
 export type CodeAnalysisState =
   | { status: 'disabled' | 'idle' }
   | { status: 'pending'; phase: 'capture' | 'analysis'; requestId: string }
-  | { status: 'ready'; requestId: string; report: CodeAnalysisReport }
+  | {
+      status: 'ready'
+      requestId: string
+      report: CodeFeedbackReport
+      assessment: AnalyzeLeetCodeSubmissionRequest
+      host: 'leetcode.com' | 'www.leetcode.com'
+    }
   | {
       status: 'unavailable'
       message: string
@@ -145,7 +152,12 @@ export function useLeetCodeCodeAnalysis(
   const { revision, readRevision } = useGenAiConfigurationRevision()
   const attemptId = capture.submissionAttempt?.attemptId ?? null
   const attemptKey = attemptId ? JSON.stringify([activeSlug, attemptId]) : null
-  const scope = JSON.stringify([activeSlug, attemptId, revision])
+  const scope = JSON.stringify([
+    activeSlug,
+    capture.location?.host,
+    attemptId,
+    revision,
+  ])
   const matchingAttempt = Boolean(
     activeSlug &&
     attemptId &&
@@ -227,6 +239,7 @@ export function useLeetCodeCodeAnalysis(
         requestId: crypto.randomUUID(),
         scope: JSON.stringify([
           snapshot.options.activeSlug,
+          snapshot.options.capture.location?.host,
           snapshot.options.capture.submissionAttempt?.attemptId,
           configurationRevision,
         ]),
@@ -287,7 +300,7 @@ export function useLeetCodeCodeAnalysis(
       }
 
       void withAiDeadline(
-        { timeoutMs: 50_000, signal: operation.controller.signal },
+        { timeoutMs: 80_000, signal: operation.controller.signal },
         async (signal) => {
           const prepared = await prepareLeetCodeAnalysisContext(
             selectedCapture,
@@ -352,6 +365,10 @@ export function useLeetCodeCodeAnalysis(
               status: 'ready',
               requestId: response.requestId,
               report: response.report,
+              assessment: request,
+              host: hintProblemSchema.shape.host.parse(
+                prepared.context.location.host,
+              ),
             })
           } else if (response.status === 'unavailable') {
             publish({
