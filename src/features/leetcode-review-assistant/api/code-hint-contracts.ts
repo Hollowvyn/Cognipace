@@ -2,10 +2,20 @@ import { z } from 'zod'
 
 import { problemSlugSchema } from '@/features/problems/api/problems-contracts'
 import { aiErrorCodes, aiProviderIds } from '@/lib/ai/types'
+import { completeCodeSnapshotSchema } from '@/lib/leetcode/editor/complete-code-snapshot'
 
-import { hintBatchSchema } from '../domain/code-hint-schema'
+import {
+  codeHintSchema,
+  codeHintHistorySchema,
+} from '../domain/code-hint-schema'
 
-export { hintBatchSchema, type HintBatch } from '../domain/code-hint-schema'
+export {
+  codeHintSchema,
+  codeHintTurnSchema,
+  isCodeHintConsistent,
+  type CodeHint,
+  type CodeHintTurn,
+} from '../domain/code-hint-schema'
 
 const text = (max: number) => z.string().min(1).max(max).regex(/\S/)
 
@@ -40,12 +50,19 @@ export function makeHintInputFingerprint(problem: HintProblem): string {
   })
 }
 
+export const codeHintInputSchema = z.strictObject({
+  problem: hintProblemSchema,
+  snapshot: completeCodeSnapshotSchema,
+  history: codeHintHistorySchema,
+})
+export type CodeHintInput = z.infer<typeof codeHintInputSchema>
+
 export const generateLeetCodeHintsRequestSchema = z.strictObject({
   surface: z.literal('content-script'),
   requestId: text(160),
   connectionRevision: z.uuid(),
   connectionProvider: z.enum(aiProviderIds),
-  problem: hintProblemSchema,
+  ...codeHintInputSchema.shape,
 })
 
 export type GenerateLeetCodeHintsRequest = z.infer<
@@ -64,7 +81,7 @@ export const generateLeetCodeHintsResponseSchema = z.discriminatedUnion(
     z.strictObject({
       status: z.literal('ready'),
       requestId: text(160),
-      batch: hintBatchSchema,
+      hint: codeHintSchema,
     }),
     z.strictObject({
       status: z.literal('error'),

@@ -26,13 +26,19 @@ describe('OverlayHelpSection', () => {
     expect(onToggleHints).toHaveBeenCalledOnce()
   })
 
-  it('reveals inert pointers progressively without a regenerate action', async () => {
+  it('shows inert snapshot-bound hints with actual strength and caps at three', async () => {
     const onRevealNextHint = vi.fn()
+    const turn = (
+      text: string,
+      strength: 'light' | 'medium' | 'heavy' = 'light',
+    ) => ({
+      snapshot: { code: '', language: 'typescript', capturedAt: 1 },
+      hint: { text, strength, progress: 'initial' as const },
+    })
     const hints = {
       status: 'ready' as const,
       isOpen: true,
-      batch: { hints: ['<script>inert pointer</script>', 'Second pointer'] },
-      revealedCount: 1,
+      history: [turn('<script>inert pointer</script>')],
     }
     const { rerender, container } = render(
       <OverlayHelpSection
@@ -42,30 +48,33 @@ describe('OverlayHelpSection', () => {
       />,
     )
     expect(
-      screen.getByRole('heading', { name: 'Hints · 1 of 2' }),
+      screen.getByRole('heading', { name: 'Hints · 1 of 3' }),
     ).toBeInTheDocument()
-    expect(
-      screen.getByText('<script>inert pointer</script>'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Light')).toBeInTheDocument()
+    expect(screen.getByText('Based on code when requested')).toBeInTheDocument()
     expect(container.querySelector('script')).toBeNull()
-    expect(screen.queryByText('Second pointer')).not.toBeInTheDocument()
     await userEvent
       .setup()
-      .click(screen.getByRole('button', { name: 'Reveal next hint' }))
+      .click(screen.getByRole('button', { name: 'Get next hint' }))
     expect(onRevealNextHint).toHaveBeenCalledOnce()
     rerender(
       <OverlayHelpSection
         searchQuery={searchQuery}
-        hints={{ ...hints, revealedCount: 2 }}
+        hints={{
+          ...hints,
+          history: [
+            ...hints.history,
+            turn('Second pointer', 'medium'),
+            turn('Third pointer', 'heavy'),
+          ],
+        }}
       />,
     )
-    expect(screen.getByText('Second pointer')).toBeInTheDocument()
-    expect(screen.getByText('All 2 hints revealed')).toBeInTheDocument()
+    expect(screen.getByText('Medium')).toBeInTheDocument()
+    expect(screen.getByText('Heavy')).toBeInTheDocument()
+    expect(screen.getByText('All 3 hints requested')).toBeInTheDocument()
     expect(
-      screen.queryByRole('button', { name: 'Reveal next hint' }),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: /regenerate/i }),
+      screen.queryByRole('button', { name: 'Get next hint' }),
     ).not.toBeInTheDocument()
     rerender(
       <OverlayHelpSection
@@ -78,34 +87,65 @@ describe('OverlayHelpSection', () => {
     ).not.toBeInTheDocument()
   })
 
-  it.each([1, 2, 3])('uses the actual %i pointer batch length', (count) => {
-    render(
+  it('preserves earlier hints through preparation and controlled errors', () => {
+    const history = [
+      {
+        snapshot: { code: '', language: 'python', capturedAt: 1 },
+        hint: {
+          text: 'Earlier pointer',
+          strength: 'light' as const,
+          progress: 'initial' as const,
+        },
+      },
+    ]
+    const { rerender } = render(
       <OverlayHelpSection
         searchQuery={searchQuery}
         hints={{
-          status: 'ready',
+          status: 'pending',
           isOpen: true,
-          batch: {
-            hints: Array.from({ length: count }, (_, i) => `Pointer ${i}`),
-          },
-          revealedCount: 1,
+          history,
+          requestId: 'next',
+          phase: 'preparation',
         }}
       />,
     )
-    expect(screen.getByRole('region', { name: 'AI hints' })).toBeInTheDocument()
+    expect(screen.getByText('Earlier pointer')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Get next hint' })).toBeDisabled()
+    rerender(
+      <OverlayHelpSection
+        searchQuery={searchQuery}
+        hints={{
+          status: 'error',
+          isOpen: true,
+          history,
+          code: 'unknown',
+          message: 'Try again.',
+          canRetry: true,
+          showSettings: false,
+        }}
+      />,
+    )
+    expect(screen.getByText('Earlier pointer')).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: `Hints · 1 of ${count}` }),
+      screen.getByRole('button', { name: 'Retry hints' }),
     ).toBeInTheDocument()
   })
 
   it.each([
-    ['preparation', 'Reading problem details…'],
-    ['generation', 'Generating hints…'],
+    ['preparation', 'Reading code and problem details…'],
+    ['generation', 'Generating hint…'],
   ] as const)('shows a useful busy state during %s', (phase, message) => {
     render(
       <OverlayHelpSection
         searchQuery={searchQuery}
-        hints={{ status: 'pending', isOpen: true, requestId: 'fixture', phase }}
+        hints={{
+          history: [],
+          status: 'pending',
+          isOpen: true,
+          requestId: 'fixture',
+          phase,
+        }}
         onToggleHints={vi.fn()}
       />,
     )
@@ -124,6 +164,7 @@ describe('OverlayHelpSection', () => {
       <OverlayHelpSection
         searchQuery={searchQuery}
         hints={{
+          history: [],
           status: 'error',
           isOpen: true,
           code: 'auth',

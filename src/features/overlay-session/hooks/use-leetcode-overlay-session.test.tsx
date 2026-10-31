@@ -77,6 +77,13 @@ vi.mock('@/lib/leetcode', async (importOriginal) => {
 
   return {
     ...actual,
+    readCompleteLeetCodeEditorSnapshot: vi.fn(() =>
+      Promise.resolve({
+        code: 'function solution() {}',
+        language: 'typescript',
+        capturedAt: 1,
+      }),
+    ),
     createLeetCodePageWatcher: vi.fn(
       (options: { onEvent: (event: LeetCodePageEvent) => void }) => {
         leetcodeMockState.onEvent = options.onEvent
@@ -268,7 +275,11 @@ describe('useLeetCodeOverlaySession', () => {
       Promise.resolve({
         status: 'ready',
         requestId: request.requestId,
-        batch: { hints: hintPointers },
+        hint: {
+          text: hintPointers[request.history.length]!,
+          strength: request.history.length ? 'medium' : 'light',
+          progress: request.history.length ? 'stuck' : 'initial',
+        },
       }),
     )
     vi.mocked(cancelLeetCodeHintsViaRuntime)
@@ -299,12 +310,13 @@ describe('useLeetCodeOverlaySession', () => {
     act(() => result.current.actions.toggleHints())
     await waitFor(() => expect(result.current.hints.status).toBe('ready'))
     act(() => result.current.actions.revealNextHint())
-    const expected = {
-      status: 'ready',
-      isOpen: true,
-      revealedCount: 2,
-      batch: { hints: hintPointers },
-    }
+    await waitFor(() =>
+      expect(result.current.hints).toMatchObject({
+        status: 'ready',
+        history: [expect.anything(), expect.anything()],
+      }),
+    )
+    const expected = result.current.hints
     act(() => result.current.actions.selectExpandedTab('ai'))
     for (const action of ['collapse', 'dock', 'restore', 'expand'] as const) {
       act(() => result.current.actions[action]())
@@ -319,7 +331,7 @@ describe('useLeetCodeOverlaySession', () => {
     await runOverlayAction(result.current.actions.updateReview)
     expect(result.current.hints).toEqual(expected)
     expect(analyze).not.toHaveBeenCalled()
-    expect(generateHints).toHaveBeenCalledOnce()
+    expect(generateHints).toHaveBeenCalledTimes(2)
     expect(saveReview).toHaveBeenCalledOnce()
     expect(overrideReview).toHaveBeenCalledOnce()
     expect(JSON.stringify(saveReview.mock.calls)).not.toContain(hintPointers[0])

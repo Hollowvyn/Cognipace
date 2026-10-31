@@ -1,0 +1,28 @@
+[
+  {
+    "theme": "dark",
+    "cardWidth": 392,
+    "pageIdentity": true,
+    "meaningfulContent": true,
+    "noFrameworkOverlay": true,
+    "noConsoleErrors": true,
+    "nextBusyRetainsEarlier": true,
+    "errorKeepsCount": true,
+    "retryFinalCap": true,
+    "progressLight": true,
+    "noHintHorizontalOverflow": true
+  },
+  {
+    "theme": "light",
+    "cardWidth": 320,
+    "pageIdentity": true,
+    "meaningfulContent": true,
+    "noFrameworkOverlay": true,
+    "noConsoleErrors": true,
+    "nextBusyRetainsEarlier": true,
+    "errorKeepsCount": true,
+    "retryFinalCap": true,
+    "progressLight": true,
+    "noHintHorizontalOverflow": true
+  }
+]

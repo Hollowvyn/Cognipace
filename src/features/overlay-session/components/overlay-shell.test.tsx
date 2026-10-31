@@ -194,8 +194,16 @@ describe('OverlayShell', () => {
       hints: {
         status: 'ready',
         isOpen: true,
-        batch: { hints: ['Pointer'] },
-        revealedCount: 1,
+        history: [
+          {
+            snapshot: { code: '', language: 'typescript', capturedAt: 1 },
+            hint: {
+              text: 'First pointer',
+              strength: 'light',
+              progress: 'initial',
+            },
+          },
+        ],
       },
     })
     render(<OverlayShell {...session} />)

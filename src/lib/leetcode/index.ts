@@ -7,6 +7,11 @@ export {
   normalizeLeetCodeLanguageLabel,
   readLeetCodeLanguageLabelFromText,
 } from './domain/language'
+export {
+  completeCodeSnapshotSchema,
+  type CompleteCodeSnapshot,
+} from './editor/complete-code-snapshot'
+export { readCompleteLeetCodeEditorSnapshot } from './editor/editor-snapshot-bridge'
 export { createLeetCodeProblemMetadataFingerprint } from './metadata/metadata-fingerprint'
 export {
   createLeetCodeProblemUrl,
