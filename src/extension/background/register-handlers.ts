@@ -1,3 +1,10 @@
+import {
+  generateLeetCodeImplementationRequestSchema,
+  generateLeetCodeImplementationResponseSchema,
+  cancelLeetCodeImplementationRequestSchema,
+  cancelLeetCodeImplementationResponseSchema,
+} from '@/features/leetcode-review-assistant/api/code-implementation-contracts'
+import { generateLeetCodeImplementationInBackground } from '@/features/leetcode-review-assistant/server/implementation-runtime-service'
 import { timeOverlayStartup } from '@/lib/performance/overlay-startup-timing'
 
 import {
@@ -184,6 +191,8 @@ import { z } from 'zod'
 
 import {
   analysisOwner,
+  runOwnedImplementation,
+  cancelOwnedImplementation,
   cancelOwnedAnalysis,
   cancelOwnedHints,
   runOwnedHints,
@@ -1406,6 +1415,46 @@ export function registerBackgroundHandlers() {
     return cancelLeetCodeHintsResponseSchema.parse({
       requestId: request.requestId,
       cancelled: cancelOwnedHints(analysisOwner(sender), request.requestId),
+    })
+  })
+
+  onMessage('genai.generateLeetCodeImplementation', ({ data, sender }) => {
+    const request = generateLeetCodeImplementationRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'genai.generateLeetCodeImplementation',
+      request.surface,
+      sender,
+    )
+    assertHintProblemSender(sender, {
+      host: request.host,
+      slug: request.assessment.problemSlug,
+    })
+    return runOwnedImplementation(
+      analysisOwner(sender),
+      request.requestId,
+      async (signal) =>
+        generateLeetCodeImplementationResponseSchema.parse(
+          await generateLeetCodeImplementationInBackground(
+            request,
+            async () => (await getAppDb()).db,
+            signal,
+          ),
+        ),
+    )
+  })
+  onMessage('genai.cancelLeetCodeImplementation', ({ data, sender }) => {
+    const request = cancelLeetCodeImplementationRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'genai.cancelLeetCodeImplementation',
+      request.surface,
+      sender,
+    )
+    return cancelLeetCodeImplementationResponseSchema.parse({
+      requestId: request.requestId,
+      cancelled: cancelOwnedImplementation(
+        analysisOwner(sender),
+        request.requestId,
+      ),
     })
   })
 

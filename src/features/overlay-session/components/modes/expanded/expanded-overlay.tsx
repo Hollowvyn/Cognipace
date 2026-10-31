@@ -1,3 +1,4 @@
+import type { CodeImplementationState } from '../../../hooks/use-leetcode-code-implementation'
 import { AlertCircle, Info } from 'lucide-react'
 import { useId, useLayoutEffect, useRef, type UIEvent } from 'react'
 
@@ -32,6 +33,7 @@ import { OverlayTimerCard } from './overlay-timer-card'
 
 type ExpandedOverlayViewModel = {
   aiAnalysis: CodeAnalysisState
+  aiImplementation: CodeImplementationState
   context: OverlayAppShellData['overlay'] | null
   elapsedSeconds: number
   helpSearchQuery: string | null
@@ -54,6 +56,7 @@ type ExpandedOverlayCommands = {
   onResetTimer: () => void
   onRestart: () => void
   onRetryAiAnalysis: () => void
+  onGenerateImplementation: () => void
   onToggleHints: () => void
   onRevealNextHint: () => void
   onRetryHints: () => void
@@ -79,6 +82,7 @@ export function ExpandedOverlay({
 }: ExpandedOverlayProps) {
   const {
     aiAnalysis,
+    aiImplementation,
     context,
     elapsedSeconds,
     helpSearchQuery,
@@ -100,6 +104,7 @@ export function ExpandedOverlay({
     onResetTimer,
     onRestart,
     onRetryAiAnalysis,
+    onGenerateImplementation,
     onToggleHints,
     onRevealNextHint,
     onRetryHints,
@@ -288,6 +293,8 @@ export function ExpandedOverlay({
               onRetry={onRetryAiAnalysis}
               onSettings={onSettings}
               state={aiAnalysis}
+              implementationState={aiImplementation}
+              onGenerateImplementation={onGenerateImplementation}
             />
           </div>
         </section>

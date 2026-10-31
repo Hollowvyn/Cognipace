@@ -237,6 +237,11 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
   and preserve language-specific signatures and types, including Kotlin Long
   and retained generic collection types.
 - Keep suggested code as literal text in a horizontally scrollable code block.
+  Show Generate suggested code inside its disclosure until requested; opening
+  the disclosure alone makes no API call. Keep the scored feedback visible
+  during code pending/error states, and make Retry local to code generation.
+  Reopening successful code reuses it. Generation always uses the original
+  assessed submission, even if the editor has since changed.
   Show AI-generated and Untested labels, Copy success/failure feedback, changes,
   complexity, and assumptions. Opening or copying suggestions does not run or
   submit code.

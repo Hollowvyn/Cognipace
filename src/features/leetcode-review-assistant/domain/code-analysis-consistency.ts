@@ -1,12 +1,37 @@
 import { normalizeLeetCodeLanguageLabel } from '@/lib/leetcode'
 
 import type { CodeAnalysisReport } from './code-analysis-schema'
+import type { CodeFeedbackReport } from './code-feedback-schema'
 
 export function isCodeAnalysisConsistent(
   report: CodeAnalysisReport,
   language: string,
 ) {
-  const { approach, efficiency, codeStyle, suggestedImplementation } = report
+  if (!isCodeFeedbackConsistent(report)) return false
+  const { suggestedImplementation } = report
+
+  if (suggestedImplementation !== null) {
+    const normalizedLanguage = normalizeLeetCodeLanguageLabel(language)
+
+    return (
+      suggestedImplementation.code.trim().length > 0 &&
+      report.suggestedImplementationUnavailableReason === null &&
+      normalizedLanguage !== null &&
+      normalizeLeetCodeLanguageLabel(suggestedImplementation.language) ===
+        normalizedLanguage
+    )
+  }
+
+  return (
+    report.suggestedImplementationUnavailableReason !== null &&
+    report.suggestedImplementationUnavailableReason.trim().length > 0
+  )
+}
+
+export function isCodeFeedbackConsistent(
+  report: Pick<CodeFeedbackReport, 'approach' | 'efficiency' | 'codeStyle'>,
+) {
+  const { approach, efficiency, codeStyle } = report
 
   if (
     (approach.score === null) !==
@@ -43,20 +68,5 @@ export function isCodeAnalysisConsistent(
     return false
   }
 
-  if (suggestedImplementation !== null) {
-    const normalizedLanguage = normalizeLeetCodeLanguageLabel(language)
-
-    return (
-      suggestedImplementation.code.trim().length > 0 &&
-      report.suggestedImplementationUnavailableReason === null &&
-      normalizedLanguage !== null &&
-      normalizeLeetCodeLanguageLabel(suggestedImplementation.language) ===
-        normalizedLanguage
-    )
-  }
-
-  return (
-    report.suggestedImplementationUnavailableReason !== null &&
-    report.suggestedImplementationUnavailableReason.trim().length > 0
-  )
+  return true
 }

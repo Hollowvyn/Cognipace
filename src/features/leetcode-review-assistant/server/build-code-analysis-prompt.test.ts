@@ -15,7 +15,28 @@ describe('buildCodeAnalysisPrompt', () => {
     const prompt = buildCodeAnalysisPrompt(request)
     expect(JSON.parse(prompt.user)).toEqual({
       problem: request.problem,
-      submission: request.submission,
+      submission: {
+        status: request.submission.status,
+        code: request.submission.code,
+        language: request.submission.language,
+        runtime: request.submission.runtime,
+        passedTestCount: request.submission.passedTestCount,
+        totalTestCount: request.submission.totalTestCount,
+        ...(request.submission.diagnostics.stdOutput !== null
+          ? {
+              diagnostics: {
+                stdOutput: request.submission.diagnostics.stdOutput,
+              },
+            }
+          : {}),
+        ...(request.submission.diagnostics.errorMessage !== null
+          ? {
+              diagnostics: {
+                errorMessage: request.submission.diagnostics.errorMessage,
+              },
+            }
+          : {}),
+      },
     })
     expect(prompt.user).not.toContain('request-1')
     expect(prompt.user).not.toContain('attempt-1')
@@ -32,7 +53,28 @@ describe('buildCodeAnalysisPrompt', () => {
     )
     expect(JSON.parse(prompt.user)).toEqual({
       problem: request.problem,
-      submission: request.submission,
+      submission: {
+        status: request.submission.status,
+        code: request.submission.code,
+        language: request.submission.language,
+        runtime: request.submission.runtime,
+        passedTestCount: request.submission.passedTestCount,
+        totalTestCount: request.submission.totalTestCount,
+        ...(request.submission.diagnostics.stdOutput !== null
+          ? {
+              diagnostics: {
+                stdOutput: request.submission.diagnostics.stdOutput,
+              },
+            }
+          : {}),
+        ...(request.submission.diagnostics.errorMessage !== null
+          ? {
+              diagnostics: {
+                errorMessage: request.submission.diagnostics.errorMessage,
+              },
+            }
+          : {}),
+      },
     })
     expect(prompt.system).not.toContain('Ignore the rubric')
   })
@@ -40,7 +82,7 @@ describe('buildCodeAnalysisPrompt', () => {
   it('defines independent scores, honest constraints, and separate resource tradeoffs', () => {
     const { system } = buildCodeAnalysisPrompt(makeAnalysisRequest())
     for (const rule of [
-      'leetcode-code-analysis-v1',
+      'leetcode-code-feedback-v1',
       'independently',
       'Use null',
       'Never produce a recall rating or overall average',
@@ -94,27 +136,50 @@ describe('buildCodeAnalysisPrompt', () => {
       const prompt = buildCodeAnalysisPrompt(request)
       expect(JSON.parse(prompt.user) as unknown).toEqual({
         problem: request.problem,
-        submission: request.submission,
+        submission: {
+          status: request.submission.status,
+          code: request.submission.code,
+          language: request.submission.language,
+          runtime: request.submission.runtime,
+          passedTestCount: request.submission.passedTestCount,
+          totalTestCount: request.submission.totalTestCount,
+          ...(request.submission.diagnostics.stdOutput !== null
+            ? {
+                diagnostics: {
+                  stdOutput: request.submission.diagnostics.stdOutput,
+                },
+              }
+            : {}),
+          ...(request.submission.diagnostics.errorMessage !== null
+            ? {
+                diagnostics: {
+                  errorMessage: request.submission.diagnostics.errorMessage,
+                },
+              }
+            : {}),
+        },
       })
       expect(prompt.system).toContain(
         'A syntax error alone does not establish a wrong algorithm',
       )
-      expect(prompt.system).toContain('Suggested code has not been executed')
+      expect(prompt.system).toContain(
+        'do not claim universal optimality or that code has been executed',
+      )
     },
   )
 
-  it('uses the selected rows and asks for complete untested suggested code', () => {
+  it('uses the selected rows and excludes implementation generation', () => {
     const { system } = buildCodeAnalysisPrompt(makeAnalysisRequest())
     for (const rule of [
       'Current/Suggested/Key idea/Consider',
       'Current complexity/Suggested complexity/Suggestions',
       'Readability/Structure/Suggestions',
       'do not invent first-attempt history',
-      'complete suggested code in the exact submitted language',
-      'preserve callable signatures',
+      'Do not generate a replacement implementation or code',
+      'preserve its exact language and callable signature',
       'do not claim universal optimality',
       'No tools or additional calls',
-      'raw code without Markdown fences',
+      'Do not output suggested code or implementation fields',
     ])
       expect(system).toContain(rule)
   })
@@ -125,4 +190,26 @@ it('requests compact complete reports without reducing the rubric', () => {
   expect(system).toContain('one sentence per rationale')
   expect(system).toContain('at most two high-value items per suggestion list')
   expect(system).toContain('compact complexity assumptions')
+})
+
+it('compacts only unavailable provider fields and preserves meaningful zero evidence', () => {
+  const request = makeAnalysisRequest()
+  request.submission.languageVersion = null
+  request.submission.runtime = null
+  request.submission.memory = null
+  request.submission.passedTestCount = 0
+  request.submission.totalTestCount = 0
+  const before = structuredClone(request)
+  const prompt = buildCodeAnalysisPrompt(request)
+  const input = JSON.parse(prompt.user) as Record<string, unknown>
+  expect(input.problem).toEqual(request.problem)
+  expect(input.submission).toEqual({
+    status: request.submission.status,
+    code: request.submission.code,
+    language: request.submission.language,
+    passedTestCount: 0,
+    totalTestCount: 0,
+  })
+  expect(request).toEqual(before)
+  expect(prompt.system).toContain('Absent optional fields are unavailable')
 })

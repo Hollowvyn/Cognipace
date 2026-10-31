@@ -454,6 +454,8 @@ function createSession(
     hints: { status: 'idle', isOpen: false },
     aiAnalysis: { status: 'idle' },
     retryAiAnalysis: vi.fn(),
+    aiImplementation: { status: 'idle' },
+    generateAiImplementation: vi.fn(),
     ...overrides,
   }
 }

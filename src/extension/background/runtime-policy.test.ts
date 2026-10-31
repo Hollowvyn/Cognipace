@@ -514,3 +514,28 @@ it('allows owner cancellation after LeetCode SPA navigation while rejecting new 
     ),
   ).toThrow(/LeetCode/i)
 })
+
+it('authorizes implementation generation only for actual LeetCode content scripts', () => {
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.generateLeetCodeImplementation',
+      'content-script',
+      {
+        tab: { id: 1 },
+        frameId: 0,
+        url: 'https://leetcode.com/problems/two-sum/',
+      },
+    ),
+  ).not.toThrow()
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.generateLeetCodeImplementation',
+      'content-script',
+      {
+        tab: { id: 1 },
+        frameId: 0,
+        url: 'https://example.com/problems/two-sum/',
+      },
+    ),
+  ).toThrow()
+})

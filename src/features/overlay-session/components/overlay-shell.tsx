@@ -14,6 +14,8 @@ type OverlayShellProps = LeetCodeOverlaySession
 export function OverlayShell({
   actions,
   aiAnalysis,
+  aiImplementation,
+  generateAiImplementation,
   context,
   feedback,
   hints,
@@ -71,6 +73,7 @@ export function OverlayShell({
           onResetTimer: actions.resetTimer,
           onRestart: actions.restartLocalSession,
           onRetryAiAnalysis: retryAiAnalysis,
+          onGenerateImplementation: generateAiImplementation,
           onToggleHints: actions.toggleHints,
           onRevealNextHint: actions.revealNextHint,
           onRetryHints: actions.retryHints,
@@ -84,6 +87,7 @@ export function OverlayShell({
         }}
         view={{
           aiAnalysis,
+          aiImplementation,
           context,
           elapsedSeconds: timer.elapsedSeconds,
           helpSearchQuery,

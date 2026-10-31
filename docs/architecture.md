@@ -773,8 +773,8 @@ secret.
 Ownership follows the existing feature direction. `src/lib/ai` owns reusable
 structured SDK transport and the direct official provider adapters. GenAI owns
 saved configuration, availability, trusted credentials, and connection testing.
-`leetcode-review-assistant` owns the versioned report and request schemas,
-rubric, prompt, consistency checks, and analysis service.
+`leetcode-review-assistant` owns the separate versioned feedback and
+implementation schemas, requests, prompts, consistency checks and services.
 `leetcode-capture` and `src/lib/leetcode` own full matching submission and
 problem content, including follow-ups and refreshable capture caches.
 `overlay-session` owns the session controller and Option A presentation.
@@ -802,7 +802,9 @@ Retry. A request has an 8,192-token output budget and a 60-second background
 deadline including database/configuration/secret loading and any recovery.
 The controller bounds the complete client operation at 80 seconds. All assessment providers/models may retry a transient failure once; hints and
 connection tests keep one attempt. Reports request concise rationales and at most two high-value suggestions
-per list without shrinking the schema or dropping complete suggested code. Retry makes
+per list. The initial provider schema excludes implementation fields; a separate
+explicit operation generates complete suggested code from the same assessed
+source and validated feedback. Retry makes
 a fresh request identity for the same retained submission; repeated terminal
 events and disclosure/collapse/dock actions do not generate another request.
 
@@ -813,6 +815,26 @@ second provider call. This establishes contract consistency, not compilation,
 correctness, human rubric quality, or universal optimality. Suggested code is
 rendered as text, labeled AI-generated and Untested, and is never executed or
 submitted by the product.
+
+The overlay retains the successful assessment request and feedback in session
+memory. On-demand implementation requests are self-contained strict envelopes
+with that original context and correlated identities. The background treats
+all supplied context as untrusted model data, authorizes the actual sender
+host/slug, and checks the trusted connection before publishing. Code generation
+does not depend on completed-result state surviving an MV3 worker restart.
+Its in-flight ownership/cancellation is independent of feedback and hints;
+navigation, reset, disable, a new attempt or configuration change rejects stale
+code. Both operations keep 60-second background and 80-second client bounds.
+
+Assessment generation explicitly opts into safe numeric measurements: outgoing
+request-body bytes, validated output JSON bytes, attempts, schema preparation,
+generation and validation durations, plus available normalized SDK usage.
+Generation timing excludes validation and backoff; missing tokens stay unknown,
+and usage does not claim unknown failed-attempt billing. No response body clone,
+extra measurement fetch or raw SDK metadata is retained. Provider input omits
+null optional metadata and empty diagnostics while preserving all populated
+evidence, exact source, language, examples, constraints and zero counts. Local
+runtime request contracts retain the complete typed context.
 
 Reports and in-flight operations stay in session/controller state, outside
 TanStack Query query and mutation caches and the database. Report completion
