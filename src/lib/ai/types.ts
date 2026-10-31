@@ -1,5 +1,7 @@
 import type { ZodType } from 'zod'
 
+import type { AiGenerationMetrics } from './metrics'
+
 export const aiProviderIds = [
   'openai',
   'anthropic',
@@ -38,6 +40,10 @@ export type AiGenerateJsonRequest<T> = AiProviderConfig & {
   temperature?: number
   /** Default 30,000; bounds preparation, transport, body reading and validation. */
   timeoutMs?: number
+  /** One transient retry for any provider/model; disabled by default. */
+  retryTransientErrors?: boolean
+  /** Safe numeric measurements; omitted unless explicitly requested. */
+  collectMetrics?: boolean
   signal?: AbortSignal
   /** Default 2,048; must be a positive integer no greater than 8,192. */
   maxOutputTokens?: number
@@ -48,6 +54,7 @@ export type AiProviderMetadata = {
   resolvedModel?: string
   /** Whole operation duration, including preparation and validation. */
   durationMs: number
+  metrics?: AiGenerationMetrics
 }
 export type AiGenerateJsonResult<T> =
   | { status: 'success'; data: T; providerMetadata: AiProviderMetadata }
@@ -57,6 +64,6 @@ export type AiGenerateJsonResult<T> =
       message: string
       providerMetadata: Pick<
         AiProviderMetadata,
-        'provider' | 'model' | 'durationMs'
+        'provider' | 'model' | 'durationMs' | 'metrics'
       >
     }

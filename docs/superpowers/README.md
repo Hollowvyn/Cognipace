@@ -13,12 +13,17 @@ This folder contains planning artifacts created through Superpowers workflows. T
 ## Specs
 
 - [`specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md`](./specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md): user-approved written design for durable local saves, versioned Google Drive data backups, explicit force and restore recovery, Gist migration, and separate Google-account-protected key recovery; covered by the three plans below.
+- [`specs/2026-10-31-ai-data-flow-efficiency.md`](./specs/2026-10-31-ai-data-flow-efficiency.md): approved and implemented measured data-flow improvements: safe metrics, compact provider input and feedback-first/on-demand code in PR #214, plus exact snapshot interning in #203; human extension and live-provider proof remain pending.
+
+- [`specs/2026-10-30-free-model-assessment-reliability-design.md`](./specs/2026-10-30-free-model-assessment-reliability-design.md): approved concise assessments, bounded recovery for all assessment providers/models and safe evaluation failure records; live-provider and human proof remain required.
 
 - [`specs/2026-10-12-overlay-baseline-pr-cleanup-design.md`](./specs/2026-10-12-overlay-baseline-pr-cleanup-design.md): approved design to compact PR #211's raw startup evidence, correct readiness classification, bound observational timing, and rerun a reproducible packaged baseline; written spec awaiting user review.
 
 - [`specs/2026-10-12-responsive-leetcode-overlay-startup-design.md`](./specs/2026-10-12-responsive-leetcode-overlay-startup-design.md): approved progressive overlay startup with early manual timing, concurrent local context and remote metadata reads, deferred secondary data, measured latency targets, and unchanged review and upsert durability. Phase 1 baseline is recorded; behavior phases still need separate plans.
 
 - [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall, ten equal cards in Overview and Details, target-relative timing, strict backlog color boundary, and 30/90/All time with available young history. The final prototype adds four selected-period activity totals and quiet fixed card states. Backlog stays Last 30 days, Upcoming Next 14 days, and tooltip cleanup is deferred. Implementation, independent reviews, automated gates and desktop state proof are complete; human installed-extension smoke/proof remains pending before PR review or merge. See the dated handoff.
+
+- [`specs/2026-10-05-adaptive-code-hints-design.md`](./specs/2026-10-05-adaptive-code-hints-design.md): approved replacement of problem-only hint batches with complete editor snapshots, one hint per request, fixed Light/Medium/Heavy order and three successful turns; implementation and human/provider proof tracked in its plan and handoff.
 
 - [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
 
@@ -84,6 +89,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`plans/2026-10-16-reliable-backup-phase-1-local-durability.md`](./plans/2026-10-16-reliable-backup-phase-1-local-durability.md): implementation plan for durable binary local snapshots, interrupted migration, save acknowledgment, recoverable replacement, and scaling proof.
 - [`plans/2026-10-16-reliable-backup-phase-2-drive-data.md`](./plans/2026-10-16-reliable-backup-phase-2-drive-data.md): implementation plan for Google connection, versioned and verified one-way Drive data backup, restart-safe worker, force/restore actions, and Gist cutover.
 - [`plans/2026-10-16-reliable-backup-phase-3-key-recovery.md`](./plans/2026-10-16-reliable-backup-phase-3-key-recovery.md): implementation plan for separate opted-in key backup, startup reconciliation, owner checks, explicit recovery, cleanup, and deletion.
+- [`plans/2026-10-30-free-model-assessments.md`](./plans/2026-10-30-free-model-assessments.md): focused assessment implementation and validation plan, separate from the hint sequence PR.
 
 - [`plans/2026-10-12-overlay-baseline-pr-cleanup.md`](./plans/2026-10-12-overlay-baseline-pr-cleanup.md): phase-sized plan to compact PR #211 startup evidence, repair classification and timing retention, rerun the packaged baseline, and update the draft PR.
 
@@ -98,6 +104,8 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`plans/2026-10-10-fsrs-phase-e-daily-scheduling.md`](./plans/2026-10-10-fsrs-phase-e-daily-scheduling.md): independently reviewed and implemented Phase E plan for native daily scheduling, calendar eligibility, automatic and explicit practice queues, historical Analytics provenance, live due equality, reminders, preservation and proof. The [handoff](./handoffs/2026-10-10-fsrs-phase-e-daily-scheduling.md) records automated gates and pending human extension proof.
 - [`plans/2026-10-10-fsrs-phase-f-native-previews.md`](./plans/2026-10-10-fsrs-phase-f-native-previews.md): Phase F native four-rating preview plan for genuine Submit and original-context Update, read-only Practice/runtime boundaries, Overlay lifecycle, validation and pending human proof.
 - [`plans/2026-10-10-fsrs-phase-g-local-scaling.md`](./plans/2026-10-10-fsrs-phase-g-local-scaling.md): reviewed Phase G plan for deterministic local-growth fixtures, supporting in-process samples, disposable packaged Chrome measurement, preservation checks, measured changes and pending human proof.
+
+- [`plans/2026-10-05-adaptive-code-hints.md`](./plans/2026-10-05-adaptive-code-hints.md): complete editor bridge, single-turn contracts and adaptive generation, overlay history and per-click requests, documentation and validation.
 
 - [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
 
@@ -182,6 +190,8 @@ Use these files to understand why work was shaped a certain way. Before changing
 
 - [`handoffs/2026-10-05-analytics-performance-layout.md`](./handoffs/2026-10-05-analytics-performance-layout.md): completed Analytics implementation, exact final checks, production-component proof, and required pending human extension smoke.
 - [`handoffs/2026-10-04-fsrs-phase-c-storage-restore.md`](./handoffs/2026-10-04-fsrs-phase-c-storage-restore.md): reviewed evidence storage, v6 backup and recoverable replacement with real preserving migration, repaired collision/cache/import-boundary findings, exact validation and a runnable human fault-smoke procedure; installed-extension proof remains pending with the owner's October 5 decision to merge then test after backing up.
+
+- [`handoffs/2026-10-05-adaptive-code-hints.md`](./handoffs/2026-10-05-adaptive-code-hints.md): reviewed snapshot-bound adaptive hints, exact automated results, mocked production-component proof, and pending human editor/provider gates.
 
 - [`handoffs/2026-10-04-overlay-ai-hints.md`](./handoffs/2026-10-04-overlay-ai-hints.md): reviewed Phase 2 source, exact final/historical checks, progressive-hint fixture proof, pending human installed-extension smoke and live provider quality, and release/recovery notes.
 

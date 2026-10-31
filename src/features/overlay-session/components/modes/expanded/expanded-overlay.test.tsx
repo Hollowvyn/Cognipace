@@ -1,9 +1,10 @@
+import { makeAnalysisRequest } from '@/features/leetcode-review-assistant/testing/code-analysis-fixtures'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { makeValidAnalysis } from '@/features/leetcode-review-assistant/testing'
+import { makeValidFeedback } from '@/features/leetcode-review-assistant/testing'
 
 import { initialOverlaySessionState } from '../../../domain'
 import { ExpandedOverlay } from './expanded-overlay'
@@ -59,8 +60,16 @@ describe('ExpandedOverlay', () => {
         hints: {
           status: 'ready',
           isOpen: true,
-          batch: { hints: ['First pointer', 'Second pointer'] },
-          revealedCount: 1,
+          history: [
+            {
+              snapshot: { code: '', language: 'typescript', capturedAt: 1 },
+              hint: {
+                text: 'First pointer',
+                strength: 'light',
+                progress: 'initial',
+              },
+            },
+          ],
         },
       },
     })
@@ -69,7 +78,7 @@ describe('ExpandedOverlay', () => {
     expect(screen.getByRole('region', { name: 'AI hints' })).toBeInTheDocument()
     expect(screen.getByText('First pointer')).toBeInTheDocument()
     expect(screen.queryByText('Second pointer')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Reveal next hint' }))
+    await user.click(screen.getByRole('button', { name: 'Get next hint' }))
     await user.click(screen.getByRole('button', { name: 'Show AI hints' }))
     expect(props.commands.onRevealNextHint).toHaveBeenCalledOnce()
     expect(props.commands.onToggleHints).toHaveBeenCalledOnce()
@@ -79,6 +88,7 @@ describe('ExpandedOverlay', () => {
     const props = createProps({
       view: {
         hints: {
+          history: [],
           status: 'error',
           isOpen: true,
           code: 'auth',
@@ -174,7 +184,9 @@ describe('ExpandedOverlay', () => {
         aiAnalysis: {
           status: 'ready',
           requestId: 'request-1',
-          report: makeValidAnalysis(),
+          report: makeValidFeedback(),
+          assessment: makeAnalysisRequest(),
+          host: 'leetcode.com',
         },
         overlay: {
           ...initialOverlaySessionState,
@@ -387,7 +399,9 @@ describe('ExpandedOverlay', () => {
         aiAnalysis: {
           status: 'ready',
           requestId: 'request-1',
-          report: makeValidAnalysis(),
+          report: makeValidFeedback(),
+          assessment: makeAnalysisRequest(),
+          host: 'leetcode.com',
         },
         overlay: {
           ...createFailedSubmittedOverlay(),
@@ -470,6 +484,7 @@ function createProps(
       onResetTimer: vi.fn(),
       onRestart: vi.fn(),
       onRetryAiAnalysis: vi.fn(),
+      onGenerateImplementation: vi.fn(),
       onToggleHints: vi.fn(),
       onRevealNextHint: vi.fn(),
       onRetryHints: vi.fn(),
@@ -486,6 +501,7 @@ function createProps(
     view: {
       hints: { status: 'idle', isOpen: false },
       aiAnalysis: { status: 'idle' },
+      aiImplementation: { status: 'idle' },
       context: createOverlayContext(),
       elapsedSeconds: 0,
       helpSearchQuery: 'Two Sum',

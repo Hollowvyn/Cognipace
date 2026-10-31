@@ -99,13 +99,20 @@ Current behavior:
 - an explicit AI hints action beside YouTube in Solve's Help row, using the
   selected saved provider, model, and key independently of whether automatic
   AI assessment is on or off
-- one requested batch of one to three progressively stronger short pointers:
-  the first appears immediately when ready, and Reveal next exposes the next
-  pointer locally without another provider request
-- session-only hints that retain their batch, revealed count, and disclosure
+- one new code-aware hint per explicit request, with at most three successful
+  hints per session; each request captures the complete current editor code and
+  language and includes earlier hints with their code snapshots
+- a fixed light → medium → heavy sequence for successful hints, including
+  after meaningful progress; every hint uses the latest snapshot and targets
+  the remaining gap
+- Light, Medium and Heavy describe the specificity of hints one, two and three;
+  hints respect the learner's valid approach and focus on remaining logic or
+  edge cases, rather than forcing a single reference solution
+- session-only hints that retain their history and disclosure
   across folding/reopening Help, tab switches, collapse/dock/restore, accepted
   or failed review saves, rating updates, and ordinary metadata refetches;
-  none of these actions generates another batch
+  none of these actions generates another hint; ordinary code edits preserve
+  earlier hints, and Get next hint captures the editor again
 - hints reset on Restart, a different problem, page reload, overlay remount,
   selected problem-input changes, a changed or removed saved connection, or
   clear local data; toggling automatic AI assessment alone preserves them
@@ -114,6 +121,14 @@ Current behavior:
 Hints exist only in the current overlay session. They never write review/log
 fields, rating, solve time, FSRS, Analytics, backup, or sync data. Notes remains
 a reserved, deferred tab without editing or persistence.
+
+Missing, ambiguous or oversized editor capture shows a retryable unavailable
+state rather than using visible lines or generating generic problem-only advice.
+Empty editor text is a valid starting point. Each hint remains attached to the
+snapshot read when requested, even if the user edits while generation is pending.
+Earlier hints remain visible during a later request or error; failures do not
+consume a hint slot. Real provider quality and human installed-extension smoke
+remain pending until their proof is recorded.
 
 Submission notes stay in LeetCode. Existing saved CogniPace log fields remain
 preserved in local practice history, backups, and sync; overlay review saves and
@@ -147,6 +162,13 @@ Long initializer such as 0L, and a retained empty generic collection needs its
 type on either the annotation or initializer. A justified direct LongArray is
 also valid.
 
+The initial assessment generates scores and feedback only. Opening Suggested
+implementation does not call the provider. Its Generate suggested code action
+requests code separately using the original assessed submission and feedback.
+Feedback stays visible during code generation and after a code-generation error;
+Retry in that section retries only code. Successful code remains available for
+the session without regeneration when the disclosure is reopened.
+
 Suggested code is labeled AI-generated and Untested, with Copy feedback and
 complexity assumptions. CogniPace never executes or submits that code. A
 report may explain why no responsible implementation is available.
@@ -159,9 +181,14 @@ causes no review write. The former AI recall-rating override has been retired.
 
 The overlay distinguishes idle, capture preparation, generation, ready,
 unavailable, and controlled-error states, with Settings and Retry where useful.
-Capture preparation has a 15-second deadline, background analysis a 30-second
+Capture preparation has a 15-second deadline, background analysis a 60-second
 deadline including configuration loading, and the whole client operation a
-50-second deadline. There is one provider attempt per request. Explicit Retry
+80-second deadline. Assessments using any supported provider/model may recover once from a temporary
+provider failure within that same deadline. Quota, authentication and invalid
+reports require an explicit recovery action. Assessment guidance stays concise
+while retaining all scored sections. Full suggested code is generated only on
+explicit request and has the same bounded recovery/deadline policy.
+Explicit Retry
 uses a new request identity for the retained submission. New attempts,
 configuration/key/model changes, navigation, restart, disable, and clear/reset
 cancel or invalidate stale work. Reset keeps the same handled attempt idle
@@ -477,7 +504,8 @@ availability, and usage limits can vary. Users can explicitly enter another free
 or paid model ID. CogniPace never configures paid fallback model IDs or switches
 a failed free request to a paid model. Connection testing checks basic access
 and structured output, not full report quality or every future routed model.
-OpenRouter forwards submission code and problem context to a model provider;
+OpenRouter forwards submission analysis and explicitly requested hint code,
+problem context and previous hint snapshots to a model provider;
 OpenRouter and provider data policies apply, including account privacy routing
 settings.
 
@@ -495,6 +523,17 @@ code calls the approved BYOK provider hosts through a reusable Vercel AI SDK
 integration. Development smoke testing can also run an opt-in live provider
 check from the hidden dashboard smoke route. Neither connection testing flow
 reveals stored secret values.
+
+GitHub Sync and AI connection offer **Save in your password manager**. This
+optional helper prepares Website, Username, Password and Notes fields for an
+existing manager. GitHub Notes include the Gist ID; AI Notes include the
+selected provider and model. Users explicitly copy individual fields and
+complete Add/Save in their manager. The Google Password Manager button opens
+Chrome's local manager without sending any credential data. Other managers
+can use the same fields. Automatic saving/autofill is unavailable on extension
+pages; users paste saved values back into CogniPace when needed. Only a newly
+entered key can be copied, before CogniPace clears the input on local save.
+Stored keys remain background-only and cannot be retrieved by this helper.
 
 ### Analytics
 

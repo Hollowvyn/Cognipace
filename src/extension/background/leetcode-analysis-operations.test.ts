@@ -235,3 +235,33 @@ describe('volatile sender-owned operations', () => {
     expect(cancelOwnedAnalysis('all-0', 'id')).toBe(false)
   })
 })
+
+it('keeps implementation operations independent and coalesces duplicate activations', async () => {
+  const operations = await import('./leetcode-analysis-operations')
+  expect(operations.runOwnedImplementation).toBeTypeOf('function')
+  let finish!: () => void
+  const task = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  let codeSignal!: AbortSignal
+  const work = vi.fn((signal: AbortSignal) => {
+    codeSignal = signal
+    return task
+  })
+  const first = operations.runOwnedImplementation(
+    'implementation-test',
+    'code-1',
+    work,
+  )
+  expect(
+    operations.runOwnedImplementation('implementation-test', 'code-1', work),
+  ).toBe(first)
+  await Promise.resolve()
+  operations.abortLeetCodeHints()
+  expect(codeSignal.aborted).toBe(false)
+  operations.abortLeetCodeAnalyses()
+  expect(codeSignal.aborted).toBe(true)
+  finish()
+  await first
+  expect(work).toHaveBeenCalledTimes(1)
+})

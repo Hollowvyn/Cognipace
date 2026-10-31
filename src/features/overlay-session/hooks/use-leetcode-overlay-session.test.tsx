@@ -9,6 +9,9 @@ import {
 } from '@/features/app-shell'
 import {
   analyzeLeetCodeSubmissionViaRuntime,
+  generateLeetCodeImplementationViaRuntime,
+  cancelLeetCodeImplementationViaRuntime,
+  implementationIdentity,
   cancelLeetCodeAnalysisViaRuntime,
   generateLeetCodeHintsViaRuntime,
   cancelLeetCodeHintsViaRuntime,
@@ -16,7 +19,10 @@ import {
 } from '@/features/leetcode-review-assistant'
 import { makeCompleteCapture } from '@/features/leetcode-capture/testing/code-analysis-capture-fixtures'
 import { analysisIdentity } from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
-import { makeValidAnalysis } from '@/features/leetcode-review-assistant/testing'
+import {
+  makeValidFeedback,
+  makeValidAnalysis,
+} from '@/features/leetcode-review-assistant/testing'
 import {
   overrideLastReviewResultViaRuntime,
   saveReviewResultViaRuntime,
@@ -71,6 +77,13 @@ vi.mock('@/lib/leetcode', async (importOriginal) => {
 
   return {
     ...actual,
+    readCompleteLeetCodeEditorSnapshot: vi.fn(() =>
+      Promise.resolve({
+        code: 'function solution() {}',
+        language: 'typescript',
+        capturedAt: 1,
+      }),
+    ),
     createLeetCodePageWatcher: vi.fn(
       (options: { onEvent: (event: LeetCodePageEvent) => void }) => {
         leetcodeMockState.onEvent = options.onEvent
@@ -110,6 +123,8 @@ vi.mock('@/features/leetcode-review-assistant', async (importOriginal) => {
   return {
     ...actual,
     analyzeLeetCodeSubmissionViaRuntime: vi.fn(),
+    generateLeetCodeImplementationViaRuntime: vi.fn(),
+    cancelLeetCodeImplementationViaRuntime: vi.fn(),
     cancelLeetCodeAnalysisViaRuntime: vi.fn(),
     generateLeetCodeHintsViaRuntime: vi.fn(),
     cancelLeetCodeHintsViaRuntime: vi.fn(),
@@ -220,11 +235,32 @@ describe('useLeetCodeOverlaySession', () => {
       result: makeCompleteCapture().submissionResult,
       debugEvents: [],
     })
+    vi.mocked(cancelLeetCodeImplementationViaRuntime)
+      .mockReset()
+      .mockResolvedValue({ requestId: 'ignored', cancelled: true })
+    vi.mocked(generateLeetCodeImplementationViaRuntime)
+      .mockReset()
+      .mockImplementation((request) =>
+        Promise.resolve({
+          status: 'ready',
+          ...implementationIdentity(request),
+          report: {
+            version: 'leetcode-code-implementation-v1',
+            status: 'ready',
+            implementation: makeValidAnalysis().suggestedImplementation!,
+          },
+          providerMetadata: {
+            provider: 'gemini',
+            model: 'fixture',
+            durationMs: 1,
+          },
+        }),
+      )
     analyze.mockReset().mockImplementation((request) =>
       Promise.resolve({
         status: 'ready',
         ...analysisIdentity(request),
-        report: makeValidAnalysis({ summary: AI_PROBE_SUMMARY }),
+        report: makeValidFeedback({ summary: AI_PROBE_SUMMARY }),
         providerMetadata: {
           provider: 'openai',
           model: 'fixture',
@@ -239,7 +275,11 @@ describe('useLeetCodeOverlaySession', () => {
       Promise.resolve({
         status: 'ready',
         requestId: request.requestId,
-        batch: { hints: hintPointers },
+        hint: {
+          text: hintPointers[request.history.length]!,
+          strength: request.history.length ? 'medium' : 'light',
+          progress: request.history.length ? 'stuck' : 'initial',
+        },
       }),
     )
     vi.mocked(cancelLeetCodeHintsViaRuntime)
@@ -270,12 +310,13 @@ describe('useLeetCodeOverlaySession', () => {
     act(() => result.current.actions.toggleHints())
     await waitFor(() => expect(result.current.hints.status).toBe('ready'))
     act(() => result.current.actions.revealNextHint())
-    const expected = {
-      status: 'ready',
-      isOpen: true,
-      revealedCount: 2,
-      batch: { hints: hintPointers },
-    }
+    await waitFor(() =>
+      expect(result.current.hints).toMatchObject({
+        status: 'ready',
+        history: [expect.anything(), expect.anything()],
+      }),
+    )
+    const expected = result.current.hints
     act(() => result.current.actions.selectExpandedTab('ai'))
     for (const action of ['collapse', 'dock', 'restore', 'expand'] as const) {
       act(() => result.current.actions[action]())
@@ -290,7 +331,7 @@ describe('useLeetCodeOverlaySession', () => {
     await runOverlayAction(result.current.actions.updateReview)
     expect(result.current.hints).toEqual(expected)
     expect(analyze).not.toHaveBeenCalled()
-    expect(generateHints).toHaveBeenCalledOnce()
+    expect(generateHints).toHaveBeenCalledTimes(2)
     expect(saveReview).toHaveBeenCalledOnce()
     expect(overrideReview).toHaveBeenCalledOnce()
     expect(JSON.stringify(saveReview.mock.calls)).not.toContain(hintPointers[0])
@@ -1288,6 +1329,51 @@ describe('useLeetCodeOverlaySession', () => {
     expect(result.current.overlay.reviewStatus).toBe('submitted-clean')
   })
 
+  it('generates code explicitly from the assessed pin, reuses it through local save and update, and keeps writes manual', async () => {
+    const { result } = await renderReadySession({
+      aiAssessmentEnabled: true,
+      aiAssessmentAvailable: true,
+    })
+    emitCompleteAnalysisSubmission()
+    await waitFor(() => expect(result.current.aiAnalysis.status).toBe('ready'))
+    const generate = vi.mocked(generateLeetCodeImplementationViaRuntime)
+    expect(generate).not.toHaveBeenCalled()
+    await act(async () => {
+      result.current.generateAiImplementation()
+      result.current.generateAiImplementation()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.aiImplementation.status).toBe('ready'),
+    )
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(generate.mock.calls[0]![0].assessment).toEqual(
+      analyze.mock.calls[0]![0],
+    )
+    expect(saveReview).not.toHaveBeenCalled()
+    expect(overrideReview).not.toHaveBeenCalled()
+    await runOverlayAction(result.current.actions.submitReview)
+    act(() => result.current.actions.selectRating('hard'))
+    await runOverlayAction(result.current.actions.updateReview)
+    expect(result.current.aiAnalysis.status).toBe('ready')
+    expect(result.current.aiImplementation.status).toBe('ready')
+    await act(async () => {
+      result.current.generateAiImplementation()
+      await Promise.resolve()
+    })
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(analyze).toHaveBeenCalledTimes(1)
+    for (const payload of [
+      latestSavedReviewRequest(),
+      overrideReview.mock.calls[0]![0],
+    ]) {
+      expect(JSON.stringify(payload)).not.toContain(
+        makeValidAnalysis().suggestedImplementation!.code,
+      )
+      expect(payload).not.toHaveProperty('implementation')
+    }
+  })
+
   it('excludes a ready AI report from both save and update payloads', async () => {
     const { result } = await renderReadySession({
       aiAssessmentEnabled: true,
@@ -1353,7 +1439,7 @@ async function completePendingAnalysis(
     analysis.resolve({
       status: 'ready',
       ...analysisIdentity(request),
-      report: makeValidAnalysis(),
+      report: makeValidFeedback(),
       providerMetadata: {
         provider: 'openai',
         model: 'fixture',

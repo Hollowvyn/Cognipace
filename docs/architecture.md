@@ -113,6 +113,8 @@ Not every feature needs every folder. Add only the folder needed for the change.
   behavior.
 - `sync`: GitHub Gist configuration, sync metadata, directional pull/push
   rules, Settings/header sync UI, and background orchestration.
+- `password-manager`: optional copy-and-paste credential handoff UI shared by
+  GitHub Sync and AI connection, exposed through its public feature barrel.
 - `genai`: AI provider settings contracts, trusted provider key storage,
   connection testing, and background-owned BYOK calls through `src/lib/ai`.
 - `dev-smoke`: hidden dashboard-only extension development smoke checks for
@@ -714,12 +716,29 @@ returned runtime data. Approved AI host permissions are exactly:
 - `https://generativelanguage.googleapis.com/*`
 - `https://openrouter.ai/*`
 
+The password-manager helper receives only the current form's entered key and
+public connection properties. Explicit user clicks copy a single field with
+`navigator.clipboard.writeText`; the secret is never rendered by the helper.
+`src/platform/chrome/password-manager.ts` opens the fixed
+`chrome://password-manager/passwords` URL using the existing tabs API without
+new permissions or any credential in navigation data. Chrome excludes extension
+pages from its password saving/filling UI, so the user completes Add/Save in
+their manager and manually pastes saved values back. There is no manager API
+integration, stored-secret read endpoint, plaintext file export, new runtime
+method, persistence, invalidation, or sync side effect. Copy/open failures use
+controlled text and never surface raw exception messages.
+
 Provider calls run in trusted background code after configuration and key
 checks. Explicit model objects use controlled fetch with redirects rejected,
 SDK retries disabled, bounded output, and telemetry disabled. Strict SDK/Zod
 and report-consistency validation remain required. OpenRouter requests specify
 only the selected model, without paid fallback IDs or privacy overrides;
-OpenRouter can perform internal routing within CogniPace's single request.
+OpenRouter can perform internal routing within each request. Assessments alone
+opt into one application recovery attempt for any provider/model after a recognized
+transient upstream failure; SDK retries remain disabled. Recovery preserves the
+selected model, strict output and the shared whole-operation deadline. It uses
+abortable backoff, honors Retry-After, and returns the original error if the delay
+cannot fit. Quota, auth, billing, refusal and output errors do not trigger recovery.
 
 Metadata keeps requested `model` as configuration identity and optionally adds
 bounded `resolvedModel` for a successful OpenRouter response that identifies a
@@ -768,8 +787,8 @@ secret.
 Ownership follows the existing feature direction. `src/lib/ai` owns reusable
 structured SDK transport and the direct official provider adapters. GenAI owns
 saved configuration, availability, trusted credentials, and connection testing.
-`leetcode-review-assistant` owns the versioned report and request schemas,
-rubric, prompt, consistency checks, and analysis service.
+`leetcode-review-assistant` owns the separate versioned feedback and
+implementation schemas, requests, prompts, consistency checks and services.
 `leetcode-capture` and `src/lib/leetcode` own full matching submission and
 problem content, including follow-ups and refreshable capture caches.
 `overlay-session` owns the session controller and Option A presentation.
@@ -793,9 +812,13 @@ serialized problem context up to 24,000 characters. Optional diagnostics above
 2,000 characters are omitted and named explicitly. Code and problem content are
 never silently truncated. Preparation refreshes the immutable submission pin
 and has a 15-second deadline; the retained pin survives unavailable reads for
-Retry. A request has one SDK generation with an 8,192-token output budget and a
-30-second background deadline including database/configuration/secret loading.
-The controller bounds the complete client operation at 50 seconds. Retry makes
+Retry. A request has an 8,192-token output budget and a 60-second background
+deadline including database/configuration/secret loading and any recovery.
+The controller bounds the complete client operation at 80 seconds. All assessment providers/models may retry a transient failure once; hints and
+connection tests keep one attempt. Reports request concise rationales and at most two high-value suggestions
+per list. The initial provider schema excludes implementation fields; a separate
+explicit operation generates complete suggested code from the same assessed
+source and validated feedback. Retry makes
 a fresh request identity for the same retained submission; repeated terminal
 events and disclosure/collapse/dock actions do not generate another request.
 
@@ -807,6 +830,26 @@ correctness, human rubric quality, or universal optimality. Suggested code is
 rendered as text, labeled AI-generated and Untested, and is never executed or
 submitted by the product.
 
+The overlay retains the successful assessment request and feedback in session
+memory. On-demand implementation requests are self-contained strict envelopes
+with that original context and correlated identities. The background treats
+all supplied context as untrusted model data, authorizes the actual sender
+host/slug, and checks the trusted connection before publishing. Code generation
+does not depend on completed-result state surviving an MV3 worker restart.
+Its in-flight ownership/cancellation is independent of feedback and hints;
+navigation, reset, disable, a new attempt or configuration change rejects stale
+code. Both operations keep 60-second background and 80-second client bounds.
+
+Assessment generation explicitly opts into safe numeric measurements: outgoing
+request-body bytes, validated output JSON bytes, attempts, schema preparation,
+generation and validation durations, plus available normalized SDK usage.
+Generation timing excludes validation and backoff; missing tokens stay unknown,
+and usage does not claim unknown failed-attempt billing. No response body clone,
+extra measurement fetch or raw SDK metadata is retained. Provider input omits
+null optional metadata and empty diagnostics while preserving all populated
+evidence, exact source, language, examples, constraints and zero counts. Local
+runtime request contracts retain the complete typed context.
+
 Reports and in-flight operations stay in session/controller state, outside
 TanStack Query query and mutation caches and the database. Report completion
 causes no invalidation, sync, review write, or rating change. The retired
@@ -817,43 +860,73 @@ key-save transport and provider authentication still carry keys where required.
 
 Evaluation inputs live in the owning review-assistant testing folder, and the
 test-only private environment configuration lives in GenAI testing. The opt-in
-harness calls the real `analyzeCode` SDK path with six cases and stores only
-report, provider metadata, criterion, and checked date in
-`/private/tmp/cognipace-ai-evaluation`. Its environment option does not replace
+harness calls the real `analyzeCode` SDK path with six cases and writes controlled
+success and failure artifacts before asserting success. Successful cases include
+the validated report; failed cases include only the controlled error category.
+Artifacts retain fixture identity, allowlisted provider metadata and checked date;
+a current-run summary records counts, error categories and durations under
+`/private/tmp/cognipace-ai-evaluation`. Raw SDK messages, bodies and keys are never
+written. Its environment option does not replace
 or read the application's trusted secret store. Normal tests skip all six live
 cases before reading any evaluation provider/model/key values.
 
-### Manual progressive hints
+### Manual adaptive hints
 
-`overlay-session` owns the transient hint batch, revealed count, disclosure,
-and in-flight operation above the collapsed, expanded, and docked modes. The
-Solve Help action starts a request explicitly; folding, reopening, tab or mode
-changes, review saves/updates, and ordinary refetches do not generate hints.
-Accepted and failed saves retain the batch. Restart, navigation, reload/remount,
-selected input changes, saved connection changes/removal, and local-data clear
-invalidate it. Automatic-assessment enable-only changes preserve it. Notes
-remains reserved without editing or persistence.
+`overlay-session` owns transient hint history, disclosure and the in-flight
+operation above visual modes. Solve Help explicitly requests one new hint at a
+time, up to three successful hints per session. Folding/reopening, mode/tab
+changes, review saves/updates and ordinary editor edits preserve history without
+requesting generation. Restart, navigation, reload/remount, selected problem
+input changes, saved connection changes/removal and local-data clear invalidate
+history and reject late output. Assessment enable-only toggles preserve it.
 
 `leetcode-capture` prepares complete matching problem context without requiring
-a submission: canonical title, statement, `examples[].rawText`, and
-constraints, with supported host and slug. The selected JSON identity contains
-only those inputs. Editor code, submissions, diagnostics, topics, official
-hints, follow-ups, and authentication data are excluded; enrichment of excluded
-fields preserves the batch, while any selected-input change invalidates it.
-Preparation and the strict problem-only runtime contract reject incomplete,
-mismatched, or oversized input rather than repairing or truncating it. Selected
-problem JSON is limited to 24,000 characters, 50 examples, and 100 constraints.
-Selected-input identity stays local to the controller. Runtime requests contain
-`surface`, `requestId`, problem and connection revision/provider; problem
-host/slug is not duplicated. Responses correlate by `requestId`, while the
-controller verifies its current operation, local input identity and connection.
+a submission: canonical title, statement, `examples[].rawText`, constraints,
+host and slug. Problem identity contains these inputs; diagnostics, topics,
+official hints, follow-ups and authentication data remain excluded. Incomplete,
+mismatched or oversized problem input is rejected without truncation. Serialized
+problem JSON is limited to 24,000 characters, 50 examples and 100 constraints.
 
-`leetcode-review-assistant` owns the hint request/response schemas, prompt, and
-service. A batch contains one to three distinct, trimmed, nonblank pointers of
-at most 200 characters each. The prompt requests increasingly specific
-conceptual nudges without code or a complete answer. Structural validation does
-not establish usefulness, progressive strength, or spoiler restraint; real
-provider quality requires separate evaluation.
+`src/lib/leetcode/editor` owns a read-only complete editor snapshot bridge.
+A static MAIN-world content script reads the live solution Monaco model on each
+explicit hint request. It identifies the editor attached to the solution root
+and rejects missing or ambiguous models; virtualized visible lines and Monaco's
+input textarea cannot establish completeness. Strict bounded page envelopes
+bind request UUID, host and slug, validate source/origin/location, and clean up
+on completion, abort and timeout. Page data remains untrusted and grants no
+extension authority. Complete code is bounded to 32,000 characters per snapshot;
+empty text is valid. Capture failure offers Retry, never problem-only fallback.
+This adds no Chrome permission, provider host or extension API in the page world.
+
+`leetcode-review-assistant` owns strict single-turn contracts and generation.
+Each request carries the current `{ code, language, capturedAt }` snapshot and
+at most two previous `{ snapshot, hint }` turns alongside problem and connection
+revision/provider. One response contains `{ text, strength, progress }`. A hint
+is trimmed, nonblank, at most 600 characters and rendered as inert text.
+The first turn is light/initial. Identical code/language (normalizing only line
+endings) forces stuck. Strength always follows successful history length:
+light, medium, heavy, regardless of progress. Changed code lets the model assess
+semantic progress to target the next remaining gap; cosmetic edits, irrelevant
+changes and regressions do not count as improved. Validation rejects out-of-order
+strengths, inconsistent progress and duplicate hints.
+The prompt preserves valid strategies, targets the smallest remaining gap and
+avoids complete implementations or invented defects. A model progress judgment
+is not proof of correctness; live provider quality requires separate evaluation.
+
+Provider input interns identical code/language snapshots into one table and
+uses indices for the current snapshot and ordered prior turns. Equality ignores
+capture timestamps and normalizes only CRLF endings. Distinct source or language
+remains complete; no semantic summary, truncation or opaque hash replaces code.
+This projection reduces repeated provider context without changing local/runtime
+history, turn validation or request-time snapshot ownership.
+
+Every Get next hint and Retry captures fresh code and makes one new provider
+request. A failure does not consume a slot; previous hints remain visible during
+pending/error states. A completed hint remains bound to its request-time code,
+even if the learner types while generation is pending. Editor changes do not
+invalidate historical guidance. Problem/connection identity and request-owner
+checks still reject obsolete output. History and snapshots remain session-only,
+outside database, query/mutation caches, backup and sync.
 
 GenAI exposes only `{ available, provider, revision }` to the content script;
 `revision` is an opaque UUID, and availability uses the selected saved provider,
@@ -864,8 +937,8 @@ enable-only changes do not. Per-database issued/committed read ordering and a
 captured registry reset epoch prevent late configuration reads from overwriting
 a newer observation or repopulating a reset registry.
 
-Broad GenAI invalidation refetches public connection metadata; the batch
-survives when revision and selected inputs remain the same. Full local-data
+Broad GenAI invalidation refetches public connection metadata; the history
+survives when revision and selected problem inputs remain the same. Full local-data
 reset/restore rotates the private in-memory registry before broadcast. The
 single existing application cache listener recognizes the existing full
 replacement signature and clears cached public hint metadata after cancelling

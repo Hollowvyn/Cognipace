@@ -9,7 +9,7 @@ import {
 } from '../api/code-analysis-contracts'
 import { analyzeCode } from './code-analysis-service'
 
-const analysisTimeoutMs = 30_000
+const analysisTimeoutMs = 60_000
 
 export async function analyzeLeetCodeSubmissionInBackground(
   request: AnalyzeLeetCodeSubmissionRequest,

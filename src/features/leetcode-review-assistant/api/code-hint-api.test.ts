@@ -23,13 +23,15 @@ const request: GenerateLeetCodeHintsRequest = {
   surface: 'content-script',
   requestId: 'hint-1',
   problem,
+  snapshot: { code: '', language: 'javascript', capturedAt: 0 },
+  history: [],
   connectionRevision: '00000000-0000-4000-8000-000000000001',
   connectionProvider: 'gemini',
 }
 const response = {
   status: 'ready' as const,
   requestId: request.requestId,
-  batch: { hints: ['Think about lookup.'] },
+  hint: { text: 'Think about lookup.', strength: 'light', progress: 'initial' },
 }
 
 beforeEach(() => sendMessageMock.mockReset())

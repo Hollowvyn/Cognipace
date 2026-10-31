@@ -30,6 +30,35 @@ afterEach(() => {
 })
 
 describe('GitHubSyncConnectionDialog', () => {
+  it('hands the entered token and Gist properties to the password manager without saving a connection', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText')
+    const actions = createActions()
+    renderDialog({ status: notConfiguredStatus, actions })
+    await user.type(screen.getByLabelText(/Access token/i), 'test-only-token')
+    await user.type(screen.getByLabelText(/Gist ID/i), 'test-gist')
+    await user.click(screen.getByText('Save in your password manager'))
+    await user.click(screen.getByRole('button', { name: 'Copy Password' }))
+    expect(writeText).toHaveBeenLastCalledWith('test-only-token')
+    await user.click(screen.getByRole('button', { name: 'Copy Notes' }))
+    expect(writeText).toHaveBeenLastCalledWith(
+      'App: CogniPace\nPurpose: GitHub Gist sync\nGist ID: test-gist',
+    )
+    expect(actions.onSaveToken).not.toHaveBeenCalled()
+    expect(actions.onConnectGist).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /^Save token$/ }))
+    expect(actions.onSaveToken).toHaveBeenCalledWith('test-only-token')
+    expect(screen.getByRole('button', { name: 'Copy Password' })).toBeDisabled()
+  })
+
+  it('never offers the stored-token mask for copying', async () => {
+    const user = userEvent.setup()
+    renderDialog({ status: configuredStatus })
+    await user.click(screen.getByText('Save in your password manager'))
+    expect(screen.getByRole('button', { name: 'Copy Password' })).toBeDisabled()
+    expect(screen.getByText(/Gist ID: gist_1/)).toBeVisible()
+  })
+
   it('groups token and Gist entry controls into single rows', () => {
     renderDialog({ status: notConfiguredStatus })
 

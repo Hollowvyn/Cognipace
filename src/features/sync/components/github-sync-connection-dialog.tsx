@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { InlineStatus } from '@/components/ui/inline-status'
+import { PasswordManagerHelper } from '@/features/password-manager'
 import { readErrorMessage } from '@/utils/errors'
 
 import type {
@@ -184,7 +185,7 @@ export function GitHubSyncConnectionDialog({
         aria-describedby={descriptionId}
         aria-labelledby={titleId}
         aria-modal="true"
-        className="grid w-full max-w-2xl gap-5 rounded-[var(--cp-panel-radius)] border border-border bg-card p-[var(--cp-panel-padding)] text-card-foreground shadow-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="grid max-h-[calc(100dvh-2rem)] w-full max-w-2xl gap-5 overflow-y-auto rounded-[var(--cp-panel-radius)] border border-border bg-card p-[var(--cp-panel-padding)] text-card-foreground shadow-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         ref={dialogRef}
         role="dialog"
         tabIndex={-1}
@@ -369,6 +370,14 @@ export function GitHubSyncConnectionDialog({
           </div>
         </div>
 
+        <PasswordManagerHelper
+          disabled={isPending}
+          website="https://gist.github.com"
+          username="CogniPace GitHub sync"
+          password={hasSavedToken ? '' : token}
+          notes={`App: CogniPace\nPurpose: GitHub Gist sync\nGist ID: ${gistDraft.trim() || '(not connected)'}`}
+        />
+
         {feedback?.role === 'alert' && feedback.tone === 'warning' ? (
           <div className="flex flex-wrap gap-2">
             <Button
@@ -506,6 +515,7 @@ function getFocusableElements(root: HTMLElement) {
         'select:not([disabled])',
         'textarea:not([disabled])',
         'a[href]',
+        'summary',
         '[tabindex]:not([tabindex="-1"])',
       ].join(','),
     ),

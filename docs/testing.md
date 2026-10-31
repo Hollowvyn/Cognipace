@@ -1002,7 +1002,10 @@ cannot validate a replacement key or model.
    unavailable free capacity or quota when available; distinguish 402 balance/key
    limit guidance from 429 quota guidance. Account privacy/capability restrictions
    may make a model unavailable; do not loosen privacy settings automatically.
-   Confirm no automatic retries or app-configured paid fallback requests.
+   Confirm no retries for quota/auth/billing/refusal/invalid reports and no
+   app-configured paid fallback requests. Assessments on any provider/model may recover once from
+   a temporary upstream failure within the shared deadline. Connection tests and
+   hints retain their single-attempt behavior.
 7. Remove the OpenRouter key. Confirm unavailable analysis and that other saved
    provider keys remain. Assessment can be disabled after removal. Reset Defaults
    keeps saved keys, disables assessment, and restores the blank default model.
@@ -1019,6 +1022,42 @@ cannot validate a replacement key or model.
 Human installed-extension OpenRouter happy-path and edge-case proof is pending;
 attach dated screenshots or recording before PR review or merge. Component
 fixtures and native wire tests supplement this proof.
+
+### Password Manager Handoff
+
+Human installed-extension proof is required before PR review or merge. Use
+disposable test values; mask keys in screenshots or recordings.
+
+1. Open the GitHub Sync dialog. Enter a test token and Gist ID, then expand
+   **Save in your password manager**. Copy Website, Username, Password and
+   Notes one at a time. Verify the Password copy is exactly the entered token
+   and Notes contain the current Gist ID. No token validation, connection or
+   local save should run from a helper action.
+2. Choose **Open Google Password Manager**, select Add, paste those fields and
+   save there. Alternatively add the same values in your preferred manager.
+   Retrieve them and paste the token and Gist ID back into CogniPace. Complete
+   the existing GitHub connection smoke using disposable valid credentials.
+3. Save the token in CogniPace and confirm the draft clears and Copy Password
+   is disabled. Reopen Manage connection: the stored mask is never copyable.
+   Replace token and confirm only the newly entered token becomes copyable.
+4. Repeat AI Settings with OpenAI, Anthropic, Gemini and OpenRouter. Notes must
+   contain the selected provider and current model; the website and username
+   must match that provider. Copying does not save, test, activate or enable
+   assessment. Switching providers clears the draft key; saving locally also
+   disables Password copying. Verify normal local connection save/test works.
+5. Exercise clipboard denial or unavailability, retry, and a failed manager
+   opening. Errors must be controlled, contain no key, and never claim a copy
+   or manager save succeeded. Confirm opening the manager never copies a key.
+6. At desktop and narrow widths, expand the helper and confirm the GitHub
+   dialog scrolls, Close remains reachable, Tab includes the summary, and
+   Escape/focus restoration work. Reload the extension and verify existing
+   stored connections still work. Confirm no extra Chrome permissions, provider
+   calls, secrets in navigation URLs, backup exports or sync payloads.
+
+Chrome password prompts and ordinary password-manager extension autofill do
+not work on this extension page. This flow is an explicit copy-and-paste
+handoff. Supplemental component/browser fixtures do not prove a real manager
+entry was saved or replace human installed-extension smoke.
 
 ### Dashboard Dev Smoke
 
@@ -1976,88 +2015,83 @@ it does not complete these installed-extension checks.
       before PR review or merge. Record the installed extension version and
       exact tested flows with the proof.
 
-#### Required human installed-extension manual hints smoke
+#### Required human installed-extension adaptive hints smoke
 
-Status: **HUMAN INSTALLED-EXTENSION SMOKE PENDING** and **LIVE PROVIDER
-QUALITY EVALUATION PENDING**. The human engineer must run the following
-happy-path and edge-case realtime flows and attach screenshots or a recording
-before PR review or merge. [The hints handoff](superpowers/handoffs/2026-10-04-overlay-ai-hints.md)
-records automated checks and production-component fixture screenshots. Neither
-fixture screenshots nor mock/unit tests complete these human or live gates.
+Status: **HUMAN INSTALLED-EXTENSION SMOKE PENDING**, **LIVE EDITOR
+COMPATIBILITY PENDING**, and **LIVE PROVIDER QUALITY EVALUATION PENDING**.
+Run the following happy-path and edge-case realtime flows and attach
+screenshots or a recording before PR review or merge. Mock/model tests and
+production-component fixtures do not complete these human or live gates.
 
-- [ ] Save a provider/model/key connection, turn automatic AI assessment OFF,
-      and open a problem before submitting. Activate Solve's Help AI action and
-      verify the first pointer appears after the busy state. Rapid repeated
-      activation must produce one provider call. Reveal subsequent pointers
-      locally with previous pointers retained, actual counts, and a final state
-      for the actual one-to-three-pointer batch. Fold/reopen without regeneration.
-- [ ] During preparation/generation, start/pause the timer, choose a rating,
-      save an accepted and a failed review, and update the rating. Confirm
-      immediate persistence and the expected review count, rating/correctness,
-      elapsed/solve time, FSRS scheduling, and preserved existing log values,
-      comparing with the same workflow without hints. Hint arrival must leave
-      these saved values unchanged and cause no extra write. Export a backup and inspect sync payloads:
-      neither contains hint text.
-- [ ] Retain ready and partially revealed batches through Solve/AI/Notes,
-      collapse/expand, dock then restore to collapsed then explicitly expand,
-      accepted and failed saves, rating updates, and ordinary metadata refetch.
-      Toggle automatic assessment on and off; hints remain. Exercise Phase 1
-      tab scroll retention and independent AI report disclosures too.
-- [ ] Run a hint and an automatic report simultaneously. Cancel either owner
-      without cancelling the other. Restart the overlay session and confirm
-      both reset and late output stays absent.
-- [ ] Change/remove the selected saved key, provider, or model while hints are
-      pending and ready. Reject old results, clear ready hints, and use the new
-      connection only after a new explicit request. Change an unselected
-      provider's key and verify the current batch remains.
-- [ ] Exercise missing, partial, oversized, or mismatched problem capture;
-      slow capture/configuration/key reads; authentication, unavailable-model,
-      transport, and timeout failures. Verify controlled redacted messages,
-      useful Settings/Retry, and explicit Retry with a fresh request. A missing
-      connection must offer Settings without generating automatically.
-- [ ] Rapidly navigate between problems, leave LeetCode, restart, reload,
-      remount, and clear local data while pending and ready. Old or late output
-      must not appear. Repeat reset/restore with failed or hung public metadata
-      reads; stale ready hints must clear before the reread succeeds.
-- [ ] Use keyboard and pointer controls at 320px and 392px widths, both themes,
-      and a short viewport in the installed content-script ShadowRoot. Inspect
-      the compact Help row, absent idle card, readable inert wrapping pointers,
-      visible focus, busy state, Retry, Settings, and reachable Solve controls.
-- [ ] Record the installed extension version and exact flows. Attach ready
-      first-pointer, progressive, final, busy, error, retained-after-save, and
-      restart/navigation screenshots or a recording. These are human-run proof,
-      separate from production-component fixture captures.
+- [ ] Save a provider/model/key, turn automatic assessment OFF, open a problem
+      before submitting and activate Solve Help AI. Verify one light hint after
+      reading the complete current editor, not a prefetched batch. Rapid repeated
+      activation must produce one capture and one provider request.
+- [ ] Without editing, request hints two and three: expect Medium then Heavy,
+      guidance related to the earlier hints and problem, and a final three-hint
+      limit. Fold/reopen and switch modes/tabs without another request.
+- [ ] Restart. Act on the first hint and make meaningful progress, then request
+      another: expect Medium focused on the next remaining gap, then Heavy on
+      the third successful request even after further progress. Rename variables
+      or change formatting only and verify that does not masquerade as progress.
+      Repeat with a regression and with almost-complete code: hints must target
+      the real gap or suggest verification, never invent a defect.
+- [ ] Use code longer than the visible viewport, including important logic off
+      screen. Scroll and request again; the complete snapshot must include all
+      lines, and unchanged code must still strengthen. If LeetCode exposes more
+      than one Monaco model, verify the solution editor is selected. Exercise
+      empty editor text, missing editor, ambiguous editor and code over 32,000
+      characters: unavailable captures must offer Retry, never generic fallback.
+- [ ] Edit while a hint is pending. Verify the result remains clearly tied to
+      code when requested and the next click reads the new code. Cause capture,
+      provider, timeout and malformed-output failures on a second/third request:
+      keep earlier hints visible, consume no slot, and Retry with fresh code.
+- [ ] During preparation/generation start/pause the timer, select a rating,
+      save accepted/failed reviews and update ratings. Compare review count,
+      correctness, time, FSRS and stored logs with the same workflow without
+      hints. Hint arrival must cause no review write or rating change. Backups
+      and sync must contain neither hints nor editor snapshots.
+- [ ] Retain history through Solve/AI/Notes, collapse/dock/restore, review saves,
+      rating updates, metadata refetch and automatic-assessment enable toggles.
+      Simultaneous hint/report work must have independent cancellation.
+- [ ] Restart, navigate rapidly between problems, leave LeetCode, reload,
+      remount, clear/restore local data, or change/remove the selected provider,
+      model or key while ready and while a later hint is pending. Reset history
+      and reject obsolete responses. Changing an unselected key must preserve it.
+- [ ] At 320px/392px in both themes and a short viewport, inspect the compact
+      Help row, Light/Medium/Heavy labels, N of 3 count, inert wrapped text,
+      retained earlier hints during pending/error, Get next hint, limit, Retry,
+      Settings, focus and reachable immediate review controls.
+- [ ] Record extension version, provider/model and exact flows. Attach first,
+      stagnant escalation, progressing-medium/heavy, final, later-pending/error,
+      retained-after-save and reset/navigation screenshots or recording.
 
-#### Manual hints provider evaluation
+#### Adaptive hints provider evaluation
 
-The three authored inputs in
+Authored inputs in
 `src/features/leetcode-review-assistant/testing/code-hint-evaluation-fixtures.ts`
-exercise the problem-only `generateCodeHints` service. Normal checks leave
-`COGNIPACE_AI_EVAL` unset or `0` and skip all three live cases before reading
-private provider/model/key configuration. The 2026-10-05 check was presence-only:
-opt-in was false and private configuration fields were absent. No application
-stored key was read and no live request was made.
+exercise single-turn code-aware generation with bounded prior hint/snapshot
+history. Ordinary checks leave `COGNIPACE_AI_EVAL` unset or `0` and skip live
+cases before reading private provider/model/key values. No application stored
+key is read for evaluation.
 
 Status: **LIVE PROVIDER QUALITY EVALUATION PENDING**. With private test-only
-provider/model/key environment configuration already prepared by the human,
-use the pinned Node 24.20.0 and npm 11.19.0 toolchain and run:
+provider/model/key environment configuration prepared by the human, use pinned
+Node 24.20.0/npm 11.19.0 and run:
 
 ```sh
 rtk proxy env COGNIPACE_AI_EVAL=1 npm test -- src/features/leetcode-review-assistant/server/code-hint-provider-evaluation.test.ts --run
 ```
 
-Do not paste keys into commands, reports, logs, screenshots, or Git, and do not
-read the app's trusted key store for this evaluation. Record provider, model,
-date, latency, and each fixture's progressive strength, usefulness, short
-length, lack of duplicates, and spoiler restraint. Inspect every real batch;
-schema/mock success proves structural bounds only. Human installed-extension
-smoke and live provider quality remain separate pending gates, neither N/A.
-Successful opted-in cases write only batch, provider metadata, criterion, and
-checked date under `/private/tmp/cognipace-hint-evaluation`; verify fresh dates
-before citing artifacts. Each real service call has a 30-second deadline and a
-35-second test timeout with a single 1,024-token generation attempt.
-Keep the existing six-case automatic-analysis evaluation and generated-code
-checks below unchanged.
+Do not paste keys into commands, reports, logs, screenshots or Git. Record
+provider/model/date/latency and inspect each real hint for snapshot relevance,
+continuity, semantic progress classification, useful specificity, lack of
+repetition, valid-alternative preservation and spoiler restraint. Exercise
+unchanged escalation, actual progress, cosmetic edits, regressions and
+near-complete code. Structural tests cannot prove model judgment. Artifacts
+remain under `/private/tmp/cognipace-hint-evaluation` with fresh checked dates.
+Human installed-extension proof and live provider quality remain separate pending
+gates. Keep automatic-analysis evaluation and generated-code checks unchanged.
 
 #### LeetCode Submission Capture
 
@@ -2114,15 +2148,52 @@ success or schema validity. Mocked wire tests are separate evidence. Capacity,
 account privacy settings, billing, or schema-support failures remain controlled
 and do not trigger app-configured paid fallback requests.
 
-Each case calls the actual `analyzeCode` service with a 30-second deadline and
-35-second test timeout, using the existing single 8,192-token SDK path. A
-successful case writes only report, providerMetadata, criterion, and checkedAt
-to `/private/tmp/cognipace-ai-evaluation/<fixture.id>.json`. It never writes raw
+Human assessment reliability smoke (attach screenshots or a recording):
+
+- Use `openrouter/free` and submit a valid solution; verify all scored sections,
+  concise guidance, complete suggested code and independent manual review saving.
+- Exercise a response taking more than 30 seconds; it may complete within the
+  60-second background deadline. A stalled worker must exit the client pending
+  state by its 80-second deadline and offer Retry.
+- In a test-only transport harness, fail once with a temporary upstream error,
+  then succeed. Verify at most two attempts, the same selected model and no
+  extra report/review writes. Honor Retry-After; an excessive delay returns the
+  controlled error. Capture evidence of the observed attempt count and timing.
+- Exercise quota, authentication and invalid-output errors; verify no automatic
+  recovery attempt. Navigate, cancel or change connection during backoff and
+  generation; obsolete work must not publish a report or begin another attempt.
+- Repeat recovery with a paid/custom model and each supported provider.
+  Connection tests and hints retain their single-attempt policy. Record extension
+  version and requested/served model.
+
+Each case calls the actual `analyzeCode` service with a 60-second deadline and
+65-second test timeout, using the 8,192-token SDK path with bounded recovery for
+all supported provider/model selections. Every case writes a controlled outcome before the
+success assertion to `/private/tmp/cognipace-ai-evaluation/feedback/<fixture.id>.json`.
+Successful outcomes include the validated report; errors include only the
+controlled error category. Allowlisted provider identity, duration, fixture ID
+and checked date support comparison. A current-run summary records success/failure
+counts, errors by category and durations. It never writes raw
 requests, configuration, provider bodies, environments, or keys. Verify the
 current checkedAt, provider, and model before citing an artifact; an older file
 does not prove the latest run passed. Passing schema and consistency validation
 does not establish human rubric quality, compilation, test success, or
 optimality. Inspect each report and record provider/model/date and results:
+
+The initial assessment now returns feedback only. Complete generated-code checks
+require a separate explicit implementation evaluation, using authored assessment
+pins and feedback, the same private provider configuration, and both opt-ins:
+
+```sh
+rtk proxy env COGNIPACE_AI_EVAL=1 COGNIPACE_AI_IMPLEMENTATION_EVAL=1 npm test -- src/features/leetcode-review-assistant/server/code-implementation-provider-evaluation.test.ts --run
+```
+
+Implementation artifacts and their run summary are stored under
+`/private/tmp/cognipace-ai-evaluation/implementation`. Compare the `operation`
+labels, available numeric metrics and checked dates. Feedback-only success does
+not establish generated-code quality. When reviewing a full user journey,
+include both calls if code was requested; unknown failed-attempt usage remains
+unknown. Baseline/current wire sizes are bytes, never token estimates.
 
 - Brute force with the linear goal: a material hash-map replacement needs
   Approach below 5 without forcing a particular score; expected linear time is
@@ -2183,6 +2254,11 @@ reports supplement this proof and cannot replace it.
 2. Submit long/scrolled code and a problem with follow-ups. Verify complete
    input, three /5 scores, all selected rows, independent time-better /
    space-worse styling, and Kotlin Int, Long, generic types, and signatures.
+   Confirm initial feedback contains no generated code and makes one generation
+   request. Open Suggested implementation without another call, then activate
+   Generate suggested code. Verify it uses the original assessed submission and
+   feedback even after editing the live editor. Keep all scores visible while
+   code is pending, and preserve AI-generated/Untested labels and Copy.
 3. Make capture incomplete, then Retry after a newer submission exists.
    Confirm Retry targets the original submission. Exercise rapid consecutive
    submissions and ambiguous discovery; stale code/results must not attach to
@@ -2204,6 +2280,13 @@ reports supplement this proof and cannot replace it.
    model text stays inert, Copy success and failure feedback work, and 392px
    and 320px layouts retain all labels and content with horizontal scrolling
    confined to code.
+   Exercise Generate by keyboard, duplicate activation and a code-generation
+   error. Retry only code without regenerating scores. Reopen successful code
+   and save a review without another model call. Navigate, reset, change
+   connection, disable assessment or create a new attempt during code generation;
+   old code must not attach to the next assessment. Restart the background worker
+   after feedback, then request code; the self-contained request must not depend
+   on a retained completed-worker session.
 8. Record extension version, provider/model/date, happy and edge results, and
    screenshot/recording paths. Recovery is to turn AI assessment off; review
    saving and connection testing continue, with no migration or new permission.

@@ -16,6 +16,11 @@ import {
   generateText,
 } from 'ai'
 
+import {
+  projectAiMetrics,
+  projectAiUsage,
+  type AiGenerationMetrics,
+} from './metrics'
 import { AiDeadlineError, withAiDeadline } from './operation'
 import type {
   AiErrorCode,
@@ -70,13 +75,51 @@ export async function generateJson<T>(
   request: AiGenerateJsonRequest<T>,
 ): Promise<AiGenerateJsonResult<T>> {
   const startedAt = Date.now()
+  const metrics: AiGenerationMetrics = { attemptCount: 0, requestBodyBytes: 0 }
+  let preparationEndedAt: number | undefined
+  let generationStartedAt: number | undefined
+  let generationMs = 0
+  let validationMs = 0
+  let validationStartedAt: number | undefined
   const metadata = () => ({
     provider: request.provider,
     model: request.model,
     durationMs: Math.max(0, Date.now() - startedAt),
+    ...(request.collectMetrics === true
+      ? {
+          metrics: projectAiMetrics({
+            ...metrics,
+            preparationMs: Math.max(
+              0,
+              (preparationEndedAt ?? Date.now()) - startedAt,
+            ),
+            ...(preparationEndedAt === undefined
+              ? {}
+              : {
+                  generationMs: Math.max(
+                    0,
+                    generationMs +
+                      (generationStartedAt === undefined
+                        ? 0
+                        : Date.now() - generationStartedAt) -
+                      validationMs -
+                      (validationStartedAt === undefined
+                        ? 0
+                        : Date.now() - validationStartedAt),
+                  ),
+                  validationMs:
+                    validationMs +
+                    (validationStartedAt === undefined
+                      ? 0
+                      : Math.max(0, Date.now() - validationStartedAt)),
+                }),
+          }),
+        }
+      : {}),
   })
   let preparingSchema = false
   let transportStatus: number | undefined
+  let retryAfter: string | null = null
   try {
     return await withAiDeadline(
       {
@@ -101,15 +144,41 @@ export async function generateJson<T>(
           throw new ControlledAiError('bad-request')
         }
         preparingSchema = true
-        const output = Output.object({ schema: request.schema })
+        const originalOutput = Output.object({ schema: request.schema })
+        const output =
+          request.collectMetrics === true
+            ? {
+                ...originalOutput,
+                parseCompleteOutput: async (
+                  ...args: Parameters<typeof originalOutput.parseCompleteOutput>
+                ) => {
+                  validationStartedAt = Date.now()
+                  try {
+                    return await originalOutput.parseCompleteOutput(...args)
+                  } finally {
+                    validationMs += Math.max(
+                      0,
+                      Date.now() - validationStartedAt,
+                    )
+                    validationStartedAt = undefined
+                  }
+                },
+              }
+            : originalOutput
         await output.responseFormat
         preparingSchema = false
+        preparationEndedAt = Date.now()
         signal.throwIfAborted()
         const providerFetch: typeof fetch = async (input, init) => {
           signal.throwIfAborted()
+          if (request.collectMetrics === true && typeof init?.body === 'string')
+            metrics.requestBodyBytes =
+              (metrics.requestBodyBytes ?? 0) +
+              new TextEncoder().encode(init.body).length
           try {
             const response = await fetch(input, { ...init, redirect: 'error' })
             transportStatus = response.status
+            retryAfter = response.headers.get('retry-after')
             return response
           } catch (error) {
             if (error instanceof TypeError)
@@ -118,42 +187,75 @@ export async function generateJson<T>(
           }
         }
         const model = createModel(request, providerFetch)
-        const result = await generateText({
-          model,
-          output,
-          system: request.prompt.system,
-          prompt: request.prompt.user,
-          maxOutputTokens,
-          maxRetries: 0,
-          abortSignal: signal,
-          ...(request.temperature === undefined
-            ? {}
-            : { temperature: request.temperature }),
-          telemetry: {
-            isEnabled: false,
-            recordInputs: false,
-            recordOutputs: false,
-          },
-          ...(request.provider === 'openai'
-            ? { providerOptions: { openai: { store: false } } }
-            : {}),
-        })
-        signal.throwIfAborted()
-        if (result.finishReason === 'content-filter')
-          throw new ControlledAiError('refused')
-        if (result.finishReason === 'length')
-          throw new ControlledAiError('invalid-output')
-        const resolvedModel =
-          request.provider === 'openrouter'
-            ? validResolvedModel(result.response.modelId, request.model)
-            : undefined
-        return {
-          status: 'success' as const,
-          data: result.output,
-          providerMetadata: {
-            ...metadata(),
-            ...(resolvedModel === undefined ? {} : { resolvedModel }),
-          },
+        for (let attempt = 0; ; attempt++) {
+          transportStatus = undefined
+          retryAfter = null
+          try {
+            if (request.collectMetrics === true)
+              metrics.attemptCount = (metrics.attemptCount ?? 0) + 1
+            generationStartedAt = Date.now()
+            const result = await generateText({
+              model,
+              output,
+              system: request.prompt.system,
+              prompt: request.prompt.user,
+              maxOutputTokens,
+              maxRetries: 0,
+              abortSignal: signal,
+              ...(request.temperature === undefined
+                ? {}
+                : { temperature: request.temperature }),
+              telemetry: {
+                isEnabled: false,
+                recordInputs: false,
+                recordOutputs: false,
+              },
+              ...(request.provider === 'openai'
+                ? { providerOptions: { openai: { store: false } } }
+                : {}),
+            })
+            generationMs += Math.max(0, Date.now() - generationStartedAt)
+            generationStartedAt = undefined
+            if (request.collectMetrics === true)
+              Object.assign(metrics, projectAiUsage(result.usage))
+            signal.throwIfAborted()
+            if (result.finishReason === 'content-filter')
+              throw new ControlledAiError('refused')
+            if (result.finishReason === 'length')
+              throw new ControlledAiError('invalid-output')
+            const resolvedModel =
+              request.provider === 'openrouter'
+                ? validResolvedModel(result.response.modelId, request.model)
+                : undefined
+            if (request.collectMetrics === true)
+              metrics.outputJsonBytes = new TextEncoder().encode(
+                JSON.stringify(result.output),
+              ).length
+            return {
+              status: 'success' as const,
+              data: result.output,
+              providerMetadata: {
+                ...metadata(),
+                ...(resolvedModel === undefined ? {} : { resolvedModel }),
+              },
+            }
+          } catch (error) {
+            if (generationStartedAt !== undefined) {
+              generationMs += Math.max(0, Date.now() - generationStartedAt)
+              generationStartedAt = undefined
+            }
+            signal.throwIfAborted()
+            const delayMs = retryDelayMs(retryAfter)
+            if (
+              attempt !== 0 ||
+              request.retryTransientErrors !== true ||
+              !isTransientError(error, request.provider, transportStatus) ||
+              delayMs >=
+                (request.timeoutMs ?? 30_000) - (Date.now() - startedAt)
+            )
+              throw error
+            await waitForRetry(delayMs, signal)
+          }
         }
       },
     )
@@ -407,4 +509,55 @@ function isProviderRefusal(error: unknown, provider: AiProviderId): boolean {
       )
     })
   )
+}
+
+function isTransientError(
+  error: unknown,
+  provider: AiProviderId,
+  status?: number,
+): boolean {
+  if (!APICallError.isInstance(error)) return false
+  if (normalizeError(error, provider, status) !== 'network') return false
+  // An HTTP auth/quota/billing failure cannot be overridden by embedded metadata.
+  if (
+    status !== undefined &&
+    status >= 400 &&
+    ![502, 503, 504].includes(status)
+  )
+    return false
+  if (status !== undefined && [502, 503, 504].includes(status)) return true
+  if (provider !== 'openrouter') return false
+  const record = asRecord(error.data)
+  const body = asRecord(record?.error) ?? record
+  const tag = asRecord(body?.metadata)?.error_type
+  return tag === 'provider_unavailable' || tag === 'provider_overloaded'
+}
+
+function retryDelayMs(header: string | null): number {
+  if (header === null || !header.trim()) return 1000
+  const seconds = Number(header)
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000
+  const date = Date.parse(header)
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : 1000
+}
+
+function waitForRetry(delayMs: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    signal.throwIfAborted()
+    const cleanup = () => signal.removeEventListener('abort', onAbort)
+    const onAbort = () => {
+      clearTimeout(timer)
+      cleanup()
+      reject(
+        signal.reason instanceof Error
+          ? signal.reason
+          : new AiDeadlineError('cancelled'),
+      )
+    }
+    const timer = setTimeout(() => {
+      cleanup()
+      resolve()
+    }, delayMs)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
 }

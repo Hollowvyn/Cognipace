@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.3.0](https://github.com/Hollowvyn/Cognipace/compare/v2.2.0...v2.3.0) (2026-10-30)
+
+
+### Features
+
+* **analytics:** redesign analytics cards and period metrics ([#206](https://github.com/Hollowvyn/Cognipace/issues/206)) ([a794446](https://github.com/Hollowvyn/Cognipace/commit/a7944466d1f7991e711ba8b23ca76daa551f3780))
+* **fsrs:** activate phase e daily scheduling ([#207](https://github.com/Hollowvyn/Cognipace/issues/207)) ([21b190f](https://github.com/Hollowvyn/Cognipace/commit/21b190ff5286b23ae21c8f8b02ac8ee7437196bb))
+* **fsrs:** preserve evidence and recover backup replacements ([#198](https://github.com/Hollowvyn/Cognipace/issues/198)) ([9230a70](https://github.com/Hollowvyn/Cognipace/commit/9230a7094e4811a38f87d1573c7ea1dee648129f))
+* **overlay:** add focused tabs and progressive AI hints ([#202](https://github.com/Hollowvyn/Cognipace/issues/202)) ([9cafaf7](https://github.com/Hollowvyn/Cognipace/commit/9cafaf7bb1fcea02b16fb78bd1329100c618ae36))
+* **practice:** make review saves durable and corrections safe ([#205](https://github.com/Hollowvyn/Cognipace/issues/205)) ([c6563ce](https://github.com/Hollowvyn/Cognipace/commit/c6563ced17b2679f75c306f6ad1f1b0eee1cb4d3))
+* **practice:** preview native FSRS review intervals ([#208](https://github.com/Hollowvyn/Cognipace/issues/208)) ([c4ce5d9](https://github.com/Hollowvyn/Cognipace/commit/c4ce5d9568131e09b3ee3c9586fe76f7283cb32e))
+
+
+### Performance Improvements
+
+* **fsrs:** measure and improve local scaling ([#209](https://github.com/Hollowvyn/Cognipace/issues/209)) ([ef14c1a](https://github.com/Hollowvyn/Cognipace/commit/ef14c1a5b49058206c829542447a58972bc08aa6))
+* **overlay:** measure startup baseline ([#211](https://github.com/Hollowvyn/Cognipace/issues/211)) ([d45f457](https://github.com/Hollowvyn/Cognipace/commit/d45f457578ad3a2caea44161b5ba4b3268790f0d))
+
 ## [2.2.0](https://github.com/Hollowvyn/Cognipace/compare/v2.1.0...v2.2.0) (2026-10-05)
 
 

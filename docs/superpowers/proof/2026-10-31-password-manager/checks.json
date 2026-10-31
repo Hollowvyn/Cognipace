@@ -1,0 +1,16 @@
+{
+  "packagedExtension": true,
+  "title": "CogniPace Dashboard",
+  "googleManagerOpens": true,
+  "disposableManagerEntrySaved": true,
+  "nativeClipboardCopies": true,
+  "notesContainGistAndProviderModel": true,
+  "tabFocusIncludesDisclosure": true,
+  "escapeRestoresFocus": true,
+  "switchingProviderClearsKey": true,
+  "savingLocallyClearsKey": true,
+  "viewports": ["1280x1000", "390x844"],
+  "horizontalOverflow": false,
+  "providerRequests": [],
+  "consoleErrors": []
+}
