@@ -2075,7 +2075,7 @@ Human assessment reliability smoke (attach screenshots or a recording):
 Each case calls the actual `analyzeCode` service with a 60-second deadline and
 65-second test timeout, using the 8,192-token SDK path with bounded recovery for
 all supported provider/model selections. Every case writes a controlled outcome before the
-success assertion to `/private/tmp/cognipace-ai-evaluation/<fixture.id>.json`.
+success assertion to `/private/tmp/cognipace-ai-evaluation/feedback/<fixture.id>.json`.
 Successful outcomes include the validated report; errors include only the
 controlled error category. Allowlisted provider identity, duration, fixture ID
 and checked date support comparison. A current-run summary records success/failure
@@ -2085,6 +2085,21 @@ current checkedAt, provider, and model before citing an artifact; an older file
 does not prove the latest run passed. Passing schema and consistency validation
 does not establish human rubric quality, compilation, test success, or
 optimality. Inspect each report and record provider/model/date and results:
+
+The initial assessment now returns feedback only. Complete generated-code checks
+require a separate explicit implementation evaluation, using authored assessment
+pins and feedback, the same private provider configuration, and both opt-ins:
+
+```sh
+rtk proxy env COGNIPACE_AI_EVAL=1 COGNIPACE_AI_IMPLEMENTATION_EVAL=1 npm test -- src/features/leetcode-review-assistant/server/code-implementation-provider-evaluation.test.ts --run
+```
+
+Implementation artifacts and their run summary are stored under
+`/private/tmp/cognipace-ai-evaluation/implementation`. Compare the `operation`
+labels, available numeric metrics and checked dates. Feedback-only success does
+not establish generated-code quality. When reviewing a full user journey,
+include both calls if code was requested; unknown failed-attempt usage remains
+unknown. Baseline/current wire sizes are bytes, never token estimates.
 
 - Brute force with the linear goal: a material hash-map replacement needs
   Approach below 5 without forcing a particular score; expected linear time is
@@ -2145,6 +2160,11 @@ reports supplement this proof and cannot replace it.
 2. Submit long/scrolled code and a problem with follow-ups. Verify complete
    input, three /5 scores, all selected rows, independent time-better /
    space-worse styling, and Kotlin Int, Long, generic types, and signatures.
+   Confirm initial feedback contains no generated code and makes one generation
+   request. Open Suggested implementation without another call, then activate
+   Generate suggested code. Verify it uses the original assessed submission and
+   feedback even after editing the live editor. Keep all scores visible while
+   code is pending, and preserve AI-generated/Untested labels and Copy.
 3. Make capture incomplete, then Retry after a newer submission exists.
    Confirm Retry targets the original submission. Exercise rapid consecutive
    submissions and ambiguous discovery; stale code/results must not attach to
@@ -2166,6 +2186,13 @@ reports supplement this proof and cannot replace it.
    model text stays inert, Copy success and failure feedback work, and 392px
    and 320px layouts retain all labels and content with horizontal scrolling
    confined to code.
+   Exercise Generate by keyboard, duplicate activation and a code-generation
+   error. Retry only code without regenerating scores. Reopen successful code
+   and save a review without another model call. Navigate, reset, change
+   connection, disable assessment or create a new attempt during code generation;
+   old code must not attach to the next assessment. Restart the background worker
+   after feedback, then request code; the self-contained request must not depend
+   on a retained completed-worker session.
 8. Record extension version, provider/model/date, happy and edge results, and
    screenshot/recording paths. Recovery is to turn AI assessment off; review
    saving and connection testing continue, with no migration or new permission.

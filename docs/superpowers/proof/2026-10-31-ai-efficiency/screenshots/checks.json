@@ -1,0 +1,12 @@
+{
+  "url": "http://127.0.0.1:4179/",
+  "title": "CogniPace feedback-first fixture",
+  "calls": 2,
+  "openingDoesNotGenerate": true,
+  "pendingDisabled": true,
+  "feedbackRetained": true,
+  "localRetry": true,
+  "readyReused": true,
+  "narrowOverflow": false,
+  "consoleErrors": []
+}

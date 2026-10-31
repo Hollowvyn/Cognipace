@@ -1,14 +1,18 @@
+import type { z } from 'zod'
+import {
+  codeImplementationSchema,
+  type CodeImplementationReport,
+} from '../domain/code-implementation-schema'
+import {
+  codeFeedbackSchema,
+  type CodeFeedbackReport,
+} from '../domain/code-feedback-schema'
 import { projectAiMetrics, type AiGenerationMetrics } from '@/lib/ai/metrics'
 import type {
   AiErrorCode,
   AiGenerateJsonResult,
   AiProviderId,
 } from '@/lib/ai/types'
-
-import {
-  codeAnalysisSchema,
-  type CodeAnalysisReport,
-} from '../domain/code-analysis-schema'
 
 type EvaluationContext = {
   fixtureId: string
@@ -17,22 +21,49 @@ type EvaluationContext = {
   model: string
 }
 type EvaluationBase = EvaluationContext & {
+  operation: 'feedback' | 'implementation'
   durationMs: number
   metrics?: AiGenerationMetrics
 }
 export type CodeAnalysisEvaluationResult = EvaluationBase &
   (
-    | { status: 'success'; report: CodeAnalysisReport; resolvedModel?: string }
+    | {
+        status: 'success'
+        report: CodeFeedbackReport | CodeImplementationReport
+        resolvedModel?: string
+      }
     | { status: 'error'; code: AiErrorCode }
   )
 
 /** Intentionally project fields individually; provider errors are never serialized. */
 export function projectEvaluationResult(
   context: EvaluationContext,
-  result: AiGenerateJsonResult<CodeAnalysisReport>,
+  result: AiGenerateJsonResult<CodeFeedbackReport>,
+): CodeAnalysisEvaluationResult {
+  return projectResult(context, result, codeFeedbackSchema, 'feedback')
+}
+
+export function projectImplementationEvaluationResult(
+  context: EvaluationContext,
+  result: AiGenerateJsonResult<CodeImplementationReport>,
+): CodeAnalysisEvaluationResult {
+  return projectResult(
+    context,
+    result,
+    codeImplementationSchema,
+    'implementation',
+  )
+}
+
+function projectResult<T extends CodeFeedbackReport | CodeImplementationReport>(
+  context: EvaluationContext,
+  result: AiGenerateJsonResult<T>,
+  schema: z.ZodType<T>,
+  operation: 'feedback' | 'implementation',
 ): CodeAnalysisEvaluationResult {
   const metrics = projectAiMetrics(result.providerMetadata.metrics)
   const base = {
+    operation,
     fixtureId: context.fixtureId,
     checkedAt: context.checkedAt,
     provider: context.provider,
@@ -42,7 +73,7 @@ export function projectEvaluationResult(
   }
   if (result.status === 'error')
     return { ...base, status: 'error', code: result.code }
-  const report = codeAnalysisSchema.safeParse(result.data)
+  const report = schema.safeParse(result.data)
   if (!report.success)
     return { ...base, status: 'error', code: 'invalid-output' }
   const resolved = result.providerMetadata.resolvedModel

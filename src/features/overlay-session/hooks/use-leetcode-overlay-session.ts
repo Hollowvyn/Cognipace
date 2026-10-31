@@ -1,3 +1,7 @@
+import {
+  useLeetCodeCodeImplementation,
+  type CodeImplementationState,
+} from './use-leetcode-code-implementation'
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 
 import { useAiHintConnection } from '@/features/genai'
@@ -57,6 +61,8 @@ export type LeetCodeOverlaySession = {
   }
   hints: OverlayHintState
   aiAnalysis: CodeAnalysisState
+  aiImplementation: CodeImplementationState
+  generateAiImplementation: () => void
   retryAiAnalysis: () => void
 }
 
@@ -136,6 +142,8 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     available: pageSync.context?.aiAssessmentAvailable ?? false,
   })
 
+  const implementation = useLeetCodeCodeImplementation(analysis.state)
+
   const hintConnection = useAiHintConnection(Boolean(pageSync.location))
   const hints = useLeetCodeCodeHints({
     activeSlug: overlay.activeProblemSlug,
@@ -202,6 +210,8 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     },
     hints: hints.state,
     aiAnalysis: analysis.state,
+    aiImplementation: implementation.state,
+    generateAiImplementation: implementation.generate,
     retryAiAnalysis: analysis.retry,
   }
 }

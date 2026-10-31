@@ -1,14 +1,20 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
-import type { CodeAnalysisReport } from '@/features/leetcode-review-assistant'
+import type {
+  CodeFeedbackReport,
+  SuggestedImplementation as SuggestedImplementationValue,
+} from '@/features/leetcode-review-assistant'
 import { cn } from '@/utils/cn'
 
+import type { CodeImplementationState } from '../../../hooks/use-leetcode-code-implementation'
 import type { CodeAnalysisState } from '../../../hooks/use-leetcode-code-analysis'
 
 type OverlayCodeAnalysisProps = {
   state: CodeAnalysisState
   onRetry: () => void
   onSettings: () => void
+  implementationState: CodeImplementationState
+  onGenerateImplementation: () => void
 }
 
 const focus =
@@ -21,6 +27,8 @@ export function OverlayCodeAnalysis({
   state,
   onRetry,
   onSettings,
+  implementationState,
+  onGenerateImplementation,
 }: OverlayCodeAnalysisProps) {
   const headingId = useId()
 
@@ -65,7 +73,12 @@ export function OverlayCodeAnalysis({
         </p>
       ) : null}
       {state.status === 'ready' ? (
-        <AnalysisReport key={state.requestId} report={state.report} />
+        <AnalysisReport
+          key={state.requestId}
+          report={state.report}
+          implementationState={implementationState}
+          onGenerateImplementation={onGenerateImplementation}
+        />
       ) : null}
       {state.status === 'unavailable' || state.status === 'error' ? (
         <div className="grid min-w-0 gap-2 break-words">
@@ -104,7 +117,15 @@ function scoreLabel(score: number | null) {
   return score === null ? 'Unavailable' : `${score}/5`
 }
 
-function AnalysisReport({ report }: { report: CodeAnalysisReport }) {
+function AnalysisReport({
+  report,
+  implementationState,
+  onGenerateImplementation,
+}: {
+  report: CodeFeedbackReport
+  implementationState: CodeImplementationState
+  onGenerateImplementation: () => void
+}) {
   return (
     <div className="grid min-w-0 gap-3 break-words">
       <p className={cn(text, 'text-foreground')}>{report.summary}</p>
@@ -174,14 +195,40 @@ function AnalysisReport({ report }: { report: CodeAnalysisReport }) {
           </DetailRow>
         </Disclosure>
         <Disclosure title="Suggested implementation">
-          {report.suggestedImplementation !== null ? (
+          {implementationState.status === 'ready' ? (
             <SuggestedImplementation
-              implementation={report.suggestedImplementation}
+              implementation={implementationState.implementation}
             />
           ) : (
-            <p className={cn(text, 'text-muted-foreground')}>
-              {report.suggestedImplementationUnavailableReason}
-            </p>
+            <div
+              className="grid min-w-0 gap-2"
+              aria-busy={implementationState.status === 'pending' || undefined}
+            >
+              {implementationState.status === 'idle' ? (
+                <p className={cn(text, 'text-muted-foreground')}>
+                  Generate a complete suggestion from this assessed submission.
+                </p>
+              ) : (
+                <p className={cn(text, 'text-muted-foreground')} role="status">
+                  {implementationState.status === 'pending'
+                    ? 'Generating suggested code…'
+                    : implementationState.message}
+                </p>
+              )}
+              <div>
+                <button
+                  className={cn(button, focus)}
+                  disabled={implementationState.status === 'pending'}
+                  onClick={onGenerateImplementation}
+                  type="button"
+                >
+                  {implementationState.status === 'error' ||
+                  implementationState.status === 'unavailable'
+                    ? 'Retry suggested code'
+                    : 'Generate suggested code'}
+                </button>
+              </div>
+            </div>
           )}
         </Disclosure>
       </div>
@@ -199,11 +246,11 @@ function Disclosure({
   return (
     <details className="min-w-0 break-words rounded-md border border-border">
       <summary
+        tabIndex={0}
         className={cn(
           'min-w-0 cursor-pointer break-words rounded-md px-2 py-2 font-semibold text-foreground hover:bg-muted',
           focus,
         )}
-        tabIndex={0}
       >
         {title}
       </summary>
@@ -264,7 +311,7 @@ function TextList({ items }: { items: readonly string[] }) {
   )
 }
 
-type Comparison = CodeAnalysisReport['efficiency']['timeComparison']
+type Comparison = CodeFeedbackReport['efficiency']['timeComparison']
 function comparisonClass(comparison?: Comparison) {
   if (comparison === 'better') return 'text-[color:var(--cp-tone-success-fg)]'
   if (comparison === 'worse') return 'text-[color:var(--cp-tone-warning-fg)]'
@@ -278,7 +325,7 @@ function ComplexitySection({
   spaceComparison,
 }: {
   title: string
-  complexity: CodeAnalysisReport['efficiency']['current']
+  complexity: CodeFeedbackReport['efficiency']['current']
   timeComparison?: Comparison
   spaceComparison?: Comparison
 }) {
@@ -315,7 +362,7 @@ function ComplexitySection({
 function SuggestedImplementation({
   implementation,
 }: {
-  implementation: NonNullable<CodeAnalysisReport['suggestedImplementation']>
+  implementation: SuggestedImplementationValue
 }) {
   const mounted = useRef(true)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)

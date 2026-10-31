@@ -1,3 +1,4 @@
+import { implementationIdentity } from '@/features/leetcode-review-assistant/api/code-implementation-contracts'
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 
 import {
@@ -27,7 +28,7 @@ import {
 } from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
 import {
   makeAnalysisRequest,
-  makeValidAnalysis,
+  makeValidFeedback,
 } from '@/features/leetcode-review-assistant/testing/code-analysis-fixtures'
 import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
 import {
@@ -148,6 +149,10 @@ const backgroundMocks = vi.hoisted(() => {
     getAiProviderSecretPresence: vi.fn(),
     getAiHintConnectionStatus: vi.fn(),
     generateLeetCodeHintsInBackground: vi.fn(),
+    generateLeetCodeImplementationInBackground:
+      vi.fn<
+        (typeof import('@/features/leetcode-review-assistant/server/implementation-runtime-service'))['generateLeetCodeImplementationInBackground']
+      >(),
     setAiProviderSecret: vi.fn(),
     clearAiProviderSecret: vi.fn(),
     loadActiveProviderConfig: vi.fn(),
@@ -366,6 +371,14 @@ vi.mock(
   () => ({
     analyzeLeetCodeSubmissionInBackground:
       backgroundMocks.analyzeLeetCodeSubmissionInBackground,
+  }),
+)
+
+vi.mock(
+  '@/features/leetcode-review-assistant/server/implementation-runtime-service',
+  () => ({
+    generateLeetCodeImplementationInBackground:
+      backgroundMocks.generateLeetCodeImplementationInBackground,
   }),
 )
 
@@ -878,6 +891,103 @@ describe('background handler registration', () => {
     })
   })
 
+  describe('explicit implementation handlers', () => {
+    const request = {
+      surface: 'content-script' as const,
+      requestId: 'code-1',
+      assessmentRequestId: 'request-1',
+      host: 'leetcode.com' as const,
+      assessment: makeAnalysisRequest(),
+      feedback: makeValidFeedback(),
+    }
+    const sender = {
+      tab: { id: 7 },
+      frameId: 0,
+      url: 'https://leetcode.com/problems/two-sum/',
+    }
+    beforeEach(async () => {
+      const policy =
+        await vi.importActual<typeof import('./runtime-policy')>(
+          './runtime-policy',
+        )
+      backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementation(
+        policy.assertCanSenderCallExtensionMethod,
+      )
+      backgroundMocks.generateLeetCodeImplementationInBackground
+        .mockReset()
+        .mockImplementation((input) =>
+          Promise.resolve({
+            status: 'ready',
+            ...implementationIdentity(input),
+            report: {
+              version: 'leetcode-code-implementation-v1',
+              status: 'unavailable',
+              reason: 'Missing complete callable signature.',
+            },
+            providerMetadata: {
+              provider: 'gemini',
+              model: 'fixture',
+              durationMs: 1,
+            },
+          }),
+        )
+    })
+    it('authorizes the actual host and slug without worker-completed state or persistence', async () => {
+      const value = await sendRuntimeMessage(
+        'genai.generateLeetCodeImplementation',
+        request,
+        sender,
+      )
+      expect(value).toMatchObject({
+        status: 'ready',
+        ...implementationIdentity(request),
+      })
+      expect(
+        backgroundMocks.generateLeetCodeImplementationInBackground,
+      ).toHaveBeenCalledWith(
+        request,
+        expect.any(Function),
+        expect.any(AbortSignal),
+      )
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+      expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+      expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.executePracticeReviewCommand,
+      ).not.toHaveBeenCalled()
+      await expect(
+        sendRuntimeMessage(
+          'genai.generateLeetCodeImplementation',
+          { ...request, host: 'www.leetcode.com', requestId: 'code-www' },
+          { ...sender, url: 'https://www.leetcode.com/problems/two-sum/' },
+        ),
+      ).resolves.toMatchObject({ status: 'ready' })
+    })
+    it('rejects wrong actual hosts/slugs and mismatched assessment IDs before generation', () => {
+      for (const url of [
+        'https://example.com/problems/two-sum/',
+        'https://leetcode.com/problems/other-problem/',
+        'https://www.leetcode.com/problems/two-sum/',
+      ])
+        expect(() =>
+          sendRuntimeMessage('genai.generateLeetCodeImplementation', request, {
+            ...sender,
+            url,
+          }),
+        ).toThrow()
+      expect(() =>
+        sendRuntimeMessage(
+          'genai.generateLeetCodeImplementation',
+          { ...request, assessmentRequestId: 'unrelated' },
+          sender,
+        ),
+      ).toThrow()
+      expect(
+        backgroundMocks.generateLeetCodeImplementationInBackground,
+      ).not.toHaveBeenCalled()
+    })
+  })
+
   describe('sender-owned submission analysis handlers', () => {
     const sender = {
       tab: { id: 7 },
@@ -888,7 +998,7 @@ describe('background handler registration', () => {
     const ready = (): AnalyzeLeetCodeSubmissionResponse => ({
       status: 'ready',
       ...analysisIdentity(request),
-      report: makeValidAnalysis(),
+      report: makeValidFeedback(),
       providerMetadata: {
         provider: 'openai',
         model: 'gpt-test',

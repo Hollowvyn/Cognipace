@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   makeAnalysisRequest,
-  makeValidAnalysis,
+  makeValidFeedback,
 } from '../testing/code-analysis-fixtures'
 import {
   analysisIdentity,
@@ -203,7 +203,7 @@ describe('code analysis contracts', () => {
       {
         status: 'ready',
         ...identity,
-        report: makeValidAnalysis(),
+        report: makeValidFeedback(),
         providerMetadata: {
           provider: 'gemini',
           model: 'fixture-model',
@@ -244,7 +244,7 @@ describe('code analysis contracts', () => {
     const response = {
       status: 'ready',
       ...analysisIdentity(makeAnalysisRequest()),
-      report: makeValidAnalysis(),
+      report: makeValidFeedback(),
       providerMetadata: {
         provider: 'openrouter',
         model: 'openrouter/free',
@@ -329,7 +329,7 @@ it('accepts strict optional numeric generation metrics without expanding metadat
   const response = {
     status: 'ready',
     ...analysisIdentity(makeAnalysisRequest()),
-    report: makeValidAnalysis(),
+    report: makeValidFeedback(),
     providerMetadata: {
       provider: 'gemini',
       model: 'fixture',

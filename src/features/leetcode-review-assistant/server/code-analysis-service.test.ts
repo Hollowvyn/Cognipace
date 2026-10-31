@@ -4,10 +4,10 @@ vi.mock('@/lib/ai', () => ({ generateJson: vi.fn() }))
 import { generateJson } from '@/lib/ai'
 import { aiErrorCodes, type AiProviderConfig } from '@/lib/ai/types'
 
-import { codeAnalysisSchema } from '../domain/code-analysis-schema'
+import { codeFeedbackSchema } from '../domain/code-feedback-schema'
 import {
   makeAnalysisRequest,
-  makeValidAnalysis,
+  makeValidFeedback,
 } from '../testing/code-analysis-fixtures'
 import { analyzeCode } from './code-analysis-service'
 
@@ -44,7 +44,7 @@ describe('analyzeCode', () => {
   ])(
     'uses one bounded SDK generation and returns the consistent $config.provider report',
     async ({ config, metadata, timeoutMs }) => {
-      const report = makeValidAnalysis()
+      const report = makeValidFeedback()
       vi.mocked(generateJson).mockResolvedValue({
         status: 'success',
         data: report,
@@ -58,9 +58,16 @@ describe('analyzeCode', () => {
         providerMetadata: metadata,
       })
       expect(generateJson).toHaveBeenCalledTimes(1)
+      expect(Object.keys(codeFeedbackSchema.shape)).toEqual([
+        'version',
+        'summary',
+        'approach',
+        'efficiency',
+        'codeStyle',
+      ])
       const call = vi.mocked(generateJson).mock.calls[0]?.[0]
       if (!call) throw new Error('Expected one SDK generation.')
-      expect(call.prompt.system).toContain('leetcode-code-analysis-v1')
+      expect(call.prompt.system).toContain('leetcode-code-feedback-v1')
       expect(call).toEqual({
         ...config,
         prompt: {
@@ -77,7 +84,7 @@ describe('analyzeCode', () => {
             },
           }),
         },
-        schema: codeAnalysisSchema,
+        schema: codeFeedbackSchema,
         signal,
         timeoutMs,
         maxOutputTokens: 8192,
@@ -87,12 +94,11 @@ describe('analyzeCode', () => {
     },
   )
 
-  it.each(['strategy', 'language'] as const)(
+  it.each(['strategy'] as const)(
     'rejects inconsistent %s without downgrading or another call',
     async (kind) => {
-      const report = makeValidAnalysis()
+      const report = makeValidFeedback()
       if (kind === 'strategy') report.approach.score = 5
-      else report.suggestedImplementation!.language = 'Kotlin'
       vi.mocked(generateJson).mockResolvedValue({
         status: 'success',
         data: report,
@@ -148,7 +154,7 @@ it.each([
   async (provider, model, expected) => {
     vi.mocked(generateJson).mockResolvedValue({
       status: 'success',
-      data: makeValidAnalysis(),
+      data: makeValidFeedback(),
       providerMetadata: metadata,
     })
     await analyzeCode(

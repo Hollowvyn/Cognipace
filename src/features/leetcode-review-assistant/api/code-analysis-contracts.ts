@@ -4,7 +4,7 @@ import { problemSlugSchema } from '@/features/problems/api/problems-contracts'
 import { aiGenerationMetricsSchema } from '@/lib/ai/metrics'
 import { aiErrorCodes, aiProviderIds } from '@/lib/ai/types'
 
-import { codeAnalysisSchema } from '../domain/code-analysis-schema'
+import { codeFeedbackSchema } from '../domain/code-feedback-schema'
 
 const nonBlankString = (maxLength: number) =>
   z.string().min(1).max(maxLength).regex(/\S/, 'A nonblank value is required.')
@@ -82,7 +82,7 @@ export type AnalyzeLeetCodeSubmissionRequest = z.infer<
   typeof analyzeLeetCodeSubmissionRequestSchema
 >
 
-const metadata = z.strictObject({
+export const analysisProviderMetadataSchema = z.strictObject({
   provider: z.enum(aiProviderIds),
   model: z.string().max(120),
   resolvedModel: nonBlankString(120).optional(),
@@ -101,8 +101,8 @@ export const analyzeLeetCodeSubmissionResponseSchema = z.discriminatedUnion(
     z.strictObject({
       status: z.literal('ready'),
       ...identityFields,
-      report: codeAnalysisSchema,
-      providerMetadata: metadata,
+      report: codeFeedbackSchema,
+      providerMetadata: analysisProviderMetadataSchema,
     }),
     z.strictObject({
       status: z.literal('unavailable'),

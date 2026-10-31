@@ -13,12 +13,12 @@ import {
 import { analyzeCode } from './code-analysis-service'
 
 const config = readEvaluationProviderConfig()
-const outputDirectory = '/private/tmp/cognipace-ai-evaluation'
+const outputDirectory = '/private/tmp/cognipace-ai-evaluation/feedback'
 const currentResults: CodeAnalysisEvaluationResult[] = []
 
 // Opt-in only: ordinary test runs neither read credentials nor call a provider.
 describe.skipIf(config === null)(
-  'live code analysis provider evaluation',
+  'live feedback-only provider evaluation',
   () => {
     for (const fixture of codeAnalysisEvaluationFixtures) {
       it(

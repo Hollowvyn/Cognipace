@@ -82,7 +82,7 @@ describe('buildCodeAnalysisPrompt', () => {
   it('defines independent scores, honest constraints, and separate resource tradeoffs', () => {
     const { system } = buildCodeAnalysisPrompt(makeAnalysisRequest())
     for (const rule of [
-      'leetcode-code-analysis-v1',
+      'leetcode-code-feedback-v1',
       'independently',
       'Use null',
       'Never produce a recall rating or overall average',
@@ -162,22 +162,24 @@ describe('buildCodeAnalysisPrompt', () => {
       expect(prompt.system).toContain(
         'A syntax error alone does not establish a wrong algorithm',
       )
-      expect(prompt.system).toContain('Suggested code has not been executed')
+      expect(prompt.system).toContain(
+        'do not claim universal optimality or that code has been executed',
+      )
     },
   )
 
-  it('uses the selected rows and asks for complete untested suggested code', () => {
+  it('uses the selected rows and excludes implementation generation', () => {
     const { system } = buildCodeAnalysisPrompt(makeAnalysisRequest())
     for (const rule of [
       'Current/Suggested/Key idea/Consider',
       'Current complexity/Suggested complexity/Suggestions',
       'Readability/Structure/Suggestions',
       'do not invent first-attempt history',
-      'complete suggested code in the exact submitted language',
-      'preserve callable signatures',
+      'Do not generate a replacement implementation or code',
+      'preserve its exact language and callable signature',
       'do not claim universal optimality',
       'No tools or additional calls',
-      'raw code without Markdown fences',
+      'Do not output suggested code or implementation fields',
     ])
       expect(system).toContain(rule)
   })

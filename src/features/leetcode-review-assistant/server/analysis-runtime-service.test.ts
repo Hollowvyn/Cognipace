@@ -9,7 +9,7 @@ import {
 } from '../api/code-analysis-contracts'
 import {
   makeAnalysisRequest,
-  makeValidAnalysis,
+  makeValidFeedback,
 } from '../testing/code-analysis-fixtures'
 import { analyzeCode } from './code-analysis-service'
 import { analyzeLeetCodeSubmissionInBackground } from './analysis-runtime-service'
@@ -40,7 +40,7 @@ const loadDb = vi.fn(() => Promise.resolve(db))
 const request = makeAnalysisRequest()
 const success = () => ({
   status: 'success' as const,
-  data: makeValidAnalysis(),
+  data: makeValidFeedback(),
   providerMetadata: metadata,
 })
 function deferred<T>() {
@@ -85,7 +85,7 @@ describe('trusted background submission analysis', () => {
     expect(result).toEqual({
       status: 'ready',
       ...analysisIdentity(request),
-      report: makeValidAnalysis(),
+      report: makeValidFeedback(),
       providerMetadata: metadata,
     })
     expectSafe(result)
@@ -306,7 +306,7 @@ it.each([
       .mockResolvedValueOnce(current)
     analyzeMock.mockResolvedValue({
       status: 'success',
-      data: makeValidAnalysis(),
+      data: makeValidFeedback(),
       providerMetadata,
     })
     const result = await runAnalysis()
@@ -318,7 +318,7 @@ it.each([
       expect(result).toEqual({
         status: 'ready',
         ...analysisIdentity(request),
-        report: makeValidAnalysis(),
+        report: makeValidFeedback(),
         providerMetadata,
       })
     else

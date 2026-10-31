@@ -7,7 +7,7 @@ vi.mock('@/extension/messaging', () => ({ sendMessage: sendMessageMock }))
 
 import {
   makeAnalysisRequest,
-  makeValidAnalysis,
+  makeValidFeedback,
 } from '../testing/code-analysis-fixtures'
 import {
   analyzeLeetCodeSubmissionViaRuntime,
@@ -18,7 +18,7 @@ import { analysisIdentity } from './code-analysis-contracts'
 const readyResponse = {
   status: 'ready' as const,
   ...analysisIdentity(makeAnalysisRequest()),
-  report: makeValidAnalysis(),
+  report: makeValidFeedback(),
   providerMetadata: {
     provider: 'gemini' as const,
     model: 'fixture-model',

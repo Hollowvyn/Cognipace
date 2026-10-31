@@ -19,6 +19,8 @@ const methodSurfaceAccess = {
   'genai.testConnection': ['dashboard'],
   'genai.analyzeLeetCodeSubmission': ['content-script'],
   'genai.cancelLeetCodeAnalysis': ['content-script'],
+  'genai.generateLeetCodeImplementation': ['content-script'],
+  'genai.cancelLeetCodeImplementation': ['content-script'],
   'genai.getHintConnection': ['content-script'],
   'genai.generateLeetCodeHints': ['content-script'],
   'genai.cancelLeetCodeHints': ['content-script'],
@@ -163,6 +165,8 @@ export function assertCanSenderCallExtensionMethod(
 
   assertCanCallExtensionMethod(method, senderSurface)
   if (
+    method === 'genai.generateLeetCodeImplementation' ||
+    method === 'genai.cancelLeetCodeImplementation' ||
     method === 'genai.analyzeLeetCodeSubmission' ||
     method === 'genai.cancelLeetCodeAnalysis' ||
     method === 'genai.getHintConnection' ||
@@ -178,7 +182,8 @@ export function assertCanSenderCallExtensionMethod(
     )
       throw new Error('Analysis requires an actual HTTPS LeetCode sender.')
     if (
-      (method === 'genai.analyzeLeetCodeSubmission' ||
+      (method === 'genai.generateLeetCodeImplementation' ||
+        method === 'genai.analyzeLeetCodeSubmission' ||
         method === 'genai.getHintConnection' ||
         method === 'genai.generateLeetCodeHints') &&
       !parseLeetCodeProblemLocation(actualUrl)

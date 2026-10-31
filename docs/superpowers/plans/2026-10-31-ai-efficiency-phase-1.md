@@ -21,37 +21,37 @@ metrics schema/helper and tests if needed; assessment runtime metadata contract;
 `server/code-analysis-service.ts`, `server/build-code-analysis-prompt.ts` and
 tests; `testing/code-analysis-evaluation-results.ts` and tests/harness.
 
-- [ ] Write RED tests for an explicit optional `collectMetrics` generation
+- [x] Write RED tests for an explicit optional `collectMetrics` generation
       flag. Calls without it retain their existing exact result metadata.
-- [ ] Add allowlisted optional numeric metrics: attempt count, aggregate
+- [x] Add allowlisted optional numeric metrics: attempt count, aggregate
       serialized outgoing request-body bytes, validated output JSON bytes,
       preparation/generation/validation durations, and available SDK token usage.
       Bound finite nonnegative values; unknown token counts stay absent. Read AI SDK
       7 `result.usage`, `inputTokenDetails.cacheReadTokens` and
       `outputTokenDetails.reasoningTokens`. Usage from the successful SDK call is
       not a claim about unavailable failed-attempt billing. Do not copy `usage.raw`.
-- [ ] Count outgoing string-body UTF-8 bytes in the existing fetch wrapper.
+- [x] Count outgoing string-body UTF-8 bytes in the existing fetch wrapper.
       Do not clone response bodies or add fetch calls merely to measure size. Count
       validated output JSON bytes separately from provider envelope size.
-- [ ] Include opt-in error measurements when known, without keys, prompts,
+- [x] Include opt-in error measurements when known, without keys, prompts,
       code, errors, URLs, response bodies or arbitrary provider metadata. Use an
       explicit strict optional metrics schema at the runtime metadata boundary.
-- [ ] Enable collection for assessments and retain metrics in the evaluation
+- [x] Enable collection for assessments and retain metrics in the evaluation
       allowlist/summary. Preserve success/failure categories and missing-value
       semantics; never fabricate token counts from bytes or absent usage.
-- [ ] Compact only the provider-facing assessment projection: omit null
+- [x] Compact only the provider-facing assessment projection: omit null
       optional submission metadata and diagnostics, and empty omitted-diagnostics
       lists. Preserve the complete problem, exact source/language/status, populated
       diagnostics, zero counts and all meaningful constraints/examples. The local
       strict runtime request remains unchanged. State in the prompt that absent
       optional fields are unavailable, not evidence for inferred values.
-- [ ] GREEN command:
+- [x] GREEN command:
 
   ```sh
   rtk proxy npm test -- src/lib/ai src/features/leetcode-review-assistant --run
   ```
 
-- [ ] Self-review, independent spec review, then quality review. Commit only
+- [x] Self-review, independent spec review, then quality review. Commit only
       reviewed code and exact validation evidence.
 
 ## Task 2: Exact snapshot interning on hint PR #203
@@ -60,17 +60,17 @@ After the assessment branch is committed, switch to `codex/adaptive-code-hints`.
 Do not carry unrelated changes across branches. Update the existing hint service
 and provider fixtures/tests, retaining full local history and runtime contracts.
 
-- [ ] RED test: hint three with identical code/language in all three snapshots
+- [x] RED test: hint three with identical code/language in all three snapshots
       sends that source once; distinct snapshots remain complete and recoverable.
-- [ ] Project provider input to a unique snapshot table and ordered turns with
+- [x] Project provider input to a unique snapshot table and ordered turns with
       snapshot references. Normalize only CRLF as already permitted; ignore capture
       timestamps for equality. Keep prior hints, current snapshot identity and all
       problem constraints. Do not send an opaque hash instead of necessary source.
-- [ ] Give the model explicit reference-table instructions. Preserve successful
+- [x] Give the model explicit reference-table instructions. Preserve successful
       Light → Medium → Heavy order, progress rules and the three-hint cap.
-- [ ] Run focused hint tests, lint, check, build and formatting per governance;
+- [x] Run focused hint tests, lint, check, build and formatting per governance;
       record commands and pending live/human proof, commit and update PR #203.
-- [ ] Return to the broader efficiency branch for feedback-first Phase 2.
+- [x] Return to the broader efficiency branch for feedback-first Phase 2.
 
 ## Validation and publication
 
@@ -80,3 +80,7 @@ explicit planning/proof Prettier and `rtk proxy git diff --check` after integrat
 Keep human installed-extension smoke and real-provider timing/quality comparisons
 pending without private test-only credentials. Update current authority docs and
 the dated handoff honestly. Phase 2 uses a separate plan before implementation.
+
+Implementation, independent reviews and automated checks completed on 2026-10-31.
+Human realtime extension smoke and live-provider quality/performance remain
+pending. The result-cache phase remains deferred as designed.
