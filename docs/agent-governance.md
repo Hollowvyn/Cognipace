@@ -19,6 +19,8 @@ Current authority, in order of relevance:
 - `CLAUDE.md`: Claude-facing root operating guide.
 - `.agents/skills/cognipace-agent-workflow/SKILL.md`: CogniPace workflow,
   validation, PR/issue, governance, and agent-process routing skill.
+- `.agents/skills/cognipace-autonomous-workflow/SKILL.md`: explicit autonomous
+  mode selector for the shared workflow.
 - `.agents/skills/cognipace-bulletproof-react/SKILL.md`: CogniPace architecture
   ownership lens.
 - `docs/superpowers/README.md`: planning artifact index and historical context.
@@ -26,6 +28,86 @@ Current authority, in order of relevance:
 Planning artifacts under `docs/superpowers/*` are useful history. They do not
 override current product, architecture, testing, design, contribution, or root
 agent docs unless a current doc explicitly says otherwise.
+
+## Workflow Modes
+
+### Selection And Routine Checkpoints
+
+Collaborative mode is the default. Use `cognipace-agent-workflow` as the shared
+repo-local router before domain or implementation skills; the autonomous
+selector loads it immediately when explicitly invoked. With no explicit mode
+selection, the shared router is the collaborative entry skill. Explicit invocation of
+`cognipace-autonomous-workflow`, or an explicit user request for autonomous
+mode, selects autonomous execution for the current task, its phases, and its
+subagents. Pass the selected mode and authorized scope to delegated agents.
+Re-entering the shared router does not reset the mode. Honor later explicit
+switches. Urgency, "fix it," ordinary implementation requests, or merely
+mentioning subagents do not select autonomy.
+
+In collaborative mode, use `superpowers:brainstorming`, obtain human approval
+of the substantial design, and record a phase-sized plan before implementation.
+In explicitly selected autonomous mode, use the lifecycle below instead of
+generic skills' routine human approval, artifact-review, execution-choice, and
+phase-handoff prompts. Develop alternatives and record the design and plan;
+independent agent acceptance replaces routine human design approval within the
+authorized task. Continue through accepted phases without asking the user to
+approve each artifact or choose an execution method. Existing explicit human
+approval remains valid in either mode; do not request it again.
+
+Mode switches apply to unfinished work. Preserve completed work and prior human
+approvals; independent agent acceptance is not human approval. After switching
+to collaborative mode, obtain any missing human design approval before
+implementing or resuming an unfinished substantial design or phase.
+
+This override applies only to routine workflow checkpoints. Both modes retain
+scope, safety, permissions, independent review when required, validation, and
+human smoke gates. Mode selection alone does not authorize unrelated work,
+destructive actions, external publication, merge, deployment, or release.
+Account, auth, backend, team, hosted-service, generic SaaS, sync expansion,
+Chrome permission, and secret-handling changes still require explicit approval
+for that scope. Use an in-scope solution when available; prior specific approval
+does not need repeating.
+
+### Autonomous Execution
+
+1. Orient using the required lifecycle below, inspect the checkout, and state
+   the authorized scope and acceptance criteria. The branch/worktree guard
+   applies in both modes; autonomy never authorizes overwriting, stashing, or
+   carrying unrelated user changes into the task.
+2. Develop alternatives internally and record the recommended design,
+   assumptions, ownership, risks, and a phase-sized implementation plan with
+   exact files, validation, and done-when criteria. Prefer current product and
+   architecture patterns for reversible choices.
+3. Before implementation, obtain an independent read-only subagent's acceptance
+   of both design and plan against user intent and current authority. Resolve
+   actionable findings and re-review before proceeding. The design/plan author
+   cannot supply this independent acceptance.
+4. Delegate bounded implementation with explicit read/write ownership. Parallel
+   tasks must have disjoint files and no shared mutation; dependent work runs
+   sequentially. The coordinator integrates results and owns final verification.
+5. For each phase, obtain independent read-only spec-compliance review first,
+   then a separate implementation-quality review after spec compliance passes.
+   Implementers cannot approve their own work. Fix actionable findings and
+   re-review affected work before continuing. Passing checks do not replace
+   either review.
+6. Run validation selected from the unchanged canonical matrix, inspect every
+   result, and fix regressions. Implementation changes made during validation
+   must return through affected independent spec-compliance review and then
+   implementation-quality review. Rerun affected validation after fixes and
+   reviews before completion. Continue routine work with concise progress
+   updates instead of approval pauses.
+7. Prepare a PR-ready handoff with exact commands, skipped commands and reasons,
+   remaining risks, and the affected human smoke checklist. Report
+   implementation and automated validation separately from human smoke and
+   PR-review/merge readiness. Agent evidence cannot claim human testing.
+
+Scarce agent slots require sequential scheduling, not invented review results
+or self-approval. If delegation is unavailable, disclose the limitation and hold
+the affected independent design/implementation/review gate. Continue independent
+work that does not depend on it. When permitted actions and available evidence
+cannot resolve a blocker, request only the missing input or decision; do not
+repeat the same failed approach indefinitely. Complete authorized local work
+before requesting genuinely missing approval for a later action.
 
 ## Required Lifecycle
 
@@ -58,13 +140,17 @@ worktree, branch with the changes, or let the user stash or commit them first.
 
 Use explicit skills that match the affected boundary.
 
-- Use `cognipace-agent-workflow` as the first repo-local skill for non-trivial
-  CogniPace work involving product behavior, feature changes, runtime,
+- Use `cognipace-agent-workflow` as the shared repo-local router before domain
+  or implementation skills for non-trivial CogniPace work involving product
+  behavior, feature changes, runtime,
   database, UI surfaces, sync, GenAI, CI, release, governance, PR/issue
   workflow, validation, or agent-process changes.
-- Use `superpowers:brainstorming` before substantial creative work, behavior
+- Use `cognipace-autonomous-workflow` only for explicitly selected autonomous
+  execution; it selects the mode and loads the shared router.
+- Use `superpowers:brainstorming` in collaborative mode before substantial creative work, behavior
   changes, feature changes, architecture changes, repo governance changes, CI
-  changes, release changes, or agent-workflow changes.
+  changes, release changes, or agent-workflow changes. In autonomous mode,
+  follow the design and independent acceptance process above.
 - Use `cognipace-bulletproof-react` when reviewing, planning, or implementing
   React architecture, feature ownership, runtime boundaries, import direction,
   popup responsibilities, dashboard responsibilities, overlay responsibilities,
@@ -109,8 +195,9 @@ Multi-step work must become a plan before implementation.
 - Use phase-sized implementation plans for execution.
 - Do not execute broad repo-hardening, release, CI, feature, or
   agent-governance work in one uncontrolled pass.
-- Prefer separate chats or threads for independent implementation phases so
-  each phase has a clean context and review boundary.
+- In collaborative mode, prefer separate chats or threads for independent
+  implementation phases when requested. Autonomous mode uses bounded subagents
+  and the phase review gates above.
 - Keep each plan tied to exact files, validation commands, and done-when
   criteria.
 
@@ -429,6 +516,7 @@ Audit these source-of-truth files and settings:
 - `AGENTS.md`
 - `CLAUDE.md`
 - `.agents/skills/cognipace-agent-workflow/SKILL.md`
+- `.agents/skills/cognipace-autonomous-workflow/SKILL.md`
 - `.agents/skills/cognipace-bulletproof-react/SKILL.md`
 - `.github/PULL_REQUEST_TEMPLATE.md`
 - `.github/ISSUE_TEMPLATE/bug.yml`
@@ -449,6 +537,8 @@ Confirm:
 - Codex and Claude root instructions remain equivalent in requirements.
 - Local skills route agents to this canonical governance doc instead of
   duplicating changing rules.
+- Collaborative remains the default; autonomous selection survives shared-router
+  re-entry and delegation without waiving protected gates.
 - PR and issue template expectations still match PR hygiene automation.
 - Workflow names and required checks match branch protection.
 - Labeler paths still cover sensitive areas accurately.
