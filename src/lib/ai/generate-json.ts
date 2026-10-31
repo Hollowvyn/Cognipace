@@ -16,6 +16,11 @@ import {
   generateText,
 } from 'ai'
 
+import {
+  projectAiMetrics,
+  projectAiUsage,
+  type AiGenerationMetrics,
+} from './metrics'
 import { AiDeadlineError, withAiDeadline } from './operation'
 import type {
   AiErrorCode,
@@ -70,10 +75,47 @@ export async function generateJson<T>(
   request: AiGenerateJsonRequest<T>,
 ): Promise<AiGenerateJsonResult<T>> {
   const startedAt = Date.now()
+  const metrics: AiGenerationMetrics = { attemptCount: 0, requestBodyBytes: 0 }
+  let preparationEndedAt: number | undefined
+  let generationStartedAt: number | undefined
+  let generationMs = 0
+  let validationMs = 0
+  let validationStartedAt: number | undefined
   const metadata = () => ({
     provider: request.provider,
     model: request.model,
     durationMs: Math.max(0, Date.now() - startedAt),
+    ...(request.collectMetrics === true
+      ? {
+          metrics: projectAiMetrics({
+            ...metrics,
+            preparationMs: Math.max(
+              0,
+              (preparationEndedAt ?? Date.now()) - startedAt,
+            ),
+            ...(preparationEndedAt === undefined
+              ? {}
+              : {
+                  generationMs: Math.max(
+                    0,
+                    generationMs +
+                      (generationStartedAt === undefined
+                        ? 0
+                        : Date.now() - generationStartedAt) -
+                      validationMs -
+                      (validationStartedAt === undefined
+                        ? 0
+                        : Date.now() - validationStartedAt),
+                  ),
+                  validationMs:
+                    validationMs +
+                    (validationStartedAt === undefined
+                      ? 0
+                      : Math.max(0, Date.now() - validationStartedAt)),
+                }),
+          }),
+        }
+      : {}),
   })
   let preparingSchema = false
   let transportStatus: number | undefined
@@ -102,12 +144,37 @@ export async function generateJson<T>(
           throw new ControlledAiError('bad-request')
         }
         preparingSchema = true
-        const output = Output.object({ schema: request.schema })
+        const originalOutput = Output.object({ schema: request.schema })
+        const output =
+          request.collectMetrics === true
+            ? {
+                ...originalOutput,
+                parseCompleteOutput: async (
+                  ...args: Parameters<typeof originalOutput.parseCompleteOutput>
+                ) => {
+                  validationStartedAt = Date.now()
+                  try {
+                    return await originalOutput.parseCompleteOutput(...args)
+                  } finally {
+                    validationMs += Math.max(
+                      0,
+                      Date.now() - validationStartedAt,
+                    )
+                    validationStartedAt = undefined
+                  }
+                },
+              }
+            : originalOutput
         await output.responseFormat
         preparingSchema = false
+        preparationEndedAt = Date.now()
         signal.throwIfAborted()
         const providerFetch: typeof fetch = async (input, init) => {
           signal.throwIfAborted()
+          if (request.collectMetrics === true && typeof init?.body === 'string')
+            metrics.requestBodyBytes =
+              (metrics.requestBodyBytes ?? 0) +
+              new TextEncoder().encode(init.body).length
           try {
             const response = await fetch(input, { ...init, redirect: 'error' })
             transportStatus = response.status
@@ -124,6 +191,9 @@ export async function generateJson<T>(
           transportStatus = undefined
           retryAfter = null
           try {
+            if (request.collectMetrics === true)
+              metrics.attemptCount = (metrics.attemptCount ?? 0) + 1
+            generationStartedAt = Date.now()
             const result = await generateText({
               model,
               output,
@@ -144,6 +214,10 @@ export async function generateJson<T>(
                 ? { providerOptions: { openai: { store: false } } }
                 : {}),
             })
+            generationMs += Math.max(0, Date.now() - generationStartedAt)
+            generationStartedAt = undefined
+            if (request.collectMetrics === true)
+              Object.assign(metrics, projectAiUsage(result.usage))
             signal.throwIfAborted()
             if (result.finishReason === 'content-filter')
               throw new ControlledAiError('refused')
@@ -153,6 +227,10 @@ export async function generateJson<T>(
               request.provider === 'openrouter'
                 ? validResolvedModel(result.response.modelId, request.model)
                 : undefined
+            if (request.collectMetrics === true)
+              metrics.outputJsonBytes = new TextEncoder().encode(
+                JSON.stringify(result.output),
+              ).length
             return {
               status: 'success' as const,
               data: result.output,
@@ -162,6 +240,10 @@ export async function generateJson<T>(
               },
             }
           } catch (error) {
+            if (generationStartedAt !== undefined) {
+              generationMs += Math.max(0, Date.now() - generationStartedAt)
+              generationStartedAt = undefined
+            }
             signal.throwIfAborted()
             const delayMs = retryDelayMs(retryAfter)
             if (

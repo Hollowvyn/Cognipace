@@ -20,6 +20,7 @@ export async function analyzeCode(
     timeoutMs,
     maxOutputTokens: 8192,
     retryTransientErrors: true,
+    collectMetrics: true,
   })
   if (
     result.status === 'success' &&

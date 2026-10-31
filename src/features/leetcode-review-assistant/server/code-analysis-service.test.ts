@@ -67,7 +67,14 @@ describe('analyzeCode', () => {
           system: call.prompt.system,
           user: JSON.stringify({
             problem: request.problem,
-            submission: request.submission,
+            submission: {
+              status: request.submission.status,
+              code: request.submission.code,
+              language: request.submission.language,
+              runtime: request.submission.runtime,
+              passedTestCount: 50,
+              totalTestCount: 50,
+            },
           }),
         },
         schema: codeAnalysisSchema,
@@ -75,6 +82,7 @@ describe('analyzeCode', () => {
         timeoutMs,
         maxOutputTokens: 8192,
         retryTransientErrors: true,
+        collectMetrics: true,
       })
     },
   )

@@ -1105,3 +1105,162 @@ it('resets transport status before the second attempt', async () => {
   expect(await pending).toMatchObject({ status: 'error', code: 'unknown' })
   expect(fetchMock).toHaveBeenCalledTimes(2)
 })
+
+describe('opt-in safe generation metrics', () => {
+  it.each(aiProviderIds)(
+    'measures %s actual wire without extra fetches',
+    async (provider) => {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(successBody(provider)))
+      const result = await generateJson(
+        request(provider, {
+          collectMetrics: true,
+          prompt: { system: 'Return JSON', user: 'é漢字' },
+        }),
+      )
+      expect(result.status).toBe('success')
+      expect(fetchMock).toHaveBeenCalledOnce()
+      expect(result.providerMetadata.metrics).toMatchObject({
+        attemptCount: 1,
+        requestBodyBytes: new TextEncoder().encode(
+          requestBodyText(fetchMock.mock.calls[0]![1]?.body),
+        ).length,
+        outputJsonBytes: 11,
+        inputTokens: 20,
+        outputTokens: 10,
+        totalTokens: 30,
+        preparationMs: expect.any(Number) as unknown,
+        generationMs: expect.any(Number) as unknown,
+        validationMs: expect.any(Number) as unknown,
+      })
+      expectSafe(result)
+    },
+  )
+  it('retains exact legacy metadata without opt-in', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(successBody('openai')),
+    )
+    const result = await generateJson(request('openai'))
+    expect(result.providerMetadata).toEqual({
+      provider: 'openai',
+      model: models.openai,
+      durationMs: expect.any(Number) as unknown,
+    })
+  })
+  it('retains only known failure measurements without output or usage', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(errorBody('openai', 401), 401),
+    )
+    const result = await generateJson(
+      request('openai', { collectMetrics: true }),
+    )
+    expect(result.status).toBe('error')
+    expect(result.providerMetadata.metrics).toMatchObject({
+      attemptCount: 1,
+      requestBodyBytes: expect.any(Number) as unknown,
+      generationMs: expect.any(Number) as unknown,
+    })
+    expect(result.providerMetadata.metrics).not.toHaveProperty(
+      'outputJsonBytes',
+    )
+    expect(result.providerMetadata.metrics).not.toHaveProperty('inputTokens')
+    expectSafe(result)
+  })
+})
+
+it('aggregates actual retry request bytes while retaining only successful SDK token usage', async () => {
+  const fetchMock = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(
+      new Response('{}', { status: 503, headers: { 'retry-after': '0' } }),
+    )
+    .mockResolvedValueOnce(jsonResponse(successBody('openai')))
+  const result = await generateJson(
+    request('openai', { collectMetrics: true, retryTransientErrors: true }),
+  )
+  expect(result.status).toBe('success')
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+  const bytes = fetchMock.mock.calls.reduce(
+    (sum, [, init]) =>
+      sum + new TextEncoder().encode(requestBodyText(init?.body)).length,
+    0,
+  )
+  expect(result.providerMetadata.metrics).toMatchObject({
+    attemptCount: 2,
+    requestBodyBytes: bytes,
+    inputTokens: 20,
+    outputTokens: 10,
+    totalTokens: 30,
+  })
+})
+
+it('measures async schema validation separately from generation', async () => {
+  vi.useFakeTimers()
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    jsonResponse(successBody('openai')),
+  )
+  const pending = generateJson(
+    request('openai', {
+      collectMetrics: true,
+      schema: schema.refine(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25))
+        return true
+      }),
+    }),
+  )
+  await vi.advanceTimersByTimeAsync(25)
+  const result = await pending
+  expect(result.status).toBe('success')
+  expect(result.providerMetadata.metrics).toMatchObject({
+    validationMs: 25,
+    generationMs: 0,
+  })
+})
+
+it('omits unavailable SDK token counts rather than estimating from bytes', async () => {
+  const body = successBody('openai')
+  Reflect.deleteProperty(body, 'usage')
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(body))
+  const result = await generateJson(request('openai', { collectMetrics: true }))
+  expect(result.status).toBe('success')
+  expect(result.providerMetadata.metrics).not.toHaveProperty('inputTokens')
+  expect(result.providerMetadata.metrics).not.toHaveProperty('totalTokens')
+})
+
+it('projects native OpenAI cache and reasoning counts from SDK usage only', async () => {
+  const body = successBody('openai')
+  Object.assign(body, {
+    usage: {
+      input_tokens: 20,
+      output_tokens: 10,
+      total_tokens: 30,
+      input_tokens_details: { cached_tokens: 7 },
+      output_tokens_details: { reasoning_tokens: 3 },
+      raw: API_KEY,
+    },
+  })
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(body))
+  const result = await generateJson(request('openai', { collectMetrics: true }))
+  expect(result.providerMetadata.metrics).toMatchObject({
+    cacheReadTokens: 7,
+    reasoningTokens: 3,
+  })
+  expectSafe(result)
+})
+
+it('counts validated unicode output JSON rather than the provider envelope', async () => {
+  const data = { text: 'é漢字' }
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    jsonResponse(successBody('openai', JSON.stringify(data))),
+  )
+  const result = await generateJson({
+    ...request('openai'),
+    schema: z.strictObject({ text: z.string() }),
+    collectMetrics: true,
+  })
+  expect(result.status).toBe('success')
+  expect(result.providerMetadata.metrics?.outputJsonBytes).toBe(
+    new TextEncoder().encode(JSON.stringify(data)).length,
+  )
+})

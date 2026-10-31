@@ -1,3 +1,4 @@
+import { projectAiMetrics, type AiGenerationMetrics } from '@/lib/ai/metrics'
 import type {
   AiErrorCode,
   AiGenerateJsonResult,
@@ -15,7 +16,10 @@ type EvaluationContext = {
   provider: AiProviderId
   model: string
 }
-type EvaluationBase = EvaluationContext & { durationMs: number }
+type EvaluationBase = EvaluationContext & {
+  durationMs: number
+  metrics?: AiGenerationMetrics
+}
 export type CodeAnalysisEvaluationResult = EvaluationBase &
   (
     | { status: 'success'; report: CodeAnalysisReport; resolvedModel?: string }
@@ -27,12 +31,14 @@ export function projectEvaluationResult(
   context: EvaluationContext,
   result: AiGenerateJsonResult<CodeAnalysisReport>,
 ): CodeAnalysisEvaluationResult {
+  const metrics = projectAiMetrics(result.providerMetadata.metrics)
   const base = {
     fixtureId: context.fixtureId,
     checkedAt: context.checkedAt,
     provider: context.provider,
     model: context.model,
     durationMs: result.providerMetadata.durationMs,
+    ...(Object.keys(metrics).length ? { metrics } : {}),
   }
   if (result.status === 'error')
     return { ...base, status: 'error', code: result.code }
@@ -56,13 +62,22 @@ export function summarizeEvaluationResults(
   results: CodeAnalysisEvaluationResult[],
 ) {
   const errorCounts: Partial<Record<AiErrorCode, number>> = {}
+  const metricSamples: Partial<Record<keyof AiGenerationMetrics, number[]>> = {}
   let successCount = 0
   for (const result of results) {
+    for (const [key, value] of Object.entries(
+      projectAiMetrics(result.metrics),
+    )) {
+      if (value === undefined) continue
+      const name = key as keyof AiGenerationMetrics
+      ;(metricSamples[name] ??= []).push(value)
+    }
     if (result.status === 'success') successCount++
     else errorCounts[result.code] = (errorCounts[result.code] ?? 0) + 1
   }
   const durationsMs = results.map((result) => result.durationMs)
   return {
+    ...(Object.keys(metricSamples).length ? { metricSamples } : {}),
     total: results.length,
     successCount,
     failureCount: results.length - successCount,

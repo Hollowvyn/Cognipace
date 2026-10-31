@@ -324,3 +324,32 @@ describe('code analysis contracts', () => {
     ).toBe(false)
   })
 })
+
+it('accepts strict optional numeric generation metrics without expanding metadata keys', () => {
+  const response = {
+    status: 'ready',
+    ...analysisIdentity(makeAnalysisRequest()),
+    report: makeValidAnalysis(),
+    providerMetadata: {
+      provider: 'gemini',
+      model: 'fixture',
+      durationMs: 10,
+      metrics: { attemptCount: 1, requestBodyBytes: 200, inputTokens: 0 },
+    },
+  }
+  expect(responseSchema.parse(response)).toEqual(response)
+  for (const metrics of [
+    { raw: 'private' },
+    { inputTokens: -1 },
+    { generationMs: Infinity },
+    { outputTokens: 1.2 },
+    { totalTokens: Number.MAX_SAFE_INTEGER + 1 },
+  ]) {
+    expect(
+      responseSchema.safeParse({
+        ...response,
+        providerMetadata: { ...response.providerMetadata, metrics },
+      }).success,
+    ).toBe(false)
+  }
+})

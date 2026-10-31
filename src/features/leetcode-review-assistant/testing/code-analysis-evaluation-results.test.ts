@@ -89,3 +89,38 @@ describe('safe evaluation artifacts', () => {
     expect(summarizeEvaluationResults([]).total).toBe(0)
   })
 })
+
+it('projects bounded metric numbers individually and summarizes known samples only', () => {
+  const result = projectEvaluationResult(context, {
+    status: 'success',
+    data: makeValidAnalysis(),
+    providerMetadata: {
+      ...metadata,
+      metrics: {
+        inputTokens: 0,
+        outputTokens: -1,
+        totalTokens: Number.NaN,
+        requestBodyBytes: 123,
+        apiKey: 'private-secret',
+      } as never,
+    },
+  })
+  expect(result).toHaveProperty('metrics', {
+    inputTokens: 0,
+    requestBodyBytes: 123,
+  })
+  expect(JSON.stringify(result)).not.toContain('private-secret')
+  const without = projectEvaluationResult(context, {
+    status: 'error',
+    code: 'timeout',
+    message: 'private',
+    providerMetadata: metadata,
+  })
+  expect(summarizeEvaluationResults([result, without])).toHaveProperty(
+    'metricSamples',
+    { inputTokens: [0], requestBodyBytes: [123] },
+  )
+  expect(summarizeEvaluationResults([without])).not.toHaveProperty(
+    'metricSamples',
+  )
+})

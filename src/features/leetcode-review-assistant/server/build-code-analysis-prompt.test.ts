@@ -15,7 +15,28 @@ describe('buildCodeAnalysisPrompt', () => {
     const prompt = buildCodeAnalysisPrompt(request)
     expect(JSON.parse(prompt.user)).toEqual({
       problem: request.problem,
-      submission: request.submission,
+      submission: {
+        status: request.submission.status,
+        code: request.submission.code,
+        language: request.submission.language,
+        runtime: request.submission.runtime,
+        passedTestCount: request.submission.passedTestCount,
+        totalTestCount: request.submission.totalTestCount,
+        ...(request.submission.diagnostics.stdOutput !== null
+          ? {
+              diagnostics: {
+                stdOutput: request.submission.diagnostics.stdOutput,
+              },
+            }
+          : {}),
+        ...(request.submission.diagnostics.errorMessage !== null
+          ? {
+              diagnostics: {
+                errorMessage: request.submission.diagnostics.errorMessage,
+              },
+            }
+          : {}),
+      },
     })
     expect(prompt.user).not.toContain('request-1')
     expect(prompt.user).not.toContain('attempt-1')
@@ -32,7 +53,28 @@ describe('buildCodeAnalysisPrompt', () => {
     )
     expect(JSON.parse(prompt.user)).toEqual({
       problem: request.problem,
-      submission: request.submission,
+      submission: {
+        status: request.submission.status,
+        code: request.submission.code,
+        language: request.submission.language,
+        runtime: request.submission.runtime,
+        passedTestCount: request.submission.passedTestCount,
+        totalTestCount: request.submission.totalTestCount,
+        ...(request.submission.diagnostics.stdOutput !== null
+          ? {
+              diagnostics: {
+                stdOutput: request.submission.diagnostics.stdOutput,
+              },
+            }
+          : {}),
+        ...(request.submission.diagnostics.errorMessage !== null
+          ? {
+              diagnostics: {
+                errorMessage: request.submission.diagnostics.errorMessage,
+              },
+            }
+          : {}),
+      },
     })
     expect(prompt.system).not.toContain('Ignore the rubric')
   })
@@ -94,7 +136,28 @@ describe('buildCodeAnalysisPrompt', () => {
       const prompt = buildCodeAnalysisPrompt(request)
       expect(JSON.parse(prompt.user) as unknown).toEqual({
         problem: request.problem,
-        submission: request.submission,
+        submission: {
+          status: request.submission.status,
+          code: request.submission.code,
+          language: request.submission.language,
+          runtime: request.submission.runtime,
+          passedTestCount: request.submission.passedTestCount,
+          totalTestCount: request.submission.totalTestCount,
+          ...(request.submission.diagnostics.stdOutput !== null
+            ? {
+                diagnostics: {
+                  stdOutput: request.submission.diagnostics.stdOutput,
+                },
+              }
+            : {}),
+          ...(request.submission.diagnostics.errorMessage !== null
+            ? {
+                diagnostics: {
+                  errorMessage: request.submission.diagnostics.errorMessage,
+                },
+              }
+            : {}),
+        },
       })
       expect(prompt.system).toContain(
         'A syntax error alone does not establish a wrong algorithm',
@@ -125,4 +188,26 @@ it('requests compact complete reports without reducing the rubric', () => {
   expect(system).toContain('one sentence per rationale')
   expect(system).toContain('at most two high-value items per suggestion list')
   expect(system).toContain('compact complexity assumptions')
+})
+
+it('compacts only unavailable provider fields and preserves meaningful zero evidence', () => {
+  const request = makeAnalysisRequest()
+  request.submission.languageVersion = null
+  request.submission.runtime = null
+  request.submission.memory = null
+  request.submission.passedTestCount = 0
+  request.submission.totalTestCount = 0
+  const before = structuredClone(request)
+  const prompt = buildCodeAnalysisPrompt(request)
+  const input = JSON.parse(prompt.user) as Record<string, unknown>
+  expect(input.problem).toEqual(request.problem)
+  expect(input.submission).toEqual({
+    status: request.submission.status,
+    code: request.submission.code,
+    language: request.submission.language,
+    passedTestCount: 0,
+    totalTestCount: 0,
+  })
+  expect(request).toEqual(before)
+  expect(prompt.system).toContain('Absent optional fields are unavailable')
 })

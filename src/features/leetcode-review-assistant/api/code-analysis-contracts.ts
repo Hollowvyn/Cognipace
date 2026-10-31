@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { problemSlugSchema } from '@/features/problems/api/problems-contracts'
+import { aiGenerationMetricsSchema } from '@/lib/ai/metrics'
 import { aiErrorCodes, aiProviderIds } from '@/lib/ai/types'
 
 import { codeAnalysisSchema } from '../domain/code-analysis-schema'
@@ -86,6 +87,7 @@ const metadata = z.strictObject({
   model: z.string().max(120),
   resolvedModel: nonBlankString(120).optional(),
   durationMs: z.number().nonnegative(),
+  metrics: aiGenerationMetricsSchema.optional(),
 })
 export const codeAnalysisErrorCodeSchema = z.enum([
   ...aiErrorCodes,
