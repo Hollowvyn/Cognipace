@@ -29,6 +29,15 @@ Agent-authored changes must follow
 full agent lifecycle, skill rules, validation matrix, skipped-validation policy,
 PR and issue expectations, release-impact notes, and smoke expectations.
 
+`cognipace-agent-workflow` is the shared router before domain or implementation
+skills and defaults to
+collaborative work with human design approval. Explicitly invoke
+`cognipace-autonomous-workflow` or request autonomous mode for agent-reviewed
+design, planning, and delegated execution. The selection survives router
+re-entry and delegation; later explicit switches apply. Governance defines the
+routine checkpoint override and preserves scope, permissions, validation, and
+human smoke gates in both modes.
+
 For agent work, handoffs and PR summaries must include exact validation commands
 run, commands skipped with reasons, remaining validation risk, risk areas,
 release impact, issue context or a documented exception, and rollback or
@@ -321,16 +330,10 @@ Use these skills as lenses:
 - `drizzle-orm`: schema, repository, transaction, query safety
 - `vitest`: test scope, mocks, async behavior, Testing Library usage
 
-Recommended agent flow:
-
-1. State the spec or product behavior being changed.
-2. Ask one or more agents to inspect separate ownership areas.
-3. Give each agent a read-only or disjoint write scope.
-4. Merge findings into a small implementation plan.
-5. Edit the minimum files needed.
-6. Run focused validation first, then `npm run check` and `npm run format` for
-   substantial changes.
-7. Summarize what changed, what owns it, and any remaining risk.
+For non-trivial work, start with `cognipace-agent-workflow` and follow the
+selected mode in `docs/agent-governance.md`. That shared lifecycle owns design,
+phase-sized planning, delegated ownership, independent review, validation, and
+handoff; do not infer autonomous selection from this list of available skills.
 
 Agent safety rules:
 

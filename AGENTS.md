@@ -22,14 +22,24 @@ before proposing edits.
 
 ## Hard Gates
 
-- Use `cognipace-agent-workflow` as the first repo-local skill for non-trivial
-  CogniPace work.
-- Use `superpowers:brainstorming` before substantial design, behavior,
-  architecture, governance, CI, release, or workflow work.
+- Use `cognipace-agent-workflow` as the shared repo-local router before domain
+  or implementation skills for non-trivial CogniPace work. The autonomous
+  selector loads it immediately when explicitly invoked.
+- Collaborative mode is the default. Explicitly invoke
+  `cognipace-autonomous-workflow` or request autonomous mode to select it for the
+  current task and delegated phases. Shared-router re-entry preserves selection;
+  honor later explicit switches. Urgency or a subagent mention does not select it.
+- In collaborative mode, use `superpowers:brainstorming` and human design
+  approval before substantial work. In autonomous mode, follow governance's
+  recorded design/plan and independent agent acceptance lifecycle.
+- Only in explicitly selected autonomous mode, governance replaces generic
+  skills' routine human approval, artifact-review, execution-choice, and phase
+  handoff prompts. Protected scope, permissions, validation, and human smoke
+  gates remain. Existing explicit approval does not need repeating.
 - Use `cognipace-bulletproof-react` for ownership, runtime, React architecture,
   feature placement, popup, dashboard, or overlay boundary decisions.
-- Do not implement before an approved design and phase-sized plan when
-  `docs/agent-governance.md` requires them.
+- Do not implement before the design and phase-sized plan have the acceptance
+  required by the selected mode in `docs/agent-governance.md`.
 - Do not hide skipped validation or failed validation.
 - List exact validation commands run and exact commands skipped with reasons.
 - For behavior-changing code, do not mark manual smoke testing or visual proof
@@ -45,6 +55,8 @@ Use repo-local skills under `.agents/skills` when they match the work:
 
 - `.agents/skills/cognipace-agent-workflow/SKILL.md` for non-trivial CogniPace
   workflow, validation, PR/issue, governance, and agent-process work.
+- `.agents/skills/cognipace-autonomous-workflow/SKILL.md` for explicit autonomous
+  mode selection; it loads the shared router and canonical governance.
 - `.agents/skills/cognipace-bulletproof-react/SKILL.md` for CogniPace
   architecture ownership, runtime boundaries, dependency direction, and
   popup/dashboard/overlay responsibility decisions.
