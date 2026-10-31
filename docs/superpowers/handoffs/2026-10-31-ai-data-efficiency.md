@@ -134,3 +134,12 @@ storage may be read to obtain evaluation credentials.
 Final aggregate lint/check/build/format and human smoke flows are recorded after
 integration. Do not treat offline measurements or unit tests as live-provider
 quality or installed-extension proof.
+
+## Publication
+
+Draft PR: https://github.com/Hollowvyn/Cognipace/pull/214, stacked on #213.
+The recovery PR received the documentation-only audit filename fix at
+`6f7e7c90`. The unpublished efficiency branch was rebased onto it and its tree
+verified identical to the tested `6583931d` tree before publication. Hint PR
+#203 contains snapshot interning at `cc3f644c`. Human/live gates remain pending;
+no merge or release performed. The temporary fixture server was stopped after QA.
