@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/Hollowvyn/Cognipace/compare/v2.3.0...v2.3.1) (2026-10-31)
+
+
+### Bug Fixes
+
+* **ai:** improve assessment recovery across providers ([#213](https://github.com/Hollowvyn/Cognipace/issues/213)) ([b7ae537](https://github.com/Hollowvyn/Cognipace/commit/b7ae5374f07d74b83a021363c5a827164c05d286))
+
 ## [2.3.0](https://github.com/Hollowvyn/Cognipace/compare/v2.2.0...v2.3.0) (2026-10-30)
 
 
