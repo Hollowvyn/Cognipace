@@ -1,0 +1,84 @@
+/** Disposable Phase H packaged-runtime probe. Never called by product flows. */
+import { initOptimizer } from '@open-spaced-repetition/binding/dynamic-wasi'
+import wasmUrl from '@open-spaced-repetition/binding-wasm32-wasi/fsrs-binding.wasm32-wasi.wasm?url'
+import WasiWorker from '@open-spaced-repetition/binding-wasm32-wasi/wasi-worker-browser.mjs?worker'
+
+const workers = new Set<Worker>()
+let cancelRequested = false
+
+export function cancelOfficialBindingProbe(): number {
+  cancelRequested = true
+  return workers.size
+}
+
+function terminateOfficialBindingWorkers(): number {
+  for (const worker of workers) worker.terminate()
+  const count = workers.size
+  workers.clear()
+  return count
+}
+
+export async function runOfficialBindingProbe(options: { epochs?: number; cardCount?: number } = {}) {
+  const startedAt = performance.now()
+  cancelRequested = false
+  const samples: { current: number; total: number; ms: number }[] = []
+  const worker = () => {
+    const created = new WasiWorker()
+    workers.add(created)
+    return created
+  }
+
+  try {
+    const binding = await initOptimizer({ wasm: wasmUrl, worker })
+    const initializedMs = performance.now() - startedAt
+    const cardCount = options.cardCount ?? 200
+    const items = Array.from({ length: cardCount }, (_, index) => {
+      const first = new binding.FSRSBindingReview(index % 4 === 0 ? 1 : 3, 0)
+      const second = new binding.FSRSBindingReview(index % 3 === 0 ? 2 : 3, 2 + (index % 4))
+      const third = new binding.FSRSBindingReview(index % 5 === 0 ? 1 : 4, 4 + (index % 6))
+      return [
+        new binding.FSRSBindingItem([first, second]),
+        new binding.FSRSBindingItem([first, second, third]),
+      ]
+    }).flat()
+    const weights = await binding.computeParameters(items, {
+      enableShortTerm: false,
+      numRelearningSteps: 0,
+      trainingConfig: {
+        numEpochs: options.epochs ?? 2,
+        batchSize: 8,
+        seed: 42,
+        maxSeqLen: 30,
+        learningRate: 0.001,
+        gamma: 0.01,
+      },
+      timeout: 1,
+      progress: (current, total) => {
+        samples.push({ current, total, ms: performance.now() - startedAt })
+        return !cancelRequested
+      },
+    })
+
+    return {
+      status: 'ok' as const,
+      initializedMs,
+      wallMs: performance.now() - startedAt,
+      workerCount: workers.size,
+      itemCount: items.length,
+      progress: samples,
+      weights,
+    }
+  } catch (error) {
+    return {
+      status: 'error' as const,
+      wallMs: performance.now() - startedAt,
+      workerCount: workers.size,
+      itemCount: cardCount * 2,
+      progress: samples,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    }
+  } finally {
+    terminateOfficialBindingWorkers()
+  }
+}

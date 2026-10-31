@@ -191,8 +191,11 @@ read through the background database gate on the shared SQLite connection.
 It creates no command receipt, mutation, flush, dirty sync marker or
 invalidation. The Overlay preview query keys include the problem, generation,
 session epoch and original Update target; Practice/Settings invalidation
-refreshes estimates without changing a draft or accepted command. Optimizer
-work remains in later phases.
+refreshes estimates without changing a draft or accepted command. Phase H's
+official-binding feasibility probe was removed after same-day Again parity and
+ordinary package installation failed its reviewed gate. The cancellation probe
+was inconclusive due to a harness error. No optimizer worker, training-history export or active custom-profile
+state ships; the FSRS facade still schedules with defaults and saved retention.
 
 The persisted `ts-fsrs` `card.due` value is stored as `FsrsCardSnapshot.dueAt`
 and remains the raw authority for a reviewed card's schedule. Practice derives
