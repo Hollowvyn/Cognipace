@@ -98,6 +98,49 @@ function renderSection(
 beforeEach(() => vi.clearAllMocks())
 
 describe('AiAssessmentSection', () => {
+  it.each([
+    ['OpenAI', 'https://platform.openai.com'],
+    ['Anthropic', 'https://console.anthropic.com'],
+    ['Gemini', 'https://aistudio.google.com'],
+    ['OpenRouter', 'https://openrouter.ai'],
+  ])(
+    'prepares %s key and model properties without saving or testing a connection',
+    async (providerLabel, website) => {
+      const user = userEvent.setup()
+      const writeText = vi.spyOn(navigator.clipboard, 'writeText')
+      renderSection({ model: 'saved-model' })
+      await screen.findByText('OpenAI · saved-model')
+      await user.click(screen.getByRole('radio', { name: providerLabel }))
+      const modelInput = screen.getByRole('textbox', { name: 'Model' })
+      await user.clear(modelInput)
+      await user.type(modelInput, 'test-model')
+      await user.type(
+        screen.getByLabelText(`${providerLabel} API key`),
+        'test-only-key',
+      )
+      vi.mocked(sendMessage).mockClear()
+      await user.click(screen.getByText('Save in your password manager'))
+      await user.click(screen.getByRole('button', { name: 'Copy Website' }))
+      expect(writeText).toHaveBeenLastCalledWith(website)
+      await user.click(screen.getByRole('button', { name: 'Copy Password' }))
+      expect(writeText).toHaveBeenLastCalledWith('test-only-key')
+      await user.click(screen.getByRole('button', { name: 'Copy Notes' }))
+      expect(writeText).toHaveBeenLastCalledWith(
+        `App: CogniPace\nProvider: ${providerLabel}\nModel: test-model`,
+      )
+      expect(sendMessage).not.toHaveBeenCalled()
+      await user.click(
+        screen.getByRole('radio', {
+          name: providerLabel === 'OpenAI' ? 'Gemini' : 'OpenAI',
+        }),
+      )
+      await user.click(screen.getByText('Save in your password manager'))
+      expect(
+        screen.getByRole('button', { name: 'Copy Password' }),
+      ).toBeDisabled()
+    },
+  )
+
   it('keeps the active summary while browsing saved keys and makes activation independent of testing', async () => {
     renderSection({ model: 'custom-openai' }, 'ready', {
       openai: true,

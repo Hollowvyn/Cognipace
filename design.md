@@ -164,6 +164,15 @@ Shapes are disciplined but adopt a more approachable **Rounded** profile. This b
 
 ## CogniPace AI Connection Settings Rules
 
+- Provide a collapsed **Save in your password manager** disclosure in both AI
+  connection and the GitHub Sync dialog. Expanding shows compact Website,
+  Username, Password and Notes rows with explicit per-field Copy buttons and an
+  Open Google Password Manager action. Only the currently entered key is
+  copyable; never render it in the helper. Explain that the user must add/save
+  the entry in their manager and paste it back when needed. Keep local
+  connection saving separate. Do not promise automatic saving or autofill.
+  Keep the expanded GitHub dialog scrollable within the viewport and include
+  its summary in the dialog's keyboard focus cycle.
 - Keep AI connection in its own Settings form with the existing compact row,
   input, status, and panel tokens. Ordinary preference saves do not submit it.
 - Selecting a provider fills an editable suggested model value; OpenRouter

@@ -113,6 +113,8 @@ Not every feature needs every folder. Add only the folder needed for the change.
   behavior.
 - `sync`: GitHub Gist configuration, sync metadata, directional pull/push
   rules, Settings/header sync UI, and background orchestration.
+- `password-manager`: optional copy-and-paste credential handoff UI shared by
+  GitHub Sync and AI connection, exposed through its public feature barrel.
 - `genai`: AI provider settings contracts, trusted provider key storage,
   connection testing, and background-owned BYOK calls through `src/lib/ai`.
 - `dev-smoke`: hidden dashboard-only extension development smoke checks for
@@ -713,6 +715,18 @@ returned runtime data. Approved AI host permissions are exactly:
 - `https://api.anthropic.com/*`
 - `https://generativelanguage.googleapis.com/*`
 - `https://openrouter.ai/*`
+
+The password-manager helper receives only the current form's entered key and
+public connection properties. Explicit user clicks copy a single field with
+`navigator.clipboard.writeText`; the secret is never rendered by the helper.
+`src/platform/chrome/password-manager.ts` opens the fixed
+`chrome://password-manager/passwords` URL using the existing tabs API without
+new permissions or any credential in navigation data. Chrome excludes extension
+pages from its password saving/filling UI, so the user completes Add/Save in
+their manager and manually pastes saved values back. There is no manager API
+integration, stored-secret read endpoint, plaintext file export, new runtime
+method, persistence, invalidation, or sync side effect. Copy/open failures use
+controlled text and never surface raw exception messages.
 
 Provider calls run in trusted background code after configuration and key
 checks. Explicit model objects use controlled fetch with redirects rejected,

@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { InlineStatus } from '@/components/ui/inline-status'
 import type { GenAiProviderId } from '@/features/genai'
+import { PasswordManagerHelper } from '@/features/password-manager'
 
 import {
   aiProviderLabels,
@@ -24,6 +25,12 @@ const providerOptions: ReadonlyArray<{
 
 const inputClassName =
   'w-full min-w-0 rounded-[var(--cp-control-radius)] border border-border bg-background px-3 py-2 text-[length:var(--cp-copy-font-size)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60'
+const passwordManagerWebsites: Record<GenAiProviderId, string> = {
+  openai: 'https://platform.openai.com',
+  anthropic: 'https://console.anthropic.com',
+  gemini: 'https://aistudio.google.com',
+  openrouter: 'https://openrouter.ai',
+}
 const stepLabels = {
   'saving-key': 'Saving key…',
   'saving-settings': 'Saving configuration…',
@@ -140,6 +147,14 @@ export function AiAssessmentSection({
             spellCheck={false}
             type="password"
             value={controller.keyInput}
+          />
+          <PasswordManagerHelper
+            key={provider}
+            disabled={controller.isBusy}
+            website={passwordManagerWebsites[provider]}
+            username={`CogniPace ${aiProviderLabels[provider]} API key`}
+            password={controller.keyInput}
+            notes={`App: CogniPace\nProvider: ${aiProviderLabels[provider]}\nModel: ${model.trim() || '(not set)'}`}
           />
           {provider === 'gemini' ? (
             <a

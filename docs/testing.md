@@ -960,6 +960,42 @@ Human installed-extension OpenRouter happy-path and edge-case proof is pending;
 attach dated screenshots or recording before PR review or merge. Component
 fixtures and native wire tests supplement this proof.
 
+### Password Manager Handoff
+
+Human installed-extension proof is required before PR review or merge. Use
+disposable test values; mask keys in screenshots or recordings.
+
+1. Open the GitHub Sync dialog. Enter a test token and Gist ID, then expand
+   **Save in your password manager**. Copy Website, Username, Password and
+   Notes one at a time. Verify the Password copy is exactly the entered token
+   and Notes contain the current Gist ID. No token validation, connection or
+   local save should run from a helper action.
+2. Choose **Open Google Password Manager**, select Add, paste those fields and
+   save there. Alternatively add the same values in your preferred manager.
+   Retrieve them and paste the token and Gist ID back into CogniPace. Complete
+   the existing GitHub connection smoke using disposable valid credentials.
+3. Save the token in CogniPace and confirm the draft clears and Copy Password
+   is disabled. Reopen Manage connection: the stored mask is never copyable.
+   Replace token and confirm only the newly entered token becomes copyable.
+4. Repeat AI Settings with OpenAI, Anthropic, Gemini and OpenRouter. Notes must
+   contain the selected provider and current model; the website and username
+   must match that provider. Copying does not save, test, activate or enable
+   assessment. Switching providers clears the draft key; saving locally also
+   disables Password copying. Verify normal local connection save/test works.
+5. Exercise clipboard denial or unavailability, retry, and a failed manager
+   opening. Errors must be controlled, contain no key, and never claim a copy
+   or manager save succeeded. Confirm opening the manager never copies a key.
+6. At desktop and narrow widths, expand the helper and confirm the GitHub
+   dialog scrolls, Close remains reachable, Tab includes the summary, and
+   Escape/focus restoration work. Reload the extension and verify existing
+   stored connections still work. Confirm no extra Chrome permissions, provider
+   calls, secrets in navigation URLs, backup exports or sync payloads.
+
+Chrome password prompts and ordinary password-manager extension autofill do
+not work on this extension page. This flow is an explicit copy-and-paste
+handoff. Supplemental component/browser fixtures do not prove a real manager
+entry was saved or replace human installed-extension smoke.
+
 ### Dashboard Dev Smoke
 
 1. Open the dashboard.
