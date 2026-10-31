@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm'
+import { IDBObjectStore, indexedDB as testIndexedDB } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./proxy', async (importOriginal) => {
@@ -16,18 +17,29 @@ import { saveReviewResult } from '@/features/practice/server/practice-service'
 // eslint-disable-next-line no-restricted-imports
 import { createSettingsRepository } from '@/features/settings/data/settings-repository'
 import { getBackgroundDb } from '@/extension/background/app-db'
+import { createBackupReplacementCoordinator } from '@/extension/background/backup-replacement'
 // eslint-disable-next-line no-restricted-imports
 import { createProblemsRepository } from '@/features/problems/data/problems-repository'
 // eslint-disable-next-line no-restricted-imports
 import { buildTopicGraph } from '@/features/problems/domain/topic-graph'
 import { createDb, createSqliteWasmLocator } from './client'
-import { getAppDb, flushDbSnapshot, resetAppDbForTesting } from './instance'
+import {
+  getAppDb,
+  flushDbSnapshot,
+  resetAppDbForTesting,
+  beginDbReplacement,
+  commitDbReplacementSnapshot,
+} from './instance'
 import { migrationSql } from './migration-sql'
 import {
   legacyTopicMigrationFingerprint,
   legacyTopicMigrationSql,
 } from './snapshot-upgrade'
-import { RECOVERY_KEY, TRACK_RECOVERY_KEY } from './snapshot-state'
+import {
+  RECOVERY_KEY,
+  TRACK_RECOVERY_KEY,
+  FSRS_RECOVERY_KEY,
+} from './snapshot-state'
 import {
   bytesToBase64,
   base64ToBytes,
@@ -38,6 +50,7 @@ import {
   serializeDb,
 } from './snapshot'
 import { setOnMutationHook } from './proxy'
+import { createSnapshotIdbStore } from './snapshot-idb'
 import {
   expectedV8MigrationFingerprint,
   frozenV8MigrationSql,
@@ -134,6 +147,199 @@ function readOwnedRows(db: Awaited<ReturnType<typeof getAppDb>>) {
 }
 
 describe('committed snapshot publication', () => {
+  it('resumes replacement continuation after validated startup schema upgrade', async () => {
+    installStorage()
+    const store = createSnapshotIdbStore(
+      testIndexedDB,
+      `replacement-upgrade-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    const bytes = serializeDb(legacy)
+    await store.commitSnapshot(bytes, expectedV8MigrationFingerprint, now)
+    await store.commitReplacement(bytes, expectedV8MigrationFingerprint, now, {
+      replacementId: 'restore-before-upgrade',
+      kind: 'restore',
+    })
+    legacy.rawDb.close()
+    openedHandles.push(await getAppDb({ snapshotStore: store }))
+    const active = await store.readActive()
+    expect(active).toMatchObject({
+      revision: 3,
+      replacementId: 'restore-before-upgrade',
+      fingerprint: computeFingerprint(migrationSql),
+    })
+    expect(await store.readRecovery(TRACK_RECOVERY_KEY)).not.toBeNull()
+    expect(
+      Buffer.compare(
+        Buffer.from(
+          (await store.readReplacementRecovery('restore-before-upgrade'))!
+            .bytes,
+        ),
+        Buffer.from(bytes),
+      ),
+    ).toBe(0)
+    const onDurable = vi.fn().mockResolvedValue(undefined)
+    const finishSyncMetadata = vi.fn().mockResolvedValue(undefined)
+    const coordinator = createBackupReplacementCoordinator({
+      store,
+      resume: () => ({ onDurable, finishSyncMetadata }),
+    })
+    await coordinator.ready()
+    expect(coordinator.getState().status).toBe('durable-sync-metadata-pending')
+    expect(await coordinator.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    expect(onDurable).toHaveBeenCalledTimes(1)
+    expect(finishSyncMetadata).toHaveBeenCalledTimes(1)
+    expect((await store.readActive())?.revision).toBe(3)
+  })
+  it('reopens the old durable data after replacement publication aborts', async () => {
+    installStorage()
+    const store = createSnapshotIdbStore(
+      testIndexedDB,
+      `replacement-open-${crypto.randomUUID()}`,
+    )
+    const opened = await getAppDb({ snapshotStore: store })
+    openedHandles.push(opened)
+    const before = await store.readActive()
+    const oldSettings = readRows(opened, 'settings_kv')
+    beginDbReplacement()
+    await createSettingsRepository(opened.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    const originalPut = Object.getOwnPropertyDescriptor(
+      IDBObjectStore.prototype,
+      'put',
+    )!.value as typeof IDBObjectStore.prototype.put
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: globalThis.IDBObjectStore,
+      ...args
+    ) {
+      const request = originalPut.apply(this, args)
+      this.transaction.abort()
+      return request
+    })
+    await expect(
+      commitDbReplacementSnapshot({
+        replacementId: 'restore-1',
+        kind: 'restore',
+      }),
+    ).rejects.toThrow()
+    vi.restoreAllMocks()
+    expect((await store.readActive())?.bytes).toEqual(before?.bytes)
+    resetAppDbForTesting()
+    const reopened = await getAppDb({ snapshotStore: store })
+    openedHandles.push(reopened)
+    expect(readRows(reopened, 'settings_kv')).toEqual(oldSettings)
+  })
+  it('rejects a mismatched IDB readback and retries the unacknowledged snapshot', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `readback-${crypto.randomUUID()}`,
+    )
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    const before = (await snapshotStore.readActive())!
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    const read = vi.spyOn(snapshotStore, 'readActive')
+    read.mockResolvedValueOnce(before)
+    await expect(flushDbSnapshot()).rejects.toThrow(
+      'IndexedDB snapshot readback did not match',
+    )
+    read.mockRestore()
+    const failedRevision = (await snapshotStore.readActive())!.revision
+    await flushDbSnapshot()
+    expect((await snapshotStore.readActive())?.revision).toBe(failedRevision)
+  })
+  it('does not acknowledge a retry when IDB still reads a different snapshot', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `readback-stale-${crypto.randomUUID()}`,
+    )
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    const before = (await snapshotStore.readActive())!
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    const read = vi.spyOn(snapshotStore, 'readActive')
+    const commit = vi.spyOn(snapshotStore, 'commitSnapshot')
+    read.mockResolvedValueOnce(before)
+    await expect(flushDbSnapshot()).rejects.toThrow(
+      'IndexedDB snapshot readback did not match',
+    )
+    const firstRevision = (await snapshotStore.readActive())!.revision
+    read.mockResolvedValueOnce(before)
+    await expect(flushDbSnapshot()).rejects.toThrow(
+      'IndexedDB snapshot readback did not match',
+    )
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect((await snapshotStore.readActive())?.revision).toBe(firstRevision)
+  })
+  it('waits for the IDB commit, skips unchanged flushes, and reopens the last durable state after a failed commit', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `durability-${crypto.randomUUID()}`,
+    )
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    const baseline = (await snapshotStore.readActive())!
+    await flushDbSnapshot()
+    expect((await snapshotStore.readActive())?.revision).toBe(baseline.revision)
+
+    const settings = createSettingsRepository(handle.db)
+    await settings.updateSettings({ appearance: { themeMode: 'dark' } }, now)
+    let releaseCommit!: () => void
+    const commitGate = new Promise<void>((resolve) => {
+      releaseCommit = resolve
+    })
+    const originalCommit = snapshotStore.commitSnapshot.bind(snapshotStore)
+    const commit = vi
+      .spyOn(snapshotStore, 'commitSnapshot')
+      .mockImplementation(async (...args) => {
+        await commitGate
+        return originalCommit(...args)
+      })
+    let settled = false
+    const pending = flushDbSnapshot().then(() => {
+      settled = true
+    })
+    await vi.waitFor(() => expect(commit).toHaveBeenCalledTimes(1))
+    expect(settled).toBe(false)
+    expect((await snapshotStore.readActive())?.revision).toBe(baseline.revision)
+    releaseCommit()
+    await pending
+    const durable = (await snapshotStore.readActive())!
+    expect(durable.revision).toBe(baseline.revision + 1)
+    await flushDbSnapshot()
+    expect((await snapshotStore.readActive())?.revision).toBe(durable.revision)
+
+    commit.mockRejectedValueOnce(new Error('IDB transaction aborted'))
+    await settings.updateSettings(
+      { appearance: { themeMode: 'light' } },
+      new Date(now.getTime() + 1_000),
+    )
+    await expect(flushDbSnapshot()).rejects.toThrow('IDB transaction aborted')
+    resetAppDbForTesting()
+    const reopened = await getAppDb({ snapshotStore })
+    openedHandles.push(reopened)
+    expect(
+      (await createSettingsRepository(reopened.db).getSettings()).appearance
+        .themeMode,
+    ).toBe('dark')
+  })
   it.each(['ROLLBACK', 'COMMIT'])(
     'defers automatic publication until a stalled transaction ends with %s',
     async (ending) => {
@@ -176,6 +382,402 @@ describe('committed snapshot publication', () => {
 })
 
 describe('app database startup', () => {
+  it('publishes a fresh startup snapshot to both IDB and Chrome storage', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `fresh-${crypto.randomUUID()}`,
+    )
+
+    openedHandles.push(await getAppDb({ snapshotStore }))
+
+    const active = await snapshotStore.readActive()
+    expect(active?.fingerprint).toBe(computeFingerprint(migrationSql))
+    expect(storage.values[FINGERPRINT_KEY]).toBe(active?.fingerprint)
+    expect(
+      Buffer.compare(
+        Buffer.from(base64ToBytes(String(storage.values[SNAPSHOT_KEY]))),
+        Buffer.from(active!.bytes),
+      ),
+    ).toBe(0)
+  })
+
+  it('publishes an IDB upgrade startup snapshot to Chrome storage', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `upgrade-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    await snapshotStore.commitSnapshot(
+      serializeDb(legacy),
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+
+    openedHandles.push(await getAppDb({ snapshotStore }))
+
+    const active = await snapshotStore.readActive()
+    expect(active?.fingerprint).toBe(computeFingerprint(migrationSql))
+    expect(storage.values[FINGERPRINT_KEY]).toBe(active?.fingerprint)
+    expect(
+      Buffer.compare(
+        Buffer.from(base64ToBytes(String(storage.values[SNAPSHOT_KEY]))),
+        Buffer.from(active!.bytes),
+      ),
+    ).toBe(0)
+  })
+
+  it('upgrades an IDB snapshot larger than Chrome quota with a binary IDB recovery copy', async () => {
+    const storage = installStorage()
+    const originalSet = storage.set
+    storage.set = vi.fn(async (values) => {
+      if (JSON.stringify(values).length > 10 * 1024 * 1024) {
+        throw new Error('Chrome quota exceeded')
+      }
+      await originalSet(values)
+    })
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `large-upgrade-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    legacy.rawDb.exec(
+      `INSERT INTO settings_kv (key, value, updated_at) VALUES ('large-proof', '${'x'.repeat(11 * 1024 * 1024)}', 1)`,
+    )
+    const originalBytes = serializeDb(legacy)
+    expect(originalBytes.byteLength).toBeGreaterThan(10 * 1024 * 1024)
+    await snapshotStore.commitSnapshot(
+      originalBytes,
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+
+    const upgraded = await getAppDb({ snapshotStore })
+    openedHandles.push(upgraded)
+    expect(
+      upgraded.rawDb.exec({
+        sql: "SELECT length(value) FROM settings_kv WHERE key = 'large-proof'",
+        returnValue: 'resultRows',
+      }),
+    ).toEqual([[11 * 1024 * 1024]])
+    const recovery = await snapshotStore.readRecovery(TRACK_RECOVERY_KEY)
+    expect(recovery?.value).toMatchObject({
+      version: 2,
+      fingerprint: expectedV8MigrationFingerprint,
+    })
+    const recoveryBytes = (recovery?.value as { bytes: Uint8Array }).bytes
+    expect(
+      Buffer.compare(Buffer.from(recoveryBytes), Buffer.from(originalBytes)),
+    ).toBe(0)
+    expect(storage.values[TRACK_RECOVERY_KEY]).toBeUndefined()
+    expect(storage.values[SNAPSHOT_KEY]).toBeUndefined()
+
+    await createSettingsRepository(upgraded.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await expect(flushDbSnapshot()).resolves.toBeUndefined()
+
+    resetAppDbForTesting()
+    const reopened = await getAppDb({ snapshotStore })
+    openedHandles.push(reopened)
+    expect(
+      reopened.rawDb.exec({
+        sql: "SELECT length(value) FROM settings_kv WHERE key = 'large-proof'",
+        returnValue: 'resultRows',
+      }),
+    ).toEqual([[11 * 1024 * 1024]])
+    expect(
+      (await createSettingsRepository(reopened.db).getSettings()).appearance
+        .themeMode,
+    ).toBe('dark')
+  }, 45_000)
+
+  it('identifies a non-quota Chrome mirror failure after IDB upgrade publication', async () => {
+    const storage = installStorage()
+    storage.rejectActiveSnapshotWrite = true
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `mirror-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    await snapshotStore.commitSnapshot(
+      serializeDb(legacy),
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'Chrome snapshot mirror publication failed',
+    )
+    expect((await snapshotStore.readActive())?.fingerprint).toBe(
+      computeFingerprint(migrationSql),
+    )
+  })
+
+  it('reports an IDB recovery collision separately from invalid snapshot data', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `collision-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    await snapshotStore.commitSnapshot(
+      serializeDb(legacy),
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+    await snapshotStore.commitRecovery(TRACK_RECOVERY_KEY, {
+      version: 2,
+      fingerprint: 'another',
+      bytes: new Uint8Array([1]),
+      savedAt: now.toISOString(),
+    })
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'IndexedDB recovery preservation failed',
+    )
+    expect((await snapshotStore.readActive())?.fingerprint).toBe(
+      expectedV8MigrationFingerprint,
+    )
+  })
+
+  it('reports an IDB upgrade publication failure without calling the source invalid', async () => {
+    installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `publication-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql: frozenV8MigrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    await snapshotStore.commitSnapshot(
+      serializeDb(legacy),
+      expectedV8MigrationFingerprint,
+      now,
+    )
+    legacy.rawDb.close()
+    vi.spyOn(snapshotStore, 'commitSnapshot').mockRejectedValue(
+      new Error('IDB write failed'),
+    )
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'IndexedDB publication failed',
+    )
+    expect((await snapshotStore.readActive())?.fingerprint).toBe(
+      expectedV8MigrationFingerprint,
+    )
+    expect(await snapshotStore.readRecovery(TRACK_RECOVERY_KEY)).not.toBeNull()
+  })
+
+  it('migrates a validated matching legacy snapshot before removing its pair', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    legacy.rawDb.exec(
+      "INSERT INTO settings_kv (key, value, updated_at) VALUES ('migration-proof', 'preserved', 1)",
+    )
+    const originalBytes = serializeDb(legacy)
+    legacy.rawDb.close()
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(originalBytes)
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    storage.remove.mockImplementation(async (keys) => {
+      const persisted = await snapshotStore.readActive()
+      expect(persisted?.fingerprint).toBe(computeFingerprint(migrationSql))
+      expect(
+        Buffer.compare(
+          Buffer.from(persisted!.bytes),
+          Buffer.from(originalBytes),
+        ),
+      ).toBe(0)
+      for (const key of keys) delete storage.values[key]
+    })
+
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    expect(readRows(handle, 'settings_kv')).toContainEqual([
+      'migration-proof',
+      'preserved',
+      1,
+    ])
+    expect(storage.values[SNAPSHOT_KEY]).toBeUndefined()
+    expect(storage.values[FINGERPRINT_KEY]).toBeUndefined()
+    expect(storage.remove).toHaveBeenCalledWith([SNAPSHOT_KEY, FINGERPRINT_KEY])
+  })
+
+  it('reopens the newest IDB data after migrating, mutating, and flushing', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+
+    const handle = await getAppDb({ snapshotStore })
+    openedHandles.push(handle)
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await flushDbSnapshot()
+    resetAppDbForTesting()
+
+    const reopened = await getAppDb({ snapshotStore })
+    openedHandles.push(reopened)
+    expect(
+      (await createSettingsRepository(reopened.db).getSettings()).appearance
+        .themeMode,
+    ).toBe('dark')
+  })
+
+  it('keeps the legacy pair and fails recovery when IDB migration publication fails', async () => {
+    const storage = installStorage()
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    vi.spyOn(snapshotStore, 'commitSnapshot').mockRejectedValue(
+      new Error('IDB write failed'),
+    )
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'Database recovery required',
+    )
+    expect(storage.values[SNAPSHOT_KEY]).toEqual(expect.any(String))
+    expect(storage.values[FINGERPRINT_KEY]).toBe(
+      computeFingerprint(migrationSql),
+    )
+    expect(storage.remove).not.toHaveBeenCalled()
+  })
+
+  it('does not fall back to a valid legacy pair when IDB active is invalid', async () => {
+    const storage = installStorage()
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    vi.spyOn(snapshotStore, 'readActive').mockRejectedValue(
+      new Error('invalid active record'),
+    )
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'Database recovery required',
+    )
+    expect(storage.values[SNAPSHOT_KEY]).toEqual(expect.any(String))
+    expect(storage.remove).not.toHaveBeenCalled()
+  })
+
+  it('requires recovery for invalid IDB bytes even with a valid legacy pair', async () => {
+    const storage = installStorage()
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    await snapshotStore.commitSnapshot(
+      new Uint8Array([1, 2, 3]),
+      computeFingerprint(migrationSql),
+      now,
+    )
+
+    await expect(getAppDb({ snapshotStore })).rejects.toThrow(
+      'IndexedDB validation failed',
+    )
+    expect(storage.values[SNAPSHOT_KEY]).toEqual(expect.any(String))
+    expect(storage.remove).not.toHaveBeenCalled()
+  })
+
+  it('preserves all three legacy recovery records in IDB before removing old keys', async () => {
+    const storage = installStorage()
+    const snapshotStore = createSnapshotIdbStore(
+      testIndexedDB,
+      `migration-${crypto.randomUUID()}`,
+    )
+    const legacy = await createDb({
+      migrationSql,
+      locateWasm: createSqliteWasmLocator(),
+    })
+    storage.values[SNAPSHOT_KEY] = bytesToBase64(serializeDb(legacy))
+    storage.values[FINGERPRINT_KEY] = computeFingerprint(migrationSql)
+    legacy.rawDb.close()
+    for (const key of [RECOVERY_KEY, TRACK_RECOVERY_KEY, FSRS_RECOVERY_KEY]) {
+      storage.values[key] = {
+        version: 1,
+        savedAt: now.toISOString(),
+        raw: { [SNAPSHOT_KEY]: key },
+      }
+    }
+    storage.remove.mockImplementation(async (keys) => {
+      for (const key of keys) {
+        if (
+          [RECOVERY_KEY, TRACK_RECOVERY_KEY, FSRS_RECOVERY_KEY].includes(key)
+        ) {
+          expect(await snapshotStore.readRecovery(key)).toEqual({
+            value: storage.values[key],
+          })
+        }
+        delete storage.values[key]
+      }
+    })
+
+    openedHandles.push(await getAppDb({ snapshotStore }))
+    for (const key of [RECOVERY_KEY, TRACK_RECOVERY_KEY, FSRS_RECOVERY_KEY]) {
+      expect(await snapshotStore.readRecovery(key)).toMatchObject({
+        value: { raw: { [SNAPSHOT_KEY]: key } },
+      })
+      expect(storage.values[key]).toBeUndefined()
+    }
+  })
   it.each([
     'missing-evidence',
     'partial-evidence',

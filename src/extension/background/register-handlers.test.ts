@@ -2370,6 +2370,211 @@ describe('background handler registration', () => {
     expect(cycleResponse).toBeNull()
   })
 
+  it('acknowledges settings only after flush resolves and blocks later writes while local saving fails', async () => {
+    const gate = createDeferred<void>()
+    backgroundMocks.flushDbSnapshot.mockReturnValueOnce(gate.promise)
+    const first = sendRuntimeMessage('settings.updateSettings', {
+      surface: 'popup',
+      patch: { assessment: { strictTiming: true } },
+    })
+    await waitUntil(() =>
+      expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1),
+    )
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    gate.reject(new Error('IDB transaction aborted'))
+    await expect(first).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB still unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.updateSettings', {
+        surface: 'popup',
+        patch: { assessment: { strictTiming: false } },
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(1)
+
+    await expect(
+      sendRuntimeMessage('settings.updateSettings', {
+        surface: 'popup',
+        patch: { assessment: { strictTiming: false } },
+      }),
+    ).resolves.toBeDefined()
+    expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['settings.toggleStudyMode', 'settings.cycleThemeMode'] as const)(
+    'acknowledges a recovered %s retry without toggling again',
+    async (method) => {
+      backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+        new Error('IDB unavailable'),
+      )
+      await expect(
+        sendRuntimeMessage(method, { surface: 'popup' }),
+      ).rejects.toThrow('Local data still needs saving')
+      await expect(
+        sendRuntimeMessage(method, { surface: 'popup' }),
+      ).resolves.toBeNull()
+      const write =
+        method === 'settings.toggleStudyMode'
+          ? backgroundMocks.toggleStudyMode
+          : backgroundMocks.cycleThemeMode
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(
+        1,
+      )
+      expect(
+        backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+      ).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('acknowledges a recovered track creation without creating a duplicate', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('tracks.createTrack', createTrackRequest()),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      sendRuntimeMessage('tracks.createTrack', createTrackRequest()),
+    ).resolves.toEqual(parsedTrackForEditResponse)
+    expect(backgroundMocks.createTrack).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
+  })
+
+  it('expires a recovered toggle acknowledgment when an export intervenes', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
+    ).rejects.toThrow('Local data still needs saving')
+    await sendRuntimeMessage('backup.exportFullBackup', {
+      surface: 'dashboard',
+    })
+    await expect(
+      sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
+    ).resolves.toBeNull()
+    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(2)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(2)
+  })
+
+  it('expires a recovered toggle acknowledgment when a practice review intervenes', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
+    ).rejects.toThrow('Local data still needs saving')
+    await sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest)
+    await sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' })
+    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(2)
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
+  })
+
+  it('executes a different generic action after recovering a failed toggle', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      sendRuntimeMessage('settings.cycleThemeMode', { surface: 'popup' }),
+    ).resolves.toBeNull()
+    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.cycleThemeMode).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(2)
+  })
+
+  it('blocks restore, reset, and sync push while a failed settings snapshot remains unsaved', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.updateSettings', {
+        surface: 'popup',
+        patch: { assessment: { strictTiming: true } },
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    backgroundMocks.flushDbSnapshot.mockRejectedValue(
+      new Error('IDB unavailable'),
+    )
+
+    await expect(
+      sendRuntimeMessage('backup.restoreFullBackup', {
+        surface: 'dashboard',
+        backup: validBackup,
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      sendRuntimeMessage('backup.resetLocalData', {
+        surface: 'dashboard',
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      sendRuntimeMessage('sync.pushLocal', {
+        surface: 'dashboard',
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.backupRestoreFullBackup).not.toHaveBeenCalled()
+    expect(backgroundMocks.backupResetLocalData).not.toHaveBeenCalled()
+    expect(backgroundMocks.syncService.pushLocal).not.toHaveBeenCalled()
+
+    backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
+    await sendRuntimeMessage('sync.pushLocal', { surface: 'dashboard' })
+    expect(backgroundMocks.syncService.pushLocal).toHaveBeenCalledTimes(1)
+    expect(
+      backgroundMocks.flushDbSnapshot.mock.invocationCallOrder.at(-1),
+    ).toBeLessThan(
+      backgroundMocks.syncService.pushLocal.mock.invocationCallOrder[0]!,
+    )
+    await sendRuntimeMessage('settings.updateSettings', {
+      surface: 'popup',
+      patch: { assessment: { strictTiming: true } },
+    })
+    expect(backgroundMocks.updateSettings).toHaveBeenCalledTimes(2)
+  })
+
+  it('publishes a failed settings mutation once before admitting a later practice review', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('settings.updateSettings', {
+        surface: 'popup',
+        patch: { assessment: { strictTiming: true } },
+      }),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).resolves.toEqual(commandResult)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      reason: 'settings-updated',
+      source: 'popup',
+      tags: ['settings'],
+    })
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).toHaveBeenCalledTimes(2)
+    expect(
+      backgroundMocks.broadcastCacheInvalidation.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      backgroundMocks.executePracticeReviewCommand.mock.invocationCallOrder[0]!,
+    )
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(2)
+  })
+
   it('reads settings through the runtime policy and DB boundary', async () => {
     const response = await sendRuntimeMessage('settings.getSettings', {
       surface: 'dashboard',
@@ -2807,6 +3012,110 @@ describe('background handler registration', () => {
     expect(
       await message('imports.retryPersistence', { surface: 'dashboard' }),
     ).toEqual({ status: 'saved' })
+  })
+
+  it('gates settings and practice after a failed import, then publishes the import before editing', async () => {
+    registerBackgroundHandlers()
+    const handlers = new Map(backgroundMocks.handlers)
+    const message = (method: string, data: unknown) =>
+      handlers.get(method)!({ data, sender: extensionSender })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    expect(
+      await message('imports.apply', {
+        surface: 'dashboard',
+        fileText: '{}',
+        fingerprint: 'a'.repeat(64),
+      }),
+    ).toMatchObject({ status: 'persistence-error' })
+    backgroundMocks.flushDbSnapshot.mockRejectedValue(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      message('settings.toggleStudyMode', { surface: 'dashboard' }),
+    ).rejects.toThrow('Local data still needs saving')
+    await expect(
+      message('practice.saveReviewResult', saveCommandRequest),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(backgroundMocks.toggleStudyMode).not.toHaveBeenCalled()
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
+
+    backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
+    await message('settings.toggleStudyMode', { surface: 'dashboard' })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      reason: 'problem-catalog-updated',
+      source: 'dashboard',
+      tags: ['problems', 'tracks', 'analytics'],
+    })
+    expect(
+      backgroundMocks.broadcastCacheInvalidation.mock.invocationCallOrder.at(
+        -2,
+      ),
+    ).toBeLessThan(backgroundMocks.toggleStudyMode.mock.invocationCallOrder[0]!)
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).toHaveBeenCalledTimes(2)
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'saved' })
+    expect(backgroundMocks.applyContentImport).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the import-specific retry result while sharing the local-save gate', async () => {
+    registerBackgroundHandlers()
+    const handlers = new Map(backgroundMocks.handlers)
+    const message = (method: string, data: unknown) =>
+      handlers.get(method)!({ data, sender: extensionSender })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    expect(
+      await message('imports.apply', {
+        surface: 'dashboard',
+        fileText: '{}',
+        fingerprint: 'a'.repeat(64),
+      }),
+    ).toMatchObject({ status: 'persistence-error' })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'persistence-error' })
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'saved' })
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'repreview' })
+    expect(backgroundMocks.applyContentImport).toHaveBeenCalledTimes(1)
+    await expect(
+      message('settings.toggleStudyMode', { surface: 'dashboard' }),
+    ).resolves.toBeNull()
+  })
+
+  it('does not let an import retry bypass a pending generic local save', async () => {
+    registerBackgroundHandlers()
+    const handlers = new Map(backgroundMocks.handlers)
+    const message = (method: string, data: unknown) =>
+      handlers.get(method)!({ data, sender: extensionSender })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      message('settings.toggleStudyMode', { surface: 'dashboard' }),
+    ).rejects.toThrow('Local data still needs saving')
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'repreview' })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      reason: 'settings-updated',
+      source: 'dashboard',
+      tags: ['settings'],
+    })
+    await message('settings.toggleStudyMode', { surface: 'dashboard' })
+    expect(backgroundMocks.toggleStudyMode).toHaveBeenCalledTimes(2)
   })
 
   it('finishes replacement metadata inside the owned queue while automatic bookkeeping waits behind it', async () => {
@@ -3294,7 +3603,7 @@ describe('background handler registration', () => {
     expect(backgroundMocks.previewPracticeReview).toHaveBeenCalledTimes(1)
   })
 
-  it('returns persistence pending without publication and retries the same executor command', async () => {
+  it('returns persistence pending and acknowledges the same review without applying it twice', async () => {
     backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
       new Error('disk failed'),
     )
@@ -3312,16 +3621,56 @@ describe('background handler registration', () => {
       await sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
     ).toEqual(commandResult)
     expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
-      2,
-    )
-    expect(backgroundMocks.executePracticeReviewCommand.mock.calls[0]).toEqual(
-      backgroundMocks.executePracticeReviewCommand.mock.calls[1],
+      1,
     )
     expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(2)
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
     expect(
       backgroundMocks.saveReviewResultWithTrackProgress,
     ).not.toHaveBeenCalled()
+  })
+
+  it('publishes a pending review once when an unrelated export recovers its snapshot', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('IDB unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).resolves.toMatchObject({
+      status: 'persistence-pending',
+    })
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+
+    await sendRuntimeMessage('backup.exportFullBackup', {
+      surface: 'dashboard',
+    })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
+      problemSlug: 'two-sum',
+      reason: 'practice-updated',
+      source: 'dashboard',
+      tags: ['practice'],
+    })
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).toHaveBeenCalledTimes(1)
+    expect(
+      backgroundMocks.broadcastCacheInvalidation.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      backgroundMocks.backupExportFullBackup.mock.invocationCallOrder[0]!,
+    )
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).resolves.toEqual(commandResult)
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
   })
 
   it('protects a pending review from automatic remote replacement and recovers publication before sync admission', async () => {
@@ -3430,7 +3779,7 @@ describe('background handler registration', () => {
       expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
       await expect(
         sendRuntimeMessage('sync.checkRemoteOnOpen', { surface: 'dashboard' }),
-      ).rejects.toThrow('sync metadata could not be saved')
+      ).rejects.toThrow('Local data still needs saving')
       expect(backgroundMocks.createBackgroundSyncService).not.toHaveBeenCalled()
       expect(getGist).not.toHaveBeenCalled()
       expect(restoreBackup).not.toHaveBeenCalled()
@@ -3448,7 +3797,7 @@ describe('background handler registration', () => {
       expect(
         await readLatestSyncAutoSyncDeps().runCleanPullCheck(),
       ).toMatchObject({ outcome: 'no-change', reason: 'local-dirty' })
-      expect(order).toEqual(['flush', 'dirty', 'sync'])
+      expect(order).toEqual(['flush', 'flush', 'dirty', 'sync'])
       expect(getGist).not.toHaveBeenCalled()
       expect(restoreBackup).not.toHaveBeenCalled()
       expect(await practice.getPracticeDetails(handle.db, 'two-sum')).toEqual(

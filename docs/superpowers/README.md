@@ -12,6 +12,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
+- [`specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md`](./specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md): user-approved written design for durable local saves, versioned Google Drive data backups, explicit force and restore recovery, Gist migration, and separate Google-account-protected key recovery; covered by the three plans below.
 - [`specs/2026-10-31-ai-data-flow-efficiency.md`](./specs/2026-10-31-ai-data-flow-efficiency.md): approved and implemented measured data-flow improvements: safe metrics, compact provider input and feedback-first/on-demand code in PR #214, plus exact snapshot interning in #203; human extension and live-provider proof remain pending.
 
 - [`specs/2026-10-30-free-model-assessment-reliability-design.md`](./specs/2026-10-30-free-model-assessment-reliability-design.md): approved concise assessments, bounded recovery for all assessment providers/models and safe evaluation failure records; live-provider and human proof remain required.
@@ -85,6 +86,9 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-16-reliable-backup-phase-1-local-durability.md`](./plans/2026-10-16-reliable-backup-phase-1-local-durability.md): implementation plan for durable binary local snapshots, interrupted migration, save acknowledgment, recoverable replacement, and scaling proof.
+- [`plans/2026-10-16-reliable-backup-phase-2-drive-data.md`](./plans/2026-10-16-reliable-backup-phase-2-drive-data.md): implementation plan for Google connection, versioned and verified one-way Drive data backup, restart-safe worker, force/restore actions, and Gist cutover.
+- [`plans/2026-10-16-reliable-backup-phase-3-key-recovery.md`](./plans/2026-10-16-reliable-backup-phase-3-key-recovery.md): implementation plan for separate opted-in key backup, startup reconciliation, owner checks, explicit recovery, cleanup, and deletion.
 - [`plans/2026-10-30-free-model-assessments.md`](./plans/2026-10-30-free-model-assessments.md): focused assessment implementation and validation plan, separate from the hint sequence PR.
 
 - [`plans/2026-10-12-overlay-baseline-pr-cleanup.md`](./plans/2026-10-12-overlay-baseline-pr-cleanup.md): phase-sized plan to compact PR #211 startup evidence, repair classification and timing retention, rerun the packaged baseline, and update the draft PR.

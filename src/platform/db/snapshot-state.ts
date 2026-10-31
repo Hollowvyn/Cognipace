@@ -4,6 +4,7 @@ import { FINGERPRINT_KEY, SNAPSHOT_KEY, base64ToBytes } from './snapshot'
 export interface SnapshotStorage {
   get(keys: string[]): Promise<Record<string, unknown>>
   set(values: Record<string, unknown>): Promise<void>
+  remove?(keys: string[]): Promise<void>
 }
 
 export type SnapshotState =
@@ -55,10 +56,16 @@ export const RECOVERY_KEY = 'cognipace_db_recovery_topics_v1'
 export const TRACK_RECOVERY_KEY = 'cognipace_db_recovery_tracks_v1'
 export const FSRS_RECOVERY_KEY = 'cognipace_db_recovery_fsrs_v1'
 
-type SnapshotRecoveryKey =
+export type SnapshotRecoveryKey =
   | typeof RECOVERY_KEY
   | typeof TRACK_RECOVERY_KEY
   | typeof FSRS_RECOVERY_KEY
+
+export const SNAPSHOT_RECOVERY_KEYS: readonly SnapshotRecoveryKey[] = [
+  RECOVERY_KEY,
+  TRACK_RECOVERY_KEY,
+  FSRS_RECOVERY_KEY,
+]
 
 const recoveryRecordSchema = z.strictObject({
   version: z.literal(1),
@@ -76,6 +83,12 @@ function stableValue(value: unknown): unknown {
     )
   }
   return value
+}
+
+export function sameRecoveryValue(left: unknown, right: unknown) {
+  return (
+    JSON.stringify(stableValue(left)) === JSON.stringify(stableValue(right))
+  )
 }
 
 function stableRawValues(raw: Record<string, unknown>) {

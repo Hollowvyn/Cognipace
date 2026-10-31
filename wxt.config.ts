@@ -46,7 +46,7 @@ export default defineConfig({
       action: {
         default_icon: icons,
       },
-      permissions: ['storage', 'alarms', 'notifications'],
+      permissions: ['storage', 'alarms', 'notifications', 'unlimitedStorage'],
       host_permissions: [
         'https://leetcode.com/*',
         'https://www.leetcode.com/*',

@@ -1,6 +1,13 @@
 export type { Db, DbHandle, DbSchema } from './client'
 export { createDb, createSqliteWasmLocator } from './client'
-export { getAppDb, flushDbSnapshot, type AppDbOptions } from './instance'
+export {
+  getAppDb,
+  flushDbSnapshot,
+  beginDbReplacement,
+  abortDbReplacement,
+  commitDbReplacementSnapshot,
+  type AppDbOptions,
+} from './instance'
 export { seedInitialCatalog } from './seed'
 export {
   base64ToBytes,

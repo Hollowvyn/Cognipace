@@ -16,16 +16,22 @@ import type { Db } from '@/platform/db'
 import { assertCanSenderCallExtensionMethod } from './runtime-policy'
 
 export type ImportHandlerDependencies = {
-  runInMutationQueue<T>(work: () => Promise<T>): Promise<T>
+  runInMutationQueue<T>(
+    work: () => Promise<T>,
+    retryPersistence?: boolean,
+  ): Promise<T>
   getDb(): Promise<Db>
   flush(): Promise<void>
   markDirty(): Promise<void>
   invalidate(): Promise<unknown>
   scheduleSync(): Promise<void>
+  onPersistencePending?(onDurable: () => Promise<void>): void
+  retrySharedPendingPersistence?(): Promise<void>
 }
 
 export function registerImportHandlers(deps: ImportHandlerDependencies) {
   let pendingPersistence = false
+  let recoveredPersistence = false
 
   onMessage('imports.preview', ({ data, sender }) => {
     const request = importPreviewRequestSchema.parse(data)
@@ -70,6 +76,11 @@ export function registerImportHandlers(deps: ImportHandlerDependencies) {
         await deps.flush()
       } catch {
         await ignoreFailure(() => deps.invalidate())
+        deps.onPersistencePending?.(async () => {
+          pendingPersistence = false
+          recoveredPersistence = true
+          await invalidateAndScheduleSync(deps)
+        })
         return importApplyResponseSchema.parse({
           status: 'persistence-error',
           preview,
@@ -77,6 +88,7 @@ export function registerImportHandlers(deps: ImportHandlerDependencies) {
       }
 
       pendingPersistence = false
+      recoveredPersistence = false
       await invalidateAndScheduleSync(deps)
 
       return importApplyResponseSchema.parse({ status: 'saved', preview })
@@ -92,6 +104,10 @@ export function registerImportHandlers(deps: ImportHandlerDependencies) {
     )
 
     return deps.runInMutationQueue(async () => {
+      if (recoveredPersistence) {
+        recoveredPersistence = false
+        return importRetryPersistenceResponseSchema.parse({ status: 'saved' })
+      }
       if (!pendingPersistence) {
         return importRetryPersistenceResponseSchema.parse({
           status: 'repreview',
@@ -99,23 +115,34 @@ export function registerImportHandlers(deps: ImportHandlerDependencies) {
       }
 
       try {
-        await deps.flush()
+        if (deps.retrySharedPendingPersistence) {
+          await deps.retrySharedPendingPersistence()
+        } else {
+          await deps.flush()
+        }
       } catch {
         return importRetryPersistenceResponseSchema.parse({
           status: 'persistence-error',
         })
       }
 
+      if (deps.retrySharedPendingPersistence) {
+        recoveredPersistence = false
+        return importRetryPersistenceResponseSchema.parse({ status: 'saved' })
+      }
+
       pendingPersistence = false
       await invalidateAndScheduleSync(deps)
 
       return importRetryPersistenceResponseSchema.parse({ status: 'saved' })
-    })
+    }, true)
   })
 
   return {
+    hasPendingPersistence: () => pendingPersistence,
     clearPendingPersistence: () => {
       pendingPersistence = false
+      recoveredPersistence = false
     },
   }
 }

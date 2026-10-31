@@ -60,12 +60,29 @@ The extension requests the Chrome `notifications` permission for local
 due-review reminders. It does not add notification-related host permissions.
 Due reminder smoke should use local queue `dueToday` semantics, not a separate
 notification-specific count.
+The production manifest also requests `unlimitedStorage` for binary IndexedDB
+snapshots. This does not guarantee free disk space or a successful write. This
+phase adds no Google Drive or new Gist host permission.
 
 ## Local Database Recovery
 
-When both snapshot keys are absent, startup creates and seeds a fresh database.
-A partial pair, malformed value, or unknown or unsupported fingerprint fails
-startup and retains the original available values for recovery. Automatic
+The active complete SQLite snapshot lives in IndexedDB database
+`cognipace-local-v1`, object store `records`, key `active`. Replacement recovery
+uses key `recovery`, and supported legacy recovery records use `recovery:<key>`.
+For a healthy database, use Settings > Data Management to export a full backup.
+For startup failure, keep the profile intact and preserve a private copy of the
+IndexedDB database before clearing any extension storage. Do not post its binary
+bytes, fingerprints, or personal contents in an issue.
+
+When both the IndexedDB active record and legacy Chrome snapshot keys are absent,
+startup creates and seeds a fresh database. With no IndexedDB active record, a
+complete legacy Chrome storage pair is migrated into IndexedDB and read back
+before the old active pair is removed. Existing legacy recovery copies also
+migrate. A partial pair, malformed value, or unknown or unsupported fingerprint
+fails startup and retains the original available values for recovery.
+A failed IndexedDB read or publication requires recovery; do not clear the
+profile or interpret the failure as an empty install.
+Automatic
 upgrades accept only the exact through-0007, through-0008, and through-0009
 migration prefixes allowlisted in
 [`snapshot-upgrade.ts`](../src/platform/db/snapshot-upgrade.ts),
@@ -74,7 +91,8 @@ Automatic downgrade is unsupported. The Library may still offer Retry for
 transient startup failures, but retrying does not repair corrupt or unsupported
 database data.
 
-To make a local recovery copy:
+For a profile still holding a **legacy Chrome storage snapshot**, make a local
+recovery copy as follows:
 
 1. Open `chrome://extensions`, find CogniPace, and select its service worker
    console from the Inspect views.
@@ -109,6 +127,51 @@ verifies six inferred unknown evidence rows and active generation scopes, and
 checks exact metadata/token equality on matching reopen. A real staged
 preparation failure rejects a malformed log without changing the stored
 original or first recovery record.
+
+### IndexedDB Snapshot Scaling And Installed-Extension Proof
+
+Run `COGNIPACE_IDB_SCALING=standard npm run test --
+src/testing/snapshot-idb-scaling.test.ts` and repeat with `stress`. The
+deterministic fixtures contain 5,000 and 50,000 reviews. The local synthetic
+run on 2026-10-16 produced 7,290,880 and 66,076,672 serialized SQLite bytes
+respectively; their backup JSON sizes were 7,644,369 and 75,847,120 bytes.
+`fake-indexeddb` commit/reopen measurements were 4.82/1.20 ms and
+25.31/9.36 ms. Forced transaction aborts preserved the previous active
+revision. These are test-runner timings, not installed-Chrome timings.
+`fake-indexeddb` does not enforce profile quota. The earlier 50,000-review
+runtime-message failure was on a different whole-snapshot message path, so do
+not classify it as an IndexedDB quota failure. Record Chrome version, build
+SHA-256, actual `navigator.storage.estimate()` usage/quota (or unavailable
+result), snapshot bytes, commit and reopen times, and any exact failure. The
+full SQLite serialization and binary commit are still on each changed snapshot;
+if this makes accepted Save latency unacceptable, stop release and redesign
+publication before claiming this phase complete.
+
+Human engineers must run installed-extension happy-path and edge-case realtime
+smoke in a disposable profile and attach redacted screenshots or a recording
+before PR review or merge:
+
+1. Save a normal review, wait for Saved, restart the worker, and verify the
+   review and card state remain. Repeat on both fixture sizes and record Save
+   latency.
+2. Force an IndexedDB active publication failure after SQLite commit. Verify
+   the UI says the save is pending, offers Retry review, and never shows a false
+   Saved state. Clear the fault and retry the exact command. Restart before a
+   successful publication and verify the last durable revision reopens.
+3. Open a populated legacy Chrome storage snapshot and its recovery copies.
+   Verify migration into IndexedDB, readback, and removal of only the legacy
+   active pair. Keep a private recovery copy before this test.
+4. Abort a full-backup replacement publication. Verify the previous active
+   snapshot and recovery record survive, the replacement is pending, and Retry
+   saving completes without reimporting. Restart and verify continuation and
+   one selectable recovery copy.
+5. Export a full backup from a healthy profile and preserve a private copy of
+   the IndexedDB database for a deliberately damaged profile. Verify recovery
+   inspection does not expose raw bytes, tokens, or personal data in proof.
+
+The older `cpBackupSmoke` shim below intercepts `chrome.storage.local`; it only
+tests legacy snapshot mirroring and sync metadata, not active IndexedDB
+publication. Use an IndexedDB transaction fault for current local-save proof.
 
 ### Reliable Review Commands (Phase D)
 
