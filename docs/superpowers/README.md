@@ -14,6 +14,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-31-agent-workflow-modes-design.md`](./specs/2026-10-31-agent-workflow-modes-design.md): approved collaborative default and explicit autonomous selector sharing governance, independent agent review, and unchanged scope and human smoke gates.
 
+- [`specs/2026-10-31-notes-and-submission-history-design.md`](./specs/2026-10-31-notes-and-submission-history-design.md): consolidated Notes and submission-history design grounded in the existing overlay and merged IndexedDB foundation; covers permanent learning records, saved AI sections, coordinated reset/recovery, and full local/remote backups. Product direction approved; written spec awaiting user review before phase-sized implementation plans.
 - [`specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md`](./specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md): user-approved written design for durable local saves, versioned Google Drive data backups, explicit force and restore recovery, Gist migration, and separate Google-account-protected key recovery; covered by the three plans below.
 - [`specs/2026-10-31-ai-data-flow-efficiency.md`](./specs/2026-10-31-ai-data-flow-efficiency.md): approved and implemented measured data-flow improvements: safe metrics, compact provider input and feedback-first/on-demand code in PR #214, plus exact snapshot interning in #203; human extension and live-provider proof remain pending.
 
