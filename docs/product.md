@@ -499,6 +499,17 @@ integration. Development smoke testing can also run an opt-in live provider
 check from the hidden dashboard smoke route. Neither connection testing flow
 reveals stored secret values.
 
+GitHub Sync and AI connection offer **Save in your password manager**. This
+optional helper prepares Website, Username, Password and Notes fields for an
+existing manager. GitHub Notes include the Gist ID; AI Notes include the
+selected provider and model. Users explicitly copy individual fields and
+complete Add/Save in their manager. The Google Password Manager button opens
+Chrome's local manager without sending any credential data. Other managers
+can use the same fields. Automatic saving/autofill is unavailable on extension
+pages; users paste saved values back into CogniPace when needed. Only a newly
+entered key can be copied, before CogniPace clears the input on local save.
+Stored keys remain background-only and cannot be retrieved by this helper.
+
 ### Analytics
 
 Analytics owns the local dashboard route for review health, historical recall
