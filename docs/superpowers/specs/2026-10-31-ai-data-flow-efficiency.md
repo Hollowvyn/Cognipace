@@ -45,7 +45,7 @@ cost or latency measurements and not production traffic statistics.
 Evidence and reproducible probe:
 
 - `../proof/2026-10-31-ai-efficiency/measurements.json`
-- `../proof/2026-10-31-ai-efficiency/measure-payloads.ts`
+- `../proof/2026-10-31-ai-efficiency/measure-payloads.ts.txt`
 
 From the repository root, copy the probe to
 `src/testing/ai-payload-audit.probe.test.ts`, run
