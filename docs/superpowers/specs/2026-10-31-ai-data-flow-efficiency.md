@@ -1,6 +1,7 @@
 # AI data-flow efficiency audit and proposed next phase
 
-Status: measured offline audit; optimization design proposed for user review.
+Status: measured offline audit; the user approved metrics/context cleanup and
+feedback-first assessments with suggested code on demand on 2026-10-31.
 The all-model retry correction is separately authorized and does not establish
 an efficiency improvement. The request covers sending, receiving and avoiding
 unnecessary AI work across assessments and hints.
@@ -121,6 +122,13 @@ by problem slug alone. Invalidate on reset/configuration change and provide an
 explicit regeneration action. Keep caches out of persistence, backup and sync.
 
 ## Approval boundary and acceptance
+
+Approval received for Phase 1 and Phase 2. Execute them in phase-sized plans on
+`codex/ai-data-efficiency`, stacked on PR #213. Exact hint snapshot interning
+belongs on the separate hint PR #203 because that snapshot contract has not
+merged into main. The conditional result-cache phase remains deferred until
+request measurements justify it. No additional approval is needed for routine
+implementation choices within the approved two phases.
 
 Phase 1 requires a short implementation plan before production edits. Phase 2
 also requires approval for the on-demand suggested-code interaction and updated
