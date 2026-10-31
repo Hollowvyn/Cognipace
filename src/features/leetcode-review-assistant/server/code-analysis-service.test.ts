@@ -74,7 +74,7 @@ describe('analyzeCode', () => {
         signal,
         timeoutMs,
         maxOutputTokens: 8192,
-        retryTransientFreeModel: config.provider === 'openrouter',
+        retryTransientErrors: true,
       })
     },
   )
@@ -133,10 +133,10 @@ describe('analyzeCode', () => {
 it.each([
   ['openrouter', 'openrouter/free', true],
   ['openrouter', 'vendor/model:free', true],
-  ['openrouter', 'vendor/paid', false],
-  ['gemini', 'vendor/model:free', false],
+  ['openrouter', 'vendor/paid', true],
+  ['gemini', 'vendor/model:free', true],
 ] as const)(
-  'opts into retries only for %s/%s',
+  'opts into bounded retries for %s/%s',
   async (provider, model, expected) => {
     vi.mocked(generateJson).mockResolvedValue({
       status: 'success',
@@ -150,7 +150,7 @@ it.each([
       60000,
     )
     expect(
-      vi.mocked(generateJson).mock.calls[0]?.[0].retryTransientFreeModel,
+      vi.mocked(generateJson).mock.calls[0]?.[0].retryTransientErrors,
     ).toBe(expected)
   },
 )

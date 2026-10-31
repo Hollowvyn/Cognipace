@@ -720,7 +720,7 @@ SDK retries disabled, bounded output, and telemetry disabled. Strict SDK/Zod
 and report-consistency validation remain required. OpenRouter requests specify
 only the selected model, without paid fallback IDs or privacy overrides;
 OpenRouter can perform internal routing within each request. Assessments alone
-opt into one application recovery attempt for free selections after a recognized
+opt into one application recovery attempt for any provider/model after a recognized
 transient upstream failure; SDK retries remain disabled. Recovery preserves the
 selected model, strict output and the shared whole-operation deadline. It uses
 abortable backoff, honors Retry-After, and returns the original error if the delay
@@ -800,9 +800,8 @@ never silently truncated. Preparation refreshes the immutable submission pin
 and has a 15-second deadline; the retained pin survives unavailable reads for
 Retry. A request has an 8,192-token output budget and a 60-second background
 deadline including database/configuration/secret loading and any recovery.
-The controller bounds the complete client operation at 80 seconds. Only free
-OpenRouter selections may retry a transient failure once; other calls keep one
-attempt. Reports request concise rationales and at most two high-value suggestions
+The controller bounds the complete client operation at 80 seconds. All assessment providers/models may retry a transient failure once; hints and
+connection tests keep one attempt. Reports request concise rationales and at most two high-value suggestions
 per list without shrinking the schema or dropping complete suggested code. Retry makes
 a fresh request identity for the same retained submission; repeated terminal
 events and disclosure/collapse/dock actions do not generate another request.

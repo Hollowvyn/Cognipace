@@ -1,5 +1,16 @@
 # Free-model assessment reliability — proposed design
 
+## Approved correction — 2026-10-31
+
+The user requested retry support for all models. This supersedes the free-only
+scope below. Assessments now enable one bounded transient retry for every
+supported provider/model, including paid/custom models. Rename the library
+opt-in to `retryTransientErrors`; retain the shared deadline, same-model request,
+Retry-After, cancellation, error exclusions and strict output validation. Hints
+and connection testing remain single-attempt calls. Add cross-provider and paid
+OpenRouter recovery coverage and update current docs and PR #213. This changes
+reliability policy; it does not establish a measured efficiency improvement.
+
 Status: approved by the user in chat on 2026-10-30. Implement on the separate
 `codex/free-model-assessments` branch from `origin/main`. The existing hint PR
 keeps fresh snapshots and the separately approved light → medium → heavy

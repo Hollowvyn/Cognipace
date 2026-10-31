@@ -19,9 +19,7 @@ export async function analyzeCode(
     signal,
     timeoutMs,
     maxOutputTokens: 8192,
-    retryTransientFreeModel:
-      config.provider === 'openrouter' &&
-      (config.model === 'openrouter/free' || config.model.endsWith(':free')),
+    retryTransientErrors: true,
   })
   if (
     result.status === 'success' &&

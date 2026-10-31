@@ -1,5 +1,16 @@
 # Free-model assessment reliability implementation plan
 
+## Approved correction — 2026-10-31
+
+The user requested retry support for all models. This supersedes the free-only
+scope below. Assessments now enable one bounded transient retry for every
+supported provider/model, including paid/custom models. Rename the library
+opt-in to `retryTransientErrors`; retain the shared deadline, same-model request,
+Retry-After, cancellation, error exclusions and strict output validation. Hints
+and connection testing remain single-attempt calls. Add cross-provider and paid
+OpenRouter recovery coverage and update current docs and PR #213. This changes
+reliability policy; it does not establish a measured efficiency improvement.
+
 > **For agentic workers:** Use superpowers:subagent-driven-development for this
 > focused phase, with spec review followed by quality review. Execute continuously
 > under the user's approval; no additional execution-choice approval is needed.

@@ -940,7 +940,7 @@ cannot validate a replacement key or model.
    limit guidance from 429 quota guidance. Account privacy/capability restrictions
    may make a model unavailable; do not loosen privacy settings automatically.
    Confirm no retries for quota/auth/billing/refusal/invalid reports and no
-   app-configured paid fallback requests. Free assessments may recover once from
+   app-configured paid fallback requests. Assessments on any provider/model may recover once from
    a temporary upstream failure within the shared deadline. Connection tests and
    hints retain their single-attempt behavior.
 7. Remove the OpenRouter key. Confirm unavailable analysis and that other saved
@@ -2068,12 +2068,13 @@ Human assessment reliability smoke (attach screenshots or a recording):
 - Exercise quota, authentication and invalid-output errors; verify no automatic
   recovery attempt. Navigate, cancel or change connection during backoff and
   generation; obsolete work must not publish a report or begin another attempt.
-- Check a paid/custom model, connection test and hint request; their attempt
-  policy remains unchanged. Record extension version and requested/served model.
+- Repeat recovery with a paid/custom model and each supported provider.
+  Connection tests and hints retain their single-attempt policy. Record extension
+  version and requested/served model.
 
 Each case calls the actual `analyzeCode` service with a 60-second deadline and
 65-second test timeout, using the 8,192-token SDK path with bounded recovery for
-free OpenRouter selections. Every case writes a controlled outcome before the
+all supported provider/model selections. Every case writes a controlled outcome before the
 success assertion to `/private/tmp/cognipace-ai-evaluation/<fixture.id>.json`.
 Successful outcomes include the validated report; errors include only the
 controlled error category. Allowlisted provider identity, duration, fixture ID

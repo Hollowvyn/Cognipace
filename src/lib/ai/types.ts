@@ -38,8 +38,8 @@ export type AiGenerateJsonRequest<T> = AiProviderConfig & {
   temperature?: number
   /** Default 30,000; bounds preparation, transport, body reading and validation. */
   timeoutMs?: number
-  /** One transient retry, restricted to free OpenRouter models; disabled by default. */
-  retryTransientFreeModel?: boolean
+  /** One transient retry for any provider/model; disabled by default. */
+  retryTransientErrors?: boolean
   signal?: AbortSignal
   /** Default 2,048; must be a positive integer no greater than 8,192. */
   maxOutputTokens?: number

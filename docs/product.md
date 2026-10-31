@@ -161,7 +161,7 @@ The overlay distinguishes idle, capture preparation, generation, ready,
 unavailable, and controlled-error states, with Settings and Retry where useful.
 Capture preparation has a 15-second deadline, background analysis a 60-second
 deadline including configuration loading, and the whole client operation a
-80-second deadline. Free OpenRouter assessments may recover once from a temporary
+80-second deadline. Assessments using any supported provider/model may recover once from a temporary
 provider failure within that same deadline. Quota, authentication and invalid
 reports require an explicit recovery action. Assessment guidance stays concise
 while retaining all scored sections and the complete suggested implementation.

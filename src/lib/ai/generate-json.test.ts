@@ -850,7 +850,7 @@ describe('generateJson actual SDK wire', () => {
   })
 })
 
-describe('opt-in transient free-model recovery', () => {
+describe('opt-in transient model recovery', () => {
   it.each([502, 503, 504, 'provider_unavailable', 'provider_overloaded'])(
     'recovers once from %s with unchanged strict routing',
     async (failure) => {
@@ -869,7 +869,7 @@ describe('opt-in transient free-model recovery', () => {
         )
         .mockResolvedValueOnce(jsonResponse(successBody('openrouter')))
       const pending = generateJson(
-        request('openrouter', { retryTransientFreeModel: true }),
+        request('openrouter', { retryTransientErrors: true }),
       )
       await vi.advanceTimersByTimeAsync(999)
       expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -894,7 +894,7 @@ describe('opt-in transient free-model recovery', () => {
         Promise.resolve(jsonResponse(errorBody('openrouter', 503), 503)),
       )
     const pending = generateJson(
-      request('openrouter', { retryTransientFreeModel: true }),
+      request('openrouter', { retryTransientErrors: true }),
     )
     await vi.advanceTimersByTimeAsync(2000)
     const result = await pending
@@ -915,7 +915,7 @@ describe('opt-in transient free-model recovery', () => {
         .mockResolvedValueOnce(response)
         .mockResolvedValueOnce(jsonResponse(successBody('openrouter')))
       const pending = generateJson(
-        request('openrouter', { retryTransientFreeModel: true }),
+        request('openrouter', { retryTransientErrors: true }),
       )
       await vi.advanceTimersByTimeAsync(1999)
       expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -931,7 +931,7 @@ describe('opt-in transient free-model recovery', () => {
     expect(
       await generateJson(
         request('openrouter', {
-          retryTransientFreeModel: true,
+          retryTransientErrors: true,
           timeoutMs: 60000,
         }),
       ),
@@ -947,7 +947,7 @@ describe('opt-in transient free-model recovery', () => {
       .mockResolvedValue(jsonResponse(errorBody('openrouter', 503), 503))
     const pending = generateJson(
       request('openrouter', {
-        retryTransientFreeModel: true,
+        retryTransientErrors: true,
         signal: controller.signal,
       }),
     )
@@ -969,7 +969,7 @@ describe('opt-in transient free-model recovery', () => {
       })
       .mockImplementationOnce(() => new Promise(() => {}))
     const pending = generateJson(
-      request('openrouter', { retryTransientFreeModel: true, timeoutMs: 2000 }),
+      request('openrouter', { retryTransientErrors: true, timeoutMs: 2000 }),
     )
     await vi.advanceTimersByTimeAsync(2000)
     expect(await pending).toMatchObject({
@@ -980,32 +980,42 @@ describe('opt-in transient free-model recovery', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it.each([
-    {
-      provider: 'openrouter' as const,
-      model: 'paid/model',
-      retryTransientFreeModel: true,
-    },
-    { provider: 'openrouter' as const, model: 'openrouter/free' },
-    {
-      provider: 'openai' as const,
-      model: 'openrouter/free',
-      retryTransientFreeModel: true,
-    },
-  ])(
-    'requires explicit opt-in and a free OpenRouter model: %j',
-    async (overrides) => {
+  it.each(aiProviderIds)(
+    'recovers for any opted-in %s model',
+    async (provider) => {
+      vi.useFakeTimers()
       const fetchMock = vi
         .spyOn(globalThis, 'fetch')
-        .mockImplementation(() =>
-          Promise.resolve(
-            jsonResponse(errorBody(overrides.provider, 503), 503),
-          ),
-        )
-      expect(
-        await generateJson(request(overrides.provider, overrides)),
-      ).toMatchObject({ status: 'error', code: 'network' })
-      expect(fetchMock).toHaveBeenCalledTimes(1)
+        .mockResolvedValueOnce(jsonResponse(errorBody(provider, 503), 503))
+        .mockResolvedValueOnce(jsonResponse(successBody(provider)))
+      const pending = generateJson(
+        request(provider, {
+          model:
+            provider === 'openrouter' ? 'vendor/paid-model' : models[provider],
+          retryTransientErrors: true,
+        }),
+      )
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(await pending).toMatchObject({ status: 'success' })
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(
+        fetchMock.mock.calls[0]?.[1]?.body,
+      )
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
+
+  it.each(aiProviderIds)(
+    'keeps %s calls single-attempt without opt-in',
+    async (provider) => {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(errorBody(provider, 503), 503))
+      expect(await generateJson(request(provider))).toMatchObject({
+        status: 'error',
+        code: 'network',
+      })
+      expect(fetchMock).toHaveBeenCalledOnce()
     },
   )
 
@@ -1018,7 +1028,7 @@ describe('opt-in transient free-model recovery', () => {
           jsonResponse(errorBody('openrouter', status), status),
         )
       const result = await generateJson(
-        request('openrouter', { retryTransientFreeModel: true }),
+        request('openrouter', { retryTransientErrors: true }),
       )
       expect(result.status).toBe('error')
       expectSafe(result)
@@ -1040,7 +1050,7 @@ describe('opt-in transient free-model recovery', () => {
     expect(
       (
         await generateJson(
-          request('openrouter', { retryTransientFreeModel: true }),
+          request('openrouter', { retryTransientErrors: true }),
         )
       ).status,
     ).toBe('error')
@@ -1068,7 +1078,7 @@ it.each(['refused', 'invalid-output', 'malformed'] as const)(
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(jsonResponse(body))
     const result = await generateJson(
-      request('openrouter', { retryTransientFreeModel: true }),
+      request('openrouter', { retryTransientErrors: true }),
     )
     expect(result).toMatchObject({
       status: 'error',
@@ -1088,7 +1098,7 @@ it('resets transport status before the second attempt', async () => {
   const pending = generateJson(
     request('openrouter', {
       model: 'vendor/model:free',
-      retryTransientFreeModel: true,
+      retryTransientErrors: true,
     }),
   )
   await vi.advanceTimersByTimeAsync(1000)

@@ -12,7 +12,9 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-30-free-model-assessment-reliability-design.md`](./specs/2026-10-30-free-model-assessment-reliability-design.md): approved concise assessments, bounded free-provider recovery and safe evaluation failure records; live-provider and human proof remain required.
+- [`specs/2026-10-31-ai-data-flow-efficiency.md`](./specs/2026-10-31-ai-data-flow-efficiency.md): measured offline audit of provider payloads, hidden generated output, repeated hint snapshots and request reuse; proposes metrics/context cleanup and feedback-first assessment behavior for user review.
+
+- [`specs/2026-10-30-free-model-assessment-reliability-design.md`](./specs/2026-10-30-free-model-assessment-reliability-design.md): approved concise assessments, bounded recovery for all assessment providers/models and safe evaluation failure records; live-provider and human proof remain required.
 
 - [`specs/2026-10-12-overlay-baseline-pr-cleanup-design.md`](./specs/2026-10-12-overlay-baseline-pr-cleanup-design.md): approved design to compact PR #211's raw startup evidence, correct readiness classification, bound observational timing, and rerun a reproducible packaged baseline; written spec awaiting user review.
 

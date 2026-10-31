@@ -10,9 +10,9 @@ Light → Medium → Heavy with fresh snapshots.
 Assessments request concise reports while retaining all scored dimensions,
 strict validation, the 8,192-token ceiling and complete suggested code. Their
 whole background deadline is 60 seconds and client deadline is 80 seconds.
-Only explicitly opted-in free OpenRouter assessments may recover once from a
+All assessment providers/models may recover once from a
 recognized temporary upstream failure. Backoff is abortable, honors Retry-After
-and fits inside the original operation deadline. Other calls retain their
+and fits inside the original operation deadline. Hints and connection tests retain their
 existing attempt policy. Quota, auth, billing, refusal and invalid reports do not
 trigger recovery. No model fallback, privacy override or provider-body logging.
 
@@ -21,6 +21,38 @@ assertions and summarizes current-run counts, categories and durations. It
 cannot prove a reliability improvement until real provider measurements exist.
 
 ## Validation record
+
+### All-model correction — 2026-10-31
+
+The user explicitly requested retries for all models. The assessment service
+now sets `retryTransientErrors` for every provider/model. The library tests
+cover successful bounded recovery for OpenAI, Anthropic, Gemini and paid
+OpenRouter models, identical request bodies and calls remaining single-attempt
+without explicit opt-in. Error exclusions, strict validation, Retry-After,
+cancellation and deadline bounds remain enforced. No broader agentic efficiency
+claim is made: the current assessment still generates its full report and
+suggested implementation in one model call.
+
+- `rtk proxy npm test -- src/lib/ai/generate-json.test.ts src/features/leetcode-review-assistant/server/code-analysis-service.test.ts --run`:
+  first produced 21 expected RED failures, then passed 174 tests.
+- `rtk proxy npm run check`: passed database check, typecheck, lint and tests;
+  3,932 passed, ten skipped across 251 passed and three skipped files.
+- `rtk proxy npm run lint`, `rtk proxy npm run build` and
+  `rtk proxy npm run format`: passed. The existing chunk-size warning remains.
+- Explicit Prettier on the updated planning/proof files and
+  `rtk proxy git diff --check`: passed. Skipped commands and human/live gates
+  below still apply; all-model smoke now includes each provider and paid models.
+
+The user clarified the broader objective is efficient data flow. The separate
+`2026-10-31-ai-data-flow-efficiency.md` audit records measured offline payloads,
+the current end-to-end flow and a proposed next phase. The temporary probe
+initially failed on unsupported fake model identifiers, then passed using the
+existing wire fixture model IDs and mocked responses. No provider was called.
+Its source and numeric evidence are preserved under
+`docs/superpowers/proof/2026-10-31-ai-efficiency`. Broader optimization remains
+proposed; no feedback-first/on-demand-code behavior is implemented here.
+
+### Original phase validation
 
 - `rtk proxy npm test -- src/lib/ai src/features/leetcode-review-assistant src/features/overlay-session/hooks/use-leetcode-code-analysis.test.tsx --run`:
   baseline 442 passed, nine opt-in live cases skipped.

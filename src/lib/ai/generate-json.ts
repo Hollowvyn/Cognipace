@@ -166,13 +166,8 @@ export async function generateJson<T>(
             const delayMs = retryDelayMs(retryAfter)
             if (
               attempt !== 0 ||
-              request.retryTransientFreeModel !== true ||
-              request.provider !== 'openrouter' ||
-              !(
-                request.model === 'openrouter/free' ||
-                request.model.endsWith(':free')
-              ) ||
-              !isTransientFreeModelError(error, transportStatus) ||
+              request.retryTransientErrors !== true ||
+              !isTransientError(error, request.provider, transportStatus) ||
               delayMs >=
                 (request.timeoutMs ?? 30_000) - (Date.now() - startedAt)
             )
@@ -434,9 +429,13 @@ function isProviderRefusal(error: unknown, provider: AiProviderId): boolean {
   )
 }
 
-function isTransientFreeModelError(error: unknown, status?: number): boolean {
+function isTransientError(
+  error: unknown,
+  provider: AiProviderId,
+  status?: number,
+): boolean {
   if (!APICallError.isInstance(error)) return false
-  if (normalizeError(error, 'openrouter', status) !== 'network') return false
+  if (normalizeError(error, provider, status) !== 'network') return false
   // An HTTP auth/quota/billing failure cannot be overridden by embedded metadata.
   if (
     status !== undefined &&
@@ -445,6 +444,7 @@ function isTransientFreeModelError(error: unknown, status?: number): boolean {
   )
     return false
   if (status !== undefined && [502, 503, 504].includes(status)) return true
+  if (provider !== 'openrouter') return false
   const record = asRecord(error.data)
   const body = asRecord(record?.error) ?? record
   const tag = asRecord(body?.metadata)?.error_type
