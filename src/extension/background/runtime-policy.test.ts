@@ -14,6 +14,17 @@ import {
 import { getAppShellRuntimeSurface } from './register-handlers'
 
 describe('runtime-policy', () => {
+  it('permits only the real content-script sender to request practice previews', () => {
+    expect(
+      canCallExtensionMethod('practice.previewReview', 'content-script'),
+    ).toBe(true)
+    expect(canCallExtensionMethod('practice.previewReview', 'popup')).toBe(
+      false,
+    )
+    expect(canCallExtensionMethod('practice.previewReview', 'dashboard')).toBe(
+      false,
+    )
+  })
   it('keeps protocol methods covered by runtime sender policy', () => {
     expect([...extensionMethodNames].sort()).toEqual(
       [...protocolMethodNames].sort(),
@@ -213,6 +224,8 @@ describe('runtime-policy', () => {
       'backup.validateFullBackup',
       'backup.restoreFullBackup',
       'backup.resetLocalData',
+      'backup.getPendingReplacement',
+      'backup.retryPendingReplacement',
     ]) {
       expect(canCallExtensionMethod(method, 'dashboard')).toBe(true)
       expect(canCallExtensionMethod(method, 'popup')).toBe(false)
@@ -224,6 +237,16 @@ describe('runtime-policy', () => {
     for (const surface of ['popup', 'dashboard', 'content-script'] as const) {
       expect(canCallExtensionMethod('sync.getStatus', surface)).toBe(true)
     }
+  })
+
+  it('keeps queue reads on popup and dashboard surfaces for either intent', () => {
+    expect(canCallExtensionMethod('queue.getTodayQueue', 'popup')).toBe(true)
+    expect(canCallExtensionMethod('queue.getTodayQueue', 'dashboard')).toBe(
+      true,
+    )
+    expect(
+      canCallExtensionMethod('queue.getTodayQueue', 'content-script'),
+    ).toBe(false)
   })
 
   it('allows safe sync open checks from every UI surface', () => {
@@ -490,4 +513,29 @@ it('allows owner cancellation after LeetCode SPA navigation while rejecting new 
       sender,
     ),
   ).toThrow(/LeetCode/i)
+})
+
+it('authorizes implementation generation only for actual LeetCode content scripts', () => {
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.generateLeetCodeImplementation',
+      'content-script',
+      {
+        tab: { id: 1 },
+        frameId: 0,
+        url: 'https://leetcode.com/problems/two-sum/',
+      },
+    ),
+  ).not.toThrow()
+  expect(() =>
+    assertCanSenderCallExtensionMethod(
+      'genai.generateLeetCodeImplementation',
+      'content-script',
+      {
+        tab: { id: 1 },
+        frameId: 0,
+        url: 'https://example.com/problems/two-sum/',
+      },
+    ),
+  ).toThrow()
 })

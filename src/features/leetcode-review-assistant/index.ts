@@ -47,3 +47,15 @@ export {
   generateLeetCodeHintsViaRuntime,
   cancelLeetCodeHintsViaRuntime,
 } from './api/code-hint-api'
+
+export {
+  CODE_FEEDBACK_VERSION,
+  codeFeedbackSchema,
+  type CodeFeedbackReport,
+} from './domain/code-feedback-schema'
+export {
+  type SuggestedImplementation,
+  type CodeImplementationReport,
+} from './domain/code-implementation-schema'
+export * from './api/code-implementation-contracts'
+export * from './api/code-implementation-api'

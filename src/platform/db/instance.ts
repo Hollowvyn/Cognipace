@@ -36,6 +36,7 @@ let snapshotWriteChain: Promise<void> = Promise.resolve()
 
 export interface AppDbOptions {
   beforePublish?: (handle: DbHandle, context: PublishContext) => Promise<void>
+  validateCurrentData?: (handle: DbHandle) => Promise<void>
 }
 
 export function getAppDb(options: AppDbOptions = {}) {
@@ -122,6 +123,8 @@ async function openAppDb(options: AppDbOptions, generation: number) {
           : selectSnapshotBaselineSql(candidateFingerprint)
       await validateSnapshotSchema(candidate, expectedSql)
       assertDatabaseIntegrity(candidate)
+      if (candidateFingerprint === fingerprint)
+        await options.validateCurrentData?.(candidate)
     },
     upgrade: (candidate, fromFingerprint) => {
       candidate.rawDb.exec(selectUpgradeSql(fromFingerprint, migrationEntries))
@@ -165,12 +168,12 @@ function scheduleSnapshot() {
 
   snapshotTimer = setTimeout(() => {
     snapshotTimer = null
-    void writeSnapshotAfterPending()
+    void writeSnapshotAfterPending(true)
   }, snapshotDebounceMs)
 }
 
-async function writeSnapshotAfterPending() {
-  await enqueueSnapshotWrite(persistSnapshot)
+async function writeSnapshotAfterPending(automatic = false) {
+  await enqueueSnapshotWrite(() => persistSnapshot(automatic))
 }
 
 function enqueueSnapshotWrite(write: () => Promise<void>) {
@@ -179,9 +182,21 @@ function enqueueSnapshotWrite(write: () => Promise<void>) {
   return writePromise
 }
 
-async function persistSnapshot() {
+async function persistSnapshot(automatic: boolean) {
   if (!activeHandle || !canUseChromeStorage()) {
     return
+  }
+
+  // SQLite's export includes uncommitted pages. Check at serialization time,
+  // including writes that waited behind an earlier storage publication.
+  if (!activeHandle.sqlite3.capi.sqlite3_get_autocommit(activeHandle.rawDb)) {
+    if (automatic) {
+      scheduleSnapshot()
+      return
+    }
+    throw new Error(
+      'Cannot publish a database snapshot during an open transaction.',
+    )
   }
 
   await writeSnapshotToStorage({

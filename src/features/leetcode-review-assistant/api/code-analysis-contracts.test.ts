@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   makeAnalysisRequest,
-  makeValidAnalysis,
+  makeValidFeedback,
 } from '../testing/code-analysis-fixtures'
 import {
   analysisIdentity,
@@ -203,7 +203,7 @@ describe('code analysis contracts', () => {
       {
         status: 'ready',
         ...identity,
-        report: makeValidAnalysis(),
+        report: makeValidFeedback(),
         providerMetadata: {
           provider: 'gemini',
           model: 'fixture-model',
@@ -244,7 +244,7 @@ describe('code analysis contracts', () => {
     const response = {
       status: 'ready',
       ...analysisIdentity(makeAnalysisRequest()),
-      report: makeValidAnalysis(),
+      report: makeValidFeedback(),
       providerMetadata: {
         provider: 'openrouter',
         model: 'openrouter/free',
@@ -323,4 +323,33 @@ describe('code analysis contracts', () => {
       }).success,
     ).toBe(false)
   })
+})
+
+it('accepts strict optional numeric generation metrics without expanding metadata keys', () => {
+  const response = {
+    status: 'ready',
+    ...analysisIdentity(makeAnalysisRequest()),
+    report: makeValidFeedback(),
+    providerMetadata: {
+      provider: 'gemini',
+      model: 'fixture',
+      durationMs: 10,
+      metrics: { attemptCount: 1, requestBodyBytes: 200, inputTokens: 0 },
+    },
+  }
+  expect(responseSchema.parse(response)).toEqual(response)
+  for (const metrics of [
+    { raw: 'private' },
+    { inputTokens: -1 },
+    { generationMs: Infinity },
+    { outputTokens: 1.2 },
+    { totalTokens: Number.MAX_SAFE_INTEGER + 1 },
+  ]) {
+    expect(
+      responseSchema.safeParse({
+        ...response,
+        providerMetadata: { ...response.providerMetadata, metrics },
+      }).success,
+    ).toBe(false)
+  }
 })

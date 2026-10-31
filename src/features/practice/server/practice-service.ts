@@ -1,16 +1,30 @@
 import type { Db } from '@/platform/db'
 
 import { createPracticeRepository } from '../data/practice-repository'
+import { getSettings } from '@/features/settings/server/settings-service'
 import { resetPracticeScheduleWithTrackProgress } from './practice-review-workflow'
 import type {
   PracticeDetails,
   OverrideLastReviewResultInput,
   PracticeProgressSummaryInput,
   PracticeReadOptions,
+  PracticePreviewInput,
   ResetPracticeScheduleInput,
   SaveReviewResultInput,
   SetPracticeSuspendedInput,
 } from '../domain'
+
+/** One consistent read snapshot; the background serializes it with DB writes. */
+export function previewPracticeReview(db: Db, input: PracticePreviewInput) {
+  return db.transaction(async (transactionDb) => {
+    const readDb = transactionDb as unknown as Db
+    const settings = await getSettings(readDb)
+    return createPracticeRepository(readDb).previewReview(
+      input,
+      settings.review.targetRetention,
+    )
+  })
+}
 
 export function getPracticeDetails(
   db: Db,
@@ -50,6 +64,7 @@ export function resetPracticeSchedule(
 }
 
 export {
+  executePracticeReviewCommand,
   overrideLastReviewResultWithTrackProgress,
   resetPracticeScheduleWithTrackProgress,
   saveReviewResultWithTrackProgress,

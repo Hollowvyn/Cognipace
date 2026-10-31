@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "status": "one-shot diagnostic, not a benchmark percentile",
+  "dataset": "stress",
+  "seed": 20261010,
+  "range": "all",
+  "asOf": "2026-10-10T12:00:00.000Z",
+  "timeZone": "UTC",
+  "method": "A temporary Vitest partial mock wrapped resolveHistoricalSchedulingEvidence and accumulated call count and performance.now() self-time. The deterministic fixture was created outside the full getAnalyticsSummary timer. One call was measured before and one after request-scoped memoization. The temporary test was removed afterward; no production timing instrumentation was added.",
+  "command": "rtk npm run test -- src/testing/fsrs-analytics-profile.temp.test.ts",
+  "reference": "test-results/fsrs-phase-g/stress-local.json referenceDigests.analyticsAll",
+  "parityProof": {
+    "scope": "SHA256 of the complete serialized Analytics All summary matched before and after memoization on the same deterministic 50,000-review stress fixture.",
+    "fixtureCases": "The stress fixture includes corrected attempts, equal-timestamp ties, captured evidence, legacy-derived evidence, and unknown evidence. The fixture test asserts those cases; the entire-summary digest covers their combined output.",
+    "focusedTests": "Four Analytics test files passed, 115 tests total: analytics-service, review-cohorts, historical-presentation, and chart-data. These include corrected and restored chronology, lexical ID ties, custom captured profiles, legacy compatibility, and unknown evidence.",
+    "checkedInReference": "analytics-service.test.ts compares the complete Analytics All summary for the deterministic 5,000-review standard fixture with the frozen pre-optimization digest 65e87aaa707bbcc08f6925e9ef7bddd6ee68eb8371f97b6173eedd301428b161. The test asserts corrected revisions, timestamp ties, and captured/legacy-derived/unknown evidence before comparing the digest; its focused run passed."
+  },
+  "cacheSafetyAudit": {
+    "scope": "The Map is constructed inside getAnalyticsSummary for one invocation. A hit requires equal rating, reviewedAt epoch, fsrsReviewLog, schedulingEvidenceKind, schedulerProfileJson, and preCardJson for the same attempt ID.",
+    "callSites": "The summary passes this resolver to repeat-review pairing, historical presentation, stability points, overdue reconstruction, and stability readiness. Topic recall readiness checks valid rating, observed correctness, and topic labels only; it does not resolve scheduling evidence. Domain functions retain the original pure resolver as a default for other callers.",
+    "consumerMutation": "Reviewed repeat-review pairs, historical memory rows, stability points, and overdue reconstruction. They read kind, estimate, and preCard/postCard fields; overdue reconstruction stores a postCard reference as currentCard and only reads its dueAt. No consumer writes to cached evidence, nested cards, or parsed log/profile objects."
+  },
+  "before": {
+    "resolverCalls": 295780,
+    "uniqueEventIds": 50000,
+    "resolverSelfTimeMs": 12694.962038,
+    "summaryTimeMs": 25019.640167,
+    "resolverShare": 0.5073998648,
+    "summaryDigestSha256": "22a39ca7b0ce93251e21f1601c70e604fc50aa47f84799f41c14e65422faa694"
+  },
+  "after": {
+    "resolverCalls": 50000,
+    "uniqueEventIds": 50000,
+    "resolverSelfTimeMs": 2624.142908,
+    "summaryTimeMs": 14728.827917,
+    "resolverShare": 0.1781637292,
+    "summaryDigestSha256": "22a39ca7b0ce93251e21f1601c70e604fc50aa47f84799f41c14e65422faa694"
+  },
+  "interpretation": "The exact serialized Analytics All output digest matched the saved stress reference before and after the change. The observed single-call elapsed time fell by about 41%; use the repeated local and packaged runs for reported p50/p95 latency."
+}

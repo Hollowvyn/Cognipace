@@ -60,7 +60,7 @@ function createPrimaryView(
       kicker: 'Review Now',
       title: 'Queue Clear',
       detail:
-        'No review pressure is waiting. Browse the Library when you want extra practice.',
+        'No review pressure is waiting. Try Extra Practice for a future review card.',
       actionLabel: 'Open Library',
     }
   }

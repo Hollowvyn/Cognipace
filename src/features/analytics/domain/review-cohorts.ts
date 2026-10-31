@@ -1,17 +1,19 @@
 import {
-  getRetrievability,
   isReviewRating,
-  replayReviewHistorySequence,
   type NormalizedFsrsSchedulingOptions,
   type ReviewRating,
 } from '@/lib/fsrs'
+import {
+  resolveHistoricalSchedulingEvidence,
+  type HistoricalSchedulingEvidenceResolver,
+  type HistoricalSchedulingEvidenceInput,
+} from './historical-scheduling-evidence'
 
-interface ReviewCohortEvent {
+interface ReviewCohortEvent extends HistoricalSchedulingEvidenceInput {
   id: string
   cardId: string
   problemSlug: string
-  rating: string
-  reviewedAt: Date
+  applicationSequence?: number | null
 }
 
 export interface RepeatReviewPair {
@@ -19,7 +21,8 @@ export interface RepeatReviewPair {
   cardId: string
   reviewedAt: Date
   rating: ReviewRating
-  estimate: number
+  estimate: number | null
+  provenance: 'captured' | 'legacy-derived' | 'unknown'
 }
 
 export function compareReviewEvents(
@@ -63,6 +66,7 @@ export function buildRepeatReviewPairs(
     start: Date
     end: Date
     fsrsOptions: NormalizedFsrsSchedulingOptions
+    resolveEvidence?: HistoricalSchedulingEvidenceResolver
   },
 ): RepeatReviewPair[] {
   const byCard = new Map<
@@ -79,25 +83,20 @@ export function buildRepeatReviewPairs(
   const pairs: RepeatReviewPair[] = []
   for (const history of byCard.values()) {
     const ordered = [...history].sort(compareReviewEvents)
-    const replayed = replayReviewHistorySequence(ordered, options.fsrsOptions)
     for (let index = 1; index < ordered.length; index += 1) {
       const event = ordered[index]!
       if (event.reviewedAt < options.start || event.reviewedAt > options.end)
         continue
-      const priorCard = replayed[index - 1]?.card
-      if (!priorCard) continue
-      const estimate = getRetrievability(
-        priorCard,
-        event.reviewedAt,
-        options.fsrsOptions,
-      )
-      if (!Number.isFinite(estimate) || estimate < 0 || estimate > 1) continue
+      const evidence = (
+        options.resolveEvidence ?? resolveHistoricalSchedulingEvidence
+      )(event)
       pairs.push({
         id: event.id,
         cardId: event.cardId,
         reviewedAt: event.reviewedAt,
         rating: event.rating,
-        estimate,
+        estimate: evidence.estimate,
+        provenance: evidence.kind,
       })
     }
   }

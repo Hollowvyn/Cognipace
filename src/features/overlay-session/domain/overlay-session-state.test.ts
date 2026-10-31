@@ -84,6 +84,86 @@ describe('overlaySessionReducer', () => {
     ).toBe('solve')
   })
 
+  it('retains the exact accepted command through persistence pending and error while blocking draft edits and restart', () => {
+    const command = {
+      operation: 'save' as const,
+      syncToken: 1,
+      lockReason: null,
+      feedback: { tone: 'success' as const, message: 'Review saved.' },
+      request: {
+        surface: 'content-script' as const,
+        commandId: 'command-1',
+        problemSlug: 'two-sum',
+        generation: {
+          localGenerationToken: 'local-1',
+          problemGenerationToken: null,
+        },
+        reviewedAt: '2026-01-01T10:00:00.000Z',
+        rating: 'good' as const,
+        reviewMode: 'leetcode' as const,
+      },
+    }
+    let state = overlaySessionReducer(initialOverlaySessionState, {
+      type: 'command-started',
+      command,
+    })
+    state = overlaySessionReducer(state, { type: 'command-pending' })
+    expect(state.acceptedCommand).toBe(command)
+    expect(state.commandStatus).toBe('persistence-pending')
+    expect(state.submittedSession).toBeNull()
+    expect(state.feedback?.tone).toBe('neutral')
+    expect(
+      overlaySessionReducer(state, {
+        type: 'set-selected-rating',
+        rating: 'hard',
+      }),
+    ).toBe(state)
+    expect(
+      overlaySessionReducer(state, {
+        type: 'restart-local-session',
+        selectedRating: 'easy',
+      }),
+    ).toBe(state)
+    state = overlaySessionReducer(state, {
+      type: 'mutation-failed',
+      message: 'Transport failed.',
+    })
+    expect(state.acceptedCommand).toBe(command)
+    expect(state.commandStatus).toBe('error')
+    state = overlaySessionReducer(state, {
+      type: 'command-conflicted',
+      message: 'Practice was reset.',
+    })
+    expect(state.acceptedCommand).toBeNull()
+    expect(state.selectedRating).toBe('good')
+  })
+
+  it('never replaces an attached acknowledged review or a selected draft with a later context', () => {
+    const submitted = createSubmittedState()
+    const refreshed = overlaySessionReducer(submitted, {
+      type: 'problem-context-refreshed',
+      problemSlug: 'two-sum',
+      selectedRating: 'easy',
+      submittedSession: createSubmittedSession({
+        reviewAttemptId: 'other-tab',
+        rating: 'easy',
+      }),
+    })
+    expect(refreshed).toBe(submitted)
+    const draft = overlaySessionReducer(initialOverlaySessionState, {
+      type: 'set-selected-rating',
+      rating: 'hard',
+    })
+    expect(
+      overlaySessionReducer(draft, {
+        type: 'problem-context-refreshed',
+        problemSlug: 'two-sum',
+        selectedRating: 'easy',
+        submittedSession: null,
+      }).selectedRating,
+    ).toBe('hard')
+  })
+
   it('loads a problem with the selected rating', () => {
     const state = overlaySessionReducer(
       {
@@ -205,6 +285,13 @@ function createSubmittedSession(
   overrides: Partial<OverlaySubmittedSession> = {},
 ): OverlaySubmittedSession {
   return {
+    reviewAttemptId: 'attempt-1',
+    revision: 0,
+    reviewedAt: '2026-01-01T10:00:00.000Z',
+    generation: {
+      localGenerationToken: 'local-1',
+      problemGenerationToken: 'problem-1',
+    },
     elapsedSeconds: 95,
     isCorrect: true,
     lockReason: null,

@@ -99,11 +99,96 @@ describe('DevSmokeScreen', () => {
       expect(sendMessage).toHaveBeenCalledWith('devSmoke.run', {
         surface: 'dashboard',
         runLiveGenAi: true,
+        includeCapacity: false,
       })
     })
     expect(
       await screen.findByText('Provider smoke returned a non-secret warning.'),
     ).toBeVisible()
+  })
+
+  it('requests storage capacity only when opted in and shows numeric usage', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(createDevSmokeReport())
+      .mockResolvedValueOnce(
+        createDevSmokeReport({
+          capacity: {
+            status: 'available',
+            storage: {
+              totalBytes: 900,
+              quotaBytes: 1000,
+              headroomBytes: 100,
+              activeSnapshotBytes: 500,
+              activeFingerprintBytes: 20,
+              recoveryTopicsBytes: 100,
+              recoveryTracksBytes: 80,
+              recoveryFsrsBytes: 60,
+            },
+          },
+          readTimings: {
+            status: 'available',
+            method: 'sequential-background-service-reads',
+            warmups: 1,
+            analytics: { samplesMs: [1, 2, 3, 4, 5], p50Ms: 3, p95Ms: 5 },
+            queue: { samplesMs: [2, 3, 4, 5, 6], p50Ms: 4, p95Ms: 6 },
+          },
+        }),
+      )
+
+    renderDevSmokeScreen()
+    await screen.findByText('Background smoke service is reachable.')
+    expect(sendMessage).toHaveBeenCalledWith('devSmoke.run', {
+      surface: 'dashboard',
+      runLiveGenAi: false,
+      includeCapacity: false,
+    })
+    expect(screen.queryByText('Storage capacity')).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Measure storage and read timings',
+      }),
+    )
+
+    expect(await screen.findByText('Storage capacity')).toBeVisible()
+    expect(sendMessage).toHaveBeenCalledWith('devSmoke.run', {
+      surface: 'dashboard',
+      runLiveGenAi: false,
+      includeCapacity: true,
+    })
+    expect(screen.getByText('900 bytes')).toBeVisible()
+    expect(screen.getAllByText('100 bytes')).toHaveLength(2)
+    expect(
+      screen.getByText('Analytics: p50 3.00 ms, p95 5.00 ms'),
+    ).toBeVisible()
+    expect(screen.getByText('Queue: p50 4.00 ms, p95 6.00 ms')).toBeVisible()
+    expect(screen.getByText(/exclude runtime messaging/)).toBeVisible()
+  })
+
+  it('turns off live GenAI before requesting storage capacity', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockResolvedValue(createDevSmokeReport())
+
+    renderDevSmokeScreen()
+    await screen.findByText('Background smoke service is reachable.')
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Run live GenAI provider smoke' }),
+    )
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Measure storage and read timings',
+      }),
+    )
+
+    expect(
+      screen.getByRole('checkbox', { name: 'Run live GenAI provider smoke' }),
+    ).not.toBeChecked()
+    expect(sendMessage).toHaveBeenLastCalledWith('devSmoke.run', {
+      surface: 'dashboard',
+      runLiveGenAi: false,
+      includeCapacity: true,
+    })
   })
 
   it('runs fresh smoke checks when remounted with a fresh cached report', async () => {

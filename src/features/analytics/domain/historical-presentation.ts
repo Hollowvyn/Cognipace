@@ -1,9 +1,14 @@
 import {
   isReviewRating,
-  replayReviewHistorySequence,
   type NormalizedFsrsSchedulingOptions,
   type ReviewRating,
 } from '@/lib/fsrs'
+import {
+  resolveHistoricalSchedulingEvidence,
+  summarizeHistoricalSchedulingProvenance,
+  type HistoricalSchedulingEvidenceResolver,
+  type HistoricalSchedulingProvenance,
+} from './historical-scheduling-evidence'
 import {
   normalizeTopicLabelList,
   normalizeTopicLookupKey,
@@ -30,7 +35,7 @@ import {
 import {
   addAnalyticsCalendarDays,
   buildAnalyticsTimeFrame,
-  shiftAnalyticsCalendarDays,
+  getAnalyticsPreviousPeriod,
   getAnalyticsDateKey,
   type AnalyticsTimeFrame,
 } from './analytics-time'
@@ -42,10 +47,16 @@ import {
 } from './analytics-scales'
 import type { CurrentStateAnalyticsViews } from './current-state-presentation'
 import type { WorkloadAnalyticsViews } from './workload-presentation'
+import { buildAnalyticsHistoryTimeFrame } from './analytics-history-frame'
+import {
+  aggregatePerformance,
+  type PerformanceCountMatrix,
+} from './performance-presentation'
 import {
   buildRepeatReviewPairs,
   selectFirstRecordedAttempts,
   selectLaterRecordedAttempts,
+  type RepeatReviewPair,
 } from './review-cohorts'
 
 export interface HistoricalAnalyticsReviewEvent {
@@ -56,12 +67,12 @@ export interface HistoricalAnalyticsReviewEvent {
   rating: string
   reviewedAt: Date
   fsrsReviewLog: string | null
+  applicationSequence?: number | null
+  schedulingEvidenceKind?: 'captured' | 'legacy-derived' | 'unknown'
+  schedulerProfileJson?: string | null
+  preCardJson?: string | null
   problemDifficulty?: ProblemDifficulty | undefined
   elapsedSeconds?: number | null | undefined
-}
-
-type ValidHistoricalReviewEvent = HistoricalAnalyticsReviewEvent & {
-  rating: ReviewRating
 }
 
 export interface HistoricalPresentationOptions {
@@ -71,8 +82,10 @@ export interface HistoricalPresentationOptions {
   fsrsOptions: NormalizedFsrsSchedulingOptions
   timeZone: string
   timeFrame: AnalyticsTimeFrame
+  pairedReviews?: readonly RepeatReviewPair[]
   analyticsTargets?: AnalyticsTargets
   timeTargetsMinutes?: UserSettings['assessment']['timeTargetsMinutes']
+  resolveEvidence?: HistoricalSchedulingEvidenceResolver
 }
 
 export interface HistoricalPresentationScale {
@@ -147,7 +160,7 @@ export interface ProblemSolvingView {
   }
   targets: AnalyticsTargets
   timeTargetsMinutes: UserSettings['assessment']['timeTargetsMinutes']
-  previousPeriod: { start: string; asOf: string }
+  previousPeriod: { start: string; asOf: string } | null
 }
 
 const knownProblemDifficulties = ['easy', 'medium', 'hard'] as const
@@ -162,6 +175,13 @@ export interface ObservedRecallVsFsrsRow {
   observedRecall: number | null
   fsrsEstimate: number | null
   difference: number | null
+  modelSampleSize?: number | undefined
+  modelProvenance?:
+    | 'captured'
+    | 'legacy-derived'
+    | 'mixed'
+    | 'unknown'
+    | undefined
   provenance: 'reconstructed'
   evidence: 'measured' | 'not-measured'
 }
@@ -175,6 +195,8 @@ export interface MemoryStrengthRow {
   q1: number | null
   q3: number | null
   eligibleReviews: number
+  observedReviews?: number | undefined
+  modelProvenance?: HistoricalSchedulingProvenance | undefined
   medianChangeDays: number | null
   provenance: 'reconstructed'
   evidence: 'measured' | 'not-measured'
@@ -217,6 +239,7 @@ export interface TopicPerformanceRow {
   goodEasy: number
   validRatings: number
   distinctProblems: number
+  ratingCountsByDifficulty: PerformanceCountMatrix
   evidence: 'Measured'
 }
 
@@ -229,6 +252,7 @@ export interface LowEvidenceTopicRow {
 export interface HistoricalAnalyticsViews {
   problemSolving: ProblemSolvingView
   observedRecallVsFsrs: {
+    timeFrame: AnalyticsTimeFrame
     rows: ObservedRecallVsFsrsRow[]
     scale: HistoricalPresentationScale
     targetRecall: number
@@ -272,9 +296,30 @@ export function buildHistoricalAnalyticsViews(
   events: readonly HistoricalAnalyticsReviewEvent[],
   options: HistoricalPresentationOptions,
 ): HistoricalAnalyticsViews {
-  const pairedByEvent = buildRepeatReviewPairs(events, options)
+  const pairedByEvent =
+    options.pairedReviews ??
+    buildRepeatReviewPairs(events, {
+      ...options,
+      start: new Date(options.timeFrame.history?.nominalStart ?? options.start),
+    })
+  const recallTimeFrame = options.timeFrame.history
+    ? buildAnalyticsHistoryTimeFrame({
+        selection: options.timeFrame.history.selection,
+        asOf: new Date(options.timeFrame.asOf),
+        timeZone: options.timeZone,
+        history: pairedByEvent,
+      })
+    : options.timeFrame
+  if (options.timeFrame.history && recallTimeFrame.history) {
+    recallTimeFrame.timeZoneFallback = options.timeFrame.timeZoneFallback
+    recallTimeFrame.history.timeZoneFallback =
+      options.timeFrame.timeZoneFallback
+  }
+  const recallBuckets = options.timeFrame.history
+    ? buildAnalyticsBucketsFromTimeFrame(recallTimeFrame)
+    : options.buckets
   const stabilityByEvent = buildStabilityObservations(events, options)
-  const observedRows = options.buckets.map((bucket) => {
+  const observedRows = recallBuckets.map((bucket) => {
     const pairs = pairedByEvent.filter((pair) =>
       inBucket(pair.reviewedAt, bucket),
     )
@@ -282,8 +327,15 @@ export function buildHistoricalAnalyticsViews(
     const recalledCount = pairs.filter((pair) => pair.rating !== 'again').length
     const observedRecall =
       pairedReviews === 0 ? null : recalledCount / pairedReviews
-    const fsrsEstimate =
-      pairedReviews === 0 ? null : mean(pairs.map((pair) => pair.estimate))
+    const modeledPairs = pairs.filter((pair) => pair.estimate !== null)
+    const fsrsEstimate = mean(modeledPairs.map((pair) => pair.estimate!))
+    const knownKinds = new Set(modeledPairs.map((pair) => pair.provenance))
+    const provenance =
+      modeledPairs.length === 0
+        ? ('unknown' as const)
+        : modeledPairs.length < pairedReviews || knownKinds.size > 1
+          ? ('mixed' as const)
+          : modeledPairs[0]!.provenance
 
     return {
       ...bucketRow(bucket, options.end),
@@ -291,18 +343,40 @@ export function buildHistoricalAnalyticsViews(
       pairedReviews,
       observedRecall,
       fsrsEstimate,
+      modelSampleSize: modeledPairs.length,
       difference:
-        observedRecall === null || fsrsEstimate === null
+        observedRecall === null ||
+        fsrsEstimate === null ||
+        modeledPairs.length !== pairedReviews
           ? null
           : observedRecall - fsrsEstimate,
+      modelProvenance: provenance,
       provenance: 'reconstructed' as const,
       evidence:
         pairedReviews === 0 ? ('not-measured' as const) : ('measured' as const),
     }
   })
   const memoryRows = options.buckets.map((bucket) => {
+    const observed = events.filter(
+      (event) =>
+        isReviewRating(event.rating) &&
+        event.reviewedAt >= options.start &&
+        event.reviewedAt <= options.end &&
+        inBucket(event.reviewedAt, bucket),
+    )
     const observations = stabilityByEvent.filter((sample) =>
       inBucket(sample.reviewedAt, bucket),
+    )
+    const modelProvenance = summarizeHistoricalSchedulingProvenance(
+      observed.map((event) => {
+        const evidence = (
+          options.resolveEvidence ?? resolveHistoricalSchedulingEvidence
+        )(event)
+        return evidence.postCard?.stability &&
+          Number.isFinite(evidence.postCard.stability)
+          ? evidence.kind
+          : 'unknown'
+      }),
     )
     const strengths = observations.map((sample) => sample.postReviewStability)
     const changes = observations.flatMap((sample) =>
@@ -319,6 +393,8 @@ export function buildHistoricalAnalyticsViews(
       q1,
       q3,
       eligibleReviews: strengths.length,
+      observedReviews: observed.length,
+      modelProvenance,
       medianChangeDays: median(changes),
       provenance: 'reconstructed' as const,
       evidence:
@@ -412,6 +488,7 @@ export function buildHistoricalAnalyticsViews(
     {
       problemSolving: buildProblemSolvingView(events, options),
       observedRecallVsFsrs: {
+        timeFrame: recallTimeFrame,
         rows: observedRows,
       },
       memoryStrength: {
@@ -444,6 +521,7 @@ export function buildHistoricalAnalyticsViews(
       },
       memorySignals: { rows: [], totalQualifying: 0 },
       overdueBacklog: {
+        timeFrame: options.timeFrame,
         rows: [],
         knownDays: 0,
         withinWatchDays: 0,
@@ -535,23 +613,29 @@ function buildRatingsMixComparison(
   selectedHardAgain: number,
   selectedValidRatings: number,
 ): RatingsMixComparison {
-  const previousStart = shiftAnalyticsCalendarDays(
-    options.start,
-    -options.timeFrame.requestedDays,
-    options.timeFrame.timeZone,
-  )
-  const previousEnd = shiftAnalyticsCalendarDays(
-    new Date(options.timeFrame.asOf),
-    -options.timeFrame.requestedDays,
-    options.timeFrame.timeZone,
-  )
-  const previousBuckets = buildAnalyticsBucketsFromTimeFrame(
-    buildAnalyticsTimeFrame({
-      asOf: previousEnd,
-      requestedDays: options.timeFrame.requestedDays,
-      timeZone: options.timeFrame.timeZone,
-    }),
-  )
+  const previous = getAnalyticsPreviousPeriod(options.timeFrame)
+  if (previous === null || options.timeFrame.requestedDays === null)
+    return {
+      previousHardAgainShare: null,
+      previousValidRatings: 0,
+      difference: null,
+      direction: null,
+    }
+  const previousStart = previous.start
+  const previousEnd = previous.asOf
+  const previousTimeFrame = options.timeFrame.history
+    ? buildAnalyticsHistoryTimeFrame({
+        selection: options.timeFrame.history.selection,
+        asOf: previousEnd,
+        timeZone: options.timeFrame.timeZone,
+        history: events,
+      })
+    : buildAnalyticsTimeFrame({
+        asOf: previousEnd,
+        requestedDays: options.timeFrame.requestedDays,
+        timeZone: options.timeFrame.timeZone,
+      })
+  const previousBuckets = buildAnalyticsBucketsFromTimeFrame(previousTimeFrame)
   const previousRatings = events.filter(
     (event) =>
       event.reviewedAt >= previousStart &&
@@ -572,6 +656,7 @@ function buildRatingsMixComparison(
       calculateRatingsMixReadiness(events, previousBuckets, {
         ...options,
         end: previousEnd,
+        timeFrame: previousTimeFrame,
       }),
     )
   const selectedShare =
@@ -607,6 +692,8 @@ function calculateRatingsMixReadiness(
 ): AnalyticsReadiness {
   return calculateAnalyticsReadiness({
     requestedDays: options.timeFrame.requestedDays,
+    grouping: options.timeFrame.grouping,
+    availableDays: options.timeFrame.history?.availableDays,
     evidenceCounts: buckets.map(
       (bucket) =>
         events.filter(
@@ -639,6 +726,10 @@ function buildTopicPerformance(
       normalizedTopic: string
       goodEasy: number
       validRatings: number
+      ratingCountsByDifficulty: Record<
+        ProblemDifficulty,
+        Record<ReviewRating, number>
+      >
       problems: Set<string>
     }
   >()
@@ -657,9 +748,18 @@ function buildTopicPerformance(
         normalizedTopic: label.normalizedTopic,
         goodEasy: 0,
         validRatings: 0,
+        ratingCountsByDifficulty: {
+          easy: { again: 0, hard: 0, good: 0, easy: 0 },
+          medium: { again: 0, hard: 0, good: 0, easy: 0 },
+          hard: { again: 0, hard: 0, good: 0, easy: 0 },
+          unknown: { again: 0, hard: 0, good: 0, easy: 0 },
+        },
         problems: new Set<string>(),
       }
       entry.validRatings += 1
+      entry.ratingCountsByDifficulty[event.problemDifficulty ?? 'unknown'][
+        event.rating
+      ] += 1
       if (event.rating === 'good' || event.rating === 'easy')
         entry.goodEasy += 1
       entry.problems.add(event.problemSlug)
@@ -671,12 +771,13 @@ function buildTopicPerformance(
     ...entry,
     distinctProblems: entry.problems.size,
     reviewSuccess: entry.goodEasy / entry.validRatings,
+    weightedScore: aggregatePerformance(entry.ratingCountsByDifficulty).score!,
   }))
   const qualifying = entries
     .filter((entry) => entry.validRatings >= 10 && entry.distinctProblems >= 3)
     .sort(
       (left, right) =>
-        left.reviewSuccess - right.reviewSuccess ||
+        left.weightedScore - right.weightedScore ||
         right.validRatings - left.validRatings ||
         left.normalizedTopic.localeCompare(right.normalizedTopic),
     )
@@ -694,6 +795,7 @@ function buildTopicPerformance(
       goodEasy: entry.goodEasy,
       validRatings: entry.validRatings,
       distinctProblems: entry.distinctProblems,
+      ratingCountsByDifficulty: entry.ratingCountsByDifficulty,
       evidence: 'Measured',
     })),
     strongerQualifyingTopics: 0,
@@ -746,16 +848,7 @@ function buildProblemSolvingView(
   const timeTargetsMinutes =
     options.timeTargetsMinutes ??
     defaultUserSettings.assessment.timeTargetsMinutes
-  const previousStart = shiftAnalyticsCalendarDays(
-    options.start,
-    -options.timeFrame.requestedDays,
-    options.timeZone,
-  )
-  const previousAsOf = shiftAnalyticsCalendarDays(
-    options.end,
-    -options.timeFrame.requestedDays,
-    options.timeZone,
-  )
+  const previousPeriod = getAnalyticsPreviousPeriod(options.timeFrame)
   const cohort = (
     raw: readonly HistoricalAnalyticsReviewEvent[],
     references: readonly number[],
@@ -766,7 +859,9 @@ function buildProblemSolvingView(
     )
     const previous = raw.filter(
       (event) =>
-        event.reviewedAt >= previousStart && event.reviewedAt <= previousAsOf,
+        previousPeriod !== null &&
+        event.reviewedAt >= previousPeriod.start &&
+        event.reviewedAt <= previousPeriod.asOf,
     )
     const rows = options.buckets.map((bucket) => ({
       ...bucketRow(bucket, options.end),
@@ -826,10 +921,13 @@ function buildProblemSolvingView(
     },
     targets,
     timeTargetsMinutes,
-    previousPeriod: {
-      start: previousStart.toISOString(),
-      asOf: previousAsOf.toISOString(),
-    },
+    previousPeriod:
+      previousPeriod === null
+        ? null
+        : {
+            start: previousPeriod.start.toISOString(),
+            asOf: previousPeriod.asOf.toISOString(),
+          },
   }
 }
 
@@ -926,44 +1024,23 @@ function buildStabilityObservations(
     postReviewStability: number
     preReviewStability: number | null
   }> = []
-  const byCard = new Map<string, ValidHistoricalReviewEvent[]>()
   for (const event of events) {
-    if (!hasValidRating(event)) continue
-    const cardEvents = byCard.get(event.cardId) ?? []
-    cardEvents.push(event)
-    byCard.set(event.cardId, cardEvents)
-  }
-  for (const cardEvents of byCard.values()) {
-    const ordered = [...cardEvents].sort(compareEvents)
-    const replayed = replayReviewHistorySequence(
-      ordered.map((event) => ({
-        rating: event.rating,
-        reviewedAt: event.reviewedAt,
-      })),
-      options.fsrsOptions,
-    )
-    for (const [index, event] of ordered.entries()) {
-      if (event.reviewedAt < options.start || event.reviewedAt > options.end)
-        continue
-      const postReviewStability = replayed[index]?.card.stability
-      if (
-        postReviewStability === undefined ||
-        !Number.isFinite(postReviewStability) ||
-        postReviewStability <= 0
-      )
-        continue
-      const preReviewStability = replayed[index - 1]?.card.stability
-      observations.push({
-        reviewedAt: event.reviewedAt,
-        postReviewStability,
-        preReviewStability:
-          preReviewStability !== undefined &&
-          Number.isFinite(preReviewStability) &&
-          preReviewStability > 0
-            ? preReviewStability
-            : null,
-      })
-    }
+    if (event.reviewedAt < options.start || event.reviewedAt > options.end)
+      continue
+    const evidence = (
+      options.resolveEvidence ?? resolveHistoricalSchedulingEvidence
+    )(event)
+    const postReviewStability = evidence.postCard?.stability
+    if (!postReviewStability || !Number.isFinite(postReviewStability)) continue
+    const preReviewStability = evidence.preCard?.stability
+    observations.push({
+      reviewedAt: event.reviewedAt,
+      postReviewStability,
+      preReviewStability:
+        preReviewStability && Number.isFinite(preReviewStability)
+          ? preReviewStability
+          : null,
+    })
   }
   return observations
 }
@@ -1000,22 +1077,6 @@ function toPresentationScale(
 
 function inBucket(date: Date, bucket: AnalyticsBucket): boolean {
   return date >= bucket.start && date <= bucket.end
-}
-
-function compareEvents(
-  left: HistoricalAnalyticsReviewEvent,
-  right: HistoricalAnalyticsReviewEvent,
-): number {
-  return (
-    left.reviewedAt.getTime() - right.reviewedAt.getTime() ||
-    left.id.localeCompare(right.id)
-  )
-}
-
-function hasValidRating(
-  event: HistoricalAnalyticsReviewEvent,
-): event is ValidHistoricalReviewEvent {
-  return isReviewRating(event.rating)
 }
 
 function mean(values: readonly number[]): number | null {

@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "status": "pending",
+  "startedAt": "2026-10-11T03:24:58.723Z",
+  "dataset": "single-card",
+  "probe": "initial-restore-only",
+  "fixture": {
+    "seed": 20261010,
+    "inputBytes": 14868605,
+    "inputDataDigest": "f8252fc6f70be0b7eb27239af16cbb0950205ed99908a62b13cbcb1ffd3af963",
+    "counts": {
+      "problems": 1,
+      "reviewAttempts": 10000,
+      "fsrsCards": 1,
+      "reviewEvidence": 10000,
+      "commandReceipts": 1,
+      "schedulerProfiles": 2,
+      "generationScopes": 2
+    }
+  },
+  "environment": {
+    "commit": "ae45ceab3ed804cffcb676954a02e9c6426768e4",
+    "node": "v24.20.0",
+    "chrome": "Google Chrome for Testing 151.0.7922.47",
+    "os": "darwin 27.0.0 arm64",
+    "cpu": "Apple M2 Pro",
+    "memoryBytes": 34359738368,
+    "extensionVersion": "2.2.0",
+    "extensionBuild": "chrome-mv3",
+    "extensionBuildSha256": "960726e037380e24f605a516357917a22dc3b0651b879266dad8ea19351776bf",
+    "dependencies": {
+      "source": "installed node_modules package.json versions",
+      "wxt": "0.21.4",
+      "sqliteWasm": "3.53.0-build1",
+      "drizzle": "0.45.2",
+      "fsrs": "5.4.0",
+      "messaging": "2.3.0"
+    },
+    "profile": "unique disposable /private/tmp directory; removed after run",
+    "definition": "Warm: same opened Chrome worker and persisted database. Request duration is performance.now() around dashboard chrome.runtime.sendMessage to response. Restore/reset and setup are outside warm operation timers.",
+    "extensionId": "dfbkgmdabfhpgkffliobdankjbfipflg",
+    "workerUint8ArrayToBase64": true
+  },
+  "requested": {
+    "samples": 1,
+    "warmups": 0
+  },
+  "operations": {
+    "queue": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "practiceDetails": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "analytics30": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "analytics90": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "analyticsall": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "backupExport": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "backupValidation": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "save": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "sameCommandRetry": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "update": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "backupRestore": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "serviceWorkerReopen": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "fullBrowserRestart": {
+      "status": "pending",
+      "reason": "Packaged Chrome setup or verification failed",
+      "samples": [],
+      "summary": {
+        "attempted": 0,
+        "succeeded": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    }
+  },
+  "memory": {
+    "method": "Sampled dashboard performance.memory.usedJSHeapSize where Chrome exposes it; not a continuous peak or service-worker heap",
+    "observations": [],
+    "maxObservedBytes": null
+  },
+  "contentScriptPreview": {
+    "status": "pending",
+    "reason": "No valid content-script execution context measured yet"
+  },
+  "storageBeforeRestore": {
+    "bytesInUse": 786504,
+    "quotaBytes": 10485760,
+    "headroomBytes": 9699256,
+    "keyBytes": {
+      "cognipace_db_snapshot_v1": 786458,
+      "cognipace_db_snapshot_fingerprint_v1": 46,
+      "cognipace_db_recovery_topics_v1": 0,
+      "cognipace_db_recovery_tracks_v1": 0,
+      "cognipace_db_recovery_fsrs_v1": 0
+    },
+    "keyDigests": {
+      "cognipace_db_snapshot_v1": "e5b85e44ca115508d0b3f84747ed91626e165412daafcac1d77764faaaf320f4",
+      "cognipace_db_snapshot_fingerprint_v1": "f17b398220f3f9f12fb6c5ea26aa6d8e4ded28661f21a7b1cbb471ce09df08f8",
+      "cognipace_db_recovery_topics_v1": null,
+      "cognipace_db_recovery_tracks_v1": null,
+      "cognipace_db_recovery_fsrs_v1": null
+    },
+    "heapUsedBytes": 15950925,
+    "heapMethod": "Chrome performance.memory.usedJSHeapSize (nonstandard estimate)"
+  },
+  "failure": {
+    "code": "publication-pending",
+    "message": "publication-pending"
+  },
+  "failureStage": "initialRestore",
+  "storageAfterFailedRestore": {
+    "bytesInUse": 786872,
+    "quotaBytes": 10485760,
+    "headroomBytes": 9698888,
+    "keyBytes": {
+      "cognipace_db_snapshot_v1": 786458,
+      "cognipace_db_snapshot_fingerprint_v1": 46,
+      "cognipace_db_recovery_topics_v1": 0,
+      "cognipace_db_recovery_tracks_v1": 0,
+      "cognipace_db_recovery_fsrs_v1": 0
+    },
+    "keyDigests": {
+      "cognipace_db_snapshot_v1": "e5b85e44ca115508d0b3f84747ed91626e165412daafcac1d77764faaaf320f4",
+      "cognipace_db_snapshot_fingerprint_v1": "f17b398220f3f9f12fb6c5ea26aa6d8e4ded28661f21a7b1cbb471ce09df08f8",
+      "cognipace_db_recovery_topics_v1": null,
+      "cognipace_db_recovery_tracks_v1": null,
+      "cognipace_db_recovery_fsrs_v1": null
+    },
+    "heapUsedBytes": 56879401,
+    "heapMethod": "Chrome performance.memory.usedJSHeapSize (nonstandard estimate)"
+  },
+  "durableSnapshotUnchanged": true,
+  "reachedAfterFailedRestore": {
+    "status": "pending",
+    "error": {
+      "code": "restore-failed",
+      "message": "restore-failed"
+    }
+  },
+  "completedAt": "2026-10-11T03:25:03.372Z"
+}

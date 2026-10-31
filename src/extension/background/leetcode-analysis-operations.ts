@@ -8,6 +8,7 @@ type ActiveOperation = {
 }
 
 const activeAnalyses = new Map<string, ActiveOperation>()
+const activeImplementations = new Map<string, ActiveOperation>()
 const activeHints = new Map<string, ActiveOperation>()
 
 /** Hints and reports retain independent volatile ownership. */
@@ -54,6 +55,7 @@ export function cancelOwnedAnalysis(owner: string, requestId: string): boolean {
 }
 
 export function abortLeetCodeAnalyses(): void {
+  for (const active of activeImplementations.values()) active.controller.abort()
   for (const active of activeAnalyses.values()) active.controller.abort()
 }
 
@@ -99,4 +101,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 function isOwnerId(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+export function runOwnedImplementation<T>(
+  owner: string,
+  requestId: string,
+  work: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  return runOwnedOperation(activeImplementations, owner, requestId, work)
+}
+export function cancelOwnedImplementation(
+  owner: string,
+  requestId: string,
+): boolean {
+  return cancelOwnedOperation(activeImplementations, owner, requestId)
 }

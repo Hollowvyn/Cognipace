@@ -12,7 +12,17 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Specs
 
-- [`specs/2026-10-05-adaptive-code-hints-design.md`](./specs/2026-10-05-adaptive-code-hints-design.md): approved replacement of problem-only hint batches with complete editor snapshots, one hint per request, adaptive strength and three successful turns; implementation and human/provider proof tracked in its plan and handoff.
+- [`specs/2026-10-31-ai-data-flow-efficiency.md`](./specs/2026-10-31-ai-data-flow-efficiency.md): approved and implemented measured data-flow improvements: safe metrics, compact provider input and feedback-first/on-demand code in PR #214, plus exact snapshot interning in #203; human extension and live-provider proof remain pending.
+
+- [`specs/2026-10-30-free-model-assessment-reliability-design.md`](./specs/2026-10-30-free-model-assessment-reliability-design.md): approved concise assessments, bounded recovery for all assessment providers/models and safe evaluation failure records; live-provider and human proof remain required.
+
+- [`specs/2026-10-12-overlay-baseline-pr-cleanup-design.md`](./specs/2026-10-12-overlay-baseline-pr-cleanup-design.md): approved design to compact PR #211's raw startup evidence, correct readiness classification, bound observational timing, and rerun a reproducible packaged baseline; written spec awaiting user review.
+
+- [`specs/2026-10-12-responsive-leetcode-overlay-startup-design.md`](./specs/2026-10-12-responsive-leetcode-overlay-startup-design.md): approved progressive overlay startup with early manual timing, concurrent local context and remote metadata reads, deferred secondary data, measured latency targets, and unchanged review and upsert durability. Phase 1 baseline is recorded; behavior phases still need separate plans.
+
+- [`specs/2026-10-05-analytics-performance-layout-design.md`](./specs/2026-10-05-analytics-performance-layout-design.md): approved Value first direction, weighted Performance, cumulative paired Recall, ten equal cards in Overview and Details, target-relative timing, strict backlog color boundary, and 30/90/All time with available young history. The final prototype adds four selected-period activity totals and quiet fixed card states. Backlog stays Last 30 days, Upcoming Next 14 days, and tooltip cleanup is deferred. Implementation, independent reviews, automated gates and desktop state proof are complete; human installed-extension smoke/proof remains pending before PR review or merge. See the dated handoff.
+
+- [`specs/2026-10-05-adaptive-code-hints-design.md`](./specs/2026-10-05-adaptive-code-hints-design.md): approved replacement of problem-only hint batches with complete editor snapshots, one hint per request, fixed Light/Medium/Heavy order and three successful turns; implementation and human/provider proof tracked in its plan and handoff.
 
 - [`specs/2026-10-05-active-ai-provider-design.md`](./specs/2026-10-05-active-ai-provider-design.md): approved active-provider summary, separate Save & make active / Make active and Test connection actions, and reuse of independently saved provider keys. Human installed-extension smoke remains pending.
 
@@ -30,7 +40,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-03-overview-daily-time-design.md`](./specs/2026-10-03-overview-daily-time-design.md): approved fourth Overview card for saved elapsed time from today's local-date assessments, including repeats and failures.
 
-- [`specs/2026-10-03-fsrs-remediation-design.md`](./specs/2026-10-03-fsrs-remediation-design.md): approved eight-priority FSRS remediation design covering reliable saves/corrections, recorded profiles, daily scheduling, queue and preview behavior, preserving upgrades, measured local scaling and an evaluated personalization pilot; October 4 amendment assigns the 180-day maximum interval policy, native boundary verification and existing-date decision to Phase E. Phase A merged in PR #190. B is implemented with reviewed pure helpers and passing automated/build checks; its human smoke proof remains pending. C–H remain unimplemented.
+- [`specs/2026-10-03-fsrs-remediation-design.md`](./specs/2026-10-03-fsrs-remediation-design.md): approved eight-priority FSRS remediation design covering reliable saves/corrections, recorded profiles, daily scheduling, queue and preview behavior, preserving upgrades, measured local scaling and an evaluated personalization pilot. A–F merged in PRs #190, #196, #198, #205, #207 and #208. The October 10 Phase E decision keeps native `maximum_interval: 180`, accepts ordered results up to 183 days, and preserves existing longer dates until genuine review. Phase F's human installed-extension proof remains pending; G has completed automated local/package measurement with human proof pending, and H remains future.
 
 - [`specs/2026-10-03-next-question-group-design.md`](./specs/2026-10-03-next-question-group-design.md): user-requested popup/dashboard chapter correction and local workspace browsing that reopens on the next question's group.
 
@@ -75,6 +85,22 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 ## Plans
 
+- [`plans/2026-10-30-free-model-assessments.md`](./plans/2026-10-30-free-model-assessments.md): focused assessment implementation and validation plan, separate from the hint sequence PR.
+
+- [`plans/2026-10-12-overlay-baseline-pr-cleanup.md`](./plans/2026-10-12-overlay-baseline-pr-cleanup.md): phase-sized plan to compact PR #211 startup evidence, repair classification and timing retention, rerun the packaged baseline, and update the draft PR.
+
+- [`plans/2026-10-12-responsive-overlay-phase-1-baseline.md`](./plans/2026-10-12-responsive-overlay-phase-1-baseline.md): Phase 1 timing and disposable packaged 5,000-review baseline implemented. Page-stage results are measured; worker/renderer attribution and live Submit comparison remain pending. See the [handoff](./handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md).
+- [`plans/2026-10-05-analytics-history-window-foundation.md`](./plans/2026-10-05-analytics-history-window-foundation.md): implemented and independently reviewed pure selection, raw-history bounds, bounded calendar intervals and fixed daily backlog foundation; 69 focused tests and the required full check pass. Runtime/service/route/readiness integration is implemented in the following phase.
+- [`plans/2026-10-05-analytics-history-runtime-integration.md`](./plans/2026-10-05-analytics-history-runtime-integration.md): implemented and independently reviewed public selections, explicit report frames, paired Recall dates with shared-calendar readiness, nominal comparisons, independent workload frames, and truthful selected activity through validated messages; 3,172 tests and build pass. Weighted models and compact UI are implemented in the following completed phases.
+- [`plans/2026-10-05-analytics-weighted-presentation.md`](./plans/2026-10-05-analytics-weighted-presentation.md): shared weighted Performance, cumulative paired Recall, normalized Time, sixteen-cell topic evidence, and natural cumulative trend geometry before compact production composition.
+- [`plans/2026-10-05-analytics-compact-card-foundation.md`](./plans/2026-10-05-analytics-compact-card-foundation.md): fixed card geometry, measured plots, bounded exact paging, and persistent fitting goal surfaces.
+- [`plans/2026-10-05-analytics-compact-card-adapters.md`](./plans/2026-10-05-analytics-compact-card-adapters.md): all ten production adapters, retaining advanced outcomes/time/Mix, paired Recall, exact evidence, complete Retention interactions and independent workload scopes.
+- [`plans/2026-10-05-analytics-page-assembly-proof.md`](./plans/2026-10-05-analytics-page-assembly-proof.md): completed four period headlines, ten-card grid, quiet query/action states, desktop production proof, authority-doc alignment and pending human extension smoke checklist.
+- [`plans/2026-10-06-fsrs-phase-d-reliable-reviews.md`](./plans/2026-10-06-fsrs-phase-d-reliable-reviews.md): approved-scope implementation plan for frozen review commands, atomic receipts/track effects, single-event guarded Update, durable acknowledgement and overlay retry after merged Phase C.
+- [`plans/2026-10-10-fsrs-phase-e-daily-scheduling.md`](./plans/2026-10-10-fsrs-phase-e-daily-scheduling.md): independently reviewed and implemented Phase E plan for native daily scheduling, calendar eligibility, automatic and explicit practice queues, historical Analytics provenance, live due equality, reminders, preservation and proof. The [handoff](./handoffs/2026-10-10-fsrs-phase-e-daily-scheduling.md) records automated gates and pending human extension proof.
+- [`plans/2026-10-10-fsrs-phase-f-native-previews.md`](./plans/2026-10-10-fsrs-phase-f-native-previews.md): Phase F native four-rating preview plan for genuine Submit and original-context Update, read-only Practice/runtime boundaries, Overlay lifecycle, validation and pending human proof.
+- [`plans/2026-10-10-fsrs-phase-g-local-scaling.md`](./plans/2026-10-10-fsrs-phase-g-local-scaling.md): reviewed Phase G plan for deterministic local-growth fixtures, supporting in-process samples, disposable packaged Chrome measurement, preservation checks, measured changes and pending human proof.
+
 - [`plans/2026-10-05-adaptive-code-hints.md`](./plans/2026-10-05-adaptive-code-hints.md): complete editor bridge, single-turn contracts and adaptive generation, overlay history and per-click requests, documentation and validation.
 
 - [`plans/2026-10-05-active-ai-provider.md`](./plans/2026-10-05-active-ai-provider.md): scoped controller, Settings UI, integration tests, documentation, and validation for explicit provider activation and independent testing.
@@ -99,8 +125,9 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`plans/2026-10-03-overview-daily-time.md`](./plans/2026-10-03-overview-daily-time.md): Practice read-model total, Overview contract/presentation, validation, and required human smoke proof.
 
+- [`plans/2026-10-04-fsrs-phase-c-storage-restore.md`](./plans/2026-10-04-fsrs-phase-c-storage-restore.md): reviewed and executed Phase C plan for additive evidence storage, frozen v1–v5 backup readers, v6 preflight, opaque identities, fresh lifecycle generations and replacement publication retry; full checks/build passed and human smoke/visual proof remains pending.
 - [`plans/2026-10-04-fsrs-phase-b-scheduling-evidence.md`](./plans/2026-10-04-fsrs-phase-b-scheduling-evidence.md): executed plan for complete immutable profiles, detached codecs, captured-context correction and guarded legacy estimates; five tasks reviewed, sparse-history repair verified, automated/build checks passed and human compatibility proof pending. No schema or daily activation.
-- [`plans/2026-10-03-fsrs-remediation.md`](./plans/2026-10-03-fsrs-remediation.md): dependency and acceptance map for all eight FSRS findings; foundation precedes daily experience, including Phase E's approved 180-day interval policy, measured local growth and the optimizer pilot. A and B have detailed plans; later slices require their own code-level plans against verified predecessors.
+- [`plans/2026-10-03-fsrs-remediation.md`](./plans/2026-10-03-fsrs-remediation.md): dependency and acceptance map for all eight FSRS findings; foundation precedes daily experience, including Phase E's configured 180-day interval policy, measured local growth and the optimizer pilot. A–G have detailed phase plans; H requires its own code-level plan against verified predecessors.
 - [`plans/2026-10-03-fsrs-phase-a-preserving-baseline.md`](./plans/2026-10-03-fsrs-phase-a-preserving-baseline.md): executed preservation plan merged in PR #190 for the frozen through-0009 baseline, independent recovery, populated singleton upgrade/reopen and background preparation guard; the handoff retains exact validation and historical proof status.
 
 - [`plans/2026-10-03-next-question-group.md`](./plans/2026-10-03-next-question-group.md): focused service and workspace regression plan for membership-derived chapter guidance, local tabs, and required human extension smoke.
@@ -155,6 +182,11 @@ Use these files to understand why work was shaped a certain way. Before changing
 
 ## Handoffs
 
+- [`handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md`](./handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md): committed-source packaged warm/cold startup measurements, [validated compact evidence](./evidence/responsive-overlay/overlay-startup-standard.json), attribution limits, reproducible smoke steps and pending human installed-extension proof.
+
+- [`handoffs/2026-10-05-analytics-performance-layout.md`](./handoffs/2026-10-05-analytics-performance-layout.md): completed Analytics implementation, exact final checks, production-component proof, and required pending human extension smoke.
+- [`handoffs/2026-10-04-fsrs-phase-c-storage-restore.md`](./handoffs/2026-10-04-fsrs-phase-c-storage-restore.md): reviewed evidence storage, v6 backup and recoverable replacement with real preserving migration, repaired collision/cache/import-boundary findings, exact validation and a runnable human fault-smoke procedure; installed-extension proof remains pending with the owner's October 5 decision to merge then test after backing up.
+
 - [`handoffs/2026-10-05-adaptive-code-hints.md`](./handoffs/2026-10-05-adaptive-code-hints.md): reviewed snapshot-bound adaptive hints, exact automated results, mocked production-component proof, and pending human editor/provider gates.
 
 - [`handoffs/2026-10-04-overlay-ai-hints.md`](./handoffs/2026-10-04-overlay-ai-hints.md): reviewed Phase 2 source, exact final/historical checks, progressive-hint fixture proof, pending human installed-extension smoke and live provider quality, and release/recovery notes.
@@ -188,3 +220,7 @@ Use these files to understand why work was shaped a certain way. Before changing
 ## Audits
 
 - [`audits/2026-06-07-closed-issues-1-6-11-17.md`](./audits/2026-06-07-closed-issues-1-6-11-17.md): closed-issue rescue audit for issues 1, 6, 11, and 17.
+
+- [`handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md`](./handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md): Phase D captured context, frozen commands, atomic receipts/track effects, guarded corrections and durable snapshot proof; final independent SPEC/QUALITY and 3,290 tests passed. PR #205 merged while its body still recorded human installed-extension proof as pending.
+- [`handoffs/2026-10-10-fsrs-phase-f-native-previews.md`](./handoffs/2026-10-10-fsrs-phase-f-native-previews.md): Phase F native Submit/Update four-rating previews, read and async-state proof, validation, review repairs and pending installed-extension visual proof.
+- [`handoffs/2026-10-10-fsrs-phase-g-local-scaling.md`](./handoffs/2026-10-10-fsrs-phase-g-local-scaling.md): Phase G deterministic workloads, restore batching, local and disposable packaged evidence, measured boundaries, validation, review repairs, [draft PR #209](https://github.com/Hollowvyn/Cognipace/pull/209) and pending human proof.

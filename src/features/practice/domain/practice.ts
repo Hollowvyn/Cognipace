@@ -2,11 +2,16 @@ import {
   getRetrievability,
   type FsrsCardKind,
   type FsrsCardSnapshot,
+  type FsrsSchedulingOptions,
   type ReviewRating,
 } from '@/lib/fsrs'
 import type { ProblemSlug } from '@/features/problems/domain'
 
 import { derivePracticeScheduleTiming } from './practice-schedule'
+import type {
+  PracticeGenerationContext,
+  PracticeAssessmentEvidence,
+} from './practice-storage'
 
 export const practiceStatuses = [
   'new',
@@ -58,16 +63,21 @@ export interface SaveReviewResultInput {
   cardKind?: FsrsCardKind | undefined
   targetRetention?: number | undefined
   reviewAttemptId?: string | undefined
+  assessmentEvidence?: PracticeAssessmentEvidence | undefined
 }
 
 export interface OverrideLastReviewResultInput {
   problemSlug: ProblemSlug
   rating: ReviewRating
+  targetAttemptId: string
+  expectedRevision: number
+  reviewedAt?: Date | undefined
   elapsedSeconds?: number | null | undefined
   isCorrect?: boolean | null | undefined
   log?: PracticeLogFields | undefined
   cardKind?: FsrsCardKind | undefined
   targetRetention?: number | undefined
+  assessmentEvidence?: PracticeAssessmentEvidence | undefined
 }
 
 export interface SetPracticeSuspendedInput {
@@ -126,6 +136,7 @@ export interface PracticeReviewAttemptSnapshot {
 export interface PracticeSummary {
   phase: PracticePhase
   nextReviewAt: Date | null
+  eligibleOn: string | null
   lastReviewedAt: Date | null
   reviewCount: number
   lapses: number
@@ -155,6 +166,13 @@ export interface PracticeDetails extends NormalizedPracticeState {
   card: FsrsCardSnapshot | null
   currentLog: Required<PracticeLogFields>
   canOverrideLatestReview: boolean
+  readonly generation: PracticeGenerationContext | null
+  readonly latestReview: {
+    readonly reviewAttemptId: string
+    readonly applicationSequence: number
+    readonly revision: number
+    readonly reviewedAt: Date
+  } | null
 }
 
 /**
@@ -178,6 +196,7 @@ export interface NormalizedPracticeState {
   isOverdue: boolean
   overdueDays: number
   dueAt: Date | null
+  eligibleOn: string | null
   lastReviewedAt: Date | null
 
   // FSRS metrics (computed from card)
@@ -201,11 +220,13 @@ export function deriveNormalizedPracticeState(input: {
   card: FsrsCardSnapshot | null
   attempts: PracticeReviewAttemptSnapshot[]
   now?: Date
+  retrievabilityOptions?: FsrsSchedulingOptions | undefined
 }): NormalizedPracticeState {
   const summary = derivePracticeSummary({
     practice: input.practice,
     card: input.card,
     now: input.now,
+    retrievabilityOptions: input.retrievabilityOptions,
   })
 
   return {
@@ -219,6 +240,7 @@ export function deriveNormalizedPracticeState(input: {
     isOverdue: summary.isOverdue,
     overdueDays: summary.overdueDays,
     dueAt: summary.nextReviewAt,
+    eligibleOn: summary.eligibleOn,
     lastReviewedAt: summary.lastReviewedAt,
     retrievability: summary.retrievability,
     stability: summary.stability,
@@ -255,6 +277,7 @@ export function derivePracticeSummary(input: {
   practice: PracticeStateSnapshot | null
   card: FsrsCardSnapshot | null
   now?: Date | undefined
+  retrievabilityOptions?: FsrsSchedulingOptions | undefined
 }): PracticeSummary {
   const now = input.now ?? new Date()
   const suspended =
@@ -269,10 +292,11 @@ export function derivePracticeSummary(input: {
     (input.practice?.attemptCount ?? 0) > 0
   const retrievability =
     input.card && input.card.lastReviewAt
-      ? getRetrievability(input.card, now)
+      ? getRetrievability(input.card, now, input.retrievabilityOptions)
       : null
   const timing = derivePracticeScheduleTiming({
     dueAt: input.card?.dueAt ?? null,
+    lastReviewedAt,
     isStarted,
     isSuspended: suspended,
     now,
@@ -283,6 +307,7 @@ export function derivePracticeSummary(input: {
       ? 'suspended'
       : phaseFromPracticeAndCard(input.practice, input.card),
     nextReviewAt: input.card?.dueAt ?? null,
+    eligibleOn: timing.eligibleOn,
     lastReviewedAt,
     reviewCount,
     lapses: input.card?.lapses ?? 0,

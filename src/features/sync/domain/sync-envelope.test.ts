@@ -28,6 +28,10 @@ const backup: BackupFile = {
       problemPractice: [],
       fsrsCards: [],
       reviewAttempts: [],
+      schedulerProfiles: [],
+      reviewEvidence: [],
+      generations: [],
+      commandReceipts: [],
     },
     tracks: {
       tracks: [],
@@ -119,11 +123,11 @@ describe('sync envelope', () => {
         dataUpdatedAt: '2026-05-26T12:00:00.000Z',
       }),
     ).toMatchObject({
-      syncEnvelopeVersion,
+      syncEnvelopeVersion: 1,
       app: 'cognipace',
       exportedAt: '2026-05-26T12:00:01.000Z',
       dataUpdatedAt: '2026-05-26T12:00:00.000Z',
-      backup,
+      backup: { ...backup, schemaVersion: 6 },
     })
   })
 
@@ -194,6 +198,11 @@ describe('sync envelope', () => {
       schemaVersion: 3,
       data: {
         ...backup.data,
+        practice: {
+          problemPractice: backup.data.practice.problemPractice,
+          fsrsCards: backup.data.practice.fsrsCards,
+          reviewAttempts: backup.data.practice.reviewAttempts,
+        },
         topics: [
           {
             id: 'array',

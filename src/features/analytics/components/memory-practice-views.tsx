@@ -22,6 +22,28 @@ import { ChartTrendNote, formatCount, formatDays } from './charts/chart-shared'
 
 type MemoryRow = AnalyticsViews['memoryStrength']['rows'][number]
 
+/** Shared supported-edge window; preserve every unavailable interval inside it. */
+export function memoryStrengthRows(source: readonly MemoryRow[]) {
+  return trimHistoricalEmptyEdges(
+    source,
+    (row) =>
+      isFiniteValue(row.medianStrengthDays) || (row.observedReviews ?? 0) > 0,
+  )
+}
+
+export function memoryModelProvenanceText(row: MemoryRow) {
+  switch (row.modelProvenance) {
+    case 'captured':
+      return 'Recorded scheduling evidence'
+    case 'legacy-derived':
+      return 'Legacy-derived compatibility'
+    case 'mixed':
+      return 'Mixed scheduling evidence'
+    default:
+      return 'Unavailable · insufficient scheduling evidence'
+  }
+}
+
 export function MemoryStrengthView({
   view,
   timeFrame,
@@ -29,9 +51,7 @@ export function MemoryStrengthView({
   view: AnalyticsViews['memoryStrength']
   timeFrame?: HistoricalChartTimeFrame | undefined
 }) {
-  const rows = trimHistoricalEmptyEdges(view.rows, (row) =>
-    isFiniteValue(row.medianStrengthDays),
-  )
+  const rows = memoryStrengthRows(view.rows)
   const hasValues = rows.length > 0
   return (
     <div className="cp-historical-view cp-historical-memory grid min-w-0 gap-2">
@@ -39,51 +59,11 @@ export function MemoryStrengthView({
         chart={
           hasValues ? (
             <div className="grid min-w-0 gap-2">
-              <HistoricalChart
-                config={{
-                  medianStrengthDays: {
-                    label: 'Median strength',
-                    color: 'var(--cp-analytics-healthy)',
-                  },
-                }}
-                description={`Median post-review FSRS stability with supported Q1–Q3 ranges. Scale: ${formatDays(view.scale.domain[0])}–${formatDays(view.scale.domain[1])}. Ranges require at least four eligible reviews. Dashed lines cross periods with no eligible evidence. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
-                height={290}
-                name="Memory Strength chart"
-                rows={rows}
+              <MemoryStrengthPlot
+                view={view}
                 timeFrame={timeFrame}
-                tooltip={(row) => (
-                  <MemoryTooltip row={row} timeFrame={timeFrame} />
-                )}
-                yAxes={[
-                  {
-                    label: 'Stability (days)',
-                    scale: view.scale,
-                    format: formatDays,
-                    padding: { top: 6, bottom: 10 },
-                  },
-                ]}
-              >
-                {(rows, selected, visible) => (
-                  <>
-                    <MemoryWhiskers rows={rows} />
-                    <LineSegments
-                      activeIndex={
-                        visible && selected ? rows.indexOf(selected) : null
-                      }
-                      data={rows}
-                      dataKey="medianStrengthDays"
-                      markerFill="var(--cp-analytics-healthy)"
-                      markerShape="circle"
-                      seriesKey="Median strength"
-                      showMeasuredDots
-                      stroke="var(--cp-analytics-healthy)"
-                      strokeWidth={2}
-                      testId="memory-strength"
-                      type="linear"
-                    />
-                  </>
-                )}
-              </HistoricalChart>
+                rows={rows}
+              />
               <MemoryLegend />
               <ChartTrendNote
                 pointCount={
@@ -105,8 +85,9 @@ export function MemoryStrengthView({
                 formatDays(row.medianStrengthDays),
                 memoryRangeText(row),
                 row.eligibleReviews,
+                row.observedReviews ?? row.eligibleReviews,
                 formatSignedDays(row.medianChangeDays),
-                'Reconstructed',
+                memoryModelProvenanceText(row),
                 evidenceText(row.evidence),
                 historicalIntervalContext(row, timeFrame),
               ]}
@@ -115,8 +96,9 @@ export function MemoryStrengthView({
                 'Median strength',
                 'Middle 50%',
                 'Eligible reviews',
+                'Observed reviews',
                 'Median change',
-                'Provenance',
+                'Model provenance',
                 'Evidence',
                 'Period context',
               ]}
@@ -128,6 +110,71 @@ export function MemoryStrengthView({
         }
       />
     </div>
+  )
+}
+
+export function MemoryStrengthPlot({
+  view,
+  timeFrame,
+  compact,
+  exactTooltip = false,
+  rows = memoryStrengthRows(view.rows),
+}: {
+  view: AnalyticsViews['memoryStrength']
+  timeFrame?: HistoricalChartTimeFrame | undefined
+  compact?: { height: number; showGroupingLabel?: boolean } | undefined
+  exactTooltip?: boolean | undefined
+  rows?: readonly MemoryRow[] | undefined
+}) {
+  return (
+    <HistoricalChart
+      config={{
+        medianStrengthDays: {
+          label: 'Median strength',
+          color: 'var(--cp-analytics-healthy)',
+        },
+      }}
+      description={`Median post-review FSRS stability with supported Q1–Q3 ranges. Scale: ${formatDays(view.scale.domain[0])}–${formatDays(view.scale.domain[1])}. Ranges require at least four eligible reviews. Dashed lines cross periods with no eligible evidence. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
+      height={290}
+      compact={compact}
+      name="Memory Strength chart"
+      rows={rows}
+      timeFrame={timeFrame}
+      tooltip={(row) => (
+        <MemoryTooltip
+          row={row}
+          timeFrame={timeFrame}
+          exactValues={exactTooltip}
+        />
+      )}
+      yAxes={[
+        {
+          label: 'Stability (days)',
+          scale: view.scale,
+          format: formatDays,
+          padding: { top: 6, bottom: 10 },
+        },
+      ]}
+    >
+      {(rows, selected, visible) => (
+        <>
+          <MemoryWhiskers rows={rows} />
+          <LineSegments
+            activeIndex={visible && selected ? rows.indexOf(selected) : null}
+            data={rows}
+            dataKey="medianStrengthDays"
+            markerFill="var(--cp-analytics-healthy)"
+            markerShape="circle"
+            seriesKey="Median strength"
+            showMeasuredDots
+            stroke="var(--cp-analytics-healthy)"
+            strokeWidth={2}
+            testId="memory-strength"
+            type="linear"
+          />
+        </>
+      )}
+    </HistoricalChart>
   )
 }
 
@@ -180,7 +227,7 @@ function MemoryWhiskers({
   )
 }
 
-function MemoryLegend() {
+export function MemoryLegend() {
   return (
     <div
       aria-label="Memory Strength series"
@@ -231,22 +278,25 @@ function ReportContext({
 function MemoryTooltip({
   row,
   timeFrame,
+  exactValues = false,
 }: {
   row: MemoryRow
   timeFrame?: HistoricalChartTimeFrame | undefined
+  exactValues?: boolean | undefined
 }) {
   return (
     <TooltipBox
       row={row}
       timeFrame={timeFrame}
       values={[
-        `Median strength: ${availableDays(row.medianStrengthDays)}`,
+        `Median strength: ${exactValues && isFiniteValue(row.medianStrengthDays) ? `${row.medianStrengthDays} days` : availableDays(row.medianStrengthDays)}`,
         `Middle 50%: ${hasSupportedRange(row) ? `${formatDays(row.q1)}–${formatDays(row.q3)}` : row.eligibleReviews < 4 ? 'Unavailable (needs 4 eligible reviews)' : 'Unavailable'}`,
         `Q1: ${hasSupportedRange(row) ? formatDays(row.q1) : 'Unavailable'}`,
         `Q3: ${hasSupportedRange(row) ? formatDays(row.q3) : 'Unavailable'}`,
         `Eligible reviews: ${formatCount(row.eligibleReviews)}`,
+        `Observed reviews: ${formatCount(row.observedReviews ?? row.eligibleReviews)}`,
         `Median change: ${formatSignedDays(row.medianChangeDays)}`,
-        'Provenance: Reconstructed',
+        `Model provenance: ${memoryModelProvenanceText(row)}`,
         `Evidence: ${evidenceText(row.evidence)}`,
       ]}
     />

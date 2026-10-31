@@ -1,5 +1,6 @@
 export {
   getPracticeDetailsViaRuntime,
+  previewPracticeReviewViaRuntime,
   overrideLastReviewResultViaRuntime,
   resetPracticeScheduleViaRuntime,
   saveReviewResultViaRuntime,
@@ -21,12 +22,18 @@ export {
   practiceResetScheduleRequestSchema,
   practiceReviewAttemptSchema,
   practiceReviewResultSchema,
+  practiceReviewCommandResultSchema,
+  practicePreviewRequestSchema,
+  practicePreviewResponseSchema,
   practiceRuntimeSurfaceSchema,
   practiceSaveReviewResultRequestSchema,
   practiceSetSuspendedRequestSchema,
   normalizedPracticeStateSchema,
   practiceStateSnapshotSchema,
   type PracticeDetailsRequest,
+  type PracticeReviewCommandResult,
+  type PracticePreviewRequest,
+  type PracticePreviewResponse,
   type PracticeOverrideLastReviewResultRequest,
   type PracticeResetScheduleRequest,
   type PracticeSaveReviewResultRequest,
@@ -42,6 +49,7 @@ export {
 } from './api/practice-serializers'
 export {
   buildPracticeProgressSummary,
+  derivePracticeScheduleTiming,
   deriveNormalizedPracticeState,
   normalizeReviewLogFields,
   practiceStatuses,
@@ -65,3 +73,9 @@ export {
   type SaveReviewResultInput,
   type SetPracticeSuspendedInput,
 } from './domain'
+
+export * from './domain/practice-storage'
+export {
+  ReviewCommandConflictError,
+  type ReviewCommandConflictReason,
+} from './domain/practice-command'

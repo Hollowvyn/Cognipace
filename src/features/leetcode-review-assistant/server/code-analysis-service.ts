@@ -2,8 +2,8 @@ import { generateJson } from '@/lib/ai'
 import type { AiProviderConfig } from '@/lib/ai/types'
 
 import type { AnalyzeLeetCodeSubmissionRequest } from '../api/code-analysis-contracts'
-import { isCodeAnalysisConsistent } from '../domain/code-analysis-consistency'
-import { codeAnalysisSchema } from '../domain/code-analysis-schema'
+import { isCodeFeedbackConsistent } from '../domain/code-analysis-consistency'
+import { codeFeedbackSchema } from '../domain/code-feedback-schema'
 import { buildCodeAnalysisPrompt } from './build-code-analysis-prompt'
 
 export async function analyzeCode(
@@ -15,15 +15,14 @@ export async function analyzeCode(
   const result = await generateJson({
     ...config,
     prompt: buildCodeAnalysisPrompt(request),
-    schema: codeAnalysisSchema,
+    schema: codeFeedbackSchema,
     signal,
     timeoutMs,
     maxOutputTokens: 8192,
+    retryTransientErrors: true,
+    collectMetrics: true,
   })
-  if (
-    result.status === 'success' &&
-    !isCodeAnalysisConsistent(result.data, request.submission.language)
-  ) {
+  if (result.status === 'success' && !isCodeFeedbackConsistent(result.data)) {
     return {
       status: 'error' as const,
       code: 'invalid-output' as const,

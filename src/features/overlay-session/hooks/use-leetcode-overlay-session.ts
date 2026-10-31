@@ -1,3 +1,7 @@
+import {
+  useLeetCodeCodeImplementation,
+  type CodeImplementationState,
+} from './use-leetcode-code-implementation'
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 
 import { useAiHintConnection } from '@/features/genai'
@@ -10,7 +14,6 @@ import type {
 import {
   initialOverlaySessionState,
   overlaySessionReducer,
-  type OverlaySubmittedSession,
   type OverlaySessionState,
 } from '../domain'
 import {
@@ -31,6 +34,10 @@ import {
   type OverlayReviewActions,
 } from './use-overlay-review-actions'
 import { useLeetCodeSubmissionAutomation } from './use-leetcode-submission-automation'
+import {
+  useOverlayReviewPreview,
+  type OverlayReviewPreviewState,
+} from './use-overlay-review-preview'
 import { useOverlayTimer, type OverlayTimerStatus } from './use-overlay-timer'
 
 export type LeetCodeOverlaySession = {
@@ -40,6 +47,7 @@ export type LeetCodeOverlaySession = {
   status: OverlaySyncStatus
   feedback: string | null
   overlay: OverlaySessionState
+  preview: OverlayReviewPreviewState
   timer: {
     elapsedSeconds: number
     targetSeconds: number
@@ -53,6 +61,8 @@ export type LeetCodeOverlaySession = {
   }
   hints: OverlayHintState
   aiAnalysis: CodeAnalysisState
+  aiImplementation: CodeImplementationState
+  generateAiImplementation: () => void
   retryAiAnalysis: () => void
 }
 
@@ -87,6 +97,7 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
           nextContext.practice?.latestAttempt?.rating ??
           nextContext.practice?.practice?.lastRating ??
           'good',
+        previewGeneration: nextContext.practice?.generation ?? null,
       })
     },
     [],
@@ -98,8 +109,6 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
         return
       }
 
-      const submittedSession = latestOverlayRef.current.submittedSession
-
       dispatch({
         type: 'problem-context-refreshed',
         problemSlug: problem.problemSlug,
@@ -107,12 +116,8 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
           nextContext.practice?.latestAttempt?.rating ??
           nextContext.practice?.practice?.lastRating ??
           'good',
-        submittedSession: submittedSession
-          ? createSubmittedSessionFromContext(
-              nextContext,
-              submittedSession.lockReason,
-            )
-          : null,
+        submittedSession: null,
+        previewGeneration: nextContext.practice?.generation ?? null,
       })
     },
     [],
@@ -136,6 +141,8 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     enabled: pageSync.context?.aiAssessmentEnabled ?? false,
     available: pageSync.context?.aiAssessmentAvailable ?? false,
   })
+
+  const implementation = useLeetCodeCodeImplementation(analysis.state)
 
   const hintConnection = useAiHintConnection(Boolean(pageSync.location))
   const hints = useLeetCodeCodeHints({
@@ -163,6 +170,10 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     },
   })
 
+  const preview = useOverlayReviewPreview({
+    overlay,
+  })
+
   useLeetCodeSubmissionAutomation({
     activeProblemSlug: overlay.activeProblemSlug,
     autoDetectSolved: pageSync.context?.automation.autoDetectSolved ?? false,
@@ -184,6 +195,7 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     status: pageSync.status,
     feedback: pageSync.feedback,
     overlay,
+    preview,
     timer: {
       elapsedSeconds,
       targetSeconds,
@@ -198,6 +210,8 @@ export function useLeetCodeOverlaySession(): LeetCodeOverlaySession {
     },
     hints: hints.state,
     aiAnalysis: analysis.state,
+    aiImplementation: implementation.state,
+    generateAiImplementation: implementation.generate,
     retryAiAnalysis: analysis.retry,
   }
 }
@@ -210,24 +224,6 @@ function getTargetSeconds(context: LeetCodeOverlayContext | null) {
   }
 
   return getLeetCodeSolveTimeTargetSeconds(problem.difficulty, context.timing)
-}
-
-function createSubmittedSessionFromContext(
-  context: LeetCodeOverlayContext,
-  lockReason: OverlaySubmittedSession['lockReason'],
-): OverlaySubmittedSession | null {
-  const latestAttempt = context.practice?.latestAttempt
-
-  if (!latestAttempt) {
-    return null
-  }
-
-  return {
-    rating: latestAttempt.rating,
-    elapsedSeconds: latestAttempt.elapsedSeconds,
-    isCorrect: latestAttempt.isCorrect ?? latestAttempt.rating !== 'again',
-    lockReason,
-  }
 }
 
 export type { OverlaySyncStatus } from './use-leetcode-page-sync'

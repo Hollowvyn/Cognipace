@@ -30,7 +30,7 @@ export function AdvancedReviewSection({
 }: AdvancedReviewSectionProps) {
   const isStrictTimingDisabled = !draft.assessment.requireSolveTime
   const targetRetentionHint =
-    'FSRS applies this target when scheduling your next review. Existing due dates stay unchanged.'
+    'This is an FSRS model target, not a guarantee of coding success or interview readiness. It applies to your next review; existing due dates stay unchanged. The configured 180-day maximum can yield native 181–183-day intervals after rating ordering.'
   const strictTimingHint =
     'Requires solve time; over-time accepted solutions are saved as Again.'
   const timingTargetsHint =

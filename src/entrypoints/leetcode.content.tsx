@@ -6,6 +6,7 @@ import '@/app/styles.css'
 import { OverlayApp } from '@/app/overlay/overlay-app'
 import { AppProviders } from '@/app/providers/app-providers'
 import { parseLeetCodeProblemLocation } from '@/lib/leetcode'
+import { markOverlayStartup } from '@/lib/performance/overlay-startup-timing'
 
 const overlayZIndex = 2147483000
 
@@ -30,6 +31,7 @@ export default defineContentScript({
       zIndex: overlayZIndex,
       isolateEvents: true,
       onMount: (container) => {
+        markOverlayStartup('content-mount')
         const root = createRoot(container)
 
         root.render(

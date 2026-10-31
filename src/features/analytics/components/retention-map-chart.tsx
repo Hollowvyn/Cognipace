@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type RefObject,
@@ -35,6 +36,7 @@ import {
   fullViewport,
   panViewport,
   recallTicks,
+  retentionModelProvenance,
   revealRow,
   statusColor,
   statusLabel,
@@ -46,16 +48,20 @@ import {
 
 type Selection = { slug: string; candidates: string[] } | null
 
-export function RetentionMapChart({
+export function useRetentionMapController({
   rows,
-  timeZone,
   view,
+  deferPointerSelection = false,
+  contextKey = '',
+  fallbackFocusRef,
 }: {
   rows: RetentionRow[]
-  timeZone: string
   view: AnalyticsViews['retentionMap']
+  deferPointerSelection?: boolean
+  contextKey?: string
+  fallbackFocusRef?: RefObject<HTMLElement | null>
 }) {
-  const full = fullViewport(view)
+  const full = useMemo(() => fullViewport(view), [view])
   const domainKey = `${full.duration.join(',')}:${full.recall.join(',')}`
   const [storedViewport, setViewport] = useState({
     key: domainKey,
@@ -66,12 +72,29 @@ export function RetentionMapChart({
   const [activeSlug, setActiveSlug] = useState<string | null>(null)
   const [hoverSlug, setHoverSlug] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection>(null)
-  const [host, setHost] = useState<HTMLDivElement | null>(null)
   const inspectionRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const regionRef = useRef<HTMLDivElement>(null)
   const cancelGestureRef = useRef<(() => boolean) | null>(null)
   const beforeClick = useRef<Selection>(null)
+  const [selectionOpen, setSelectionOpen] = useState(false)
+  const handoff = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingFocus = useRef(false)
+  const [focusRequested, setFocusRequested] = useState(0)
+  const consumedFocusRequest = useRef(0)
+  const cancelHandoff = useCallback(() => {
+    if (handoff.current !== null) clearTimeout(handoff.current)
+    handoff.current = null
+  }, [])
+  const onInspectorMounted = useCallback(
+    (control: HTMLButtonElement | null) => {
+      if (control && pendingFocus.current && !control.disabled) {
+        pendingFocus.current = false
+        control.focus({ preventScroll: true })
+      }
+    },
+    [],
+  )
   const summaryId = useId()
   const detailsId = useId()
   const activeIndex = Math.max(
@@ -90,23 +113,66 @@ export function RetentionMapChart({
     setViewport({ key: domainKey, value })
 
   const dismiss = useCallback(() => {
+    cancelHandoff()
     setSelection(null)
+    setSelectionOpen(false)
     setHoverSlug(null)
-    if (!inspectionRef.current?.closest('[hidden]'))
-      inspectionRef.current?.focus({ preventScroll: true })
-  }, [])
+    pendingFocus.current = true
+    const control = inspectionRef.current
+    if (control && !control.disabled && !control.closest('[hidden]')) {
+      pendingFocus.current = false
+      control.focus({ preventScroll: true })
+    }
+  }, [cancelHandoff])
 
-  if (selection && !rows.some((row) => row.slug === selection.slug))
-    setSelection(null)
-
+  const rowKey = rows.map((row) => row.slug).join('|')
+  // Reconcile against the full filtered cohort, including chooser membership.
+  if (selection) {
+    if (!pinned) {
+      setSelection(null)
+      setSelectionOpen(false)
+      setFocusRequested((value) => value + 1)
+    } else if (
+      selection.candidates.length &&
+      candidates.length !== selection.candidates.length
+    ) {
+      setSelection({
+        slug: pinned.slug,
+        candidates:
+          candidates.length > 1 ? candidates.map((row) => row.slug) : [],
+      })
+    }
+  }
   useEffect(() => {
-    if (!selection) return
-    closeRef.current?.focus({ preventScroll: true })
-  }, [selection])
+    if (focusRequested === consumedFocusRequest.current) return
+    consumedFocusRequest.current = focusRequested
+    pendingFocus.current = true
+    const control = inspectionRef.current
+    if (control && !control.disabled && !control.closest('[hidden]')) {
+      pendingFocus.current = false
+      control.focus({ preventScroll: true })
+    } else if (rows.length === 0) {
+      pendingFocus.current = false
+      fallbackFocusRef?.current?.focus({ preventScroll: true })
+    }
+  }, [focusRequested, rows.length, fallbackFocusRef])
+  useEffect(() => {
+    cancelHandoff()
+    return cancelHandoff
+  }, [rowKey, domainKey, contextKey, cancelHandoff])
+  useEffect(() => {
+    window.addEventListener('blur', cancelHandoff)
+    return () => window.removeEventListener('blur', cancelHandoff)
+  }, [cancelHandoff])
+  useEffect(() => {
+    if (selection && (selectionOpen || !deferPointerSelection))
+      closeRef.current?.focus({ preventScroll: true })
+  }, [selection, selectionOpen, deferPointerSelection])
 
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      cancelHandoff()
       if (cancelGestureRef.current?.()) {
         event.preventDefault()
         return
@@ -129,7 +195,7 @@ export function RetentionMapChart({
       document.removeEventListener('keydown', escape)
       document.removeEventListener('pointerdown', outside, true)
     }
-  }, [selection, hoverSlug, dismiss])
+  }, [selection, hoverSlug, dismiss, cancelHandoff])
 
   function select(index: number) {
     const row = rows[index]
@@ -139,20 +205,120 @@ export function RetentionMapChart({
     updateViewport(revealRow(viewport, full, row))
   }
 
-  function pin(slugs: string[], clickDetail?: number) {
+  function pin(slugs: string[], clickDetail?: number, pointerType?: string) {
     if (clickDetail !== undefined && clickDetail !== 2)
       beforeClick.current = selection
+    cancelHandoff()
     if (!slugs[0] || clickDetail === 2) return
     const slug = slugs[0]
-    setActiveSlug(slug)
-    setHoverSlug(null)
-    setSelection(
+    const next =
       selection?.slug === slug && slugs.length === 1
         ? null
-        : { slug, candidates: slugs.length > 1 ? slugs : [] },
-    )
+        : { slug, candidates: slugs.length > 1 ? slugs : [] }
+    setActiveSlug(slug)
+    setHoverSlug(null)
+    setSelection(next)
+    if (deferPointerSelection && clickDetail && pointerType !== 'touch') {
+      // Preserve the same native hit target for fast and slower browser
+      // double-clicks. The mark/pin changes immediately; only the surface
+      // handoff waits up to 1,000ms. Keyboard, touch and chooser are immediate.
+      handoff.current = setTimeout(() => {
+        handoff.current = null
+        setSelectionOpen(!!next)
+      }, 1000)
+    } else setSelectionOpen(!!next)
   }
+  function resetFromDoubleClick() {
+    cancelHandoff()
+    updateViewport(full)
+    const previous = beforeClick.current
+    const valid =
+      previous && rows.some((row) => row.slug === previous.slug)
+        ? {
+            ...previous,
+            candidates: previous.candidates.filter((slug) =>
+              rows.some((row) => row.slug === slug),
+            ),
+          }
+        : null
+    setSelection(valid)
+    setSelectionOpen(false)
+  }
+  function returnToMap() {
+    cancelHandoff()
+    setSelectionOpen(false)
+  }
+  function choose(slug: string) {
+    cancelHandoff()
+    setActiveSlug(slug)
+    setSelection({ slug, candidates: [] })
+    setSelectionOpen(true)
+  }
+  function hover(slug: string | null) {
+    if (!selection) {
+      setHoverSlug(slug)
+      if (slug) setActiveSlug(slug)
+    }
+  }
+  return {
+    activeIndex,
+    candidates,
+    closeRef,
+    detailsId,
+    dismiss,
+    full,
+    hover,
+    inspectionRef,
+    onInspectorMounted,
+    pin,
+    pinned,
+    preview,
+    regionRef,
+    resetFromDoubleClick,
+    returnToMap,
+    select,
+    selection,
+    selectionOpen,
+    setSelectionOpen,
+    summaryId,
+    updateViewport,
+    viewport,
+    visibleCount,
+    cancelGestureRef,
+    cancelHandoff,
+    choose,
+    activeSlug: selection?.slug ?? hoverSlug,
+  }
+}
 
+export type RetentionMapController = ReturnType<
+  typeof useRetentionMapController
+>
+
+export function RetentionMapChart({
+  rows,
+  timeZone,
+  view,
+}: {
+  rows: RetentionRow[]
+  timeZone: string
+  view: AnalyticsViews['retentionMap']
+}) {
+  const controller = useRetentionMapController({ rows, view })
+  const {
+    candidates,
+    closeRef,
+    detailsId,
+    dismiss,
+    full,
+    pinned,
+    preview,
+    regionRef,
+    summaryId,
+    updateViewport,
+    viewport,
+    visibleCount,
+  } = controller
   return (
     <div className="grid min-w-0 gap-3" ref={regionRef}>
       <div className="cp-retention-references">
@@ -176,82 +342,7 @@ export function RetentionMapChart({
         resets the full landscape. Escape cancels a gesture or closes
         inspection.
       </p>
-      <div className="cp-retention-plot-host" ref={setHost}>
-        <p className="cp-retention-y-title">Estimated recall now (%)</p>
-        <ChartContainer
-          accessibleName="Retention Map chart"
-          aria-describedby={summaryId}
-          aria-label="Retention Map chart"
-          aria-roledescription="interactive scatter plot"
-          className="aspect-auto h-80"
-          config={{}}
-          initialDimension={{ width: 640, height: 320 }}
-          role="region"
-        >
-          <ScatterChart
-            accessibilityLayer={false}
-            margin={{ left: 0, right: 12, top: 12, bottom: 12 }}
-          >
-            <CartesianGrid
-              stroke="var(--color-border)"
-              strokeOpacity={0.45}
-              vertical={false}
-            />
-            <XAxis
-              allowDataOverflow
-              axisLine={false}
-              dataKey="targetDurationDays"
-              domain={viewport.duration}
-              padding={{ left: 8, right: 8 }}
-              scale="log"
-              tickFormatter={formatDuration}
-              tickLine={false}
-              ticks={durationTicks(viewport.duration)}
-              type="number"
-            />
-            <YAxis
-              allowDataOverflow
-              axisLine={false}
-              dataKey="retrievability"
-              domain={viewport.recall}
-              padding={{ top: 8, bottom: 8 }}
-              tickFormatter={formatPercent}
-              tickLine={false}
-              ticks={recallTicks(viewport.recall)}
-              type="number"
-              width={44}
-            />
-            <RetentionPlot
-              activeSlug={selection?.slug ?? hoverSlug}
-              cancelGestureRef={cancelGestureRef}
-              controlRef={inspectionRef}
-              detailsId={detailsId}
-              full={full}
-              host={host}
-              onHover={(slug) => {
-                if (!selection) {
-                  setHoverSlug(slug)
-                  if (slug) setActiveSlug(slug)
-                }
-              }}
-              onPin={pin}
-              onReset={() => {
-                updateViewport(full)
-                setSelection(beforeClick.current)
-              }}
-              onSelect={select}
-              onViewport={updateViewport}
-              pinned={!!selection}
-              rows={rows}
-              selectedIndex={activeIndex}
-              summaryId={summaryId}
-              target={view.targetRetention}
-              viewport={viewport}
-            />
-          </ScatterChart>
-        </ChartContainer>
-        <p className="cp-retention-x-title">Memory durability (days, log)</p>
-      </div>
+      <RetentionMapCanvas controller={controller} rows={rows} view={view} />
       <div className="cp-retention-view-controls">
         <p className="m-0 text-xs text-muted-foreground">
           {formatCount(visibleCount)} in view · {formatCount(rows.length)}{' '}
@@ -313,7 +404,7 @@ export function RetentionMapChart({
             {candidates.map((row) => (
               <Button
                 key={row.slug}
-                onClick={() => setSelection({ slug: row.slug, candidates: [] })}
+                onClick={() => controller.choose(row.slug)}
                 variant="outline"
               >
                 <span className="min-w-0 text-left">
@@ -368,15 +459,122 @@ export function RetentionMapChart({
   )
 }
 
+export function RetentionMapCanvas({
+  controller,
+  rows,
+  view,
+  height = 320,
+}: {
+  controller: RetentionMapController
+  rows: RetentionRow[]
+  view: AnalyticsViews['retentionMap']
+  height?: number
+}) {
+  const [host, setHost] = useState<HTMLDivElement | null>(null)
+  const {
+    activeSlug,
+    cancelGestureRef,
+    cancelHandoff,
+    detailsId,
+    full,
+    hover,
+    inspectionRef,
+    onInspectorMounted,
+    pin,
+    resetFromDoubleClick,
+    select,
+    selection,
+    summaryId,
+    updateViewport,
+    viewport,
+    activeIndex,
+  } = controller
+  return (
+    <div className="cp-retention-plot-host" ref={setHost}>
+      <p className="cp-retention-y-title">Estimated recall now (%)</p>
+      <ChartContainer
+        accessibleName="Retention Map chart"
+        aria-describedby={summaryId}
+        aria-label="Retention Map chart"
+        aria-roledescription="interactive scatter plot"
+        className="aspect-auto min-h-0 [&_.recharts-responsive-container]:min-h-0!"
+        style={{ height }}
+        config={{}}
+        initialDimension={{ width: 640, height }}
+        role="region"
+      >
+        <ScatterChart
+          accessibilityLayer={false}
+          margin={{ left: 0, right: 12, top: 12, bottom: 12 }}
+        >
+          <CartesianGrid
+            stroke="var(--color-border)"
+            strokeOpacity={0.45}
+            vertical={false}
+          />
+          <XAxis
+            allowDataOverflow
+            axisLine={false}
+            dataKey="targetDurationDays"
+            domain={viewport.duration}
+            padding={{ left: 8, right: 8 }}
+            scale="log"
+            tickFormatter={formatDuration}
+            tickLine={false}
+            ticks={durationTicks(viewport.duration)}
+            type="number"
+          />
+          <YAxis
+            allowDataOverflow
+            axisLine={false}
+            dataKey="retrievability"
+            domain={viewport.recall}
+            padding={{ top: 8, bottom: 8 }}
+            tickFormatter={formatPercent}
+            tickLine={false}
+            ticks={recallTicks(viewport.recall)}
+            type="number"
+            width={44}
+          />
+          <RetentionPlot
+            activeSlug={activeSlug}
+            cancelGestureRef={cancelGestureRef}
+            onCancelGesture={cancelHandoff}
+            controlRef={inspectionRef}
+            onControlMounted={onInspectorMounted}
+            detailsId={detailsId}
+            full={full}
+            host={host}
+            onHover={hover}
+            onPin={pin}
+            onReset={resetFromDoubleClick}
+            onSelect={select}
+            onViewport={updateViewport}
+            pinned={!!selection}
+            rows={rows}
+            selectedIndex={activeIndex}
+            summaryId={summaryId}
+            target={view.targetRetention}
+            viewport={viewport}
+          />
+        </ScatterChart>
+      </ChartContainer>
+      <p className="cp-retention-x-title">Memory durability (days, log)</p>
+    </div>
+  )
+}
+
 interface PlotProps {
   activeSlug: string | null | undefined
   cancelGestureRef: RefObject<(() => boolean) | null>
   controlRef: RefObject<HTMLButtonElement | null>
+  onControlMounted: (control: HTMLButtonElement | null) => void
+  onCancelGesture: () => void
   detailsId: string
   full: RetentionViewport
   host: HTMLDivElement | null
   onHover: (slug: string | null) => void
-  onPin: (slugs: string[], clickDetail?: number) => void
+  onPin: (slugs: string[], clickDetail?: number, pointerType?: string) => void
   onReset: () => void
   onSelect: (index: number) => void
   onViewport: (viewport: RetentionViewport) => void
@@ -392,6 +590,8 @@ function RetentionPlot({
   activeSlug,
   cancelGestureRef,
   controlRef,
+  onControlMounted,
+  onCancelGesture,
   detailsId,
   full,
   host,
@@ -413,6 +613,17 @@ function RetentionPlot({
   const inverseX = useXAxisInverseScale()
   const inverseY = useYAxisInverseScale()
   const clipId = useId()
+  const [controlNode, setControlNode] = useState<HTMLButtonElement | null>(null)
+  const lastPointerType = useRef('mouse')
+  const captured = useRef(new Set<number>())
+  const mountedControl = useCallback(
+    (node: HTMLButtonElement | null) => {
+      controlRef.current = node
+      setControlNode(node)
+      onControlMounted(node)
+    },
+    [controlRef, onControlMounted],
+  )
   const [box, setBox] = useState<{ start: PlotPoint; end: PlotPoint } | null>(
     null,
   )
@@ -449,19 +660,26 @@ function RetentionPlot({
     [inverseX, inverseY],
   )
   const cancel = useCallback(() => {
+    onCancelGesture()
     const wasActive = gesture.current !== null
     gesture.current = null
     touches.current.clear()
+    for (const pointerId of captured.current) {
+      if (controlRef.current?.hasPointerCapture?.(pointerId))
+        controlRef.current.releasePointerCapture?.(pointerId)
+    }
+    captured.current.clear()
     pointerFocusRef.current = false
     setBox(null)
     if (wasActive) suppressClick.current = true
     return wasActive
-  }, [])
+  }, [controlRef, onCancelGesture])
 
   useEffect(() => {
     cancelGestureRef.current = cancel
     window.addEventListener('blur', cancel)
     return () => {
+      cancel()
       cancelGestureRef.current = null
       window.removeEventListener('blur', cancel)
     }
@@ -482,7 +700,7 @@ function RetentionPlot({
   }, [host, cancel])
 
   useEffect(() => {
-    const control = controlRef.current
+    const control = controlNode
     if (!control || !plot) return
     const wheel = (event: WheelEvent) => {
       event.preventDefault()
@@ -515,7 +733,7 @@ function RetentionPlot({
     }
     control.addEventListener('wheel', wheel, { passive: false })
     return () => control.removeEventListener('wheel', wheel)
-  }, [controlRef, plot, viewport, full, onViewport, cancel, anchorAt])
+  }, [controlNode, plot, viewport, full, onViewport, cancel, anchorAt])
 
   if (!plot || !xScale || !yScale || !inverseX || !inverseY) return null
   const dataWidth = Math.abs(
@@ -703,6 +921,7 @@ function RetentionPlot({
                 onPin(
                   items.map((item) => item.row.slug),
                   event.detail,
+                  lastPointerType.current,
                 )
               }}
               onDoubleClick={(event) => {
@@ -741,7 +960,10 @@ function RetentionPlot({
               onPointerCancel={cancel}
               onPointerDown={(event) => {
                 if (event.pointerType !== 'touch' && event.button !== 0) return
+                onCancelGesture()
                 pointerFocusRef.current = true
+                lastPointerType.current = event.pointerType
+                captured.current.add(event.pointerId)
                 const point = pointAt(event.clientX, event.clientY)
                 suppressClick.current = false
                 event.currentTarget.setPointerCapture?.(event.pointerId)
@@ -837,9 +1059,10 @@ function RetentionPlot({
                     anchor: undefined,
                   }
                 setBox(null)
+                captured.current.delete(event.pointerId)
                 event.currentTarget.releasePointerCapture?.(event.pointerId)
               }}
-              ref={controlRef}
+              ref={mountedControl}
               style={{
                 left: plot.x,
                 top: plot.y + 24,
@@ -884,6 +1107,7 @@ function RetentionDetails({
   const details = [
     ['Status', statusLabel(row.status)],
     ['Estimated recall now', formatPercent(row.retrievability)],
+    ['Model evidence', retentionModelProvenance(row)],
     ['FSRS scheduling target', formatPercent(row.targetRetention)],
     ['Target gap', formatGap(row.targetGap)],
     ['Memory durability', formatDuration(row.targetDurationDays)],

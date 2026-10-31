@@ -20,7 +20,7 @@ const baseProblem = {
 }
 
 describe('buildTodayQueue', () => {
-  it('uses the FSRS due waterfall before future reinforcement and new work', () => {
+  it('uses the eligible due waterfall then new work without future cards', () => {
     const now = new Date('2026-09-13T12:00:00.000Z')
     const queue = buildTodayQueue(
       [
@@ -104,8 +104,6 @@ describe('buildTodayQueue', () => {
       'overdue-latest',
       'due-today-early',
       'due-today-late',
-      'future-low-retrievability',
-      'future-high-retrievability',
       'new-a',
       'new-b',
     ])
@@ -114,8 +112,6 @@ describe('buildTodayQueue', () => {
       'overdue',
       'due-today',
       'due-today',
-      'reinforcement',
-      'reinforcement',
       'new-problem',
       'new-problem',
     ])
@@ -123,6 +119,7 @@ describe('buildTodayQueue', () => {
     expect(queue.dueToday).toBe(4)
     expect(queue.reinforcementCount).toBe(2)
     expect(queue.newCount).toBe(2)
+    expect(queue.topRecommendation?.problemSlug).toBe('overdue-oldest')
   })
 
   it('caps by daily goal after due items first', () => {
@@ -156,6 +153,43 @@ describe('buildTodayQueue', () => {
     expect(queue.newCount).toBe(1)
   })
 
+  it('orders overdue cards by eligible day before raw due time', () => {
+    const now = new Date('2026-09-13T12:00:00.000Z')
+    const queue = buildTodayQueue(
+      [
+        candidate({
+          slug: 'raw-earlier-eligible-later',
+          card: reviewCard({
+            dueAt: new Date('2026-09-09T10:00:00.000Z'),
+            lastReviewAt: new Date('2026-09-11T10:00:00.000Z'),
+          }),
+          practice: practice({
+            lastReviewedAt: new Date('2026-09-11T10:00:00.000Z'),
+          }),
+          now,
+        }),
+        candidate({
+          slug: 'raw-later-eligible-earlier',
+          card: reviewCard({
+            dueAt: new Date('2026-09-10T10:00:00.000Z'),
+            lastReviewAt: new Date('2026-09-08T10:00:00.000Z'),
+          }),
+          practice: practice({
+            lastReviewedAt: new Date('2026-09-08T10:00:00.000Z'),
+          }),
+          now,
+        }),
+      ],
+      defaultUserSettings,
+      now,
+    )
+
+    expect(queue.items.map((item) => item.problemSlug)).toEqual([
+      'raw-later-eligible-earlier',
+      'raw-earlier-eligible-later',
+    ])
+  })
+
   it('excludes manually suspended and premium-filtered candidates', () => {
     const queue = buildTodayQueue(
       [
@@ -187,7 +221,26 @@ describe('buildTodayQueue', () => {
     expect(queue.topRecommendation).toBeNull()
   })
 
-  it('orders future review reinforcement by lowest current retrievability', () => {
+  it('presents a legacy mastered card when its review is due', () => {
+    const queue = buildTodayQueue(
+      [
+        candidate({
+          slug: 'mastered-with-review',
+          card: reviewCard(),
+          practice: practice({ status: 'mastered' }),
+        }),
+      ],
+      defaultUserSettings,
+      generatedAt,
+    )
+
+    expect(queue.items.map((item) => item.problemSlug)).toEqual([
+      'mastered-with-review',
+    ])
+    expect(queue.items[0]?.category).toBe('due')
+  })
+
+  it('orders explicitly requested extra practice by lowest current retrievability', () => {
     const queue = buildTodayQueue(
       [
         candidate({
@@ -216,15 +269,62 @@ describe('buildTodayQueue', () => {
         },
       },
       generatedAt,
+      'extra-practice',
     )
 
     expect(queue.items.map((item) => item.problemSlug)).toEqual([
       'low-retrievability',
-      'high-retrievability',
     ])
+    expect(queue.reinforcementCount).toBe(2)
+    expect(queue.queueLoad).toBe(1)
   })
 
-  it('puts unavailable retrievability after finite reinforcement values', () => {
+  it('limits extra practice to future reviewed cards that pass suspension and premium filters', () => {
+    const queue = buildTodayQueue(
+      [
+        candidate({ slug: 'unstarted' }),
+        candidate({
+          slug: 'due',
+          card: reviewCard(),
+          practice: practice({ lastRating: 'good' }),
+        }),
+        candidate({
+          slug: 'suspended-future',
+          card: reviewCard({ dueAt: new Date('2026-01-10T00:00:00.000Z') }),
+          practice: practice({ isSuspended: true }),
+        }),
+        candidate({
+          slug: 'premium-future',
+          isPremium: true,
+          card: reviewCard({ dueAt: new Date('2026-01-10T00:00:00.000Z') }),
+          practice: practice({ lastRating: 'good' }),
+        }),
+        candidate({
+          slug: 'eligible-future',
+          card: reviewCard({ dueAt: new Date('2026-01-10T00:00:00.000Z') }),
+          practice: practice({ lastRating: 'again' }),
+        }),
+      ],
+      {
+        ...defaultUserSettings,
+        practice: {
+          ...defaultUserSettings.practice,
+          problemFilters: { skipPremium: true },
+        },
+      },
+      generatedAt,
+      'extra-practice',
+    )
+
+    expect(queue.items.map((item) => item.problemSlug)).toEqual([
+      'eligible-future',
+    ])
+    expect(queue.topRecommendation?.reason).toBe('reinforcement')
+    expect(queue.dueCount).toBe(1)
+    expect(queue.newCount).toBe(1)
+  })
+
+  it('puts unavailable retrievability after finite extra practice values', () => {
     const queue = buildTodayQueue(
       [
         candidate({
@@ -247,15 +347,16 @@ describe('buildTodayQueue', () => {
       ],
       defaultUserSettings,
       generatedAt,
+      'extra-practice',
     )
 
     expect(queue.items.map((item) => item.problemSlug)).toEqual([
       'finite-retrievability',
-      'unavailable-retrievability',
     ])
+    expect(queue.reinforcementCount).toBe(2)
   })
 
-  it('breaks reinforcement ties by due date before problem identity', () => {
+  it('breaks extra practice ties by due date before problem identity', () => {
     const queue = buildTodayQueue(
       [
         candidate({
@@ -279,12 +380,11 @@ describe('buildTodayQueue', () => {
       ],
       defaultUserSettings,
       generatedAt,
+      'extra-practice',
     )
 
-    expect(queue.items.map((item) => item.problemSlug)).toEqual([
-      'earlier-due',
-      'later-due',
-    ])
+    expect(queue.items.map((item) => item.problemSlug)).toEqual(['earlier-due'])
+    expect(queue.reinforcementCount).toBe(2)
   })
 
   it('ignores the persisted review order setting', () => {
@@ -428,6 +528,7 @@ function candidate(input: {
 
 function practice(input: {
   lastRating?: ReviewRating
+  lastReviewedAt?: Date
   isSuspended?: boolean
   status?: PracticeStateSnapshot['status']
 }): PracticeStateSnapshot {
@@ -435,7 +536,8 @@ function practice(input: {
 
   return {
     status: input.status ?? (input.isSuspended ? 'suspended' : 'review'),
-    lastReviewedAt: new Date('2026-01-01T08:00:00.000Z'),
+    lastReviewedAt:
+      input.lastReviewedAt ?? new Date('2026-01-01T08:00:00.000Z'),
     attemptCount: 1,
     solvedCount: lastRating === 'again' ? 0 : 1,
     isSuspended: input.isSuspended ?? false,

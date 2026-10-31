@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { browser } from 'wxt/browser'
 
 import { useToggleStudyMode, type StudyMode } from '@/features/settings'
+import { useExtraPractice } from '@/features/queue'
+import type { SerializedTodayQueue } from '@/extension/messaging'
 import {
   getDashboardUrl,
   type DashboardRoute,
@@ -35,6 +37,7 @@ export interface PopupAppShellActions {
     scope: 'recommendation' | 'track',
   ) => void
   shuffleRecommendation: () => void
+  requestExtraPractice: () => void
   toggleStudyMode: () => void
 }
 
@@ -46,6 +49,12 @@ export interface PopupAppShellController {
   isUpdatingStudyMode: boolean
   canToggleStudyMode: boolean
   canShuffleRecommendation: boolean
+  extraPractice: {
+    item: SerializedTodayQueue['topRecommendation']
+    isLoading: boolean
+    hasRequested: boolean
+    error: string | null
+  }
   actions: PopupAppShellActions
 }
 
@@ -130,6 +139,12 @@ const fallbackData = {
 export function usePopupAppShellController(): PopupAppShellController {
   const shell = usePopupAppShellData()
   const toggleStudyModeMutation = useToggleStudyMode()
+  const [hasRequestedExtraPractice, setHasRequestedExtraPractice] =
+    useState(false)
+  const extraPracticeRequest = useExtraPractice(
+    'popup',
+    hasRequestedExtraPractice,
+  )
   const [recommendationIndex, setRecommendationIndex] = useState(0)
   const [status, setStatus] = useState<PopupControllerStatus>(null)
   const hasShellData = shell.data !== undefined
@@ -211,6 +226,20 @@ export function usePopupAppShellController(): PopupAppShellController {
     canToggleStudyMode,
     canShuffleRecommendation:
       hasShellData && data.popup.queuePreview.length > 1,
+    extraPractice: {
+      item: hasRequestedExtraPractice
+        ? (extraPracticeRequest.data?.items[0] ?? null)
+        : null,
+      isLoading: hasRequestedExtraPractice && extraPracticeRequest.isFetching,
+      hasRequested: hasRequestedExtraPractice && extraPracticeRequest.isSuccess,
+      error:
+        hasRequestedExtraPractice && extraPracticeRequest.isError
+          ? readErrorMessage(
+              extraPracticeRequest.error,
+              'Failed to load extra practice.',
+            )
+          : null,
+    },
     actions: {
       openOverview: () => {
         void openDashboard()
@@ -234,6 +263,13 @@ export function usePopupAppShellController(): PopupAppShellController {
 
           return count === 0 ? 0 : (current + 1) % count
         })
+      },
+      requestExtraPractice: () => {
+        if (hasRequestedExtraPractice) {
+          void extraPracticeRequest.refetch()
+        } else {
+          setHasRequestedExtraPractice(true)
+        }
       },
       toggleStudyMode: () => {
         void toggleStudyMode()

@@ -28,6 +28,7 @@ function Marks({
   const plot = usePlotArea()
   const xScale = useXAxisScale()
   const yScale = useYAxisScale()
+  const rightScale = useYAxisScale('success')
   if (!plot || !xScale || !yScale) return null
   return (
     <g
@@ -37,6 +38,17 @@ function Marks({
       data-top={plot.y}
       data-visible={visible}
     >
+      {data.map((row) =>
+        row.value === null || !rightScale ? null : (
+          <circle
+            cx={xScale(row.x)}
+            cy={rightScale(row.value)}
+            data-testid={`right-measured-${row.id}`}
+            key={`right-${row.id}`}
+            r={4}
+          />
+        ),
+      )}
       {data.map((row) =>
         row.value === null ? null : (
           <circle
@@ -72,13 +84,28 @@ function Fixture({
   data = rows,
   initialIndex = 0,
   inspectionResetKey = '',
+  compact,
+  cumulativeAsOf = false,
 }: {
   data?: typeof rows
   initialIndex?: number
   inspectionResetKey?: string
+  compact?: { height: number; showGroupingLabel?: boolean }
+  cumulativeAsOf?: boolean
 }) {
   return (
     <HistoricalChart
+      compact={compact}
+      cumulativeAsOf={cumulativeAsOf}
+      timeFrame={
+        cumulativeAsOf
+          ? {
+              asOf: '2026-09-03T00:10:00.123Z',
+              timeZone: 'UTC',
+              requestedDays: 30,
+            }
+          : undefined
+      }
       config={{ value: { color: 'green' } }}
       description="Measured values with unknown periods."
       initialIndex={initialIndex}
@@ -274,4 +301,58 @@ describe('HistoricalChart inspection', () => {
       }),
     ).not.toBeInTheDocument()
   })
+})
+
+it('fits the supplied remaining height with readable axes, cleared boundary markers and original-row inspection at 320px', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 320, 144),
+  )
+  const { container } = render(
+    <Fixture
+      compact={{ height: 144, showGroupingLabel: false }}
+      cumulativeAsOf
+    />,
+  )
+  const host = container.querySelector('.cp-historical-chart')!
+  expect(host).toHaveStyle({ height: '144px', minHeight: '0px' })
+  expect(host).not.toHaveClass('min-h-48')
+  expect(
+    screen.queryByText('Local date · 3-day summaries'),
+  ).not.toBeInTheDocument()
+  const marks = await screen.findByTestId('marks')
+  const top = Number(marks.getAttribute('data-top'))
+  const bottom = Number(marks.getAttribute('data-bottom'))
+  expect(bottom).toBeLessThanOrEqual(144)
+  expect(
+    Number(screen.getByTestId('measured-first').getAttribute('cy')) - 4,
+  ).toBeGreaterThanOrEqual(top)
+  expect(
+    Number(screen.getByTestId('measured-last').getAttribute('cy')) + 4,
+  ).toBeLessThanOrEqual(bottom)
+  const control = inspect()
+  for (const testId of [
+    'measured-first',
+    'measured-last',
+    'right-measured-first',
+    'right-measured-last',
+  ]) {
+    const mark = screen.getByTestId(testId)
+    const cx = Number(mark.getAttribute('cx'))
+    const cy = Number(mark.getAttribute('cy'))
+    expect(cx - 4).toBeGreaterThanOrEqual(Number.parseFloat(control.style.left))
+    expect(cx + 4).toBeLessThanOrEqual(
+      Number.parseFloat(control.style.left) +
+        Number.parseFloat(control.style.width),
+    )
+    expect(cy - 4).toBeGreaterThanOrEqual(top)
+    expect(cy + 4).toBeLessThanOrEqual(bottom)
+  }
+  fireEvent.keyDown(control, { key: 'End' })
+  expect(screen.getByRole('tooltip')).toHaveTextContent('last: 1')
+  fireEvent.keyDown(control, { key: 'Escape' })
+  fireEvent.keyDown(control, { key: ' ' })
+  expect(screen.getByRole('tooltip')).toHaveTextContent('last: 1')
+  fireEvent.keyDown(control, { key: 'Escape' })
+  fireEvent.keyDown(control, { key: 'Enter' })
+  expect(screen.getByRole('tooltip')).toHaveTextContent('last: 1')
 })

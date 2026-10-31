@@ -11,12 +11,16 @@ const methodSurfaceAccess = {
   'backup.validateFullBackup': ['dashboard'],
   'backup.restoreFullBackup': ['dashboard'],
   'backup.resetLocalData': ['dashboard'],
+  'backup.getPendingReplacement': ['dashboard'],
+  'backup.retryPendingReplacement': ['dashboard'],
   'genai.getAiProviderSecretPresence': ['popup', 'dashboard'],
   'genai.setAiProviderSecret': ['popup', 'dashboard'],
   'genai.clearAiProviderSecret': ['popup', 'dashboard'],
   'genai.testConnection': ['dashboard'],
   'genai.analyzeLeetCodeSubmission': ['content-script'],
   'genai.cancelLeetCodeAnalysis': ['content-script'],
+  'genai.generateLeetCodeImplementation': ['content-script'],
+  'genai.cancelLeetCodeImplementation': ['content-script'],
   'genai.getHintConnection': ['content-script'],
   'genai.generateLeetCodeHints': ['content-script'],
   'genai.cancelLeetCodeHints': ['content-script'],
@@ -45,6 +49,7 @@ const methodSurfaceAccess = {
   'problems.bulkUpdateProblems': ['dashboard'],
   'problems.bulkDelete': ['dashboard'],
   'practice.getDetails': ['popup', 'dashboard', 'content-script'],
+  'practice.previewReview': ['content-script'],
   'practice.saveReviewResult': ['popup', 'dashboard', 'content-script'],
   'practice.overrideLastReviewResult': ['popup', 'dashboard', 'content-script'],
   'practice.setSuspended': ['popup', 'dashboard', 'content-script'],
@@ -160,6 +165,8 @@ export function assertCanSenderCallExtensionMethod(
 
   assertCanCallExtensionMethod(method, senderSurface)
   if (
+    method === 'genai.generateLeetCodeImplementation' ||
+    method === 'genai.cancelLeetCodeImplementation' ||
     method === 'genai.analyzeLeetCodeSubmission' ||
     method === 'genai.cancelLeetCodeAnalysis' ||
     method === 'genai.getHintConnection' ||
@@ -175,7 +182,8 @@ export function assertCanSenderCallExtensionMethod(
     )
       throw new Error('Analysis requires an actual HTTPS LeetCode sender.')
     if (
-      (method === 'genai.analyzeLeetCodeSubmission' ||
+      (method === 'genai.generateLeetCodeImplementation' ||
+        method === 'genai.analyzeLeetCodeSubmission' ||
         method === 'genai.getHintConnection' ||
         method === 'genai.generateLeetCodeHints') &&
       !parseLeetCodeProblemLocation(actualUrl)

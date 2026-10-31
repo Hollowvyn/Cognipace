@@ -15,6 +15,7 @@ import type { UserSettings } from '@/features/settings/domain'
 import { getSettings } from '@/features/settings/server/settings-service'
 import type { ActiveTrack } from '@/features/tracks/domain'
 import { getActiveTrack } from '@/features/tracks/server/tracks-service'
+import { timeOverlayStartup } from '@/lib/performance/overlay-startup-timing'
 import type { Db } from '@/platform/db'
 
 import type {
@@ -87,7 +88,7 @@ async function getMainAppShellData(db: Db, now: Date) {
     generatedAt: now.toISOString(),
     status: {
       label: 'Practice ready',
-      detail: `${queue.dueCount} due, ${queue.newCount} new, ${queue.reinforcementCount} reinforcement available.`,
+      detail: `${queue.dueCount} due, ${queue.newCount} new.`,
     },
     metrics: createAppShellMetrics({
       dueCount: queue.dueCount,
@@ -173,9 +174,11 @@ async function getOverlayPayload(
   }
 
   const [practice, queue, activeTrack] = await Promise.all([
-    getPracticeDetails(db, context.problem.slug, { now }),
-    getTodayQueue(db, now),
-    getActiveTrack(db, now),
+    timeOverlayStartup('worker.overlay-practice', () =>
+      getPracticeDetails(db, context.problem.slug, { now }),
+    ),
+    timeOverlayStartup('worker.overlay-queue', () => getTodayQueue(db, now)),
+    timeOverlayStartup('worker.overlay-track', () => getActiveTrack(db, now)),
   ])
   const queueItems = queue.items.map(serializeQueueItem)
   const currentProblem = serializeProblemSummary(context.problem)

@@ -12,7 +12,7 @@ import {
   analyzeLeetCodeSubmissionViaRuntime,
   cancelLeetCodeAnalysisViaRuntime,
 } from '@/features/leetcode-review-assistant'
-import { makeValidAnalysis } from '@/features/leetcode-review-assistant/testing/code-analysis-fixtures'
+import { makeValidFeedback } from '@/features/leetcode-review-assistant/testing/code-analysis-fixtures'
 import {
   createLeetCodeReviewContext,
   type LeetCodeCaptureState,
@@ -65,7 +65,7 @@ function ready(
   return {
     status: 'ready',
     ...analysisIdentity(request),
-    report: makeValidAnalysis(),
+    report: makeValidFeedback(),
     providerMetadata: { provider: 'gemini', model: 'fixture', durationMs: 10 },
   }
 }
@@ -426,7 +426,7 @@ describe('useLeetCodeCodeAnalysis', () => {
     expect(request.configurationRevision).toBe(1)
     expect(request.submissionId).toBe('1234567890')
   })
-  it('bounds hung messaging at 50000ms, cancels, and ignores its late result', async () => {
+  it('bounds hung messaging at 80000ms, cancels, and ignores its late result', async () => {
     vi.useFakeTimers()
     const pending = deferred<AnalyzeLeetCodeSubmissionResponse>()
     analyze.mockReturnValue(pending.promise)
@@ -438,7 +438,7 @@ describe('useLeetCodeCodeAnalysis', () => {
     })
     const request = analyze.mock.calls[0]![0]
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(49999)
+      await vi.advanceTimersByTimeAsync(79999)
     })
     expect(result.current.state.status).toBe('pending')
     await act(async () => {
@@ -683,4 +683,22 @@ describe('useLeetCodeCodeAnalysis', () => {
       'private-token-and-code',
     )
   })
+})
+
+it('retains the exact successful assessment request for explicit implementation generation', async () => {
+  const { result, rerender, options } = mount()
+  await waitFor(() => expect(result.current.state.status).toBe('ready'))
+  const original = analyze.mock.calls[0]![0]
+  expect(result.current.state).toMatchObject({
+    assessment: original,
+    host: 'leetcode.com',
+  })
+  const changed = structuredClone(options.capture)
+  changed.codeSnapshot = {
+    ...changed.codeSnapshot!,
+    code: 'new unrelated editor text',
+  }
+  rerender({ ...options, capture: changed })
+  expect(result.current.state).toMatchObject({ assessment: original })
+  expect(analyze).toHaveBeenCalledTimes(1)
 })

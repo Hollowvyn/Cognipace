@@ -4,10 +4,10 @@ vi.mock('@/lib/ai', () => ({ generateJson: vi.fn() }))
 import { generateJson } from '@/lib/ai'
 import { aiErrorCodes, type AiProviderConfig } from '@/lib/ai/types'
 
-import { codeAnalysisSchema } from '../domain/code-analysis-schema'
+import { codeFeedbackSchema } from '../domain/code-feedback-schema'
 import {
   makeAnalysisRequest,
-  makeValidAnalysis,
+  makeValidFeedback,
 } from '../testing/code-analysis-fixtures'
 import { analyzeCode } from './code-analysis-service'
 
@@ -44,7 +44,7 @@ describe('analyzeCode', () => {
   ])(
     'uses one bounded SDK generation and returns the consistent $config.provider report',
     async ({ config, metadata, timeoutMs }) => {
-      const report = makeValidAnalysis()
+      const report = makeValidFeedback()
       vi.mocked(generateJson).mockResolvedValue({
         status: 'success',
         data: report,
@@ -58,32 +58,47 @@ describe('analyzeCode', () => {
         providerMetadata: metadata,
       })
       expect(generateJson).toHaveBeenCalledTimes(1)
+      expect(Object.keys(codeFeedbackSchema.shape)).toEqual([
+        'version',
+        'summary',
+        'approach',
+        'efficiency',
+        'codeStyle',
+      ])
       const call = vi.mocked(generateJson).mock.calls[0]?.[0]
       if (!call) throw new Error('Expected one SDK generation.')
-      expect(call.prompt.system).toContain('leetcode-code-analysis-v1')
+      expect(call.prompt.system).toContain('leetcode-code-feedback-v1')
       expect(call).toEqual({
         ...config,
         prompt: {
           system: call.prompt.system,
           user: JSON.stringify({
             problem: request.problem,
-            submission: request.submission,
+            submission: {
+              status: request.submission.status,
+              code: request.submission.code,
+              language: request.submission.language,
+              runtime: request.submission.runtime,
+              passedTestCount: 50,
+              totalTestCount: 50,
+            },
           }),
         },
-        schema: codeAnalysisSchema,
+        schema: codeFeedbackSchema,
         signal,
         timeoutMs,
         maxOutputTokens: 8192,
+        retryTransientErrors: true,
+        collectMetrics: true,
       })
     },
   )
 
-  it.each(['strategy', 'language'] as const)(
+  it.each(['strategy'] as const)(
     'rejects inconsistent %s without downgrading or another call',
     async (kind) => {
-      const report = makeValidAnalysis()
+      const report = makeValidFeedback()
       if (kind === 'strategy') report.approach.score = 5
-      else report.suggestedImplementation!.language = 'Kotlin'
       vi.mocked(generateJson).mockResolvedValue({
         status: 'success',
         data: report,
@@ -128,3 +143,28 @@ describe('analyzeCode', () => {
     },
   )
 })
+
+it.each([
+  ['openrouter', 'openrouter/free', true],
+  ['openrouter', 'vendor/model:free', true],
+  ['openrouter', 'vendor/paid', true],
+  ['gemini', 'vendor/model:free', true],
+] as const)(
+  'opts into bounded retries for %s/%s',
+  async (provider, model, expected) => {
+    vi.mocked(generateJson).mockResolvedValue({
+      status: 'success',
+      data: makeValidFeedback(),
+      providerMetadata: metadata,
+    })
+    await analyzeCode(
+      makeAnalysisRequest(),
+      { ...config, provider, model },
+      new AbortController().signal,
+      60000,
+    )
+    expect(
+      vi.mocked(generateJson).mock.calls[0]?.[0].retryTransientErrors,
+    ).toBe(expected)
+  },
+)

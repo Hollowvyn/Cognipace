@@ -1,9 +1,14 @@
+import { Buffer } from 'node:buffer'
+
 import { eq } from 'drizzle-orm'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createPracticeRepository } from '@/features/practice/data/practice-repository'
+import { ReviewCommandConflictError } from '@/features/practice/domain'
+import { readPracticeStorageData } from '@/features/practice/data/practice-storage-repository'
 import {
   overrideLastReviewResultWithTrackProgress,
+  previewPracticeReview,
   resetPracticeSchedule,
   saveReviewResultWithTrackProgress,
 } from '@/features/practice/server/practice-service'
@@ -11,17 +16,1114 @@ import { getTodayQueue } from '@/features/queue/server/queue-service'
 import { createSettingsRepository } from '@/features/settings/data/settings-repository'
 import { defaultUserSettings } from '@/features/settings/domain'
 import { createTracksRepository } from '@/features/tracks/data/tracks-repository'
-import { createInitialFsrsCard, scheduleReview } from '@/lib/fsrs'
+import {
+  createInitialFsrsCard,
+  scheduleReview,
+  createFsrsSchedulerProfile,
+  scheduleReviewWithProfile,
+  serializeFsrsSchedulerProfile,
+  serializeFsrsCardSnapshot,
+  serializeFsrsReviewLogSnapshot,
+} from '@/lib/fsrs'
 import { createTestDb } from '@/platform/db/test-db'
+import { createDb, createSqliteWasmLocator } from '@/platform/db/client'
+import { serializeDb, deserializeDb } from '@/platform/db/snapshot'
 import {
   fsrsCards,
   problemPractice,
   reviewAttempts,
   trackGroupProblems,
   trackProblemProgress,
+  practiceReviewEvidence,
+  practiceGenerations,
+  fsrsSchedulerProfiles,
 } from '@/platform/db/schema'
 
+import {
+  preparePracticeStorage,
+  validatePracticeStorage,
+} from './server/practice-storage-service'
+
 describe('practice core', () => {
+  it.each([0.75, 0.9])(
+    'captures the prospective daily profile on a genuine Save at %s retention',
+    async (targetRetention) => {
+      const { db } = await createTestDb()
+      const repository = createPracticeRepository(db)
+      const reviewedAt = new Date('2026-01-01T10:00:00.000Z')
+      const saved = await repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'good',
+        reviewedAt,
+        targetRetention,
+      })
+      const storage = await readPracticeStorageData(db)
+      const expectedProfile = createFsrsSchedulerProfile({
+        targetRetention,
+        maximumInterval: 180,
+        enableShortTerm: false,
+        learningSteps: [],
+        relearningSteps: [],
+        enableFuzz: false,
+      })
+
+      expect(storage.schedulerProfiles).toHaveLength(1)
+      expect(storage.schedulerProfiles[0]?.profileJson).toBe(
+        serializeFsrsSchedulerProfile(expectedProfile),
+      )
+      expect(storage.reviewEvidence[0]?.schedulerProfileId).toBe(
+        storage.schedulerProfiles[0]?.id,
+      )
+      expect(saved.card).toEqual(
+        scheduleReviewWithProfile(
+          createInitialFsrsCard(reviewedAt),
+          'good',
+          reviewedAt,
+          expectedProfile,
+        ).card,
+      )
+    },
+  )
+
+  it('preserves a captured long-interval profile through repeated Update until a genuine Save', async () => {
+    const handle = await createTestDb()
+    const repository = createPracticeRepository(handle.db)
+    const settingsRepository = createSettingsRepository(handle.db)
+    const oldProfile = createFsrsSchedulerProfile({ targetRetention: 0.75 })
+    const dailyProfile = createFsrsSchedulerProfile({
+      targetRetention: 0.9,
+      maximumInterval: 180,
+      enableShortTerm: false,
+      learningSteps: [],
+      relearningSteps: [],
+      enableFuzz: false,
+    })
+    expect(oldProfile.parameters.maximumInterval).toBeGreaterThan(180)
+
+    let reviewedAt = new Date('2020-01-01T10:00:00.000Z')
+    let preCard = (
+      await repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'easy',
+        reviewedAt,
+        targetRetention: 0.75,
+        reviewAttemptId: 'long-interval-prior-0',
+      })
+    ).card
+    let oldGood = scheduleReviewWithProfile(
+      preCard,
+      'good',
+      reviewedAt,
+      oldProfile,
+    )
+    let oldEasy = scheduleReviewWithProfile(
+      preCard,
+      'easy',
+      reviewedAt,
+      oldProfile,
+    )
+    for (
+      let index = 1;
+      index <= 12 &&
+      (oldGood.card.scheduledDays <= 180 || oldEasy.card.scheduledDays <= 180);
+      index += 1
+    ) {
+      reviewedAt = new Date(reviewedAt.getTime() + 365 * 24 * 60 * 60 * 1000)
+      oldGood = scheduleReviewWithProfile(
+        preCard,
+        'good',
+        reviewedAt,
+        oldProfile,
+      )
+      oldEasy = scheduleReviewWithProfile(
+        preCard,
+        'easy',
+        reviewedAt,
+        oldProfile,
+      )
+      if (oldGood.card.scheduledDays > 180 && oldEasy.card.scheduledDays > 180)
+        break
+      preCard = (
+        await repository.saveReviewResult({
+          problemSlug: 'two-sum',
+          rating: 'easy',
+          reviewedAt,
+          targetRetention: 0.75,
+          reviewAttemptId: `long-interval-prior-${index}`,
+        })
+      ).card
+    }
+    expect(oldGood.card.scheduledDays).toBeGreaterThan(180)
+    expect(oldEasy.card.scheduledDays).toBeGreaterThan(180)
+
+    const original = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt,
+      targetRetention: 0.75,
+      reviewAttemptId: 'old-profile-latest',
+    })
+    await handle.db.insert(fsrsSchedulerProfiles).values({
+      id: 'old-maximum-profile',
+      profileJson: serializeFsrsSchedulerProfile(oldProfile),
+      createdAt: reviewedAt.getTime(),
+    })
+    await handle.db
+      .update(practiceReviewEvidence)
+      .set({
+        schedulerProfileId: 'old-maximum-profile',
+        preCardJson: serializeFsrsCardSnapshot(preCard),
+      })
+      .where(
+        eq(practiceReviewEvidence.reviewAttemptId, original.reviewAttemptId),
+      )
+    await handle.db
+      .update(reviewAttempts)
+      .set({ fsrsReviewLog: serializeFsrsReviewLogSnapshot(oldGood.log) })
+      .where(eq(reviewAttempts.id, original.reviewAttemptId))
+    await handle.db
+      .update(fsrsCards)
+      .set({
+        dueAt: oldGood.card.dueAt.getTime(),
+        stability: oldGood.card.stability,
+        difficulty: oldGood.card.difficulty,
+        elapsedDays: oldGood.card.elapsedDays,
+        scheduledDays: oldGood.card.scheduledDays,
+        learningSteps: oldGood.card.learningSteps,
+        reps: oldGood.card.reps,
+        lapses: oldGood.card.lapses,
+        state: oldGood.card.state,
+        lastReviewAt: oldGood.card.lastReviewAt!.getTime(),
+      })
+      .where(eq(fsrsCards.id, original.cardId))
+
+    const [beforeRead] = await handle.db
+      .select()
+      .from(fsrsCards)
+      .where(eq(fsrsCards.id, original.cardId))
+    expect(beforeRead?.dueAt).toBe(oldGood.card.dueAt.getTime())
+    await repository.getPracticeDetails('two-sum')
+    await settingsRepository.updateSettings({
+      review: { targetRetention: 0.9 },
+    })
+    const [afterSettings] = await handle.db
+      .select()
+      .from(fsrsCards)
+      .where(eq(fsrsCards.id, original.cardId))
+    expect(afterSettings).toEqual(beforeRead)
+
+    const previewInput = {
+      mode: 'update' as const,
+      problemSlug: 'two-sum',
+      generation: (await repository.getPracticeDetails('two-sum')).generation!,
+      targetAttemptId: original.reviewAttemptId,
+      expectedRevision: 0,
+      reviewedAt: reviewedAt.toISOString(),
+    }
+    const beforePreview = serializeDb(handle)
+    const preview = await previewPracticeReview(handle.db, previewInput)
+    expect(Buffer.from(serializeDb(handle)).equals(beforePreview)).toBe(true)
+    expect(preview.status).toBe('ready')
+    if (preview.status !== 'ready') throw new Error('preview unavailable')
+    expect(preview.evidence).toBe('captured')
+    for (const rating of ['again', 'hard', 'good', 'easy'] as const) {
+      const expected = scheduleReviewWithProfile(
+        preCard,
+        rating,
+        reviewedAt,
+        oldProfile,
+      )
+      expect(preview.ratings[rating].dueAt).toBe(
+        expected.card.dueAt.toISOString(),
+      )
+      expect(preview.ratings[rating].scheduledDays).toBe(
+        expected.card.scheduledDays,
+      )
+    }
+    expect(preview.ratings.easy.scheduledDays).toBeGreaterThan(180)
+
+    const updatedToEasy = await repository.overrideLastReviewResult({
+      problemSlug: 'two-sum',
+      targetAttemptId: original.reviewAttemptId,
+      expectedRevision: 0,
+      rating: 'easy',
+      targetRetention: 0.9,
+    })
+    expect(updatedToEasy.card).toEqual(oldEasy.card)
+    expect(updatedToEasy.reviewedAt).toEqual(reviewedAt)
+    expect(updatedToEasy.card.scheduledDays).toBeGreaterThan(180)
+
+    const updatedToGood = await repository.overrideLastReviewResult({
+      problemSlug: 'two-sum',
+      targetAttemptId: original.reviewAttemptId,
+      expectedRevision: 1,
+      rating: 'good',
+      targetRetention: 0.9,
+    })
+    expect(updatedToGood.card).toEqual(oldGood.card)
+    expect(updatedToGood.reviewedAt).toEqual(reviewedAt)
+    expect(updatedToGood.card.scheduledDays).toBeGreaterThan(180)
+    const beforeNewSave = await readPracticeStorageData(handle.db)
+    const oldEvidence = beforeNewSave.reviewEvidence.find(
+      (row) => row.reviewAttemptId === original.reviewAttemptId,
+    )
+    expect(oldEvidence).toMatchObject({
+      revision: 2,
+      schedulerProfileId: 'old-maximum-profile',
+      preCardJson: serializeFsrsCardSnapshot(preCard),
+    })
+    expect(
+      (await handle.db.select().from(reviewAttempts)).find(
+        (row) => row.id === original.reviewAttemptId,
+      ),
+    ).toMatchObject({ reviewedAt: reviewedAt.getTime(), rating: 'good' })
+
+    const nextReviewAt = new Date(reviewedAt.getTime() + 24 * 60 * 60 * 1000)
+    const next = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt: nextReviewAt,
+      targetRetention: 0.9,
+      reviewAttemptId: 'new-profile-next',
+    })
+    expect(next.card).toEqual(
+      scheduleReviewWithProfile(
+        oldGood.card,
+        'good',
+        nextReviewAt,
+        dailyProfile,
+      ).card,
+    )
+    const afterNewSave = await readPracticeStorageData(handle.db)
+    const newEvidence = afterNewSave.reviewEvidence.find(
+      (row) => row.reviewAttemptId === next.reviewAttemptId,
+    )
+    expect(newEvidence?.schedulerProfileId).not.toBe('old-maximum-profile')
+    expect(
+      afterNewSave.schedulerProfiles.find(
+        (row) => row.id === newEvidence?.schedulerProfileId,
+      )?.profileJson,
+    ).toBe(serializeFsrsSchedulerProfile(dailyProfile))
+    expect(
+      afterNewSave.reviewEvidence.find(
+        (row) => row.reviewAttemptId === original.reviewAttemptId,
+      ),
+    ).toEqual(oldEvidence)
+  })
+
+  it.each([
+    { label: 'missing', rawLog: null },
+    { label: 'malformed', rawLog: '{invalid-json' },
+  ])(
+    'rejects $label retained legacy logs without writes and distinguishes known missing context',
+    async ({ rawLog }) => {
+      const handle = await createTestDb()
+      const repository = createPracticeRepository(handle.db)
+      await repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'easy',
+        reviewedAt: new Date('2026-01-01T10:00:00.000Z'),
+        reviewAttemptId: 'missing-log-earlier',
+      })
+      await repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'good',
+        reviewedAt: new Date('2026-01-10T10:00:00.000Z'),
+        reviewAttemptId: 'missing-log-latest',
+      })
+      await handle.db.update(practiceReviewEvidence).set({
+        schedulingEvidenceKind: 'unknown',
+        schedulerProfileId: null,
+        preCardJson: null,
+        sequenceSource: 'legacy-inferred',
+      })
+      await handle.db
+        .update(reviewAttempts)
+        .set({ fsrsReviewLog: rawLog })
+        .where(eq(reviewAttempts.id, 'missing-log-earlier'))
+      const before = serializeDb(handle)
+      expect(
+        (await repository.getPracticeDetails('two-sum'))
+          .canOverrideLatestReview,
+      ).toBe(false)
+      expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
+      const rejected = repository.overrideLastReviewResult({
+        problemSlug: 'two-sum',
+        targetAttemptId: 'missing-log-latest',
+        expectedRevision: 0,
+        rating: 'hard',
+      })
+      if (rawLog === null) {
+        await expect(rejected).rejects.toBeInstanceOf(
+          ReviewCommandConflictError,
+        )
+        await expect(rejected).rejects.toMatchObject({
+          reason: 'unsupported-legacy',
+        })
+      } else {
+        await expect(rejected).rejects.not.toBeInstanceOf(
+          ReviewCommandConflictError,
+        )
+        await expect(rejected).rejects.toThrow(
+          'Invalid FSRS review log snapshot.',
+        )
+      }
+      expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
+    },
+  )
+
+  it('reads generation context without preparing or rotating scopes', async () => {
+    const handle = await createTestDb()
+    const repository = createPracticeRepository(handle.db)
+    const unprepared = serializeDb(handle)
+    const initial = await repository.getPracticeDetails('two-sum')
+    expect(initial.generation).toBeNull()
+    expect(initial.latestReview).toBeNull()
+    expect(Buffer.from(serializeDb(handle)).equals(unprepared)).toBe(true)
+    await preparePracticeStorage(handle.db)
+    const prepared = serializeDb(handle)
+    const details = await repository.getPracticeDetails('two-sum')
+    expect(details.generation?.localGenerationToken).toBeTypeOf('string')
+    expect(details.generation?.problemGenerationToken).toBeNull()
+    expect(Buffer.from(serializeDb(handle)).equals(prepared)).toBe(true)
+  })
+
+  it('captures validated assessment evidence and rejects mismatched final ratings without writes', async () => {
+    const handle = await createTestDb()
+    const repository = createPracticeRepository(handle.db)
+    const evidence = {
+      schemaVersion: 1 as const,
+      source: 'manual' as const,
+      policyVersion: null,
+      submissionIntent: null,
+      reasonCode: null,
+      lockReason: null,
+      finalRating: 'good' as const,
+    }
+    const saved = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewAttemptId: 'assessment-captured',
+      assessmentEvidence: evidence,
+    })
+    expect(
+      (await readPracticeStorageData(handle.db)).reviewEvidence[0]
+        ?.assessmentEvidenceJson,
+    ).toBe(JSON.stringify(evidence))
+    const before = serializeDb(handle)
+    await expect(
+      repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'easy',
+        assessmentEvidence: evidence,
+      }),
+    ).rejects.toThrow(/effective rating/)
+    expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
+    await expect(
+      repository.overrideLastReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'hard',
+        targetAttemptId: saved.reviewAttemptId,
+        expectedRevision: 0,
+        assessmentEvidence: evidence,
+      }),
+    ).rejects.toThrow(/effective rating/)
+    expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
+    await validatePracticeStorage(handle.db)
+  })
+
+  it('captures and deduplicates complete original scheduler profiles and corrects with the recorded retention', async () => {
+    const { db } = await createTestDb()
+    const repository = createPracticeRepository(db)
+    const firstAt = new Date('2026-01-01T10:00:00.000Z')
+    const eventAt = new Date('2026-01-10T10:00:00.000Z')
+    const first = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'easy',
+      reviewedAt: firstAt,
+      targetRetention: 0.75,
+    })
+    const saved = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt: eventAt,
+      targetRetention: 0.75,
+      elapsedSeconds: 40,
+      log: { notes: 'Keep this note.' },
+    })
+    const before = await readPracticeStorageData(db)
+    expect(before.schedulerProfiles).toHaveLength(1)
+    expect(before.reviewEvidence.at(-1)).toMatchObject({
+      schedulingEvidenceKind: 'captured',
+      applicationSequence: 2,
+      revision: 0,
+      schedulerProfileId: before.schedulerProfiles[0]!.id,
+      preCardJson: serializeFsrsCardSnapshot(first.card),
+    })
+    const earlier = (await db.select().from(reviewAttempts)).find(
+      (row) => row.id === first.reviewAttemptId,
+    )
+    const expected = scheduleReviewWithProfile(
+      first.card,
+      'hard',
+      eventAt,
+      createFsrsSchedulerProfile({ targetRetention: 0.75 }),
+    )
+    const corrected = await repository.overrideLastReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'hard',
+      targetAttemptId: saved.reviewAttemptId,
+      expectedRevision: 0,
+      targetRetention: 0.95,
+    })
+    expect(corrected.card).toEqual(expected.card)
+    expect(corrected.reviewedAt).toEqual(eventAt)
+    expect(corrected.reviewAttemptId).toBe(saved.reviewAttemptId)
+    expect(
+      (await db.select().from(reviewAttempts)).find(
+        (row) => row.id === first.reviewAttemptId,
+      ),
+    ).toEqual(earlier)
+    const after = await readPracticeStorageData(db)
+    expect(after.schedulerProfiles).toEqual(before.schedulerProfiles)
+    expect(after.reviewEvidence.at(-1)).toEqual({
+      ...before.reviewEvidence.at(-1),
+      revision: 1,
+    })
+    const details = await repository.getPracticeDetails('two-sum')
+    expect(details.canOverrideLatestReview).toBe(true)
+    expect(details.generation?.localGenerationToken).toBeTypeOf('string')
+    expect(details.generation?.problemGenerationToken).toBeTypeOf('string')
+    expect(details.latestReview).toEqual({
+      reviewAttemptId: saved.reviewAttemptId,
+      applicationSequence: 2,
+      revision: 1,
+      reviewedAt: eventAt,
+    })
+    await validatePracticeStorage(db)
+  })
+
+  it('orders equal-time reviews by stored application sequence even when attempt IDs and creation dates disagree', async () => {
+    const { db } = await createTestDb()
+    const repository = createPracticeRepository(db)
+    const reviewedAt = new Date('2026-01-01T10:00:00.000Z')
+    await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt,
+      reviewAttemptId: 'z-first',
+    })
+    await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'easy',
+      reviewedAt,
+      reviewAttemptId: 'a-second',
+    })
+    await db
+      .update(reviewAttempts)
+      .set({ createdAt: 1 })
+      .where(eq(reviewAttempts.id, 'a-second'))
+    const details = await repository.getPracticeDetails('two-sum')
+    expect(details.reviewHistory.map((row) => row.id)).toEqual([
+      'z-first',
+      'a-second',
+    ])
+    expect(details.latestAttempt?.id).toBe('a-second')
+    expect(details.canOverrideLatestReview).toBe(true)
+    const corrected = await repository.overrideLastReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'hard',
+      targetAttemptId: 'a-second',
+      expectedRevision: 0,
+    })
+    expect(corrected.reviewAttemptId).toBe('a-second')
+    expect(corrected.card.reps).toBe(2)
+  })
+
+  it('rejects backdated saves before any writes against both last applied time and card last review', async () => {
+    const handle = await createTestDb()
+    const repository = createPracticeRepository(handle.db)
+    await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt: new Date('2026-01-02T00:00:00.000Z'),
+    })
+    const before = serializeDb(handle)
+    await expect(
+      repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'easy',
+        reviewedAt: new Date('2026-01-01T00:00:00.000Z'),
+      }),
+    ).rejects.toThrow(/precede|before/i)
+    expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
+    await handle.db
+      .update(fsrsCards)
+      .set({ lastReviewAt: new Date('2026-01-04T00:00:00.000Z').getTime() })
+    const laterCard = serializeDb(handle)
+    await expect(
+      repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'easy',
+        reviewedAt: new Date('2026-01-03T00:00:00.000Z'),
+      }),
+    ).rejects.toThrow(/precede|before/i)
+    expect(Buffer.from(serializeDb(handle)).equals(laterCard)).toBe(true)
+  })
+
+  it('rejects stale targets and revisions without changing any event or scheduling data', async () => {
+    const handle = await createTestDb()
+    const repository = createPracticeRepository(handle.db)
+    const first = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt: new Date('2026-01-01T00:00:00.000Z'),
+    })
+    const latest = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'easy',
+      reviewedAt: new Date('2026-01-02T00:00:00.000Z'),
+    })
+    const foreign = await repository.saveReviewResult({
+      problemSlug: '3sum',
+      rating: 'good',
+      reviewedAt: new Date('2026-01-01T00:00:00.000Z'),
+    })
+    for (const target of [
+      { targetAttemptId: first.reviewAttemptId, expectedRevision: 0 },
+      { targetAttemptId: latest.reviewAttemptId, expectedRevision: 1 },
+      { targetAttemptId: foreign.reviewAttemptId, expectedRevision: 0 },
+      { targetAttemptId: 'foreign-or-missing', expectedRevision: 0 },
+    ]) {
+      const before = serializeDb(handle)
+      await expect(
+        repository.overrideLastReviewResult({
+          problemSlug: 'two-sum',
+          rating: 'again',
+          ...target,
+        }),
+      ).rejects.toThrow(/changed|refresh/i)
+      expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
+    }
+  })
+
+  it.each([false, true])(
+    'requires uniquely verified legacy context and retains it for further corrections (tied=%s)',
+    async (tied) => {
+      const handle = await createTestDb()
+      const repository = createPracticeRepository(handle.db)
+      const firstAt = new Date('2026-01-01T10:00:00.000Z')
+      const secondAt = tied ? firstAt : new Date('2026-01-10T10:00:00.000Z')
+      await repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'easy',
+        reviewedAt: firstAt,
+        reviewAttemptId: 'legacy-first',
+        targetRetention: 0.75,
+      })
+      await repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'good',
+        reviewedAt: secondAt,
+        reviewAttemptId: 'legacy-latest',
+        targetRetention: 0.75,
+      })
+      await handle.db.update(practiceReviewEvidence).set({
+        schedulingEvidenceKind: 'unknown',
+        schedulerProfileId: null,
+        preCardJson: null,
+        sequenceSource: 'legacy-inferred',
+      })
+      const details = await repository.getPracticeDetails('two-sum')
+      expect(details.canOverrideLatestReview).toBe(!tied)
+      const request = {
+        problemSlug: 'two-sum',
+        rating: 'hard' as const,
+        targetAttemptId: 'legacy-latest',
+        expectedRevision: 0,
+        targetRetention: 0.9,
+      }
+      if (tied) {
+        const before = serializeDb(handle)
+        await expect(
+          repository.overrideLastReviewResult(request),
+        ).rejects.toThrow(/ambiguous|unsupported/i)
+        expect(Buffer.from(serializeDb(handle)).equals(before)).toBe(true)
+      } else {
+        await repository.overrideLastReviewResult(request)
+        const evidence = (
+          await readPracticeStorageData(handle.db)
+        ).reviewEvidence.at(-1)!
+        expect(evidence).toMatchObject({
+          schedulingEvidenceKind: 'legacy-derived',
+          revision: 1,
+        })
+        expect(evidence.schedulerProfileId).toBeTypeOf('string')
+        expect(evidence.preCardJson).toBeTypeOf('string')
+        const originalContext = { ...evidence }
+        await repository.overrideLastReviewResult({
+          ...request,
+          rating: 'again',
+          expectedRevision: 1,
+          targetRetention: 0.95,
+        })
+        expect(
+          (await readPracticeStorageData(handle.db)).reviewEvidence.at(-1),
+        ).toEqual({ ...originalContext, revision: 2 })
+        await validatePracticeStorage(handle.db)
+      }
+    },
+  )
+
+  it('allocates a fresh card identity when the canonical ID belongs to an imported sibling, and rejects UUID collisions atomically', async () => {
+    const handle = await createTestDb()
+    const { db } = handle
+    const reviewedAt = new Date('2026-01-01T00:00:00Z')
+    const scheduled = scheduleReview(
+      createInitialFsrsCard(reviewedAt),
+      'good',
+      reviewedAt,
+    )
+    const card = scheduled.card
+    await db.insert(fsrsCards).values({
+      id: 'two-sum:default',
+      problemSlug: '3sum',
+      cardKind: 'default',
+      dueAt: card.dueAt.getTime(),
+      stability: card.stability,
+      difficulty: card.difficulty,
+      elapsedDays: card.elapsedDays,
+      scheduledDays: card.scheduledDays,
+      learningSteps: card.learningSteps,
+      reps: card.reps,
+      lapses: card.lapses,
+      state: card.state,
+      lastReviewAt: card.lastReviewAt!.getTime(),
+      createdAt: reviewedAt.getTime(),
+      updatedAt: reviewedAt.getTime(),
+    })
+    await db.insert(reviewAttempts).values({
+      id: 'sibling-imported',
+      problemSlug: '3sum',
+      cardId: 'two-sum:default',
+      rating: 'good',
+      reviewMode: 'manual',
+      reviewedAt: reviewedAt.getTime(),
+      fsrsReviewLog: serializeFsrsReviewLogSnapshot(scheduled.log),
+      createdAt: reviewedAt.getTime(),
+      updatedAt: reviewedAt.getTime(),
+    })
+    await preparePracticeStorage(db)
+    await validatePracticeStorage(db)
+    const siblingRows = () =>
+      [
+        "SELECT * FROM fsrs_cards WHERE problem_slug = '3sum'",
+        "SELECT * FROM review_attempts WHERE problem_slug = '3sum'",
+        "SELECT * FROM practice_review_evidence WHERE review_attempt_id = 'sibling-imported'",
+        "SELECT * FROM practice_generations WHERE scope_id IN ('local', 'problem:3sum') ORDER BY scope_id",
+      ].map((sql) => handle.rawDb.exec({ sql, returnValue: 'resultRows' }))
+    const beforeSibling = siblingRows()
+    const allRows = () =>
+      [
+        'fsrs_cards',
+        'review_attempts',
+        'problem_practice',
+        'practice_review_evidence',
+        'practice_generations',
+      ].map((table) =>
+        handle.rawDb.exec({
+          sql: `SELECT * FROM ${table} ORDER BY 1`,
+          returnValue: 'resultRows',
+        }),
+      )
+    const beforeFailure = allRows()
+    const repository = createPracticeRepository(db)
+    const collision = vi
+      .spyOn(crypto, 'randomUUID')
+      .mockReturnValue(
+        'two-sum:default' as ReturnType<typeof crypto.randomUUID>,
+      )
+    try {
+      await expect(
+        repository.saveReviewResult({
+          problemSlug: 'two-sum',
+          rating: 'hard',
+          reviewedAt: new Date('2026-01-02T00:00:00Z'),
+          reviewAttemptId: 'collision-rejected',
+        }),
+      ).rejects.toThrow()
+      expect(allRows()).toEqual(beforeFailure)
+    } finally {
+      collision.mockRestore()
+    }
+    const saved = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'hard',
+      reviewedAt: new Date('2026-01-02T00:00:00Z'),
+      reviewAttemptId: 'safe-new-card',
+    })
+    expect(saved.cardId).not.toBe('two-sum:default')
+    expect(siblingRows()).toEqual(beforeSibling)
+    await validatePracticeStorage(db)
+    expect(
+      (
+        await repository.overrideLastReviewResult({
+          problemSlug: 'two-sum',
+          targetAttemptId: saved.reviewAttemptId,
+          expectedRevision: 0,
+          rating: 'easy',
+        })
+      ).cardId,
+    ).toBe(saved.cardId)
+    expect(siblingRows()).toEqual(beforeSibling)
+    await validatePracticeStorage(db)
+    const reopened = await createDb({ locateWasm: createSqliteWasmLocator() })
+    try {
+      deserializeDb(reopened, serializeDb(handle))
+      const reloadedRepository = createPracticeRepository(reopened.db)
+      expect(
+        (await reloadedRepository.getPracticeDetails('two-sum')).cardId,
+      ).toBe(saved.cardId)
+      expect((await reloadedRepository.getPracticeDetails('3sum')).cardId).toBe(
+        'two-sum:default',
+      )
+      await validatePracticeStorage(reopened.db)
+    } finally {
+      reopened.rawDb.close()
+    }
+  })
+  it('uses an imported opaque card ID for details, Save and Update and retains application sequence', async () => {
+    const { db } = await createTestDb()
+    const repository = createPracticeRepository(db)
+    await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewAttemptId: 'opaque-first',
+      reviewedAt: new Date('2026-01-02T00:00:00Z'),
+    })
+    // Import base rows with opaque identity and then initialize their sidecars.
+    await db.delete(reviewAttempts)
+    await db.delete(fsrsCards)
+    const card = scheduleReview(
+      createInitialFsrsCard(new Date('2026-01-02T00:00:00Z')),
+      'good',
+      new Date('2026-01-02T00:00:00Z'),
+    ).card
+    await db.insert(fsrsCards).values({
+      id: 'imported/opaque',
+      problemSlug: 'two-sum',
+      cardKind: 'default',
+      dueAt: card.dueAt.getTime(),
+      stability: card.stability,
+      difficulty: card.difficulty,
+      elapsedDays: card.elapsedDays,
+      scheduledDays: card.scheduledDays,
+      learningSteps: card.learningSteps,
+      reps: card.reps,
+      lapses: card.lapses,
+      state: card.state,
+      lastReviewAt: card.lastReviewAt!.getTime(),
+      createdAt: 1,
+      updatedAt: 2,
+    })
+    await db.insert(reviewAttempts).values({
+      id: 'legacy-later-created',
+      problemSlug: 'two-sum',
+      cardId: 'imported/opaque',
+      rating: 'good',
+      reviewMode: 'manual',
+      reviewedAt: new Date('2026-01-02T00:00:00Z').getTime(),
+      createdAt: 20,
+      updatedAt: 20,
+    })
+    await preparePracticeStorage(db)
+    expect((await repository.getPracticeDetails('two-sum')).cardId).toBe(
+      'imported/opaque',
+    )
+    const saved = await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'hard',
+      reviewAttemptId: 'opaque-next',
+      reviewedAt: new Date('2026-01-03T00:00:00Z'),
+    })
+    expect(saved.cardId).toBe('imported/opaque')
+    expect(
+      (
+        await repository.overrideLastReviewResult({
+          problemSlug: 'two-sum',
+          targetAttemptId: saved.reviewAttemptId,
+          expectedRevision: 0,
+          rating: 'easy',
+        })
+      ).cardId,
+    ).toBe('imported/opaque')
+    expect(await db.select().from(fsrsCards)).toHaveLength(1)
+    expect(await db.select().from(practiceReviewEvidence)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reviewAttemptId: 'legacy-later-created',
+          applicationSequence: 1,
+          revision: 0,
+          sequenceSource: 'legacy-inferred',
+        }),
+        expect.objectContaining({
+          reviewAttemptId: 'opaque-next',
+          applicationSequence: 2,
+          revision: 1,
+          sequenceSource: 'applied',
+        }),
+      ]),
+    )
+  })
+
+  it('initializes scopes when suspending untouched Practice and rejects sequence/revision overflow atomically', async () => {
+    const handle = await createTestDb()
+    const repository = createPracticeRepository(handle.db)
+    await repository.setPracticeSuspended({
+      problemSlug: 'two-sum',
+      suspended: true,
+    })
+    expect(await handle.db.select().from(practiceGenerations)).toHaveLength(2)
+    await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewAttemptId: 'overflow',
+    })
+    await handle.db
+      .update(practiceReviewEvidence)
+      .set({ applicationSequence: Number.MAX_SAFE_INTEGER })
+      .where(eq(practiceReviewEvidence.reviewAttemptId, 'overflow'))
+    const rows = () =>
+      [
+        'fsrs_cards',
+        'review_attempts',
+        'problem_practice',
+        'practice_review_evidence',
+        'practice_generations',
+      ].map((table) =>
+        handle.rawDb.exec({
+          sql: `SELECT * FROM ${table}`,
+          returnValue: 'resultRows',
+        }),
+      )
+    const beforeSave = rows()
+    await expect(
+      repository.saveReviewResult({
+        problemSlug: 'two-sum',
+        rating: 'easy',
+        reviewAttemptId: 'overflow-save',
+      }),
+    ).rejects.toThrow(/sequence/i)
+    expect(rows()).toEqual(beforeSave)
+    await handle.db
+      .update(practiceReviewEvidence)
+      .set({ applicationSequence: 1, revision: Number.MAX_SAFE_INTEGER })
+      .where(eq(practiceReviewEvidence.reviewAttemptId, 'overflow'))
+    const beforeUpdate = rows()
+    await expect(
+      repository.overrideLastReviewResult({
+        problemSlug: 'two-sum',
+        targetAttemptId: 'overflow',
+        expectedRevision: Number.MAX_SAFE_INTEGER,
+        rating: 'easy',
+      }),
+    ).rejects.toThrow(/revision/i)
+    expect(rows()).toEqual(beforeUpdate)
+  })
+
+  it.each([false, true])(
+    'reads inferred sequence order and rejects unverified imported history (ties=%s)',
+    async (ties) => {
+      const { db } = await createTestDb()
+      const repository = createPracticeRepository(db)
+      await db.insert(fsrsCards).values({
+        id: 'selection/opaque',
+        problemSlug: 'two-sum',
+        cardKind: 'default',
+        dueAt: 0,
+        stability: 0,
+        difficulty: 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        learningSteps: 0,
+        reps: 0,
+        lapses: 0,
+        state: 'new',
+        lastReviewAt: null,
+        createdAt: 0,
+        updatedAt: 0,
+      })
+      await db.insert(reviewAttempts).values([
+        {
+          id: 'later-reviewed',
+          problemSlug: 'two-sum',
+          cardId: 'selection/opaque',
+          rating: 'good',
+          reviewMode: 'manual',
+          reviewedAt: new Date('2026-01-03T00:00:00Z').getTime(),
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'latest-created',
+          problemSlug: 'two-sum',
+          cardId: 'selection/opaque',
+          rating: 'hard',
+          reviewMode: 'manual',
+          reviewedAt: new Date('2026-01-01T00:00:00Z').getTime(),
+          createdAt: 2,
+          updatedAt: 2,
+        },
+      ])
+      if (ties)
+        await db.insert(reviewAttempts).values({
+          id: 'earlier-tied',
+          problemSlug: 'two-sum',
+          cardId: 'selection/opaque',
+          rating: 'again',
+          reviewMode: 'manual',
+          reviewedAt: new Date('2026-01-01T00:00:00Z').getTime(),
+          createdAt: 0,
+          updatedAt: 0,
+        })
+      await preparePracticeStorage(db)
+      const details = await repository.getPracticeDetails('two-sum')
+      expect(details.latestAttempt?.id).toBe('later-reviewed')
+      expect(details.reviewHistory.map((row) => row.id)).toEqual(
+        ties
+          ? ['earlier-tied', 'latest-created', 'later-reviewed']
+          : ['latest-created', 'later-reviewed'],
+      )
+      expect(details.canOverrideLatestReview).toBe(false)
+      const beforeAttempts = await db.select().from(reviewAttempts)
+      const beforeEvidence = await db.select().from(practiceReviewEvidence)
+      await expect(
+        repository.overrideLastReviewResult({
+          problemSlug: 'two-sum',
+          targetAttemptId: 'later-reviewed',
+          expectedRevision: 0,
+          rating: 'easy',
+        }),
+      ).rejects.toThrow()
+      expect(await db.select().from(reviewAttempts)).toEqual(beforeAttempts)
+      expect(await db.select().from(practiceReviewEvidence)).toEqual(
+        beforeEvidence,
+      )
+      await validatePracticeStorage(db)
+    },
+  )
+
+  it('corrects a later captured Save without replaying an imported custom-profile event', async () => {
+    const handle = await createTestDb()
+    const repository = createPracticeRepository(handle.db)
+    const reviewedAt = new Date('2026-01-01T00:00:00Z')
+    const preCard = createInitialFsrsCard(reviewedAt)
+    const defaults = createFsrsSchedulerProfile().parameters.weights
+    const profile = createFsrsSchedulerProfile({
+      weights: defaults.map((weight, index) =>
+        index === 0 ? weight + 0.1 : weight,
+      ),
+      targetRetention: 0.75,
+    })
+    const captured = scheduleReviewWithProfile(
+      preCard,
+      'good',
+      reviewedAt,
+      profile,
+    )
+    await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'good',
+      reviewedAt,
+      reviewAttemptId: 'captured-import',
+    })
+    await handle.db.insert(fsrsSchedulerProfiles).values({
+      id: 'custom-captured',
+      profileJson: serializeFsrsSchedulerProfile(profile),
+      createdAt: reviewedAt.getTime(),
+    })
+    await handle.db
+      .update(practiceReviewEvidence)
+      .set({
+        schedulingEvidenceKind: 'captured',
+        schedulerProfileId: 'custom-captured',
+        preCardJson: serializeFsrsCardSnapshot(preCard),
+      })
+      .where(eq(practiceReviewEvidence.reviewAttemptId, 'captured-import'))
+    await handle.db
+      .update(reviewAttempts)
+      .set({ fsrsReviewLog: serializeFsrsReviewLogSnapshot(captured.log) })
+      .where(eq(reviewAttempts.id, 'captured-import'))
+    const card = captured.card
+    await handle.db
+      .update(fsrsCards)
+      .set({
+        dueAt: card.dueAt.getTime(),
+        stability: card.stability,
+        difficulty: card.difficulty,
+        elapsedDays: card.elapsedDays,
+        scheduledDays: card.scheduledDays,
+        learningSteps: card.learningSteps,
+        reps: card.reps,
+        lapses: card.lapses,
+        state: card.state,
+        lastReviewAt: card.lastReviewAt!.getTime(),
+      })
+      .where(eq(fsrsCards.id, 'two-sum:default'))
+    await preparePracticeStorage(handle.db)
+    await repository.saveReviewResult({
+      problemSlug: 'two-sum',
+      rating: 'hard',
+      reviewedAt: new Date('2026-01-02T00:00:00Z'),
+      reviewAttemptId: 'saved-after-captured',
+    })
+    const [originalAttempt] = await handle.db
+      .select()
+      .from(reviewAttempts)
+      .where(eq(reviewAttempts.id, 'captured-import'))
+    const [originalEvidence] = await handle.db
+      .select()
+      .from(practiceReviewEvidence)
+      .where(eq(practiceReviewEvidence.reviewAttemptId, 'captured-import'))
+    expect(
+      (await repository.getPracticeDetails('two-sum')).canOverrideLatestReview,
+    ).toBe(true)
+    const corrected = await overrideLastReviewResultWithTrackProgress(
+      handle.db,
+      {
+        problemSlug: 'two-sum',
+        targetAttemptId: 'saved-after-captured',
+        expectedRevision: 0,
+        rating: 'easy',
+        targetRetention: 0.95,
+      },
+    )
+    expect(corrected.card).toEqual(
+      scheduleReviewWithProfile(
+        card,
+        'easy',
+        new Date('2026-01-02T00:00:00Z'),
+        createFsrsSchedulerProfile(),
+      ).card,
+    )
+    expect(
+      (
+        await handle.db
+          .select()
+          .from(reviewAttempts)
+          .where(eq(reviewAttempts.id, 'captured-import'))
+      )[0],
+    ).toEqual(originalAttempt)
+    expect(
+      (
+        await handle.db
+          .select()
+          .from(practiceReviewEvidence)
+          .where(eq(practiceReviewEvidence.reviewAttemptId, 'captured-import'))
+      )[0],
+    ).toEqual(originalEvidence)
+    await validatePracticeStorage(handle.db)
+  })
   it('reconciles only existing linked track progress after switching mode or active track, without resurrecting reset progress', async () => {
     const { db } = await createTestDb()
     const tracks = createTracksRepository(db)
@@ -42,6 +1144,8 @@ describe('practice core', () => {
     })
     await overrideLastReviewResultWithTrackProgress(db, {
       problemSlug: 'two-sum',
+      targetAttemptId: 'linked-before-mode',
+      expectedRevision: 0,
       rating: 'again',
     })
     expect(
@@ -50,6 +1154,8 @@ describe('practice core', () => {
     ).toBe(0)
     await overrideLastReviewResultWithTrackProgress(db, {
       problemSlug: 'two-sum',
+      targetAttemptId: 'linked-before-mode',
+      expectedRevision: 1,
       rating: 'hard',
     })
     expect(
@@ -60,6 +1166,8 @@ describe('practice core', () => {
     await tracks.resetTrackProgress('leetcode-75')
     await overrideLastReviewResultWithTrackProgress(db, {
       problemSlug: 'two-sum',
+      targetAttemptId: 'linked-before-mode',
+      expectedRevision: 2,
       rating: 'easy',
     })
     expect(await db.select().from(trackProblemProgress)).toEqual([])
@@ -115,7 +1223,14 @@ describe('practice core', () => {
       createInitialFsrsCard(firstReviewedAt),
       'good',
       firstReviewedAt,
-      { targetRetention: 0.9 },
+      {
+        targetRetention: 0.9,
+        maximumInterval: 180,
+        enableShortTerm: false,
+        learningSteps: [],
+        relearningSteps: [],
+        enableFuzz: false,
+      },
     ).card
 
     await practiceRepository.saveReviewResult({
@@ -157,7 +1272,14 @@ describe('practice core', () => {
       firstCard,
       'good',
       secondReviewedAt,
-      { targetRetention: 0.85 },
+      {
+        targetRetention: 0.85,
+        maximumInterval: 180,
+        enableShortTerm: false,
+        learningSteps: [],
+        relearningSteps: [],
+        enableFuzz: false,
+      },
     ).card
 
     expect(secondReview.card).toEqual(expectedSecondCard)
@@ -438,6 +1560,8 @@ describe('practice core', () => {
 
     const override = await repository.overrideLastReviewResult({
       problemSlug: 'two-sum',
+      targetAttemptId: 'review-2',
+      expectedRevision: 0,
       rating: 'again',
       elapsedSeconds: 900,
       isCorrect: false,
@@ -482,7 +1606,7 @@ describe('practice core', () => {
       ),
     ).toMatchObject({
       rating: 'again',
-      state: 'learning',
+      state: 'review',
     })
     expect(practice).toMatchObject({
       attemptCount: 2,
@@ -529,6 +1653,8 @@ describe('practice core', () => {
       vi.setSystemTime(new Date('2026-01-01T10:03:00.000Z'))
       await repository.overrideLastReviewResult({
         problemSlug: 'two-sum',
+        targetAttemptId: 'review-2',
+        expectedRevision: 0,
         rating: 'again',
       })
     } finally {
@@ -647,7 +1773,7 @@ describe('practice core', () => {
       practice: {
         attemptCount: 1,
         isSuspended: true,
-        status: 'learning',
+        status: 'review',
       },
       phase: 'suspended',
       isSuspended: true,
@@ -687,6 +1813,8 @@ describe('practice core', () => {
 
     await repository.overrideLastReviewResult({
       problemSlug: 'two-sum',
+      targetAttemptId: 'review-1',
+      expectedRevision: 0,
       rating: 'hard',
     })
     const updated = await repository.getPracticeDetails('two-sum')
@@ -991,6 +2119,8 @@ describe('practice core', () => {
 
     await overrideLastReviewResultWithTrackProgress(handle.db, {
       problemSlug: 'two-sum',
+      targetAttemptId: 'workflow-good-to-hard-1',
+      expectedRevision: 0,
       rating: 'hard',
     })
 
@@ -1023,6 +2153,8 @@ describe('practice core', () => {
 
     await overrideLastReviewResultWithTrackProgress(handle.db, {
       problemSlug: 'two-sum',
+      targetAttemptId: 'workflow-easy-to-again-1',
+      expectedRevision: 0,
       rating: 'again',
     })
 
@@ -1058,6 +2190,8 @@ describe('practice core', () => {
 
     await overrideLastReviewResultWithTrackProgress(handle.db, {
       problemSlug: 'two-sum',
+      targetAttemptId: 'workflow-again-to-easy-1',
+      expectedRevision: 0,
       rating: 'easy',
     })
 

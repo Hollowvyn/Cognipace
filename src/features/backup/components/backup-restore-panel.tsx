@@ -20,6 +20,7 @@ interface BackupRestorePanelProps {
   error: string | null
   isExporting: boolean
   isRestoring: boolean
+  isReplacementPending: boolean
   isValidating: boolean
   onExport: () => void
   onFileSelect: (file: File) => void
@@ -33,6 +34,7 @@ export function BackupRestorePanel({
   error,
   isExporting,
   isRestoring,
+  isReplacementPending,
   isValidating,
   onExport,
   onFileSelect,
@@ -58,7 +60,11 @@ export function BackupRestorePanel({
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button disabled={isExporting} onClick={onExport} size="sm">
+        <Button
+          disabled={isExporting || isReplacementPending}
+          onClick={onExport}
+          size="sm"
+        >
           {isExporting ? (
             <Loader2
               aria-hidden="true"
@@ -81,14 +87,14 @@ export function BackupRestorePanel({
             aria-describedby={fileStatusId}
             aria-label="Backup file"
             className="sr-only"
-            disabled={isValidating || isRestoring}
+            disabled={isValidating || isRestoring || isReplacementPending}
             id="backup-import-file"
             onChange={handleFileChange(onFileSelect)}
             ref={fileInputRef}
             type="file"
           />
           <Button
-            disabled={isValidating || isRestoring}
+            disabled={isValidating || isRestoring || isReplacementPending}
             onClick={() => {
               fileInputRef.current?.click()
             }}
@@ -125,7 +131,9 @@ export function BackupRestorePanel({
       {summary ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            disabled={!backup || isRestoring || isValidating}
+            disabled={
+              !backup || isRestoring || isValidating || isReplacementPending
+            }
             onClick={onOpenRestoreDialog}
             size="sm"
             variant="outline"

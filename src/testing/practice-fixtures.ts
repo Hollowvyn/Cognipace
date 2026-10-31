@@ -17,6 +17,7 @@ export function createSerializedNormalizedPracticeState(
     isOverdue: false,
     overdueDays: 0,
     dueAt: null,
+    eligibleOn: null,
     lastReviewedAt: null,
     retrievability: null,
     stability: null,
@@ -46,6 +47,8 @@ export function createSerializedPracticeDetails(
       notes: null,
     },
     canOverrideLatestReview: false,
+    generation: null,
+    latestReview: null,
     ...overrides,
   }
 }

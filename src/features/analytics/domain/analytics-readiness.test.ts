@@ -9,6 +9,28 @@ const keys = (count: number) =>
   Array.from({ length: count }, (_, index) => `b${index + 1}`)
 
 describe('analytics readiness', () => {
+  it.each([
+    [12, 12],
+    [30, 24],
+    [120, 45],
+  ] as const)(
+    'caps All time policy to its actual %s-day span with a %s assessment minimum',
+    (availableDays, minimumAssessments) => {
+      const readiness = calculateAnalyticsReadiness({
+        requestedDays: null,
+        availableDays,
+        grouping: { unit: 'day', step: 1 },
+        evidenceCounts: [1],
+        bucketKeys: ['2026-10-05'],
+      })
+      expect(readiness).toMatchObject({
+        requestedDays: null,
+        policyDays: Math.min(availableDays, 90),
+        availableDays,
+        minimumAssessments,
+      })
+    },
+  )
   it('reports the shared evidence measurements alongside readiness', () => {
     const readiness = calculateAnalyticsReadiness({
       requestedDays: 30 as const,
@@ -131,14 +153,24 @@ describe('analytics readiness', () => {
     ).toThrow(RangeError)
   })
 
-  it('rejects empty aligned evidence', () => {
-    expect(() =>
+  it('accepts empty aligned evidence as unavailable All time history', () => {
+    expect(
       calculateAnalyticsReadiness({
-        requestedDays: 14,
+        requestedDays: null,
+        grouping: null,
+        availableDays: 0,
         evidenceCounts: [],
         bucketKeys: [],
       }),
-    ).toThrow(RangeError)
+    ).toMatchObject({
+      ready: false,
+      requestedDays: null,
+      policyDays: 1,
+      requestedBuckets: 0,
+      assessments: 0,
+      minimumAssessments: 12,
+      failingReasons: ['no-evidence', 'insufficient-assessments'],
+    })
   })
 
   it('rejects negative, non-integer, and unsafe integer counts', () => {

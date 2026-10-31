@@ -1,3 +1,7 @@
+import type {
+  GenerateLeetCodeImplementationRequest,
+  GenerateLeetCodeImplementationResponse,
+} from '@/features/leetcode-review-assistant/api/code-implementation-contracts'
 import { defineExtensionMessaging } from '@webext-core/messaging'
 import { z } from 'zod'
 
@@ -18,12 +22,16 @@ import type {
   BackupPayloadRequest,
   BackupRequest,
   BackupSummary,
+  BackupReplacementState,
+  BackupReplacementResult,
 } from '@/features/backup/api/backup-contracts'
 export {
   backupFileSchema,
   backupPayloadRequestSchema,
   backupRequestSchema,
   backupSummarySchema,
+  backupReplacementStateSchema,
+  backupReplacementResultSchema,
 } from '@/features/backup/api/backup-contracts'
 import type {
   ClearAiProviderSecretRequest,
@@ -88,6 +96,9 @@ import type {
 import {
   normalizedPracticeStateSchema,
   type PracticeDetailsRequest,
+  type PracticePreviewRequest,
+  type PracticePreviewResponse,
+  type PracticeReviewCommandResult,
   type PracticeOverrideLastReviewResultRequest,
   type PracticeResetScheduleRequest,
   type PracticeSaveReviewResultRequest,
@@ -289,9 +300,10 @@ export type PingResponse = {
 export const queueRequestSchema = z.object({
   surface: z.enum(['popup', 'dashboard']),
   at: z.iso.datetime().optional(),
+  intent: z.enum(['automatic', 'extra-practice']).default('automatic'),
 })
 
-export type QueueRequest = z.infer<typeof queueRequestSchema>
+export type QueueRequest = z.input<typeof queueRequestSchema>
 
 export const openDashboardRequestSchema = z.object({
   surface: z.literal('content-script'),
@@ -332,8 +344,14 @@ export interface ProtocolMap {
   'app.openDashboard'(request: OpenDashboardRequest): null
   'backup.exportFullBackup'(request: BackupRequest): BackupFile
   'backup.validateFullBackup'(request: BackupPayloadRequest): BackupSummary
-  'backup.restoreFullBackup'(request: BackupPayloadRequest): BackupSummary
-  'backup.resetLocalData'(request: BackupRequest): null
+  'backup.restoreFullBackup'(
+    request: BackupPayloadRequest,
+  ): BackupReplacementResult
+  'backup.resetLocalData'(request: BackupRequest): BackupReplacementResult
+  'backup.getPendingReplacement'(request: BackupRequest): BackupReplacementState
+  'backup.retryPendingReplacement'(
+    request: BackupRequest,
+  ): BackupReplacementResult
   'genai.getAiProviderSecretPresence'(
     request: GetAiProviderSecretPresenceRequest,
   ): AiProviderSecretPresence
@@ -346,6 +364,12 @@ export interface ProtocolMap {
   'genai.testConnection'(
     request: TestAiConnectionRequest,
   ): TestAiConnectionResponse
+  'genai.generateLeetCodeImplementation'(
+    request: GenerateLeetCodeImplementationRequest,
+  ): GenerateLeetCodeImplementationResponse
+  'genai.cancelLeetCodeImplementation'(
+    request: CancelLeetCodeAnalysisRequest,
+  ): CancelLeetCodeAnalysisResponse
   'genai.analyzeLeetCodeSubmission'(
     request: AnalyzeLeetCodeSubmissionRequest,
   ): AnalyzeLeetCodeSubmissionResponse
@@ -405,13 +429,16 @@ export interface ProtocolMap {
   ): ProblemDeleteResponse
   'practice.saveReviewResult'(
     request: PracticeSaveReviewResultRequest,
-  ): SerializedPracticeDetails
+  ): PracticeReviewCommandResult
   'practice.getDetails'(
     request: PracticeDetailsRequest,
   ): SerializedPracticeDetails
+  'practice.previewReview'(
+    request: PracticePreviewRequest,
+  ): PracticePreviewResponse
   'practice.overrideLastReviewResult'(
     request: PracticeOverrideLastReviewResultRequest,
-  ): SerializedPracticeDetails
+  ): PracticeReviewCommandResult
   'practice.setSuspended'(
     request: PracticeSetSuspendedRequest,
   ): SerializedPracticeDetails
@@ -460,10 +487,14 @@ export const protocolMethodNames = [
   'backup.validateFullBackup',
   'backup.restoreFullBackup',
   'backup.resetLocalData',
+  'backup.getPendingReplacement',
+  'backup.retryPendingReplacement',
   'genai.getAiProviderSecretPresence',
   'genai.setAiProviderSecret',
   'genai.clearAiProviderSecret',
   'genai.testConnection',
+  'genai.generateLeetCodeImplementation',
+  'genai.cancelLeetCodeImplementation',
   'genai.analyzeLeetCodeSubmission',
   'genai.cancelLeetCodeAnalysis',
   'genai.getHintConnection',
@@ -495,6 +526,7 @@ export const protocolMethodNames = [
   'problems.bulkDelete',
   'practice.saveReviewResult',
   'practice.getDetails',
+  'practice.previewReview',
   'practice.overrideLastReviewResult',
   'practice.setSuspended',
   'practice.resetSchedule',

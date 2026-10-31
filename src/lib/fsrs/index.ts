@@ -31,6 +31,7 @@ export {
   type NormalizedFsrsSchedulingOptions,
 } from './domain/scheduling-options'
 export {
+  assertFsrsReviewLogMatchesPreCard,
   isFsrsReviewLogSnapshot,
   parseFsrsReviewLogSnapshot,
   parseSerializedFsrsReviewLogSnapshot,
@@ -48,6 +49,7 @@ export {
   getTargetRetentionDuration,
   parseFsrsSchedulerProfile,
   parseSerializedFsrsSchedulerProfile,
+  previewReviewWithProfile,
   projectReviewSchedule,
   replayReviewHistory,
   replayReviewHistorySequence,

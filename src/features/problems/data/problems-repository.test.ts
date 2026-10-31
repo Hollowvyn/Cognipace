@@ -31,6 +31,31 @@ import { createTestDb } from '@/platform/db/test-db'
 import { createProblemsRepository } from './problems-repository'
 
 describe('ProblemsRepository library data', () => {
+  it('retains the stored opaque card ID in Library state', async () => {
+    const { db } = await createTestDb()
+    await db.insert(fsrsCards).values({
+      id: 'library/opaque',
+      problemSlug: 'two-sum',
+      cardKind: 'default',
+      dueAt: new Date('2026-01-01T12:00:00Z').getTime(),
+      stability: 2,
+      difficulty: 4,
+      elapsedDays: 0,
+      scheduledDays: 1,
+      learningSteps: 0,
+      reps: 1,
+      lapses: 0,
+      state: 'review',
+      lastReviewAt: new Date('2025-12-31T12:00:00Z').getTime(),
+      createdAt: 0,
+      updatedAt: 0,
+    })
+    const rows = await createProblemsRepository(db).getLibraryRowsBySlug(
+      ['two-sum'],
+      { now: new Date('2026-01-02T12:00:00Z') },
+    )
+    expect(rows[0]?.state.cardId).toBe('library/opaque')
+  })
   it('composes Library rows from DB-backed problem, practice, labels, companies, and tracks', async () => {
     const handle = await createTestDb({
       now: new Date('2026-01-01T00:00:00.000Z'),
@@ -600,13 +625,16 @@ describe('ProblemsRepository library data', () => {
 
     expect(rowAtReviewTime[0]?.status).toBe('scheduled')
     expect(rowAfterRetentionChange[0]).toMatchObject({
-      status: 'due',
+      status: 'scheduled',
       state: {
-        isDue: true,
+        isDue: false,
       },
     })
     expect(rowAfterRetentionChange[0]?.state.dueAt).toEqual(
       rowAtReviewTime[0]?.state.dueAt,
+    )
+    expect(rowAfterRetentionChange[0]?.state.eligibleOn).toBe(
+      rowAtReviewTime[0]?.state.eligibleOn,
     )
     expect(rowAfterRetentionChange[0]?.state.retrievability).toBeGreaterThan(
       0.9,

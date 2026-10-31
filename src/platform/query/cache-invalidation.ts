@@ -46,7 +46,7 @@ const queryKeysByInvalidationTag = {
     queryKeys.tracks.all,
     queryKeys.problems.all,
   ],
-  sync: [queryKeys.sync.all],
+  sync: [queryKeys.sync.all, queryKeys.backup.pendingReplacement()],
   tracks: [queryKeys.tracks.all, queryKeys.appShell.all],
 } satisfies Record<CacheInvalidationTag, readonly QueryKey[]>
 

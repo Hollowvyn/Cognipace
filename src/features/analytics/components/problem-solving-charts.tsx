@@ -56,6 +56,7 @@ interface PlotOptions {
   goal: number
   timeFrame?: HistoricalChartTimeFrame | undefined
   resetKey: string
+  compact?: { height: number; showGroupingLabel?: boolean } | undefined
 }
 const labelFor = (kind: 'outcome' | 'time') =>
   kind === 'outcome' ? 'Success by Difficulty' : 'Recorded Time by Difficulty'
@@ -89,7 +90,13 @@ export function ProblemTrendChart({
       hard: value('hard'),
     }
   })
-  if (shown.length === 0) return <Empty message="Select a difficulty." />
+  if (shown.length === 0)
+    return (
+      <Empty
+        message="Select a difficulty."
+        compact={options.compact !== undefined}
+      />
+    )
   const measured = rows.filter((row) =>
     shown.some(({ key }) =>
       kind === 'outcome'
@@ -100,6 +107,7 @@ export function ProblemTrendChart({
   if (measured === 0)
     return (
       <Empty
+        compact={options.compact !== undefined}
         message={
           kind === 'outcome'
             ? 'No valid outcomes for the selected difficulties in this period.'
@@ -128,6 +136,7 @@ export function ProblemTrendChart({
   return (
     <div className="grid gap-2">
       <HistoricalChart
+        compact={options.compact}
         rows={seriesRows}
         config={{}}
         name={name}
@@ -208,7 +217,7 @@ export function ProblemTrendChart({
           </>
         )}
       </HistoricalChart>
-      <ChartTrendNote pointCount={measured} />
+      {options.compact ? null : <ChartTrendNote pointCount={measured} />}
     </div>
   )
 }
@@ -273,11 +282,13 @@ export function DifficultyMixChart({
   measure,
   timeFrame,
   resetKey,
+  compact,
 }: {
   rows: ProblemRow[]
   measure: 'assessments' | 'time'
   timeFrame?: HistoricalChartTimeFrame | undefined
   resetKey: string
+  compact?: { height: number; showGroupingLabel?: boolean } | undefined
 }) {
   const hasValue = rows.some((row) => mixShares(row, measure)[0] !== null)
   if (!hasValue)
@@ -292,6 +303,7 @@ export function DifficultyMixChart({
     )
   return (
     <HistoricalChart
+      compact={compact}
       rows={rows}
       config={{}}
       name="Difficulty Mix chart"
@@ -430,10 +442,20 @@ export function ComparisonChart({
       <ChartContainer
         accessibleName={`${labelFor(kind)} comparison`}
         aria-label={`${labelFor(kind)} comparison`}
-        className="aspect-auto"
+        className={
+          options.compact
+            ? 'aspect-auto min-h-0 [&_.recharts-responsive-container]:min-h-0!'
+            : 'aspect-auto'
+        }
         config={{}}
-        initialDimension={{ width: 640, height: 288 }}
-        style={{ height: 288 }}
+        initialDimension={{
+          width: 640,
+          height: options.compact?.height ?? 288,
+        }}
+        style={{
+          height: options.compact?.height ?? 288,
+          ...(options.compact ? { minHeight: 0 } : {}),
+        }}
         ref={setHost}
       >
         <ComposedChart
@@ -490,45 +512,59 @@ export function ComparisonChart({
           />
         </ComposedChart>
       </ChartContainer>
-      <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted-foreground">
-        {difficulties.map(({ key, label, symbol, color }) => (
-          <div key={key}>
-            <p className="m-0 font-semibold" style={{ color }}>
-              {symbol} {label}
-            </p>
-            {kind === 'outcome' ? (
-              <>
-                <p className="m-0">
-                  {outcomeText(current.totals.difficulties[key][measure])} · n=
-                  {current.totals.difficulties[key].validRatings}
-                </p>
-                <p className="m-0">
-                  Prior{' '}
-                  {outcomeText(current.previous.difficulties[key][measure])} ·
-                  n={current.previous.difficulties[key].validRatings}
-                </p>
-                <p className="m-0">
-                  {comparisonText(
-                    current.totals.difficulties[key],
-                    current.previous.difficulties[key],
-                    measure,
-                  )}
-                </p>
-              </>
-            ) : (
-              <p className="m-0">
-                {current.totals.difficulties[key].time[timing].timedAssessments}
-                /
-                {
-                  current.totals.difficulties[key].time[timing]
-                    .eligibleAssessments
-                }{' '}
-                timed
+      {options.compact ? null : (
+        <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted-foreground">
+          {difficulties.map(({ key, label, symbol, color }) => (
+            <div key={key}>
+              <p className="m-0 font-semibold" style={{ color }}>
+                {symbol} {label}
               </p>
-            )}
-          </div>
-        ))}
-      </div>
+              {kind === 'outcome' ? (
+                <>
+                  <p className="m-0">
+                    {outcomeText(current.totals.difficulties[key][measure])} ·
+                    n=
+                    {current.totals.difficulties[key].validRatings}
+                  </p>
+                  {view.previousPeriod ? (
+                    <>
+                      <p className="m-0">
+                        Prior{' '}
+                        {outcomeText(
+                          current.previous.difficulties[key][measure],
+                        )}{' '}
+                        · n={current.previous.difficulties[key].validRatings}
+                      </p>
+                      <p className="m-0">
+                        {comparisonText(
+                          current.totals.difficulties[key],
+                          current.previous.difficulties[key],
+                          measure,
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="m-0">No previous period</p>
+                  )}
+                </>
+              ) : (
+                <p className="m-0">
+                  {
+                    current.totals.difficulties[key].time[timing]
+                      .timedAssessments
+                  }
+                  /
+                  {
+                    current.totals.difficulties[key].time[timing]
+                      .eligibleAssessments
+                  }{' '}
+                  timed
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       {selected ? (
         <div
           className="pointer-events-none absolute right-2 top-2 z-20 max-w-[calc(100%-1rem)] rounded border border-border bg-popover p-2.5 text-xs shadow-md"
@@ -541,7 +577,7 @@ export function ComparisonChart({
             kind={kind}
             {...options}
           />
-          {kind === 'outcome' ? (
+          {kind === 'outcome' && view.previousPeriod ? (
             <>
               <p className="m-0">
                 Prior:{' '}
@@ -559,6 +595,8 @@ export function ComparisonChart({
                 )}
               </p>
             </>
+          ) : kind === 'outcome' ? (
+            <p className="m-0">No previous period</p>
           ) : null}
           <p className="m-0 text-muted-foreground">
             {historicalReportContext(timeFrame)}
@@ -863,9 +901,17 @@ function ProblemStats({
     </div>
   )
 }
-function Empty({ message }: { message: string }) {
+function Empty({
+  message,
+  compact = false,
+}: {
+  message: string
+  compact?: boolean
+}) {
   return (
-    <p className="m-0 grid min-h-48 place-items-center text-center text-sm text-muted-foreground">
+    <p
+      className={`m-0 grid ${compact ? 'min-h-0' : 'min-h-48'} place-items-center text-center text-sm text-muted-foreground`}
+    >
       {message}
     </p>
   )

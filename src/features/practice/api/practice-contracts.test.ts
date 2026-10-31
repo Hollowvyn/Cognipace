@@ -1,11 +1,100 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  normalizedPracticeStateSchema,
   practiceOverrideLastReviewResultRequestSchema,
+  practiceSaveReviewResultRequestSchema,
   practiceReviewResultSchema,
+  practicePreviewRequestSchema,
+  practicePreviewResponseSchema,
 } from './practice-contracts'
+import { serializeNormalizedPracticeState } from './practice-serializers'
 
 describe('practice runtime contracts', () => {
+  it('requires exact preview identity, all four ratings, and valid study dates', () => {
+    const identity = {
+      mode: 'submit' as const,
+      problemSlug: 'two-sum',
+      generation: {
+        localGenerationToken: 'local',
+        problemGenerationToken: null,
+      },
+      previewedAt: '2026-01-01T10:00:00.000Z',
+    }
+    expect(
+      practicePreviewRequestSchema.parse({
+        ...identity,
+        surface: 'content-script',
+      }),
+    ).toMatchObject(identity)
+    expect(
+      practicePreviewRequestSchema.safeParse({
+        ...identity,
+        surface: 'dashboard',
+      }).success,
+    ).toBe(false)
+    const item = {
+      dueAt: '2026-01-02T10:00:00.000Z',
+      eligibleOn: '2026-01-02',
+      studyDays: 1,
+      scheduledDays: 1,
+    }
+    const ready = {
+      status: 'ready',
+      identity,
+      evidence: 'active',
+      ratings: { again: item, hard: item, good: item, easy: item },
+    }
+    expect(practicePreviewResponseSchema.parse(ready)).toEqual(ready)
+    expect(
+      practicePreviewResponseSchema.safeParse({
+        ...ready,
+        ratings: { ...ready.ratings, easy: { ...item, studyDays: NaN } },
+      }).success,
+    ).toBe(false)
+    expect(
+      practicePreviewResponseSchema.safeParse({
+        ...ready,
+        ratings: { again: item, hard: item, good: item },
+      }).success,
+    ).toBe(false)
+  })
+  it('serializes and validates the derived eligible local day', () => {
+    const state = {
+      problemSlug: 'two-sum',
+      cardId: 'two-sum:default',
+      status: 'review' as const,
+      isSuspended: false,
+      phase: 'review' as const,
+      isStarted: true,
+      isDue: false,
+      isOverdue: false,
+      overdueDays: 0,
+      dueAt: new Date('2026-09-13T22:00:00.000Z'),
+      eligibleOn: '2026-09-14',
+      lastReviewedAt: new Date('2026-09-13T01:00:00.000Z'),
+      retrievability: 1,
+      stability: 2,
+      difficulty: 5,
+      scheduledDays: 1,
+      lapses: 0,
+      reviewCount: 1,
+      reviewHistory: [],
+      recentAttempts: [],
+      latestAttempt: null,
+    }
+
+    expect(serializeNormalizedPracticeState(state).eligibleOn).toBe(
+      '2026-09-14',
+    )
+    expect(
+      normalizedPracticeStateSchema.safeParse({
+        ...serializeNormalizedPracticeState(state),
+        eligibleOn: undefined,
+      }).success,
+    ).toBe(false)
+  })
+
   it('accepts serialized review results with a review attempt id', () => {
     expect(
       practiceReviewResultSchema.parse({
@@ -19,6 +108,7 @@ describe('practice runtime contracts', () => {
         summary: {
           phase: 'review',
           nextReviewAt: '2026-01-02T10:00:00.000Z',
+          eligibleOn: '2026-01-02',
           lastReviewedAt: '2026-01-01T10:00:00.000Z',
           reviewCount: 1,
           lapses: 0,
@@ -50,6 +140,7 @@ describe('practice runtime contracts', () => {
       summary: {
         phase: 'review',
         nextReviewAt: '2026-01-02T10:00:00.000Z',
+        eligibleOn: '2026-01-02',
         lastReviewedAt: '2026-01-01T10:00:00.000Z',
         reviewCount: 1,
         lapses: 0,
@@ -79,14 +170,64 @@ describe('practice runtime contracts', () => {
     ).toThrow()
   })
 
-  it('rejects reviewedAt on override requests', () => {
-    expect(() =>
-      practiceOverrideLastReviewResultRequestSchema.parse({
-        surface: 'content-script',
-        problemSlug: 'two-sum',
-        rating: 'good',
-        reviewedAt: '2026-01-01T10:00:00.000Z',
-      }),
-    ).toThrow()
+  it('requires strict identity, generation, canonical time and explicit Save mode', () => {
+    const request = {
+      surface: 'content-script',
+      commandId: 'command',
+      problemSlug: 'two-sum',
+      generation: {
+        localGenerationToken: 'local',
+        problemGenerationToken: null,
+      },
+      rating: 'good',
+      reviewMode: 'leetcode',
+      reviewedAt: '2026-01-01T10:00:00.000Z',
+      log: { notes: 'Accepted notes' },
+    }
+    expect(practiceSaveReviewResultRequestSchema.parse(request)).toEqual(
+      request,
+    )
+    for (const invalid of [
+      { ...request, commandId: undefined },
+      { ...request, generation: undefined },
+      { ...request, reviewMode: undefined },
+      { ...request, reviewedAt: '2026-01-01T10:00:00Z' },
+      { ...request, notes: 'legacy' },
+      { ...request, log: { serverId: 'forged' } },
+    ]) {
+      expect(
+        practiceSaveReviewResultRequestSchema.safeParse(invalid).success,
+      ).toBe(false)
+    }
+  })
+
+  it('requires the exact Update target and revision along with original reviewedAt', () => {
+    const request = {
+      surface: 'content-script',
+      commandId: 'update',
+      problemSlug: 'two-sum',
+      generation: {
+        localGenerationToken: 'local',
+        problemGenerationToken: 'problem',
+      },
+      rating: 'good',
+      reviewedAt: '2026-01-01T10:00:00.000Z',
+      targetAttemptId: 'original',
+      expectedRevision: 0,
+    }
+    expect(
+      practiceOverrideLastReviewResultRequestSchema.parse(request),
+    ).toEqual(request)
+    for (const invalid of [
+      { ...request, targetAttemptId: undefined },
+      { ...request, expectedRevision: undefined },
+      { ...request, expectedRevision: -1 },
+      { ...request, reviewedAt: undefined },
+    ]) {
+      expect(
+        practiceOverrideLastReviewResultRequestSchema.safeParse(invalid)
+          .success,
+      ).toBe(false)
+    }
   })
 })

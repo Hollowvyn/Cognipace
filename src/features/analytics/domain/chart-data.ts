@@ -1,12 +1,15 @@
 import type { ProblemDifficulty } from '@/features/problems/domain'
 import {
-  createInitialFsrsCard,
   isReviewRating,
-  parseSerializedFsrsReviewLogSnapshot,
-  scheduleReview,
   type NormalizedFsrsSchedulingOptions,
   type ReviewRating,
 } from '@/lib/fsrs'
+import {
+  resolveHistoricalSchedulingEvidence,
+  summarizeHistoricalSchedulingProvenance,
+  type HistoricalSchedulingEvidenceResolver,
+  type HistoricalSchedulingProvenance,
+} from './historical-scheduling-evidence'
 
 import {
   medianBucketValues,
@@ -19,7 +22,7 @@ import {
   addAnalyticsCalendarDays,
   getAnalyticsDateKey,
   getAnalyticsLocalDayStart,
-  shiftAnalyticsCalendarDays,
+  getAnalyticsPreviousPeriod,
   type AnalyticsTimeFrame,
 } from './analytics-time'
 
@@ -35,6 +38,10 @@ export interface AnalyticsReviewEvent {
   reviewedAt: Date
   isCorrect: boolean | null
   fsrsReviewLog: string | null
+  applicationSequence?: number | null
+  schedulingEvidenceKind?: 'captured' | 'legacy-derived' | 'unknown'
+  schedulerProfileJson?: string | null
+  preCardJson?: string | null
 }
 
 export interface AnalyticsCurrentCard {
@@ -52,11 +59,14 @@ export interface AnalyticsCurrentCard {
   lastReviewAt: Date | null
   suspended?: boolean
   fsrsCard?: import('@/lib/fsrs').FsrsCardSnapshot
+  modelOptions?: import('@/lib/fsrs').FsrsSchedulingOptions
+  modelProvenance?: 'captured' | 'legacy-derived' | 'compatibility'
 }
 
 export interface AnalyticsOverdueSnapshot {
   date: Date
   overdueCount: number
+  schedulingProvenance?: HistoricalSchedulingProvenance | undefined
 }
 
 export interface RecallQualityPoint {
@@ -135,6 +145,7 @@ export interface AnalyticsRangeOptions {
   timeZone?: string
   timeFrame?: AnalyticsTimeFrame
   lowSampleThreshold?: number
+  resolveEvidence?: HistoricalSchedulingEvidenceResolver
 }
 
 export function toAnalyticsDateKey(date: Date, timeZone?: string): string {
@@ -168,10 +179,9 @@ export function hasTopicRecallEvidence(
 
 export function getValidStabilitySample(
   event: AnalyticsReviewEvent,
+  resolveEvidence: HistoricalSchedulingEvidenceResolver = resolveHistoricalSchedulingEvidence,
 ): number | null {
-  return hasValidReviewRating(event) && event.fsrsReviewLog
-    ? parseValidStability(event.fsrsReviewLog)
-    : null
+  return resolveEvidence(event).postCard?.stability ?? null
 }
 
 export function buildRecallQualityPoints(
@@ -191,10 +201,10 @@ export function buildRecallQualityPoints(
     point.reviewCount += 1
     point.observed.denominator += 1
     if (pair.rating !== 'again') point.observed.numerator += 1
-    point.predicted.push(pair.estimate)
+    if (pair.estimate !== null) point.predicted.push(pair.estimate)
   }
 
-  return trimLeadingEmptyBuckets(
+  return presentHistoricalPoints(
     points.map((point) => ({
       ...bucketBounds(point.bucket),
       observedRecall: recomputeBucketRatio([point.observed]),
@@ -209,6 +219,7 @@ export function buildRecallQualityPoints(
       eligibleSampleSize: point.observed.denominator,
     })),
     (point) => point.observedRecall !== null || point.predictedRecall !== null,
+    options,
   )
 }
 
@@ -216,11 +227,13 @@ export function buildPredictedRecallSamples(
   events: readonly AnalyticsReviewEvent[],
   options: AnalyticsRangeOptions,
 ): PredictedRecallSample[] {
-  return buildRepeatReviewPairs(events, options).map((pair) => ({
-    date: toAnalyticsDateKey(pair.reviewedAt, options.timeZone),
-    reviewedAt: pair.reviewedAt,
-    value: pair.estimate,
-  }))
+  return buildRepeatReviewPairs(events, options)
+    .filter((pair) => pair.estimate !== null)
+    .map((pair) => ({
+      date: toAnalyticsDateKey(pair.reviewedAt, options.timeZone),
+      reviewedAt: pair.reviewedAt,
+      value: pair.estimate!,
+    }))
 }
 
 export function buildPracticeRhythmPoints(
@@ -249,7 +262,7 @@ export function buildPracticeRhythmPoints(
     }
   }
 
-  return trimLeadingEmptyBuckets(
+  return presentHistoricalPoints(
     points.map((point) => ({
       ...bucketBounds(point.bucket),
       reviewCount: point.reviewCount,
@@ -258,6 +271,7 @@ export function buildPracticeRhythmPoints(
       associationOnly: true,
     })),
     (point) => point.reviewCount > 0,
+    options,
   )
 }
 
@@ -265,7 +279,7 @@ export function buildRatingsMixPoints(
   events: readonly AnalyticsReviewEvent[],
   options: AnalyticsRangeOptions,
 ): RatingsMixPoint[] {
-  return trimLeadingEmptyBuckets(
+  return presentHistoricalPoints(
     options.buckets.map((bucket) => {
       const counts = { again: 0, hard: 0, good: 0, easy: 0 }
       for (const event of events)
@@ -285,6 +299,7 @@ export function buildRatingsMixPoints(
       }
     }),
     (point) => point.total > 0,
+    options,
   )
 }
 
@@ -293,23 +308,15 @@ export function buildHardAgainSummary(
   options: AnalyticsRangeOptions,
   lowSampleThreshold = 10,
 ): HardAgainSummary {
-  const previousStart = options.timeFrame
-    ? shiftAnalyticsCalendarDays(
-        new Date(options.timeFrame.periodStart),
-        -options.timeFrame.requestedDays,
-        options.timeFrame.timeZone,
-      )
-    : new Date(
-        options.start.getTime() -
-          (options.end.getTime() - options.start.getTime()),
-      )
-  const previousEnd = options.timeFrame
-    ? shiftAnalyticsCalendarDays(
-        new Date(options.timeFrame.asOf),
-        -options.timeFrame.requestedDays,
-        options.timeFrame.timeZone,
-      )
-    : options.start
+  const previous = options.timeFrame
+    ? getAnalyticsPreviousPeriod(options.timeFrame)
+    : {
+        start: new Date(
+          options.start.getTime() -
+            (options.end.getTime() - options.start.getTime()),
+        ),
+        asOf: options.start,
+      }
   const selectedRatings = events.filter(
     (event) =>
       event.reviewedAt >= options.start &&
@@ -318,9 +325,10 @@ export function buildHardAgainSummary(
   )
   const previousRatings = events.filter(
     (event) =>
-      event.reviewedAt >= previousStart &&
+      previous !== null &&
+      event.reviewedAt >= previous.start &&
       (options.timeFrame
-        ? event.reviewedAt <= previousEnd
+        ? event.reviewedAt <= previous.asOf
         : event.reviewedAt < options.start) &&
       hasValidReviewRating(event),
   )
@@ -398,19 +406,20 @@ export function buildStabilityPoints(
   for (const event of events) {
     if (!isWithinRange(event.reviewedAt, options)) continue
     const point = findBucketPoint(points, event.reviewedAt)
-    const stability = getValidStabilitySample(event)
+    const stability = getValidStabilitySample(event, options.resolveEvidence)
     if (!point || stability === null) continue
 
     point.values.push(stability)
   }
 
-  return trimLeadingEmptyBuckets(
+  return presentHistoricalPoints(
     points.map((point) => ({
       ...bucketBounds(point.bucket),
       medianStabilityDays: medianBucketValues(point.values),
       sampleSize: point.values.length,
     })),
     (point) => point.sampleSize > 0,
+    options,
   )
 }
 
@@ -440,6 +449,7 @@ export function reconstructOverdueBacklogSnapshots(
 
   return dailyObservationDates(options).flatMap((observationAt) => {
     let overdueCount = 0
+    const intervalKinds: Array<'captured' | 'legacy-derived' | 'unknown'> = []
 
     for (const { card, intervals } of intervalsByCard) {
       if (observationAt < card.createdAt) continue
@@ -449,15 +459,23 @@ export function reconstructOverdueBacklogSnapshots(
           observationAt < candidate.endExclusive,
       )
       if (!interval) return []
+      intervalKinds.push(interval.provenance)
       if (interval.dueAt < observationAt) overdueCount += 1
     }
 
-    return [{ date: observationAt, overdueCount }]
+    return [
+      {
+        date: observationAt,
+        overdueCount,
+        schedulingProvenance:
+          summarizeHistoricalSchedulingProvenance(intervalKinds),
+      },
+    ]
   })
 }
 
 export function buildUpcomingLoadPoints(
-  dueDates: readonly Date[],
+  eligibleDays: readonly string[],
   now: Date,
   timeZone?: string,
 ): UpcomingLoadPoint[] {
@@ -465,23 +483,17 @@ export function buildUpcomingLoadPoints(
     ? getAnalyticsDateKey(now, timeZone)
     : toAnalyticsDateKey(now)
   const points = Array.from({ length: 14 }, (_, index) => {
-    const localDate = new Date(now)
-    localDate.setDate(localDate.getDate() + index)
-    const date = timeZone
-      ? addAnalyticsCalendarDays(todayKey, index)
-      : toAnalyticsDateKey(localDate)
     return {
-      date,
+      date: addAnalyticsCalendarDays(todayKey, index),
       dueCount: 0,
       overdueCount: 0,
       today: index === 0,
     }
   })
-  for (const dueAt of dueDates) {
-    const dueKey = toAnalyticsDateKey(dueAt, timeZone)
-    if (dueKey < todayKey) points[0]!.overdueCount += 1
+  for (const eligibleOn of eligibleDays) {
+    if (eligibleOn < todayKey) points[0]!.overdueCount += 1
     else {
-      const point = points.find((candidate) => candidate.date === dueKey)
+      const point = points.find((candidate) => candidate.date === eligibleOn)
       if (point) point.dueCount += 1
     }
   }
@@ -522,20 +534,21 @@ function dailyObservationDates(options: AnalyticsRangeOptions): Date[] {
   }
   return observations
 }
-function compareEvents(
-  a: AnalyticsReviewEvent,
-  b: AnalyticsReviewEvent,
-): number {
-  return (
-    a.reviewedAt.getTime() - b.reviewedAt.getTime() || a.id.localeCompare(b.id)
-  )
-}
-
 function bucketBounds(bucket: AnalyticsBucket) {
   return {
     bucketStart: bucket.startKey ?? toAnalyticsDateKey(bucket.start),
     bucketEnd: bucket.endKey ?? toAnalyticsDateKey(bucket.end),
   }
+}
+
+function presentHistoricalPoints<T>(
+  points: readonly T[],
+  hasEvidence: (point: T) => boolean,
+  options: AnalyticsRangeOptions,
+): T[] {
+  return options.timeFrame?.history
+    ? [...points]
+    : trimLeadingEmptyBuckets(points, hasEvidence)
 }
 
 function trimLeadingEmptyBuckets<T>(
@@ -576,6 +589,7 @@ interface KnownOverdueInterval {
   start: Date
   endExclusive: Date
   dueAt: Date
+  provenance: 'captured' | 'legacy-derived' | 'unknown'
 }
 
 function buildKnownOverdueIntervals(
@@ -583,67 +597,51 @@ function buildKnownOverdueIntervals(
   events: readonly AnalyticsReviewEvent[],
   options: AnalyticsRangeOptions,
 ): KnownOverdueInterval[] {
-  const ordered = [...events]
-    .filter((event) => event.reviewedAt <= options.end)
-    .sort(compareEvents)
+  const ordered = events.filter((event) => event.reviewedAt <= options.end)
+  const hasCompleteApplicationOrder = ordered.every(
+    (event) => event.applicationSequence != null,
+  )
+  ordered.sort((left, right) =>
+    hasCompleteApplicationOrder
+      ? left.applicationSequence! - right.applicationSequence! ||
+        left.id.localeCompare(right.id)
+      : left.reviewedAt.getTime() - right.reviewedAt.getTime() ||
+        left.id.localeCompare(right.id),
+  )
   const intervals: KnownOverdueInterval[] = []
-  let currentCard = createInitialFsrsCard(card.createdAt)
-  let segmentStart: Date | null = card.createdAt
-  let historyKnown = true
+  let currentCard: import('@/lib/fsrs').FsrsCardSnapshot | null = null
+  let segmentStart: Date | null = null
+  let currentProvenance: 'captured' | 'legacy-derived' | 'unknown' = 'unknown'
 
-  for (const event of ordered) {
-    const log = parseReviewLog(event.fsrsReviewLog)
-    if (
-      !historyKnown ||
-      !log ||
-      !hasValidReviewRating(event) ||
-      !isConsistentReviewLog(log, event, currentCard)
-    ) {
-      if (
-        historyKnown &&
-        segmentStart !== null &&
-        segmentStart <= event.reviewedAt
-      ) {
-        intervals.push({
-          start: segmentStart,
-          endExclusive: event.reviewedAt,
-          dueAt: currentCard.dueAt,
-        })
-      }
-      segmentStart = null
-      historyKnown = false
-      continue
-    }
-
-    if (segmentStart !== null && segmentStart <= event.reviewedAt) {
+  for (const [index, event] of ordered.entries()) {
+    const evidence = (
+      options.resolveEvidence ?? resolveHistoricalSchedulingEvidence
+    )(event)
+    if (currentCard && segmentStart && segmentStart <= event.reviewedAt) {
       intervals.push({
         start: segmentStart,
         endExclusive: event.reviewedAt,
-        // ReviewLog.due is prior-state rollback metadata in ts-fsrs. The
-        // active due date before this review belongs to the prior card.
         dueAt: currentCard.dueAt,
+        provenance: currentProvenance,
+      })
+    } else if (
+      index === 0 &&
+      evidence.preCard?.state === 'new' &&
+      card.createdAt <= event.reviewedAt
+    ) {
+      intervals.push({
+        start: card.createdAt,
+        endExclusive: event.reviewedAt,
+        dueAt: evidence.preCard.dueAt,
+        provenance: evidence.kind,
       })
     }
-
-    try {
-      // The scheduled card carries the due date that becomes active after
-      // this review; the review log itself does not.
-      currentCard = scheduleReview(
-        currentCard,
-        event.rating,
-        event.reviewedAt,
-        options.fsrsOptions,
-      ).card
-    } catch {
-      segmentStart = null
-      historyKnown = false
-      continue
-    }
-    segmentStart = event.reviewedAt
+    currentCard = evidence.postCard
+    currentProvenance = evidence.kind
+    segmentStart = currentCard ? event.reviewedAt : null
   }
 
   if (
-    historyKnown &&
     card.lastReviewAt === null &&
     ordered.length === 0 &&
     card.createdAt <= options.end
@@ -652,9 +650,10 @@ function buildKnownOverdueIntervals(
       start: card.createdAt,
       endExclusive: new Date(options.end.getTime() + 1),
       dueAt: card.dueAt,
+      provenance: 'unknown',
     })
   } else if (
-    historyKnown &&
+    currentCard &&
     segmentStart !== null &&
     ordered.length > 0 &&
     card.lastReviewAt?.getTime() === segmentStart.getTime()
@@ -663,33 +662,11 @@ function buildKnownOverdueIntervals(
       start: segmentStart,
       endExclusive: new Date(options.end.getTime() + 1),
       dueAt: card.dueAt,
+      provenance: currentProvenance,
     })
   }
 
   return intervals
-}
-
-function isConsistentReviewLog(
-  log: ReturnType<typeof parseSerializedFsrsReviewLogSnapshot>,
-  event: AnalyticsReviewEvent,
-  card: ReturnType<typeof createInitialFsrsCard>,
-): boolean {
-  const expectedDueAt = card.lastReviewAt ?? card.dueAt
-
-  return (
-    log.rating === event.rating &&
-    log.reviewedAt === event.reviewedAt.toISOString() &&
-    log.dueAt === expectedDueAt.toISOString()
-  )
-}
-
-function parseReviewLog(serialized: string | null) {
-  if (!serialized) return null
-  try {
-    return parseSerializedFsrsReviewLogSnapshot(serialized)
-  } catch {
-    return null
-  }
 }
 
 function observationDateForKey(dateKey: string, end: Date): Date {
@@ -704,12 +681,4 @@ function observationDateForKey(dateKey: string, end: Date): Date {
     999,
   )
   return date > end ? end : date
-}
-
-function parseValidStability(serialized: string): number | null {
-  try {
-    return parseSerializedFsrsReviewLogSnapshot(serialized).stability
-  } catch {
-    return null
-  }
 }

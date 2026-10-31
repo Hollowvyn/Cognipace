@@ -8,16 +8,124 @@ import {
   createDashboardAppShellData,
 } from '@/testing/app-shell-fixtures'
 import { createQueryTestHarness } from '@/testing/query-test-harness'
+import { createSerializedNormalizedPracticeState } from '@/testing/practice-fixtures'
 
 import { OverviewScreen } from './overview-screen'
 
-vi.mock('@/extension/messaging', () => ({
+vi.mock('@/extension/messaging', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/extension/messaging')>()),
   sendMessage: vi.fn(),
 }))
 
 describe('OverviewScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('loads Extra Practice on request while keeping the automatic recommendation', async () => {
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(createDashboardAppShellData())
+      .mockResolvedValueOnce({
+        generatedAt: '2026-01-01T12:00:00.000Z',
+        dueCount: 1,
+        dueToday: 1,
+        newCount: 0,
+        newAvailable: 0,
+        queueLoad: 1,
+        reinforcementCount: 1,
+        excludedCount: 0,
+        recommendationReason: 'reinforcement',
+        items: [
+          {
+            category: 'reinforcement',
+            reason: 'reinforcement',
+            problemSlug: 'future-card',
+            title: 'Future Card',
+            difficulty: 'easy',
+            isPremium: false,
+            state: createSerializedNormalizedPracticeState({
+              problemSlug: 'future-card',
+              status: 'review',
+              phase: 'review',
+              isStarted: true,
+              dueAt: '2026-01-10T00:00:00.000Z',
+              eligibleOn: '2026-01-10',
+            }),
+          },
+        ],
+        topRecommendation: null,
+      } as never)
+
+    renderOverviewScreen()
+    expect(
+      await screen.findByRole('heading', { name: 'Add Binary' }),
+    ).toBeVisible()
+    expect(screen.queryByText('Future Card')).toBeNull()
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Extra Practice' }))
+
+    expect(await screen.findByText('Future Card')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Add Binary' })).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: 'Open Extra Practice' }),
+    ).toHaveAttribute('href', 'https://leetcode.com/problems/future-card/')
+    expect(sendMessage).toHaveBeenCalledWith('queue.getTodayQueue', {
+      surface: 'dashboard',
+      intent: 'extra-practice',
+    })
+  })
+
+  it('shows pending and empty Extra Practice feedback in Overview', async () => {
+    const pending = createDeferred<unknown>()
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(createDashboardAppShellData())
+      .mockReturnValueOnce(pending.promise as never)
+
+    renderOverviewScreen()
+    await screen.findByRole('heading', { name: 'Add Binary' })
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Extra Practice' }))
+    expect(screen.getByText('Finding extra practice...')).toBeVisible()
+    expect(screen.queryByText('Future Card')).toBeNull()
+
+    pending.resolve({
+      generatedAt: '2026-01-01T12:00:00.000Z',
+      dueCount: 1,
+      dueToday: 1,
+      newCount: 0,
+      newAvailable: 0,
+      queueLoad: 0,
+      reinforcementCount: 0,
+      excludedCount: 0,
+      recommendationReason: null,
+      items: [],
+      topRecommendation: null,
+    })
+
+    expect(
+      await screen.findByText(
+        'No future review cards available for extra practice.',
+      ),
+    ).toBeVisible()
+  })
+
+  it('shows an Extra Practice read error without replacing the recommendation', async () => {
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(createDashboardAppShellData())
+      .mockRejectedValueOnce(new Error('Queue read failed'))
+
+    renderOverviewScreen()
+    await screen.findByRole('heading', { name: 'Add Binary' })
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Extra Practice' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Queue read failed',
+    )
+    expect(screen.getByRole('heading', { name: 'Add Binary' })).toBeVisible()
   })
 
   it('renders a populated due-review recommendation with practice progress', async () => {

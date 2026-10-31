@@ -104,21 +104,498 @@ The through-0009 upgrade suite in
 [`fsrs-preservation.integration.test.ts`](../src/platform/db/fsrs-preservation.integration.test.ts)
 compares every original column in a populated source, 75% retention, distinct
 daily and streak progress, staged-publication failure, retry, and reopen while
-checking both older recovery slots. Its appended table is test-only and does
-not prove preservation for a later real FSRS metadata migration.
+checking both older recovery slots. It runs the real 0010 evidence migration,
+verifies six inferred unknown evidence rows and active generation scopes, and
+checks exact metadata/token equality on matching reopen. A real staged
+preparation failure rejects a malformed log without changing the stored
+original or first recovery record.
 
-Before PR review or merge, a human must load this phase's built extension in a
-disposable profile with current history, opaque card IDs, suspension, track
-completion, an active session, and non-default settings. Compare history, raw due
-dates, Daily Goal and streaks, track credit, and Settings before and after
-reload; capture screenshots or a recording without private recovery contents.
-Confirm an ordinary review save persists across reload. Run older supported
-upgrade and recovery smoke when affected, and capture unsupported or corrupt
-failure proof without discarding the original bytes. A future actual metadata
-migration requires human through-0009 upgrade, failure, and retry proof. This
-phase adds no schema; its upgrade trigger is synthetic-test-only. Opaque-ID
-subsequent-save behavior remains for phases C/D; Phase A proves load
-preservation only.
+### Reliable Review Commands (Phase D)
+
+Human installed-extension proof is pending. Use a disposable profile with a
+pre-D full backup and attach screenshots or a recording before PR review or
+merge. C's historical proof record and user confirmation do not provide D proof.
+
+1. Submit a timed review and confirm Saved only after durable publication. Reload
+   and inspect one event, its original time, log, card ID and track credit.
+2. Reselect the rating and Update repeatedly; verify one attempt/count, unchanged
+   event and solve time/log, incrementing revision and original-profile schedule
+   even after changing target retention. Restart then Submit must add a genuine
+   new review. Existing assessment rating locks must still hold.
+3. Open the same problem in two tabs. Update in one then submit the other's stale
+   Update; verify conflict, no extra mutation and preserved selected draft. Use
+   deliberate refresh/reselect to recover.
+4. Reuse the test-only `cpBackupSmoke` storage fault shim below to reject snapshot
+   publication after a review transaction. Verify pending feedback, no Saved or
+   next-step success, locked rating/Restart and accessible Retry. Remove the fault
+   and retry the same accepted command; reload shows one event/track effect.
+5. Lose the review acknowledgement after publication and terminate/restart the
+   service worker, keeping the caller's accepted command. Retry returns the
+   original acknowledgement without a second review. If restart instead loses
+   unflushed state, the same command applies once against the durable baseline.
+6. Retain a pending command, perform an actual targeted schedule reset or full
+   backup restore from another surface, then retry. Verify stale-generation
+   rejection, preserved draft, fresh tokens and untouched replacement history.
+7. Export/restore v6 with captured/legacy-derived evidence and historical
+   correction receipts; compare opaque IDs, history, event/solve time, logs,
+   settings/profiles and track metadata. Imported receipt keys cannot acknowledge
+   old local commands. Check ambiguous legacy Update's explanation and new Save.
+8. With configured Gist sync and a changed remote backup, force review publication
+   failure and request an open check or pull without overwrite consent. Confirm
+   the pending local review remains. Clear the fault and Retry; a clean check must
+   still see local changes. Also stop the worker after publication while the
+   acknowledgement is delayed; after restart automatic sync must preserve the
+   published review until the existing explicit sync decision is made.
+
+Automated real-WASM proof is in `practice-durability.integration.test.ts`,
+`practice-command.integration.test.ts` and `platform/db/instance.test.ts`.
+It covers stored snapshot reopen, lost acknowledgement, failed publication,
+unflushed bootstrap retry, historical correction replay, populated C/v6
+compatibility, reset/restore rotation and stalled transaction rollback/commit.
+Runtime/overlay suites separately cover pending UI, authentication and locks.
+
+### Phase E Daily Scheduling And Study-Day Smoke
+
+Human installed-extension happy-path and edge-case proof is pending. Use a
+disposable Chrome profile with a populated pre-E backup and a local timezone
+that observes daylight saving time. Reload the built `dist/chrome-mv3` extension
+from `chrome://extensions` after each build. Record the local timezone, wall
+clock, and representative raw FSRS due instants; attach redacted screenshots or
+a recording of Settings, Practice, popup/Overview, Analytics and reminder
+results before PR review or merge. Automated tests do not replace this proof.
+
+1. Preserve a history with a future raw due date more than 180 days away,
+   suspension, an active track and earned Daily Goal/streak credit. Upgrade and
+   reopen without reviewing it. Confirm its raw due date, history, card ID,
+   settings, credit and suspension are unchanged. A restore/reopen must preserve
+   the same facts.
+2. Set FSRS target retention to 75%, save, reload Settings and confirm it stays
+   75% while the independent Analytics chart goals remain unchanged. Submit a
+   genuine review and inspect its captured long-term profile: 180-day native
+   maximum, empty steps and fuzz off. Verify the returned card/log agree, and
+   do not interpret 180 as a strict ceiling: a mature-card boundary fixture may
+   return Good/Easy at 181–183 days. A low-retrievability future card must stay
+   future-scheduled.
+3. Reselect and Update the latest older review after changing Settings. Verify
+   the original event time, profile, count, identity, log and track credit are
+   retained; its original maximum can still produce a due date beyond 180 days.
+   Repeating Update must not create another review. Restart then Submit must
+   create one genuine new review under the current daily profile. Confirm
+   assessment rating locks still work.
+4. Around local midnight, review a card whose raw `dueAt` still falls on the
+   review's local date. Confirm Practice, Library, popup, Overview and current
+   Analytics do not reoffer it that day; it becomes eligible no earlier than
+   the next local day. Repeat at spring and autumn daylight saving transitions,
+   and after changing the browser's timezone. A same-day Update must use the
+   original review time rather than its later correction time. Keep the raw
+   `dueAt` unchanged throughout these read checks.
+5. Fill the automatic queue with overdue, due-today, New, future low-recall,
+   suspended and premium-filtered cards. Confirm only overdue, due-today and
+   eligible New cards enter automatic recommendations, in that order and within
+   the full Daily Goal count. A future card never becomes the automatic top
+   recommendation. Check the popup and Overview separately, including empty
+   and fully met-goal states; track progression remains separate.
+6. Click **Extra Practice** in popup and Overview. Confirm it requests a future
+   reviewed card only after the click, opens the selected problem, and leaves
+   automatic items and Daily Goal/track credit unchanged until an actual
+   review. Verify loading, no-future-card and read-error states. Suspended and
+   filtered premium cards must not be offered.
+7. Compare Practice's due-today/overdue values, the automatic queue, current
+   Analytics memory signals, Retention Map and Today's Upcoming Review Load
+   around local midnight. For cards included by the saved Queue filters,
+   eligibility and due counts should agree. Retention Map and Memory Signals
+   still show unsuspended reviewed premium cards when the queue's premium
+   filter is on; a future low-retrievability card can appear without being due. Check
+   Upcoming's Today plus thirteen dates and that historical Overdue Backlog
+   remains a separate historical snapshot.
+8. Open historical Recall and Memory strength with captured reviews,
+   legacy-derived reviews and an event missing scheduling evidence. Observed
+   repeat outcomes must remain counted; modeled values use recorded inputs,
+   legacy estimates are labeled compatibility, and missing model evidence is
+   shown as unavailable with modeled sample counts. Change current retention
+   and confirm it does not rewrite those historical estimates. Confirm current
+   Retention Map identifies the recorded or compatibility profile used.
+9. Enable local due reminders and compare their due count with the automatic
+   queue's `dueToday`. Two checks on the same local day must notify at most
+   once; crossing local midnight permits the next eligible day's reminder.
+   Repeat at both daylight saving transitions, and check popup/Overview and
+   Analytics counts again after the service worker restarts.
+
+### Phase F Four-Rating Preview Smoke
+
+Human installed-extension happy-path and edge-case proof remains **pending**.
+Use a disposable Chrome profile and the built `dist/chrome-mv3` extension.
+Attach redacted screenshots or a recording of the expanded LeetCode Overlay
+for these flows before PR review or merge.
+
+1. On an unreviewed problem, open the expanded Solve rating controls. Confirm
+   Again, Hard, Good and Easy each show a local next-study date and day count.
+   Submit a selected grade and compare the saved due date with the estimate
+   when the clock and Settings have not changed. Repeat at 75% retention; a
+   mature boundary fixture may show native 181–183-day results despite the
+   configured 180-day maximum.
+2. On a reviewed problem, change retention and select a different grade for
+   Update. Confirm the four estimates use the original review date/profile and
+   the matching Update yields the same due date. Repeat Update and verify no
+   extra attempt, changed credit or changed log. A past estimate must say
+   **Past study date** rather than imply a future wait. Check a supported
+   legacy-derived estimate and an unavailable ambiguous legacy context.
+3. Check local midnight and both daylight saving transitions. A same-day raw
+   FSRS due instant becomes eligible on the next local study day; an Update's
+   day count starts at its original review date, not the correction time.
+4. While a preview loads or fails, Submit/Update must remain available when
+   their existing rules permit them. Confirm locked grades stay disabled,
+   selected draft survives a preview refetch and a stale Update conflict, and
+   pending Save/Update Retry keeps its accepted command locked. Restart or
+   navigate to another LeetCode problem while a read is pending; no old
+   estimate may appear on the new problem. A final AI effective grade may
+   differ from the selected preview without silently changing the command.
+5. Compare card, attempt, profile, receipt, track credit and sync state before
+   and after preview-only actions. Reopen the extension and confirm no preview
+   read created a review or altered a due date.
+
+### Responsive Overlay Startup Baseline And Smoke
+
+Status: the packaged disposable-profile page-stage baseline is **partial**;
+worker/renderer attribution and real Submit comparison are pending. Human
+installed-extension happy-path and edge-case smoke with screenshots or a
+recording is **pending** before PR review or merge. See the [Phase 1
+handoff](superpowers/handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md)
+and [validated compact report](superpowers/evidence/responsive-overlay/overlay-startup-standard.json).
+
+To reproduce the automated page baseline, use the pinned Node/npm versions in
+Local Setup, install dependencies, and run from the repository root:
+
+```sh
+rtk npm run build
+rtk proxy env COGNIPACE_SCALING=standard npm run test -- src/testing/fsrs-scaling-benchmark.test.ts
+rtk proxy node scripts/fsrs-scaling-chrome.mjs --backup test-results/fsrs-phase-g/standard-backup.json --dataset standard --problem-url https://leetcode.com/problems/two-sum/ --startup-only --samples 20 --cold-samples 10
+rtk proxy node scripts/validate-overlay-startup-report.mjs docs/superpowers/evidence/responsive-overlay/overlay-startup-standard.json
+```
+
+The driver loads `dist/chrome-mv3` into a unique `/private/tmp` Chrome profile,
+restores the synthetic v6 fixture there, verifies the real Two Sum slug, and
+removes that profile afterward. Run this from a clean checkout of committed
+source and record its commit and packaged build SHA-256 with the report. Never restore the scaling backup in a personal
+profile. It opens 20 fresh tabs in the same browser and worker for warm samples;
+each of 10 cold samples restarts the entire browser with the same persisted
+disposable profile before opening a fresh tab. Fixture restore and known-slug
+setup are untimed. It writes compact, sanitized raw stage cells and trace metadata
+to the fixed report path above. The validator independently recalculates stage
+counts and nearest-rank percentiles from those cells. Timer and saved-context
+readiness have separate per-opening statuses. The first warm and cold opens
+include trace collection overhead. A partial report makes the command exit 1;
+read its statuses rather than interpreting that exit as a complete pass. The
+current report has 20/20 warm and 10/10 cold page readiness samples; worker
+attribution, renderer attribution, cold trace, and real Submit remain pending.
+
+For a human Performance trace, use a separate disposable Chrome profile with
+the packaged extension loaded, restore the synthetic backup only in that
+profile, and open a verified known LeetCode problem. Capture one warm and one
+full-browser-restart cold opening with DevTools Performance recording. Inspect
+the page's User Timing marks, extension service-worker work, renderer tasks
+over 50 ms, and the timer's first usable state. Attribute a task to CogniPace
+only when the trace identifies its extension or script context. Record Chrome
+version, extension build, fixture counts, profile type, raw durations, failure
+statuses, and redacted trace or screenshot paths. Keep submitted code, full
+trace payloads, storage snapshots, credentials, and personal history out of
+shared evidence.
+
+#### Phase 1 human smoke: observe current behavior
+
+These checks describe the installed extension as it works in Phase 1. Record
+what happens and any failure; do not grade it against the progressive startup
+behavior planned for Phases 2 and 3.
+
+- [ ] With the installed packaged extension, open a fixture-known problem warm
+      and after a full browser restart. For the new-problem cases, use two
+      distinct valid LeetCode slugs confirmed absent from the installed
+      disposable database (including seeded catalog rows):
+      one for the warm open and another, still unseen slug after the full browser
+      restart for the cold open. Record mount-to-usable-timer and saved-context timing,
+      displayed identity, loading/error state and when the timer becomes
+      responsive. Note whether the new problem is upserted and whether its
+      saved history is empty after context loads.
+- [ ] On known and new problems, start, pause and reset the manual timer as
+      soon as it is usable. Enable the saved automatic timing setting and repeat
+      warm and cold opens. Record when automatic start occurs relative to
+      context arrival and verify the current elapsed-time, pause/reset and
+      navigation reset rules. Record the target-time display before and after
+      difficulty and settings arrive.
+- [ ] Throttle and then fail remote metadata in the disposable profile; repeat
+      on known and new problems. Record page identity, timer availability,
+      saved context, loading/error treatment and recovery; a failed metadata
+      request may prevent current Phase 1 startup from reaching usable context.
+      Repeat with a slow or failed local read where reproducible, and record
+      whether empty history or review controls appear before valid context.
+- [ ] Navigate between known and new problems while metadata or local context
+      is pending. Check for an old result replacing the active session, timer
+      reset, wrong-slug context and duplicate attempts; record any failure.
+- [ ] Once valid saved context loads, save a review and wait for durable Saved
+      acknowledgement; reload and verify one attempt and correct timer, rating,
+      FSRS and track effects. Update its rating and verify no extra attempt.
+      Induce a recoverable Save failure in the disposable profile and use Retry;
+      confirm the accepted command stays locked, success is not shown early,
+      and Retry preserves one durable attempt. Repeat a valid review while
+      preview or next-step data is unavailable.
+- [ ] In an authenticated, disposable LeetCode profile, capture a real code
+      Submit click and Command/Ctrl+Enter path with the extension enabled.
+      Repeat comparable submissions with the extension disabled and compare
+      click-to-LeetCode response and renderer work. Verify CogniPace captures
+      the matching submission and does not change LeetCode's submission result.
+      This comparison was unavailable in the automated unauthenticated run;
+      no code was submitted there.
+- [ ] On the user's affected installed profile, reproduce or rule out the
+      reported approximately 30-second delay with a redacted Performance trace.
+      Record extensions and profile conditions relevant to the delay without
+      sharing personal data. The disposable fixture did not reproduce it.
+- [ ] Attach redacted screenshots or a screen recording of the installed
+      extension happy path and edge cases, with exact flows, version, date and
+      result, before PR review or merge.
+
+#### Future progressive-startup acceptance (Phases 2 and 3)
+
+These are acceptance checks for later behavior-changing phases, **not Phase 1
+PR gates**. Their separate plans must specify implementation and proof. Repeat
+warm/cold known and new opens and require manual timer access without waiting
+for metadata, upsert or local context; automatic start only after verified
+settings, without backdating; and a pending target label while timing inputs
+are unknown. With slow/failed metadata, known saved context must remain usable
+and a new problem must retain identity and manual timer access. With slow/failed
+local context, keep the timer usable and show pending/error review context,
+never a false empty history. Check retryable new-problem upsert failure,
+slug/epoch supersession, independent preview/next-step failure, and exact
+Save/Update/Retry durability. Human installed-extension smoke and visual proof
+will be required for those phases when implemented.
+
+### Phase G Local Scaling Smoke
+
+Human installed-extension happy-path and edge-case proof, with redacted
+screenshots or a recording, remains **pending**. Use only a disposable Chrome
+profile and synthetic history. Never import a scaling fixture into a personal
+profile. Build `dist/chrome-mv3`, then run the disposable packaged driver with
+`rtk proxy node scripts/fsrs-scaling-chrome.mjs --backup
+test-results/fsrs-phase-g/standard-backup.json --dataset standard`. Generate the
+backup first with `rtk proxy env COGNIPACE_SCALING=standard npm run test --
+src/testing/fsrs-scaling-benchmark.test.ts`; repeat for `stress` and
+`single-card` only when the previous workload leaves the last durable state
+intact. The driver creates and removes a unique `/private/tmp` profile and
+writes sanitized samples under `docs/superpowers/evidence/`. A failed or
+unmeasured operation stays pending. Its automated results are separate from
+the human proof below.
+
+1. With sync and live AI disabled, restore the synthetic v6 backup through
+   Data Management. Verify the fixture problem slugs, full attempt/log history,
+   profiles, corrected evidence, suspension, track progress and Settings. Export
+   and reopen the same profile; compare counts and representative original
+   review times, raw due dates, logs and earned credit.
+2. Review an eligible fixture card, wait for Saved, then reload and verify one
+   new attempt and durable card/track effects. Update its latest rating twice;
+   verify the same event time, one attempt, incrementing revision and original
+   scheduling context. Retry the same accepted command after a delayed response
+   and verify its original acknowledgement and no duplicate effect.
+3. Compare Queue, recent Practice details and Analytics 30/90/All with the
+   exported full history, including pre-window reviews, first/repeat cohorts,
+   tied timestamps, suspended and premium-filtered cards. On a real LeetCode
+   problem page, request Submit and Update previews while a Save is pending in
+   another surface. Confirm the shared database gate serializes work, the
+   preview stays read-only, and either a current result or a stale-context
+   conflict appears without changing the draft.
+4. On the hidden dashboard `/dev/smoke` route, opt into **Measure storage and
+   read timings**. Record the displayed total, quota/headroom, active snapshot and
+   recovery-copy byte counts with Chrome version and loaded build. Keep live
+   GenAI unchecked. Check the read-operation samples separately from the
+   sequential health checks. If Chrome omits quota or a workload fails, record
+   the API result and last durable snapshot; do not infer a supported capacity.
+5. Use the disposable-profile failure harness below to reject local snapshot
+   publication after a review or restore. Confirm `persistence-pending`, no
+   false Saved acknowledgement, unchanged active and recovery bytes, and
+   successful same-command Retry while the worker still retains it. Restart
+   before publication and verify the last durable snapshot; repeat after a
+   successful publication and verify the new state. Record the existing
+   sync-metadata best-effort limitation separately.
+
+Attach redacted screen proof for the human flows before PR review or merge.
+The predecessor Phase F human preview proof remains a separate pending gate.
+
+### FSRS Evidence And Recoverable Replacement
+
+Run these human happy-path and edge-case flows in a disposable installed
+extension profile. Export a pre-C backup before updating. Attach screenshots or
+a recording, with private history and recovery contents redacted, before PR
+review or merge. Automated tests do not replace this proof.
+
+1. Update to `dist/chrome-mv3` with populated history, opaque card IDs,
+   suspension, an active track/session and 75% retention. Compare history, raw due dates,
+   Daily Goal/streak progress, track credit and Settings before/after reload.
+   Save a genuine new review, correct an unknown event with Update, and reload.
+   Verify the same event time and one revision change, with no extra review.
+2. Restore a supported old backup, export v6 and restore that v6 file. Compare
+   all existing cards/logs/settings and earned progress; active local/problem
+   tokens must be fresh after each intentional restore. Verify an untouched
+   suspended problem and a valid New card with zero memory/null last review.
+3. Import valid v6 evidence with opaque IDs, recorded profiles and historical
+   correction receipts. A Good revision-1 acknowledgement must survive a
+   current Again revision-2 event. Verify subsequent Save reuses the card ID;
+   captured/legacy-derived Update uses original context and preserves identity,
+   time and count. Ambiguous unknown history explains why Update is unavailable;
+   a genuine new Save establishes captured context. An occupied prospective card
+   ID must leave its sibling unchanged.
+4. Try malformed logs, profiles, evidence ownership/sequences, generations and
+   historical acknowledgements. Validation must reject before replacement;
+   existing rows and generation tokens stay unchanged.
+5. In a test-only fault harness, fail snapshot publication after commit. Verify
+   pending text, no saved toast, disabled fresh file/restore/reset/export actions,
+   closed confirmation with retained draft, and an accessible Retry saving.
+   Reload Settings while the worker lives; status must not flush. Retry and
+   reload the persisted data without an extra restore or review. The runtime
+   and repository regressions additionally prove one replacement/rotation.
+6. Fail sync bookkeeping after a durable replacement. Text must say data is
+   already saved. Retry only metadata: no second Gist fetch, restore, flush,
+   rotation or data invalidation. Test failed error/status reads in the same
+   outage; the recovery message must remain useful and contain no secrets.
+   With Settings already mounted, trigger an automatic Gist pull failure and
+   verify Retry saving appears without remount/focus. After retry succeeds,
+   both the recovery panel and stale Sync retry-needed message must clear.
+7. Verify automatic/unconfirmed dirty Gist pull blocks and explicitly confirmed
+   manual overwrite succeeds. A pending replacement must block queued local
+   writes, content imports/retries, export and automatic/manual sync.
+8. Fail the local pre-commit dirty marker: restore/reset must not commit or
+   rotate. Reject malformed input before marking. Rollback after successful
+   marking preserves the old database and may conservatively leave dirty status.
+   Restart after durable data with failed final bookkeeping; automatic pull must
+   still block on the persisted dirty marker.
+9. Restart before publication and verify the last durable snapshot reopens.
+   Worker-local recovery callbacks are lost on restart; do not claim lifecycle
+   replacement deduplication. After publication, replacement data must survive.
+10. Fail content-import publication, then intentionally replace local data.
+    The old import Retry saving must request a new preview rather than report
+    erased content saved. A rejected replacement retains genuine import retry.
+
+Use the following temporary DevTools harness for installed-extension failure
+proof, alongside the coordinator/runtime/SQLite regressions. No production
+failure switch is added.
+
+#### Disposable-profile failure harness
+
+Build with `npm run build`, load `dist/chrome-mv3` unpacked into a disposable
+Chrome profile and open Settings > Data Management once so startup completes.
+Export its initial backup. For local restore/reset cases, disable automatic sync
+before arming a fault. In `chrome://extensions`, click CogniPace's service-worker
+Inspect link and paste this into that worker's Console, not the dashboard's
+Console. Keep it open during retry tests: [Chrome documents that inspection
+keeps the worker active](https://developer.chrome.com/docs/extensions/get-started/tutorial/service-worker-events).
+
+This replaces only that worker's storage methods until cleanup/restart. It
+never reads or prints tokens, backups or raw database bytes. The key names
+match `snapshot.ts` and `sync-metadata-store.ts`; ordinary storage calls still
+reach Chrome's [Promise-based storage API](https://developer.chrome.com/docs/extensions/reference/api/storage).
+
+```js
+;(() => {
+  if (globalThis.cpBackupSmoke) throw new Error('Harness already installed')
+  const local = chrome.storage.local
+  const originalSet = local.set
+  const originalGet = local.get
+  const snapshotKey = 'cognipace_db_snapshot_v1'
+  const syncKey = 'cognipace_sync_metadata_v1'
+  const state = {
+    failSnapshots: false,
+    failSyncFrom: Infinity,
+    failSyncReads: false,
+    snapshotAttempts: 0,
+    savedSnapshots: 0,
+    syncAttempts: 0,
+    savedSyncWrites: 0,
+  }
+  const set = async (values) => {
+    const snapshot = Object.hasOwn(values, snapshotKey)
+    const sync = Object.hasOwn(values, syncKey)
+    if (snapshot) state.snapshotAttempts += 1
+    if (sync) state.syncAttempts += 1
+    if (snapshot && state.failSnapshots)
+      throw new Error('Smoke snapshot failure')
+    if (sync && state.syncAttempts >= state.failSyncFrom)
+      throw new Error('Smoke sync metadata failure')
+    const result = await originalSet.call(local, values)
+    if (snapshot) state.savedSnapshots += 1
+    if (sync) state.savedSyncWrites += 1
+    return result
+  }
+  const get = async (keys) => {
+    if (state.failSyncReads && keys === syncKey)
+      throw new Error('Smoke sync metadata read failure')
+    return originalGet.call(local, keys)
+  }
+  local.set = set
+  local.get = get
+  if (local.set !== set || local.get !== get) {
+    local.set = originalSet
+    local.get = originalGet
+    throw new Error('Storage shim unavailable; do not claim fault proof')
+  }
+  globalThis.cpBackupSmoke = {
+    state,
+    clearFaults() {
+      state.failSnapshots = false
+      state.failSyncFrom = Infinity
+      state.failSyncReads = false
+    },
+    cleanup() {
+      local.set = originalSet
+      local.get = originalGet
+      delete globalThis.cpBackupSmoke
+    },
+  }
+})()
+```
+
+Run one fault at a time, then clear it and finish Retry saving before starting
+the next case. Inspect only `cpBackupSmoke.state` counters. An unhandled
+`Smoke snapshot failure` from the existing automatic publication timer is
+expected while snapshot writes are blocked; it must contain no study contents.
+
+- **Publication failure:** set `cpBackupSmoke.state.failSnapshots = true`, then
+  intentionally restore the exported backup or clear local data. Verify pending
+  recovery and disabled replacement/export actions. Reload only the dashboard;
+  `savedSnapshots` must stay unchanged. Run `cpBackupSmoke.clearFaults()`, click
+  Retry saving and confirm durable data after reload.
+- **Pre-commit marker failure:** set
+  `cpBackupSmoke.state.failSyncFrom = cpBackupSmoke.state.syncAttempts + 1`, then
+  restore/reset. It must report failure before replacing data and show no pending
+  replacement. Clear faults; export and compare the original history/due dates.
+- **Post-publication local metadata failure:** with automatic sync disabled, set
+  `cpBackupSmoke.state.failSyncFrom = cpBackupSmoke.state.syncAttempts + 2`, then
+  restore/reset. The first dirty marker succeeds, publication succeeds and the
+  second sync write fails. Verify the data-saved/sync-status-pending text. Record
+  `savedSnapshots`, clear faults and Retry saving; the count must not increase.
+- **Gist metadata failure:** use an already configured disposable test Gist and
+  an intentional manual pull. Arm `failSyncFrom` at `syncAttempts + 1` before
+  confirming the pull. Verify durable data with metadata pending. Clear faults
+  and retry; `savedSnapshots` must not increase and the Network panel must show
+  no second Gist request. Use the same case with publication failure, then enable
+  `failSyncReads` only after the pending result exists, to check status-read failure
+  does not hide Retry saving. Automated tests cover failure on the initial result
+  construction as well.
+- **Worker restart:** arm publication failure and restore. Use the extension's
+  Reload button in `chrome://extensions` without clearing storage; then reopen
+  Settings and inspect the new worker. The shim and pending callbacks must be
+  gone, and the last durable dataset must reopen. Repeat after the local
+  post-publication failure: restored data and the persisted dirty marker must
+  survive. With the configured test Gist, an unconfirmed/automatic pull must
+  still block until an intentional overwrite is confirmed.
+- **Obsolete import acknowledgement:** arm publication failure, import disposable
+  content and observe its pending acknowledgement. Clear faults, intentionally
+  restore/reset, then use the old content-import Retry saving. It must request a
+  fresh preview. Transaction rollback and metadata-only callback counts remain
+  covered by automated regressions; do not claim these were induced in Chrome.
+
+After every run, call `cpBackupSmoke.cleanup()` if the harness still exists,
+reload the extension and verify a normal export/save. Do not leave the shim in
+a regular profile or attach private Console/storage output. Capture the visible
+pending, disabled-action, retry and completed states with screenshots/recording.
+This recipe is prepared for the human engineer; no installed-Chrome execution
+is claimed by the agent.
 
 Startup diagnostics should report a safe, actionable error without logging raw
 snapshot bytes, topics, tokens, or settings. When the original snapshot pair is
@@ -163,9 +640,9 @@ shows only the relevant UI state and safe error text.
      "utf8",
    )
    const legacy = Array.from(upgrade.matchAll(
-     /legacy(?:Topic|Track)MigrationFingerprint = '([a-f0-9]{8})'/g,
+     /legacy(?:Topic|Track|Fsrs)MigrationFingerprint = '([a-f0-9]{8})'/g,
    ), (match) => match[1])
-   if (legacy.length !== 2) throw new Error("Could not read both allowlisted fingerprints")
+   if (legacy.length !== 3) throw new Error("Could not read all three allowlisted fingerprints")
    let candidate = 0
    const sentinel = () => candidate.toString(16).padStart(8, "0")
    while ([current, ...legacy].includes(sentinel())) candidate += 1
@@ -462,7 +939,10 @@ cannot validate a replacement key or model.
    unavailable free capacity or quota when available; distinguish 402 balance/key
    limit guidance from 429 quota guidance. Account privacy/capability restrictions
    may make a model unavailable; do not loosen privacy settings automatically.
-   Confirm no automatic retries or app-configured paid fallback requests.
+   Confirm no retries for quota/auth/billing/refusal/invalid reports and no
+   app-configured paid fallback requests. Assessments on any provider/model may recover once from
+   a temporary upstream failure within the shared deadline. Connection tests and
+   hints retain their single-attempt behavior.
 7. Remove the OpenRouter key. Confirm unavailable analysis and that other saved
    provider keys remain. Assessment can be disabled after removal. Reset Defaults
    keeps saved keys, disables assessment, and restores the blank default model.
@@ -653,7 +1133,7 @@ existing Library, capture, and backup flows:
    as `Tree / Graph` in a disposable problem. Save, reload, and edit again;
    confirm Unicode and slash text survive lookup and persistence.
 4. Export a backup and inspect only the disposable fixture's taxonomy rows.
-   Confirm it declares schema version 5 and typed relations have source,
+   Confirm it declares schema version 6 and typed relations have source,
    target, and kind fields. Import that file into another disposable profile
    and verify assignments, aliases, and both relation kinds round-trip.
 
@@ -837,11 +1317,11 @@ restore, and correction cases.
    turns off, the count becomes zero, and practice history remains. Re-enable to
    restore historical credit. Reset global practice for a question and confirm
    its evidence disappears from every opted-in track.
-8. Export a v5 backup with an enabled track; restore into a disposable profile
+8. Export a v6 backup with an enabled track; restore into a disposable profile
    and confirm the flag and raw history survive. Restore v1-v4 fixtures and
    confirm flags default false. Re-import content v1 and confirm an existing
    enabled flag stays enabled while new imported tracks default off. Run the
-   existing authorized sync smoke with v5 data if testing configured sync.
+   existing authorized sync smoke with v6 data if testing configured sync.
 
 Bounded database upgrade proof is automated using frozen populated v7 and v8
 fixtures. Run `npm run test -- src/platform/db/instance.test.ts
@@ -919,75 +1399,77 @@ exact pending case.
    reload button in `chrome://extensions` after the build. Reopen the dashboard
    and navigate to Analytics so the smoke uses the rebuilt local extension and
    its runtime, rather than a fixture page or an already-open stale dashboard.
-2. In both datasets, choose 14, 30, and 90 days. Confirm daily, three-day, and
-   weekly grouping respectively, and verify the selected range remains selected
-   until explicitly changed. Available charts remain visible under a readiness
-   warning; a suggested shorter ready range changes selection only when its
-   link is activated.
-3. Check the report's selected timezone and as-of context, sparse calendar-date
-   ticks, and full bucket intervals in inspection. Marks use each supplied
-   interval's midpoint, including shortened edge intervals. Tick labels use
-   MM/DD in the report's as-of year and /YY for another year; a cross-year
-   tooltip interval shows both years. The current partial interval is marked
-   in progress, with no future observations.
-   Historical trend charts must remove only unsupported beginning and ending
-   buckets from Chart, Table, and inspection while retaining all internal gaps.
-   Recall's window starts/ends with either known rate; Memory's starts/ends with
-   a finite median, including zero or sub-day values; Practice's starts/ends
-   with positive completed reviews, positive valid-rating counts in either
-   source view, or a finite supplied success rate including 0%. The paired
-   difficulty Success/Time plots share a window supported by any known-difficulty
-   raw assessment, including invalid ratings or unavailable time. Confirm the
-   selected range, period totals, readiness, serialized scales, and report time
-   remain unchanged.
+2. In both datasets, choose 30, 90, and All time; confirm 30 is the default
+   and legacy `range=14` resolves to 30. Young twelve-date history remains
+   selected as 30 and displays its available dates; old sparse history keeps
+   real inactivity. All time uses explicit calendar grouping with at most sixty
+   intervals and conserves every eligible record in totals. Finite comparisons
+   retain complete nominal prior bounds and matched local wall-clock cutoff;
+   All time has no comparison. Recall starts at its first eligible selected
+   pair through the same as-of; long paired history remains long and regrouping
+   cannot improve global selected-history readiness. Backlog stays Last 30 days/
+   daily and Upcoming stays Next 14 days under every selection. Available charts
+   remain visible with neutral guidance; a shorter-ready link changes selection
+   only when activated.
+3. Check the report timezone/as-of, actual displayed dates, sparse calendar
+   ticks, and full intervals in inspection. Marks use actual midpoints,
+   including clipped edges and partial as-of intervals; future observations
+   remain excluded. Dates use MM/DD in the as-of year and /YY otherwise;
+   cross-year tooltip intervals show both years.
+   Performance retains the global available-history domain with leading
+   unavailable rows and trailing cumulative holds. Recall uses its labelled
+   paired frame, preserving raw interval and cumulative counts independently.
+   Raw outcomes/time, Memory, and Practice trim only unsupported outer rows and
+   keep internal gaps. Memory support is a finite median including zero/subday;
+   Practice support is positive completed reviews, positive valid counts in
+   either source, or finite success including zero. Raw outcome/time windows
+   use their local cohort's known-difficulty raw activity, including invalid
+   ratings/unavailable time. Selection, totals, readiness, serialized fits, and
+   report time remain unchanged by presentation.
 4. In each chart, move the pointer across the plot and tap near its left,
    middle, and right buckets. The nearest retained original bucket must be
    inspected, including an internal empty bucket. Confirm no permanent bottom
    detail row is added and the tooltip remains hidden before interaction.
-5. Tab to each chart's native inspection button. Check visible focus,
-   Left/Right arrows, Home/End, Enter/Space, and Escape. Keyboard inspection
-   exposes the same exact bucket values as pointer/tap inspection; Escape and
-   blur hide the tooltip. A quiet selected guide must not create a measured
-   marker or value for unknown evidence.
-   In New Problem Success, verify both simultaneous outcome curves across all
-   difficulties, including Unknown. Compare pooled counts with the exact table
-   using unequal difficulty sample sizes; the overall rate must use summed
-   counts, not an average of difficulty rates. Inspect an internal gap, measured
-   zero, invalid-only outer buckets and an Unknown-only period. Both target
-   editors remain available in empty/Chart/Table states, equal goals share one
-   neutral reference and distinct goals show two. Save a goal and confirm both
-   the combined and difficulty views update. Toggle each outcome independently;
-   its tooltip value hides while dates, scale and goals remain fixed. Change
-   Problem Solving population, measure, view and difficulties; the combined
-   first-recorded chart must remain unchanged.
-6. Inspect the first and last measured values and extremes near axis bounds.
-   Circle/diamond markers and low whiskers must remain visible with sufficient
-   clearance. Missing-evidence bridges connect measured neighbors only; an
-   unknown bucket keeps its unavailable value. A single point remains visible
-   with “Not enough data for a trend yet.”
-7. In Recall vs FSRS Estimate, confirm repeat-only copy, a solid observed line with
-   circle markers, an opaque short-dashed estimate with diamonds, visibly longer
-   missing-evidence bridges, and the saved Target Recall button above the data.
-   With at least two retained intervals, verify the first marker sits 12px from
-   the plot's left axis at both wide and narrow widths. The domain starts at
-   that interval's actual midpoint and still ends at the last interval's end;
-   ticks must represent true dates within this domain. For example, a first
-   09/09–09/11 interval starts the domain at 09/10, while its tooltip and Table
-   still show 09/09–09/11. Inspect a first point at 0% or 100% and confirm its
-   ordinary and active circle/diamond remain fully visible. A singleton keeps
-   its original interval domain and centered marker. Memory Strength and Practice
-   Rhythm retain their interval-boundary X domains and padding.
-   Compare tooltip and Table recalled/paired counts, rate values, signed
-   observed-minus-estimate difference, evidence, and reconstruction provenance.
-   The difference must reflect the supplied value rather than subtraction of
-   rounded displayed rates.
-8. Toggle each Recall series with pointer and keyboard, then hide both. The
-   curve, markers, and tooltip rate hide together; the signed difference appears
-   only with both series visible. Shared sample counts and the target remain,
-   and the accessible description matches the visible series. The retained
-   window, X domain, first-point clearance, and dates must remain fixed while
-   toggling, even when an edge
-   bucket has only one known rate. A measured 0% edge remains supported.
+5. Tab to each chart's native inspector. Check visible focus, Left/Right,
+   Home/End, Enter/Space, Escape and blur. Pointer/tap/keyboard expose the same
+   original row; a quiet guide cannot create an unknown observation.
+   In Performance Breakdown, verify Ratings / Difficulty / Mix / Intervals and
+   Pooled outcomes / Difficulty outcomes / Goals / Method. Original simultaneous
+   pooled Hard + Good + Easy and Good + Easy curves include Unknown; unequal
+   difficulty sample sizes reconcile using summed counts. Raw rate controls,
+   goals, exclusions, timing/assessment Mix and every field remain reachable.
+   Toggle raw curves/difficulties: visible inspection changes, fits/dates stay.
+   Saving a raw goal updates its references while the weighted /100 score remains
+   unchanged. Performance's cohort/control changes never alter Time's cohort.
+6. Inspect first/last updates and extremes near axis bounds. Circle/diamond
+   markers and low whiskers must remain visible with clearance. Raw outcome/
+   time, Memory and Practice bridges connect measured neighbors without a
+   fabricated unknown value. Cumulative Performance/Recall instead show flat
+   no-new-evidence holds through as-of, retaining actual last update and
+   cumulative n. New evidence moves only within its supported interval toward
+   its actual midpoint; curves remain bounded. A single real update plus holds
+   still says Not enough data for a trend yet.
+7. In Recall, confirm repeat-only copy, solid observed circles, short-dashed
+   FSRS diamonds, longer horizontal held dashes, and the saved Target Recall.
+   Valid Again pairs remain failed outcomes in the denominator; Hard/Good/Easy
+   alone count as recalled. Check initial-only empty history, pre-range replay,
+   and genuine zero estimates. Its cumulative observed and FSRS values use the
+   exact same pairs and their latest values equal selected-period totals.
+   Inspect raw interval counts/rates separately from cumulative counts/rates,
+   full-precision signed difference, provenance, evidence and last update.
+   Verify the labelled first-pair-to-as-of frame/grouping; short paired history
+   and genuinely old paired history retain their own actual dates without
+   changing global readiness. With multiple intervals the first true midpoint
+   has 12px left clearance and the domain ends at as-of. A singleton retains
+   its original interval domain/centered marker; full interval details remain.
+   Memory and Practice keep interval-boundary domains/padding.
+8. Toggle each Recall series with pointer/keyboard, then hide both. Curve,
+   marks and inspection rate hide together, and signed difference appears only
+   with both visible. Shared interval/cumulative samples and saved target remain;
+   accessible copy follows visibility. Domains, dates, paired frame and fit
+   including both cumulative series plus the 0%/100% goal do not shift. Measured
+   zero remains supported, and holds show zero new pairs with unchanged
+   cumulative n and last updated interval.
 9. In Memory Strength, inspect a bucket with at least four eligible reviews and
    one with fewer than four. Only the supported bucket gets discrete Q1–Q3
    whiskers; known medians remain available in both. Confirm the Median/Middle
@@ -1002,14 +1484,14 @@ exact pending case.
     unavailable buckets remain inspectable. A single finite median retains its
     original interval and single-point guidance; wholly unavailable medians
     show the explicit empty state.
-11. Confirm one full-width Practice Rhythm card combines exact supplied shares
+11. Confirm the fixed Practice card combines exact supplied shares
     in bottom-to-top Easy, Good, Hard, Again order with a thin, straight neutral
     completed-review line and measured markers. The left axis is fixed at
     0–100% and labeled Rating share (%); the supplied independent right axis is
     labeled Reviews. The Good + Easy upper boundary expresses Review Success,
     with no separate success curve. The saved Target Review Success reference
-    uses the left percentage axis; its compact editor remains above the plot in
-    empty, sparse, Chart, and Table states. Test goals at 0% and 100% and confirm
+    uses the left percentage axis; its compact goal stays reachable in fitting
+    Goals, empty, sparse, Chart, and exact-value states. Test goals at 0% and 100% and confirm
     they do not change rating geometry, count scale, rows, or dates. Completed
     reviews must remain independently supplied rather than derived from valid
     ratings. The visible copy explains association rather than causation, and
@@ -1034,50 +1516,63 @@ exact pending case.
     shares. Toggle Reviews with pointer and keyboard: the count line, markers,
     right axis, and tooltip count hide/show together, and accessible copy follows
     that state. Dates, retained rows, target, Table counts, and category geometry
-    remain fixed. Confirm distinct practice/rating readiness warnings, the
-    selected-period Hard + Again summary, evidence-gated prior-period comparison,
-    and wholly unsupported-period empty state remain truthful.
-14. Switch each historical plot between Chart and Table. When more than
-    seven rows exist, confirm seven rows per page, Previous/Next boundary
-    states, and page reset after a range change. Inspect full interval,
-    complete/in-progress state, grouping, report time, and evidence context
-    across both views. Confirm Chart and Table use the same retained activity
-    window, and wholly unsupported periods show their explicit empty state.
-    Practice's Table retains all supplied counts/shares and unavailable states
-    when Reviews is hidden in Chart; its target control remains reachable.
-    Change range while a tooltip is visible to check that selection resets or
-    clamps to the new rows without stale values.
-15. Repeat ready and sparse paths at wide and 320px dashboard widths in both
-    light and dark themes. Check axis/key contrast, sparse ticks, control
-    reachability, tap coordinates, keyboard focus, table scrolling, and
-    the combined New Problem Success/Recall pair, paired difficulty Success/Time
-    plots, full-width Practice, and
-    Memory/Topic stacking. There must
-    be no horizontal document overflow. Include neighboring panels with different
-    readiness messages; plots and controls must retain usable alignment without
-    overlap or clipped labels.
+    remain fixed. Confirm distinct practice/rating readiness guidance, the
+    selected-period Hard + Again summary and evidence-gated comparison in
+    Details, plus the wholly unsupported-period empty state, remain truthful.
+14. Visit Chart and every fitting exact-value section/field group, including
+    final pages. Preserve all original rows/fields, interval/partial/grouping/
+    timezone/as-of/evidence context, measured zero and unavailable states.
+    Native Previous/Next boundaries and live ranges match the current page.
+    Range/report/width changes reset or clamp pages even while Details is hidden;
+    equivalent rerenders keep the page. Overview restores local filters, series,
+    selection and trigger focus. Practice retains every count/share when Reviews
+    is hidden; all goals remain reachable. Change range during inspection and
+    confirm selection resets/clamps without stale values.
+15. Repeat ready/sparse paths at wide desktop, actual content widths 736px
+    and 735px, and 320px in both themes and at 200% zoom. Verify four equal
+    148px headlines reflow four/two/one and the exact ten-card reading order:
+    Performance / Time vs target, Practice / Topic performance, Recall / Memory
+    strength, Retention map / Memory signals, Overdue backlog / Upcoming reviews.
+    The 736px boundary gives two 360px cards plus 16px gap at 464px height;
+    735px stacks at 512px. Every Overview/Details/goals/selection/Table/loading/
+    empty/sparse/error state retains that height. Fonts must be loaded before
+    measuring. Check long names, all-hidden series, control/tap/focus reachability,
+    plot growth and every final field page without clipping, smaller text,
+    internal vertical scrolling or horizontal document overflow.
 16. Reload the built extension again and reopen Analytics. Confirm the local
     data and expected values remain available, and repeat a range change and
     keyboard inspection through the extension runtime.
-17. Confirm Recent Overdue Backlog still has a watch zone at five problems:
-    values at or below five use healthy green, values above five use attention
-    yellow, and its tooltip reports threshold status. Unknown/reconstructable
-    history must not be made up. Confirm straight connections, dots for zero and
-    isolated known dates, null gaps, unclipped boundary dots, and matching
-    pointer/tap/keyboard inspection with arrows, Home/End and Escape.
+17. In Last 30 days/daily Overdue backlog, test 4/5/6, both crossing
+    directions, flat five, singleton zero, and unknown days. Lines and markers
+    are green strictly below five and amber at/above five; split exact crossings
+    without another observation. Unknown days break runs. Straight connectors,
+    zero/isolated dots, unclipped boundaries and exact threshold/day/count
+    context agree for pointer/tap/native keyboard arrows/Home/End/Escape.
+    Reconcile known/unknown days, known-only peak, and below-five plus
+    at-or-above-five totals to known days. An unknown last day keeps the current
+    headline unavailable without carrying an earlier observation.
+    Reconstructed history must not be invented.
 18. Confirm Upcoming Review Load still shows its fixed next 14 calendar days,
     including when the selected historical range is unready. Check separate Due
     and Overdue counts inside sufficiently large segments, tiny outside labels,
     overdue-only Today, neighboring label collisions, and zero schedules. Inspect
-    and Table must retain exact counts, dates and report context.
+    and Table must retain exact counts, dates and current as-of/timezone/fallback
+    context. Today plus thirteen local dates is a schedule snapshot without
+    future review/rescheduling simulation. Due earlier today remains Due; only
+    Today includes overdue cards from prior local dates. A historical selection
+    change alone preserves pages when current report context is equivalent.
 19. In Retention Map, use more than 30 eligible reviewed questions, including
     exact overlaps, boundary recall values, sub-day durability and long titles.
+    Include 31 eligible questions and, where available, 150; record the exact
+    larger-cohort smoke case as pending if it cannot be exercised locally.
     Confirm every eligible question remains in Chart/Table and the full status
     counts agree. All/Below target keeps the same fitted landscape; include an
     empty Below target result. Hover/tap and the native keyboard inspector must
     agree, nearby-memory choices must include every overlapping question, and
-    Home/End/arrows must reach the final question. Pin details below the chart,
-    check all supplied values/dates and canonical LeetCode links, then close,
+    Home/End/arrows must reach the final question. Pin details in the fixed
+    card's fitting selection surface, check all eleven supplied problem fields,
+    dates/rank and canonical LeetCode links; Problems retains the supplied Region
+    in addition to the eleven original table fields. Then close,
     Escape or click outside; focus must return appropriately.
     Drag forward and reversed boxes, a nested box and a box reaching each plot
     edge. Release must magnify the chosen region, keep all selected points
@@ -1091,24 +1586,93 @@ exact pending case.
     offscreen question. Test both themes at 320px and desktop, all Chart/Table
     pages, and refreshed data removing a selected question. Compare FSRS cards,
     due dates and Settings before/after to confirm presentation-only changes.
-20. In Memory Signals by Problem, confirm exactly five rows per page when more
-    than five exist, Previous/Next and the live row range update correctly, and
-    visible problem links open canonical LeetCode problems in new tabs. Confirm
-    compact inline reasons, long-title wrapping and severity order. Refresh data
-    while on a later page to check reset/clamping and top-25 versus total copy.
-21. For Topic Performance, include more than five qualifying topics, low-evidence
-    topics, long names, and rates at 0%, just below the goal, and 100%. Confirm
-    rising columns, stable ordering, the shared Review Success goal, unrounded
-    goal status, and all rows/full names in Table. Changing the goal from either
-    Topic or Practice Rhythm updates both while preserving outcomes. At 320px,
-    keyboard selection must reveal the active topic inside the bounded scroller;
-    neither the chart nor its editor may create document overflow.
+20. In Memory signals, visit every fitting linked page and final row.
+    Previous/Next and live range update correctly; canonical links open LeetCode
+    problems in new tabs. Keep every typed reason/flag, severity order and long
+    titles without clipping. Changed current as-of/timezone/fallback or returned
+    row identities while a later page is hidden must reset; width changes reflow/
+    clamp pages. Historical selection alone preserves an equivalent current
+    report's page. Scope must retain current report context without presenting
+    the historical selection as its population. Reconcile returned-top-25 versus qualifying-total
+    counts; no flagged problems is a measured empty result.
+21. In Topic performance, include more than five qualifying topics,
+    overlapping direct assignments, Unknown, long names, and low-evidence topics.
+    Qualifying requires at least ten valid ratings across three distinct
+    valid-reviewed problems. All /100 rows/full names remain reachable in
+    bounded pages with unrounded score-ascending/count-descending/name ordering.
+    The sixteen cells reconcile valid n, Good/Easy numerator and original raw
+    Review Success. The alphabetical first five returned low-evidence topics
+    and exact additional count stay separate; omitted qualifying topics is zero. Weighted
+    scores have no percentage goal; raw rate/unrounded goal status/editor remain
+    in Ratings. Editing that goal from Topic or Practice updates its raw
+    references without changing scores. Verify every page and native access at
+    320px without document overflow.
+    Expected: Analytics loads through the extension runtime without the failed-load
+    state, reflects only local practice data, and tells a truthful chart story
+    without filling missing evidence.
 
-Expected: Analytics loads through the extension runtime without the failed-load
-state, reflects only local practice data, and tells a truthful chart story
-without filling missing evidence.
+#### Compact Analytics headlines, continuity and query states
 
-#### Difficulty And Recorded Time and Repeat Recall
+For this redesign, the user's latest validation scope prioritizes full-size
+desktop and avoids expanding exhaustive narrow-screen/accessibility matrices.
+Preserve the existing behavior and completed evidence; focus remaining signoff
+on desktop data, query/action states, and required automated gates. The broader
+responsive checklist below remains reference coverage, rather than extra
+agent verification required for this iteration.
+
+All cases remain unchecked until the human runs them in the rebuilt installed
+extension. Record the induced method for loading/failure/race cases; anything
+uninduced remains pending. Production-component fixture proof stays separate.
+
+- [ ] **Selected headlines:** include first/repeat assessments, true with Again,
+      false with Easy, null with Good, invalid ratings, duplicates, repeated
+      successes, local midnight/overnight dates, future/invalid dates, and
+      all-known-failure/empty/all-unknown histories. Reconcile distinct assessment
+      dates, unique correct questions, true/(true+false), exact positive successful
+      seconds and timed/total successful coverage in 30/90/All. Include missing/
+      zero/negative/nonfinite durations and a positive 35-second duration; it
+      must not appear as measured zero. No finite headline uses all-time totals.
+- [ ] **Weighted reconciliation:** verify 0/50/80/100 points and 1/2/3/Unknown 1
+      influence, all Good 80, Again zero, invalid-only unavailable, and unequal
+      samples. Actual valid n stays distinct from weighted units. Hero/trend/
+      breakdown agree after first/follow-up switches; weighted delta uses
+      unrounded score points while raw deltas use percentage points. Check
+      n=9/n=10 prior gates, nominal windows, matched cutoff and no All delta.
+- [ ] **Cumulative pairs and holds:** reconcile final Performance and Recall
+      values to whole-period totals; raw interval counts never accompany a
+      cumulative rate as its denominator. Include leading unavailable, internal/
+      trailing inactivity, genuine zero estimates, equal updates and one-update
+      history. Again pairs remain failures, initial replay never emits, and
+      pre-range replay supplies the same pairs. Holds have zero new evidence,
+      unchanged cumulative n/last update, long horizontal dashes through as-of,
+      no extra markers/readiness and no movement in unsupported intervals.
+- [ ] **State and geometry:** induce initial pending/error and Retry, incompatible
+      range/timezone changes, same-key Updating and failed refresh. Four headlines/
+      ten cards retain fixed shells. Old-range values clear immediately; failed
+      refresh preserves the exact old snapshot/as-of with persistent failure and
+      Retry. Check one polite announcement, neutral evidence/coverage slots,
+      full distinct Practice/rating reasons in Details, no shortened-history
+      warning, and genuine zero/no flags versus unavailable evidence.
+- [ ] **Details and persistent goals:** visit all original field groups, method/
+      evidence pages and final rows at desktop/320px/200% zoom in both themes.
+      Long labels, all-hidden series, Table/Goals/Selection and pending/error
+      states fit without clipping, smaller text or internal vertical scrolling.
+      Returning restores local filters/series/selection/focus; hidden-table
+      report/width/range changes reflow/clamp. Goal drafts/errors survive
+      Overview/Details, counterpart changes and pending completions, using one
+      atomic edited-key save; retain all four raw goals and backup/configured
+      sync behavior.
+- [ ] **Independent scope and retained actions:** Time below/at/above target,
+      uncapped overtime, Unknown coverage/no target, all/successful subsets,
+      one-observation median/four-observation quartiles and legacy units/Trend/
+      Compare remain available independently of Performance. Topics retain
+      all qualifying and returned low-evidence rows, the exact additional count,
+      and sixteen cells; Signals keeps all
+      returned flags versus qualifying total. Backlog's strict five boundary
+      and Last 30 days, Upcoming's exact Next 14 dates, and every Retention
+      gesture/overlap/eleven-field/link/focus action survive fixed composition.
+
+#### Performance, Time vs target and cumulative Recall
 
 Human happy-path and edge-case smoke is pending. Run these unchecked cases in
 Chrome's rebuilt installed extension with disposable retained history and attach
@@ -1116,13 +1680,14 @@ screenshots or recording proof before PR review or merge. Agent automated and
 production-component checks are separate evidence; record any uninduced case as
 pending rather than passed.
 
-- [ ] **Opening state and placement:** confirm one expanded section replaces the
-      old standalone chart: paired Success/Time and full-width Mix, with Recall
-      separate. Defaults are New problems, Trend, all Easy/Medium/Hard, Hard +
-      Good + Easy, percent of current target, all timed assessments, and
-      assessment-share Mix. The summary uses selected-period assessment days,
-      recorded assessments/distinct problems, Good + Easy/valid and invalid
-      exclusions, rather than an all-time review count.
+- [ ] **Opening state and placement:** Performance defaults to First attempts
+      and Time has an independent New problems/all-timed cohort. Performance
+      Breakdown retains Ratings/Difficulty/Mix/Intervals plus Pooled outcomes,
+      Difficulty outcomes, Goals and Method; Time Details retains Trend/Compare/
+      Intervals/Settings/Method. Advanced defaults remain Trend, all known
+      difficulties, Hard + Good + Easy, current-target percentage and assessment
+      share. Summary details preserve assessment days, recorded assessments/
+      distinct problems, Good + Easy/valid and invalid exclusions.
 - [ ] **Raw cohorts and Recall:** record Again then Good on one problem; New
       problems retains Again and Follow-up practice includes Good. Include an
       invalid first followed by valid Good, different cards/modes, shuffled
@@ -1135,8 +1700,8 @@ pending rather than passed.
       measured. Raw later-record outcomes are independent of that paired cohort.
 - [ ] **Outcome denominators and prior evidence:** within a difficulty use Again,
       Hard, and Good: success is 2/3 and Good + Easy is 1/3 over the same valid n.
-      Check all-Again zero versus invalid-only unavailable, weighted period
-      totals, and exact current/prior counts against the immediately preceding
+      Check all-Again zero versus invalid-only unavailable, summed period
+      numerators/denominators, and exact current/prior counts against the immediately preceding
       equivalent local-calendar period. Either difficulty n below ten says
       Sparse comparison, including n=9; n=10 on both sides permits a directional
       change. Unknown stays separate in Mix and leaves the three outcome/time
@@ -1152,8 +1717,9 @@ pending rather than passed.
       above 100%. Pause excludes time, running idle may count, and Strict Timing
       can record Again for an accepted overtime solution. Caveats must not call
       these values cumulative solving time or historical policy compliance.
-- [ ] **Shared controls and Mix:** verify mint Easy circles, blue Medium diamonds,
-      amber Hard triangles and matching labels in both plots. Hide/reveal each
+- [ ] **Independent controls and Mix:** verify mint Easy circles, blue Medium
+      diamonds and amber Hard triangles in raw outcome/time details. Performance
+      and Time cohort/difficulty switches do not cross-filter each other. Hide/reveal each
       difficulty without resetting the selected outcome or changing domains or
       dates. Hidden series leave inspection; all-hidden shows Select a
       difficulty while Mix still counts the full cohort. Switch raw populations,
@@ -1173,14 +1739,14 @@ pending rather than passed.
       without changing recorded seconds or claiming historical compliance.
 - [ ] **Exact tables and access:** compare Trend/Compare Table values with selected
       measure, units/subset, raw/valid/excluded counts, prior n, timing coverage,
-      medians/quartiles, complete intervals and timezone/as-of. Check seven-row
-      pagination, links, visible focus, Left/Right/Home/End, Escape, hover and
+      medians/quartiles, complete intervals and timezone/as-of. Check every fitting
+      page/field group, links, visible focus, Left/Right/Home/End, Escape, hover and
       touch pinning. Inspection reports only visible series and measured values;
       no hidden or unavailable interval gets a fabricated observation.
-- [ ] **Gaps, boundaries and proof:** at 14/30/90 days test empty, Unknown-only,
+- [ ] **Gaps, boundaries and proof:** at 30/90/All time test empty, Unknown-only,
       no-time, first-only/follow-up-only, sparse zero, singleton, internal gaps,
-      partial edges and cross-year intervals. Both Trend plots retain their shared
-      raw-activity window regardless of difficulty, measure or timing switches;
+      partial edges and cross-year intervals. Raw outcome/time Trend retains each
+      local cohort's activity window despite difficulty/measure/timing switches;
       long-dash bridges create no values. Verify appropriate empty states and
       marker/whisker clearance. Check wide and 320px layouts in light/dark themes,
       including all-hidden, saved-goal editors, tables and tooltip placement,
@@ -1201,7 +1767,8 @@ proof.
       must be 90%. Record FSRS retention, representative card due dates, Recall
       and Review Success rates/counts, and Retention Map values before editing
       goals so the later comparisons use the same practice data.
-- [ ] **Save and cancel:** open Target Recall, confirm its input receives focus,
+- [ ] **Save and cancel:** open Target Recall from Overview/Details Goals,
+      confirm its input receives focus,
       and verify exactly one input with the Hard + Good + Easy hint and current
       Success limit. Save Recall 80%; Success remains 90%. Open Target Review
       Success, verify its single focused input and Good + Easy / Recall-limit
@@ -1213,6 +1780,8 @@ proof.
       101, and Recall 95% with Success 90%. Saving must be blocked without
       changing either goal or silently adjusting the other goal. The invalid
       pair says “Review Success target must be at least your Recall target.”
+      Both counterpart buttons remain reachable in the same Recall Goals surface;
+      change the counterpart explicitly rather than silently adjusting it.
       Equality, 0%, and 100% are valid when the pair satisfies the rule. Raise
       Success before raising Recall beyond it; lower Recall before lowering
       Success below it. With a draft open, change the counterpart from another
@@ -1221,8 +1790,11 @@ proof.
 - [ ] **Pending and failure:** use a controlled delayed and rejected
       `settings.updateSettings` mutation in a disposable local test build and
       record how it was induced. Confirm Saving and duplicate-submit prevention.
-      A rejected save must keep the prior captions/references and the open
-      draft with a useful error; retry succeeds and Cancel still discards it.
+      A rejected save must keep prior captions/references and the open draft
+      with an associated persistent field error. Move Overview/Details and back;
+      the same draft/error survives. Retry succeeds and Cancel still discards it.
+      Complete an earlier pending save after selecting another goal; it must
+      not close that active draft or steal focus.
       If either condition cannot be induced, record that exact case as pending.
 - [ ] **Boundary references:** save 0%/0%, 0%/100%, and 100%/100%. Inspect both
       named dashed references and accessible descriptions at 0% and 100%; each
@@ -1231,7 +1803,7 @@ proof.
       geometry and its supplied right review-count scale unchanged. Measured rates, counts, rows, dates,
       internal gaps, and trimming must match the pre-edit data.
 - [ ] **Range and presentation:** retain a non-default pair while changing
-      14/30/90-day ranges, including switching to an uncached range while a save
+      30/90/All time ranges, including switching to an uncached range while a save
       is pending, toggling Recall series and Practice's Reviews, switching Chart/Table, and
       opening empty or sparse datasets. The controls remain reachable and the
       saved pair remains fixed. Repeat closed, open, invalid, and boundary-goal
@@ -1477,15 +2049,52 @@ success or schema validity. Mocked wire tests are separate evidence. Capacity,
 account privacy settings, billing, or schema-support failures remain controlled
 and do not trigger app-configured paid fallback requests.
 
-Each case calls the actual `analyzeCode` service with a 30-second deadline and
-35-second test timeout, using the existing single 8,192-token SDK path. A
-successful case writes only report, providerMetadata, criterion, and checkedAt
-to `/private/tmp/cognipace-ai-evaluation/<fixture.id>.json`. It never writes raw
+Human assessment reliability smoke (attach screenshots or a recording):
+
+- Use `openrouter/free` and submit a valid solution; verify all scored sections,
+  concise guidance, complete suggested code and independent manual review saving.
+- Exercise a response taking more than 30 seconds; it may complete within the
+  60-second background deadline. A stalled worker must exit the client pending
+  state by its 80-second deadline and offer Retry.
+- In a test-only transport harness, fail once with a temporary upstream error,
+  then succeed. Verify at most two attempts, the same selected model and no
+  extra report/review writes. Honor Retry-After; an excessive delay returns the
+  controlled error. Capture evidence of the observed attempt count and timing.
+- Exercise quota, authentication and invalid-output errors; verify no automatic
+  recovery attempt. Navigate, cancel or change connection during backoff and
+  generation; obsolete work must not publish a report or begin another attempt.
+- Repeat recovery with a paid/custom model and each supported provider.
+  Connection tests and hints retain their single-attempt policy. Record extension
+  version and requested/served model.
+
+Each case calls the actual `analyzeCode` service with a 60-second deadline and
+65-second test timeout, using the 8,192-token SDK path with bounded recovery for
+all supported provider/model selections. Every case writes a controlled outcome before the
+success assertion to `/private/tmp/cognipace-ai-evaluation/feedback/<fixture.id>.json`.
+Successful outcomes include the validated report; errors include only the
+controlled error category. Allowlisted provider identity, duration, fixture ID
+and checked date support comparison. A current-run summary records success/failure
+counts, errors by category and durations. It never writes raw
 requests, configuration, provider bodies, environments, or keys. Verify the
 current checkedAt, provider, and model before citing an artifact; an older file
 does not prove the latest run passed. Passing schema and consistency validation
 does not establish human rubric quality, compilation, test success, or
 optimality. Inspect each report and record provider/model/date and results:
+
+The initial assessment now returns feedback only. Complete generated-code checks
+require a separate explicit implementation evaluation, using authored assessment
+pins and feedback, the same private provider configuration, and both opt-ins:
+
+```sh
+rtk proxy env COGNIPACE_AI_EVAL=1 COGNIPACE_AI_IMPLEMENTATION_EVAL=1 npm test -- src/features/leetcode-review-assistant/server/code-implementation-provider-evaluation.test.ts --run
+```
+
+Implementation artifacts and their run summary are stored under
+`/private/tmp/cognipace-ai-evaluation/implementation`. Compare the `operation`
+labels, available numeric metrics and checked dates. Feedback-only success does
+not establish generated-code quality. When reviewing a full user journey,
+include both calls if code was requested; unknown failed-attempt usage remains
+unknown. Baseline/current wire sizes are bytes, never token estimates.
 
 - Brute force with the linear goal: a material hash-map replacement needs
   Approach below 5 without forcing a particular score; expected linear time is
@@ -1546,6 +2155,11 @@ reports supplement this proof and cannot replace it.
 2. Submit long/scrolled code and a problem with follow-ups. Verify complete
    input, three /5 scores, all selected rows, independent time-better /
    space-worse styling, and Kotlin Int, Long, generic types, and signatures.
+   Confirm initial feedback contains no generated code and makes one generation
+   request. Open Suggested implementation without another call, then activate
+   Generate suggested code. Verify it uses the original assessed submission and
+   feedback even after editing the live editor. Keep all scores visible while
+   code is pending, and preserve AI-generated/Untested labels and Copy.
 3. Make capture incomplete, then Retry after a newer submission exists.
    Confirm Retry targets the original submission. Exercise rapid consecutive
    submissions and ambiguous discovery; stale code/results must not attach to
@@ -1567,6 +2181,13 @@ reports supplement this proof and cannot replace it.
    model text stays inert, Copy success and failure feedback work, and 392px
    and 320px layouts retain all labels and content with horizontal scrolling
    confined to code.
+   Exercise Generate by keyboard, duplicate activation and a code-generation
+   error. Retry only code without regenerating scores. Reopen successful code
+   and save a review without another model call. Navigate, reset, change
+   connection, disable assessment or create a new attempt during code generation;
+   old code must not attach to the next assessment. Restart the background worker
+   after feedback, then request code; the self-contained request must not depend
+   on a retained completed-worker session.
 8. Record extension version, provider/model/date, happy and edge results, and
    screenshot/recording paths. Recovery is to turn AI assessment off; review
    saving and connection testing continue, with no migration or new permission.
@@ -1641,7 +2262,8 @@ Use Settings > Data Management > Clear local data for an in-app fresh-install
 clear/reset. Removing and reloading the extension remains useful when testing
 extension installation behavior.
 
-Schema and migration changes may reset local extension data during development.
+Supported schema upgrades preserve local data. An intentional fresh-install
+reset is a separate action; unsupported or corrupt snapshots require recovery.
 
 ## Troubleshooting
 
@@ -1671,7 +2293,8 @@ Schema and migration changes may reset local extension data during development.
 ### Database Or Migration Errors
 
 - Run `npm run db:check`.
-- Reset local extension data.
+- Preserve the original and follow [Local Database Recovery](#local-database-recovery).
+- Use reset only when deliberately discarding disposable local test data.
 - Rebuild and reload the extension.
 
 ## Useful Bug Reports

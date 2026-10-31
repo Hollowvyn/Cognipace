@@ -12,6 +12,12 @@ import { createLeetCodeFetchRemoteClient } from '../remote/leetcode-fetch-remote
 import { readLeetCodeRemoteAuthFromDocument } from '../remote/leetcode-remote-auth'
 import type { LeetCodeRemoteClient } from '../remote/leetcode-remote-client'
 import { readLeetCodeSubmissionAttempt } from '../submission/submission-attempt-reader'
+import {
+  markOverlayStartup,
+  recordOverlayStartupMeasure,
+  timeOverlayStartup,
+  timeOverlayStartupSync,
+} from '@/lib/performance/overlay-startup-timing'
 import { createLeetCodeHydrationScheduler } from './hydration-scheduler'
 import { createLeetCodeNavigationObserver } from './navigation-observer'
 import { createLeetCodeSubmissionResultWatch } from './submission-result-watch'
@@ -180,6 +186,7 @@ export function createLeetCodePageWatcher(
 
     const previousLocation = activeLocation
     activeLocation = location
+    markOverlayStartup('url-ready')
     activeToken += 1
     readySlug = null
     latestProblemMetadataFingerprint = null
@@ -234,14 +241,15 @@ export function createLeetCodePageWatcher(
     location: LeetCodeProblemLocation,
   ) {
     try {
-      const pageSnapshot = readLeetCodePageSnapshot(documentRef, {
-        location,
-        now,
-      })
-      const metadataReadResult = await remoteClient.readProblemMetadata({
-        location,
-        auth: readLeetCodeRemoteAuthFromDocument(documentRef),
-      })
+      const pageSnapshot = timeOverlayStartupSync('page.snapshot', () =>
+        readLeetCodePageSnapshot(documentRef, { location, now }),
+      )
+      const metadataReadResult = await timeOverlayStartup('page.metadata', () =>
+        remoteClient.readProblemMetadata({
+          location,
+          auth: readLeetCodeRemoteAuthFromDocument(documentRef),
+        }),
+      )
 
       if (isStaleSnapshotRefresh(token, location)) {
         return
@@ -257,6 +265,7 @@ export function createLeetCodePageWatcher(
 
       if (readySlug !== location.slug) {
         readySlug = location.slug
+        markOverlayStartup('page-ready')
         options.onEvent({
           type: 'page-ready',
           location,
@@ -315,6 +324,7 @@ export function createLeetCodePageWatcher(
   }
 
   function handleClick(event: MouseEvent) {
+    const start = performance.now()
     const location = activeLocation
 
     if (!location) {
@@ -330,7 +340,11 @@ export function createLeetCodePageWatcher(
       return
     }
 
-    handleSubmission(click)
+    try {
+      handleSubmission(click)
+    } finally {
+      recordOverlayStartupMeasure('page.submit-event', start, performance.now())
+    }
   }
 
   function handleKeyDown(event: KeyboardEvent) {
@@ -348,20 +362,25 @@ export function createLeetCodePageWatcher(
       return
     }
 
-    handleSubmission({
-      location: activeLocation,
-      clickedAt: now(),
-      buttonText: 'Submit',
+    const location = activeLocation
+    timeOverlayStartupSync('page.submit-event', () => {
+      handleSubmission({
+        location,
+        clickedAt: now(),
+        buttonText: 'Submit',
+      })
     })
   }
 
   function handleSubmission(click: LeetCodeSubmissionClick) {
     options.onEvent({ type: 'submit-clicked', click })
-    const attempt = readLeetCodeSubmissionAttempt({
-      attemptId: crypto.randomUUID(),
-      click,
-      editorRoot: documentRef,
-    })
+    const attempt = timeOverlayStartupSync('page.submit-capture', () =>
+      readLeetCodeSubmissionAttempt({
+        attemptId: crypto.randomUUID(),
+        click,
+        editorRoot: documentRef,
+      }),
+    )
 
     options.onEvent({
       type: 'submission-started',

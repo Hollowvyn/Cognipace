@@ -17,12 +17,14 @@ import {
 import { HistoricalTable } from './charts/historical-table'
 import { HistoricalTargetLine } from './charts/historical-target-line'
 import { LineSegments } from './charts/line-segments'
+import { CumulativeTrend } from './charts/cumulative-trend'
+import type { CumulativeRecallPresentationRow } from '../domain/cumulative-recall-presentation'
 
 type RecallRow = AnalyticsViews['observedRecallVsFsrs']['rows'][number]
 
 export function ObservedRecallVsFsrsView({
   view,
-  timeFrame,
+  timeFrame = view.timeFrame,
   targetControl,
 }: {
   view: AnalyticsViews['observedRecallVsFsrs']
@@ -30,10 +32,12 @@ export function ObservedRecallVsFsrsView({
   targetControl?: ReactNode
 }) {
   const [series, setSeries] = useState({ observed: true, estimate: true })
-  const rows = trimHistoricalEmptyEdges(
-    view.rows,
-    (row) => row.observedRecall !== null || row.fsrsEstimate !== null,
-  )
+  const rows = view.timeFrame.history
+    ? view.rows
+    : trimHistoricalEmptyEdges(
+        view.rows,
+        (row) => row.observedRecall !== null || row.fsrsEstimate !== null,
+      )
   const hasValues = rows.length > 0
   const visibleDescription =
     [
@@ -204,7 +208,7 @@ export function ObservedRecallVsFsrsView({
               />
             </div>
           ) : (
-            <Empty message="No repeat reviews in this period have both a valid rating and an FSRS estimate. First recorded reviews build memory for later comparisons." />
+            <Empty message="No repeat reviews in this period. First recorded reviews build memory for later comparisons." />
           )
         }
         table={
@@ -217,7 +221,10 @@ export function ObservedRecallVsFsrsView({
               percent(row.observedRecall),
               percent(row.fsrsEstimate),
               difference(row.difference),
-              'Reconstructed',
+              row.modelSampleSize === undefined
+                ? '—'
+                : formatCount(row.modelSampleSize),
+              modelProvenanceText(row.modelProvenance),
               evidenceText(row.evidence),
               periodContext(row, timeFrame),
             ]}
@@ -228,6 +235,7 @@ export function ObservedRecallVsFsrsView({
               'Observed recall',
               'FSRS estimate',
               'Difference',
+              'Modeled reviews',
               'Provenance',
               'Evidence',
               'Period context',
@@ -241,7 +249,7 @@ export function ObservedRecallVsFsrsView({
   )
 }
 
-function SeriesSwitch({
+export function SeriesSwitch({
   label,
   pressed,
   onClick,
@@ -296,6 +304,131 @@ function SeriesSwitch({
   )
 }
 
+/** Compact cumulative adapter; the legacy raw interval view remains compatible. */
+export function CumulativeRecallPlot({
+  rows,
+  view,
+  timeFrame = view.timeFrame,
+  series,
+  height,
+}: {
+  rows: readonly CumulativeRecallPresentationRow[]
+  view: AnalyticsViews['observedRecallVsFsrs']
+  timeFrame?: HistoricalChartTimeFrame | undefined
+  series: { observed: boolean; estimate: boolean }
+  height: number
+}) {
+  const values = rows
+    .flatMap((row) => [
+      row.cumulativeObservedRecall,
+      row.cumulativeFsrsEstimate,
+    ])
+    .filter(
+      (value): value is number => value !== null && Number.isFinite(value),
+    )
+  const domain: [number, number] = [
+    Math.min(view.scale.domain[0], view.targetRecall, ...values),
+    Math.max(view.scale.domain[1], view.targetRecall, ...values),
+  ]
+  return (
+    <HistoricalChart
+      compact={{ height, showGroupingLabel: false }}
+      cumulativeAsOf
+      startAtFirstPoint
+      config={{}}
+      name="Recall cumulative chart"
+      description={`${series.observed ? 'Observed recall: solid circles. ' : ''}${series.estimate ? 'FSRS estimate: short dashes and diamonds. ' : ''}${!series.observed && !series.estimate ? 'Both data series are hidden. ' : ''}Cumulative paired repeat reviews; long dashes hold existing evidence through as-of without adding observations. Target Recall: ${percent(view.targetRecall)}. ${historicalReportContext(timeFrame)}`}
+      rows={rows}
+      timeFrame={timeFrame}
+      inspectionResetKey={`${series.observed}:${series.estimate}`}
+      yAxes={[
+        {
+          label: 'Recall (%)',
+          scale: { ...view.scale, domain },
+          format: percent,
+        },
+      ]}
+      tooltip={(row) => (
+        <div className="rounded border border-border bg-popover p-2 text-xs shadow-md">
+          <p className="m-0">
+            {formatHistoricalBucket(row, timeFrame)} · {row.state}
+          </p>
+          <p className="m-0">
+            Cumulative {row.cumulativeRecalledCount} recalled /{' '}
+            {row.cumulativePairedReviews} paired reviews.
+          </p>
+          {series.observed ? (
+            <p className="m-0">
+              Observed recall: {percent(row.cumulativeObservedRecall)}
+            </p>
+          ) : null}
+          {series.estimate ? (
+            <p className="m-0">
+              FSRS estimate: {percent(row.cumulativeFsrsEstimate)}
+            </p>
+          ) : null}
+          {series.observed && series.estimate ? (
+            <p className="m-0">
+              Difference: {difference(row.cumulativeDifference)}
+            </p>
+          ) : null}
+          <p className="m-0">
+            Target Recall: {percent(view.targetRecall)}. Interval{' '}
+            {row.recalledCount}/{row.pairedReviews};{' '}
+            {row.state === 'held'
+              ? 'No new paired evidence; prior value held.'
+              : row.state === 'unavailable'
+                ? 'No paired evidence yet.'
+                : 'Updated from paired evidence.'}
+          </p>
+          <p className="m-0">
+            Last update:{' '}
+            {row.lastUpdatedInterval
+              ? formatHistoricalBucket(row.lastUpdatedInterval, timeFrame)
+              : 'None'}
+            . Reconstructed. {historicalIntervalContext(row, timeFrame)} ·{' '}
+            {historicalReportContext(timeFrame)}
+          </p>
+        </div>
+      )}
+    >
+      {(positioned, selected, visible) => (
+        <>
+          <HistoricalTargetLine
+            testId="recall-target"
+            value={view.targetRecall}
+          />
+          {series.observed ? (
+            <CumulativeTrend
+              rows={positioned}
+              value={(row) => row.cumulativeObservedRecall}
+              state={(row) => row.state}
+              visibleEnd={positioned.at(-1)?.endX ?? 0}
+              color="var(--cp-analytics-observed)"
+              markerShape="circle"
+              selectedRow={visible ? selected : null}
+              testId="recall-observed"
+            />
+          ) : null}
+          {series.estimate ? (
+            <CumulativeTrend
+              rows={positioned}
+              value={(row) => row.cumulativeFsrsEstimate}
+              state={(row) => row.state}
+              visibleEnd={positioned.at(-1)?.endX ?? 0}
+              color="var(--cp-analytics-predicted)"
+              markerShape="diamond"
+              strokeDasharray="4 4"
+              selectedRow={visible ? selected : null}
+              testId="recall-estimate"
+            />
+          ) : null}
+        </>
+      )}
+    </HistoricalChart>
+  )
+}
+
 function RecallTooltip({
   row,
   series,
@@ -323,7 +456,13 @@ function RecallTooltip({
           ? [['Observed − estimate', difference(row.difference)] as const]
           : []),
         ['Target Recall', percent(target)],
-        ['Provenance', 'Reconstructed'],
+        [
+          'Modeled reviews',
+          row.modelSampleSize === undefined
+            ? '—'
+            : formatCount(row.modelSampleSize),
+        ],
+        ['Provenance', modelProvenanceText(row.modelProvenance)],
         ['Evidence', evidenceText(row.evidence)],
       ]}
     >
@@ -334,6 +473,19 @@ function RecallTooltip({
       ) : null}
     </HistoricalTooltip>
   )
+}
+
+function modelProvenanceText(provenance: RecallRow['modelProvenance']): string {
+  switch (provenance) {
+    case 'captured':
+      return 'Historical model estimate from recorded inputs'
+    case 'legacy-derived':
+      return 'Legacy compatibility estimate'
+    case 'mixed':
+      return 'Mixed recorded and insufficient model evidence'
+    default:
+      return 'Unavailable · insufficient scheduling evidence'
+  }
 }
 
 function HistoricalTooltip({

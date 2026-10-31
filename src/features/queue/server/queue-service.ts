@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, max } from 'drizzle-orm'
 
 import {
   normalizeProblemDifficulty,
@@ -14,24 +14,41 @@ import { getSettings } from '@/features/settings/server/settings-service'
 import {
   defaultFsrsCardKind,
   parseFsrsCardState,
+  parseSerializedFsrsSchedulerProfile,
   parseReviewRating,
   type FsrsCardSnapshot,
+  type FsrsSchedulerProfile,
 } from '@/lib/fsrs'
 import type { Db } from '@/platform/db'
-import { fsrsCards, problemPractice, problems } from '@/platform/db/schema'
+import {
+  fsrsCards,
+  fsrsSchedulerProfiles,
+  practiceReviewEvidence,
+  problemPractice,
+  problems,
+} from '@/platform/db/schema'
 
-import { buildTodayQueue, type QueueCandidate } from '../domain'
+import {
+  buildTodayQueue,
+  type QueueCandidate,
+  type QueueIntent,
+} from '../domain'
 
-export async function getTodayQueue(db: Db, generatedAt = new Date()) {
+export async function getTodayQueue(
+  db: Db,
+  generatedAt = new Date(),
+  intent: QueueIntent = 'automatic',
+) {
   const settings = await getSettings(db)
-  const candidates = await readQueueCandidates(db, generatedAt)
+  const candidates = await readQueueCandidates(db, generatedAt, intent)
 
-  return buildTodayQueue(candidates, settings, generatedAt)
+  return buildTodayQueue(candidates, settings, generatedAt, intent)
 }
 
 async function readQueueCandidates(
   db: Db,
   now: Date,
+  intent: QueueIntent,
 ): Promise<QueueCandidate[]> {
   const rows = await db
     .select(queueCandidateSelection)
@@ -46,7 +63,63 @@ async function readQueueCandidates(
     )
     .orderBy(asc(problems.slug))
 
-  return rows.map((row) => mapQueueCandidate(row, now))
+  const capturedProfiles =
+    intent === 'extra-practice'
+      ? await readLatestCapturedProfiles(db)
+      : new Map<string, FsrsSchedulerProfile>()
+
+  return rows.map((row) => mapQueueCandidate(row, now, capturedProfiles))
+}
+
+async function readLatestCapturedProfiles(db: Db) {
+  const latestSequence = db
+    .select({
+      cardId: practiceReviewEvidence.cardId,
+      applicationSequence: max(practiceReviewEvidence.applicationSequence).as(
+        'latest_application_sequence',
+      ),
+    })
+    .from(practiceReviewEvidence)
+    .groupBy(practiceReviewEvidence.cardId)
+    .as('latest_queue_review_evidence')
+  const evidenceRows = await db
+    .select({
+      cardId: practiceReviewEvidence.cardId,
+      schedulingEvidenceKind: practiceReviewEvidence.schedulingEvidenceKind,
+      profileJson: fsrsSchedulerProfiles.profileJson,
+    })
+    .from(latestSequence)
+    .innerJoin(
+      practiceReviewEvidence,
+      and(
+        eq(practiceReviewEvidence.cardId, latestSequence.cardId),
+        eq(
+          practiceReviewEvidence.applicationSequence,
+          latestSequence.applicationSequence,
+        ),
+      ),
+    )
+    .leftJoin(
+      fsrsSchedulerProfiles,
+      eq(practiceReviewEvidence.schedulerProfileId, fsrsSchedulerProfiles.id),
+    )
+  const profiles = new Map<string, FsrsSchedulerProfile>()
+
+  for (const row of evidenceRows) {
+    // Legacy-derived and unknown evidence cannot justify a historical profile.
+    if (row.schedulingEvidenceKind !== 'captured' || !row.profileJson) continue
+
+    try {
+      profiles.set(
+        row.cardId,
+        parseSerializedFsrsSchedulerProfile(row.profileJson),
+      )
+    } catch {
+      // Keep the compatibility/default metric for invalid imported evidence.
+    }
+  }
+
+  return profiles
 }
 
 const queueCandidateSelection = {
@@ -74,6 +147,7 @@ const queueCandidateSelection = {
     notes: problemPractice.notes,
   },
   card: {
+    id: fsrsCards.id,
     dueAt: fsrsCards.dueAt,
     stability: fsrsCards.stability,
     difficulty: fsrsCards.difficulty,
@@ -94,11 +168,14 @@ function mapQueueCandidate(
     card: QueueCardRow | null
   },
   now: Date,
+  capturedProfiles: ReadonlyMap<string, FsrsSchedulerProfile>,
 ): QueueCandidate {
   const problemSlug = row.problem.slug
-  const cardId = `${problemSlug}:${defaultFsrsCardKind}`
+  const cardId = row.card?.id ?? `${problemSlug}:${defaultFsrsCardKind}`
   const practice = mapPractice(row.practice)
   const card = mapCard(row.card)
+
+  const profile = capturedProfiles.get(cardId)
 
   return {
     problem: mapProblem(row.problem),
@@ -109,6 +186,7 @@ function mapQueueCandidate(
       card,
       attempts: [],
       now,
+      retrievabilityOptions: profile?.parameters,
     }),
   }
 }
@@ -139,6 +217,7 @@ interface QueuePracticeRow {
 }
 
 interface QueueCardRow {
+  id: string | null
   dueAt: number | null
   stability: number | null
   difficulty: number | null

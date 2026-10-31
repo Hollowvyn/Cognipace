@@ -3,11 +3,13 @@ import {
   getTargetRetentionDuration,
   normalizeFsrsSchedulingOptions,
   parseFsrsCardState,
+  parseSerializedFsrsSchedulerProfile,
   type FsrsCardSnapshot,
 } from '@/lib/fsrs'
 
 import type { Db } from '@/platform/db'
 
+import { derivePracticeScheduleTiming } from '@/features/practice'
 import { getPracticeProgressSummary } from '@/features/practice/server/practice-service'
 import { getSettings } from '@/features/settings/server/settings-service'
 import type { AnalyticsRange } from '../api/analytics-contracts'
@@ -16,16 +18,13 @@ import {
   getReviewDayStats,
   getReviewHistory,
   getCurrentFsrsCards,
-  getUpcomingCards,
   type CurrentFsrsCard,
 } from '../data/analytics-repository'
 
 import {
   buildHardAgainSummary,
-  buildPredictedRecallSamples,
   buildPracticeRhythmPoints,
   buildRatingsMixPoints,
-  buildRecallQualityPoints,
   buildStabilityPoints,
   buildTopicPoints,
   buildUpcomingLoadPoints,
@@ -41,23 +40,28 @@ import {
 import {
   calculateAnalyticsReadiness,
   findRichestReadyRange,
-  type AnalyticsReadiness,
 } from '../domain/analytics-readiness'
 import {
   buildAnalyticsBucketsFromTimeFrame,
   type AnalyticsBucket,
 } from '../domain/analytics-range-policy'
-import {
-  buildAnalyticsTimeFrame,
-  buildForecastBounds,
-} from '../domain/analytics-time'
+import { buildAnalyticsHistoryTimeFrame } from '../domain/analytics-history-frame'
+import { buildAnalyticsBacklogTimeFrame } from '../domain/analytics-history-window'
+import type { AnalyticsTimeFrame } from '../domain/analytics-time'
 import { buildHistoricalAnalyticsViews } from '../domain/historical-presentation'
+import { buildRepeatReviewPairs } from '../domain/review-cohorts'
 import { buildCurrentStateAnalyticsViews } from '../domain/current-state-presentation'
 import { buildWorkloadAnalyticsViews } from '../domain/workload-presentation'
+import {
+  resolveHistoricalSchedulingEvidence,
+  type HistoricalSchedulingEvidenceResolver,
+  type ResolvedHistoricalSchedulingEvidence,
+} from '../domain/historical-scheduling-evidence'
 
 import {
   buildObservedRatingQuality,
   buildAnalyticsSummary,
+  buildSelectedActivity,
   type AnalyticsSummary,
 } from '../domain/summary'
 
@@ -74,29 +78,31 @@ export async function getAnalyticsSummary(
   const range = nowOrOptions instanceof Date ? 30 : nowOrOptions.range
   const timeZone =
     nowOrOptions instanceof Date ? 'UTC' : (nowOrOptions.timeZone ?? 'UTC')
-  const presentationTimeFrame = buildAnalyticsTimeFrame({
-    asOf: now,
-    requestedDays: range,
-    timeZone,
-  })
-  const periodEnd = new Date(presentationTimeFrame.asOf)
-  const buckets = buildAnalyticsBucketsFromTimeFrame(presentationTimeFrame)
-  const periodStart = buckets[0]!.start
-  const forecastBounds = buildForecastBounds({
-    asOf: now,
-    timeZone: presentationTimeFrame.timeZone,
-  })
-  const fourteenDaysLater = new Date(forecastBounds.end)
 
-  const [dayStats, reviewHistory, currentFsrsCards, upcomingCards, settings] =
+  const [dayStats, reviewHistory, currentFsrsCards, settings] =
     await Promise.all([
       getReviewDayStats(db),
       getReviewHistory(db),
       getCurrentFsrsCards(db),
-      getUpcomingCards(db, fourteenDaysLater),
       getSettings(db),
     ])
+  const resolveEvidence = createRequestEvidenceResolver()
 
+  const presentationTimeFrame = buildAnalyticsHistoryTimeFrame({
+    selection: range,
+    asOf: now,
+    timeZone,
+    history: reviewHistory,
+  })
+  const periodEnd = new Date(presentationTimeFrame.asOf)
+  const buckets = buildAnalyticsBucketsFromTimeFrame(presentationTimeFrame)
+  const periodStart = new Date(presentationTimeFrame.periodStart)
+  const backlogTimeFrame: AnalyticsTimeFrame = {
+    ...buildAnalyticsBacklogTimeFrame({ asOf: now, timeZone }),
+    requestedDays: 30,
+    grouping: { unit: 'day', step: 1 },
+  }
+  const backlogBuckets = buildAnalyticsBucketsFromTimeFrame(backlogTimeFrame)
   const fsrsOptions = normalizeFsrsSchedulingOptions({
     targetRetention: settings.review.targetRetention,
   })
@@ -107,6 +113,7 @@ export async function getAnalyticsSummary(
 
   const practiceProgress = await getPracticeProgressSummary(db, {
     dailyGoal: settings.practice.dailyGoal,
+    now,
   })
 
   // Step 4: build domain objects
@@ -126,8 +133,20 @@ export async function getAnalyticsSummary(
     fsrsOptions,
     timeZone: presentationTimeFrame.timeZone,
     timeFrame: presentationTimeFrame,
+    resolveEvidence,
   }
   const analyticsReviewHistory = reviewHistory satisfies AnalyticsReviewEvent[]
+  const activity = buildSelectedActivity(analyticsReviewHistory, {
+    start: periodStart,
+    asOf: periodEnd,
+    timeZone: presentationTimeFrame.timeZone,
+  })
+  const pairedReviews = buildRepeatReviewPairs(analyticsReviewHistory, {
+    start: new Date(presentationTimeFrame.history?.nominalStart ?? periodStart),
+    end: periodEnd,
+    fsrsOptions,
+    resolveEvidence,
+  })
   const analyticsCurrentCards = buildCurrentAnalyticsCards(
     currentFsrsCards,
     now,
@@ -142,8 +161,10 @@ export async function getAnalyticsSummary(
       start: periodStart,
       timeZone: presentationTimeFrame.timeZone,
       timeFrame: presentationTimeFrame,
+      pairedReviews,
       analyticsTargets: settings.analytics,
       timeTargetsMinutes: settings.assessment.timeTargetsMinutes,
+      resolveEvidence,
     },
   )
   const currentStateViews = buildCurrentStateAnalyticsViews(
@@ -152,11 +173,14 @@ export async function getAnalyticsSummary(
       slug: card.slug,
       title: card.title,
       retrievability: card.retrievability,
+      ...(card.modelProvenance
+        ? { modelProvenance: card.modelProvenance }
+        : {}),
       targetDurationDays: card.fsrsCard
         ? getTargetRetentionDuration(
             card.fsrsCard,
             fsrsOptions.targetRetention,
-            fsrsOptions,
+            card.modelOptions ?? fsrsOptions,
           )
         : null,
       dueAt: card.dueAt,
@@ -179,7 +203,9 @@ export async function getAnalyticsSummary(
     hasValidReviewRating,
   )
   const requestedReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: baselineEvidenceCounts,
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
@@ -190,14 +216,21 @@ export async function getAnalyticsSummary(
     hasObservedCorrectnessReview,
   )
   const recallReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
-    evidenceCounts: historicalViews.observedRecallVsFsrs.rows.map(
-      (row) => row.pairedReviews,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
+    evidenceCounts: buildBucketEvidenceCounts(
+      pairedReviews,
+      buckets,
+      periodEnd,
+      () => true,
     ),
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
   const firstAttemptReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: historicalViews.problemSolving.cohorts.newProblems.rows.map(
       (row) =>
         Object.values(row.difficulties).reduce(
@@ -208,33 +241,41 @@ export async function getAnalyticsSummary(
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
   const practiceRhythmReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: correctnessEvidenceCounts,
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
   const ratingsMixReadiness = requestedReadiness
 
-  const recallQuality = buildRecallQualityPoints(
-    analyticsReviewHistory,
-    chartOptions,
+  const recallQuality = historicalViews.observedRecallVsFsrs.rows.map(
+    (row) => ({
+      bucketStart: row.bucketStart,
+      bucketEnd: row.bucketEnd,
+      observedRecall: row.observedRecall,
+      predictedRecall: row.fsrsEstimate,
+      targetRetention: fsrsOptions.targetRetention,
+      reviewCount: row.pairedReviews,
+      eligibleSampleSize: row.pairedReviews,
+    }),
   )
   const predictedRecall = buildMetricSummary(
-    buildPredictedRecallSamples(analyticsReviewHistory, chartOptions).map(
-      (sample) => sample.value,
+    pairedReviews.flatMap((pair) =>
+      pair.estimate === null ? [] : [pair.estimate],
     ),
   )
   const practiceRhythm = buildPracticeRhythmPoints(
     analyticsReviewHistory,
     chartOptions,
   )
-  const ratingsMix = trimHistoricalPoints(
-    buildRatingsMixPoints(analyticsReviewHistory, chartOptions),
-    ratingsMixReadiness,
-  )
+  const ratingsMix = buildRatingsMixPoints(analyticsReviewHistory, chartOptions)
   const hardAgain = buildHardAgainSummary(analyticsReviewHistory, chartOptions)
   const topics = buildTopicPoints(analyticsReviewHistory, chartOptions)
   const topicReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: buildBucketEvidenceCounts(
       analyticsReviewHistory,
       buckets,
@@ -245,27 +286,35 @@ export async function getAnalyticsSummary(
   })
   const stability = buildStabilityPoints(analyticsReviewHistory, chartOptions)
   const stabilityReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: presentationTimeFrame.requestedDays,
+    grouping: presentationTimeFrame.grouping,
+    availableDays: presentationTimeFrame.history?.availableDays,
     evidenceCounts: buildBucketEvidenceCounts(
       analyticsReviewHistory,
       buckets,
       periodEnd,
-      (event) => getValidStabilitySample(event) !== null,
+      (event) => getValidStabilitySample(event, resolveEvidence) !== null,
     ),
     bucketKeys: buckets.map((bucket) => bucket.key),
   })
   const overdueSnapshots = reconstructOverdueBacklogSnapshots(
     analyticsReviewHistory,
     analyticsCurrentCards,
-    chartOptions,
+    {
+      ...chartOptions,
+      start: new Date(backlogTimeFrame.periodStart),
+      buckets: backlogBuckets,
+      timeFrame: backlogTimeFrame,
+    },
   )
   const overdueReadiness = calculateAnalyticsReadiness({
-    requestedDays: range,
+    requestedDays: 30,
+    grouping: backlogTimeFrame.grouping,
     evidenceCounts: bucketCountsFromDatedObservations(
-      buckets,
+      backlogBuckets,
       overdueSnapshots,
     ),
-    bucketKeys: buckets.map((bucket) => bucket.key),
+    bucketKeys: backlogBuckets.map((bucket) => bucket.key),
   })
   const historicalReadiness = {
     firstAttemptOutcomes: firstAttemptReadiness,
@@ -286,13 +335,32 @@ export async function getAnalyticsSummary(
         ),
   }
   const upcomingLoad = buildUpcomingLoadPoints(
-    upcomingCards.map((card) => card.dueAt),
+    currentFsrsCards.flatMap((card) => {
+      if (
+        card.isSuspended ||
+        card.practiceStatus === 'suspended' ||
+        (settings.practice.problemFilters.skipPremium && card.isPremium)
+      )
+        return []
+      const timing = derivePracticeScheduleTiming({
+        dueAt: card.dueAt,
+        lastReviewedAt: card.lastReviewAt ?? card.practiceLastReviewedAt,
+        isStarted:
+          card.reps > 0 ||
+          card.lastReviewAt !== null ||
+          card.practiceLastReviewedAt !== null,
+        isSuspended: false,
+        now,
+        timeZone: presentationTimeFrame.timeZone,
+      })
+      return timing.eligibleOn ? [timing.eligibleOn] : []
+    }),
     now,
     presentationTimeFrame.timeZone,
   )
   const workloadViews = buildWorkloadAnalyticsViews({
     overdueSnapshots,
-    timeFrame: presentationTimeFrame,
+    timeFrame: backlogTimeFrame,
     upcomingLoad,
   })
   const views = { ...baseViews, ...workloadViews }
@@ -300,6 +368,7 @@ export async function getAnalyticsSummary(
   return buildAnalyticsSummary({
     generatedAt: now,
     timeFrame: presentationTimeFrame,
+    activity,
     reviewDays: dayStats.reviewDays,
     totalReviews: dayStats.totalReviews,
     currentStreak: practiceProgress.currentStreak,
@@ -318,6 +387,48 @@ export async function getAnalyticsSummary(
   })
 }
 
+function createRequestEvidenceResolver(): HistoricalSchedulingEvidenceResolver {
+  const byAttemptId = new Map<
+    string,
+    {
+      rating: string
+      reviewedAt: number
+      fsrsReviewLog: string | null
+      schedulingEvidenceKind: string | undefined
+      schedulerProfileJson: string | null | undefined
+      preCardJson: string | null | undefined
+      value: ResolvedHistoricalSchedulingEvidence
+    }
+  >()
+
+  return (event) => {
+    const reviewedAt = event.reviewedAt.getTime()
+    const cached = byAttemptId.get(event.id)
+    if (
+      cached &&
+      cached.rating === event.rating &&
+      cached.reviewedAt === reviewedAt &&
+      cached.fsrsReviewLog === event.fsrsReviewLog &&
+      cached.schedulingEvidenceKind === event.schedulingEvidenceKind &&
+      cached.schedulerProfileJson === event.schedulerProfileJson &&
+      cached.preCardJson === event.preCardJson
+    )
+      return cached.value
+
+    const value = resolveHistoricalSchedulingEvidence(event)
+    byAttemptId.set(event.id, {
+      rating: event.rating,
+      reviewedAt,
+      fsrsReviewLog: event.fsrsReviewLog,
+      schedulingEvidenceKind: event.schedulingEvidenceKind,
+      schedulerProfileJson: event.schedulerProfileJson,
+      preCardJson: event.preCardJson,
+      value,
+    })
+    return value
+  }
+}
+
 function buildCurrentAnalyticsCards(
   cards: CurrentFsrsCard[],
   now: Date,
@@ -325,20 +436,40 @@ function buildCurrentAnalyticsCards(
 ): AnalyticsCurrentCard[] {
   return cards.map((card) => {
     const fsrsCard = buildCurrentCard(card)
+    let cardOptions:
+      | ReturnType<typeof normalizeFsrsSchedulingOptions>
+      | import('@/lib/fsrs').FsrsEffectiveParameters = fsrsOptions
+    let modelProvenance: AnalyticsCurrentCard['modelProvenance'] =
+      'compatibility'
+    if (
+      card.lastSchedulerProfileJson &&
+      card.lastSchedulingEvidenceKind !== 'unknown'
+    ) {
+      try {
+        cardOptions = parseSerializedFsrsSchedulerProfile(
+          card.lastSchedulerProfileJson,
+        ).parameters
+        modelProvenance = card.lastSchedulingEvidenceKind
+      } catch {
+        // Explicit compatibility estimate retains the visible current card.
+      }
+    }
     return {
       fsrsCard,
+      modelOptions: cardOptions,
+      modelProvenance,
       cardId: card.cardId,
       slug: card.problemSlug,
       title: card.title,
       topics: card.topics,
-      retrievability: getRetrievability(fsrsCard, now, fsrsOptions),
+      retrievability: getRetrievability(fsrsCard, now, cardOptions),
       targetRetention: fsrsOptions.targetRetention,
       stabilityDays: card.stability,
       difficulty: card.difficulty,
       lapseCount: card.lapses,
       dueAt: card.dueAt,
       createdAt: card.createdAt,
-      lastReviewAt: card.lastReviewAt,
+      lastReviewAt: card.lastReviewAt ?? card.practiceLastReviewedAt,
       suspended: card.isSuspended || card.practiceStatus === 'suspended',
     }
   })
@@ -355,7 +486,7 @@ function buildCurrentCard(card: CurrentFsrsCard): FsrsCardSnapshot {
     reps: card.reps,
     lapses: card.lapses,
     state: parseFsrsCardState(card.state),
-    lastReviewAt: card.lastReviewAt,
+    lastReviewAt: card.lastReviewAt ?? card.practiceLastReviewedAt,
   }
 }
 
@@ -375,11 +506,11 @@ function buildMetricSummary(
   }
 }
 
-function buildBucketEvidenceCounts(
-  events: readonly AnalyticsReviewEvent[],
+function buildBucketEvidenceCounts<T extends { reviewedAt: Date }>(
+  events: readonly T[],
   buckets: readonly AnalyticsBucket[],
   periodEnd: Date,
-  isEligible: (event: AnalyticsReviewEvent) => boolean,
+  isEligible: (event: T) => boolean,
 ): number[] {
   return buckets.map(
     (bucket) =>
@@ -406,37 +537,26 @@ function bucketCountsFromDatedObservations<T extends { date: Date }>(
   )
 }
 
-function trimHistoricalPoints<T extends { bucketStart: string }>(
-  points: readonly T[],
-  readiness: AnalyticsReadiness,
-): T[] {
-  if (readiness.effectiveStart === null) return []
-
-  const effectiveStartIndex = points.findIndex(
-    (point) => point.bucketStart === readiness.effectiveStart,
-  )
-
-  return effectiveStartIndex === -1 ? [] : points.slice(effectiveStartIndex)
-}
-
 function findRecommendedRange(
   events: readonly AnalyticsReviewEvent[],
   now: Date,
   requestedDays: AnalyticsRange,
   timeZone: string,
-): AnalyticsRange | null {
-  const ranges = ([14, 30, 90] as const)
-    .filter((range) => range < requestedDays)
+): 30 | 90 | null {
+  const ranges = ([30, 90] as const)
+    .filter((range) => requestedDays === 'all' || range < requestedDays)
     .map((range) => {
-      const buckets = buildAnalyticsBucketsFromTimeFrame(
-        buildAnalyticsTimeFrame({
-          asOf: now,
-          requestedDays: range,
-          timeZone,
-        }),
-      )
+      const timeFrame = buildAnalyticsHistoryTimeFrame({
+        selection: range,
+        asOf: now,
+        timeZone,
+        history: events,
+      })
+      const buckets = buildAnalyticsBucketsFromTimeFrame(timeFrame)
       const readiness = calculateAnalyticsReadiness({
         requestedDays: range,
+        grouping: timeFrame.grouping,
+        availableDays: timeFrame.history?.availableDays,
         evidenceCounts: buildBucketEvidenceCounts(
           events,
           buckets,
@@ -450,9 +570,7 @@ function findRecommendedRange(
     })
 
   const recommendedRange = findRichestReadyRange(ranges)
-  return recommendedRange === 14 ||
-    recommendedRange === 30 ||
-    recommendedRange === 90
+  return recommendedRange === 30 || recommendedRange === 90
     ? recommendedRange
     : null
 }

@@ -1,0 +1,687 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600&amp;family=Nunito+Sans:wght@400;500;600;700&amp;display=swap">
+<div id="cp-range-preview">
+  <div class="cp-range-demo"><span>Illustrative data</span><label>Example history <select data-example class="cursor-interaction"><option value="established">Established history</option><option value="young">First 12 days</option></select></label></div>
+  <div aria-label="Complete Analytics page">
+    <section aria-label="Value first Analytics overview">
+      <div class="cp-preview-screen" data-design="trend">
+        <header class="cp-preview-header">
+          <div><span class="cp-preview-brand">CogniPace / Your learning</span><h1>Analytics</h1><p>Your progress, memory, and next reviews.</p></div>
+          <div class="cp-range-picker" role="group" aria-label="History range"><button type="button" class="cp-preview-button cursor-interaction" data-range="30" aria-pressed="true">30 days</button><button type="button" class="cp-preview-button cursor-interaction" data-range="90" aria-pressed="false">90 days</button><button type="button" class="cp-preview-button cursor-interaction" data-range="all" aria-pressed="false">All time</button></div>
+        </header>
+        <div class="cp-range-context" aria-live="polite"><span data-history-scope>Sep 6–Oct 5 · 3-day summaries</span><span data-history-coverage>30 days of available history</span></div>
+        <div class="cp-summary-grid" role="group" aria-label="Selected period summary">
+          <article class="cp-summary-card" data-period-summary="days" aria-labelledby="cp-summary-days"><h2 id="cp-summary-days">Review days</h2><strong data-summary-value>—</strong><p data-summary-caption>Days with recorded practice</p></article>
+          <article class="cp-summary-card" data-period-summary="solved" aria-labelledby="cp-summary-solved"><h2 id="cp-summary-solved">Questions solved</h2><strong data-summary-value>—</strong><p data-summary-caption>Unique questions marked correct</p></article>
+          <article class="cp-summary-card" data-period-summary="correctness" aria-labelledby="cp-summary-correctness"><h2 id="cp-summary-correctness">Observed correctness</h2><strong data-summary-value>—</strong><p data-summary-caption>Recorded assessment results</p></article>
+          <article class="cp-summary-card" data-period-summary="time" aria-labelledby="cp-summary-time"><h2 id="cp-summary-time">Recorded solve time</h2><strong data-summary-value>—</strong><p data-summary-caption>Successful solves with recorded time</p></article>
+        </div>
+        <div class="cp-summary-report">America/New_York · As of Oct 5, 2026</div>
+        <div class="cp-preview-grid">
+          <article class="cp-preview-panel" data-kind="performance" aria-label="Performance score">
+            <header><div><h2>Performance</h2><p>First attempts · weighted by difficulty</p></div><button class="cp-preview-button cursor-interaction" type="button" data-breakdown aria-expanded="false">Breakdown <i data-lucide="arrow-up-right" aria-hidden="true"></i></button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong data-period-score>68</strong><span>/100</span></div><span class="cp-preview-context">100 first assessments<br>Updated Sep 30–Oct 2</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="performance"></div><section class="cp-preview-breakdown" hidden aria-label="Performance score breakdown"></section></div>
+            <footer><span data-performance-foot>Period to date · Sep 6–Oct 5</span><button class="cp-preview-text-button cursor-interaction" type="button" data-breakdown aria-expanded="false">How it adds up</button></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="time" aria-label="Median assessment time against current targets">
+            <header><div><h2>Time vs target</h2><p>Median time by difficulty</p></div><button class="cp-preview-button cursor-interaction" type="button" data-full-details="time" aria-expanded="false">Details</button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>94</strong><span>timed</span></div><span class="cp-preview-context">100 eligible · first attempts<br>All timed assessments</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="time"></div><section class="cp-preview-breakdown cp-full-detail" data-full-body="time" hidden></section></div>
+            <footer><span class="cp-full-rating-legend"><span><i style="background:var(--cp-preview-strong)"></i>Recorded</span><span><i style="background:var(--cp-preview-hard)"></i>Over target</span></span><span>Current targets</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="practice" aria-label="Practice rating mix and review volume">
+            <header><div><h2>Practice</h2><p>Rating mix and review volume</p></div><button class="cp-preview-button cursor-interaction" type="button" data-full-details="practice" aria-expanded="false">Details</button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>159</strong><span>reviews</span></div><span class="cp-preview-context">This period<br>First and repeat assessments</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="practice"></div><section class="cp-preview-breakdown cp-full-detail" data-full-body="practice" hidden></section></div>
+            <footer class="cp-full-legend-footer"><span class="cp-full-rating-legend"><span><i style="background:var(--cp-preview-strong)"></i>Strong</span><span><i style="background:var(--cp-preview-solid)"></i>Solid</span><span><i style="background:var(--cp-preview-effort)"></i>Effortful</span><span><i style="background:var(--cp-preview-practice)"></i>Needs practice</span><span><i class="cp-full-line-key"></i>Reviews</span></span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="topics" aria-label="Weighted topic performance">
+            <header><div><h2>Topic performance</h2><p>Weighted scores across all assessments</p></div><button class="cp-preview-button cursor-interaction" type="button" data-full-details="topics" aria-expanded="false">Details</button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>4</strong><span>topics</span></div><span class="cp-preview-context">Weakest → strongest<br>10+ ratings · 3+ problems</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="topics"></div><section class="cp-preview-breakdown cp-full-detail" data-full-body="topics" hidden></section></div>
+            <footer><span>All assessments · overlapping topics</span><span>Points /100</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="recall" aria-label="Recall compared with FSRS estimate">
+            <header><div><h2>Recall</h2><p>Repeat reviews · period to date</p></div><button class="cp-preview-button cursor-interaction" type="button" data-recall-details aria-expanded="false">Details <i data-lucide="arrow-up-right" aria-hidden="true"></i></button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>92</strong><span>%</span></div><span class="cp-preview-context">FSRS average <b>89%</b><br>52 paired reviews</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="recall"></div><section class="cp-preview-breakdown" data-recall-breakdown hidden aria-label="Recall comparison details"></section></div>
+            <footer><span class="cp-preview-legend"><button class="cp-preview-series cursor-interaction" type="button" data-recall-series="observed" aria-pressed="true"><i class="cp-preview-dot"></i>Recall</button><button class="cp-preview-series cursor-interaction" type="button" data-recall-series="estimate" aria-pressed="true"><i class="cp-preview-estimate"></i>FSRS avg</button></span><span>Updated Sep 30–Oct 2</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="memory" aria-label="Memory strength over time">
+            <header><div><h2>Memory strength</h2><p>FSRS stability after review</p></div><button class="cp-preview-button cursor-interaction" type="button" data-full-details="memory" aria-expanded="false">Details</button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>20</strong><span>days</span></div><span class="cp-preview-context">Last reviewed group<br>Median and middle 50%</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="memory"></div><section class="cp-preview-breakdown cp-full-detail" data-full-body="memory" hidden></section></div>
+            <footer><span>Median · middle 50%</span><span>Days</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="retention" aria-label="Current memory retention map">
+            <header><div><h2>Retention map</h2><p>Current recall and memory durability</p></div><button class="cp-preview-button cursor-interaction" type="button" data-full-details="retention" aria-expanded="false">Details</button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>39</strong><span>memories</span></div><span class="cp-preview-context">30 on target · 5 watch<br>4 need attention</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="retention"></div><section class="cp-preview-breakdown cp-full-detail" data-full-body="retention" hidden></section></div>
+            <footer><span>Current · as of Oct 5</span><span>Durability · days, log</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="signals" aria-label="Problems with memory signals">
+            <header><div><h2>Memory signals</h2><p>Problems that need attention</p></div><button class="cp-preview-button cursor-interaction" type="button" data-full-details="signals" aria-expanded="false">Details</button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>16</strong><span>flagged</span></div><span class="cp-preview-context">Current memory state<br>Ranked by severity</span></div>
+            <div class="cp-preview-body"><ol class="cp-full-signals" data-signals-list></ol><section class="cp-preview-breakdown cp-full-detail" data-full-body="signals" hidden></section></div>
+            <footer><span data-signals-count>Showing 1–3 of 16</span><span class="cp-full-pagination"><button type="button" class="cp-preview-text-button cursor-interaction" data-signals-prev disabled aria-label="Previous flagged problems">Previous</button><button type="button" class="cp-preview-text-button cursor-interaction" data-signals-next aria-label="Next flagged problems">Next</button></span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="backlog" aria-label="Daily overdue backlog">
+            <header><div><h2>Overdue backlog</h2><p>Daily overdue · last 30 days</p></div><button class="cp-preview-button cursor-interaction" type="button" data-full-details="backlog" aria-expanded="false">Details</button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>12</strong><span>overdue</span></div><span class="cp-preview-context">Current backlog<br>Watch starts at 5</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="backlog"></div><section class="cp-preview-breakdown cp-full-detail" data-full-body="backlog" hidden></section></div>
+            <footer><span>Last 30 days · Sep 6–Oct 5</span><span data-backlog-known>30 known days</span></footer>
+          </article>
+          <article class="cp-preview-panel" data-kind="upcoming" aria-label="Upcoming review schedule">
+            <header><div><h2>Upcoming reviews</h2><p>Scheduled reviews · next 14 days</p></div><button class="cp-preview-button cursor-interaction" type="button" data-full-details="upcoming" aria-expanded="false">Details</button></header>
+            <div class="cp-preview-summary"><div class="cp-preview-number"><strong>18</strong><span>scheduled</span></div><span class="cp-preview-context">6 due · 12 overdue<br>Fixed 14-day snapshot</span></div>
+            <div class="cp-preview-body"><div class="cp-preview-chart" data-chart="upcoming"></div><section class="cp-preview-breakdown cp-full-detail" data-full-body="upcoming" hidden></section></div>
+            <footer><span class="cp-full-rating-legend"><i style="background:var(--cp-preview-strong)"></i>Due <i class="cp-full-hatched-key"></i>Overdue</span><span>Oct 5–18</span></footer>
+          </article>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<style>
+  #cp-range-preview {
+    --cp-preview-bg: light-dark(#f3f6f2, #101713);
+    --cp-preview-card: light-dark(#ffffff, #19211d);
+    --cp-preview-ink: light-dark(#253d2f, #e4ece6);
+    --cp-preview-subtle: light-dark(#617568, #a4b5a9);
+    --cp-preview-border: light-dark(#dce5dc, #34463a);
+    --cp-preview-grid-line: light-dark(#e8eee7, #29392e);
+    --cp-preview-primary: light-dark(#2d5a43, #a1d1b4);
+    --cp-preview-on-primary: light-dark(#ffffff, #063824);
+    --cp-preview-strong: light-dark(#34865a, #8fdfa9);
+    --cp-preview-solid: light-dark(#258e86, #5bdcc9);
+    --cp-preview-effort: light-dark(#a87906, #ccb777);
+    --cp-preview-practice: light-dark(#bd6862, #cba5a2);
+    --cp-preview-medium: light-dark(#477cae, #83b7ea);
+    --cp-preview-hard: light-dark(#aa7a00, #ffd449);
+    --cp-preview-estimate: light-dark(#6f879a, #9db7c7);
+    --cp-preview-focus: light-dark(#2d5a43, #a1d1b4);
+    color: var(--cp-preview-ink);
+    font-family: 'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  #cp-range-preview * { box-sizing: border-box; }
+  #cp-range-preview [hidden] { display: none !important; }
+  #cp-range-preview .cp-preview-note { margin: 0 0 12px; color: var(--cp-preview-subtle); font-size: 12px; }
+  #cp-range-preview .cp-preview-screen { padding: 28px; min-height: 1170px; background: var(--cp-preview-bg); }
+  #cp-range-preview .cp-preview-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-right: 80px; margin-bottom: 30px; }
+  #cp-range-preview .cp-preview-brand { color: var(--cp-preview-subtle); font-size: 12px; }
+  #cp-range-preview h1 { margin: 8px 0; font-family: Literata, Georgia, serif; font-size: 34px; font-weight: 500; line-height: 1.2; letter-spacing: -.03em; }
+  #cp-range-preview .cp-preview-header p { margin: 0; color: var(--cp-preview-subtle); font-size: 14px; }
+  #cp-range-preview .cp-preview-scope { color: var(--cp-preview-subtle); font-size: 12px; white-space: nowrap; }
+  #cp-range-preview .cp-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  #cp-range-preview .cp-preview-panel { height: 464px; min-width: 0; display: grid; grid-template-rows: 44px 62px minmax(0, 1fr) 26px; gap: 14px; padding: 22px; border: 1px solid var(--cp-preview-border); border-radius: 14px; background: var(--cp-preview-card); box-shadow: 0 3px 16px color-mix(in srgb, var(--cp-preview-ink) 3%, transparent); }
+  #cp-range-preview .cp-preview-panel[data-expanded='true'] { grid-template-rows: 44px minmax(0, 1fr) 26px; }
+  #cp-range-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) { grid-template-rows: 44px minmax(0, 1fr) 46px 26px; }
+  #cp-range-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) > .cp-preview-body { grid-row: 2; }
+  #cp-range-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) > .cp-preview-summary { grid-row: 3; border-top: 1px solid var(--cp-preview-grid-line); padding-top: 12px; }
+  #cp-range-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) .cp-preview-number strong { font-size: 32px; }
+  #cp-range-preview .cp-preview-panel > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; min-width: 0; }
+  #cp-range-preview .cp-preview-panel h2 { margin: 0 0 4px; color: var(--cp-preview-ink); font-size: 18px; font-weight: 700; line-height: 1.3; letter-spacing: -.015em; }
+  #cp-range-preview .cp-preview-panel header p { margin: 0; color: var(--cp-preview-subtle); font-size: 12px; line-height: 1.4; }
+  #cp-range-preview .cp-preview-button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--cp-preview-border); border-radius: 8px; padding: 7px 9px; background: transparent; color: var(--cp-preview-ink); font: inherit; font-size: 12px; white-space: nowrap; }
+  #cp-range-preview .cp-preview-button svg { width: 13px; height: 13px; }
+  #cp-range-preview .cp-preview-button[aria-expanded='true'] { background: var(--cp-preview-primary); color: var(--cp-preview-on-primary); border-color: var(--cp-preview-primary); }
+  #cp-range-preview button:focus-visible { outline: 2px solid var(--cp-preview-focus); outline-offset: 3px; }
+  #cp-range-preview .cp-preview-chip { font-size: 11px; line-height: 1.4; color: var(--cp-preview-subtle); text-align: right; }
+  #cp-range-preview .cp-preview-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  #cp-range-preview .cp-preview-number { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  #cp-range-preview .cp-preview-number strong { font-size: 50px; line-height: 1; font-weight: 600; letter-spacing: -.05em; color: var(--cp-preview-ink); }
+  #cp-range-preview .cp-preview-number > span { font-size: 16px; color: var(--cp-preview-subtle); }
+  #cp-range-preview .cp-preview-context { color: var(--cp-preview-subtle); font-size: 12px; text-align: right; }
+  #cp-range-preview .cp-preview-small-label { font-size: 12px; color: var(--cp-preview-subtle); }
+  #cp-range-preview .cp-preview-body, #cp-range-preview .cp-preview-chart { min-width: 0; min-height: 0; height: 100%; }
+  #cp-range-preview .cp-preview-chart { position: relative; }
+  #cp-range-preview .cp-preview-inspector { position: absolute; inset: 18px 12px 28px 40px; border: 0; padding: 0; background: transparent; color: inherit; }
+  #cp-range-preview .cp-preview-inspect-detail { position: absolute; left: 46px; right: 14px; top: 32px; padding: 8px 10px; color: var(--cp-preview-ink); background: var(--cp-preview-card); border: 1px solid var(--cp-preview-border); border-radius: 6px; font-size: 12px; pointer-events: none; }
+  #cp-range-preview .cp-preview-inspect-detail strong, #cp-range-preview .cp-preview-inspect-detail span { display: block; }
+  #cp-range-preview .cp-preview-inspect-detail span { color: var(--cp-preview-subtle); font-size: 11px; }
+  #cp-range-preview .cp-preview-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  #cp-range-preview .cp-preview-plot-text { fill: var(--cp-preview-subtle); font-family: inherit; font-size: 11px; }
+  #cp-range-preview .cp-preview-plot-value { fill: var(--cp-preview-ink); font-family: inherit; font-size: 12px; font-weight: 600; }
+  #cp-range-preview .cp-preview-tooltip-mark { outline-offset: 3px; }
+  #cp-range-preview .cp-preview-panel footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--cp-preview-subtle); font-size: 11px; min-width: 0; }
+  #cp-range-preview .cp-preview-text-button { border: 0; background: transparent; color: var(--cp-preview-primary); font: inherit; font-size: 11px; padding: 5px 0; white-space: nowrap; }
+  #cp-range-preview .cp-preview-legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  #cp-range-preview .cp-preview-series { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 4px 0; background: transparent; color: var(--cp-preview-subtle); font: inherit; font-size: 11px; }
+  #cp-range-preview .cp-preview-series[aria-pressed='false'] { text-decoration: line-through; opacity: .6; }
+  #cp-range-preview .cp-preview-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cp-preview-strong); display: inline-block; }
+  #cp-range-preview .cp-preview-estimate { width: 15px; border-top: 2px dashed var(--cp-preview-estimate); display: inline-block; margin-left: 4px; }
+  #cp-range-preview .cp-preview-breakdown { height: 100%; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 8px; }
+  #cp-range-preview .cp-preview-detail-tabs { display: flex; gap: 4px; }
+  #cp-range-preview .cp-preview-detail-tabs button { font-size: 11px; padding: 4px 6px; }
+  #cp-range-preview .cp-preview-detail-tabs button[aria-pressed='true'] { color: var(--cp-preview-on-primary); background: var(--cp-preview-primary); border-color: var(--cp-preview-primary); }
+  #cp-range-preview .cp-preview-breakdown table { border-collapse: collapse; table-layout: fixed; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+  #cp-range-preview .cp-preview-breakdown th { font-weight: 400; color: var(--cp-preview-subtle); font-size: 11px; padding: 0 0 8px; text-align: right; }
+  #cp-range-preview .cp-preview-breakdown td { padding: 5px 0; text-align: right; border-top: 1px solid var(--cp-preview-grid-line); color: var(--cp-preview-ink); }
+  #cp-range-preview .cp-preview-breakdown th:first-child, #cp-range-preview .cp-preview-breakdown td:first-child { text-align: left; }
+  #cp-range-preview .cp-preview-breakdown table[data-columns='4'] th:first-child { width: 46%; }
+  #cp-range-preview .cp-preview-breakdown table[data-columns='3'] th:first-child { width: 42%; }
+  #cp-range-preview .cp-preview-breakdown table[data-columns='2'] th:first-child { width: 42%; }
+  #cp-range-preview .cp-preview-breakdown th + th, #cp-range-preview .cp-preview-breakdown td + td { padding-left: 6px; }
+  #cp-range-preview .cp-preview-breakdown small { display: block; color: var(--cp-preview-subtle); font-size: 11px; }
+  #cp-range-preview .cp-preview-math-total { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--cp-preview-border); font-size: 12px; }
+  #cp-range-preview .cp-preview-breakdown-note { color: var(--cp-preview-subtle); font-size: 11px; margin: 0; }
+  #cp-range-preview .cp-preview-distribution { display: grid; align-content: center; gap: 15px; height: 100%; }
+  #cp-range-preview .cp-preview-dist-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+  #cp-range-preview .cp-preview-track { height: 12px; background: var(--cp-preview-grid-line); overflow: hidden; }
+  #cp-range-preview .cp-preview-track > span { display: block; height: 100%; }
+  @media (max-width: 690px) {
+    #cp-range-preview .cp-preview-screen { padding: 16px; min-height: 2130px; }
+    #cp-range-preview .cp-preview-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    #cp-range-preview .cp-preview-header { padding-right: 0; flex-wrap: wrap; }
+    #cp-range-preview h1 { font-size: 28px; }
+    #cp-range-preview .cp-preview-panel { padding: 18px; grid-template-rows: 50px 62px minmax(0, 1fr) 26px; }
+  }
+  @media (max-width: 380px) {
+    #cp-range-preview .cp-preview-screen { padding: 12px; }
+    #cp-range-preview .cp-preview-panel { padding: 14px; grid-template-rows: 60px 62px minmax(0, 1fr) 34px; gap: 12px; }
+    #cp-range-preview .cp-preview-panel[data-expanded='true'] { grid-template-rows: 60px minmax(0, 1fr) 34px; }
+    #cp-range-preview .cp-preview-screen[data-design='distribution'] .cp-preview-panel:not([data-expanded='true']) { grid-template-rows: 60px minmax(0, 1fr) 48px 34px; }
+    #cp-range-preview .cp-preview-context { font-size: 11px; }
+    #cp-range-preview .cp-preview-button svg { display: none; }
+    #cp-range-preview .cp-preview-panel footer { flex-wrap: wrap; gap: 2px 8px; }
+    #cp-range-preview .cp-preview-breakdown td { padding: 7px 0; }
+  }
+  @media (pointer: coarse) {
+    #cp-range-preview .cp-preview-button, #cp-range-preview .cp-preview-text-button, #cp-range-preview .cp-preview-series { min-height: 44px; }
+    #cp-range-preview .cp-preview-detail-tabs button { min-width: 44px; }
+  }
+  #cp-range-preview .cp-preview-screen { min-height: 0; }
+  #cp-range-preview .cp-preview-header { margin-bottom: 16px; }
+  #cp-range-preview .cp-full-activity { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; color: var(--cp-preview-subtle); font-size: 12px; margin-bottom: 22px; }
+  #cp-range-preview .cp-full-activity small { font-size: inherit; }
+  #cp-range-preview .cp-preview-panel { padding: 20px; gap: 10px; grid-template-rows: 52px 62px minmax(0, 1fr) 44px; }
+  #cp-range-preview .cp-preview-panel[data-expanded='true'] { grid-template-rows: 52px minmax(0, 1fr) 44px; }
+  #cp-range-preview .cp-preview-panel[data-expanded='true'] .cp-preview-body { min-height: 0; height: 100%; }
+  #cp-range-preview .cp-preview-detail-tabs { flex-wrap: wrap; }
+  #cp-range-preview .cp-full-rating-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  #cp-range-preview .cp-full-rating-legend > span { display: inline-flex; align-items: center; gap: 4px; }
+  #cp-range-preview .cp-full-rating-legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+  #cp-range-preview .cp-full-rating-legend .cp-full-line-key { width: 14px; height: 0; border-top: 2px solid var(--cp-preview-ink); border-radius: 0; }
+  #cp-range-preview .cp-full-rating-legend .cp-full-hatched-key { border-radius: 0; background: repeating-linear-gradient(135deg, var(--cp-preview-practice) 0 2px, transparent 2px 4px); }
+  #cp-range-preview .cp-full-pagination { display: flex; gap: 14px; }
+  #cp-range-preview button:disabled { opacity: .4; }
+  #cp-range-preview .cp-full-signals { margin: 0; padding: 0; list-style: none; display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); height: 100%; gap: 0; }
+  #cp-range-preview .cp-full-signals li { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 10px 0; border-bottom: 1px solid var(--cp-preview-grid-line); }
+  #cp-range-preview .cp-full-signals li:last-child { border-bottom: 0; }
+  #cp-range-preview .cp-full-signals strong { font-weight: 600; font-size: 13px; }
+  #cp-range-preview .cp-full-signals span { color: var(--cp-preview-subtle); font-size: 11px; }
+  #cp-range-preview .cp-full-signals b { font-weight: 500; color: var(--cp-preview-practice); }
+  #cp-range-preview .cp-full-detail { height: 100%; min-height: 0; justify-content: flex-start; gap: 10px; }
+  #cp-range-preview .cp-full-detail table { table-layout: fixed; }
+  #cp-range-preview .cp-full-detail td { padding: 6px 0; overflow-wrap: normal; }
+  #cp-range-preview .cp-full-detail th { padding-right: 2px; overflow-wrap: normal; }
+  @media (max-width: 768px) {
+    #cp-range-preview .cp-preview-grid { grid-template-columns: minmax(0, 1fr); }
+    #cp-range-preview .cp-preview-header { padding-right: 0; flex-wrap: wrap; }
+    #cp-range-preview .cp-preview-panel { height: 512px; grid-template-rows: 72px 64px minmax(0, 1fr) 64px; gap: 10px; }
+    #cp-range-preview .cp-preview-panel[data-expanded='true'] { grid-template-rows: 72px minmax(0, 1fr) 64px; }
+    #cp-range-preview .cp-preview-panel footer { flex-wrap: wrap; }
+    #cp-range-preview .cp-full-activity { flex-direction: column; }
+    #cp-range-preview .cp-preview-body { min-height: 0; }
+    #cp-range-preview .cp-preview-chart { min-height: 0; }
+  }
+  @media (max-width: 380px) {
+    #cp-range-preview .cp-preview-panel { padding: 14px; }
+    #cp-range-preview .cp-preview-panel h2 { font-size: 17px; }
+    #cp-range-preview .cp-preview-number strong { font-size: 44px; }
+    #cp-range-preview .cp-preview-number > span { font-size: 14px; }
+    #cp-range-preview .cp-preview-summary { gap: 8px; }
+  }
+</style>
+<style>
+  #cp-range-preview .cp-range-demo { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 18px; padding:0 0 14px; color:var(--cp-preview-subtle); font-size:12px; }
+  #cp-range-preview .cp-range-demo label { display:flex; gap:8px; align-items:center; }
+  #cp-range-preview .cp-range-demo select { font:inherit; color:var(--cp-preview-ink); background:var(--cp-preview-card); border:1px solid var(--cp-preview-border); padding:6px 9px; border-radius:6px; }
+  #cp-range-preview .cp-range-picker { display:flex; align-items:center; gap:3px; background:var(--cp-preview-card); border:1px solid var(--cp-preview-border); border-radius:8px; padding:3px; }
+  #cp-range-preview .cp-range-picker .cp-preview-button { border-color:transparent; white-space:nowrap; }
+  #cp-range-preview .cp-range-picker [aria-pressed='true'] { background:var(--cp-preview-primary); color:var(--cp-preview-on-primary); }
+  #cp-range-preview .cp-range-context { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 16px; padding:0 0 8px; color:var(--cp-preview-subtle); font-size:12px; }
+  #cp-range-preview .cp-summary-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:8px 0 12px; }
+  #cp-range-preview .cp-summary-card { min-width:0; height:148px; display:grid; grid-template-rows:36px 38px 36px; gap:3px; align-content:center; padding:16px; background:var(--cp-preview-card); border:1px solid var(--cp-preview-border); border-radius:12px; }
+  #cp-range-preview .cp-summary-card h2 { margin:0; font-size:14px; font-weight:500; line-height:1.3; align-self:start; }
+  #cp-range-preview .cp-summary-card > strong { font-size:32px; font-weight:500; line-height:1.1; font-variant-numeric:tabular-nums; white-space:nowrap; align-self:center; letter-spacing:-.025em; }
+  #cp-range-preview .cp-summary-card p { margin:0; color:var(--cp-preview-subtle); font-size:12px; line-height:1.4; }
+  #cp-range-preview .cp-summary-report { margin:0 0 18px; color:var(--cp-preview-subtle); font-size:12px; }
+  @media (max-width:900px) { #cp-range-preview .cp-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:480px) { #cp-range-preview .cp-summary-grid { grid-template-columns:minmax(0,1fr); } }
+  #cp-range-preview .cp-preview-header { align-items:center; padding-right:0; }
+  #cp-range-preview .cp-preview-panel { transition:background-color 150ms; }
+  #cp-range-preview .cp-empty-chart { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--cp-preview-subtle); gap:6px; }
+  #cp-range-preview .cp-empty-chart strong { color:var(--cp-preview-ink); font-weight:500; }
+  #cp-range-preview .cp-preview-plot text { font-size:11px; }
+  #cp-range-preview .cp-preview-plot .cp-preview-plot-value { font-size:12px; }
+  #cp-range-preview .cp-full-detail { padding-top:4px; }
+  #cp-range-preview .cp-full-detail h3 { margin:0; font-size:14px; font-weight:500; }
+  @media (max-width:768px) { #cp-range-preview .cp-range-picker { width:max-content; } #cp-range-preview .cp-range-context { flex-direction:column; } }
+  @media (max-width:380px) { #cp-range-preview .cp-range-demo { flex-direction:column; align-items:flex-start; } #cp-range-preview .cp-range-picker .cp-preview-button { padding:8px 10px; } }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('cp-range-preview');
+  if (!root) return;
+  const asOf = Date.parse('2026-10-05T17:00:00.123Z'), today = '2026-10-05', dayMs = 86400000;
+  const weights = { again: 0, hard: 50, good: 80, easy: 100 };
+  const difficultyNames = ['Easy', 'Medium', 'Hard'];
+  const influences = { Easy: 1, Medium: 2, Hard: 3, Unclassified: 1 };
+  const targets = { Easy: 20, Medium: 35, Hard: 50 };
+  const topicNames = ['Graphs', 'Dynamic programming', 'Arrays', 'Strings'];
+  const categories = [
+    { key: 'easy', label: 'Strong', original: 'Easy', color: '--cp-preview-strong' },
+    { key: 'good', label: 'Solid', original: 'Good', color: '--cp-preview-solid' },
+    { key: 'hard', label: 'Effortful', original: 'Hard', color: '--cp-preview-effort' },
+    { key: 'again', label: 'Needs practice', original: 'Again', color: '--cp-preview-practice' },
+  ];
+  const state = { range: '30', example: 'established', details: {}, sections: {}, breakdown: 'ratings', recallObserved: true, recallEstimate: true, signalsPage: 0, pages: {} };
+  const create = (tag, attrs = {}, text) => {
+    const element = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, String(value));
+    if (text !== undefined) element.textContent = text;
+    return element;
+  };
+  const svgEl = (tag, attrs = {}, text) => {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, String(value));
+    if (text !== undefined) element.textContent = text;
+    return element;
+  };
+  const ordinal = key => Date.parse(key + 'T00:00:00Z') / dayMs;
+  const addDays = (key, days) => new Date((ordinal(key) + days) * dayMs).toISOString().slice(0, 10);
+  const dateLabel = key => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(key + 'T12:00:00Z'));
+  const dateTick = key => key.slice(5).replace('-', '/') + (key.slice(0, 4) === '2026' ? '' : '/' + key.slice(2, 4));
+  const intervalLabel = row => { const firstYear=row.startKey.slice(0,4),lastYear=row.endKey.slice(0,4),showYear=model?.startKey.slice(0,4)!==today.slice(0,4)||firstYear!==lastYear;return row.startKey===row.endKey?dateLabel(row.startKey)+(showYear?', '+firstYear:''):firstYear!==lastYear?dateLabel(row.startKey)+', '+firstYear+'–'+dateLabel(row.endKey)+', '+lastYear:dateLabel(row.startKey)+'–'+dateLabel(row.endKey)+(showYear?', '+firstYear:''); };
+  const number = value => value === null || !Number.isFinite(value) ? '—' : Number.isInteger(value) ? String(value) : value.toFixed(1);
+  const median = values => { const sorted = [...values].sort((a, b) => a - b); return sorted.length ? (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.floor(sorted.length / 2)]) / 2 : null; };
+  function quantile(values, p) {
+    if (!values.length) return null;
+    const sorted = [...values].sort((a, b) => a - b), position = (sorted.length - 1) * p, index = Math.floor(position);
+    return sorted[index] + ((sorted[index + 1] ?? sorted[index]) - sorted[index]) * (position - index);
+  }
+  function midnight(key) {
+    const wall = Date.parse(key + 'T00:00:00Z'); let instant = wall;
+    for (let tries = 0; tries < 3; tries++) {
+      const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(instant)).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+      const represented = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+      const next = wall - (represented - instant); if (next === instant) break; instant = next;
+    }
+    return instant;
+  }
+  function makeFixture() {
+    const events = [];
+    const add = event => {
+      const index = events.length;
+      events.push({ id: 'e' + index, problem: event.problem ?? 'p' + index, first: true, paired: false, estimate: null, isCorrect: event.rating !== 'again', ...event, timestamp: Date.parse(event.key + 'T' + (event.first === false ? '20' : '15') + ':00:00Z'), topics: event.topics ?? [topicNames[index % 4], topicNames[(index + 1) % 4]], stability: event.stability ?? Math.max(1, 4 + (ordinal(event.key) - ordinal('2026-09-06')) * .5 + (index % 5) * .5) });
+    };
+    for (let index = 0; index < 50; index++) {
+      const slot = index % 30;
+      const key = slot < 20 ? addDays('2025-02-01', slot * 12) : addDays('2026-07-10', (slot - 20) * 5);
+      const difficulty = difficultyNames[index % 3], rating = ['again', 'hard', 'good', 'good', 'easy'][index % 5];
+      add({ key, difficulty, rating, minutes: [24, 50, 62][index % 3], stability: 2 + slot / 6 });
+    }
+    const remaining = [
+      { easy: 8, good: 15, hard: 1, again: 1 },
+      { easy: 10, good: 30, hard: 10, again: 5 },
+      { easy: 2, good: 9, hard: 4, again: 5 },
+    ];
+    const sourceCounts = [
+      [0,3,3,4], [1,5,2,2], [2,5,2,1], [1,4,3,2], [2,6,1,1],
+      [2,6,2,0], [3,6,1,0], [3,6,1,0], [3,6,0,1], [3,7,0,0],
+    ];
+    const groupStarts = ['2026-09-09','2026-09-09','2026-09-12','2026-09-21','2026-09-21','2026-09-21','2026-09-24','2026-09-24','2026-09-30','2026-09-30'];
+    const difficultyCount = [0,0,0];
+    sourceCounts.forEach((counts, bucketIndex) => {
+      counts.forEach((count, ratingIndex) => {
+        const rating = ['easy','good','hard','again'][ratingIndex];
+        for (let n = 0; n < count; n++) {
+          let difficultyIndex = (bucketIndex + ratingIndex + n) % 3;
+          while (remaining[difficultyIndex][rating] === 0) difficultyIndex = (difficultyIndex + 1) % 3;
+          remaining[difficultyIndex][rating]--; difficultyCount[difficultyIndex]++;
+          const difficulty = difficultyNames[difficultyIndex], timed = difficultyCount[difficultyIndex] <= [24,51,19][difficultyIndex];
+          add({ key: addDays(groupStarts[bucketIndex], n % 3), difficulty, rating, minutes: timed ? [18,42,45][difficultyIndex] : null });
+        }
+      });
+    });
+    const pairedRemaining = { easy: 8, good: 22, hard: 18 };
+    for (const [key, count, failures, estimate] of [['2026-09-09',10,2,.82],['2026-09-12',12,1,.86],['2026-09-21',14,1,.90],['2026-09-30',16,0,.94]]) {
+      for (let n = 0; n < count; n++) {
+        let rating = 'again';
+        if (n >= failures) { rating = Object.keys(pairedRemaining).find(name => pairedRemaining[name] > 0); pairedRemaining[rating]--; }
+        add({ key: addDays(key, n % 3), first: false, paired: true, estimate, problem: 'p' + n % 50, difficulty: difficultyNames[n % 3], rating, minutes: [16,38,46][n % 3] });
+      }
+    }
+    for (let n = 0; n < 7; n++) add({ key: '2026-10-01', first: false, problem: 'p' + n, difficulty: difficultyNames[n % 3], rating: n < 3 ? 'again' : 'good', minutes: 32 });
+    const currentProblems = new Map(events.filter(event => event.first).map(event => [event.problem, event]));
+    events.filter(event => !event.first).forEach(event => { const first = currentProblems.get(event.problem); event.difficulty = first.difficulty; event.topics = [...first.topics]; });
+    const young = events.filter(event => event.key >= '2026-09-24').map(event => ({ ...event }));
+    const youngFirst = young.filter(event => event.first && event.key < '2026-09-30');
+    young.filter(event => !event.first).forEach((event, index) => { const first = youngFirst[index % youngFirst.length]; event.problem = first.problem; event.difficulty = first.difficulty; event.topics = [...first.topics]; });
+    return { established: events, young };
+  }
+  const fixtures = makeFixture();
+  const backlogAll = [9,9,10,10,7,9,1,3,4,4,5,5,6,6,5,7,6,6,7,7,4,7,7,7,7,5,7,10,12,12];
+  const upcomingDue = [3,0,0,1,0,1,0,1,0,0,0,0,0,0];
+  const signalNames = ['Put Boxes Into the Warehouse II','K-diff Pairs in an Array','Put Boxes Into the Warehouse I','Random Pick with Weight','Median of Two Sorted Arrays','Word Ladder','Longest Increasing Path','Coin Change','Merge Intervals','Course Schedule','Decode Ways','Number of Islands','Sliding Window Maximum','Search a 2D Matrix','Longest Palindrome','Binary Tree Maximum Path Sum'];
+  const signals = signalNames.map((name, index) => ({ name, recall: [58,61,69,77,83,85,86,88,89,90,91,92,93,94,95,96][index], overdue: [14,2,14,1,3,2,1,1,0,0,0,0,0,0,0,0][index], durability: [.6,.1,1.9,.3,1.9,3,4,1.5,2.5,3,4,5,2,4,5,6][index] }));
+  function groupingFor(days, startKey) {
+    if (days <= 14) return { unit: 'day', step: 1, label: 'Daily summaries' };
+    if (days <= 30) return { unit: 'day', step: 3, label: '3-day summaries' };
+    if (state.range !== 'all' || days <= 365) return { unit: 'week', step: 1, label: 'Weekly summaries' };
+    const month = key => +key.slice(0,4) * 12 + +key.slice(5,7) - 1;
+    if (month(today) - month(startKey) + 1 <= 60) return { unit: 'month', step: 1, label: 'Monthly summaries' };
+    if (Math.floor(month(today) / 3) - Math.floor(month(startKey) / 3) + 1 <= 60) return { unit: 'month', step: 3, label: 'Quarterly summaries' };
+    let step = 1; const from = +startKey.slice(0,4), to = +today.slice(0,4);
+    while (Math.floor(to / step) - Math.floor(from / step) + 1 > 60) { const base = 10 ** Math.floor(Math.log10(step)); step = step/base === 1 ? base*2 : step/base === 2 ? base*5 : base*10; }
+    return { unit: 'year', step, label: step === 1 ? 'Yearly summaries' : step + '-year summaries' };
+  }
+  function windowModel(display = {}) {
+    const all = fixtures[state.example], origin = all.reduce((start, event) => event.key < start ? event.key : start, today);
+    const nominal = state.range === 'all' ? origin : addDays(today, -(Number(state.range)-1));
+    const startKey = display.startKey ?? (origin > nominal ? origin : nominal), anchor = display.anchor ?? nominal, days = ordinal(today)-ordinal(startKey)+1, grouping = groupingFor(days, startKey);
+    const endExclusive = addDays(today, 1), monthKey = index => String(Math.floor(index/12)).padStart(4,'0') + '-' + String(index%12+1).padStart(2,'0') + '-01';
+    let natural = startKey;
+    if (grouping.unit === 'day') natural = addDays(anchor, Math.floor((ordinal(startKey)-ordinal(anchor))/grouping.step)*grouping.step);
+    if (grouping.unit === 'week') natural = addDays(startKey, -((new Date(startKey+'T00:00:00Z').getUTCDay()+6)%7));
+    if (grouping.unit === 'month') { const index = +startKey.slice(0,4)*12 + +startKey.slice(5,7)-1; natural = monthKey(Math.floor(index/grouping.step)*grouping.step); }
+    if (grouping.unit === 'year') natural = String(Math.floor(+startKey.slice(0,4)/grouping.step)*grouping.step).padStart(4,'0')+'-01-01';
+    const buckets = [];
+    while (natural <= today) {
+      let next;
+      if (grouping.unit === 'day' || grouping.unit === 'week') next = addDays(natural, grouping.unit === 'week' ? 7 : grouping.step);
+      else if (grouping.unit === 'month') next = monthKey(+natural.slice(0,4)*12 + +natural.slice(5,7)-1+grouping.step);
+      else next = String(+natural.slice(0,4)+grouping.step).padStart(4,'0')+'-01-01';
+      const from = natural < startKey ? startKey : natural, until = next > endExclusive ? endExclusive : next;
+      const start = midnight(from), end = Math.min(midnight(until)-1, asOf), events = all.filter(event => event.key >= from && event.key < until && event.timestamp <= asOf);
+      buckets.push({ startKey: from, endKey: addDays(until,-1), start, end, x: (start+end)/2, events, partial: until === endExclusive }); natural = next;
+    }
+    const events = all.filter(event => event.key >= startKey && event.timestamp <= asOf);
+    return { all, origin, nominal, startKey, days, grouping, buckets, events, start: midnight(startKey), end: asOf, young: origin > nominal, spanLabel: dateLabel(startKey) + '–' + dateLabel(today) + (startKey.slice(0,4) === '2026' ? '' : ', ' + startKey.slice(0,4)+'–2026') };
+  }
+  function stats(events) {
+    const counts = { easy:0, good:0, hard:0, again:0 }; let points=0, units=0;
+    for (const event of events) { counts[event.rating]++; const influence=influences[event.difficulty]; points+=influence*weights[event.rating]; units+=influence; }
+    return { counts, count:events.length, points, units, score:units ? points/units : null };
+  }
+  function periodSummary(source = model.events) {
+    const events = [...new Map(source.map(event => [event.id, event])).values()];
+    const assessed = events.filter(event => typeof event.isCorrect === 'boolean');
+    const successful = assessed.filter(event => event.isCorrect === true);
+    const timed = successful.filter(event => Number.isFinite(event.minutes) && event.minutes > 0);
+    return {
+      reviewDays: new Set(events.map(event => event.key)).size,
+      questionsSolved: assessed.length || !events.length ? new Set(successful.map(event => event.problem)).size : null,
+      correctAssessments: successful.length,
+      assessed: assessed.length,
+      unknownResults: events.length - assessed.length,
+      correctness: assessed.length ? 100 * successful.length / assessed.length : null,
+      recordedSolveSeconds: successful.length ? timed.length ? timed.reduce((sum, event) => sum + event.minutes * 60, 0) : null : assessed.length || !events.length ? 0 : null,
+      timedSuccessful: timed.length,
+    };
+  }
+  function solveTimeLabel(seconds) {
+    if (seconds === null) return '—';
+    if (seconds === 0) return '0m';
+    if (seconds < 60) return '<1m';
+    const minutes = Math.floor(seconds / 60), hours = Math.floor(minutes / 60);
+    return hours ? hours + 'h ' + minutes % 60 + 'm' : minutes + 'm';
+  }
+  function renderPeriodSummary() {
+    const summary = periodSummary();
+    const cards = [
+      ['days', summary.reviewDays, 'Days with recorded practice'],
+      ['solved', number(summary.questionsSolved), 'Unique questions marked correct'],
+      ['correctness', summary.correctness === null ? '—' : Math.round(summary.correctness) + '%', summary.assessed ? summary.correctAssessments + ' of ' + summary.assessed + ' assessed' : 'No recorded results yet'],
+      ['time', solveTimeLabel(summary.recordedSolveSeconds), summary.correctAssessments ? summary.timedSuccessful + ' of ' + summary.correctAssessments + ' successful attempts timed' : summary.recordedSolveSeconds === null ? 'No recorded results yet' : 'No successful solves recorded'],
+    ];
+    for (const [kind, value, caption] of cards) {
+      const card = root.querySelector('[data-period-summary="' + kind + '"]');
+      card.querySelector('[data-summary-value]').textContent = value;
+      card.querySelector('[data-summary-caption]').textContent = caption;
+    }
+  }
+  function cumulative(model, recall = false) {
+    let count=0, points=0, units=0, recalled=0, estimates=0, lastUpdated=null;
+    return model.buckets.map(bucket => {
+      const events=bucket.events.filter(event => recall ? event.paired : event.first), added=events.length; count+=added;
+      if (recall) { recalled+=events.filter(event => event.rating!=='again').length; estimates+=events.reduce((sum,event)=>sum+event.estimate,0); }
+      else { const result=stats(events); points+=result.points; units+=result.units; }
+      if (added) lastUpdated=intervalLabel(bucket);
+      return { ...bucket, added, count, lastUpdated, value: units ? points/units : null, observed:count ? 100*recalled/count : null, estimate:count ? 100*estimates/count : null, recalled, points, units };
+    });
+  }
+  let model;
+  function recallModel() {
+    const paired=model.events.filter(event=>event.paired);
+    if(!paired.length)return model;
+    const first=paired.reduce((key,event)=>event.key<key?event.key:key,today);
+    return windowModel({startKey:first,anchor:first});
+  }
+  function chartFrame(host, label, maximum, ticks, suffix='', right=12) {
+    const {width,height}=host.getBoundingClientRect(); if (host.hidden || width<80 || height<60) return null;
+    host.replaceChildren(); const left=40, top=28, bottom=30, plotWidth=width-left-right, plotHeight=height-top-bottom;
+    const svg=svgEl('svg',{viewBox:'0 0 '+width+' '+height,role:'img','aria-label':label,class:'cp-preview-plot'}); host.append(svg);
+    const y=value=>top+plotHeight*(1-value/maximum);
+    for (const tick of ticks) { svg.append(svgEl('line',{x1:left,x2:width-right,y1:y(tick),y2:y(tick),stroke:'var(--cp-preview-grid-line)','stroke-width':1})); svg.append(svgEl('text',{x:left-8,y:y(tick)+4,'text-anchor':'end',class:'cp-preview-plot-text'},tick+suffix)); }
+    return {svg,width,height,left,right,top,plotWidth,plotHeight,y};
+  }
+  function dateAxis(frame, supplied=model) {
+    const count=frame.width<340 ? 3 : 4;
+    const keys=Array.from({length:count},(_,index)=>addDays(supplied.startKey,Math.round((ordinal(today)-ordinal(supplied.startKey))*index/(count-1))));
+    const x=instant=>frame.left+4+(frame.plotWidth-8)*(instant-supplied.start)/Math.max(1,supplied.end-supplied.start);
+    [...new Set(keys)].forEach((key,index,array)=>frame.svg.append(svgEl('text',{x:x(midnight(key)),y:frame.height-6,'text-anchor':index===0?'start':index===array.length-1?'end':'middle',class:'cp-preview-plot-text'},dateTick(key)))); return x;
+  }
+  function empty(host, message) { host.replaceChildren(create('div',{class:'cp-empty-chart'},message)); }
+  function tangent(rows,index,key,x,y) {
+    const row=rows[index],before=rows[index-1],after=rows[index+1];
+    if (!row || !row.added || !after || !after.added || row[key]===null || after[key]===null) return 0;
+    const right=x(after.x)-x(row.x), next=(y(after[key])-y(row[key]))/right;
+    if (!before || before[key]===null) return next;
+    if (!before.added) return 0;
+    const left=x(row.x)-x(before.x), previous=(y(row[key])-y(before[key]))/left;
+    if (!previous || !next || Math.sign(previous)!==Math.sign(next)) return 0;
+    const a=2*right+left,b=right+2*left; return (a+b)/(a/previous+b/next);
+  }
+  function connection(rows,index,key,x,y) {
+    const previous=rows[index-1],current=rows[index]; if (previous[key]===null || current[key]===null) return [];
+    const from=x(previous.x),to=x(current.x),firstY=y(previous[key]),lastY=y(current[key]);
+    const hold=(a,b)=>({held:true,command:'H '+b,path:'M '+a+' '+firstY+' H '+b});
+    const curve=(a,b,m0,m1)=>{const width=b-a,secant=(lastY-firstY)/width; const bound=s=>Math.sign(s)===Math.sign(secant)?Math.sign(s)*Math.min(Math.abs(s),3*Math.abs(secant)):0; const command=firstY===lastY?'H '+b:'C '+(a+width/3)+' '+(firstY+bound(m0)*width/3)+' '+(b-width/3)+' '+(lastY-bound(m1)*width/3)+' '+b+' '+lastY;return {held:false,command,path:'M '+a+' '+firstY+' '+command};};
+    if (!current.added) return [hold(from,to)];
+    if (!previous.added) {const activeStart=Math.max(from,x(current.start)); return [...(activeStart>from?[hold(from,activeStart)]:[]),curve(activeStart,to,0,tangent(rows,index,key,x,y))];}
+    return [curve(from,to,tangent(rows,index-1,key,x,y),tangent(rows,index,key,x,y))];
+  }
+  function inspect(host, rows, summarize, x) {
+    const button=create('button',{type:'button',class:'cp-preview-inspector cursor-interaction','aria-label':'Inspect original interval values. Use Left and Right arrows, Home, End, or Escape.'});
+    const id='cp-range-inspect-'+host.dataset.chart, detail=create('div',{id,class:'cp-preview-inspect-detail',role:'tooltip',hidden:''}); let selected=rows.length-1,pinned=false;
+    const show=index=>{selected=Math.max(0,Math.min(rows.length-1,index)); const row=rows[selected]; detail.replaceChildren(...summarize(row).map((text,index)=>create(index?'span':'strong',{},text)));detail.hidden=false;button.setAttribute('aria-describedby',id);};
+    const hide=()=>{detail.hidden=true;button.removeAttribute('aria-describedby');};
+    const nearest=event=>{const px=event.clientX-host.getBoundingClientRect().left;return rows.reduce((best,row,index)=>Math.abs(x(row.x)-px)<Math.abs(x(rows[best].x)-px)?index:best,0);};
+    button.addEventListener('focus',()=>show(selected));button.addEventListener('blur',()=>{pinned=false;hide();});button.addEventListener('pointermove',event=>{if(!pinned&&event.pointerType!=='touch')show(nearest(event));});button.addEventListener('pointerleave',()=>{if(!pinned&&document.activeElement!==button)hide();});button.addEventListener('click',event=>{pinned=!pinned;show(event.detail?nearest(event):selected);});
+    button.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End','Escape'].includes(event.key))event.preventDefault();if(event.key==='ArrowLeft'||event.key==='ArrowRight')show(selected+(event.key==='ArrowRight'?1:-1));if(event.key==='Home'||event.key==='End')show(event.key==='Home'?0:rows.length-1);if(event.key==='Escape'){pinned=false;hide();}});host.append(button,detail);
+  }
+  function cumulativeChart(host, recall=false) {
+    const displayed=recall?recallModel():model,rows=cumulative(displayed,recall), supported=rows.filter(row=>row.added), final=rows.at(-1);
+    if (!supported.length) {empty(host,recall?'No paired repeat reviews yet':'No valid first assessments yet');return;}
+    if(recall&&!state.recallObserved&&!state.recallEstimate){empty(host,'Select Recall or FSRS average below');return;}
+    const frame=chartFrame(host,(recall?'Paired Recall':'Difficulty-weighted Performance')+' within '+displayed.spanLabel+'. Dashed horizontal spans add no evidence.',100,[0,25,50,75,100],recall?'%':'');if(!frame)return;
+    const {svg,y,width,right,left}=frame,x=dateAxis(frame,displayed), series=recall?[['estimate',state.recallEstimate,'--cp-preview-estimate','3 5'],['observed',state.recallObserved,'--cp-preview-strong','']]:[['value',true,'--cp-preview-strong','']];
+    if(recall){svg.append(svgEl('line',{x1:left,x2:width-right,y1:y(90),y2:y(90),stroke:'var(--cp-preview-hard)','stroke-width':1,'stroke-dasharray':'2 6',opacity:.65}));svg.append(svgEl('text',{x:left+3,y:y(90)-7,class:'cp-preview-plot-text'},'Goal 90%'));}
+    else {let path='M '+x(supported[0].x)+' '+y(supported[0].value);for(let i=rows.indexOf(supported[0])+1;i<rows.length;i++)for(const segment of connection(rows,i,'value',x,y))path+=' '+segment.command;path+=' H '+x(model.end)+' L '+x(model.end)+' '+y(0)+' H '+x(supported[0].x)+' Z';svg.append(svgEl('path',{d:path,fill:'var(--cp-preview-strong)',opacity:.08,'aria-hidden':true}));}
+    for(const [key,visible,color,dash]of series){if(!visible)continue;for(let i=1;i<rows.length;i++){for(const segment of connection(rows,i,key,x,y))svg.append(svgEl('path',{d:segment.path,fill:'none',stroke:'var('+color+')','stroke-width':key==='estimate'?1.6:2.3,'stroke-linecap':'round','stroke-dasharray':segment.held?'9 7':dash,'data-transition-kind':segment.held?'held':'updated','data-series':key}));}
+      svg.append(svgEl('path',{d:'M '+x(final.x)+' '+y(final[key])+' H '+x(model.end),fill:'none',stroke:'var('+color+')','stroke-width':2,'stroke-dasharray':'9 7','data-transition-kind':'held','data-series':key}));
+      for(const row of supported){const radius=row===supported.at(-1)?3.2:2.1;if(key==='estimate')svg.append(svgEl('path',{d:'M '+x(row.x)+' '+(y(row[key])-radius)+' l '+radius+' '+radius+' l '+(-radius)+' '+radius+' l '+(-radius)+' '+(-radius)+' Z',fill:'var(--cp-preview-card)',stroke:'var('+color+')','stroke-width':1.1,'data-measured-marker':row.startKey}));else svg.append(svgEl('circle',{cx:x(row.x),cy:y(row[key]),r:radius,fill:'var(--cp-preview-card)',stroke:'var('+color+')','stroke-width':1.6,'data-measured-marker':row.startKey}));}
+      const offset=key==='estimate'?17:-10;svg.append(svgEl('text',{x:width-right,y:Math.max(22,Math.min(frame.height-34,y(final[key])+offset)),'text-anchor':'end',class:'cp-preview-plot-value'},Math.round(final[key])+(recall?'%':'')));
+    }
+    svg.append(svgEl('line',{x1:left,x2:left+18,y1:8,y2:8,stroke:'var(--cp-preview-subtle)','stroke-width':1.7,'stroke-dasharray':'9 7'}));svg.append(svgEl('text',{x:left+24,y:12,class:'cp-preview-plot-text'},recall?'No new pairs':'No new ratings'));
+    inspect(host,rows,row=>[intervalLabel(row)+' · '+(recall?(state.recallObserved?number(row.observed)+'% recall':'')+(state.recallObserved&&state.recallEstimate?' / ':'')+(state.recallEstimate?number(row.estimate)+'% FSRS':''):number(row.value)+'/100'),row.added?row.added+' new '+(recall?'pairs':'ratings'):'No new '+(recall?'paired reviews':'ratings'),row.count+' cumulative '+(recall?'pairs':'assessments')+' · '+(row.lastUpdated?'Updated '+row.lastUpdated:'No evidence yet')],x);
+  }
+  function timeRows() {return difficultyNames.map(name=>{const events=model.events.filter(event=>event.first&&event.difficulty===name),times=events.map(event=>event.minutes).filter(value=>value!==null);return{name,timed:times.length,eligible:events.length,median:median(times),target:targets[name]};});}
+  function timeChart(host) {
+    const rows=timeRows(),{width,height}=host.getBoundingClientRect();if(width<80||height<60)return;host.replaceChildren();const ratios=rows.map(row=>row.median===null?0:100*row.median/row.target),maximum=Math.ceil(Math.max(100,...ratios)*1.15/25)*25;
+    const svg=svgEl('svg',{viewBox:'0 0 '+width+' '+height,role:'img','aria-label':'Median first-assessment time against current difficulty targets. '+rows.map(row=>row.name+': '+number(row.median)+' of '+row.target+' minutes').join('; '),class:'cp-preview-plot'});host.append(svg);const left=4,right=4,top=17,bottom=29,slot=(height-top-bottom)/3,x=value=>left+(width-left-right)*value/maximum;
+    for(const tick of(width<300?[0,100,maximum]:[0,50,100,maximum])){svg.append(svgEl('line',{x1:x(tick),x2:x(tick),y1:top-4,y2:height-bottom+2,stroke:tick===100?'var(--cp-preview-subtle)':'var(--cp-preview-grid-line)','stroke-width':1,'stroke-dasharray':tick===100?'3 4':''}));svg.append(svgEl('text',{x:x(tick),y:height-7,'text-anchor':tick===0?'start':tick===maximum?'end':'middle',class:'cp-preview-plot-text'},tick+'%'));}
+    rows.forEach((row,index)=>{const rowTop=top+index*slot,ratio=ratios[index],barY=rowTop+21,barH=23;svg.append(svgEl('text',{x:left,y:rowTop+9,class:'cp-preview-plot-value'},row.name));svg.append(svgEl('text',{x:width-right,y:rowTop+9,'text-anchor':'end',class:'cp-preview-plot-text'},number(row.median)+'m / '+row.target+'m'));svg.append(svgEl('rect',{x:left,y:barY,width:x(100)-left,height:barH,fill:'var(--cp-preview-grid-line)'}));if(row.median!==null){svg.append(svgEl('rect',{x:left,y:barY,width:x(Math.min(ratio,100))-left,height:barH,fill:'var(--cp-preview-strong)','data-bar-id':'time-'+row.name}));if(ratio>100)svg.append(svgEl('rect',{x:x(100),y:barY,width:x(ratio)-x(100),height:barH,fill:'var(--cp-preview-hard)','data-bar-id':'over-'+row.name}));}const difference=row.median===null?null:row.median-row.target;svg.append(svgEl('text',{x:left,y:barY+barH+16,class:'cp-preview-plot-text'},difference===null?'No timed assessments':Math.abs(difference)<.001?'On target':number(Math.abs(difference))+'m '+(difference>0?'over':'under')+' · '+number(Math.abs(ratio-100))+'%'));});
+  }
+  function practiceChart(host) {
+    const maximum=Math.max(1,...model.buckets.map(row=>row.events.length)),ceiling=Math.ceil(maximum/5)*5;
+    const frame=chartFrame(host,'Interval rating shares and separate review volume. '+model.events.length+' recorded assessments.',100,[0,50,100],'%',34);if(!frame)return;const {svg,y,width,right}=frame,x=dateAxis(frame);
+    for(const value of[0,ceiling/2,ceiling])svg.append(svgEl('text',{x:width-right+5,y:y(100*value/ceiling)+4,class:'cp-preview-plot-text'},number(value)));
+    const path=[];model.buckets.forEach(row=>{const left=x(row.start),end=x(row.end),gap=Math.min(12,(end-left)*.18),barWidth=Math.max(0,end-left-gap),result=stats(row.events);let stacked=0;
+      for(const category of categories){const share=result.count?100*result.counts[category.key]/result.count:0;if(share)svg.append(svgEl('rect',{x:left+gap/2,y:y(stacked+share),width:barWidth,height:y(stacked)-y(stacked+share),fill:'var('+category.color+')','data-tooltip':intervalLabel(row)+' · '+category.label+' '+number(share)+'% ('+result.counts[category.key]+')'}));stacked+=share;}
+      path.push((path.length?'L':'M')+' '+x(row.x)+' '+y(100*result.count/ceiling));
+    });svg.append(svgEl('path',{d:path.join(' '),fill:'none',stroke:'var(--cp-preview-ink)','stroke-width':1.5}));
+    for(const row of model.buckets)svg.append(svgEl('circle',{cx:x(row.x),cy:y(100*row.events.length/ceiling),r:2.2,fill:'var(--cp-preview-card)',stroke:'var(--cp-preview-ink)','stroke-width':1,'data-tooltip':intervalLabel(row)+' · '+row.events.length+' reviews'}));
+  }
+  function topicRows() {return topicNames.map(name=>{const events=model.events.filter(event=>event.topics.includes(name)),result=stats(events);return{name,...result,problems:new Set(events.map(event=>event.problem)).size};}).filter(row=>row.count>=10&&row.problems>=3).sort((a,b)=>a.score-b.score||b.count-a.count||a.name.localeCompare(b.name));}
+  function topicChart(host) {
+    const rows=topicRows(),{width,height}=host.getBoundingClientRect();if(width<80||height<60)return;if(!rows.length){empty(host,'Topics need 10 ratings across 3 problems');return;}host.replaceChildren();const svg=svgEl('svg',{viewBox:'0 0 '+width+' '+height,role:'img','aria-label':'Weighted topic Performance. '+rows.map(row=>row.name+' '+number(row.score)+' of 100').join('; '),class:'cp-preview-plot'});host.append(svg);const left=width<330?86:122,right=25,top=20,bottom=30,plotWidth=width-left-right,slot=(height-top-bottom)/rows.length,x=value=>left+plotWidth*value/100;
+    for(const tick of[0,50,100]){svg.append(svgEl('line',{x1:x(tick),x2:x(tick),y1:top,y2:height-bottom,stroke:'var(--cp-preview-grid-line)','stroke-width':1}));svg.append(svgEl('text',{x:x(tick),y:height-7,'text-anchor':'middle',class:'cp-preview-plot-text'},tick));}
+    rows.forEach((row,index)=>{const center=top+slot*(index+.5),label=row.name==='Dynamic programming'?['Dynamic','programming']:[row.name];label.forEach((part,i)=>svg.append(svgEl('text',{x:left-10,y:center+4+(i-(label.length-1)/2)*13,'text-anchor':'end',class:'cp-preview-plot-text'},part)));const barH=Math.min(27,slot-12);svg.append(svgEl('rect',{x:left,y:center-barH/2,width:x(row.score)-left,height:barH,fill:'var(--cp-preview-strong)','data-bar-id':'topic-'+row.name}));svg.append(svgEl('text',{x:x(row.score)+5,y:center+4,class:'cp-preview-plot-value'},Math.round(row.score)));});
+  }
+  function memoryRows() {return model.buckets.map(row=>{const values=row.events.map(event=>event.stability);return{...row,median:median(values),low:values.length>=4?quantile(values,.25):null,high:values.length>=4?quantile(values,.75):null};});}
+  function memoryChart(host) {
+    const rows=memoryRows(),supported=rows.filter(row=>row.median!==null);if(!supported.length){empty(host,'No reviewed stability estimates');return;}const maximum=Math.ceil(Math.max(5,...supported.map(row=>row.high??row.median))*1.15/5)*5,frame=chartFrame(host,'Median post-review FSRS stability and supported middle-50% whiskers, in days.',maximum,[0,maximum/2,maximum],'d');if(!frame)return;const{svg,y}=frame,x=dateAxis(frame);let previous=null;
+    rows.forEach(row=>{if(row.median===null)return;if(previous)svg.append(svgEl('line',{x1:x(previous.x),x2:x(row.x),y1:y(previous.median),y2:y(row.median),stroke:'var(--cp-preview-strong)','stroke-width':1.7,'stroke-dasharray':rows.indexOf(row)-rows.indexOf(previous)>1?'9 7':''}));if(row.low!==null){svg.append(svgEl('line',{x1:x(row.x),x2:x(row.x),y1:y(row.low),y2:y(row.high),stroke:'var(--cp-preview-estimate)','stroke-width':1}));for(const value of[row.low,row.high])svg.append(svgEl('line',{x1:x(row.x)-4,x2:x(row.x)+4,y1:y(value),y2:y(value),stroke:'var(--cp-preview-estimate)','stroke-width':1}));}svg.append(svgEl('circle',{cx:x(row.x),cy:y(row.median),r:2.5,fill:'var(--cp-preview-strong)','data-tooltip':intervalLabel(row)+' · Median '+number(row.median)+'d'}));previous=row;});
+  }
+  function retentionChart(host) {
+    const frame=chartFrame(host,'Current snapshot: 39 reviewed memories. 30 on target, 5 watch, 4 need attention. Estimated recall versus logarithmic durability.',102,[0,50,100],'%');if(!frame)return;const{svg,y,left,plotWidth,width,right,height}=frame,x=value=>left+6+(plotWidth-12)*(Math.log10(value)+1)/4;
+    svg.append(svgEl('rect',{x:left,y:y(87),width:plotWidth,height:y(0)-y(87),fill:'var(--cp-preview-practice)',opacity:.06}));svg.append(svgEl('line',{x1:left,x2:width-right,y1:y(87),y2:y(87),stroke:'var(--cp-preview-subtle)','stroke-width':1,'stroke-dasharray':'4 4'}));svg.append(svgEl('line',{x1:x(7),x2:x(7),y1:frame.top,y2:y(0),stroke:'var(--cp-preview-subtle)','stroke-width':1,'stroke-dasharray':'4 4'}));
+    for(let index=0;index<30;index++){const recall=89+(index*7%12),durability=10**(-.4+(index*17%37)/11);svg.append(svgEl('circle',{cx:x(durability),cy:y(recall),r:3.2,fill:'var(--cp-preview-strong)',opacity:.72,'data-tooltip':'On target · '+recall+'% estimated recall · '+number(durability)+'d durability'}));}
+    for(let index=0;index<9;index++){const needs=index<4,recall=[58,61,69,77,83,85,86,86,86][index],durability=[.6,.1,1.9,.3,3,9,16,32,61][index],cx=x(durability),cy=y(recall);svg.append(svgEl('path',{d:needs?'M '+cx+' '+(cy-4)+' l 4 7 h -8 Z':'M '+cx+' '+(cy-4)+' l 4 4 l -4 4 l -4 -4 Z',fill:'var('+(needs?'--cp-preview-practice':'--cp-preview-hard')+')','data-tooltip':(needs?'Needs attention':'Watch')+' · '+recall+'% estimated recall'}));}
+    for(const tick of[.1,1,10,1000])svg.append(svgEl('text',{x:x(tick),y:height-6,'text-anchor':tick===.1?'start':tick===1000?'end':'middle',class:'cp-preview-plot-text'},tick+'d'));
+  }
+  function backlogValues() {return backlogAll.map((value,index)=>state.example==='young'&&index<18?null:value);}
+  function backlogSegments(values,threshold) {
+    const result=[];for(let index=1;index<values.length;index++){const previous=values[index-1],current=values[index];if(previous===null||current===null)continue;const a=previous<threshold,b=current<threshold;if(a===b)result.push({from:index-1,to:index,first:previous,last:current,below:a});else{const crossing=index-1+(threshold-previous)/(current-previous);result.push({from:index-1,to:crossing,first:previous,last:threshold,below:a},{from:crossing,to:index,first:threshold,last:current,below:b});}}return result;
+  }
+  function backlogChart(host) {
+    const values=backlogValues(),frame=chartFrame(host,'Last 30 days of exact daily backlog. Green strictly below 5, amber at or above 5. Unknown days have no line or observation.',15,[0,5,10,15]);if(!frame)return;const{svg,left,plotWidth,y,width,right}=frame;
+    const fixed={startKey:'2026-09-06',start:midnight('2026-09-06'),end:asOf},xTime=dateAxis(frame,fixed),positions=values.map((_,index)=>xTime(midnight(addDays(fixed.startKey,index))+6*3600000)),x=index=>{const before=Math.floor(index),after=Math.min(values.length-1,before+1);return positions[before]+(positions[after]-positions[before])*(index-before);};
+    svg.append(svgEl('rect',{x:left,y:y(5),width:plotWidth,height:y(0)-y(5),fill:'var(--cp-preview-strong)',opacity:.04}));svg.append(svgEl('line',{x1:left,x2:width-right,y1:y(5),y2:y(5),stroke:'var(--cp-preview-hard)','stroke-width':1,'stroke-dasharray':'4 5'}));svg.append(svgEl('text',{x:width-right,y:y(5)-7,'text-anchor':'end',class:'cp-preview-plot-text'},'Watch starts at 5'));
+    for(const segment of backlogSegments(values,5))svg.append(svgEl('path',{d:'M '+x(segment.from)+' '+y(segment.first)+' L '+x(segment.to)+' '+y(segment.last),fill:'none',stroke:'var('+(segment.below?'--cp-preview-strong':'--cp-preview-hard')+')','stroke-width':2.1,'data-zone':segment.below?'below':'at-or-above'}));
+    values.forEach((value,index)=>{if(value!==null)svg.append(svgEl('circle',{cx:x(index),cy:y(value),r:2.2,fill:'var('+(value<5?'--cp-preview-strong':'--cp-preview-hard')+')','data-backlog-value':value,'data-tooltip':dateLabel(addDays('2026-09-06',index))+' · '+value+' overdue'}));});svg.append(svgEl('text',{x:width-right,y:y(12)-10,'text-anchor':'end',class:'cp-preview-plot-value'},'12'));
+  }
+  function upcomingChart(host) {
+    const frame=chartFrame(host,'Next fourteen dates: 6 due and 12 overdue, totaling 18 scheduled reviews. Current snapshot independent of history range.',20,[0,5,10,15,20]);if(!frame)return;const{svg,left,plotWidth,y,height}=frame,slot=plotWidth/14,gap=Math.min(12,slot*.18),barWidth=slot-gap;
+    const defs=svgEl('defs'),pattern=svgEl('pattern',{id:'cp-range-overdue-pattern',width:6,height:6,patternUnits:'userSpaceOnUse'});pattern.append(svgEl('rect',{width:6,height:6,fill:'var(--cp-preview-practice)'}),svgEl('path',{d:'M -1 1 L 1 -1 M 0 6 L 6 0 M 5 7 L 7 5',stroke:'var(--cp-preview-card)','stroke-width':1,opacity:.55}));defs.append(pattern);svg.append(defs);
+    upcomingDue.forEach((due,index)=>{const overdue=index===0?12:0,x=left+slot*index+gap/2;if(overdue)svg.append(svgEl('rect',{x,y:y(overdue),width:barWidth,height:y(0)-y(overdue),fill:'url(#cp-range-overdue-pattern)'}));if(due){svg.append(svgEl('rect',{x,y:y(overdue+due),width:barWidth,height:y(overdue)-y(overdue+due),fill:'var(--cp-preview-strong)'}));svg.append(svgEl('text',{x:x+barWidth/2,y:y(overdue+due)-6,'text-anchor':'middle',class:'cp-preview-plot-text'},due));}});
+    for(const index of[0,6,13])svg.append(svgEl('text',{x:left+slot*(index+.5),y:height-6,'text-anchor':index===0?'start':index===13?'end':'middle',class:'cp-preview-plot-text'},dateTick(addDays(today,index))));
+  }
+  function table(container,headers,rows,note,pagedKey) {
+    const narrow=container.closest('[data-kind]').getBoundingClientRect().width<340;
+    const limit=pagedKey==='signals'?(narrow?2:3):(narrow?3:4);
+    const page=pagedKey?Math.max(0,Math.min(state.pages[pagedKey]??0,Math.ceil(rows.length/limit)-1)):0;
+    if(pagedKey)state.pages[pagedKey]=page;
+    const visible=pagedKey?rows.slice(page*limit,(page+1)*limit):rows;
+    const element=create('table',{'data-columns':headers.length}),head=create('thead'),headRow=create('tr'),body=create('tbody');headers.forEach(text=>headRow.append(create('th',{scope:'col'},text)));head.append(headRow);element.append(head);
+    visible.forEach(values=>{const row=create('tr');values.forEach(value=>row.append(create('td',{},value)));body.append(row);});element.append(body);container.append(element);if(note)container.append(create('p',{class:'cp-preview-breakdown-note'},note));
+    if(pagedKey&&rows.length>limit){const row=create('div',{class:'cp-full-pagination','aria-label':'Table pages'});row.append(create('span',{},(page*limit+1)+'–'+Math.min((page+1)*limit,rows.length)+' of '+rows.length));for(const[label,delta]of[['Previous',-1],['Next',1]]){const button=create('button',{type:'button',class:'cp-preview-text-button cursor-interaction'},label);button.disabled=delta<0?page===0:(page+1)*limit>=rows.length;button.addEventListener('click',()=>{state.pages[pagedKey]=page+delta;render();saveState();});row.append(button);}container.append(row);}
+  }
+  function detailSection(container,kind,choices) {
+    const selected=choices.some(([key])=>key===state.sections[kind])?state.sections[kind]:choices[0][0];
+    const tabs=create('div',{class:'cp-preview-detail-tabs','aria-label':kind+' detail sections'});
+    for(const[key,label]of choices){const button=create('button',{type:'button',class:'cp-preview-button cursor-interaction','aria-pressed':String(selected===key)},label);button.addEventListener('click',()=>{state.sections[kind]=key;render();saveState();});tabs.append(button);}
+    container.append(tabs);return selected;
+  }
+  function firstStats() {return stats(model.events.filter(event=>event.first));}
+  function makeBreakdown(container) {
+    container.replaceChildren();const tabs=create('div',{class:'cp-preview-detail-tabs','aria-label':'Performance breakdown'});
+    for(const[key,label]of[['ratings','Ratings'],['difficulty','Difficulty'],['mix','Mix'],['intervals','Intervals']]){const button=create('button',{type:'button',class:'cp-preview-button cursor-interaction','aria-pressed':String(state.breakdown===key)},label);button.addEventListener('click',()=>{state.breakdown=key;render();root.querySelector('.cp-preview-detail-tabs [aria-pressed="true"]').focus();saveState();});tabs.append(button);}container.append(tabs);
+    const events=model.events.filter(event=>event.first),result=stats(events),byDifficulty=difficultyNames.map(name=>({name,...stats(events.filter(event=>event.difficulty===name))}));
+    if(state.breakdown==='ratings')table(container,['Rating','Count','Points','Share'],categories.map(category=>[category.label+' ('+category.original+')',result.counts[category.key],weights[category.key],number(100*events.filter(event=>event.rating===category.key).reduce((sum,event)=>sum+influences[event.difficulty],0)/result.units)+'%']));
+    if(state.breakdown==='difficulty')table(container,['Difficulty','Count','Weight','Score'],byDifficulty.map(row=>[row.name,row.count,influences[row.name]+'×',number(row.score)+'/100']));
+    if(state.breakdown==='mix')table(container,['Difficulty','Count','Share','Timed'],byDifficulty.map(row=>[row.name,row.count,number(100*row.count/result.count)+'%',timeRows().find(time=>time.name===row.name).timed]));
+    if(state.breakdown==='intervals')table(container,['Interval','New','Score','Running'],cumulative(model).map(row=>[intervalLabel(row),row.added,number(stats(row.events.filter(event=>event.first)).score),number(row.value)]),'Score: new ratings. Running: all selected ratings. Holds add no evidence.','performance');
+    else{const math=create('div',{class:'cp-preview-math-total'});math.append(create('span',{},number(result.points)+' points ÷ '+result.units+' weighted units'),create('strong',{},number(result.score)+' /100'));container.append(math,create('p',{class:'cp-preview-breakdown-note'},(state.breakdown==='ratings'?'Share is weighted. ':'')+'Questions: Easy 1× · Medium 2× · Hard 3×.'));
+    }
+  }
+  function makeRecallDetails(container) {
+    container.replaceChildren();const displayed=recallModel(),rows=cumulative(displayed,true),last=rows.at(-1),section=detailSection(container,'recall',[['summary','Summary'],['intervals','Intervals'],['method','Method']]);
+    if(section==='summary')table(container,['Measure','Value','Evidence'],[['Recall',number(last.observed)+'%',last.recalled+' of '+last.count],['FSRS average',number(last.estimate)+'%','Same '+last.count+' pairs'],['Difference',number(last.observed===null?null:last.observed-last.estimate)+' pts','Recall − FSRS']],'Paired history: '+displayed.spanLabel+'. Both measures use the same reviews.');
+    if(section==='intervals')table(container,['Interval','New pairs','Running'],rows.map(row=>[intervalLabel(row),row.added,row.observed===null?'—':number(row.observed)+'%']),'Dashed holds add no pairs.','recall');
+    if(section==='method')table(container,['Measure','Uses'],[['Recall','Hard, Good, Easy = recalled; Again = missed.'],['FSRS average','Estimated recall before those same reviews.'],['Chart span','First paired review in your selection through today.']],'Illustrative FSRS estimates. Holds add no evidence.');
+  }
+  function makeDetails(kind,container) {
+    container.replaceChildren();
+    if(kind==='time')table(container,['Difficulty','Median / target','Timed / eligible'],timeRows().map(row=>[row.name,number(row.median)+'m / '+row.target+'m',row.timed+' / '+row.eligible]),'Selected first assessments · '+model.spanLabel+'. Current Settings targets are references, not a speed grade.');
+    if(kind==='practice'){const result=stats(model.events),section=detailSection(container,'practice',[['ratings','Ratings'],['intervals','Intervals']]);if(section==='ratings')table(container,['Rating','Count','Share'],categories.map(category=>[category.label+' ('+category.original+')',result.counts[category.key],number(100*result.counts[category.key]/result.count)+'%']),result.count+' selected first + repeat assessments.');else table(container,['Interval','Reviews'],model.buckets.map(row=>[intervalLabel(row),row.events.length]),'Review count measures volume.','practice');}
+    if(kind==='topics')table(container,['Topic','Ratings / problems','Score'],topicRows().map(row=>[row.name,row.count+' / '+row.problems,number(row.score)+'/100']),'First + repeat assessments; current direct tags can overlap. Eligibility: 10 valid ratings across 3 problems.');
+    if(kind==='memory')table(container,['Interval','Median','Middle 50%'],memoryRows().map(row=>[intervalLabel(row),number(row.median)+'d',row.low===null?'—':number(row.low)+'–'+number(row.high)+'d']),'Illustrative post-review FSRS stability; empty intervals have no new estimate.','memory');
+    if(kind==='retention')table(container,['Current status','Memories','Reference'],[['On target',30,'87%+ recall'],['Watch',5,'80–87% recall'],['Needs attention',4,'Below 80%'],['Durability',39,'7d benchmark']],'Current snapshot as of Oct 5. It stays unchanged when the selected history range changes.');
+    if(kind==='signals')table(container,['Problem','Current signals'],signals.map(row=>[row.name,row.recall+'% recall · '+Math.min(row.overdue,state.example==='young'?8:row.overdue)+'d overdue · '+row.durability+'d durability']),'Current problems · Ranked by severity.','signals');
+    if(kind==='backlog')table(container,['Measure','Value'],[['Current backlog',12],['Known peak',12],['Known days',backlogValues().filter(value=>value!==null).length+' of 30'],['Below watch zone',backlogValues().filter(value=>value!==null&&value<5).length+' days']],'Last 30 days · Sep 6–Oct 5. Green strictly below 5; amber at 5 and above. Unknown dates have no invented zero.');
+    if(kind==='upcoming')table(container,['Date','Due','Overdue'],upcomingDue.map((due,index)=>[dateLabel(addDays(today,index)),due,index===0?12:0]),'Next 14 days · Oct 5–18. This fixed schedule is independent of the history range.','upcoming');
+  }
+  function setSummary(kind,value,unit,lines) {
+    const card=root.querySelector('[data-kind="'+kind+'"]');card.querySelector('.cp-preview-number strong').textContent=value;card.querySelector('.cp-preview-number > span').textContent=unit;const context=card.querySelector('.cp-preview-context');context.replaceChildren();lines.forEach((line,index)=>{if(index)context.append(create('br'));context.append(document.createTextNode(line));});
+  }
+  function renderSignals() {
+    const list=root.querySelector('[data-signals-list]'),limit=signalLimit();state.signalsPage=Math.min(state.signalsPage,Math.ceil(signals.length/limit)-1);const start=state.signalsPage*limit;list.style.gridTemplateRows='repeat('+limit+', minmax(0, 1fr))';list.hidden=state.details.signals===true;list.replaceChildren();signals.slice(start,start+limit).forEach((row,index)=>{const item=create('li');item.append(create('strong',{},(start+index+1)+'. '+row.name),create('span',{},row.recall+'% recall'+(row.recall<87?' · below target':'')),create('span',{},'Overdue '+Math.min(row.overdue,state.example==='young'?8:row.overdue)+'d · Durability '+row.durability+'d'));list.append(item);});root.querySelector('[data-signals-count]').textContent=state.details.signals?'Current flags · 16 problems':(start+1)+'–'+Math.min(start+limit,signals.length)+' of 16';root.querySelector('[data-signals-prev]').disabled=state.signalsPage===0;root.querySelector('[data-signals-next]').disabled=start+limit>=signals.length;root.querySelector('[data-kind="signals"] footer .cp-full-pagination').hidden=state.details.signals===true;
+  }
+  function signalLimit() {return root.querySelector('[data-kind="signals"]').getBoundingClientRect().width<340?2:3;}
+  function applyState(saved) {
+    const privateState=saved?.privateContent;if(!privateState)return;
+    if(['30','90','all'].includes(privateState.range))state.range=privateState.range;
+    if(['established','young'].includes(privateState.example))state.example=privateState.example;
+    if(privateState.details&&typeof privateState.details==='object')state.details={...privateState.details};
+    if(privateState.sections&&typeof privateState.sections==='object')state.sections={...privateState.sections};
+    if(['ratings','difficulty','mix','intervals'].includes(privateState.breakdown))state.breakdown=privateState.breakdown;
+    state.recallObserved=privateState.recallObserved!==false;state.recallEstimate=privateState.recallEstimate!==false;
+    state.signalsPage=Number.isInteger(privateState.signalsPage)?Math.max(0,Math.min(7,privateState.signalsPage)):0;
+  }
+  function saveState() {
+    if(!window.openai?.setWidgetState)return;const first=firstStats(),last=cumulative(recallModel(),true).at(-1);
+    window.openai.setWidgetState({modelContent:{design:'Analytics range prototype',range:state.range,example:state.example,displaySpan:model.spanLabel,availableDays:model.days,grouping:model.grouping.label,buckets:model.buckets.length,periodSummary:periodSummary(),rubric:{...weights},questionWeights:{Easy:1,Medium:2,Hard:3},performance:first.score,firstAssessments:first.count,recall:{paired:last.count,recalled:last.recalled,observed:last.observed,estimate:last.estimate},scopes:{backlog:'Last 30 days',upcoming:'Next 14 days',retention:'Current',signals:'Current'},tooltipCleanup:'Deferred'},privateContent:{...state}}).catch(()=>{});
+  }
+  function render() {
+    model=windowModel();const first=firstStats(),performanceRows=cumulative(model),recallDisplay=recallModel(),recallRows=cumulative(recallDisplay,true),lastPerformance=performanceRows.at(-1),lastRecall=recallRows.at(-1),times=timeRows(),topics=topicRows(),memory=memoryRows().filter(row=>row.median!==null).at(-1);
+    for(const button of root.querySelectorAll('[data-range]'))button.setAttribute('aria-pressed',String(button.dataset.range===state.range));root.querySelector('[data-example]').value=state.example;
+    root.querySelector('[data-history-scope]').textContent=(state.range==='all'?'All retained history · ':'')+model.spanLabel+' · '+model.grouping.label+' · '+model.buckets.length+' intervals';
+    root.querySelector('[data-history-coverage]').textContent=state.example==='young'?'Showing your first 12 days':model.days+' calendar days';
+    renderPeriodSummary();
+    setSummary('performance',first.score===null?'—':Math.round(first.score),'/100',[first.count+' first assessments',lastPerformance.lastUpdated?'Updated '+lastPerformance.lastUpdated:'No eligible ratings']);
+    setSummary('time',times.reduce((sum,row)=>sum+row.timed,0),'timed',[first.count+' eligible · first attempts','All timed assessments']);
+    setSummary('practice',model.events.length,'reviews',['Selected history','First + repeat assessments']);
+    setSummary('topics',topics.length,'topics',['Weakest → strongest','10+ ratings · 3+ problems']);
+    setSummary('recall',lastRecall.observed===null?'—':Math.round(lastRecall.observed),'%',['FSRS average '+(lastRecall.estimate===null?'—':Math.round(lastRecall.estimate)+'%'),lastRecall.count+' paired reviews']);
+    setSummary('memory',memory?number(memory.median):'—','days',['Latest reviewed interval','Median and middle 50%']);
+    root.querySelector('[data-performance-foot]').textContent=state.details.performance?first.count+' first assessments · '+number(first.score)+' /100':'Period to date';root.querySelector('[data-kind="performance"] footer [data-breakdown]').hidden=state.details.performance===true;root.querySelector('[data-kind="recall"] footer > span:last-child').textContent=lastRecall.count?'Paired '+recallDisplay.spanLabel+' · '+(recallDisplay.grouping.unit==='day'?recallDisplay.grouping.step===1?'daily':'3-day':recallDisplay.grouping.label.replace(' summaries','').toLowerCase()):'No paired reviews';root.querySelector('[data-backlog-known]').textContent=backlogValues().filter(value=>value!==null).length+' known days';
+    makeBreakdown(root.querySelector('[data-kind="performance"] .cp-preview-breakdown'));makeRecallDetails(root.querySelector('[data-recall-breakdown]'));
+    for(const card of root.querySelectorAll('.cp-preview-panel')){const kind=card.dataset.kind,expanded=state.details[kind]===true;card.dataset.expanded=String(expanded);card.querySelector('.cp-preview-summary').hidden=expanded;const chart=card.querySelector('[data-chart]'),details=card.querySelector('.cp-preview-breakdown');if(chart)chart.hidden=expanded;if(details)details.hidden=!expanded;if(kind!=='performance'&&kind!=='recall')makeDetails(kind,details);for(const button of card.querySelectorAll('[data-breakdown],[data-recall-details],[data-full-details]')){button.setAttribute('aria-expanded',String(expanded));button.textContent=expanded?'Overview':button.hasAttribute('data-breakdown')?(button.classList.contains('cp-preview-text-button')?'How it adds up':'Breakdown'):'Details';}}
+    for(const button of root.querySelectorAll('[data-recall-series]'))button.setAttribute('aria-pressed',String(button.dataset.recallSeries==='observed'?state.recallObserved:state.recallEstimate));renderSignals();
+    for(const host of root.querySelectorAll('[data-chart]')){if(host.hidden)continue;const kind=host.dataset.chart;if(kind==='performance')cumulativeChart(host);if(kind==='recall')cumulativeChart(host,true);if(kind==='time')timeChart(host);if(kind==='practice')practiceChart(host);if(kind==='topics')topicChart(host);if(kind==='memory')memoryChart(host);if(kind==='retention')retentionChart(host);if(kind==='backlog')backlogChart(host);if(kind==='upcoming')upcomingChart(host);}
+    root.dataset.range=state.range;root.dataset.example=state.example;root.dataset.availableDays=model.days;root.dataset.bucketCount=model.buckets.length;
+  }
+  function sampleSeries(host,key) {
+    const paths=[...host.querySelectorAll('path[data-series="'+key+'"]')],lengths=paths.map(path=>path.getTotalLength()),total=lengths.reduce((sum,value)=>sum+value,0);
+    if(!total)return null;
+    return Array.from({length:64},(_,index)=>{let distance=total*index/63,part=0;while(part<paths.length-1&&distance>lengths[part]){distance-=lengths[part];part++;}const point=paths[part].getPointAtLength(distance);return{x:point.x,y:point.y};});
+  }
+  function chartSnapshot() {
+    if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return null;
+    const snapshot={};
+    for(const host of root.querySelectorAll('[data-chart]')){const bars={};for(const bar of host.querySelectorAll('[data-bar-id]'))bars[bar.dataset.barId]={x:+bar.getAttribute('x'),y:+bar.getAttribute('y'),width:+bar.getAttribute('width'),height:+bar.getAttribute('height')};const lines={};for(const key of ['value','observed','estimate']){const points=sampleSeries(host,key);if(points)lines[key]=points;}snapshot[host.dataset.chart]={bars,lines};}
+    return snapshot;
+  }
+  function moveCharts(snapshot) {
+    if(!snapshot)return;
+    for(const host of root.querySelectorAll('[data-chart]')){const previous=snapshot[host.dataset.chart];if(!previous)continue;
+      for(const bar of host.querySelectorAll('[data-bar-id]')){const old=previous.bars[bar.dataset.barId],width=+bar.getAttribute('width');if(!old||!width)continue;const dx=old.x- +bar.getAttribute('x'),dy=old.y- +bar.getAttribute('y');bar.style.transformBox='fill-box';bar.style.transformOrigin='left top';bar.animate([{transform:'translate('+dx+'px,'+dy+'px) scaleX('+old.width/width+')'},{transform:'none'}],{duration:280,easing:'ease-out'});}
+      for(const[key,old]of Object.entries(previous.lines)){const points=sampleSeries(host,key),paths=[...host.querySelectorAll('path[data-series="'+key+'"]')],svg=host.querySelector('svg');if(!points||!paths.length||!svg)continue;const overlay=svgEl('path',{fill:'none',stroke:paths[0].getAttribute('stroke'),'stroke-width':paths[0].getAttribute('stroke-width'),'stroke-dasharray':key==='estimate'?'3 5':'','aria-hidden':'true'});paths.forEach(path=>path.style.visibility='hidden');svg.append(overlay);const start=performance.now();const step=now=>{if(!overlay.isConnected)return;const fraction=Math.min(1,(now-start)/280),eased=1-(1-fraction)**3;overlay.setAttribute('d',points.map((point,index)=>(index?'L ':'M ')+(old[index].x+(point.x-old[index].x)*eased)+' '+(old[index].y+(point.y-old[index].y)*eased)).join(' '));if(fraction<1)requestAnimationFrame(step);else{overlay.remove();paths.forEach(path=>path.style.visibility='');}};requestAnimationFrame(step);}
+    }
+  }
+  for(const button of root.querySelectorAll('[data-range]'))button.addEventListener('click',()=>{if(state.range===button.dataset.range)return;const snapshot=chartSnapshot();state.range=button.dataset.range;state.pages={};render();moveCharts(snapshot);saveState();});
+  root.querySelector('[data-example]').addEventListener('change',event=>{const snapshot=chartSnapshot();state.example=event.target.value;state.pages={};render();moveCharts(snapshot);saveState();});
+  for(const button of root.querySelectorAll('[data-breakdown],[data-recall-details],[data-full-details]'))button.addEventListener('click',()=>{const kind=button.closest('[data-kind]').dataset.kind;state.details[kind]=!state.details[kind];render();button.focus();saveState();});
+  for(const button of root.querySelectorAll('[data-recall-series]'))button.addEventListener('click',()=>{const key=button.dataset.recallSeries==='observed'?'recallObserved':'recallEstimate';state[key]=!state[key];render();saveState();});
+  root.querySelector('[data-signals-prev]').addEventListener('click',()=>{state.signalsPage=Math.max(0,state.signalsPage-1);renderSignals();saveState();});root.querySelector('[data-signals-next]').addEventListener('click',()=>{state.signalsPage=Math.min(Math.ceil(signals.length/signalLimit())-1,state.signalsPage+1);renderSignals();saveState();});
+  applyState(window.openai?.widgetState);render();
+  const observer=new ResizeObserver(()=>render());observer.observe(root.querySelector('.cp-preview-grid'));for(const host of root.querySelectorAll('[data-chart]'))observer.observe(host);
+  window.addEventListener('openai:set_globals',event=>{if(event.detail?.globals?.widgetState){applyState(event.detail.globals.widgetState);render();}});
+})();
+</script>

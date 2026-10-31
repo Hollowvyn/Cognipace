@@ -7,6 +7,7 @@ import { InlineStatus } from '@/components/ui/inline-status'
 import { Surface } from '@/components/ui/surface'
 import { ProblemDifficultyBadge } from '@/features/problems'
 import { createLeetCodeProblemUrl } from '@/lib/leetcode'
+import type { SerializedTodayQueue } from '@/extension/messaging'
 
 import type {
   DashboardOverviewMetricView,
@@ -16,10 +17,19 @@ import type {
 import { getQueueItemStatusPresentation } from '../../domain/queue-item-status-presentation'
 
 export function OverviewPrimaryPanel({
+  extraPractice,
   libraryAction,
+  onRequestExtraPractice,
   primary,
 }: {
+  extraPractice: {
+    item: SerializedTodayQueue['topRecommendation']
+    isLoading: boolean
+    hasRequested: boolean
+    error: string | null
+  }
   libraryAction: ReactNode
+  onRequestExtraPractice: () => void
   primary: DashboardOverviewPrimaryView
 }) {
   if (primary.kind === 'queue-clear') {
@@ -41,6 +51,10 @@ export function OverviewPrimaryPanel({
         <div>
           <ActionButton action={libraryAction} className="w-full sm:w-auto" />
         </div>
+        <OverviewExtraPractice
+          extraPractice={extraPractice}
+          onRequest={onRequestExtraPractice}
+        />
       </Surface>
     )
   }
@@ -85,7 +99,67 @@ export function OverviewPrimaryPanel({
           </a>
         </Button>
       </div>
+      <OverviewExtraPractice
+        extraPractice={extraPractice}
+        onRequest={onRequestExtraPractice}
+      />
     </Surface>
+  )
+}
+
+function OverviewExtraPractice({
+  extraPractice,
+  onRequest,
+}: {
+  extraPractice: {
+    item: SerializedTodayQueue['topRecommendation']
+    isLoading: boolean
+    hasRequested: boolean
+    error: string | null
+  }
+  onRequest: () => void
+}) {
+  const item = extraPractice.item
+
+  return (
+    <div className="grid gap-2 border-t border-border pt-4">
+      <div>
+        <Button
+          disabled={extraPractice.isLoading}
+          onClick={onRequest}
+          variant="outline"
+        >
+          Extra Practice
+        </Button>
+      </div>
+      {extraPractice.isLoading ? (
+        <InlineStatus>Finding extra practice...</InlineStatus>
+      ) : extraPractice.error ? (
+        <InlineStatus role="alert" tone="danger">
+          {extraPractice.error}
+        </InlineStatus>
+      ) : item ? (
+        <div className="grid gap-2">
+          <p className="m-0 font-semibold">{item.title}</p>
+          <div>
+            <Button asChild variant="outline">
+              <a
+                href={createLeetCodeProblemUrl(item.problemSlug)}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <ExternalLink aria-hidden="true" />
+                Open Extra Practice
+              </a>
+            </Button>
+          </div>
+        </div>
+      ) : extraPractice.hasRequested ? (
+        <InlineStatus>
+          No future review cards available for extra practice.
+        </InlineStatus>
+      ) : null}
+    </div>
   )
 }
 

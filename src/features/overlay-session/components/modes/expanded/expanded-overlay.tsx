@@ -1,3 +1,4 @@
+import type { CodeImplementationState } from '../../../hooks/use-leetcode-code-implementation'
 import { AlertCircle, Info } from 'lucide-react'
 import { useId, useLayoutEffect, useRef, type UIEvent } from 'react'
 
@@ -16,6 +17,7 @@ import {
   type OverlaySessionState,
 } from '../../../domain'
 import type { OverlayTimerStatus } from '../../../hooks/use-overlay-timer'
+import type { OverlayReviewPreviewState } from '../../../hooks/use-overlay-review-preview'
 import { OverlayActions } from './overlay-actions'
 import { OverlayCodeAnalysis } from './overlay-code-analysis'
 import { OverlayAssessmentRail } from './overlay-assessment-rail'
@@ -31,12 +33,14 @@ import { OverlayTimerCard } from './overlay-timer-card'
 
 type ExpandedOverlayViewModel = {
   aiAnalysis: CodeAnalysisState
+  aiImplementation: CodeImplementationState
   context: OverlayAppShellData['overlay'] | null
   elapsedSeconds: number
   helpSearchQuery: string | null
   hints: OverlayHintState
   isOverTarget: boolean
   overlay: OverlaySessionState
+  preview: OverlayReviewPreviewState
   problemTitle: string
   syncFeedback: string | null
   syncStatus: string
@@ -52,6 +56,7 @@ type ExpandedOverlayCommands = {
   onResetTimer: () => void
   onRestart: () => void
   onRetryAiAnalysis: () => void
+  onGenerateImplementation: () => void
   onToggleHints: () => void
   onRevealNextHint: () => void
   onRetryHints: () => void
@@ -61,6 +66,7 @@ type ExpandedOverlayCommands = {
   onStartTimer: () => void
   onSubmit: () => void
   onUpdate: () => void
+  onRetryReview: () => void
 }
 
 type ExpandedOverlayProps = {
@@ -76,12 +82,14 @@ export function ExpandedOverlay({
 }: ExpandedOverlayProps) {
   const {
     aiAnalysis,
+    aiImplementation,
     context,
     elapsedSeconds,
     helpSearchQuery,
     hints,
     isOverTarget,
     overlay,
+    preview,
     problemTitle,
     syncFeedback,
     syncStatus,
@@ -96,6 +104,7 @@ export function ExpandedOverlay({
     onResetTimer,
     onRestart,
     onRetryAiAnalysis,
+    onGenerateImplementation,
     onToggleHints,
     onRevealNextHint,
     onRetryHints,
@@ -105,6 +114,7 @@ export function ExpandedOverlay({
     onStartTimer,
     onSubmit,
     onUpdate,
+    onRetryReview,
   } = commands
   const tabId = useId()
   const scrollContainers = useRef<
@@ -134,7 +144,9 @@ export function ExpandedOverlay({
 
   const submitted = Boolean(overlay.submittedSession)
   const isMutating =
-    overlay.reviewStatus === 'saving' || overlay.reviewStatus === 'updating'
+    Boolean(overlay.acceptedCommand) ||
+    overlay.reviewStatus === 'saving' ||
+    overlay.reviewStatus === 'updating'
   const aiStatus =
     aiAnalysis.status === 'ready'
       ? 'Ready'
@@ -221,6 +233,7 @@ export function ExpandedOverlay({
                 isDisabled={isMutating}
                 lockReason={overlay.ratingLockReason}
                 onSelectRating={onSelectRating}
+                preview={preview}
                 selectedRating={overlay.selectedRating}
               />
 
@@ -254,6 +267,8 @@ export function ExpandedOverlay({
               onSubmit={onSubmit}
               onUpdate={onUpdate}
               reviewStatus={overlay.reviewStatus}
+              commandStatus={overlay.commandStatus}
+              onRetry={onRetryReview}
             />
             <OverlayNextCard nextStep={overlay.nextStep} />
           </div>
@@ -278,6 +293,8 @@ export function ExpandedOverlay({
               onRetry={onRetryAiAnalysis}
               onSettings={onSettings}
               state={aiAnalysis}
+              implementationState={aiImplementation}
+              onGenerateImplementation={onGenerateImplementation}
             />
           </div>
         </section>

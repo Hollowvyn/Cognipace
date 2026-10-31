@@ -142,25 +142,85 @@ versions. Their canonical representation reconstructs exactly; imports that
 would change during native normalization reject. Correction calculations use
 the recorded pre-review card, event time and profile. The legacy compatibility
 operation requires an unambiguous complete history and labels its inferred
-evidence explicitly. Practice's existing Save/Update wiring remains the current
-consumer path; persisted evidence and guarded command integration have separate
-implementation phases.
+evidence explicitly. Practice persists profiles, per-attempt evidence,
+application sequences/revisions, lifecycle generations and compact historical
+command receipts in four additive side tables. Existing history receives
+inferred sequence order and unknown scheduling provenance; preparation never
+infers a past profile, replays reviews or changes an existing card.
+
+Save captures the pre-review card, original ISO event time, complete canonical
+profile and optional existing assessment decision. Application sequence permits
+equal timestamps and rejects backdating. Update guards the exact latest attempt
+and expected revision in the transaction, schedules only that event from its
+captured context, and preserves time, sequence, logs and aggregate review count.
+Verified legacy correction records legacy-derived evidence with saved retention
+at first acceptance; ambiguous legacy context rejects without writes. Opaque
+stored card IDs are reused across Practice, Library and Queue.
+
+The Practice command workflow owns one transaction containing generation and
+receipt lookup, card/attempt/evidence/aggregate writes, track effects and a
+bounded original acknowledgement. Receipt lookup precedes mutable chronology
+and revision guards; payload mismatch conflicts. Receipts carry no history copy.
+Imported historical receipt keys remain inert under fresh local generations.
+Runtime uses the existing gated mutation queue, strict Zod contracts and sender
+authorization. The existing conservative sync dirty marker protects local
+changes before snapshot publication; Saved/invalidation and automatic push
+scheduling still follow a successful flush. Publication failure returns
+persistence-pending; exact retry bypasses mutation and tries publication again.
+The existing dirty-recovery admission guard flushes before recovering metadata
+or admitting sync, preventing unconfirmed reviews from being pulled over.
+After worker restart a published receipt deduplicates lost acknowledgement. If
+unflushed state was lost, the accepted bootstrap command can apply once against
+the intact durable baseline.
+
+The platform snapshot owner checks SQLite autocommit immediately before
+serialization, including queued writes. Export can include uncommitted pages;
+automatic publication defers with the existing debounce until the transaction
+ends. Explicit flush rejects an open transaction instead of claiming durable
+success. No second mutation queue, generic outbox or worker-local identity is
+introduced. Overlay accepted state freezes command ID/time/effective rating and
+original target/revision, retains pending/error retry, and preserves a draft on
+stale conflict. Phase E adds the prospective daily long-term profile, shared
+study-day eligibility and separate automatic/Extra Practice queue intent.
+Phase F adds native four-rating previews through `src/lib/fsrs` `repeat()`;
+authoritative Save and Update keep `next()`. Practice resolves a Submit against
+the current card and active profile or an Update against the guarded original
+event context in one read transaction. The content-script-only runtime method
+`practice.previewReview` validates both directions with Zod and serializes its
+read through the background database gate on the shared SQLite connection.
+It creates no command receipt, mutation, flush, dirty sync marker or
+invalidation. The Overlay preview query keys include the problem, generation,
+session epoch and original Update target; Practice/Settings invalidation
+refreshes estimates without changing a draft or accepted command. Optimizer
+work remains in later phases.
 
 The persisted `ts-fsrs` `card.due` value is stored as `FsrsCardSnapshot.dueAt`
-and is the sole authority for a reviewed card's schedule. Read models derive
-overdue and due-today state from that date using the browser's local calendar;
-retrievability remains an independent estimate used for presentation and
-future-card reinforcement ranking. Target retention is a scheduling input on
-review writes only. Updating it does not rewrite existing cards or reschedule
-their persisted due dates.
+and remains the raw authority for a reviewed card's schedule. Practice derives
+`eligibleOn` as the later of its raw due local day and the next browser-local
+day after its actual last review; same-day corrections retain that event time.
+Practice, Queue, current Analytics, Upcoming and reminders use this derived
+eligibility for due/overdue presentation. Suspended and unstarted cards are not
+due. The read rule never rewrites `dueAt`. Current retrievability remains an
+independent estimate for presentation and explicit future-card practice ranking.
+Target retention is a scheduling input on genuine review writes only. The
+active Save profile uses native `maximum_interval: 180`, long-term mode, empty
+step arrays and fuzz disabled. Native rating ordering can return 181–183-day
+intervals. Existing longer due dates remain intact until genuine Save; Update
+uses its captured original profile and can still return a longer interval.
 
-The queue feature owns a deterministic, daily-goal-capped waterfall:
+The queue feature owns a deterministic automatic waterfall capped at the full
+daily goal:
 
-1. overdue FSRS cards, oldest `dueAt` first;
-2. FSRS cards due on the local calendar date, earliest `dueAt` first;
-3. future-scheduled reviewed cards, lowest current retrievability first, as
-   optional reinforcement; and
-4. eligible new Library problems.
+1. overdue FSRS cards, earliest eligibility date then raw `dueAt` first;
+2. FSRS cards eligible on the local calendar date, earliest raw `dueAt` first;
+3. eligible new Library problems.
+
+An explicit `extra-practice` read intent separately returns future reviewed,
+filter-compliant cards ranked by current retrievability with deterministic
+ties. Popup and Overview request it on user action and display its loading,
+empty and error states. That response does not enter the automatic queue or
+change track credit. The intent is Zod-validated at the runtime boundary and
+included in the client query key.
 
 Queue code does not import `ts-fsrs` or own an alternate due threshold. The
 Review Order setting is no longer user-facing and is ignored by queue logic;
@@ -181,7 +241,11 @@ background work.
 - Feature repositories and persistence adapters live in `src/features/*/data`.
 - The hidden dashboard smoke route at `/dev/smoke` calls dashboard-only
   `devSmoke.run` for local extension development checks; it is not part of
-  primary dashboard navigation.
+  primary dashboard navigation. Its opt-in Phase G capacity view reads Chrome's
+  actual storage usage and quota, reports active/recovery key byte counts, and
+  samples sequential Queue/Analytics service reads through the existing
+  database gate. It neither loads fixtures nor runs live AI with capacity
+  sampling enabled.
 
 The normal request path is:
 
@@ -293,15 +357,17 @@ creates a fresh migrated and seeded database.
 
 Analytics calculations remain feature-owned and read-only. The only editable
 Analytics behavior is the chart-goal preferences owned by Settings.
-Difficulty And Recorded Time is implemented on this branch with passing automated
-checks and production-component browser validation.
-The chart-target and merged Practice Rhythm implementations and automated/fixture
-validation are recorded in their handoffs; human installed-extension happy-path
-and edge-case smoke with screenshot or recording proof remains pending before
-review or merge. The background Analytics
+Implementation handoffs record the automated and production-component proof
+actually run. Human installed-extension happy-path and edge-case smoke with
+screenshot or recording proof remains required before PR review or merge.
+The background Analytics
 service reads the full review history once for a request, together with the
 current FSRS cards and supporting local state; chart components do not make
-per-chart database calls. Its data flow is:
+per-chart database calls. Within that one summary request, Analytics reuses
+resolved historical scheduling evidence by attempt ID and exact resolver
+inputs across cohorts, stability, memory and backlog calculations. The cache
+dies with the request; correction inputs and the pure domain resolver remain
+unchanged. Its data flow is:
 
 ```text
 review and FSRS inputs
@@ -314,21 +380,48 @@ review and FSRS inputs
 
 The owners in that flow are:
 
+- `src/features/analytics/domain/analytics-history-window.ts` prepares the
+  implemented 30 / 90 / All time selection. It separates raw retained-history
+  origin from nominal, displayed, and prior-period bounds, groups the available
+  calendar span into at most 60 intervals, and supplies an independent
+  last-30-day daily backlog frame. The service consumes it through the small
+  feature-local `analytics-history-frame.ts` adapter. Young history clips only
+  display bounds; finite comparisons retain their complete nominal prior window
+  and matched local wall-clock cutoff. All time has no previous period.
 - `src/features/analytics/domain/analytics-range-policy.ts` selects and builds
-  local-date bucket boundaries. The current contract supports 14-day daily,
-  30-day three-day, and 90-day weekly presentation buckets.
+  local-date bucket boundaries and as-of-capped measured intervals. Public
+  selection is 30 / 90 / All time; legacy URL 14 normalizes to 30. Explicit
+  calendar grouping comes from available history rather than selector text.
+  Recall has its own first-eligible-pair display frame, while its readiness uses
+  the shared selected-history calendar and actual pair counts.
 - `src/features/analytics/domain/analytics-readiness.ts` derives the effective
   window and readiness gates. `S`, `A`, `G`, `K`, and `E` mean eligible
   assessments, active buckets, longest gap, gap runs, and effective buckets.
+- `src/features/analytics/domain/summary.ts` aggregates selected raw activity
+  independently of valid ratings: distinct report-local assessment days, unique
+  problems with persisted correct outcomes, true/(true+false) correctness, and
+  exact positive recorded seconds from every persisted correct assessment.
+  Required runtime `activity` conserves counts and distinguishes unavailable
+  correctness/timing from known zeros. The screen consumes validated `activity`
+  for all four selected-period headlines, without rating fallback, weighted
+  evidence counts, or mixing all-time totals into finite ranges.
 - `src/features/analytics/data/analytics-repository.ts` reads current catalog
   `problemDifficulty` and persisted `elapsedSeconds`, preserving attempt-ID
-  deduplication across topic joins. Numeric FSRS difficulty remains separate.
+  deduplication across topic joins. It joins per-attempt scheduling evidence and
+  effective profiles for historical model calculations. Current cards use their
+  last recorded profile when available; unknown older cards retain a labeled
+  compatibility estimate under current saved options. Numeric FSRS difficulty
+  remains separate.
 - `src/features/analytics/domain/review-cohorts.ts` selects earliest raw events
   per problem and complementary later records across cards/modes before
   validity, report-period, timing, or difficulty filters. An invalid first event
-  is never promoted. Its separate per-card valid-rating replay constructs
-  repeat-only FSRS pairs; replay index zero never enters Recall. Both legacy
-  and historical Recall builders/readiness consume those same pairs.
+  is never promoted. Its separate per-card valid-rating ordering constructs
+  repeat-only pairs; the first valid event never enters Recall. Observed
+  outcomes remain in the cohort when an event lacks model evidence. Historical
+  model estimates use exact recorded pre-card/profile inputs, distinguish
+  captured and legacy-derived compatibility evidence, and leave unknown
+  estimates null. Both legacy and historical Recall builders/readiness consume
+  those pairs.
   `historical-presentation.ts` supplies both raw problem-solving cohorts with
   bucket and period/prior outcome counts, positive-time distributions, Unknown
   accounting, current targets, and fitted scales. Period rates use summed
@@ -343,7 +436,12 @@ The owners in that flow are:
   dashed next-valid-point line continuity. Practice Rhythm retains zero-volume
   buckets after its first supported bucket.
 - `src/features/analytics/api/analytics-contracts.ts` validates the serialized
-  read model with Zod before it crosses the extension runtime boundary.
+  read model with Zod before it crosses the extension runtime boundary. Paired
+  Recall requires recalled count no greater than pairs; zero pairs have null
+  rates/difference and unmeasured evidence. Positive observed pairs retain
+  observed = recalled/pairs even with insufficient scheduling evidence; the
+  modeled sample count and provenance expose that gap. A difference requires
+  both observed and estimated values. Genuine zero estimates remain valid.
 - Settings owns defaulted `analytics.targetRecall` and
   `analytics.targetReviewSuccess` fractions in its existing JSON preferences,
   both 0.9 by default. Full-pair validation requires finite values from 0
@@ -382,47 +480,59 @@ The owners in that flow are:
   `LineSegments` in
   `src/features/analytics/components/charts/line-segments.tsx` renders measured
   runs and dashed next-valid-point bridges without interpolating data.
-- `new-problem-success-view.tsx` owns the expanded Difficulty And Recorded Time
-  section's shared local cohort, Trend/Compare, outcome measure, difficulty
-  visibility, time units/subset, and Mix controls. `analytics-screen.tsx` places
-  its paired Success/Time plots and full-width Mix below the combined New Problem
-  Success/Recall pair. `combined-problem-outcomes-view.tsx` pools the canonical
-  new-problem counts across Easy/Medium/Hard/Unknown for its two simultaneous
-  curves; it neither averages difficulty rates nor rebuilds raw cohorts. Its
-  fitted domain uses both pooled rates and both first-attempt goals, independently
-  of the known-difficulty plot scale and controls. No duplicate runtime view is
-  needed. Practice remains full width, followed by the Memory/Topic pair,
-  Retention Map, Memory Signals, and workload pair.
-  The view transforms supplied values for presentation; it does not rebuild raw
-  cohorts. New problems selects first-attempt goals; Follow-up practice selects
-  Recall/Review Success aspirations while naming its different raw population.
-  Only the selected measure's existing Settings-owned editor/reference is shown.
-  Shared Easy/Medium/Hard identities are mint circles, blue diamonds, and amber
-  triangles. Hidden difficulties leave both plots and inspection, while Mix
-  retains all raw assessments/positive-time sums, including neutral Unknown.
-  Compare uses supplied full-period rates, time medians/quartiles, exact current/
-  prior denominators, and Sparse comparison when either valid n is below ten.
-  Time transforms seconds to minutes or percent of current allowances; quartile
-  whiskers require four timed records and one visible difficulty in Trend.
-- Shared `historical-chart.tsx`, `LineSegments`, date/report helpers, ChartTable,
-  and seven-row `historical-table.tsx` retain immutable supplied rows, calendar
-  midpoints, sparse ticks, exact Table values, and native keyboard/touch
-  inspection. Long-dash bridges connect measured neighbors across unavailable
-  intervals without creating observations. The paired problem-solving Trend
-  window is one contiguous slice supported by any known-difficulty raw activity,
-  preserving internal gaps independently of visibility, measure, or time subset.
-  `trimHistoricalEmptyEdges` retains Recall when either rate is known, including
-  zero; Memory requires a finite median, including zero/subday values, rather
-  than quartile support. Recall enables `startAtFirstPoint`: multiple intervals
-  begin at the first midpoint with 12px left clearance and retain the last
-  interval's end; a singleton keeps its original domain and centered point.
-  Series visibility cannot shift dates or supplied fits. Memory retains its
-  fitted duration scale; Recall's percentage fit includes its saved goal at
-  zero or one. Practice's fixed percentage axis preserves its independent count
-  scale. Feature components and native editors own semantics and preferences;
-  drawing primitives do not persist data. Scoped styles remain in
-  `src/styles/analytics.css`. Goal edits never change observations, timing,
-  FSRS scheduling, or Retention Map values.
+- Feature-owned `performance-presentation.ts`, `cumulative-recall-presentation.ts`,
+  `time-target-presentation.ts`, and `cumulative-trend-geometry.ts` derive pure
+  presentation from supplied exact evidence. Performance pools weighted points/
+  units with the fixed Again 0 / Hard 50 / Good 80 / Easy 100 rubric and current
+  Easy/Medium/Hard/Unknown influence 1/2/3/1; evidence is actual valid n.
+  Cumulative Recall pools recalled counts and pair-weighted unrounded FSRS means
+  over identical pairs without difficulty weights. Normalized Time retains
+  separate period medians and coverage, not a pooled median from medians.
+  Raw interval values remain available alongside cumulative values and counts.
+- `components/cards/performance-card.tsx` and `time-target-card.tsx` own
+  independent local first/follow-up cohorts. Performance Breakdown retains
+  Ratings/Difficulty/Mix/Intervals plus original Pooled outcomes, Difficulty
+  outcomes, raw goals, Trend/Compare, visibility, and exact fields. Pooled raw
+  rates include Unknown and use summed counts, never averaged difficulty rates.
+  The independent Time card retains Trend/Compare, minutes/current-target
+  percentage, all/successful timing subsets, known difficulty visibility,
+  median/Q1/Q3, exact current/prior counts, and Unknown coverage without a target.
+  Weighted comparisons use unrounded score points; raw-rate comparisons keep
+  percentage points, and either valid n below ten yields Sparse comparison.
+  All time has no prior comparison. Current targets and metadata do not rewrite
+  recorded outcomes or seconds.
+- `components/cards/recall-card.tsx`, `practice-card.tsx`, and
+  `memory-strength-card.tsx` adapt the existing metric renderers. Recall consumes
+  its supplied paired display frame and keeps original and cumulative values/
+  counts, reconstructed provenance, both native series switches, last updated
+  interval, and fitting Summary/Intervals/Goals/Method sections. Practice retains
+  the exact interval union, independent counts, raw rating shares and original
+  rating names in inspection/Details; friendly labels only change Overview copy.
+  Memory retains fitted post-review stability and supported quartiles.
+- `analytics-screen.tsx` composes ten compact adapters in the approved order:
+  Performance / Time vs target, Practice / Topic performance, Recall / Memory
+  strength, Retention map / Memory signals, Overdue backlog / Upcoming reviews.
+  The shared `analytics-chart-panel.tsx` supplies measured definite body geometry;
+  `analytics-exact-table.tsx` and feature controls preserve every original row,
+  field, action, and unavailable value through bounded sections/pages. Pagination
+  clamps/reflows with width, row, range, and report changes even while hidden.
+  Equivalent report rerenders preserve a current page. Overview/Details and goal/
+  selection surfaces keep the same shell and restore controls/selections/focus.
+  Scoped `src/styles/analytics.css` owns 464px two-column cards at 736px actual
+  content width and 512px stacked cards below it, plus four equal 148px headlines.
+  Local Latin Nunito Sans UI and Literata page-title fonts are scoped to Analytics
+  with system glyph fallbacks; no runtime font-service request is needed.
+- Shared historical chart/date/report helpers retain immutable supplied rows,
+  calendar midpoints, sparse ticks, exact values, and native keyboard/pointer/
+  tap inspection. `CumulativeTrend` uses reviewed bounded geometry and a report
+  as-of cutoff only for Performance and paired Recall: update markers represent
+  new evidence, horizontal long dashes hold a prior aggregate without new samples,
+  and transitions cannot move through unsupported time. Recall fits both
+  cumulative series and its saved goal independently of visibility. Raw outcome/
+  time, Memory, and Practice retain their supported-edge slices, internal gaps,
+  existing next-valid-point bridges, and their original interval-boundary domains.
+  Drawing primitives do not persist data. Goal edits never change observations,
+  timing, weighted scores, readiness, FSRS scheduling, or Retention values.
 - `src/features/analytics/components/practice-ratings-model.ts` is the pure
   presentation join for unchanged `views.practiceRhythm` and `views.ratingsMix`.
   It keys rows by ID plus exact `bucketStart`/`bucketEnd`, sorts their interval
@@ -444,31 +554,55 @@ The owners in that flow are:
   full interval, partial state, timezone, and report time. The native Reviews
   switch hides the line, markers, right axis, and tooltip count together, without
   changing dates, rows, target, or Table values. The selected-period challenging
-  summary and evidence-gated prior comparison remain below the view. The chart
+  summary and evidence-gated prior comparison remain reachable in Details. The chart
   explains association only: count-line crossings with a percentage target
   carry no percentage meaning.
-- Topic Performance retains all qualifying domain rows in its Zod-validated
-  view, preserving success/count/name ordering and bounded low-evidence details.
-  Its omitted-qualifying compatibility count is zero. The screen supplies the
-  existing Practice `targetReviewSuccess` and Settings-owned editor; no new
-  preference or message is introduced. Categorical columns have a fixed
-  percentage scale, bounded scrolling and synchronized full-topic inspection.
-- Memory Signals render supplied ranks, canonical titles and typed reasons as
-  compact inline rows. Reason wording is produced by the owning domain, not
-  parsed by the view. The panel opts into natural body height and a 36rem cap;
-  other panels retain their body-height default.
+- Topic performance retains all qualifying direct-topic rows and its original
+  raw rate/count fields. Required `ratingCountsByDifficulty` contains all sixteen
+  nonnegative integer cells; their sum equals `validRatings`, Good/Easy equals
+  `goodEasy`, and `reviewSuccess = goodEasy / validRatings`. The shared weighted
+  helper orders by unrounded /100 score, then actual valid count descending and
+  normalized name. Eligibility remains at least ten valid ratings and three
+  distinct valid-reviewed problems, with overlapping direct membership and no
+  ancestor rollups. Its omitted-qualifying compatibility count is zero; bounded
+  pages retain full names/all rows and the alphabetical first five returned
+  low-evidence topics with their exact additional count.
+  Weighted scores have no percentage target. The original raw rate, unrounded
+  goal status, and Settings-owned Review Success editor stay in rating Details.
+- `components/cards/memory-signals-card.tsx` renders supplied ranks, canonical
+  titles, severity, and every typed reason in original order through fitting
+  linked pages. Reason wording comes from its domain, never view parsing. The
+  separate returned-top-25 limit and qualifying-total count remain explicit;
+  the fixed shell does not discard flags or reasons. Current as-of, timezone,
+  and fallback context stays in Scope; historical selection alone does not
+  reset an equivalent current report's page.
 - Workload views preserve their domain contracts. Backlog draws exact known
   daily dots and straight threshold-aware connectors, with null dates breaking
-  runs. Upcoming labels original positive stack components without minimum bar
-  heights or duplicate totals. Workload inspection uses supplied dates/counts
+  runs. Both lines and markers are green at counts strictly below five and amber
+  at or above five; exact crossings split geometry without another observation.
+  Backlog uses its own Last 30 days daily frame. Its current value is the last
+  supplied count, remaining unavailable if that day is unknown; no earlier
+  observation is carried forward. Known peak excludes unknown days, and its
+  strict below-five/at-or-above-five counts conserve known days. Upcoming uses
+  the fixed Today-plus-thirteen-local-dates eligibility snapshot, without future
+  reviews or rescheduling. Its bars fill actual projected date slots minus
+  bounded gaps, preserving all fourteen slots and zero geometry. Upcoming
+  labels original positive stack components without minimum bar heights or
+  duplicate totals. Workload inspection uses supplied dates/counts
   and the report context for pointer, tap and keyboard. The reconstructed
-  backlog timestamp rule remains distinct from Upcoming's local-date overdue
-  classification.
+  backlog timestamp rule remains distinct from Upcoming's Practice-derived
+  local-date overdue classification. Upcoming retains only
+  as-of/timezone/fallback report context,
+  not the historical page range, and preserves pages for equivalent current
+  reports under historical selection alone.
 - Retention Map returns every eligible current-state row. Its Zod contract keeps
   positive ranks and valid estimates without the former 30-row/rank limit;
   Memory Signals keeps its separate 25-row limit. Full-cohort scales/counts and
-  eligibility remain domain-owned. `current-state-views.tsx` composes the
-  All/Below target filter and the same filtered Chart/Table rows.
+  eligibility remain domain-owned. Its compact adapter keeps All/Below target,
+  the same full filtered rows, all eleven original table fields (linked title,
+  rank, recall, target, gap, durability, review/due dates, FSRS difficulty,
+  lapses, and status), plus supplied Region in Problems. Fitting linked
+  selection details expose the original fields inside the fixed card.
   `retention-map-chart.tsx` owns a local controlled viewport and native
   inspection/gesture state; `retention-map-model.ts` keeps presentation math and
   shared labels feature-local. Public Recharts plot, forward and inverse scales
@@ -484,14 +618,28 @@ The owners in that flow are:
 
 The Analytics service applies the range policy, calculates readiness separately
 for each metric's eligibility rules, and builds its Zod-validated summary.
-Legacy summary series may trim unsupported leading history. Historical trend
-views trim unsupported edges at the component presentation boundary,
-preserving the service response, selected-period totals, readiness, supplied
-scales, report time, and internal gaps. Historical readiness is exposed as
-confidence context; it does not suppress available Difficulty And Recorded Time, Recall Quality, Practice
-Rhythm, Memory Strength, or Recent Overdue Backlog points. Current Retention
-Health, Fragile Knowledge, and the fixed 14-day Upcoming Review Load do not
-depend on the historical range being ready.
+Legacy summary series may trim unsupported leading history. Performance retains
+the full available global-history calendar, leading unavailability, and trailing
+holds through real as-of. Recall uses its supplied first-selected-pair-to-as-of
+display frame and grouping; both series retain the same selected pairs/totals,
+while readiness uses their actual evidence on the shared global calendar.
+Held rows never improve samples, active buckets, gaps, or readiness. Other
+historical views keep their supported-edge trimming and internal gaps,
+preserving the service response, selected-period totals, supplied scales,
+and report context. Confidence guidance never suppresses available values.
+Current Retention/Signals and independent Last 30 days Backlog / Next 14 days
+Upcoming remain useful when historical evidence is sparse.
+
+The screen owns query compatibility: a range/timezone change clears incompatible
+values immediately, while a same-key refresh may retain its exact snapshot with
+Updating. A failed refresh retains the original values/as-of and persistent
+failure status with Retry. Initial loading/error, no evidence, and known zero
+use the reserved fixed shells. Neutral metadata exposes routine limitations;
+full reasons and distinct Practice/Rating readiness remain reachable in Details.
+One polite range/refresh announcement avoids competing card announcements.
+Persistent goal controllers preserve active drafts and associated field errors
+across Overview/Details, use the existing Settings mutation path, and prevent
+a completed earlier save from closing or focusing another active editor.
 
 Readiness diagnostics are a read-only view of that same production
 calculation—not a second implementation. They include `S/A/G/K/E`, selected
@@ -503,9 +651,10 @@ aliases while preserving legacy queue fields for existing consumers.
 
 Due-review notifications are local background work. The extension declares the
 Chrome `notifications` permission so `src/extension/background/due-notification.ts`
-can create one due-review reminder per day when enabled. Notification scheduling
-uses Chrome alarms, local dedup state, and the queue summary `dueToday`
-semantics; React components must not call `chrome.notifications` directly.
+can create one due-review reminder per browser-local day when enabled.
+Notification scheduling uses Chrome alarms, local-calendar dedup state, and the
+queue summary `dueToday` semantics derived from Practice eligibility; React
+components must not call `chrome.notifications` directly.
 
 Automatic Gist sync is orchestrated in the background layer. After a local
 mutation commits, sync metadata is marked dirty, the database snapshot is
@@ -570,7 +719,12 @@ checks. Explicit model objects use controlled fetch with redirects rejected,
 SDK retries disabled, bounded output, and telemetry disabled. Strict SDK/Zod
 and report-consistency validation remain required. OpenRouter requests specify
 only the selected model, without paid fallback IDs or privacy overrides;
-OpenRouter can perform internal routing within CogniPace's single request.
+OpenRouter can perform internal routing within each request. Assessments alone
+opt into one application recovery attempt for any provider/model after a recognized
+transient upstream failure; SDK retries remain disabled. Recovery preserves the
+selected model, strict output and the shared whole-operation deadline. It uses
+abortable backoff, honors Retry-After, and returns the original error if the delay
+cannot fit. Quota, auth, billing, refusal and output errors do not trigger recovery.
 
 Metadata keeps requested `model` as configuration identity and optionally adds
 bounded `resolvedModel` for a successful OpenRouter response that identifies a
@@ -619,8 +773,8 @@ secret.
 Ownership follows the existing feature direction. `src/lib/ai` owns reusable
 structured SDK transport and the direct official provider adapters. GenAI owns
 saved configuration, availability, trusted credentials, and connection testing.
-`leetcode-review-assistant` owns the versioned report and request schemas,
-rubric, prompt, consistency checks, and analysis service.
+`leetcode-review-assistant` owns the separate versioned feedback and
+implementation schemas, requests, prompts, consistency checks and services.
 `leetcode-capture` and `src/lib/leetcode` own full matching submission and
 problem content, including follow-ups and refreshable capture caches.
 `overlay-session` owns the session controller and Option A presentation.
@@ -644,9 +798,13 @@ serialized problem context up to 24,000 characters. Optional diagnostics above
 2,000 characters are omitted and named explicitly. Code and problem content are
 never silently truncated. Preparation refreshes the immutable submission pin
 and has a 15-second deadline; the retained pin survives unavailable reads for
-Retry. A request has one SDK generation with an 8,192-token output budget and a
-30-second background deadline including database/configuration/secret loading.
-The controller bounds the complete client operation at 50 seconds. Retry makes
+Retry. A request has an 8,192-token output budget and a 60-second background
+deadline including database/configuration/secret loading and any recovery.
+The controller bounds the complete client operation at 80 seconds. All assessment providers/models may retry a transient failure once; hints and
+connection tests keep one attempt. Reports request concise rationales and at most two high-value suggestions
+per list. The initial provider schema excludes implementation fields; a separate
+explicit operation generates complete suggested code from the same assessed
+source and validated feedback. Retry makes
 a fresh request identity for the same retained submission; repeated terminal
 events and disclosure/collapse/dock actions do not generate another request.
 
@@ -658,6 +816,26 @@ correctness, human rubric quality, or universal optimality. Suggested code is
 rendered as text, labeled AI-generated and Untested, and is never executed or
 submitted by the product.
 
+The overlay retains the successful assessment request and feedback in session
+memory. On-demand implementation requests are self-contained strict envelopes
+with that original context and correlated identities. The background treats
+all supplied context as untrusted model data, authorizes the actual sender
+host/slug, and checks the trusted connection before publishing. Code generation
+does not depend on completed-result state surviving an MV3 worker restart.
+Its in-flight ownership/cancellation is independent of feedback and hints;
+navigation, reset, disable, a new attempt or configuration change rejects stale
+code. Both operations keep 60-second background and 80-second client bounds.
+
+Assessment generation explicitly opts into safe numeric measurements: outgoing
+request-body bytes, validated output JSON bytes, attempts, schema preparation,
+generation and validation durations, plus available normalized SDK usage.
+Generation timing excludes validation and backoff; missing tokens stay unknown,
+and usage does not claim unknown failed-attempt billing. No response body clone,
+extra measurement fetch or raw SDK metadata is retained. Provider input omits
+null optional metadata and empty diagnostics while preserving all populated
+evidence, exact source, language, examples, constraints and zero counts. Local
+runtime request contracts retain the complete typed context.
+
 Reports and in-flight operations stay in session/controller state, outside
 TanStack Query query and mutation caches and the database. Report completion
 causes no invalidation, sync, review write, or rating change. The retired
@@ -668,9 +846,13 @@ key-save transport and provider authentication still carry keys where required.
 
 Evaluation inputs live in the owning review-assistant testing folder, and the
 test-only private environment configuration lives in GenAI testing. The opt-in
-harness calls the real `analyzeCode` SDK path with six cases and stores only
-report, provider metadata, criterion, and checked date in
-`/private/tmp/cognipace-ai-evaluation`. Its environment option does not replace
+harness calls the real `analyzeCode` SDK path with six cases and writes controlled
+success and failure artifacts before asserting success. Successful cases include
+the validated report; failed cases include only the controlled error category.
+Artifacts retain fixture identity, allowlisted provider metadata and checked date;
+a current-run summary records counts, error categories and durations under
+`/private/tmp/cognipace-ai-evaluation`. Raw SDK messages, bodies and keys are never
+written. Its environment option does not replace
 or read the application's trusted secret store. Normal tests skip all six live
 cases before reading any evaluation provider/model/key values.
 
@@ -813,9 +995,13 @@ original snapshot and fingerprint in the baseline's recovery slot:
 `cognipace_db_recovery_fsrs_v1` for through-0009. Earlier copies survive later
 upgrades. An existing recovery record is not overwritten by a different
 original; an identical retry retains the first timestamp. Matching current
-snapshots skip preparation and publication. A through-0009 source that
+snapshots skip preparation and publication but run read-only Practice metadata
+validation. Missing or inconsistent current evidence/scopes reject without
+repairing the snapshot. A through-0009 source that
 is already current skips historical taxonomy reconciliation during future
-upgrades; fresh and older supported sources retain the existing mapping. These
+upgrades; all fresh and supported upgrades still prepare Practice evidence and
+active scopes transactionally. Fresh and older supported sources retain the
+existing taxonomy mapping. These
 recovery values are private local data. Never log or
 share their contents in an issue; use the scoped local export procedure in
 `docs/testing.md` if recovery is needed. Startup diagnostics must describe the
@@ -868,16 +1054,72 @@ assignments after alias resolution. LeetCode capture writes use merge semantics:
 captured page topics are resolved and added to the existing direct topic set
 without clearing local or manual topics.
 
-Backup schema version 5 exports typed relations as
+Backup schema version 6 exports typed relations as
 `{ sourceTopicId, targetTopicId, kind, createdAt, updatedAt }` alongside
 `topics` and `topicAliases`, and requires `allowExternalProgress` on track rows.
-Import accepts backup versions 1 through 5 and normalizes v1-v4 tracks to false
+Import accepts backup versions 1 through 6 through frozen v1-v5 readers and
+explicit normalization. It normalizes v1-v4 tracks to false
 before current validation; v3's untyped parent/child
 edges become `broader` edges with child as source and parent as target. Unknown
 future versions are rejected. Sync keeps its envelope version
 and its existing dirty-local, overwrite-confirmation, and authorization rules,
-but a client that only understands backup v4 cannot read newly exported v5
-backups.
+but older clients cannot read newly exported v6 backups. The sync envelope
+remains version 1.
+
+The v6 Practice object adds `schedulerProfiles`, `reviewEvidence`, `generations`
+and `commandReceipts` alongside its original three arrays. Legacy normalization
+adds inferred sequences and unknown contexts without changing cards or replaying
+history. Current exports require complete initialized scopes; imported empty
+scopes remain explicit unknown. Full detached preflight validates native
+cards/logs/profiles, historical acknowledgements, ownership and catalog/track
+invariants before any restore transaction. The repository repeats the complete
+validation/reconciliation boundary even for typed prepared inputs. Replacement
+preserves base rows and metadata, discards imported active tokens and creates
+fresh local/applicable problem scopes atomically. Targeted reset rotates only
+its problem scope and removes its own receipts; sibling scopes and immutable
+profiles remain intact.
+
+Full-backup replacement inserts each table and Practice sidecar in ordered
+25-row statements inside its existing outer transaction. This bounds SQLite
+statement variables for larger histories while retaining the same complete
+data, foreign-key order, validation and all-or-nothing rollback. It adds no
+schema, migration or backup version. The deterministic Phase G fixtures under
+`src/testing` cover 250/5,000, 2,500/50,000 and one-card/10,000 workloads;
+their local Vitest timings describe an in-process SQLite handle. The packaged
+Chrome driver in `scripts/fsrs-scaling-chrome.mjs` uses a fresh disposable
+profile and records runtime message-to-response and actual Chrome storage
+measurements separately. These workloads do not define supported capacity.
+
+Background owns one replacement coordinator behind the existing mutation queue.
+It retains only the committed summary and publication/metadata continuations.
+Failed snapshot publication returns persistence pending; Retry saving flushes
+the committed state without importing again or rotating generations. Successful
+publication invalidates data once. Failed sync bookkeeping then retains a
+separate metadata-pending state whose retry writes only the captured metadata.
+Pending replacement blocks later writes, imports, exports and sync applications;
+authenticated status reads are read-only and retry remains serialized.
+Replacement settlement refreshes pending and Sync status queries. Sync-tag
+invalidation also refreshes pending replacement so automatic pull failures
+reveal recovery in an already mounted Settings screen.
+
+Local restore/reset complete preflight and strictly persist the existing sync
+dirty marker before committing. This protects the replacement if the DB's
+automatic publication timer runs and the worker restarts before final sync
+bookkeeping. Failed marking prevents commit; transaction rollback may leave a
+conservative dirty flag without changing the original database. Post-publication
+dirty marking stays strict, followed by best-effort automatic push scheduling.
+Gist pull instead captures its complete remote metadata patch once. Explicitly
+confirmed manual overwrite can replace dirty local data; automatic or
+unconfirmed application still rejects it. Automatic sync bookkeeping uses the
+same queue admission so it cannot race the retained patch.
+
+Accepted replacement clears an obsolete pending content-import acknowledgement
+only after commit. An old import retry then requests a fresh preview rather than
+claiming discarded content was saved; rollback retains its genuine retry.
+Recovery state is worker-local. Settings reload can query it without flushing,
+but worker restart loses continuations and reopens the last durable snapshot.
+Already published data survives; local replacements retain the persisted dirty
+marker. C does not guarantee replacement deduplication across worker restart.
 
 Automatic database upgrade is a separate, deliberately narrow compatibility
 path: only the exact shipped 0000–0007, 0000–0008, and 0000–0009 migration SQL
@@ -899,12 +1141,12 @@ original; a retry with the same original is supported. Failed upgrades retain th
 active stored snapshot and all recovery copies. Shipped migration SQL is never
 rewritten.
 
-The through-0009 fingerprint `1144ce07` is registered before FSRS metadata
-migrations. Compatibility registration adds no migration and changes no current
-FSRS card, review, due date, track credit, or user preference. Populated
-singleton tests use a test-only appended table to prove staging, independent
-recovery, and reopen behavior; an actual later schema migration requires its own
-preservation proof.
+The through-0009 fingerprint `1144ce07` supports the actual additive 0010 FSRS
+evidence migration. Populated singleton tests compare every original column in
+all 16 protected tables, 75% retention, daily/streak progress, opaque IDs,
+suspension and track credit. They verify six inferred evidence rows and active
+scopes across preparation, publication, retry and matching reopen; malformed
+staged logs and storage failures preserve the original and earlier recoveries.
 
 ### Effective Track Completion
 

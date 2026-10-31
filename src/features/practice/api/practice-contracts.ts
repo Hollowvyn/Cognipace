@@ -2,7 +2,15 @@ import { z } from 'zod'
 
 import { fsrsCardStates, reviewRatings } from '@/lib/fsrs'
 
-import { practicePhases, practiceStatuses, reviewModes } from '../domain'
+import {
+  practicePhases,
+  practiceStatuses,
+  reviewModes,
+  acceptedPracticeSaveCommandSchema,
+  acceptedPracticeUpdateCommandSchema,
+  practiceReceiptAcknowledgementSchema,
+  practiceGenerationContextSchema,
+} from '../domain'
 
 export const practiceRuntimeSurfaceSchema = z.enum([
   'popup',
@@ -23,6 +31,7 @@ export const practiceLogPatchSchema = practiceLogSnapshotSchema.partial()
 const practiceSummarySchema = z.object({
   phase: z.enum(practicePhases),
   nextReviewAt: z.iso.datetime().nullable(),
+  eligibleOn: z.iso.date().nullable(),
   lastReviewedAt: z.iso.datetime().nullable(),
   reviewCount: z.number().int().min(0),
   lapses: z.number().int().min(0),
@@ -87,6 +96,7 @@ export const normalizedPracticeStateSchema = z.object({
   isOverdue: z.boolean(),
   overdueDays: z.number().int().min(0),
   dueAt: z.iso.datetime().nullable(),
+  eligibleOn: z.iso.date().nullable(),
   lastReviewedAt: z.iso.datetime().nullable(),
   retrievability: z.number().nullable(),
   stability: z.number().nullable(),
@@ -109,6 +119,24 @@ export const practiceDetailsSchema = normalizedPracticeStateSchema.extend({
   card: fsrsCardSnapshotSchema.nullable(),
   currentLog: practiceLogSnapshotSchema,
   canOverrideLatestReview: z.boolean(),
+  generation: z
+    .object({
+      localGenerationToken: z.string().min(1),
+      problemGenerationToken: z.string().min(1).nullable(),
+    })
+    .nullable(),
+  latestReview: z
+    .object({
+      reviewAttemptId: z.string().min(1),
+      applicationSequence: z
+        .number()
+        .int()
+        .positive()
+        .refine(Number.isSafeInteger),
+      revision: z.number().int().nonnegative().refine(Number.isSafeInteger),
+      reviewedAt: z.iso.datetime(),
+    })
+    .nullable(),
 })
 
 export type SerializedPracticeDetails = z.infer<typeof practiceDetailsSchema>
@@ -136,35 +164,105 @@ export type PracticeDetailsRequest = z.infer<
   typeof practiceDetailsRequestSchema
 >
 
-export const practiceSaveReviewResultRequestSchema = z.object({
-  surface: practiceRuntimeSurfaceSchema,
-  problemSlug: z.string(),
-  rating: z.enum(reviewRatings),
-  reviewedAt: z.iso.datetime().optional(),
-  reviewMode: z.enum(reviewModes).optional(),
-  elapsedSeconds: z.number().int().positive().nullish(),
-  isCorrect: z.boolean().nullish(),
-  notes: z.string().nullish(),
-  log: practiceLogPatchSchema.optional(),
+const practiceSubmitPreviewIdentitySchema = z.strictObject({
+  mode: z.literal('submit'),
+  problemSlug: z.string().min(1),
+  generation: practiceGenerationContextSchema,
+  previewedAt: z.iso.datetime(),
 })
+const practiceUpdatePreviewIdentitySchema = z.strictObject({
+  mode: z.literal('update'),
+  problemSlug: z.string().min(1),
+  generation: practiceGenerationContextSchema,
+  targetAttemptId: z.string().min(1),
+  expectedRevision: z.number().int().nonnegative().refine(Number.isSafeInteger),
+  reviewedAt: z.iso.datetime(),
+})
+export const practicePreviewIdentitySchema = z.discriminatedUnion('mode', [
+  practiceSubmitPreviewIdentitySchema,
+  practiceUpdatePreviewIdentitySchema,
+])
+export const practicePreviewRequestSchema = z.discriminatedUnion('mode', [
+  practiceSubmitPreviewIdentitySchema.extend({
+    surface: z.literal('content-script'),
+  }),
+  practiceUpdatePreviewIdentitySchema.extend({
+    surface: z.literal('content-script'),
+  }),
+])
+export type PracticePreviewRequest = z.infer<
+  typeof practicePreviewRequestSchema
+>
 
+const practicePreviewRatingSchema = z.strictObject({
+  dueAt: z.iso.datetime(),
+  eligibleOn: z.iso.date(),
+  studyDays: z.number().int().nonnegative(),
+  scheduledDays: z.number().int().nonnegative(),
+})
+export const practicePreviewResponseSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('ready'),
+    identity: practicePreviewIdentitySchema,
+    evidence: z.enum(['active', 'captured', 'legacy-derived']),
+    ratings: z.record(z.enum(reviewRatings), practicePreviewRatingSchema),
+  }),
+  z.strictObject({
+    status: z.literal('unavailable'),
+    identity: practicePreviewIdentitySchema,
+    reason: z.enum(['unsupported-legacy', 'missing-context']),
+  }),
+  z.strictObject({
+    status: z.literal('conflict'),
+    identity: practicePreviewIdentitySchema,
+    reason: z.enum(['stale-generation', 'stale-review', 'backdated']),
+  }),
+])
+export type PracticePreviewResponse = z.infer<
+  typeof practicePreviewResponseSchema
+>
+
+export const practiceSaveReviewResultRequestSchema =
+  acceptedPracticeSaveCommandSchema
+    .omit({ operation: true })
+    .extend({ surface: practiceRuntimeSurfaceSchema })
+    .strict()
 export type PracticeSaveReviewResultRequest = z.infer<
   typeof practiceSaveReviewResultRequestSchema
 >
-
-export const practiceOverrideLastReviewResultRequestSchema = z
-  .object({
-    surface: practiceRuntimeSurfaceSchema,
-    problemSlug: z.string(),
-    rating: z.enum(reviewRatings),
-    elapsedSeconds: z.number().int().positive().nullish(),
-    isCorrect: z.boolean().nullish(),
-    log: practiceLogPatchSchema.optional(),
-  })
-  .strict()
-
+export const practiceOverrideLastReviewResultRequestSchema =
+  acceptedPracticeUpdateCommandSchema
+    .omit({ operation: true })
+    .extend({ surface: practiceRuntimeSurfaceSchema })
+    .strict()
 export type PracticeOverrideLastReviewResultRequest = z.infer<
   typeof practiceOverrideLastReviewResultRequestSchema
+>
+
+export const practiceReviewCommandResultSchema = z.discriminatedUnion(
+  'status',
+  [
+    z.strictObject({
+      status: z.enum(['saved', 'persistence-pending']),
+      acknowledgement: practiceReceiptAcknowledgementSchema,
+      current: practiceDetailsSchema,
+    }),
+    z.strictObject({
+      status: z.literal('conflict'),
+      reason: z.enum([
+        'stale-review',
+        'backdated',
+        'unsupported-legacy',
+        'stale-generation',
+        'command-conflict',
+      ]),
+      message: z.string(),
+      current: practiceDetailsSchema,
+    }),
+  ],
+)
+export type PracticeReviewCommandResult = z.infer<
+  typeof practiceReviewCommandResultSchema
 >
 
 export const practiceSetSuspendedRequestSchema = z.object({

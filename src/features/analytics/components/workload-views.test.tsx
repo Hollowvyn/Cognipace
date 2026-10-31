@@ -1,3 +1,4 @@
+import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -7,13 +8,23 @@ import {
   buildThresholdLineSegments,
   RecentOverdueBacklogView,
   UpcomingReviewLoadView,
+  UpcomingLoadChart,
 } from './workload-views'
 
 const overdueBacklog: AnalyticsViews['overdueBacklog'] = {
+  timeFrame: createSerializedAnalyticsSummary().timeFrame,
   rows: Array.from({ length: 8 }, (_, index) => ({
     date: `2026-08-${String(index + 9).padStart(2, '0')}`,
     overdueCount: index === 2 ? null : index,
     inProgress: index === 7,
+    schedulingProvenance:
+      index === 2
+        ? 'unknown'
+        : index === 1
+          ? 'legacy-derived'
+          : index === 7
+            ? 'mixed'
+            : 'captured',
   })),
   knownDays: 7,
   withinWatchDays: 5,
@@ -38,6 +49,33 @@ const upcomingReviewLoad: AnalyticsViews['upcomingReviewLoad'] = {
 }
 
 describe('workload analytics views', () => {
+  it.each([
+    [[5, 5], [{ d: 'M0,10L10,0', status: 'above-watch' }]],
+    [
+      [6, 4],
+      [
+        { d: 'M0,10L5,5', status: 'above-watch' },
+        { d: 'M5,5L10,0', status: 'within-watch' },
+      ],
+    ],
+    [[4, 5], [{ d: 'M0,10L10,0', status: 'within-watch' }]],
+    [[5, 4], [{ d: 'M0,10L10,0', status: 'within-watch' }]],
+    [[5, 6], [{ d: 'M0,10L10,0', status: 'above-watch' }]],
+    [[6, 5], [{ d: 'M0,10L10,0', status: 'above-watch' }]],
+  ])(
+    'keeps strict threshold geometry for %s without zero-length crossing segments',
+    (values, expected) => {
+      expect(
+        buildThresholdLineSegments(
+          [
+            { x: 0, y: 10 },
+            { x: 10, y: 0 },
+          ],
+          values,
+        ),
+      ).toEqual(expected)
+    },
+  )
   it('splits straight connectors exactly at the 5-problem threshold', () => {
     expect(
       buildThresholdLineSegments(
@@ -75,25 +113,29 @@ describe('workload analytics views', () => {
     render(<RecentOverdueBacklogView view={overdueBacklog} />)
 
     expect(screen.getByText(/7 known days of 8;/)).toBeVisible()
-    expect(
-      screen.getByText(/5 known days within the 5-problem watch zone/),
-    ).toBeVisible()
+    expect(screen.getByText(/5 known days below 5 problems/)).toBeVisible()
     const chart = screen.getByRole('region', {
       name: 'Recent Overdue Backlog chart',
     })
     expect(chart).toHaveAttribute('aria-describedby')
     expect(chart.querySelectorAll('[data-workload-dot]')).toHaveLength(7)
-    expect(screen.getByText('Within watch zone')).toBeVisible()
-    expect(screen.getByText('Above watch zone')).toBeVisible()
+    expect(screen.getByText('Below 5')).toBeVisible()
+    expect(screen.getByText('At or above 5')).toBeVisible()
     const inspect = screen.getByRole('button', {
       name: 'Inspect Recent Overdue Backlog chart',
     })
     fireEvent.keyDown(inspect, { key: 'ArrowRight' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('Overdue problems: 1')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Legacy-derived compatibility',
+    )
     expect(screen.getByRole('status')).toHaveClass('sr-only')
     fireEvent.keyDown(inspect, { key: 'ArrowRight' })
     expect(screen.getByRole('tooltip')).toHaveTextContent(
       'Watch status: Unknown',
+    )
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Unavailable · insufficient scheduling evidence',
     )
     fireEvent.keyDown(inspect, { key: 'End' })
     expect(
@@ -106,15 +148,21 @@ describe('workload analytics views', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Table' }))
     const table = screen.getByRole('table', {
-      name: 'Recent Overdue Backlog data table',
+      name: 'Recent Overdue Backlog data table · Daily summaries · Last 30 days',
     })
     expect(within(table).getByText('Not measured')).toBeVisible()
+    expect(
+      within(table).getByText('Legacy-derived compatibility'),
+    ).toBeVisible()
+    expect(
+      within(table).getByText('Unavailable · insufficient scheduling evidence'),
+    ).toBeVisible()
     expect(screen.getByRole('status')).toHaveTextContent('Showing 1–7 of 8')
     await user.click(screen.getByRole('button', { name: 'Next page' }))
     expect(within(table).getByText('08/16/26 · In progress')).toBeVisible()
   })
 
-  it('preserves gaps and the inclusive watch boundary without crossing markers', () => {
+  it('preserves gaps and the strict watch boundary without crossing markers', () => {
     expect(
       buildThresholdLineSegments(
         [
@@ -190,6 +238,25 @@ describe('workload analytics views', () => {
     vi.unstubAllGlobals()
   })
 
+  it('fills the actual fourteen date slots at wide widths without a 36px cap or fake segment heights', () => {
+    const { container } = render(
+      <UpcomingLoadChart
+        view={upcomingReviewLoad}
+        compact={{ width: 1200, height: 300 }}
+      />,
+    )
+    const bars = container.querySelectorAll('[data-workload-bar]')
+    expect(bars).toHaveLength(14)
+    const segments = bars[0]!.querySelectorAll('rect')
+    expect(segments).toHaveLength(2)
+    const width = Number(segments[0]!.getAttribute('width'))
+    expect(width).toBeGreaterThan(36)
+    expect(Number(segments[1]!.getAttribute('width'))).toBe(width)
+    expect(Number(segments[1]!.getAttribute('height'))).toBeCloseTo(
+      Number(segments[0]!.getAttribute('height')) * 2,
+    )
+    expect(bars[1]!.querySelectorAll('rect')).toHaveLength(0)
+  })
   it('uses rendered text measurements rather than fitting an oversized count', () => {
     Object.defineProperty(SVGElement.prototype, 'getComputedTextLength', {
       configurable: true,

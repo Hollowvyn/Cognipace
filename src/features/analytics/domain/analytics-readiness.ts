@@ -1,4 +1,5 @@
 import { getAnalyticsRangePolicy } from './analytics-range-policy'
+import type { AnalyticsHistoryGrouping } from './analytics-history-window'
 
 export type ReadinessFailure =
   | 'no-evidence'
@@ -9,14 +10,19 @@ export type ReadinessFailure =
   | 'too-many-gaps'
 
 export interface AnalyticsReadinessInput {
-  requestedDays: number
+  requestedDays: number | null
+  grouping?: AnalyticsHistoryGrouping | null | undefined
+  availableDays?: number | undefined
   evidenceCounts: readonly number[]
   bucketKeys: readonly string[]
 }
 
 export interface AnalyticsReadiness {
   ready: boolean
-  requestedDays: number
+  requestedDays: number | null
+  policyDays?: number | undefined
+  grouping?: AnalyticsHistoryGrouping | null | undefined
+  availableDays?: number | undefined
   bucketDays: number
   requestedBuckets: number
   effectiveBuckets: number
@@ -36,11 +42,23 @@ export function calculateAnalyticsReadiness({
   requestedDays,
   evidenceCounts,
   bucketKeys,
+  grouping,
+  availableDays,
 }: AnalyticsReadinessInput): AnalyticsReadiness {
   validateEvidenceInput(evidenceCounts, bucketKeys)
 
-  const { bucketDays, maximumGapBuckets } =
-    getAnalyticsRangePolicy(requestedDays)
+  const policyDays =
+    requestedDays === null
+      ? Math.max(1, Math.min(availableDays ?? 0, 90))
+      : requestedDays
+  const policy = getAnalyticsRangePolicy(requestedDays ?? 90)
+  const bucketDays =
+    grouping?.unit === 'day'
+      ? grouping.step
+      : grouping?.unit === 'week'
+        ? 7
+        : policy.bucketDays
+  const maximumGapBuckets = policy.maximumGapBuckets
   const firstEvidence = evidenceCounts.findIndex((count) => count > 0)
   const effectiveCounts =
     firstEvidence === -1 ? [] : evidenceCounts.slice(firstEvidence)
@@ -51,10 +69,10 @@ export function calculateAnalyticsReadiness({
   const effectiveStart =
     firstEvidence === -1 ? null : (bucketKeys[firstEvidence] ?? null)
   const minimumAssessments = Math.ceil(
-    Math.max(12, requestedDays * 0.5, Math.min(requestedDays, 30) * 0.8),
+    Math.max(12, policyDays * 0.5, Math.min(policyDays, 30) * 0.8),
   )
   const minimumActiveBuckets = Math.ceil(
-    coverage(requestedDays) * effectiveBuckets,
+    coverage(policyDays) * effectiveBuckets,
   )
   const minimumEffectiveBuckets = getMinimumEffectiveBuckets(bucketKeys.length)
   const maximumGapRuns = Math.max(1, Math.ceil(effectiveBuckets * 0.2))
@@ -78,6 +96,9 @@ export function calculateAnalyticsReadiness({
   return {
     ready: failingReasons.length === 0,
     requestedDays,
+    ...(grouping !== undefined ? { grouping } : {}),
+    ...(availableDays !== undefined ? { availableDays } : {}),
+    ...(requestedDays === null ? { policyDays } : {}),
     bucketDays,
     requestedBuckets: bucketKeys.length,
     effectiveBuckets,
@@ -114,9 +135,6 @@ function validateEvidenceInput(
 ): void {
   if (evidenceCounts.length !== bucketKeys.length) {
     throw new RangeError('Analytics evidence keys and counts must align.')
-  }
-  if (evidenceCounts.length === 0) {
-    throw new RangeError('Analytics evidence requires at least one bucket.')
   }
   if (
     evidenceCounts.some((count) => !Number.isSafeInteger(count) || count < 0)

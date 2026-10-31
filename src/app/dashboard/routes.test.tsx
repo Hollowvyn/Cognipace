@@ -14,6 +14,7 @@ import { createLibrarySelectionTrackDraft } from '@/features/tracks'
 import { createDashboardAppShellData } from '@/testing/app-shell-fixtures'
 import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
 import type { ReadinessFailure } from '@/features/analytics/api/analytics-contracts'
+import { buildAnalyticsTimeFrame } from '@/features/analytics/domain/analytics-time'
 import {
   createProblemForEditResponse,
   createProblemLibraryResponse,
@@ -179,11 +180,7 @@ describe('dashboard routes', () => {
     ['/', 'Overview', 'What should I practice now'],
     ['/tracks', 'Tracks', 'Core interview practice'],
     ['/library', 'Library', 'Total'],
-    [
-      '/analytics',
-      'How your memory is changing',
-      'A focused view of recall, practice patterns, weak spots, and workload',
-    ],
+    ['/analytics', 'Analytics', 'Your progress, memory, and next reviews'],
     ['/settings', 'Settings', 'Daily goal'],
   ])('renders the %s route', async (path, heading, expectedCopy) => {
     renderDashboard(path)
@@ -212,10 +209,12 @@ describe('dashboard routes', () => {
   })
 
   it('updates the analytics URL and runtime request when the range changes', async () => {
-    const { router, user } = renderDashboard('/analytics?range=14')
+    const { router, user } = renderDashboard(
+      '/analytics?range=all&context=history',
+    )
 
     expect(
-      await screen.findByRole('button', { name: '14 days' }),
+      await screen.findByRole('button', { name: 'All time' }),
     ).toHaveAttribute('aria-pressed', 'true')
     expect(
       screen.getByRole('group', { name: 'Analytics time range' }),
@@ -224,7 +223,10 @@ describe('dashboard routes', () => {
     await user.click(screen.getByRole('button', { name: '90 days' }))
 
     await waitFor(() => {
-      expect(router.state.location.search).toEqual({ range: 90 })
+      expect(router.state.location.search).toEqual({
+        range: 90,
+        context: 'history',
+      })
       expect(sendMessage).toHaveBeenCalledWith('analytics.getSummary', {
         surface: 'dashboard',
         range: 90,
@@ -238,6 +240,7 @@ describe('dashboard routes', () => {
   })
 
   it('preserves analytics search context when a readiness recommendation changes the range', async () => {
+    const user = userEvent.setup()
     const readiness = {
       ...analyticsSummary.historicalReadiness.requested,
       requestedDays: 90,
@@ -257,10 +260,11 @@ describe('dashboard routes', () => {
     }
     analyticsSummary = createSerializedAnalyticsSummary({
       range: 90,
-      timeFrame: {
-        ...analyticsSummary.timeFrame,
+      timeFrame: buildAnalyticsTimeFrame({
+        asOf: new Date(analyticsSummary.timeFrame.asOf),
         requestedDays: 90,
-      },
+        timeZone: analyticsSummary.timeFrame.timeZone,
+      }),
       historicalReadiness: {
         requested: readiness,
         firstAttemptOutcomes: readiness,
@@ -278,6 +282,21 @@ describe('dashboard routes', () => {
       '/analytics?range=90&context=retention-health',
     )
 
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Performance Details' }),
+      ).toBeEnabled(),
+    )
+    const performance = within(
+      await screen.findByRole('region', { name: 'Performance' }),
+    )
+    await user.click(
+      performance.getByRole('button', { name: 'Performance Details' }),
+    )
+    await user.selectOptions(
+      performance.getByLabelText('Performance detail section'),
+      'evidence',
+    )
     const recommendation = await screen.findByRole('link', {
       name: 'Use ready 30-day view',
     })
@@ -296,41 +315,43 @@ describe('dashboard routes', () => {
     })
   })
 
-  it.each(['14', '30', '90'])(
+  it.each(['30', '90', 'all'])(
     'passes the numeric analytics range from %s URL search params',
     async (range) => {
       renderDashboard(`/analytics?range=${range}`)
 
       await screen.findByRole('heading', {
-        name: 'How your memory is changing',
+        name: 'Analytics',
       })
       await waitFor(() =>
         expect(sendMessage).toHaveBeenCalledWith('analytics.getSummary', {
           surface: 'dashboard',
-          range: Number(range),
+          range: range === 'all' ? 'all' : Number(range),
           timeZone: analyticsTimeZone,
         }),
       )
     },
   )
 
-  it.each(['/analytics', '/analytics?range=7', '/analytics?range='])(
-    'defaults malformed analytics range URL %s to 30',
-    async (path) => {
-      renderDashboard(path)
+  it.each([
+    '/analytics',
+    '/analytics?range=14',
+    '/analytics?range=7',
+    '/analytics?range=',
+  ])('defaults malformed analytics range URL %s to 30', async (path) => {
+    renderDashboard(path)
 
-      await screen.findByRole('heading', {
-        name: 'How your memory is changing',
-      })
-      await waitFor(() =>
-        expect(sendMessage).toHaveBeenCalledWith('analytics.getSummary', {
-          surface: 'dashboard',
-          range: 30,
-          timeZone: analyticsTimeZone,
-        }),
-      )
-    },
-  )
+    await screen.findByRole('heading', {
+      name: 'Analytics',
+    })
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith('analytics.getSummary', {
+        surface: 'dashboard',
+        range: 30,
+        timeZone: analyticsTimeZone,
+      }),
+    )
+  })
 
   it('renders the hidden dev smoke route without adding it to primary navigation', async () => {
     vi.mocked(sendMessage).mockImplementation((method) => {
@@ -374,6 +395,7 @@ describe('dashboard routes', () => {
     expect(sendMessage).toHaveBeenCalledWith('devSmoke.run', {
       surface: 'dashboard',
       runLiveGenAi: false,
+      includeCapacity: false,
     })
   })
 

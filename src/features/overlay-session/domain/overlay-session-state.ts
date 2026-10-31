@@ -1,5 +1,10 @@
 import type { OverlayNextStep } from '@/features/app-shell'
 import type { AssessmentLockReason } from '@/features/assessment'
+import type {
+  PracticeSaveReviewResultRequest,
+  PracticeOverrideLastReviewResultRequest,
+  SerializedPracticeDetails,
+} from '@/features/practice'
 import type { ReviewRating } from '@/lib/fsrs'
 
 export type OverlayVisualMode = 'collapsed' | 'expanded' | 'docked'
@@ -22,7 +27,21 @@ export type OverlayFeedback = {
   message: string
 }
 
+export type OverlayAcceptedCommand = (
+  | { operation: 'save'; request: PracticeSaveReviewResultRequest }
+  | { operation: 'update'; request: PracticeOverrideLastReviewResultRequest }
+) & {
+  syncToken: number
+  lockReason: AssessmentLockReason | null
+  feedback: OverlayFeedback
+}
+
 export type OverlaySubmittedSession = {
+  reviewAttemptId: string
+  revision: number
+  reviewedAt: string
+  generation: NonNullable<SerializedPracticeDetails['generation']>
+
   rating: ReviewRating
   elapsedSeconds: number | null
   isCorrect: boolean
@@ -41,8 +60,12 @@ export type OverlaySessionState = {
   expandedTab: OverlayExpandedTab
   reviewStatus: OverlayReviewStatus
   selectedRating: ReviewRating
+  previewEpoch: number
+  previewGeneration: SerializedPracticeDetails['generation']
   ratingLockReason: AssessmentLockReason | null
   submittedSession: OverlaySubmittedSession | null
+  acceptedCommand: OverlayAcceptedCommand | null
+  commandStatus: 'in-flight' | 'persistence-pending' | 'error' | null
   nextStep: OverlayNextStepState
   feedback: OverlayFeedback | null
 }
@@ -52,19 +75,26 @@ export type OverlaySessionAction =
       type: 'problem-loaded'
       problemSlug: string
       selectedRating: ReviewRating
+      previewGeneration?: SerializedPracticeDetails['generation']
     }
   | {
       type: 'problem-context-refreshed'
       problemSlug: string
       selectedRating: ReviewRating
       submittedSession: OverlaySubmittedSession | null
+      previewGeneration?: SerializedPracticeDetails['generation']
     }
   | { type: 'page-changed' }
   | { type: 'set-visual-mode'; visualMode: OverlayVisualMode }
   | { type: 'set-expanded-tab'; tab: OverlayExpandedTab }
   | { type: 'set-selected-rating'; rating: ReviewRating }
-  | { type: 'save-started' }
-  | { type: 'update-started' }
+  | { type: 'command-started'; command: OverlayAcceptedCommand }
+  | { type: 'command-pending' }
+  | {
+      type: 'command-conflicted'
+      message: string
+      previewGeneration?: SerializedPracticeDetails['generation']
+    }
   | {
       type: 'submit-succeeded'
       snapshot: OverlaySubmittedSession
@@ -93,8 +123,12 @@ export const initialOverlaySessionState: OverlaySessionState = {
   expandedTab: 'solve',
   reviewStatus: 'draft',
   selectedRating: 'good',
+  previewEpoch: 0,
+  previewGeneration: null,
   ratingLockReason: null,
   submittedSession: null,
+  acceptedCommand: null,
+  commandStatus: null,
   nextStep: createHiddenNextStepState(),
   feedback: null,
 }
@@ -109,30 +143,31 @@ export function overlaySessionReducer(
         ...initialOverlaySessionState,
         activeProblemSlug: action.problemSlug,
         selectedRating: action.selectedRating,
+        previewEpoch: state.previewEpoch + 1,
+        previewGeneration: action.previewGeneration ?? null,
       }
     case 'problem-context-refreshed':
+      // Fresh Practice context belongs to the page-sync controller. It cannot
+      // retarget this session's draft or acknowledged review.
       if (
-        state.activeProblemSlug !== action.problemSlug ||
-        state.reviewStatus === 'saving' ||
-        state.reviewStatus === 'updating' ||
-        hasSubmittedSessionChanges(state)
+        state.submittedSession ||
+        action.previewGeneration === undefined ||
+        ((action.previewGeneration?.localGenerationToken ?? null) ===
+          (state.previewGeneration?.localGenerationToken ?? null) &&
+          (action.previewGeneration?.problemGenerationToken ?? null) ===
+            (state.previewGeneration?.problemGenerationToken ?? null))
       ) {
         return state
       }
-
       return {
         ...state,
-        selectedRating:
-          action.submittedSession?.rating ?? action.selectedRating,
-        submittedSession:
-          state.submittedSession && action.submittedSession
-            ? action.submittedSession
-            : state.submittedSession,
-        ratingLockReason:
-          action.submittedSession?.lockReason ?? state.ratingLockReason,
+        previewGeneration: action.previewGeneration,
       }
     case 'page-changed':
-      return initialOverlaySessionState
+      return {
+        ...initialOverlaySessionState,
+        previewEpoch: state.previewEpoch + 1,
+      }
     case 'set-visual-mode':
       return {
         ...state,
@@ -144,7 +179,7 @@ export function overlaySessionReducer(
         expandedTab: action.tab,
       }
     case 'set-selected-rating':
-      if (state.ratingLockReason) {
+      if (state.ratingLockReason || state.acceptedCommand) {
         return state
       }
 
@@ -152,17 +187,39 @@ export function overlaySessionReducer(
         ...state,
         selectedRating: action.rating,
       })
-    case 'save-started':
+    case 'command-started':
       return {
         ...state,
-        reviewStatus: 'saving',
-        feedback: null,
+        reviewStatus:
+          action.command.operation === 'save' ? 'saving' : 'updating',
+        acceptedCommand: action.command,
+        commandStatus: 'in-flight',
+        nextStep: createHiddenNextStepState(),
+        feedback: { tone: 'neutral', message: 'Saving review...' },
       }
-    case 'update-started':
+    case 'command-pending':
       return {
         ...state,
-        reviewStatus: 'updating',
-        feedback: null,
+        visualMode: 'expanded',
+        commandStatus: 'persistence-pending',
+        feedback: {
+          tone: 'neutral',
+          message:
+            'Review persistence is pending. Retry to confirm it is saved.',
+        },
+      }
+    case 'command-conflicted':
+      return {
+        ...state,
+        previewEpoch: state.previewEpoch + 1,
+        previewGeneration:
+          action.previewGeneration === undefined
+            ? state.previewGeneration
+            : action.previewGeneration,
+        acceptedCommand: null,
+        commandStatus: null,
+        reviewStatus: state.submittedSession ? 'submitted-dirty' : 'draft',
+        feedback: { tone: 'warning', message: action.message },
       }
     case 'submit-succeeded':
       return {
@@ -174,6 +231,9 @@ export function overlaySessionReducer(
         selectedRating: action.snapshot.rating,
         ratingLockReason: action.snapshot.lockReason,
         submittedSession: action.snapshot,
+        previewGeneration: action.snapshot.generation,
+        acceptedCommand: null,
+        commandStatus: null,
         nextStep: nextStepStateFromValue(action.nextStep),
         feedback: action.feedback,
       }
@@ -184,13 +244,17 @@ export function overlaySessionReducer(
         selectedRating: action.snapshot.rating,
         ratingLockReason: action.snapshot.lockReason,
         submittedSession: action.snapshot,
+        previewGeneration: action.snapshot.generation,
+        acceptedCommand: null,
+        commandStatus: null,
         nextStep: nextStepStateFromValue(action.nextStep),
         feedback: action.feedback,
       }
     case 'mutation-failed':
       return {
         ...state,
-        reviewStatus: state.submittedSession ? 'submitted-dirty' : 'draft',
+        visualMode: 'expanded',
+        commandStatus: 'error',
         feedback: {
           tone: 'danger',
           message: action.message,
@@ -220,11 +284,13 @@ export function overlaySessionReducer(
         },
       }
     case 'restart-local-session':
+      if (state.acceptedCommand) return state
       return {
         ...state,
         expandedTab: 'solve',
         reviewStatus: 'draft',
         selectedRating: action.selectedRating,
+        previewEpoch: state.previewEpoch + 1,
         ratingLockReason: null,
         submittedSession: null,
         nextStep: createHiddenNextStepState(),

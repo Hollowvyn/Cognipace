@@ -13,6 +13,32 @@ snapshots. Always advance light → medium → heavy by successful turn count,
 including after meaningful progress, and cap successful hints at three. Retain earlier hints during edits,
 subsequent requests and failures. No hint-related persistence or review writes.
 
+## Main integration — 2026-10-31
+
+The user requested updating PR #203 with current main before merging. Merged
+`origin/main` at `b7ae5374`, including the already merged #213/#214 assessment
+recovery and feedback-first changes. The only textual conflict was in
+`docs/superpowers/README.md`; retained both branches' spec, plan and handoff
+entries, and clarified the fixed hint-strength wording. Application changes
+merged automatically. Review against main preserves the snapshot-aware hint
+feature alongside feedback-first/on-demand-code assessment behavior.
+
+- `rtk proxy npm test -- src/features/leetcode-review-assistant src/features/overlay-session src/extension/background src/lib/leetcode/editor --run`:
+  1,002 passed, 17 opted-in cases skipped; 49 files passed, three skipped.
+- `rtk proxy npx prettier --write --ignore-path /dev/null docs/superpowers/README.md`
+  and `rtk proxy git diff --check`: passed after conflict resolution.
+- `rtk proxy npm run check`: passed database check, typecheck, lint and tests;
+  4,095 passed, 18 opted-in cases skipped; 259 files passed, four skipped.
+- `rtk proxy npm run lint`, `rtk proxy npm run build` and
+  `rtk proxy npm run format`: passed. Existing chunk-size/jsdom scroll notices
+  remain. Final explicit README/handoff Prettier passed. Main was rechecked and
+  still pointed to `b7ae5374` before publication.
+
+Existing live-provider/editor and human installed-extension smoke gates remain
+pending; no new manual smoke or provider quality proof is claimed for this merge.
+The exact skipped commands/reasons below remain applicable. No schema, permission,
+secret, sync or product-scope expansion was introduced by the conflict resolution.
+
 ## Approved context optimization — 2026-10-31
 
 The user approved reducing repeated model context across the whole AI flow.

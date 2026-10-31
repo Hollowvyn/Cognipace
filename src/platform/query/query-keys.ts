@@ -1,7 +1,7 @@
 export const queryKeys = {
   analytics: {
     all: ['analytics'] as const,
-    summary: (range: 14 | 30 | 90, timeZone: string) =>
+    summary: (range: 30 | 90 | 'all', timeZone: string) =>
       [...queryKeys.analytics.all, 'summary', range, timeZone] as const,
   },
   appShell: {
@@ -10,6 +10,11 @@ export const queryKeys = {
     dashboard: () => [...queryKeys.appShell.all, 'dashboard'] as const,
     overlay: (problemSlug?: string | null) =>
       [...queryKeys.appShell.all, 'overlay', problemSlug ?? null] as const,
+  },
+  backup: {
+    all: ['backup'] as const,
+    pendingReplacement: () =>
+      [...queryKeys.backup.all, 'pending-replacement'] as const,
   },
   genai: {
     all: ['genai'] as const,
@@ -20,6 +25,8 @@ export const queryKeys = {
   },
   practice: {
     all: ['practice-details'] as const,
+    preview: (identity: string) =>
+      [...queryKeys.practice.all, 'preview', identity] as const,
     details: (problemSlug: string, at?: string | null) =>
       [...queryKeys.practice.all, problemSlug, at ?? null] as const,
   },
@@ -32,8 +39,10 @@ export const queryKeys = {
   },
   queue: {
     all: ['today-queue'] as const,
-    today: (at?: string | null) =>
-      [...queryKeys.queue.all, at ?? 'now'] as const,
+    today: (
+      at?: string | null,
+      intent: 'automatic' | 'extra-practice' = 'automatic',
+    ) => [...queryKeys.queue.all, at ?? 'now', intent] as const,
   },
   settings: {
     all: ['settings'] as const,

@@ -10,6 +10,20 @@ import {
   parseBackupFileForCurrentApp,
 } from './backup-contracts'
 
+import {
+  backupFileV1Schema,
+  backupFileV2Schema,
+  backupFileV3Schema,
+  backupFileV4Schema,
+  backupFileV5Schema,
+  type BackupFileV1,
+  type BackupFileV2,
+  type BackupFileV3,
+  type BackupFileV4,
+  type BackupFileV5,
+  type LegacyBackupFile,
+} from './backup-legacy-contracts'
+
 const timestamp = '2026-05-25T12:00:00.000Z'
 
 function createValidBackupFixture() {
@@ -67,6 +81,22 @@ function createValidBackupFixture() {
       problemTopics: [{ problemSlug: 'two-sum', topicId: 'array' }],
       problemCompanies: [{ problemSlug: 'two-sum', companyId: 'meta' }],
       practice: {
+        schedulerProfiles: [],
+        reviewEvidence: [
+          {
+            reviewAttemptId: 'attempt-1',
+            cardId: 'card-1',
+            applicationSequence: 1,
+            revision: 0,
+            sequenceSource: 'legacy-inferred',
+            schedulingEvidenceKind: 'unknown',
+            schedulerProfileId: null,
+            preCardJson: null,
+            assessmentEvidenceJson: null,
+          },
+        ],
+        generations: [],
+        commandReceipts: [],
         problemPractice: [
           {
             problemSlug: 'two-sum',
@@ -258,7 +288,7 @@ describe('backup contracts', () => {
   })
 
   it('requires an explicit boolean external-progress policy in v5', () => {
-    const fixture = createValidBackupFixture()
+    const fixture = createFrozenLegacyFixture(5)
     const track = fixture.data.tracks.tracks[0]!
     const legacyTrack = Object.fromEntries(
       Object.entries(track).filter(([key]) => key !== 'allowExternalProgress'),
@@ -289,7 +319,7 @@ describe('backup contracts', () => {
       const legacy = createLegacyBackupFixture(schemaVersion)
       const parsed = parseBackupFileForCurrentApp(legacy)
 
-      expect(parsed.schemaVersion).toBe(5)
+      expect(parsed.schemaVersion).toBe(6)
       expect(parsed.data.tracks.tracks[0]).toMatchObject({
         id: 'custom-track',
         allowExternalProgress: false,
@@ -327,13 +357,13 @@ describe('backup contracts', () => {
   )
 
   it('migrates a v3 alias key and legacy false containment into v4 typed relations', () => {
-    const fixture = createValidBackupFixture()
+    const fixture = createFrozenLegacyFixture(3)
     const v3Backup = {
       ...fixture,
       schemaVersion: 3,
       data: {
         ...fixture.data,
-        tracks: createLegacyTrackData(fixture),
+        tracks: fixture.data.tracks,
         topics: [
           ...fixture.data.topics,
           {
@@ -408,7 +438,7 @@ describe('backup contracts', () => {
       const fixture =
         version === 4
           ? createLegacyBackupFixture(4)
-          : createValidBackupFixture()
+          : createFrozenLegacyFixture(5)
       const malformed = {
         ...fixture,
         data: {
@@ -443,13 +473,13 @@ describe('backup contracts', () => {
   })
 
   it('normalizes v2 backups through the v4 topic graph format', () => {
-    const fixture = createValidBackupFixture()
+    const fixture = createFrozenLegacyFixture(2)
     const v2Backup = {
       ...fixture,
       schemaVersion: 2,
       data: {
         ...fixture.data,
-        tracks: createLegacyTrackData(fixture),
+        tracks: fixture.data.tracks,
         topics: [{ id: 'array', label: 'Array' }],
         topicAliases: undefined,
         topicRelations: undefined,
@@ -478,15 +508,15 @@ describe('backup contracts', () => {
   })
 
   it('normalizes v1 track progress rows through the v4 topic graph format', () => {
-    const fixture = createValidBackupFixture()
+    const fixture = createFrozenLegacyFixture(1)
     const v1Backup = {
       ...fixture,
       schemaVersion: 1,
       data: {
-        ...createLegacyBackupData(fixture),
+        ...fixture.data,
         topics: [{ id: 'array', label: 'Array' }],
         tracks: {
-          ...createLegacyTrackData(fixture),
+          ...fixture.data.tracks,
           progress: [
             {
               trackGroupId: 'custom-track:arrays',
@@ -518,15 +548,15 @@ describe('backup contracts', () => {
   })
 
   it('rejects v1 progress rows that reference a missing track group', () => {
-    const fixture = createValidBackupFixture()
+    const fixture = createFrozenLegacyFixture(1)
     const v1Backup = {
       ...fixture,
       schemaVersion: 1,
       data: {
-        ...createLegacyBackupData(fixture),
+        ...fixture.data,
         topics: [{ id: 'array', label: 'Array' }],
         tracks: {
-          ...createLegacyTrackData(fixture),
+          ...fixture.data.tracks,
           progress: [
             {
               trackGroupId: 'missing-group',
@@ -731,78 +761,451 @@ describe('backup contracts', () => {
   )
 })
 
-function createLegacyBackupData(
-  backup: ReturnType<typeof createValidBackupFixture>,
-) {
-  return {
-    problems: backup.data.problems,
-    topics: backup.data.topics.map(({ id, label }) => ({ id, label })),
-    companies: backup.data.companies,
-    problemTopics: backup.data.problemTopics,
-    problemCompanies: backup.data.problemCompanies,
-    practice: backup.data.practice,
-    tracks: createLegacyTrackData(backup),
-    settings: backup.data.settings,
-  }
-}
-
-function createLegacyTrackData(
-  backup: ReturnType<typeof createValidBackupFixture>,
-) {
-  return {
-    ...backup.data.tracks,
-    tracks: backup.data.tracks.tracks.map((track) =>
-      Object.fromEntries(
-        Object.entries(track).filter(
-          ([key]) => key !== 'allowExternalProgress',
-        ),
-      ),
-    ),
-  }
-}
-
 function createLegacyBackupFixture(schemaVersion: 1 | 2 | 3 | 4) {
-  const fixture = createValidBackupFixture()
-  const data = {
-    ...fixture.data,
-    tracks: createLegacyTrackData(fixture),
-    ...(schemaVersion <= 2
-      ? {
-          topics: fixture.data.topics.map(({ id, label }) => ({ id, label })),
-          topicAliases: undefined,
-          topicRelations: undefined,
-        }
-      : schemaVersion === 3
-        ? {
-            topicRelations: fixture.data.topicRelations.map((edge) => ({
-              parentTopicId: edge.targetTopicId,
-              childTopicId: edge.sourceTopicId,
-              createdAt: edge.createdAt,
-              updatedAt: edge.updatedAt,
-            })),
-          }
-        : {}),
-  }
+  return createFrozenLegacyFixture(schemaVersion)
+}
 
-  return {
-    ...fixture,
-    schemaVersion,
+function createFrozenLegacyData() {
+  const backup: BackupFileV5 = {
+    schemaVersion: 5,
+    app: 'cognipace',
+    exportedAt: timestamp,
+    source: {
+      appVersion: '0.0.0',
+    },
     data: {
-      ...data,
-      tracks: {
-        ...data.tracks,
-        progress:
-          schemaVersion === 1
-            ? fixture.data.tracks.progress.map((row) => ({
-                trackGroupId: 'custom-track:arrays',
-                problemSlug: row.problemSlug,
-                completedAt: row.completedAt,
-                completedRating: row.completedRating,
-                createdAt: row.createdAt,
-                updatedAt: row.updatedAt,
-              }))
-            : data.tracks.progress,
+      problems: [
+        {
+          slug: 'two-sum',
+          title: 'Two Sum',
+          difficulty: 'easy',
+          isPremium: false,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+      topics: [
+        {
+          id: 'array',
+          label: 'Array',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+        {
+          id: 'hash-table',
+          label: 'Hash Table',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+      topicAliases: [
+        {
+          aliasKey: 'custom hash',
+          label: 'Custom Hash',
+          topicId: 'hash-table',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+      topicRelations: [
+        {
+          sourceTopicId: 'hash-table',
+          targetTopicId: 'array',
+          kind: 'broader',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+      companies: [{ id: 'meta', label: 'Meta' }],
+      problemTopics: [{ problemSlug: 'two-sum', topicId: 'array' }],
+      problemCompanies: [{ problemSlug: 'two-sum', companyId: 'meta' }],
+      practice: {
+        problemPractice: [
+          {
+            problemSlug: 'two-sum',
+            status: 'suspended',
+            firstSeenAt: timestamp,
+            lastSeenAt: timestamp,
+            lastReviewedAt: timestamp,
+            lastRating: 'good',
+            lastElapsedSeconds: 600,
+            bestElapsedSeconds: 600,
+            interviewPattern: 'hash-map',
+            timeComplexity: 'O(n)',
+            spaceComplexity: 'O(n)',
+            languages: 'TypeScript',
+            notes: 'review note',
+            solvedCount: 1,
+            attemptCount: 1,
+            isSuspended: true,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+        fsrsCards: [
+          {
+            id: ' opaque/card:δ ',
+            problemSlug: 'two-sum',
+            cardKind: 'default',
+            dueAt: timestamp,
+            stability: 2.5,
+            difficulty: 4.5,
+            elapsedDays: 0,
+            scheduledDays: 1,
+            learningSteps: 0,
+            reps: 1,
+            lapses: 0,
+            state: 'review',
+            lastReviewAt: timestamp,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+        reviewAttempts: [
+          {
+            id: 'attempt-1',
+            problemSlug: 'two-sum',
+            cardId: ' opaque/card:δ ',
+            rating: 'good',
+            reviewMode: 'manual',
+            reviewedAt: timestamp,
+            elapsedSeconds: 600,
+            isCorrect: true,
+            interviewPattern: 'hash-map',
+            timeComplexity: 'O(n)',
+            spaceComplexity: 'O(n)',
+            languages: 'TypeScript',
+            notes: 'review note',
+            fsrsReviewLog: null,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
       },
+      tracks: {
+        tracks: [
+          {
+            id: 'custom-track',
+            slug: 'custom-track',
+            title: 'Custom Track',
+            description: 'A local track',
+            dueAt: null,
+            allowExternalProgress: true,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+        groups: [
+          {
+            id: 'custom-track:arrays',
+            trackId: 'custom-track',
+            title: 'Arrays',
+            position: 1,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+        memberships: [
+          {
+            trackGroupId: 'custom-track:arrays',
+            problemSlug: 'two-sum',
+            position: 1,
+          },
+        ],
+        progress: [
+          {
+            trackId: 'custom-track',
+            problemSlug: 'two-sum',
+            reviewAttemptId: null,
+            completedAt: timestamp,
+            completedRating: 'good',
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+        session: [
+          {
+            id: 'active',
+            activeTrackId: 'custom-track',
+            activeGroupId: 'custom-track:arrays',
+            startedAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+      },
+      settings: [
+        {
+          key: 'user-settings',
+          value:
+            '{ "schemaVersion": 1, "practice": { "dailyGoal": 5, "mode": "studyPlan", "problemFilters": { "skipPremium": true } }, "review": { "targetRetention": 0.75, "order": "dueFirst" }, "assessment": { "requireSolveTime": false, "strictTiming": false, "timeTargetsMinutes": { "easy": 15, "medium": 30, "hard": 45 } }, "overlay": { "autoDetectSolved": true }, "reminders": { "daily": { "enabled": false, "time": "09:00" } } }',
+          updatedAt: timestamp,
+        },
+      ],
     },
   }
+  const practice = backup.data.practice
+  const attempt = practice.reviewAttempts[0]!
+  practice.reviewAttempts = [
+    {
+      ...attempt,
+      id: 'ä',
+      rating: 'hard',
+      updatedAt: '2026-06-01T12:00:00.000Z',
+      fsrsReviewLog:
+        '{ "reviewedAt": "2026-05-25T12:00:00.000Z", "rating": "hard", "state": "new", "dueAt": "2026-05-25T12:00:00.000Z", "stability": 0, "difficulty": 0, "elapsedDays": 0, "lastElapsedDays": 0, "scheduledDays": 0, "learningSteps": 0 }',
+    },
+    { ...attempt, id: 'z', createdAt: '2026-05-26T12:00:00.000Z' },
+    { ...attempt, id: 'A', reviewedAt: '2026-05-24T12:00:00.000Z' },
+  ]
+  practice.fsrsCards.push({
+    ...practice.fsrsCards[0]!,
+    id: 'opaque/new:card',
+    problemSlug: 'new-problem',
+    stability: 0,
+    difficulty: 0,
+    elapsedDays: 0,
+    scheduledDays: 0,
+    learningSteps: 0,
+    reps: 0,
+    lapses: 0,
+    state: 'new',
+    lastReviewAt: null,
+  })
+  backup.data.problems.push({
+    ...backup.data.problems[0]!,
+    slug: 'new-problem',
+  })
+  return backup.data
 }
+
+// Each object declares its shipped numeric version and Practice has only its
+// original three arrays. None is produced from the mutable current builder.
+function createFrozenLegacyFixture(version: 1): BackupFileV1
+function createFrozenLegacyFixture(version: 2): BackupFileV2
+function createFrozenLegacyFixture(version: 3): BackupFileV3
+function createFrozenLegacyFixture(version: 4): BackupFileV4
+function createFrozenLegacyFixture(version: 5): BackupFileV5
+function createFrozenLegacyFixture(version: 1 | 2 | 3 | 4 | 5): LegacyBackupFile
+function createFrozenLegacyFixture(
+  version: 1 | 2 | 3 | 4 | 5,
+): LegacyBackupFile {
+  const data = createFrozenLegacyData()
+  const track = data.tracks.tracks[0]!
+  const legacyTrack = {
+    id: track.id,
+    slug: track.slug,
+    title: track.title,
+    description: track.description,
+    dueAt: track.dueAt,
+    createdAt: track.createdAt,
+    updatedAt: track.updatedAt,
+  }
+  const v2Data = {
+    problems: data.problems,
+    companies: data.companies,
+    problemTopics: data.problemTopics,
+    problemCompanies: data.problemCompanies,
+    practice: data.practice,
+    settings: data.settings,
+  }
+  const v2 = {
+    ...v2Data,
+    topics: data.topics.map(({ id, label }) => ({ id, label })),
+    tracks: { ...data.tracks, tracks: [legacyTrack] },
+  }
+  const envelope = {
+    app: 'cognipace' as const,
+    exportedAt: timestamp,
+    source: { appVersion: '0.0.0' },
+  }
+  switch (version) {
+    case 1:
+      return {
+        ...envelope,
+        schemaVersion: 1,
+        data: {
+          ...v2,
+          tracks: {
+            ...v2.tracks,
+            progress: [
+              {
+                trackGroupId: 'custom-track:arrays',
+                problemSlug: 'two-sum',
+                completedAt: timestamp,
+                completedRating: 'good',
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+            ],
+          },
+        },
+      }
+    case 2:
+      return { ...envelope, schemaVersion: 2, data: v2 }
+    case 3:
+      return {
+        ...envelope,
+        schemaVersion: 3,
+        data: {
+          ...data,
+          tracks: v2.tracks,
+          topicRelations: data.topicRelations.map((edge) => ({
+            parentTopicId: edge.targetTopicId,
+            childTopicId: edge.sourceTopicId,
+            createdAt: edge.createdAt,
+            updatedAt: edge.updatedAt,
+          })),
+        },
+      }
+    case 4:
+      return {
+        ...envelope,
+        schemaVersion: 4,
+        data: { ...data, tracks: v2.tracks },
+      }
+    case 5:
+      return { ...envelope, schemaVersion: 5, data }
+  }
+}
+
+describe('frozen legacy backup normalization', () => {
+  it.each([
+    [1, backupFileV1Schema],
+    [2, backupFileV2Schema],
+    [3, backupFileV3Schema],
+    [4, backupFileV4Schema],
+    [5, backupFileV5Schema],
+  ] as const)(
+    'keeps the shipped v%s file parser independently strict',
+    (version, schema) => {
+      const legacy = createFrozenLegacyFixture(version)
+      expect(schema.safeParse(legacy).success).toBe(true)
+      expect(schema.safeParse({ ...legacy, unknown: true }).success).toBe(false)
+      expect(
+        schema.safeParse({
+          ...legacy,
+          data: {
+            ...legacy.data,
+            practice: {
+              ...legacy.data.practice,
+              reviewAttempts: legacy.data.practice.reviewAttempts.map(
+                (row) => ({ ...row, revision: 0 }),
+              ),
+            },
+          },
+        }).success,
+      ).toBe(false)
+    },
+  )
+
+  it('activates v6 as the current strict export format', () => {
+    expect(backupSchemaVersion).toBe(6)
+  })
+
+  it.each([1, 2, 3, 4, 5] as const)(
+    'normalizes genuine v%s into detached deterministic unknown evidence',
+    (version) => {
+      const legacy = createFrozenLegacyFixture(version)
+      const original = structuredClone(legacy)
+      const normalized = parseBackupFileForCurrentApp(legacy)
+      expect(normalized.schemaVersion).toBe(6)
+      expect(normalized.data.practice.problemPractice).toEqual(
+        legacy.data.practice.problemPractice,
+      )
+      expect(normalized.data.practice.fsrsCards).toEqual(
+        legacy.data.practice.fsrsCards,
+      )
+      expect(normalized.data.practice.reviewAttempts).toEqual(
+        legacy.data.practice.reviewAttempts,
+      )
+      expect(normalized.data.settings).toEqual(legacy.data.settings)
+      expect(JSON.parse(normalized.data.settings[0]!.value)).toMatchObject({
+        review: { targetRetention: 0.75 },
+      })
+      expect(normalized.data.practice).toMatchObject({
+        schedulerProfiles: [],
+        generations: [],
+        commandReceipts: [],
+      })
+      expect(normalized.data.practice.reviewEvidence).toEqual(
+        ['A', 'z', 'ä'].map((id, index) => ({
+          reviewAttemptId: id,
+          cardId: ' opaque/card:δ ',
+          applicationSequence: index + 1,
+          revision: 0,
+          sequenceSource: 'legacy-inferred',
+          schedulingEvidenceKind: 'unknown',
+          schedulerProfileId: null,
+          preCardJson: null,
+          assessmentEvidenceJson: null,
+        })),
+      )
+      expect(normalized.data.tracks.tracks[0]?.allowExternalProgress).toBe(
+        version === 5,
+      )
+      expect(normalized.data.tracks.progress[0]).toMatchObject({
+        trackId: 'custom-track',
+        completedAt: timestamp,
+        completedRating: 'good',
+      })
+      expect(normalized).toEqual(parseBackupFileForCurrentApp(legacy))
+      expect(legacy).toEqual(original)
+      normalized.data.practice.fsrsCards[0]!.id = 'changed'
+      normalized.data.practice.reviewAttempts[0]!.notes = 'changed'
+      normalized.data.settings[0]!.value = 'changed'
+      expect(legacy).toEqual(original)
+    },
+  )
+
+  it.each([1, 2, 3, 4, 5] as const)(
+    'rejects v6 metadata supplied in strict v%s Practice',
+    (version) => {
+      const legacy = createFrozenLegacyFixture(version)
+      for (const name of [
+        'schedulerProfiles',
+        'reviewEvidence',
+        'generations',
+        'commandReceipts',
+      ]) {
+        expect(() =>
+          parseBackupFileForCurrentApp({
+            ...legacy,
+            data: {
+              ...legacy.data,
+              practice: { ...legacy.data.practice, [name]: [] },
+            },
+          }),
+        ).toThrow()
+      }
+    },
+  )
+
+  it('requires all four metadata arrays in a genuine v6 file', () => {
+    const v5 = createFrozenLegacyFixture(5)
+    const v6 = {
+      ...v5,
+      schemaVersion: 6,
+      data: {
+        ...v5.data,
+        practice: {
+          ...v5.data.practice,
+          schedulerProfiles: [],
+          reviewEvidence: [],
+          generations: [],
+          commandReceipts: [],
+        },
+      },
+    }
+    expect(backupFileSchema.safeParse(v6).success).toBe(true)
+    for (const name of [
+      'schedulerProfiles',
+      'reviewEvidence',
+      'generations',
+      'commandReceipts',
+    ]) {
+      const missing = structuredClone(v6)
+      Reflect.deleteProperty(missing.data.practice, name)
+      expect(backupFileSchema.safeParse(missing).success).toBe(false)
+    }
+  })
+})

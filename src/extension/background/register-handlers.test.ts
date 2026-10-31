@@ -1,3 +1,4 @@
+import { implementationIdentity } from '@/features/leetcode-review-assistant/api/code-implementation-contracts'
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 
 import {
@@ -27,7 +28,7 @@ import {
 } from '@/features/leetcode-review-assistant/api/code-analysis-contracts'
 import {
   makeAnalysisRequest,
-  makeValidAnalysis,
+  makeValidFeedback,
 } from '@/features/leetcode-review-assistant/testing/code-analysis-fixtures'
 import { AiDeadlineError, withAiDeadline } from '@/lib/ai/operation'
 import {
@@ -42,9 +43,11 @@ import {
 } from '@/features/backup/api/backup-contracts'
 import { analyticsSummarySchema } from '@/features/analytics/api/analytics-contracts'
 import { defaultUserSettings } from '@/features/settings/domain'
+import { practiceReviewCommandResultSchema } from '@/features/practice/api/practice-contracts'
 import type { ActiveTrack } from '@/features/tracks/domain'
 import { createSerializedPracticeDetails } from '@/testing/practice-fixtures'
 import { createSerializedAnalyticsSummary } from '@/testing/analytics-fixtures'
+import { buildAnalyticsTimeFrame } from '@/features/analytics/domain/analytics-time'
 import {
   createProblemForEditResponse,
   createProblemLibraryResponse,
@@ -110,6 +113,7 @@ const backgroundMocks = vi.hoisted(() => {
     backupExportFullBackup: vi.fn(),
     backupResetLocalData: vi.fn(),
     backupRestoreFullBackup: vi.fn(),
+    backupPrepareFullBackupRestore: vi.fn(),
     backupValidateFullBackup: vi.fn(),
     broadcastCacheInvalidation: vi.fn(),
     getAnalyticsSummary: vi.fn(),
@@ -127,6 +131,8 @@ const backgroundMocks = vi.hoisted(() => {
     deleteTrack: vi.fn(),
     bulkUpdateProblems: vi.fn(),
     getPracticeDetails: vi.fn(),
+    previewPracticeReview: vi.fn(),
+    executePracticeReviewCommand: vi.fn(),
     getTrackForEdit: vi.fn(),
     getWorkspace: vi.fn(),
     recordActiveTrackProblemCompletion: vi.fn(),
@@ -143,6 +149,10 @@ const backgroundMocks = vi.hoisted(() => {
     getAiProviderSecretPresence: vi.fn(),
     getAiHintConnectionStatus: vi.fn(),
     generateLeetCodeHintsInBackground: vi.fn(),
+    generateLeetCodeImplementationInBackground:
+      vi.fn<
+        (typeof import('@/features/leetcode-review-assistant/server/implementation-runtime-service'))['generateLeetCodeImplementationInBackground']
+      >(),
     setAiProviderSecret: vi.fn(),
     clearAiProviderSecret: vi.fn(),
     loadActiveProviderConfig: vi.fn(),
@@ -260,7 +270,8 @@ vi.mock('@/lib/ai', async (importOriginal) => ({
 vi.mock('@/features/backup/server/backup-service', () => ({
   exportFullBackup: backgroundMocks.backupExportFullBackup,
   resetLocalData: backgroundMocks.backupResetLocalData,
-  restoreFullBackup: backgroundMocks.backupRestoreFullBackup,
+  restorePreparedFullBackup: backgroundMocks.backupRestoreFullBackup,
+  prepareFullBackupRestore: backgroundMocks.backupPrepareFullBackupRestore,
   validateFullBackup: backgroundMocks.backupValidateFullBackup,
 }))
 
@@ -275,6 +286,9 @@ vi.mock(
     return {
       ...actual,
       getPracticeDetails: backgroundMocks.getPracticeDetails,
+      previewPracticeReview: backgroundMocks.previewPracticeReview,
+      executePracticeReviewCommand:
+        backgroundMocks.executePracticeReviewCommand,
       overrideLastReviewResultWithTrackProgress:
         backgroundMocks.overrideLastReviewResultWithTrackProgress,
       overrideLastReviewResult: backgroundMocks.overrideLastReviewResult,
@@ -361,6 +375,14 @@ vi.mock(
 )
 
 vi.mock(
+  '@/features/leetcode-review-assistant/server/implementation-runtime-service',
+  () => ({
+    generateLeetCodeImplementationInBackground:
+      backgroundMocks.generateLeetCodeImplementationInBackground,
+  }),
+)
+
+vi.mock(
   '@/features/leetcode-review-assistant/server/hint-runtime-service',
   () => ({
     generateLeetCodeHintsInBackground:
@@ -397,6 +419,12 @@ describe('background handler registration', () => {
     vi.useFakeTimers()
     backgroundMocks.handlers.clear()
     vi.clearAllMocks()
+    backgroundMocks.backupPrepareFullBackupRestore.mockImplementation(
+      (input: unknown) => {
+        const backup = backupFileSchema.parse(input)
+        return { data: backup.data, summary: createBackupSummary(backup) }
+      },
+    )
     backgroundMocks.broadcastCacheInvalidation.mockResolvedValue(null)
     backgroundMocks.previewContentImport.mockResolvedValue({
       status: 'ready',
@@ -434,16 +462,28 @@ describe('background handler registration', () => {
       },
     })
     backgroundMocks.getAnalyticsSummary.mockResolvedValue({
-      ...createSerializedAnalyticsSummary(),
+      ...createSerializedAnalyticsSummary({
+        timeFrame: buildAnalyticsTimeFrame({
+          asOf: new Date('2026-01-15T12:00:00Z'),
+          requestedDays: 30,
+          timeZone: 'UTC',
+        }),
+      }),
       range: 30,
       generatedAt: '2026-01-15T12:00:00.000Z',
-      timeFrame: {
-        ...createSerializedAnalyticsSummary().timeFrame,
-        asOf: '2026-01-15T12:00:00.000Z',
-        requestedDays: 30,
-      },
       reviewDays: 3,
       totalReviews: 12,
+      activity: {
+        assessmentDays: 3,
+        recordedAssessments: 12,
+        knownCorrectnessAssessments: 10,
+        successfulAssessments: 9,
+        distinctSuccessfulProblems: 4,
+        observedCorrectness: 0.9,
+        timedSuccessfulAssessments: 3,
+        untimedSuccessfulAssessments: 6,
+        successfulRecordedSeconds: 360,
+      },
       currentStreak: 2,
       observedRatingQuality: 0.75,
       observedRatingQualityLabel: '75%',
@@ -482,6 +522,9 @@ describe('background handler registration', () => {
     backgroundMocks.createTrack.mockResolvedValue(trackForEditResponse)
     backgroundMocks.deleteTrack.mockResolvedValue(undefined)
     backgroundMocks.bulkUpdateProblems.mockResolvedValue(undefined)
+    backgroundMocks.executePracticeReviewCommand.mockResolvedValue(
+      commandResult,
+    )
     backgroundMocks.getPracticeDetails.mockResolvedValue(practiceDetails)
     backgroundMocks.getTrackForEdit.mockResolvedValue(trackForEditResponse)
     backgroundMocks.getWorkspace.mockResolvedValue(trackWorkspaceResponse)
@@ -618,7 +661,14 @@ describe('background handler registration', () => {
     )
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
+    backgroundMocks.markSyncLocalDataChanged.mockResolvedValue(
+      cleanSyncMetadata,
+    )
+    backgroundMocks.assertCanSenderCallExtensionMethod.mockReset()
+    const retry = backgroundMocks.handlers.get('backup.retryPendingReplacement')
+    await retry?.({ data: { surface: 'dashboard' }, sender: extensionSender })
     abortLeetCodeAnalyses()
     abortLeetCodeHints()
     vi.clearAllTimers()
@@ -847,6 +897,103 @@ describe('background handler registration', () => {
     })
   })
 
+  describe('explicit implementation handlers', () => {
+    const request = {
+      surface: 'content-script' as const,
+      requestId: 'code-1',
+      assessmentRequestId: 'request-1',
+      host: 'leetcode.com' as const,
+      assessment: makeAnalysisRequest(),
+      feedback: makeValidFeedback(),
+    }
+    const sender = {
+      tab: { id: 7 },
+      frameId: 0,
+      url: 'https://leetcode.com/problems/two-sum/',
+    }
+    beforeEach(async () => {
+      const policy =
+        await vi.importActual<typeof import('./runtime-policy')>(
+          './runtime-policy',
+        )
+      backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementation(
+        policy.assertCanSenderCallExtensionMethod,
+      )
+      backgroundMocks.generateLeetCodeImplementationInBackground
+        .mockReset()
+        .mockImplementation((input) =>
+          Promise.resolve({
+            status: 'ready',
+            ...implementationIdentity(input),
+            report: {
+              version: 'leetcode-code-implementation-v1',
+              status: 'unavailable',
+              reason: 'Missing complete callable signature.',
+            },
+            providerMetadata: {
+              provider: 'gemini',
+              model: 'fixture',
+              durationMs: 1,
+            },
+          }),
+        )
+    })
+    it('authorizes the actual host and slug without worker-completed state or persistence', async () => {
+      const value = await sendRuntimeMessage(
+        'genai.generateLeetCodeImplementation',
+        request,
+        sender,
+      )
+      expect(value).toMatchObject({
+        status: 'ready',
+        ...implementationIdentity(request),
+      })
+      expect(
+        backgroundMocks.generateLeetCodeImplementationInBackground,
+      ).toHaveBeenCalledWith(
+        request,
+        expect.any(Function),
+        expect.any(AbortSignal),
+      )
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+      expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+      expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.executePracticeReviewCommand,
+      ).not.toHaveBeenCalled()
+      await expect(
+        sendRuntimeMessage(
+          'genai.generateLeetCodeImplementation',
+          { ...request, host: 'www.leetcode.com', requestId: 'code-www' },
+          { ...sender, url: 'https://www.leetcode.com/problems/two-sum/' },
+        ),
+      ).resolves.toMatchObject({ status: 'ready' })
+    })
+    it('rejects wrong actual hosts/slugs and mismatched assessment IDs before generation', () => {
+      for (const url of [
+        'https://example.com/problems/two-sum/',
+        'https://leetcode.com/problems/other-problem/',
+        'https://www.leetcode.com/problems/two-sum/',
+      ])
+        expect(() =>
+          sendRuntimeMessage('genai.generateLeetCodeImplementation', request, {
+            ...sender,
+            url,
+          }),
+        ).toThrow()
+      expect(() =>
+        sendRuntimeMessage(
+          'genai.generateLeetCodeImplementation',
+          { ...request, assessmentRequestId: 'unrelated' },
+          sender,
+        ),
+      ).toThrow()
+      expect(
+        backgroundMocks.generateLeetCodeImplementationInBackground,
+      ).not.toHaveBeenCalled()
+    })
+  })
+
   describe('sender-owned submission analysis handlers', () => {
     const sender = {
       tab: { id: 7 },
@@ -857,7 +1004,7 @@ describe('background handler registration', () => {
     const ready = (): AnalyzeLeetCodeSubmissionResponse => ({
       status: 'ready',
       ...analysisIdentity(request),
-      report: makeValidAnalysis(),
+      report: makeValidFeedback(),
       providerMetadata: {
         provider: 'openai',
         model: 'gpt-test',
@@ -1169,6 +1316,12 @@ describe('background handler registration', () => {
       generatedAt: '2026-01-15T12:00:00.000Z',
       reviewDays: 3,
       totalReviews: 12,
+      activity: {
+        recordedAssessments: 12,
+        knownCorrectnessAssessments: 10,
+        observedCorrectness: 0.9,
+        successfulRecordedSeconds: 360,
+      },
       currentStreak: 2,
       observedRatingQuality: {
         value: 0.75,
@@ -1191,22 +1344,22 @@ describe('background handler registration', () => {
   it('passes range without an undefined now option when at is absent', async () => {
     await sendRuntimeMessage('analytics.getSummary', {
       surface: 'dashboard',
-      range: 14,
+      range: 30,
       timeZone: 'UTC',
     })
 
     expect(backgroundMocks.getAnalyticsSummary).toHaveBeenCalledWith(
       backgroundMocks.db,
-      { range: 14, timeZone: 'UTC' },
+      { range: 30, timeZone: 'UTC' },
     )
   })
 
   it('preserves requested timezone grouping across a DST boundary', async () => {
     const fixture = createSerializedAnalyticsSummary({
-      range: 14,
+      range: 30,
       timeFrame: {
         ...createSerializedAnalyticsSummary().timeFrame,
-        requestedDays: 14,
+        requestedDays: 30,
       },
       historicalReadiness: createReadyHistoricalReadiness(),
       views: {
@@ -1232,7 +1385,7 @@ describe('background handler registration', () => {
 
     const response = await sendRuntimeMessage('analytics.getSummary', {
       surface: 'dashboard',
-      range: 14,
+      range: 30,
       timeZone: 'America/New_York',
       at: '2026-03-08T05:30:00.000Z',
     })
@@ -1240,14 +1393,14 @@ describe('background handler registration', () => {
     expect(backgroundMocks.getAnalyticsSummary).toHaveBeenCalledWith(
       backgroundMocks.db,
       {
-        range: 14,
+        range: 30,
         now: new Date('2026-03-08T05:30:00.000Z'),
         timeZone: 'America/New_York',
       },
     )
     const parsed = analyticsSummarySchema.parse(response)
 
-    expect(parsed.range).toBe(14)
+    expect(parsed.range).toBe(30)
     expect(parsed.views.upcomingReviewLoad.rows[0]).toMatchObject({
       date: '2026-03-08',
       dueCount: 1,
@@ -1257,16 +1410,29 @@ describe('background handler registration', () => {
 
   it('does not expose low-sample observed rating quality as 0%', async () => {
     backgroundMocks.getAnalyticsSummary.mockResolvedValueOnce({
-      ...createSerializedAnalyticsSummary(),
+      ...createSerializedAnalyticsSummary({
+        range: 90,
+        timeFrame: buildAnalyticsTimeFrame({
+          asOf: new Date('2026-01-15T12:00:00Z'),
+          requestedDays: 90,
+          timeZone: 'UTC',
+        }),
+      }),
       range: 90,
       generatedAt: '2026-01-15T12:00:00.000Z',
-      timeFrame: {
-        ...createSerializedAnalyticsSummary().timeFrame,
-        asOf: '2026-01-15T12:00:00.000Z',
-        requestedDays: 90,
-      },
       reviewDays: 3,
       totalReviews: 4,
+      activity: {
+        assessmentDays: 3,
+        recordedAssessments: 4,
+        knownCorrectnessAssessments: 0,
+        successfulAssessments: 0,
+        distinctSuccessfulProblems: null,
+        observedCorrectness: null,
+        timedSuccessfulAssessments: 0,
+        untimedSuccessfulAssessments: 0,
+        successfulRecordedSeconds: null,
+      },
       currentStreak: 1,
       observedRatingQuality: null,
       observedRatingQualityLabel: '—',
@@ -1307,10 +1473,11 @@ describe('background handler registration', () => {
   it('serializes current and forecast analytics when the selected historical range is unready', async () => {
     const fixture = createSerializedAnalyticsSummary({
       range: 90,
-      timeFrame: {
-        ...createSerializedAnalyticsSummary().timeFrame,
+      timeFrame: buildAnalyticsTimeFrame({
+        asOf: new Date('2026-05-30T00:00:00Z'),
         requestedDays: 90,
-      },
+        timeZone: 'UTC',
+      }),
       historicalReadiness: {
         ...createSerializedAnalyticsSummary().historicalReadiness,
         requested: {
@@ -1381,12 +1548,80 @@ describe('background handler registration', () => {
       'genai.config',
       'genai.live',
     ])
+    expect(report.capacity).toBeUndefined()
     expect(
       report.checks.find((check) => check.id === 'notifications'),
     ).toMatchObject({
       status: 'pass',
       detail: 'Would send a 09:00 reminder for 1 due review.',
     })
+  })
+
+  it('returns storage byte counts only when capacity is requested', async () => {
+    const getBytesInUse = vi.fn((key: string | null) =>
+      Promise.resolve(
+        key === null ? 900 : key === 'cognipace_db_snapshot_v1' ? 500 : 20,
+      ),
+    )
+    const set = vi.fn()
+    vi.stubGlobal('chrome', {
+      storage: { local: { QUOTA_BYTES: 1000, getBytesInUse, set } },
+    })
+
+    const response = await sendRuntimeMessage('devSmoke.run', {
+      surface: 'dashboard',
+      includeCapacity: true,
+      runLiveGenAi: false,
+    })
+    const report = devSmokeReportSchema.parse(response)
+
+    expect(report.capacity).toMatchObject({
+      status: 'available',
+      storage: {
+        totalBytes: 900,
+        quotaBytes: 1000,
+        headroomBytes: 100,
+        activeSnapshotBytes: 500,
+      },
+    })
+    expect(getBytesInUse).toHaveBeenCalledTimes(6)
+    expect(set).not.toHaveBeenCalled()
+    expect(backgroundMocks.generateJson).not.toHaveBeenCalled()
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('keeps a capacity read on the shared gate before a review save', async () => {
+    let finishStorageRead: ((bytes: number) => void) | undefined
+    const pendingStorageRead = new Promise<number>((resolve) => {
+      finishStorageRead = resolve
+    })
+    const getBytesInUse = vi.fn((key: string | null) =>
+      key === null ? pendingStorageRead : Promise.resolve(0),
+    )
+    vi.stubGlobal('chrome', {
+      storage: { local: { QUOTA_BYTES: 1000, getBytesInUse } },
+    })
+
+    const smoke = sendRuntimeMessage('devSmoke.run', {
+      surface: 'dashboard',
+      includeCapacity: true,
+    })
+    await vi.waitFor(() => expect(getBytesInUse).toHaveBeenCalled())
+    const save = sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    await Promise.resolve()
+
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
+    finishStorageRead?.(100)
+    await smoke
+    await save
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
   })
 
   it('reports the selected GenAI provider and model when the secret is missing', async () => {
@@ -2232,9 +2467,14 @@ describe('background handler registration', () => {
     expectRuntimePolicy('backup.restoreFullBackup', 'dashboard')
     expect(backgroundMocks.backupRestoreFullBackup).toHaveBeenCalledWith(
       backgroundMocks.db,
-      validBackup,
+      { data: validBackup.data, summary: validBackupSummary },
     )
-    expect(response).toEqual(validBackupSummary)
+    expect(response).toEqual({
+      status: 'durable',
+      syncMetadataPending: false,
+      kind: 'restore',
+      summary: validBackupSummary,
+    })
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
       reason: 'problem-catalog-updated',
       source: 'dashboard',
@@ -2257,7 +2497,12 @@ describe('background handler registration', () => {
       surface: 'dashboard',
     })
 
-    expect(response).toBeNull()
+    expect(response).toEqual({
+      status: 'durable',
+      syncMetadataPending: false,
+      kind: 'reset',
+      summary: null,
+    })
     expectRuntimePolicy('backup.resetLocalData', 'dashboard')
     expect(backgroundMocks.backupResetLocalData).toHaveBeenCalledWith(
       backgroundMocks.db,
@@ -2277,6 +2522,414 @@ describe('background handler registration', () => {
       ],
     })
     expectFlushBeforeBroadcast()
+  })
+
+  it('authenticates narrow recovery endpoints before access and rejects callbacks or forged surfaces', async () => {
+    const status = readRegisteredHandler('backup.getPendingReplacement')
+    const retry = backgroundMocks.handlers.get(
+      'backup.retryPendingReplacement',
+    )!
+    backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementationOnce(
+      () => {
+        throw new Error('forged sender')
+      },
+    )
+    expect(() =>
+      status({ data: { surface: 'dashboard' }, sender: {} }),
+    ).toThrow('forged sender')
+    expect(() =>
+      retry({
+        data: { surface: 'dashboard', callback: () => {} },
+        sender: extensionSender,
+      }),
+    ).toThrow()
+    expect(() =>
+      status({ data: { surface: 'popup' }, sender: extensionSender }),
+    ).toThrow()
+    expect(backgroundMocks.getAppDb).not.toHaveBeenCalled()
+    expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+    expect(
+      await status({ data: { surface: 'dashboard' }, sender: extensionSender }),
+    ).toEqual({ status: 'idle' })
+    expect(
+      await retry({ data: { surface: 'dashboard' }, sender: extensionSender }),
+    ).toEqual({ status: 'no-pending' })
+  })
+
+  it('blocks writes, exports, imports and sync until authenticated retry saves the replacement', async () => {
+    const restore = readRegisteredHandler('backup.restoreFullBackup')
+    const handlers = new Map(backgroundMocks.handlers)
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(new Error('disk'))
+    expect(
+      await restore({
+        data: { surface: 'dashboard', backup: validBackup },
+        sender: extensionSender,
+      }),
+    ).toMatchObject({ status: 'persistence-pending' })
+    const status = handlers.get('backup.getPendingReplacement')!
+    expect(
+      await status({ data: { surface: 'dashboard' }, sender: extensionSender }),
+    ).toMatchObject({ status: 'persistence-pending', kind: 'restore' })
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
+    const rejected = [
+      ['backup.exportFullBackup', { surface: 'dashboard' }],
+      ['backup.resetLocalData', { surface: 'dashboard' }],
+      [
+        'backup.restoreFullBackup',
+        { surface: 'dashboard', backup: validBackup },
+      ],
+      ['settings.toggleStudyMode', { surface: 'dashboard' }],
+      ['imports.preview', { surface: 'dashboard', fileText: '{}' }],
+      [
+        'imports.apply',
+        { surface: 'dashboard', fileText: '{}', fingerprint: 'a'.repeat(64) },
+      ],
+      ['imports.retryPersistence', { surface: 'dashboard' }],
+      ['sync.pushLocal', { surface: 'dashboard' }],
+    ] as const
+    for (const [method, data] of rejected) {
+      await expect(
+        handlers.get(method)!({ data, sender: extensionSender }),
+      ).rejects.toThrow(
+        'Local data replacement still needs saving. Open Settings > Data Management and choose Retry saving.',
+      )
+    }
+    expect(backgroundMocks.backupExportFullBackup).not.toHaveBeenCalled()
+    expect(backgroundMocks.backupResetLocalData).not.toHaveBeenCalled()
+    expect(backgroundMocks.applyContentImport).not.toHaveBeenCalled()
+    expect(backgroundMocks.previewContentImport).not.toHaveBeenCalled()
+    expect(backgroundMocks.syncService.pushLocal).not.toHaveBeenCalled()
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    expect(
+      await handlers.get('backup.retryPendingReplacement')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+    ).toMatchObject({ status: 'durable', syncMetadataPending: false })
+    expect(backgroundMocks.backupRestoreFullBackup).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(2)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(2)
+  })
+
+  it('validates detached input and persists a strict dirty marker before destructive commit', async () => {
+    const restore = readRegisteredHandler('backup.restoreFullBackup')
+    await expect(
+      restore({
+        data: { surface: 'dashboard', backup: { bad: true } },
+        sender: extensionSender,
+      }),
+    ).rejects.toThrow()
+    expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+    expect(backgroundMocks.backupRestoreFullBackup).not.toHaveBeenCalled()
+    backgroundMocks.markSyncLocalDataChanged.mockRejectedValueOnce(
+      new Error('metadata down'),
+    )
+    await expect(
+      restore({
+        data: { surface: 'dashboard', backup: validBackup },
+        sender: extensionSender,
+      }),
+    ).rejects.toThrow('metadata down')
+    expect(backgroundMocks.backupRestoreFullBackup).not.toHaveBeenCalled()
+    expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+    backgroundMocks.backupRestoreFullBackup.mockRejectedValueOnce(
+      new Error('rollback'),
+    )
+    await expect(
+      restore({
+        data: { surface: 'dashboard', backup: validBackup },
+        sender: extensionSender,
+      }),
+    ).rejects.toThrow('rollback')
+    expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(2)
+    expect(
+      backgroundMocks.markSyncLocalDataChanged.mock.invocationCallOrder.at(-1),
+    ).toBeLessThan(
+      backgroundMocks.backupRestoreFullBackup.mock.invocationCallOrder[0]!,
+    )
+    expect(
+      await backgroundMocks.handlers.get('backup.getPendingReplacement')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+    ).toEqual({ status: 'idle' })
+  })
+
+  it('rejects work already queued behind a replacement when its publication becomes pending', async () => {
+    const flushGate = createDeferred<void>()
+    const reset = readRegisteredHandler('backup.resetLocalData')
+    const handlers = new Map(backgroundMocks.handlers)
+    backgroundMocks.flushDbSnapshot.mockReturnValueOnce(flushGate.promise)
+    const replacement = reset({
+      data: { surface: 'dashboard' },
+      sender: extensionSender,
+    })
+    await waitUntil(() =>
+      expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1),
+    )
+    const queued = [
+      handlers.get('backup.exportFullBackup')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+      handlers.get('settings.toggleStudyMode')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+      handlers.get('imports.retryPersistence')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+      handlers.get('sync.pushLocal')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+      readLatestSyncAutoSyncDeps().writeMetadata({ autoSyncRetryAttempt: 2 }),
+    ]
+    const rejected = Promise.all(
+      queued.map((promise) =>
+        expect(promise).rejects.toThrow('still needs saving'),
+      ),
+    )
+    expect(backgroundMocks.backupExportFullBackup).not.toHaveBeenCalled()
+    expect(backgroundMocks.toggleStudyMode).not.toHaveBeenCalled()
+    flushGate.reject(new Error('disk unavailable'))
+    expect(await replacement).toMatchObject({
+      status: 'persistence-pending',
+      kind: 'reset',
+    })
+    await rejected
+    expect(backgroundMocks.writeSyncMetadata).not.toHaveBeenCalled()
+    expect(backgroundMocks.syncService.pushLocal).not.toHaveBeenCalled()
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a committed reset gated when strict completion fails and retries metadata only', async () => {
+    const reset = readRegisteredHandler('backup.resetLocalData')
+    backgroundMocks.markSyncLocalDataChanged
+      .mockResolvedValueOnce(dirtySyncMetadata)
+      .mockRejectedValueOnce(new Error('metadata down'))
+    expect(
+      await reset({ data: { surface: 'dashboard' }, sender: extensionSender }),
+    ).toEqual({
+      status: 'durable',
+      syncMetadataPending: true,
+      kind: 'reset',
+      summary: null,
+    })
+    expect(
+      await backgroundMocks.handlers.get('backup.getPendingReplacement')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+    ).toMatchObject({ status: 'durable-sync-metadata-pending' })
+    expect(
+      await backgroundMocks.handlers.get('backup.retryPendingReplacement')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+    ).toMatchObject({ status: 'durable', syncMetadataPending: false })
+    expect(backgroundMocks.backupResetLocalData).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['restore', 'reset', 'gist-pull'] as const)(
+    'clears obsolete import persistence only after accepted %s commit',
+    async (kind) => {
+      registerBackgroundHandlers()
+      const handlers = new Map(backgroundMocks.handlers)
+      const message = (method: string, data: unknown) =>
+        handlers.get(method)!({ data, sender: extensionSender })
+      backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+        new Error('import disk'),
+      )
+      expect(
+        await message('imports.apply', {
+          surface: 'dashboard',
+          fileText: '{}',
+          fingerprint: 'a'.repeat(64),
+        }),
+      ).toMatchObject({ status: 'persistence-error' })
+      if (kind === 'gist-pull') {
+        backgroundMocks.syncService.pullLatest.mockImplementationOnce(
+          async () => {
+            const options = readLatestSyncFactoryOptions()
+            await options.runRemoteRestore(() =>
+              options.runReplacement({
+                kind,
+                commit: () => Promise.resolve(validBackupSummary),
+                flush: backgroundMocks.flushDbSnapshot,
+                onDurable: () => Promise.resolve(),
+                finishSyncMetadata: () => Promise.resolve(),
+              }),
+            )
+            return syncActionResult
+          },
+        )
+        await message('sync.pullLatest', { surface: 'dashboard' })
+      } else {
+        await message(
+          kind === 'restore'
+            ? 'backup.restoreFullBackup'
+            : 'backup.resetLocalData',
+          kind === 'restore'
+            ? { surface: 'dashboard', backup: validBackup }
+            : { surface: 'dashboard' },
+        )
+      }
+      const flushCount = backgroundMocks.flushDbSnapshot.mock.calls.length
+      expect(
+        await message('imports.retryPersistence', { surface: 'dashboard' }),
+      ).toEqual({ status: 'repreview' })
+      expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(flushCount)
+    },
+  )
+
+  it('preserves genuine pending import acknowledgement when replacement rolls back', async () => {
+    registerBackgroundHandlers()
+    const handlers = new Map(backgroundMocks.handlers)
+    const message = (method: string, data: unknown) =>
+      handlers.get(method)!({ data, sender: extensionSender })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(new Error('disk'))
+    await message('imports.apply', {
+      surface: 'dashboard',
+      fileText: '{}',
+      fingerprint: 'a'.repeat(64),
+    })
+    backgroundMocks.backupResetLocalData.mockRejectedValueOnce(
+      new Error('rollback'),
+    )
+    await expect(
+      message('backup.resetLocalData', { surface: 'dashboard' }),
+    ).rejects.toThrow('rollback')
+    expect(
+      await message('imports.retryPersistence', { surface: 'dashboard' }),
+    ).toEqual({ status: 'saved' })
+  })
+
+  it('finishes replacement metadata inside the owned queue while automatic bookkeeping waits behind it', async () => {
+    const finishGate = createDeferred<void>()
+    const metadataStarted = vi.fn()
+    backgroundMocks.syncService.pullLatest.mockImplementationOnce(async () => {
+      const options = readLatestSyncFactoryOptions()
+      await options.runRemoteRestore(() =>
+        options.runReplacement({
+          kind: 'gist-pull',
+          commit: () => Promise.resolve(validBackupSummary),
+          flush: backgroundMocks.flushDbSnapshot,
+          onDurable: () => Promise.resolve(),
+          finishSyncMetadata: async () => {
+            metadataStarted()
+            await finishGate.promise
+            await backgroundMocks.writeSyncMetadata({
+              dirtySinceLastSync: false,
+            })
+          },
+        }),
+      )
+      return syncActionResult
+    })
+    const pull = sendRuntimeMessage('sync.pullLatest', { surface: 'dashboard' })
+    await waitUntil(() => expect(metadataStarted).toHaveBeenCalled())
+    const autoWrite = readLatestSyncAutoSyncDeps().writeMetadata({
+      autoSyncRetryAttempt: 3,
+    })
+    await Promise.resolve()
+    expect(backgroundMocks.writeSyncMetadata).not.toHaveBeenCalled()
+    finishGate.resolve()
+    await Promise.all([pull, autoWrite])
+    expect(backgroundMocks.writeSyncMetadata.mock.calls).toEqual([
+      [{ dirtySinceLastSync: false }],
+      [{ autoSyncRetryAttempt: 3 }],
+    ])
+  })
+
+  it('retains the persisted dirty pre-marker when a new worker loses durable metadata recovery', async () => {
+    let persisted: import('@/features/sync/data/sync-metadata-store').SyncMetadata =
+      {
+        ...cleanSyncMetadata,
+        lastSyncDirection: 'push',
+        autoSyncRetryAttempt: 0,
+        lastAutoSyncAt: null,
+      }
+    backgroundMocks.markSyncLocalDataChanged
+      .mockImplementationOnce(() => {
+        persisted = {
+          ...persisted,
+          ...dirtySyncMetadata,
+          lastSyncDirection: 'push',
+        }
+        return Promise.resolve(persisted)
+      })
+      .mockRejectedValueOnce(new Error('completion store unavailable'))
+    const result = await sendRuntimeMessage('backup.resetLocalData', {
+      surface: 'dashboard',
+    })
+    expect(result).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: true,
+    })
+    expect(persisted.dirtySinceLastSync).toBe(true)
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
+    const { createBackupReplacementCoordinator } =
+      await import('./backup-replacement')
+    const { createSyncService, createSyncOperationCoordinator } =
+      await vi.importActual<
+        typeof import('@/features/sync/server/sync-service')
+      >('@/features/sync/server/sync-service')
+    const reopened = createBackupReplacementCoordinator()
+    const getGist = vi.fn()
+    const restore = vi.fn()
+    const service = createSyncService({
+      readToken: () => Promise.resolve(null),
+      saveToken: () => Promise.resolve(),
+      deleteToken: () => Promise.resolve(),
+      getTokenStatus: () => Promise.resolve(syncStatus.tokenStatus),
+      createGitHubClient: () => ({
+        getGist,
+        validateToken: vi.fn(),
+        createSyncGist: vi.fn(),
+        updateSyncGist: vi.fn(),
+      }),
+      readMetadata: () => Promise.resolve(persisted),
+      writeMetadata: (patch) => Promise.resolve({ ...persisted, ...patch }),
+      exportFullBackup: () => Promise.resolve(validBackup),
+      restoreBackup: restore,
+      flushDbSnapshot: () => Promise.resolve(),
+      broadcastInvalidation: () => Promise.resolve(),
+      runReplacement: reopened.run,
+      syncCoordinator: createSyncOperationCoordinator(),
+      now: () => new Date(),
+    })
+    expect(reopened.getState()).toEqual({ status: 'idle' })
+    expect(await service.checkRemoteOnOpen()).toMatchObject({
+      outcome: 'no-change',
+      reason: 'local-dirty',
+    })
+    expect(getGist).not.toHaveBeenCalled()
+    expect(restore).not.toHaveBeenCalled()
+  })
+
+  it('allows only explicitly confirmed manual dirty overwrite at the queued apply boundary', async () => {
+    backgroundMocks.readSyncMetadata.mockResolvedValue(dirtySyncMetadata)
+    const applied = vi.fn().mockResolvedValue(null)
+    backgroundMocks.syncService.pullLatest.mockImplementation(
+      async (input: { confirmLocalOverwrite: boolean }) => {
+        await readLatestSyncFactoryOptions().runRemoteRestore(applied, input)
+        return syncActionResult
+      },
+    )
+    await expect(
+      sendRuntimeMessage('sync.pullLatest', { surface: 'dashboard' }),
+    ).rejects.toThrow('Local data changed')
+    expect(applied).not.toHaveBeenCalled()
+    await sendRuntimeMessage('sync.pullLatest', {
+      surface: 'dashboard',
+      confirmLocalOverwrite: true,
+    })
+    expect(applied).toHaveBeenCalledTimes(1)
   })
 
   it('flushes and broadcasts problem invalidation after create writes', async () => {
@@ -2557,135 +3210,455 @@ describe('background handler registration', () => {
     })
   })
 
-  it('saves review results through the atomic practice workflow', async () => {
-    await sendRuntimeMessage('practice.saveReviewResult', {
-      surface: 'dashboard',
-      problemSlug: 'two-sum',
-      rating: 'hard',
-      reviewedAt: '2026-01-02T00:00:00.000Z',
-      elapsedSeconds: 725,
-      isCorrect: false,
-      notes: 'Missed a branch.',
-    })
-
+  it('returns the original acknowledgement separately from fresh current after durable flush', async () => {
+    const response = await sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    expectRuntimePolicy('practice.saveReviewResult', 'dashboard')
+    const { surface, ...command } = saveCommandRequest
+    expect(surface).toBe('dashboard')
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledWith(
+      backgroundMocks.db,
+      { ...command, operation: 'save' },
+    )
+    expect(backgroundMocks.getSettings).not.toHaveBeenCalled()
     expect(
       backgroundMocks.saveReviewResultWithTrackProgress,
-    ).toHaveBeenCalledWith(
-      backgroundMocks.db,
-      {
-        problemSlug: 'two-sum',
-        rating: 'hard',
-        reviewedAt: new Date('2026-01-02T00:00:00.000Z'),
-        elapsedSeconds: 725,
-        isCorrect: false,
-        log: { notes: 'Missed a branch.' },
-        targetRetention: defaultUserSettings.review.targetRetention,
-      },
-      defaultUserSettings,
-    )
-    expect(
-      backgroundMocks.recordActiveTrackProblemCompletion,
     ).not.toHaveBeenCalled()
-    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'dashboard',
-      tags: ['practice'],
-    })
+    expect(response).toEqual(commandResult)
+    expectFlushBeforeBroadcast()
+    expect(
+      backgroundMocks.markSyncLocalDataChanged.mock.invocationCallOrder[0],
+    ).toBeLessThan(backgroundMocks.flushDbSnapshot.mock.invocationCallOrder[0]!)
   })
 
-  it('passes free-practice settings into the atomic practice workflow', async () => {
-    resetRuntimeMutationMocks()
-    const freePracticeSettings = {
-      ...defaultUserSettings,
-      practice: {
-        ...defaultUserSettings.practice,
-        mode: 'freePractice' as const,
+  it('validates a preview sender and serializes its read before a review save without publication', async () => {
+    const previewRequest = {
+      surface: 'content-script' as const,
+      mode: 'submit' as const,
+      problemSlug: 'two-sum',
+      generation: saveCommandRequest.generation,
+      previewedAt: '2026-01-01T00:00:00.000Z',
+    }
+    const { surface: _surface, ...identity } = previewRequest
+    void _surface
+    const estimate = {
+      dueAt: '2026-01-02T00:00:00.000Z',
+      eligibleOn: '2026-01-02',
+      studyDays: 1,
+      scheduledDays: 1,
+    }
+    const response = {
+      status: 'ready' as const,
+      identity,
+      evidence: 'active' as const,
+      ratings: {
+        again: estimate,
+        hard: estimate,
+        good: estimate,
+        easy: estimate,
       },
     }
-    backgroundMocks.getSettings.mockResolvedValueOnce(freePracticeSettings)
+    const gate = createDeferred<typeof response>()
+    backgroundMocks.previewPracticeReview.mockReturnValueOnce(gate.promise)
+    const preview = sendRuntimeMessage('practice.previewReview', previewRequest)
+    await waitUntil(() =>
+      expect(backgroundMocks.previewPracticeReview).toHaveBeenCalledTimes(1),
+    )
+    expectRuntimePolicy('practice.previewReview', 'content-script')
+    const save = sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
+    gate.resolve(response)
+    await expect(preview).resolves.toEqual(response)
+    await expect(save).resolves.toEqual(commandResult)
+    expect(backgroundMocks.previewPracticeReview).toHaveBeenCalledWith(
+      backgroundMocks.db,
+      identity,
+    )
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
 
-    await sendRuntimeMessage('practice.saveReviewResult', {
-      surface: 'dashboard',
-      problemSlug: 'two-sum',
-      rating: 'good',
-      reviewedAt: '2026-01-03T00:00:00.000Z',
-      reviewMode: 'leetcode',
-    })
+    backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementationOnce(
+      () => {
+        throw new Error('forged sender')
+      },
+    )
+    expect(() =>
+      sendRuntimeMessage('practice.previewReview', previewRequest, {}),
+    ).toThrow('forged sender')
+    expect(backgroundMocks.previewPracticeReview).toHaveBeenCalledTimes(1)
+  })
 
+  it('returns persistence pending without publication and retries the same executor command', async () => {
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('disk failed'),
+    )
+    const pending = await sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    expect(pending).toEqual({ ...commandResult, status: 'persistence-pending' })
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+    expect(
+      await sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).toEqual(commandResult)
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      2,
+    )
+    expect(backgroundMocks.executePracticeReviewCommand.mock.calls[0]).toEqual(
+      backgroundMocks.executePracticeReviewCommand.mock.calls[1],
+    )
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(2)
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledTimes(1)
     expect(
       backgroundMocks.saveReviewResultWithTrackProgress,
-    ).toHaveBeenCalledWith(
-      backgroundMocks.db,
-      expect.objectContaining({
-        problemSlug: 'two-sum',
-        rating: 'good',
-        reviewedAt: new Date('2026-01-03T00:00:00.000Z'),
-        reviewMode: 'leetcode',
-      }),
-      freePracticeSettings,
-    )
-    expect(
-      backgroundMocks.recordActiveTrackProblemCompletion,
     ).not.toHaveBeenCalled()
   })
 
-  it('invalidates tracks after saving a review through the atomic workflow', async () => {
-    resetRuntimeMutationMocks()
-
-    await sendRuntimeMessage('practice.saveReviewResult', {
-      surface: 'dashboard',
-      problemSlug: 'two-sum',
-      rating: 'easy',
-      reviewedAt: '2026-01-03T00:00:00.000Z',
+  it('protects a pending review from automatic remote replacement and recovers publication before sync admission', async () => {
+    const { createTestDb } = await import('@/platform/db/test-db')
+    const { preparePracticeStorage } =
+      await import('@/features/practice/server/practice-storage-service')
+    const practice = await vi.importActual<
+      typeof import('@/features/practice/server/practice-service')
+    >('@/features/practice/server/practice-service')
+    const backup = await vi.importActual<
+      typeof import('@/features/backup/server/backup-service')
+    >('@/features/backup/server/backup-service')
+    const { createSyncService, createSyncOperationCoordinator } =
+      await vi.importActual<
+        typeof import('@/features/sync/server/sync-service')
+      >('@/features/sync/server/sync-service')
+    const { buildSyncEnvelope } =
+      await import('@/features/sync/domain/sync-envelope')
+    const { readPracticeStorageData } =
+      await import('@/features/practice/data/practice-storage-repository')
+    const syncMetadata = await vi.importActual<
+      typeof import('@/features/sync/data/sync-metadata-store')
+    >('@/features/sync/data/sync-metadata-store')
+    const handle = await createTestDb()
+    await preparePracticeStorage(handle.db)
+    const remoteBackup = await backup.exportFullBackup(handle.db)
+    const request = {
+      ...saveCommandRequest,
+      generation: (await practice.getPracticeDetails(handle.db, 'two-sum'))
+        .generation!,
+    }
+    await syncMetadata.writeSyncMetadata({
+      ...cleanSyncMetadata,
+      lastSyncDirection: 'pull',
     })
-
-    expect(
-      backgroundMocks.saveReviewResultWithTrackProgress,
-    ).toHaveBeenCalledWith(
-      backgroundMocks.db,
-      expect.objectContaining({
-        problemSlug: 'two-sum',
-        rating: 'easy',
-      }),
-      defaultUserSettings,
+    const order: string[] = []
+    const getGist = vi.fn().mockResolvedValue({
+      id: cleanSyncMetadata.gistId,
+      htmlUrl: 'https://gist.github.com/gist_1',
+      updatedAt: '2026-05-26T12:20:00.000Z',
+      remoteVersion: 'changed-remote',
+      content: JSON.stringify(
+        buildSyncEnvelope({
+          backup: remoteBackup,
+          dataUpdatedAt: '2026-05-26T12:20:00.000Z',
+        }),
+      ),
+      contentTruncated: false,
+      rawUrl: null,
+    })
+    const restoreBackup = vi.fn((input: unknown) =>
+      backup.restoreFullBackup(handle.db, input),
     )
-    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'dashboard',
-      tags: ['practice'],
+    backgroundMocks.getAppDb.mockResolvedValue(handle)
+    backgroundMocks.getSettings.mockResolvedValue({
+      ...defaultUserSettings,
+      practice: { ...defaultUserSettings.practice, mode: 'freePractice' },
     })
+    backgroundMocks.executePracticeReviewCommand.mockImplementation(
+      practice.executePracticeReviewCommand,
+    )
+    backgroundMocks.readSyncMetadata.mockImplementation(
+      syncMetadata.readSyncMetadata,
+    )
+    backgroundMocks.markSyncLocalDataChanged.mockImplementation(() => {
+      order.push('dirty')
+      return syncMetadata.markLocalDataChanged()
+    })
+    backgroundMocks.flushDbSnapshot.mockRejectedValue(new Error('disk failed'))
+    backgroundMocks.createBackgroundSyncService.mockImplementation(() => {
+      order.push('sync')
+      return createSyncService({
+        readToken: () => Promise.resolve('configured-token'),
+        saveToken: () => Promise.resolve(),
+        deleteToken: () => Promise.resolve(),
+        getTokenStatus: () => Promise.resolve(syncStatus.tokenStatus),
+        createGitHubClient: () => ({
+          getGist,
+          validateToken: vi.fn(),
+          createSyncGist: vi.fn(),
+          updateSyncGist: vi.fn(),
+        }),
+        readMetadata: syncMetadata.readSyncMetadata,
+        writeMetadata: syncMetadata.writeSyncMetadata,
+        exportFullBackup: () => backup.exportFullBackup(handle.db),
+        restoreBackup,
+        flushDbSnapshot: backgroundMocks.flushDbSnapshot,
+        broadcastInvalidation: () => Promise.resolve(),
+        ...readLatestSyncFactoryOptions(),
+        syncCoordinator: createSyncOperationCoordinator(),
+        now: () => new Date(),
+      })
+    })
+    try {
+      const pending = practiceReviewCommandResultSchema.parse(
+        await sendRuntimeMessage('practice.saveReviewResult', request),
+      )
+      expect(pending).toMatchObject({ status: 'persistence-pending' })
+      const retainedDetails = await practice.getPracticeDetails(
+        handle.db,
+        'two-sum',
+      )
+      const retainedStorage = await readPracticeStorageData(handle.db)
+      expect(retainedStorage.commandReceipts).toHaveLength(1)
+      expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+      await expect(
+        sendRuntimeMessage('sync.checkRemoteOnOpen', { surface: 'dashboard' }),
+      ).rejects.toThrow('sync metadata could not be saved')
+      expect(backgroundMocks.createBackgroundSyncService).not.toHaveBeenCalled()
+      expect(getGist).not.toHaveBeenCalled()
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(backgroundMocks.markSyncLocalDataChanged).toHaveBeenCalledTimes(1)
+      expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+      ).not.toHaveBeenCalled()
+
+      order.length = 0
+      backgroundMocks.flushDbSnapshot.mockImplementation(() => {
+        order.push('flush')
+        return Promise.resolve()
+      })
+      expect(
+        await readLatestSyncAutoSyncDeps().runCleanPullCheck(),
+      ).toMatchObject({ outcome: 'no-change', reason: 'local-dirty' })
+      expect(order).toEqual(['flush', 'dirty', 'sync'])
+      expect(getGist).not.toHaveBeenCalled()
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(await practice.getPracticeDetails(handle.db, 'two-sum')).toEqual(
+        retainedDetails,
+      )
+      expect(await readPracticeStorageData(handle.db)).toEqual(retainedStorage)
+      expect(
+        await sendRuntimeMessage('practice.saveReviewResult', request),
+      ).toEqual({ ...pending, status: 'saved' })
+      expect(await readPracticeStorageData(handle.db)).toEqual(retainedStorage)
+    } finally {
+      backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
+      await sendRuntimeMessage('backup.retryPendingReplacement', {
+        surface: 'dashboard',
+      })
+      handle.rawDb.close()
+    }
   })
 
-  it('invalidates tracks after overriding a saved review result', async () => {
-    resetRuntimeMutationMocks()
-    backgroundMocks.overrideLastReviewResultWithTrackProgress.mockResolvedValue(
-      undefined,
-    )
-
-    await sendRuntimeMessage('practice.overrideLastReviewResult', {
-      surface: 'dashboard',
-      problemSlug: 'two-sum',
-      rating: 'hard',
+  it('persists review dirty intent before publication so a fresh sync worker protects a saved review while invalidation stalls', async () => {
+    const metadata = await vi.importActual<
+      typeof import('@/features/sync/data/sync-metadata-store')
+    >('@/features/sync/data/sync-metadata-store')
+    const { createSyncService, createSyncOperationCoordinator } =
+      await vi.importActual<
+        typeof import('@/features/sync/server/sync-service')
+      >('@/features/sync/server/sync-service')
+    const { createBackupReplacementCoordinator } =
+      await import('./backup-replacement')
+    await metadata.writeSyncMetadata({
+      ...cleanSyncMetadata,
+      lastSyncDirection: 'pull',
     })
+    backgroundMocks.markSyncLocalDataChanged.mockImplementation(
+      metadata.markLocalDataChanged,
+    )
+    const invalidation = createDeferred<null>()
+    backgroundMocks.broadcastCacheInvalidation.mockReturnValueOnce(
+      invalidation.promise,
+    )
+    const saved = sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    try {
+      await waitUntil(() =>
+        expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalled(),
+      )
+      expect(backgroundMocks.flushDbSnapshot).toHaveResolvedTimes(1)
+      expect((await metadata.readSyncMetadata()).dirtySinceLastSync).toBe(true)
+      expect(
+        backgroundMocks.markSyncLocalDataChanged.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        backgroundMocks.flushDbSnapshot.mock.invocationCallOrder[0]!,
+      )
+      const getGist = vi.fn()
+      const restoreBackup = vi.fn()
+      const freshSyncWorker = createSyncService({
+        readToken: () => Promise.resolve('configured-token'),
+        saveToken: () => Promise.resolve(),
+        deleteToken: () => Promise.resolve(),
+        getTokenStatus: () => Promise.resolve(syncStatus.tokenStatus),
+        createGitHubClient: () => ({
+          getGist,
+          validateToken: vi.fn(),
+          createSyncGist: vi.fn(),
+          updateSyncGist: vi.fn(),
+        }),
+        readMetadata: metadata.readSyncMetadata,
+        writeMetadata: metadata.writeSyncMetadata,
+        exportFullBackup: () => Promise.resolve(validBackup),
+        restoreBackup,
+        flushDbSnapshot: () => Promise.resolve(),
+        broadcastInvalidation: () => Promise.resolve(),
+        runReplacement: createBackupReplacementCoordinator().run,
+        syncCoordinator: createSyncOperationCoordinator(),
+        now: () => new Date(),
+      })
+      expect(await freshSyncWorker.checkRemoteOnOpen()).toMatchObject({
+        outcome: 'no-change',
+        reason: 'local-dirty',
+      })
+      expect(getGist).not.toHaveBeenCalled()
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(
+        backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+      ).not.toHaveBeenCalled()
+    } finally {
+      invalidation.resolve(null)
+      await saved
+    }
+  })
 
+  it.each([
+    'stale-review',
+    'backdated',
+    'unsupported-legacy',
+    'stale-generation',
+    'command-conflict',
+  ])('returns %s conflicts without flushing or publication', async (reason) => {
+    const conflict = {
+      status: 'conflict',
+      reason,
+      message: 'Refresh context',
+      current: practiceDetails,
+    }
+    backgroundMocks.executePracticeReviewCommand.mockResolvedValueOnce(conflict)
     expect(
-      backgroundMocks.overrideLastReviewResultWithTrackProgress,
-    ).toHaveBeenCalledWith(
-      backgroundMocks.db,
-      expect.objectContaining({
-        problemSlug: 'two-sum',
-        rating: 'hard',
-      }),
-    )
-    expect(backgroundMocks.overrideLastReviewResult).not.toHaveBeenCalled()
-    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
-      problemSlug: 'two-sum',
-      reason: 'practice-updated',
-      source: 'dashboard',
-      tags: ['practice'],
+      await sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).toEqual(conflict)
+    expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
+    expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+    expect(
+      backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('passes an exact update target and revision to the command executor', async () => {
+    const { reviewMode, ...request } = saveCommandRequest
+    expect(reviewMode).toBe('leetcode')
+    await sendRuntimeMessage('practice.overrideLastReviewResult', {
+      ...request,
+      targetAttemptId: 'original-event',
+      expectedRevision: 2,
     })
+    const { surface, ...command } = request
+    expect(surface).toBe('dashboard')
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledWith(
+      backgroundMocks.db,
+      {
+        ...command,
+        operation: 'update',
+        targetAttemptId: 'original-event',
+        expectedRevision: 2,
+      },
+    )
+  })
+
+  it('serializes concurrent review commands through snapshot publication', async () => {
+    let release!: () => void
+    backgroundMocks.flushDbSnapshot.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve
+        }),
+    )
+    const first = sendRuntimeMessage(
+      'practice.saveReviewResult',
+      saveCommandRequest,
+    )
+    await vi.waitFor(() =>
+      expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1),
+    )
+    const second = sendRuntimeMessage('practice.saveReviewResult', {
+      ...saveCommandRequest,
+      commandId: 'second',
+    })
+    await Promise.resolve()
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      1,
+    )
+    release()
+    await Promise.all([first, second])
+    expect(backgroundMocks.executePracticeReviewCommand).toHaveBeenCalledTimes(
+      2,
+    )
+  })
+
+  it('rejects old clients and forged command fields before execution', () => {
+    for (const request of [
+      { surface: 'dashboard', problemSlug: 'two-sum', rating: 'good' },
+      { ...saveCommandRequest, notes: 'old field' },
+      { ...saveCommandRequest, reviewedAt: '2026-01-01T00:00:00Z' },
+      { ...saveCommandRequest, reviewAttemptId: 'forged' },
+    ]) {
+      expect(() =>
+        sendRuntimeMessage('practice.saveReviewResult', request),
+      ).toThrow()
+    }
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
+  })
+
+  it('rejects unauthorized commands before execution', () => {
+    backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementationOnce(
+      () => {
+        throw new Error('unauthorized')
+      },
+    )
+    expect(() =>
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).toThrow('unauthorized')
+    expect(backgroundMocks.executePracticeReviewCommand).not.toHaveBeenCalled()
+  })
+
+  it('keeps unexpected storage and invalid response errors as transport failures', async () => {
+    backgroundMocks.executePracticeReviewCommand.mockRejectedValueOnce(
+      new Error('storage unavailable'),
+    )
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).rejects.toThrow('storage unavailable')
+    backgroundMocks.executePracticeReviewCommand.mockResolvedValueOnce({
+      status: 'saved',
+      current: practiceDetails,
+    })
+    await expect(
+      sendRuntimeMessage('practice.saveReviewResult', saveCommandRequest),
+    ).rejects.toThrow()
+    expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
   })
 
   it('forwards pinned identity and refresh through the authorized capture handlers', async () => {
@@ -2729,9 +3702,42 @@ describe('background handler registration', () => {
       backgroundMocks.readLeetCodeSubmissionResultInBackground,
     ).toHaveBeenCalledWith(submissionRequest)
   })
+  it('authorizes and forwards explicit extra practice without changing the response contract', async () => {
+    backgroundMocks.getTodayQueue.mockResolvedValueOnce({
+      ...todayQueue,
+      generatedAt: new Date(todayQueue.generatedAt),
+    })
+    const response = await sendRuntimeMessage('queue.getTodayQueue', {
+      surface: 'popup',
+      intent: 'extra-practice',
+    })
+
+    expectRuntimePolicy('queue.getTodayQueue', 'popup')
+    expect(backgroundMocks.getTodayQueue).toHaveBeenCalledWith(
+      backgroundMocks.db,
+      undefined,
+      'extra-practice',
+    )
+    expect(todayQueueSchema.parse(response)).toEqual(response)
+  })
 })
 
 describe('background handler serializers', () => {
+  it('defaults queue intent to automatic and rejects unknown intents', () => {
+    expect(queueRequestSchema.parse({ surface: 'popup' }).intent).toBe(
+      'automatic',
+    )
+    expect(
+      queueRequestSchema.parse({
+        surface: 'dashboard',
+        intent: 'extra-practice',
+      }).intent,
+    ).toBe('extra-practice')
+    expect(() =>
+      queueRequestSchema.parse({ surface: 'popup', intent: 'all' }),
+    ).toThrow()
+  })
+
   it('validates queue request timestamps at the runtime boundary', () => {
     expect(() =>
       queueRequestSchema.parse({
@@ -2813,6 +3819,11 @@ function expectSyncFactoryForDb() {
 
 type SyncAutoSyncDeps = {
   runCleanPullCheck: () => Promise<unknown>
+  writeMetadata: (
+    patch: Partial<
+      import('@/features/sync/data/sync-metadata-store').SyncMetadata
+    >,
+  ) => Promise<unknown>
 }
 
 function readLatestSyncAutoSyncDeps(): SyncAutoSyncDeps {
@@ -2835,7 +3846,15 @@ function isSyncAutoSyncDeps(value: unknown): value is SyncAutoSyncDeps {
 }
 
 type SyncFactoryOptions = {
-  runRemoteRestore: <T>(work: () => Promise<T>) => Promise<T>
+  runRemoteRestore: <T>(
+    work: () => Promise<T>,
+    context?: { confirmLocalOverwrite?: boolean },
+  ) => Promise<T>
+  runReplacement: (
+    work: import('@/features/backup/server/backup-replacement-work').BackupReplacementWork,
+  ) => Promise<
+    import('@/features/backup/api/backup-contracts').BackupReplacementResult
+  >
 }
 
 function readLatestSyncFactoryOptions(): SyncFactoryOptions {
@@ -2869,25 +3888,6 @@ function isSyncFactoryOptions(value: unknown): value is SyncFactoryOptions {
     typeof (value as { runRemoteRestore?: unknown }).runRemoteRestore ===
     'function'
   )
-}
-
-function resetRuntimeMutationMocks() {
-  vi.clearAllMocks()
-  backgroundMocks.getAppDb.mockResolvedValue({ db: backgroundMocks.db })
-  backgroundMocks.broadcastCacheInvalidation.mockResolvedValue(null)
-  backgroundMocks.flushDbSnapshot.mockResolvedValue(undefined)
-  backgroundMocks.getSettings.mockResolvedValue(defaultUserSettings)
-  backgroundMocks.getPracticeDetails.mockResolvedValue(practiceDetails)
-  backgroundMocks.overrideLastReviewResultWithTrackProgress.mockResolvedValue(
-    undefined,
-  )
-  backgroundMocks.saveReviewResultWithTrackProgress.mockResolvedValue(undefined)
-  backgroundMocks.saveReviewResult.mockResolvedValue(undefined)
-  backgroundMocks.createBackgroundSyncService.mockReturnValue(
-    backgroundMocks.syncService,
-  )
-  backgroundMocks.markSyncLocalDataChanged.mockResolvedValue(cleanSyncMetadata)
-  backgroundMocks.readSyncMetadata.mockResolvedValue(cleanSyncMetadata)
 }
 
 async function expectTrackWrite<TRequest>(input: {
@@ -3208,6 +4208,10 @@ const validBackup = backupFileSchema.parse({
     problemTopics: [{ problemSlug: 'two-sum', topicId: 'array' }],
     problemCompanies: [{ problemSlug: 'two-sum', companyId: 'meta' }],
     practice: {
+      schedulerProfiles: [],
+      reviewEvidence: [],
+      generations: [],
+      commandReceipts: [],
       problemPractice: [
         {
           problemSlug: 'two-sum',
@@ -3331,3 +4335,49 @@ const validBackup = backupFileSchema.parse({
   },
 })
 const validBackupSummary = createBackupSummary(validBackup)
+
+const saveCommandRequest = {
+  surface: 'dashboard',
+  commandId: 'review-command',
+  problemSlug: 'two-sum',
+  generation: {
+    localGenerationToken: 'local-generation',
+    problemGenerationToken: null,
+  },
+  rating: 'good',
+  reviewMode: 'leetcode',
+  reviewedAt: '2026-01-01T00:00:00.000Z',
+  log: { notes: 'Accepted notes' },
+} as const
+const commandResult = {
+  status: 'saved',
+  current: practiceDetails,
+  acknowledgement: {
+    schemaVersion: 1,
+    operation: 'save',
+    problemSlug: 'two-sum',
+    cardId: 'opaque-card',
+    reviewAttemptId: 'original-event',
+    applicationSequence: 1,
+    revision: 0,
+    rating: 'good',
+    reviewedAt: '2026-01-01T00:00:00.000Z',
+    dueAt: '2026-01-02T00:00:00.000Z',
+    status: 'review',
+    card: {
+      dueAt: '2026-01-02T00:00:00.000Z',
+      stability: 1,
+      difficulty: 5,
+      elapsedDays: 0,
+      scheduledDays: 1,
+      learningSteps: 0,
+      reps: 1,
+      lapses: 0,
+      state: 'review',
+      lastReviewAt: '2026-01-01T00:00:00.000Z',
+    },
+    fsrsReviewLog: null,
+    schedulingEvidenceKind: 'unknown',
+    schedulerProfileId: null,
+  },
+}

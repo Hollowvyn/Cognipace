@@ -95,86 +95,12 @@ export function PracticeRatingsView({
         chart={
           rows.length > 0 ? (
             <div className="grid min-w-0 gap-2">
-              <HistoricalChart
-                chartRoleDescription={
-                  showReviews
-                    ? 'Stacked rating shares with completed-review line'
-                    : 'Stacked rating shares'
-                }
-                config={{
-                  ...Object.fromEntries(
-                    categories.map((rating) => [
-                      rating.share,
-                      { label: rating.label, color: rating.color },
-                    ]),
-                  ),
-                  completedReviews: {
-                    label: 'Reviews',
-                    color: 'var(--cp-analytics-review-line)',
-                  },
-                }}
-                description={`Easy, Good, Hard and Again exact supplied rating shares. Rating share scale: 0%–100%. ${showReviews ? `Completed reviews use a separate right count axis: ${view.countScale.domain.join('–')}. Known zero counts are observations; dashed lines cross unavailable count intervals.` : 'Review volume is hidden.'} The upper edge of Good + Easy represents Review Success. Target Review Success: ${formatPercent(view.targetReviewSuccess)}. Full-height gray stripes mean unavailable rating composition, including periods with no valid ratings. Labels show rounded whole percentages when they fit. Association, not causation; count-line crossings with the target have no percentage meaning. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
-                height={310}
-                name="Practice Rhythm chart"
-                rows={rows}
+              <PracticeRatingsPlot
+                view={view}
+                ratingsView={ratingsView}
                 timeFrame={timeFrame}
-                tooltip={(row) => (
-                  <PracticeRatingsTooltip
-                    row={row}
-                    showReviews={showReviews}
-                    target={view.targetReviewSuccess}
-                    timeFrame={timeFrame}
-                  />
-                )}
-                yAxes={[
-                  {
-                    id: 'ratings',
-                    label: 'Rating share (%)',
-                    scale: percentScale,
-                    format: formatPercent,
-                    padding: { top: 6, bottom: 8 },
-                  },
-                  ...(showReviews
-                    ? [
-                        {
-                          id: 'count',
-                          label: 'Reviews',
-                          scale: view.countScale,
-                          format: formatCount,
-                          orientation: 'right' as const,
-                          width: 50,
-                          padding: { top: 6, bottom: 8 },
-                        },
-                      ]
-                    : []),
-                ]}
-              >
-                {(positioned, selected, visible) => (
-                  <>
-                    <PracticeRatingsStacks
-                      rows={positioned}
-                      showReviews={showReviews}
-                      target={view.targetReviewSuccess}
-                      timeFrame={timeFrame}
-                    />
-                    <HistoricalTargetLine
-                      testId="practice-success-target"
-                      value={view.targetReviewSuccess}
-                      yAxisId="ratings"
-                    />
-                    {showReviews ? (
-                      <CompletedReviewLine
-                        activeIndex={
-                          visible && selected
-                            ? positioned.indexOf(selected)
-                            : null
-                        }
-                        rows={positioned}
-                      />
-                    ) : null}
-                  </>
-                )}
-              </HistoricalChart>
+                showReviews={showReviews}
+              />
               <PracticeRatingsLegend
                 onToggle={() => setShowReviews((current) => !current)}
                 showReviews={showReviews}
@@ -266,6 +192,103 @@ export function PracticeRatingsView({
         timing; count-line crossings with the target have no percentage meaning.
       </p>
     </div>
+  )
+}
+
+export function PracticeRatingsPlot({
+  view,
+  ratingsView,
+  timeFrame,
+  showReviews,
+  compact,
+}: {
+  view: AnalyticsViews['practiceRhythm']
+  ratingsView: AnalyticsViews['ratingsMix']
+  timeFrame?: HistoricalChartTimeFrame | undefined
+  showReviews: boolean
+  compact?: { height: number; showGroupingLabel?: boolean } | undefined
+}) {
+  const rows = buildPracticeRatingsRows(view.rows, ratingsView.rows)
+  return (
+    <HistoricalChart
+      chartRoleDescription={
+        showReviews
+          ? 'Stacked rating shares with completed-review line'
+          : 'Stacked rating shares'
+      }
+      config={{
+        ...Object.fromEntries(
+          categories.map((rating) => [
+            rating.share,
+            { label: rating.label, color: rating.color },
+          ]),
+        ),
+        completedReviews: {
+          label: 'Reviews',
+          color: 'var(--cp-analytics-review-line)',
+        },
+      }}
+      description={`Easy, Good, Hard and Again exact supplied rating shares. Rating share scale: 0%–100%. ${showReviews ? `Completed reviews use a separate right count axis: ${view.countScale.domain.join('–')}. Known zero counts are observations; dashed lines cross unavailable count intervals.` : 'Review volume is hidden.'} The upper edge of Good + Easy represents Review Success. Target Review Success: ${formatPercent(view.targetReviewSuccess)}. Full-height gray stripes mean unavailable rating composition, including periods with no valid ratings. Labels show rounded whole percentages when they fit. Association, not causation; count-line crossings with the target have no percentage meaning. ${historicalGroupingLabel(timeFrame)}. ${historicalReportContext(timeFrame)}`}
+      height={310}
+      compact={compact}
+      name="Practice Rhythm chart"
+      rows={rows}
+      timeFrame={timeFrame}
+      tooltip={(row) => (
+        <PracticeRatingsTooltip
+          row={row}
+          showReviews={showReviews}
+          target={view.targetReviewSuccess}
+          timeFrame={timeFrame}
+        />
+      )}
+      yAxes={[
+        {
+          id: 'ratings',
+          label: 'Rating share (%)',
+          scale: percentScale,
+          format: formatPercent,
+          padding: { top: 6, bottom: 8 },
+        },
+        ...(showReviews
+          ? [
+              {
+                id: 'count',
+                label: 'Reviews',
+                scale: view.countScale,
+                format: formatCount,
+                orientation: 'right' as const,
+                width: 50,
+                padding: { top: 6, bottom: 8 },
+              },
+            ]
+          : []),
+      ]}
+    >
+      {(positioned, selected, visible) => (
+        <>
+          <PracticeRatingsStacks
+            rows={positioned}
+            showReviews={showReviews}
+            target={view.targetReviewSuccess}
+            timeFrame={timeFrame}
+          />
+          <HistoricalTargetLine
+            testId="practice-success-target"
+            value={view.targetReviewSuccess}
+            yAxisId="ratings"
+          />
+          {showReviews ? (
+            <CompletedReviewLine
+              activeIndex={
+                visible && selected ? positioned.indexOf(selected) : null
+              }
+              rows={positioned}
+            />
+          ) : null}
+        </>
+      )}
+    </HistoricalChart>
   )
 }
 
@@ -394,7 +417,9 @@ function PracticeRatingsStacks({
         const end = xScale(row.endX)
         if (center === undefined || start === undefined || end === undefined)
           return null
-        const width = Math.min(44, Math.max(0, end - start - 5))
+        const slot = Math.abs(end - start)
+        const gap = Math.min(slot * 0.2, Math.max(6, Math.min(14, slot * 0.12)))
+        const width = Math.max(0, slot - gap)
         const x = center - width / 2
         if (!row.ratings || row.ratings.validRatings === 0)
           return (
@@ -546,13 +571,21 @@ function RatingLabel({
   )
 }
 
-function PracticeRatingsLegend({
+export function PracticeRatingsLegend({
   showReviews,
   onToggle,
+  compactFriendly = false,
 }: {
   showReviews: boolean
   onToggle: () => void
+  compactFriendly?: boolean
 }) {
+  const friendlyLabels = {
+    easy: 'Strong',
+    good: 'Solid',
+    hard: 'Effortful',
+    again: 'Needs practice',
+  }
   return (
     <ul
       aria-label="Practice Rhythm series"
@@ -566,7 +599,7 @@ function PracticeRatingsLegend({
             className="h-2.5 w-2.5 rounded-full"
             style={{ background: rating.color }}
           />
-          {rating.label}
+          {compactFriendly ? friendlyLabels[rating.key] : rating.label}
         </li>
       ))}
       <li>

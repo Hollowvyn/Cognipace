@@ -2,9 +2,11 @@
 
 Date: October 3, 2026.
 
-Status: the three design sections and consolidated written specification are approved. The user approved the written specification on October 3, 2026 ("This is cool beans"). Phase A merged in PR #190; its [handoff](../handoffs/2026-10-03-fsrs-phase-a-preservation.md) retains historical evidence and limits. Phase B is implemented on its phase branch with independent reviews and passing automated/build checks; [human compatibility smoke and visual proof](../handoffs/2026-10-04-fsrs-phase-b-scheduling-evidence.md) remain pending before review or merge. C–H remain unimplemented.
+Status: the three design sections and consolidated written specification were approved on October 3, 2026 ("This is cool beans"). Phases A–D have since merged in PRs #190, #196, #198 and #205. The [Phase D handoff](../handoffs/2026-10-06-fsrs-phase-d-reliable-reviews.md) and merged PR body still record installed-extension smoke and visual proof as pending. Phase E has a [reviewed implementation plan](../plans/2026-10-10-fsrs-phase-e-daily-scheduling.md); F–H remain future phases.
 
 Approved amendment, October 4, 2026: add a 180-day maximum interval policy to Phase E for ongoing coding and interview readiness. This extends priority 4 within the existing eight-phase roadmap; it does not change Phase B's implementation or activate the cap now. Native cap-boundary behavior and the treatment of existing longer due dates must be resolved in E's detailed design and plan.
+
+Phase E decision, October 10, 2026: keep the literal native `maximum_interval: 180` in the effective profile and accept ts-fsrs 5.4.0's rating-order results up to 183 days. This is not a strict 180-day ceiling. Existing due dates beyond 180 days remain untouched until a genuine review; Update keeps the original event profile and may still return a longer date. No post-library clamp or catch-up migration is approved.
 
 Baseline: `codex/fsrs-remediation-design`, based on `origin/main` at `dc0fc6f2`. The original audit examined `7cccd2d7`; the newer Analytics and Tracks work is preserved. The lockfile currently resolves ts-fsrs 5.4.0, using FSRS 6.
 
@@ -141,9 +143,9 @@ Apply profile changes prospectively to genuine reviews. Changing retention, acti
 
 ### Phase E amendment: six-month maximum interval
 
-Use the library's maximum-interval configuration through the existing FSRS boundary. In pinned ts-fsrs 5.4.0, rating ordering can produce Good/Easy intervals above the configured maximum; resolve and test supported boundary behavior before promising a strict 180-day ceiling. A naked post-processing clamp of due dates or logs is not an approved solution. Saved results, Submit previews, projected future reviews and due consumers must agree on the actual policy. Update remains bound to its original event profile, including an older maximum, rather than applying today's cap to a correction.
+Use the library's `maximum_interval: 180` configuration through the existing FSRS boundary. In pinned ts-fsrs 5.4.0, rating ordering can produce native intervals up to 183 days after each raw interval is capped. The owner chose to retain this literal configuration and disclose the result rather than promise a strict 180-day ceiling. A naked post-processing clamp of due dates or logs is not approved. Saved results, Phase F Submit previews, projected future reviews and due consumers must agree on the actual policy. Update remains bound to its original event profile, including an older maximum, rather than applying today's cap to a correction.
 
-The detailed Phase E plan must settle how to treat existing problems already scheduled beyond 180 days. The current preservation rule remains in force: this amendment alone does not authorize bulk rescheduling, history replay or rewriting saved card/log values. Record the approved prospective or explicit catch-up policy before activation, with any schedule-changing catch-up separately designed and approved. Preserve history, earned progress and suspension in either case.
+Existing problems already scheduled beyond 180 days retain their raw due date until a genuine review under the prospective policy. This decision does not authorize bulk rescheduling, history replay or rewriting saved card/log values. Any schedule-changing catch-up requires a separately approved design. Preserve history, earned progress and suspension.
 
 Verify mature-card outputs at and above the maximum for all ratings and supported retention targets, profile round-trip, new Save versus original-profile Update, preview/save parity and cross-surface calendar behavior. Evaluate returned mature problems using existing recorded correctness, Again ratings, solve time and review workload; concept tracking and a new readiness subsystem are not required by this amendment.
 

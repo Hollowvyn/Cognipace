@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import type { AssessmentLockReason } from '@/features/assessment'
 import type { ReviewRating } from '@/lib/fsrs'
 import { cn } from '@/utils/cn'
+import type { OverlayReviewPreviewState } from '../../../hooks/use-overlay-review-preview'
 
 type AssessmentOption = {
   label: string
@@ -42,6 +43,7 @@ type OverlayAssessmentRailProps = {
   isDisabled?: boolean
   lockReason: AssessmentLockReason | null
   selectedRating: ReviewRating
+  preview: OverlayReviewPreviewState
   onSelectRating: (rating: ReviewRating) => void
 }
 
@@ -49,6 +51,7 @@ export function OverlayAssessmentRail({
   isDisabled,
   lockReason,
   selectedRating,
+  preview,
   onSelectRating,
 }: OverlayAssessmentRailProps) {
   const selectedOption = assessmentOptions.find(
@@ -72,9 +75,11 @@ export function OverlayAssessmentRail({
           const selected = option.rating === selectedRating
           const isOptionDisabled =
             isDisabled || (Boolean(lockReason) && !selected)
+          const estimate = formatRatingEstimate(preview, option.rating)
 
           return (
             <button
+              aria-label={`${option.label}, ${option.meaning}. ${estimate.accessible}`}
               aria-pressed={selected}
               className={cn(
                 'min-w-0 border-r border-border bg-card px-2 py-3 text-center transition-colors last:border-r-0',
@@ -96,10 +101,27 @@ export function OverlayAssessmentRail({
               <span className="mt-1 block truncate font-mono text-[0.72rem] uppercase tracking-[0.12em] opacity-80">
                 {option.meaning}
               </span>
+              <span className="mt-1 block text-[0.68rem] leading-tight opacity-85">
+                {estimate.short}
+              </span>
             </button>
           )
         })}
       </div>
+      {preview.status === 'unavailable' ? (
+        <p className="mt-2 text-xs text-muted-foreground" role="status">
+          {preview.reason}
+        </p>
+      ) : preview.status === 'error' ? (
+        <p className="mt-2 text-xs text-muted-foreground" role="status">
+          Estimates could not load. Review saving is still available.
+        </p>
+      ) : preview.status === 'ready' &&
+        preview.result.evidence === 'legacy-derived' ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Compatibility estimate from verified legacy evidence.
+        </p>
+      ) : null}
       <p
         className="mt-3 border-l-2 border-[color:var(--overlay-rating-fg)] pl-2 text-[0.78rem] leading-snug text-foreground"
         style={ratingStyle(selectedOption?.token ?? 'good')}
@@ -108,6 +130,48 @@ export function OverlayAssessmentRail({
       </p>
     </section>
   )
+}
+
+function formatRatingEstimate(
+  preview: OverlayReviewPreviewState,
+  rating: ReviewRating,
+): { short: string; accessible: string } {
+  if (preview.status === 'loading') {
+    return { short: 'Estimating…', accessible: 'Estimate loading.' }
+  }
+  if (preview.status === 'error') {
+    return { short: 'No estimate', accessible: 'Estimate failed.' }
+  }
+  if (preview.status === 'unavailable') {
+    return { short: 'Unavailable', accessible: preview.reason }
+  }
+  const result = preview.result.ratings[rating]
+  const date = new Date(`${result.eligibleOn}T12:00:00`)
+  const shortDate = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
+  const fullDate = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(date)
+  const today = new Date()
+  const todayKey = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-')
+  const past = result.eligibleOn < todayKey
+  const update = preview.result.identity.mode === 'update'
+  const days = `${result.studyDays} ${result.studyDays === 1 ? 'day' : 'days'}`
+  return {
+    short:
+      past && update
+        ? `Past ${shortDate} · ${result.studyDays}d`
+        : `${shortDate} · ${result.studyDays}d`,
+    accessible: `Estimated next study date ${fullDate}, ${days} after ${update ? 'the original review' : 'this preview'}.${past && update ? ' Past study date.' : ''}`,
+  }
 }
 
 function ratingStyle(token: string): CSSProperties {

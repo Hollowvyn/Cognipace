@@ -14,7 +14,7 @@ export function AnalyticsPage() {
   const { range } = useSearch({ from: '/analytics' })
 
   return (
-    <DashboardPage className="mx-auto w-full max-w-[80rem]">
+    <DashboardPage className="cp-analytics-dashboard mx-auto w-full max-w-[80rem]">
       <DashboardPageHeader
         actions={
           <>
@@ -22,9 +22,9 @@ export function AnalyticsPage() {
             {headerActions}
           </>
         }
-        title="How your memory is changing"
+        title="Analytics"
       >
-        A focused view of recall, practice patterns, weak spots, and workload.
+        Your progress, memory, and next reviews.
       </DashboardPageHeader>
       <DashboardPageBody>
         <AnalyticsScreen range={range} />

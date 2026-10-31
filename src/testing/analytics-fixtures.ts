@@ -4,7 +4,28 @@ import {
   buildHistoricalAnalyticsViews,
 } from '@/features/analytics/domain/historical-presentation'
 import { buildAnalyticsBucketsFromTimeFrame } from '@/features/analytics/domain/analytics-range-policy'
+import { buildAnalyticsBacklogTimeFrame } from '@/features/analytics/domain/analytics-history-window'
+import {
+  getAnalyticsDateKey,
+  addAnalyticsCalendarDays,
+} from '@/features/analytics/domain/analytics-time'
 import { normalizeFsrsSchedulingOptions } from '@/lib/fsrs'
+import type { PerformanceCountMatrix } from '@/features/analytics/domain/performance-presentation'
+
+export function createTopicRatingCountMatrix(
+  counts: Partial<{
+    [Difficulty in keyof PerformanceCountMatrix]: Partial<
+      PerformanceCountMatrix[Difficulty]
+    >
+  }> = {},
+): PerformanceCountMatrix {
+  return {
+    easy: { again: 0, hard: 0, good: 0, easy: 0, ...counts.easy },
+    medium: { again: 0, hard: 0, good: 0, easy: 0, ...counts.medium },
+    hard: { again: 0, hard: 0, good: 0, easy: 0, ...counts.hard },
+    unknown: { again: 0, hard: 0, good: 0, easy: 0, ...counts.unknown },
+  }
+}
 
 export const analyticsChartPointFixtures = {
   practiceRhythm: [
@@ -98,13 +119,24 @@ export function createSerializedAnalyticsSummary(
     range: 30,
     generatedAt: '2026-05-30T00:00:00.000Z',
     timeFrame,
-    reviewDays: 30,
-    totalReviews: 150,
-    currentStreak: 7,
-    observedRatingQuality: { value: 0.85, sampleSize: 50, lowSample: false },
+    activity: {
+      assessmentDays: 0,
+      recordedAssessments: 0,
+      knownCorrectnessAssessments: 0,
+      successfulAssessments: 0,
+      distinctSuccessfulProblems: 0,
+      observedCorrectness: null,
+      timedSuccessfulAssessments: 0,
+      untimedSuccessfulAssessments: 0,
+      successfulRecordedSeconds: 0,
+    },
+    reviewDays: 0,
+    totalReviews: 0,
+    currentStreak: 0,
+    observedRatingQuality: { value: null, sampleSize: 0, lowSample: true },
     predictedRecall: { value: null, sampleSize: 0, lowSample: true },
-    observedRatingSampleSize: 50,
-    lowSample: false,
+    observedRatingSampleSize: 0,
+    lowSample: true,
     targetRetention: 0.9,
     views: {
       problemSolving: buildHistoricalAnalyticsViews([], {
@@ -116,6 +148,7 @@ export function createSerializedAnalyticsSummary(
         fsrsOptions: normalizeFsrsSchedulingOptions(),
       }).problemSolving,
       observedRecallVsFsrs: {
+        timeFrame,
         rows: [],
         scale: { domain: [0, 1], ticks: [0, 1] },
         targetRecall: 0.9,
@@ -157,6 +190,15 @@ export function createSerializedAnalyticsSummary(
       },
       memorySignals: { rows: [], totalQualifying: 0 },
       overdueBacklog: {
+        timeFrame: {
+          ...buildAnalyticsBacklogTimeFrame({
+            asOf: new Date(timeFrame.asOf),
+            timeZone: timeFrame.timeZone,
+          }),
+          requestedDays: 30,
+          grouping: { unit: 'day', step: 1 },
+          timeZoneFallback: timeFrame.timeZoneFallback,
+        },
         rows: [],
         knownDays: 0,
         withinWatchDays: 0,
@@ -168,7 +210,10 @@ export function createSerializedAnalyticsSummary(
       },
       upcomingReviewLoad: {
         rows: Array.from({ length: 14 }, (_, index) => ({
-          date: `1970-01-${String(index + 1).padStart(2, '0')}`,
+          date: addAnalyticsCalendarDays(
+            getAnalyticsDateKey(new Date(timeFrame.asOf), timeFrame.timeZone),
+            index,
+          ),
           dueCount: 0,
           overdueCount: 0,
           today: index === 0,

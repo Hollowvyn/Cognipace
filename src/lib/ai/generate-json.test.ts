@@ -849,3 +849,418 @@ describe('generateJson actual SDK wire', () => {
     expectSafe(result)
   })
 })
+
+describe('opt-in transient model recovery', () => {
+  it.each([502, 503, 504, 'provider_unavailable', 'provider_overloaded'])(
+    'recovers once from %s with unchanged strict routing',
+    async (failure) => {
+      vi.useFakeTimers()
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(
+          jsonResponse(
+            errorBody(
+              'openrouter',
+              503,
+              typeof failure === 'string' ? failure : 'generic',
+            ),
+            typeof failure === 'number' ? failure : 200,
+          ),
+        )
+        .mockResolvedValueOnce(jsonResponse(successBody('openrouter')))
+      const pending = generateJson(
+        request('openrouter', { retryTransientErrors: true }),
+      )
+      await vi.advanceTimersByTimeAsync(999)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(await pending).toMatchObject({
+        status: 'success',
+        providerMetadata: { durationMs: 1000 },
+      })
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(
+        fetchMock.mock.calls[0]?.[1]?.body,
+      )
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
+
+  it('caps retry attempts at two', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() =>
+        Promise.resolve(jsonResponse(errorBody('openrouter', 503), 503)),
+      )
+    const pending = generateJson(
+      request('openrouter', { retryTransientErrors: true }),
+    )
+    await vi.advanceTimersByTimeAsync(2000)
+    const result = await pending
+    expect(result).toMatchObject({ status: 'error', code: 'network' })
+    expectSafe(result)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['2', 'Wed, 01 Jan 2031 00:00:02 GMT'])(
+    'honors Retry-After %s',
+    async (header) => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2031-01-01T00:00:00Z'))
+      const response = jsonResponse(errorBody('openrouter', 503), 503)
+      response.headers.set('Retry-After', header)
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(response)
+        .mockResolvedValueOnce(jsonResponse(successBody('openrouter')))
+      const pending = generateJson(
+        request('openrouter', { retryTransientErrors: true }),
+      )
+      await vi.advanceTimersByTimeAsync(1999)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(await pending).toMatchObject({ status: 'success' })
+    },
+  )
+
+  it('returns the original error immediately when the retry cannot fit', async () => {
+    const response = jsonResponse(errorBody('openrouter', 503), 503)
+    response.headers.set('Retry-After', '60')
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
+    expect(
+      await generateJson(
+        request('openrouter', {
+          retryTransientErrors: true,
+          timeoutMs: 60000,
+        }),
+      ),
+    ).toMatchObject({ status: 'error', code: 'network' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels during backoff without dispatching again', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(errorBody('openrouter', 503), 503))
+    const pending = generateJson(
+      request('openrouter', {
+        retryTransientErrors: true,
+        signal: controller.signal,
+      }),
+    )
+    await vi.advanceTimersByTimeAsync(100)
+    controller.abort()
+    expect(await pending).toMatchObject({ status: 'error', code: 'cancelled' })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('shares the deadline across preparation, retry and second transport', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        return jsonResponse(errorBody('openrouter', 503), 503)
+      })
+      .mockImplementationOnce(() => new Promise(() => {}))
+    const pending = generateJson(
+      request('openrouter', { retryTransientErrors: true, timeoutMs: 2000 }),
+    )
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(await pending).toMatchObject({
+      status: 'error',
+      code: 'timeout',
+      providerMetadata: { durationMs: 2000 },
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(aiProviderIds)(
+    'recovers for any opted-in %s model',
+    async (provider) => {
+      vi.useFakeTimers()
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(jsonResponse(errorBody(provider, 503), 503))
+        .mockResolvedValueOnce(jsonResponse(successBody(provider)))
+      const pending = generateJson(
+        request(provider, {
+          model:
+            provider === 'openrouter' ? 'vendor/paid-model' : models[provider],
+          retryTransientErrors: true,
+        }),
+      )
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(await pending).toMatchObject({ status: 'success' })
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(
+        fetchMock.mock.calls[0]?.[1]?.body,
+      )
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
+
+  it.each(aiProviderIds)(
+    'keeps %s calls single-attempt without opt-in',
+    async (provider) => {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(errorBody(provider, 503), 503))
+      expect(await generateJson(request(provider))).toMatchObject({
+        status: 'error',
+        code: 'network',
+      })
+      expect(fetchMock).toHaveBeenCalledOnce()
+    },
+  )
+
+  it.each([401, 402, 403, 404, 408, 429, 500])(
+    'never retries HTTP %s',
+    async (status) => {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          jsonResponse(errorBody('openrouter', status), status),
+        )
+      const result = await generateJson(
+        request('openrouter', { retryTransientErrors: true }),
+      )
+      expect(result.status).toBe('error')
+      expectSafe(result)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it.each([
+    'payment_required',
+    'rate_limit_exceeded',
+    'refusal',
+    'timeout',
+    'max_tokens_exceeded',
+    'authentication',
+  ])('never retries machine error %s even with HTTP 503', async (tag) => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(errorBody('openrouter', 503, tag), 503))
+    expect(
+      (
+        await generateJson(
+          request('openrouter', { retryTransientErrors: true }),
+        )
+      ).status,
+    ).toBe('error')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+it.each(['refused', 'invalid-output', 'malformed'] as const)(
+  'never retries opt-in %s output',
+  async (kind) => {
+    const body =
+      kind === 'malformed'
+        ? { unrelated: API_KEY }
+        : {
+            ...successBody('openrouter'),
+            choices: [
+              {
+                index: 0,
+                message: { role: 'assistant', content: '{"ok":true}' },
+                finish_reason: kind === 'refused' ? 'content_filter' : 'length',
+              },
+            ],
+          }
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(body))
+    const result = await generateJson(
+      request('openrouter', { retryTransientErrors: true }),
+    )
+    expect(result).toMatchObject({
+      status: 'error',
+      code: kind === 'refused' ? 'refused' : 'invalid-output',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expectSafe(result)
+  },
+)
+
+it('resets transport status before the second attempt', async () => {
+  vi.useFakeTimers()
+  const fetchMock = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(jsonResponse(errorBody('openrouter', 503), 503))
+    .mockRejectedValueOnce(new Error('private provider diagnostic'))
+  const pending = generateJson(
+    request('openrouter', {
+      model: 'vendor/model:free',
+      retryTransientErrors: true,
+    }),
+  )
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(await pending).toMatchObject({ status: 'error', code: 'unknown' })
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+})
+
+describe('opt-in safe generation metrics', () => {
+  it.each(aiProviderIds)(
+    'measures %s actual wire without extra fetches',
+    async (provider) => {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(successBody(provider)))
+      const result = await generateJson(
+        request(provider, {
+          collectMetrics: true,
+          prompt: { system: 'Return JSON', user: 'é漢字' },
+        }),
+      )
+      expect(result.status).toBe('success')
+      expect(fetchMock).toHaveBeenCalledOnce()
+      expect(result.providerMetadata.metrics).toMatchObject({
+        attemptCount: 1,
+        requestBodyBytes: new TextEncoder().encode(
+          requestBodyText(fetchMock.mock.calls[0]![1]?.body),
+        ).length,
+        outputJsonBytes: 11,
+        inputTokens: 20,
+        outputTokens: 10,
+        totalTokens: 30,
+        preparationMs: expect.any(Number) as unknown,
+        generationMs: expect.any(Number) as unknown,
+        validationMs: expect.any(Number) as unknown,
+      })
+      expectSafe(result)
+    },
+  )
+  it('retains exact legacy metadata without opt-in', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(successBody('openai')),
+    )
+    const result = await generateJson(request('openai'))
+    expect(result.providerMetadata).toEqual({
+      provider: 'openai',
+      model: models.openai,
+      durationMs: expect.any(Number) as unknown,
+    })
+  })
+  it('retains only known failure measurements without output or usage', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(errorBody('openai', 401), 401),
+    )
+    const result = await generateJson(
+      request('openai', { collectMetrics: true }),
+    )
+    expect(result.status).toBe('error')
+    expect(result.providerMetadata.metrics).toMatchObject({
+      attemptCount: 1,
+      requestBodyBytes: expect.any(Number) as unknown,
+      generationMs: expect.any(Number) as unknown,
+    })
+    expect(result.providerMetadata.metrics).not.toHaveProperty(
+      'outputJsonBytes',
+    )
+    expect(result.providerMetadata.metrics).not.toHaveProperty('inputTokens')
+    expectSafe(result)
+  })
+})
+
+it('aggregates actual retry request bytes while retaining only successful SDK token usage', async () => {
+  const fetchMock = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(
+      new Response('{}', { status: 503, headers: { 'retry-after': '0' } }),
+    )
+    .mockResolvedValueOnce(jsonResponse(successBody('openai')))
+  const result = await generateJson(
+    request('openai', { collectMetrics: true, retryTransientErrors: true }),
+  )
+  expect(result.status).toBe('success')
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+  const bytes = fetchMock.mock.calls.reduce(
+    (sum, [, init]) =>
+      sum + new TextEncoder().encode(requestBodyText(init?.body)).length,
+    0,
+  )
+  expect(result.providerMetadata.metrics).toMatchObject({
+    attemptCount: 2,
+    requestBodyBytes: bytes,
+    inputTokens: 20,
+    outputTokens: 10,
+    totalTokens: 30,
+  })
+})
+
+it('measures async schema validation separately from generation', async () => {
+  vi.useFakeTimers()
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    jsonResponse(successBody('openai')),
+  )
+  const pending = generateJson(
+    request('openai', {
+      collectMetrics: true,
+      schema: schema.refine(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25))
+        return true
+      }),
+    }),
+  )
+  await vi.advanceTimersByTimeAsync(25)
+  const result = await pending
+  expect(result.status).toBe('success')
+  expect(result.providerMetadata.metrics).toMatchObject({
+    validationMs: 25,
+    generationMs: 0,
+  })
+})
+
+it('omits unavailable SDK token counts rather than estimating from bytes', async () => {
+  const body = successBody('openai')
+  Reflect.deleteProperty(body, 'usage')
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(body))
+  const result = await generateJson(request('openai', { collectMetrics: true }))
+  expect(result.status).toBe('success')
+  expect(result.providerMetadata.metrics).not.toHaveProperty('inputTokens')
+  expect(result.providerMetadata.metrics).not.toHaveProperty('totalTokens')
+})
+
+it('projects native OpenAI cache and reasoning counts from SDK usage only', async () => {
+  const body = successBody('openai')
+  Object.assign(body, {
+    usage: {
+      input_tokens: 20,
+      output_tokens: 10,
+      total_tokens: 30,
+      input_tokens_details: { cached_tokens: 7 },
+      output_tokens_details: { reasoning_tokens: 3 },
+      raw: API_KEY,
+    },
+  })
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(body))
+  const result = await generateJson(request('openai', { collectMetrics: true }))
+  expect(result.providerMetadata.metrics).toMatchObject({
+    cacheReadTokens: 7,
+    reasoningTokens: 3,
+  })
+  expectSafe(result)
+})
+
+it('counts validated unicode output JSON rather than the provider envelope', async () => {
+  const data = { text: 'é漢字' }
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    jsonResponse(successBody('openai', JSON.stringify(data))),
+  )
+  const result = await generateJson({
+    ...request('openai'),
+    schema: z.strictObject({ text: z.string() }),
+    collectMetrics: true,
+  })
+  expect(result.status).toBe('success')
+  expect(result.providerMetadata.metrics?.outputJsonBytes).toBe(
+    new TextEncoder().encode(JSON.stringify(data)).length,
+  )
+})

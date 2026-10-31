@@ -1,14 +1,59 @@
+import { makeAnalysisRequest } from '@/features/leetcode-review-assistant/testing/code-analysis-fixtures'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { makeValidAnalysis } from '@/features/leetcode-review-assistant/testing'
+import { makeValidFeedback } from '@/features/leetcode-review-assistant/testing'
 
 import { initialOverlaySessionState } from '../../../domain'
 import { ExpandedOverlay } from './expanded-overlay'
 
 describe('ExpandedOverlay', () => {
+  it('shows an honest past Update study date without disabling review actions', () => {
+    const rating = {
+      dueAt: '2020-01-03T10:00:00.000Z',
+      eligibleOn: '2020-01-03',
+      studyDays: 2,
+      scheduledDays: 2,
+    }
+    const props = createProps({
+      view: {
+        preview: {
+          status: 'ready',
+          result: {
+            status: 'ready',
+            identity: {
+              mode: 'update',
+              problemSlug: 'two-sum',
+              generation: {
+                localGenerationToken: 'local',
+                problemGenerationToken: 'problem',
+              },
+              targetAttemptId: 'attempt',
+              expectedRevision: 0,
+              reviewedAt: '2020-01-01T10:00:00.000Z',
+            },
+            evidence: 'legacy-derived',
+            ratings: {
+              again: rating,
+              hard: rating,
+              good: rating,
+              easy: rating,
+            },
+          },
+        },
+      },
+    })
+    render(<ExpandedOverlay {...props} />)
+    expect(
+      screen.getByRole('button', { name: /Easy, Fast.*Past study date/ }),
+    ).toBeEnabled()
+    expect(screen.getAllByText(/Past Jan 3 · 2d/)).toHaveLength(4)
+    expect(
+      screen.getByText(/Compatibility estimate from verified legacy evidence/),
+    ).toBeInTheDocument()
+  })
   it('presents hints in Solve Help and hands off reveal and toggle actions', async () => {
     const props = createProps({
       view: {
@@ -61,6 +106,39 @@ describe('ExpandedOverlay', () => {
     expect(props.commands.onSettings).toHaveBeenCalledOnce()
   })
 
+  it.each(['error', 'persistence-pending'] as const)(
+    'provides accessible %s retry while disabling rating and restart controls',
+    async (commandStatus) => {
+      const props = createProps({
+        view: {
+          overlay: {
+            ...createSubmittedOverlay(),
+            reviewStatus: 'updating',
+            commandStatus,
+            feedback: {
+              tone: 'neutral',
+              message:
+                'Review persistence is pending. Retry to confirm it is saved.',
+            },
+          },
+        },
+      })
+      render(<ExpandedOverlay {...props} />)
+      const user = userEvent.setup()
+      expect(screen.getByRole('button', { name: 'Restart' })).toBeDisabled()
+      for (const name of [
+        /^Easy, Fast/,
+        /^Good, Stable/,
+        /^Hard, Lagging/,
+        /^Again, Failed/,
+      ])
+        expect(screen.getByRole('button', { name })).toBeDisabled()
+      await user.click(screen.getByRole('button', { name: 'Retry review' }))
+      expect(props.commands.onRetryReview).toHaveBeenCalledOnce()
+      expect(screen.queryByText('Review saved.')).not.toBeInTheDocument()
+    },
+  )
+
   it('keeps review actions in Solve and shows focused AI and Notes panels', () => {
     const props = createProps()
     const { rerender } = render(<ExpandedOverlay {...props} />)
@@ -106,7 +184,9 @@ describe('ExpandedOverlay', () => {
         aiAnalysis: {
           status: 'ready',
           requestId: 'request-1',
-          report: makeValidAnalysis(),
+          report: makeValidFeedback(),
+          assessment: makeAnalysisRequest(),
+          host: 'leetcode.com',
         },
         overlay: {
           ...initialOverlaySessionState,
@@ -319,7 +399,9 @@ describe('ExpandedOverlay', () => {
         aiAnalysis: {
           status: 'ready',
           requestId: 'request-1',
-          report: makeValidAnalysis(),
+          report: makeValidFeedback(),
+          assessment: makeAnalysisRequest(),
+          host: 'leetcode.com',
         },
         overlay: {
           ...createFailedSubmittedOverlay(),
@@ -402,6 +484,7 @@ function createProps(
       onResetTimer: vi.fn(),
       onRestart: vi.fn(),
       onRetryAiAnalysis: vi.fn(),
+      onGenerateImplementation: vi.fn(),
       onToggleHints: vi.fn(),
       onRevealNextHint: vi.fn(),
       onRetryHints: vi.fn(),
@@ -411,12 +494,14 @@ function createProps(
       onStartTimer: vi.fn(),
       onSubmit: vi.fn(),
       onUpdate: vi.fn(),
+      onRetryReview: vi.fn(),
       ...overrides.commands,
     },
     themeMode: 'system',
     view: {
       hints: { status: 'idle', isOpen: false },
       aiAnalysis: { status: 'idle' },
+      aiImplementation: { status: 'idle' },
       context: createOverlayContext(),
       elapsedSeconds: 0,
       helpSearchQuery: 'Two Sum',
@@ -426,6 +511,7 @@ function createProps(
         activeProblemSlug: 'two-sum',
         visualMode: 'expanded',
       },
+      preview: { status: 'loading' },
       problemTitle: 'Two Sum',
       syncFeedback: null,
       syncStatus: 'ready',
@@ -444,6 +530,13 @@ function createSubmittedOverlay(
     activeProblemSlug: 'two-sum',
     reviewStatus: 'submitted-clean',
     submittedSession: {
+      reviewAttemptId: 'attempt-1',
+      revision: 0,
+      reviewedAt: '2026-01-01T10:00:00.000Z',
+      generation: {
+        localGenerationToken: 'local-1',
+        problemGenerationToken: 'problem-1',
+      },
       elapsedSeconds: 95,
       isCorrect: true,
       lockReason: null,
@@ -459,6 +552,13 @@ function createFailedSubmittedOverlay(): ExpandedOverlayProps['view']['overlay']
     ratingLockReason: 'failed',
     selectedRating: 'again',
     submittedSession: {
+      reviewAttemptId: 'attempt-1',
+      revision: 0,
+      reviewedAt: '2026-01-01T10:00:00.000Z',
+      generation: {
+        localGenerationToken: 'local-1',
+        problemGenerationToken: 'problem-1',
+      },
       elapsedSeconds: null,
       isCorrect: false,
       lockReason: 'failed',
