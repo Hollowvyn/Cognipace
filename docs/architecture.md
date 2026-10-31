@@ -717,6 +717,13 @@ The prompt preserves valid strategies, targets the smallest remaining gap and
 avoids complete implementations or invented defects. A model progress judgment
 is not proof of correctness; live provider quality requires separate evaluation.
 
+Provider input interns identical code/language snapshots into one table and
+uses indices for the current snapshot and ordered prior turns. Equality ignores
+capture timestamps and normalizes only CRLF endings. Distinct source or language
+remains complete; no semantic summary, truncation or opaque hash replaces code.
+This projection reduces repeated provider context without changing local/runtime
+history, turn validation or request-time snapshot ownership.
+
 Every Get next hint and Retry captures fresh code and makes one new provider
 request. A failure does not consume a slot; previous hints remain visible during
 pending/error states. A completed hint remains bound to its request-time code,

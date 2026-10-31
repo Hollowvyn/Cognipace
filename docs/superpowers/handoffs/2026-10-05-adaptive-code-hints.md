@@ -13,6 +13,37 @@ snapshots. Always advance light → medium → heavy by successful turn count,
 including after meaningful progress, and cap successful hints at three. Retain earlier hints during edits,
 subsequent requests and failures. No hint-related persistence or review writes.
 
+## Approved context optimization — 2026-10-31
+
+The user approved reducing repeated model context across the whole AI flow.
+The hint service now projects validated input into a unique complete snapshot
+table, a current-snapshot index and ordered prior hint/snapshot references.
+Equality uses language and CRLF-normalized code; timestamps are irrelevant.
+Current source retains its original text. Distinct code/language remains complete.
+Only provider input changes: local history, strict runtime/domain contracts,
+capture, UI, Light/Medium/Heavy progression and the three-success cap stay intact.
+
+- `rtk proxy npm test -- src/features/leetcode-review-assistant/server/code-hint-service.test.ts --run`:
+  RED 10 expected failures / 12 passes before implementation, then 22 passed.
+- `rtk proxy npm test -- src/features/leetcode-review-assistant --run`:
+  298 passed, 14 opted-in live-provider cases skipped.
+- `rtk proxy npx eslint src/features/leetcode-review-assistant/server/code-hint-service.ts src/features/leetcode-review-assistant/server/code-hint-service.test.ts`,
+  equivalent `rtk proxy npx prettier --check` on those files, and
+  `rtk proxy npx tsc --noEmit -p tsconfig.json`: passed. An initial test helper
+  typing/lint diagnostic was corrected before the final runs.
+- Independent SPEC and QUALITY reviews approved without findings and each ran
+  the 22-test service suite successfully.
+- `rtk proxy npm run check`: passed database check, typecheck, lint and tests;
+  3,102 passed, 14 opted-in live cases skipped; 219 files passed, two skipped.
+- `rtk proxy npm run lint`, `rtk proxy npm run build` and
+  `rtk proxy npm run format`: passed. Existing large-chunk and jsdom scroll
+  notices remain. Explicit planning/handoff Prettier and diff checks passed.
+
+Live prompt usefulness and human extension smoke remain pending. Snapshot
+references have deterministic offline coverage; no provider latency or token
+savings are claimed without live measurements. The skipped commands and reasons
+below still apply to this correction.
+
 ## Approved strength correction — 2026-10-30
 
 The user explicitly chose always advancing light → medium → heavy. Progress

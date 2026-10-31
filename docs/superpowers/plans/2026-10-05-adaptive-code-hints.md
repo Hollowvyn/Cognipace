@@ -1,5 +1,17 @@
 # Adaptive code hints implementation plan
 
+## Approved provider-context optimization — 2026-10-31
+
+The user approved an end-to-end AI data-efficiency pass. For this hint branch,
+intern exactly equal code/language snapshots in provider input only, comparing
+with CRLF normalization and ignoring capturedAt. Preserve full local/runtime
+snapshots and all distinct code/language entries, ordered prior hints, problem
+context and fixed Light/Medium/Heavy progression. Explain snapshot references in
+the prompt. Add RED/GREEN serialization tests proving one copy on unchanged
+turn three and lossless references for changed source/language. Run focused tests,
+independent spec/quality reviews and required lint/check/build/format before
+updating PR #203. No capture, schema, persistence, sync, permission or UI change.
+
 > **For agentic workers:** Use superpowers:subagent-driven-development for scoped
 > implementation and independent spec/quality reviews. Execute continuously under
 > the user's design approval; no further execution-choice approval is needed.
