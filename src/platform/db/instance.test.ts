@@ -1,5 +1,9 @@
 import { sql } from 'drizzle-orm'
-import { IDBObjectStore, indexedDB as testIndexedDB } from 'fake-indexeddb'
+import {
+  IDBKeyRange,
+  IDBObjectStore,
+  indexedDB as testIndexedDB,
+} from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./proxy', async (importOriginal) => {
@@ -95,6 +99,7 @@ class FakeStorage {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('IDBKeyRange', IDBKeyRange)
   resetAppDbForTesting()
 })
 

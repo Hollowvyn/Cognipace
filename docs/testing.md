@@ -2560,3 +2560,29 @@ Full verification:
 npm run check
 npm run format
 ```
+
+### Ordinary core retirement proof
+
+`src/testing/snapshot-retirement.integration.test.ts` exercises the standard
+250-problem/5,000-review fixture through the Library bulk action's service and
+snapshot-flush sequence for 20 suspended rows, both from an ordinary seed and
+a completed composite replacement. `src/platform/db/snapshot-idb.test.ts` covers
+explicit provenance, pending roots, bounded uncertainty, opaque lookalikes,
+changed heads, dangling/mismatched recovery provenance, missing reserved
+provenance, readiness or active-core disappearance between readback and cleanup,
+array-valued provenance/candidate keys, lazy namespace-boundary bodies, readback failure
+and retirement abort. These use native SQLite
+and fake IndexedDB; they do not establish Chrome quota, latency or realtime
+service-worker behavior. The measured 7,290,880-byte fixture retains one core
+(7,290,880 bytes) after 20 ordinary saves; after completed composite replacement
+it retains active and paired recovery cores (14,581,760 bytes). The old implementation
+retained 21 and 22 cores respectively under these same sequences.
+
+Human Chrome proof remains pending: on a disposable populated profile, suspend
+one default Library page, verify all 20 changes survive worker restart, record
+physical core counts/bytes before and after, and attach screenshot or recording.
+Repeat after a completed restore, verify the retained recovery export, and
+exercise failed publication and failed cleanup: publication failure preserves the
+old active pair; cleanup failure leaves the new saved data usable and retains
+old bytes for maintenance. Include pending/restarted replacement roots and
+capture exact failures without exposing study contents.

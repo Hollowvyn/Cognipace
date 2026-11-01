@@ -1046,6 +1046,26 @@ Downgrade to a version-1 client is unsupported: preserve the profile and use a
 compatible build or a separately exported compatible backup in a disposable
 profile. Do not delete the new database to make an older build open it.
 
+Ordinary core saves promptly retire only their outgoing immutable core after
+strict durable publication and readback of the new pair and binary. A separate
+small transaction rechecks the exact active identity and checks fixed pending
+replacement records plus compact provenance and candidate prefixes (at most 64
+each). Explicit paired, core-only and legacy recovery pointers pin their target;
+opaque head-like recovery fields do not invent provenance. Unresolved, malformed,
+capped or otherwise uncertain roots retain the old core for reachability
+maintenance. Completed candidates require their exact committed command fence before
+their preparation can be ignored, including their formerly published core. Recovery targets and their explicit pointers must agree; reserved recovery
+without provenance or dangling targets retain bytes. Active and paired-recovery
+readiness markers and the new active core key are rechecked inside proof/delete.
+Prefix discovery uses key-only lower-bound cursors that stop on the first
+namespace change, including array-valued provenance target keys; only matched
+compact metadata is fetched. Stale heads,
+readback failures and cleanup aborts retain old bytes without failing the already
+durable save. This avoids accumulating a full copy per ordinary Library mutation
+when reachability is provable, rather than guaranteeing constant physical storage.
+It does not scan archive rows or other binary bodies, change replacement
+publication, or rely on an age TTL or faster alarm.
+
 The physical v2→v3 upgrade only backfills a lossless UTC timestamp sort key and
 recreates the submission chronology index, atomically. It preserves head
 `formatVersion: 2`, SQL, original timestamp strings, cores, recoveries, readiness,

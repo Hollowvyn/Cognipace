@@ -1,4 +1,7 @@
 import {
+  isCommittedCompositeCandidate,
+  preparedCompositeCandidateSchema,
+  pendingCompositeKey,
   readPendingCompositePreparation,
   type PendingCompositePreparation,
 } from './composite-publication'
@@ -425,6 +428,305 @@ export function createSnapshotIdbStore(
     )
   }
 
+  // Best-effort retirement is restricted to the outgoing ordinary-save core.
+  // Unknown roots defer to bounded reachability maintenance. Never scan bodies
+  // or archive rows here, and never turn an already durable save into failure.
+  async function retireOrdinaryCore(
+    oldId: string | undefined,
+    next: ActiveSnapshotRecord,
+  ) {
+    if (!oldId) return
+    try {
+      const expected = await local.readHead() // validates the published pair
+      if (
+        !expected ||
+        expected.coreSnapshotId === oldId ||
+        expected.revision !== next.revision ||
+        expected.fingerprint !== next.fingerprint ||
+        expected.savedAt !== next.savedAt
+      )
+        return
+      const verified = await local.readCore(expected.coreSnapshotId)
+      if (
+        !verified ||
+        verified.byteLength !== next.bytes.byteLength ||
+        !verified.every((byte, i) => byte === next.bytes[i])
+      )
+        return
+      await local.transact(
+        ['records', 'coreSnapshots'],
+        'readwrite',
+        (s, finish, fail) => {
+          const keep = () => finish(undefined)
+          const guard = (callback: () => void) => () => {
+            try {
+              callback()
+            } catch (error) {
+              fail(error)
+            }
+          }
+          // Opaque history is never hydrated by discovery. Separately stored
+          // provenance authorizes validating a recovery's compact head fields.
+          const checkReference = (
+            recordKey: IDBValidKey,
+            rawPointer: unknown,
+            ready: () => void,
+          ) => {
+            const pointer = coreRecordReferenceSchema.parse(rawPointer)
+            if (pointer.coreSnapshotId === oldId) {
+              keep()
+              return
+            }
+            const presence = s.records.getKey(recordKey)
+            presence.onsuccess = guard(() => {
+              if (presence.result === undefined) {
+                keep()
+                return
+              }
+              const target = s.records.get(recordKey)
+              target.onsuccess = guard(() => {
+                const metadata = z
+                  .object({
+                    key: z.enum(['active', 'replacement']),
+                    formatVersion: z.literal(2),
+                    coreSnapshotId: z.string().min(1),
+                    fingerprint: z.string(),
+                    revision: z
+                      .number()
+                      .int()
+                      .positive()
+                      .max(Number.MAX_SAFE_INTEGER),
+                    savedAt: z.string(),
+                    archiveGeneration: z.string().min(1).optional(),
+                    datasetToken: z.string().min(1).optional(),
+                  })
+                  .parse(target.result)
+                if (metadata.coreSnapshotId !== pointer.coreSnapshotId) {
+                  keep()
+                  return
+                }
+                const core = s.coreSnapshots.getKey(pointer.coreSnapshotId)
+                core.onsuccess = guard(() => {
+                  if (core.result === undefined) {
+                    keep()
+                    return
+                  }
+                  if ('kind' in pointer && pointer.kind === 'paired') {
+                    if (
+                      metadata.archiveGeneration !==
+                        pointer.archiveGeneration ||
+                      metadata.datasetToken !== pointer.datasetToken
+                    ) {
+                      keep()
+                      return
+                    }
+                    readReadyArchive(
+                      s.records,
+                      pointer.archiveGeneration,
+                      ready,
+                      fail,
+                    )
+                  } else ready()
+                })
+              })
+            })
+          }
+          const checkReservedRecovery = (ready: () => void) => {
+            const recovery = s.records.getKey('recovery')
+            recovery.onsuccess = guard(() => {
+              if (recovery.result === undefined) {
+                ready()
+                return
+              }
+              const provenance = s.coreSnapshots.get(
+                coreRecordReferenceKey('recovery'),
+              )
+              provenance.onsuccess = guard(() => {
+                if (provenance.result === undefined) {
+                  keep()
+                  return
+                }
+                checkReference('recovery', provenance.result, ready)
+              })
+            })
+          }
+          const active = s.records.get('active')
+          active.onsuccess = () => {
+            try {
+              const current = localHeadSchema.parse(active.result)
+              if (
+                current.coreSnapshotId !== expected.coreSnapshotId ||
+                current.revision !== expected.revision ||
+                current.archiveGeneration !== expected.archiveGeneration ||
+                current.datasetToken !== expected.datasetToken ||
+                current.fingerprint !== expected.fingerprint ||
+                current.savedAt !== expected.savedAt ||
+                current.replacementId !== expected.replacementId ||
+                current.lastVerifiedRevision !== expected.lastVerifiedRevision
+              ) {
+                keep()
+                return
+              }
+              readReadyArchive(
+                s.records,
+                current.archiveGeneration,
+                () => {
+                  checkReservedRecovery(() => {
+                    const pending = s.records.get(pendingCompositeKey)
+                    pending.onsuccess = guard(() => {
+                      if (pending.result !== undefined) {
+                        keep()
+                        return
+                      }
+                      const continuation = s.records.get(
+                        'replacement-continuation',
+                      )
+                      continuation.onsuccess = guard(() => {
+                        if (continuation.result !== undefined) {
+                          keep()
+                          return
+                        }
+                        let candidateCount = 0
+                        const candidates = s.records.openKeyCursor(
+                          IDBKeyRange.lowerBound(['composite-candidate']),
+                        )
+                        candidates.onsuccess = guard(() => {
+                          try {
+                            const cursor = candidates.result
+                            if (
+                              cursor &&
+                              Array.isArray(cursor.key) &&
+                              cursor.key[0] === 'composite-candidate'
+                            ) {
+                              if (++candidateCount >= 64) {
+                                keep()
+                                return
+                              }
+                              const candidateRead = s.records.get(cursor.key)
+                              candidateRead.onsuccess = guard(() => {
+                                const candidate =
+                                  preparedCompositeCandidateSchema.parse(
+                                    candidateRead.result,
+                                  )
+                                const descriptor = candidate.descriptor
+                                if (
+                                  !Array.isArray(cursor.key) ||
+                                  cursor.key.length !== 2 ||
+                                  cursor.key[1] !== descriptor.replacementId
+                                ) {
+                                  keep()
+                                  return
+                                }
+                                const fence = s.records.get(
+                                  replacementCommandKey(
+                                    descriptor.replacementId,
+                                  ),
+                                )
+                                fence.onsuccess = () => {
+                                  try {
+                                    // Only an exact durable command fence can discharge
+                                    // an unrelated completed candidate after later saves.
+                                    if (
+                                      fence.result === undefined ||
+                                      !isCommittedCompositeCandidate(
+                                        descriptor,
+                                        fence.result,
+                                        current,
+                                      )
+                                    ) {
+                                      keep()
+                                      return
+                                    }
+                                    cursor.continue()
+                                  } catch (error) {
+                                    fail(error)
+                                  }
+                                }
+                              })
+                              return
+                            }
+                          } catch (error) {
+                            fail(error)
+                            return
+                          }
+                          let count = 0
+                          const references = s.coreSnapshots.openKeyCursor(
+                            IDBKeyRange.lowerBound(['recordReference']),
+                          )
+                          references.onsuccess = () => {
+                            try {
+                              const cursor = references.result
+                              if (
+                                !cursor ||
+                                !Array.isArray(cursor.key) ||
+                                cursor.key[0] !== 'recordReference'
+                              ) {
+                                // The new binary must still exist in this same
+                                // proof/delete transaction after readback.
+                                const activeCore = s.coreSnapshots.getKey(
+                                  current.coreSnapshotId,
+                                )
+                                activeCore.onsuccess = guard(() => {
+                                  if (activeCore.result === undefined) {
+                                    keep()
+                                    return
+                                  }
+                                  s.coreSnapshots.delete(oldId)
+                                  finish(undefined)
+                                })
+                                return
+                              }
+                              // Reaching the cap is uncertainty, including exactly 64.
+                              if (++count >= 64) {
+                                keep()
+                                return
+                              }
+                              const referenceRead = s.coreSnapshots.get(
+                                cursor.key,
+                              )
+                              referenceRead.onsuccess = guard(() => {
+                                const reference =
+                                  coreRecordReferenceSchema.safeParse(
+                                    referenceRead.result,
+                                  )
+                                if (
+                                  !Array.isArray(cursor.key) ||
+                                  cursor.key.length !== 2 ||
+                                  !reference.success ||
+                                  reference.data.coreSnapshotId === oldId
+                                ) {
+                                  keep()
+                                  return
+                                }
+                                checkReference(
+                                  cursor.key[1]!,
+                                  reference.data,
+                                  () => cursor.continue(),
+                                )
+                              })
+                            } catch (error) {
+                              fail(error)
+                            }
+                          }
+                        })
+                      })
+                    })
+                  })
+                },
+                fail,
+              )
+            } catch (error) {
+              fail(error)
+            }
+          }
+        },
+      )
+    } catch {
+      // Publication is already durable. Retain outgoing bytes on any proof or
+      // cleanup failure; normal reachability maintenance remains the fallback.
+    }
+  }
+
   return {
     listReplacementRecoveries() {
       return transact('readonly', (_records, finish, fail, read) => {
@@ -630,57 +932,69 @@ export function createSnapshotIdbStore(
       })
     },
 
-    commitSnapshot(bytes, fingerprint, now) {
+    async commitSnapshot(bytes, fingerprint, now) {
       const savedBytes = bytes.slice()
       const savedAt = now.toISOString()
-      return transact('readwrite', (_records, finish, fail, read, write) => {
-        const continuationRequest = read('replacement-continuation')
-        continuationRequest.onsuccess = () => {
-          try {
-            const continuation = readContinuationRecord(
-              continuationRequest.result,
-            )
-            const request = read('active')
-            request.onsuccess = () => {
-              try {
-                const previous = readRecord(request.result)
-                if (previous?.revision === Number.MAX_SAFE_INTEGER)
-                  throw new Error('Snapshot revision limit reached.')
-                if (
-                  continuation &&
-                  (!previous ||
-                    previous.revision < continuation.committedRevision ||
-                    (previous.revision > continuation.committedRevision &&
-                      previous.replacementId !== continuation.replacementId) ||
-                    previous.fingerprint === fingerprint)
-                )
-                  throw new Error(
-                    'Cannot publish unrelated data while a replacement continuation is unresolved.',
-                  )
-                const next: ActiveSnapshotRecord = {
-                  key: 'active',
-                  fingerprint,
-                  bytes: savedBytes,
-                  ...nextDataHead(
-                    { revision: previous?.revision ?? 0, savedAt },
-                    now,
-                  ),
-                  lastVerifiedRevision: previous?.lastVerifiedRevision ?? 0,
-                  ...(continuation
-                    ? { replacementId: continuation.replacementId }
-                    : {}),
-                }
-                write(next, 'active')
-                finish(next)
-              } catch (error) {
-                fail(error)
+      let outgoingCoreId: string | undefined
+      const committed = await transact<ActiveSnapshotRecord>(
+        'readwrite',
+        (records, finish, fail, read, write) => {
+          const continuationRequest = read('replacement-continuation')
+          continuationRequest.onsuccess = () => {
+            try {
+              const continuation = readContinuationRecord(
+                continuationRequest.result,
+              )
+              const rawHead = records.get('active')
+              rawHead.onsuccess = () => {
+                const parsed = localHeadSchema.safeParse(rawHead.result)
+                if (parsed.success) outgoingCoreId = parsed.data.coreSnapshotId
               }
+              const request = read('active')
+              request.onsuccess = () => {
+                try {
+                  const previous = readRecord(request.result)
+                  if (previous?.revision === Number.MAX_SAFE_INTEGER)
+                    throw new Error('Snapshot revision limit reached.')
+                  if (
+                    continuation &&
+                    (!previous ||
+                      previous.revision < continuation.committedRevision ||
+                      (previous.revision > continuation.committedRevision &&
+                        previous.replacementId !==
+                          continuation.replacementId) ||
+                      previous.fingerprint === fingerprint)
+                  )
+                    throw new Error(
+                      'Cannot publish unrelated data while a replacement continuation is unresolved.',
+                    )
+                  const next: ActiveSnapshotRecord = {
+                    key: 'active',
+                    fingerprint,
+                    bytes: savedBytes,
+                    ...nextDataHead(
+                      { revision: previous?.revision ?? 0, savedAt },
+                      now,
+                    ),
+                    lastVerifiedRevision: previous?.lastVerifiedRevision ?? 0,
+                    ...(continuation
+                      ? { replacementId: continuation.replacementId }
+                      : {}),
+                  }
+                  write(next, 'active')
+                  finish(next)
+                } catch (error) {
+                  fail(error)
+                }
+              }
+            } catch (error) {
+              fail(error)
             }
-          } catch (error) {
-            fail(error)
           }
-        }
-      })
+        },
+      )
+      await retireOrdinaryCore(outgoingCoreId, committed)
+      return committed
     },
 
     acknowledgeVerifiedRevision(revision) {
