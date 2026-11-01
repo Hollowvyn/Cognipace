@@ -1,6 +1,8 @@
+import { z } from 'zod'
+import { utcIsoSortKey } from '@/lib/utc-iso-sort-key'
 import { coreRecordReferenceKey, isBinary } from './local-store-types'
 
-export const localDatabaseVersion = 2
+export const localDatabaseVersion = 3
 export const archiveStoreNames = [
   'problemNotes',
   'submissions',
@@ -20,7 +22,7 @@ export function createArchiveStores(database: IDBDatabase): void {
       store.createIndex('byProblem', [
         'archiveGeneration',
         'problemSlug',
-        'submittedAt',
+        'submittedAtSortKey',
         'id',
       ])
       store.createIndex(
@@ -49,12 +51,56 @@ export function createArchiveStores(database: IDBDatabase): void {
 export function upgradeLocalDatabase(
   database: IDBDatabase,
   transaction: IDBTransaction,
+  oldVersion: number,
 ): void {
   if (!database.objectStoreNames.contains('records'))
     database.createObjectStore('records')
   if (!database.objectStoreNames.contains('coreSnapshots'))
     database.createObjectStore('coreSnapshots')
   createArchiveStores(database)
+  // v3 changes only the native chronological index. Never reinterpret v2 roots.
+  if (oldVersion < 3) {
+    const submissions = transaction.objectStore('submissions')
+    submissions.deleteIndex('byProblem')
+    submissions.createIndex('byProblem', [
+      'archiveGeneration',
+      'problemSlug',
+      'submittedAtSortKey',
+      'id',
+    ])
+    const request = submissions.openCursor()
+    request.onsuccess = () => {
+      const cursor = request.result
+      if (!cursor) return
+      try {
+        const row = z.record(z.string(), z.unknown()).parse(cursor.value)
+        if (row.id === undefined && typeof row.attemptAlias === 'string') {
+          z.object({
+            archiveGeneration: z.string().min(1),
+            attemptAlias: z.string().min(1),
+            submissionId: z.string().min(1),
+          }).parse(row)
+        } else {
+          const indexed = z
+            .object({
+              archiveGeneration: z.string().min(1),
+              problemSlug: z.string().min(1),
+              id: z.string().min(1),
+              submittedAt: z.string(),
+            })
+            .parse(row)
+          cursor.update({
+            ...row,
+            submittedAtSortKey: utcIsoSortKey(indexed.submittedAt),
+          })
+        }
+        cursor.continue()
+      } catch {
+        transaction.abort()
+      }
+    }
+  }
+  if (oldVersion >= 2) return
   const records = transaction.objectStore('records')
   const cores = transaction.objectStore('coreSnapshots')
   // Initialized atomically on fresh creation and preserving v1 upgrade.

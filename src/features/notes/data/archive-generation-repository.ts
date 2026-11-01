@@ -1,3 +1,4 @@
+import { utcIsoSortKey } from '@/lib/utc-iso-sort-key'
 import {
   archiveGenerationProgressSchema,
   readReadyArchive,
@@ -308,6 +309,18 @@ export function createArchiveGenerationRepository(local: LocalIdbStore) {
                     storeName === 'problemNotes'
                       ? row
                       : { ...row, archiveGeneration: nextGeneration }
+                  if (
+                    storeName === 'submissions' &&
+                    !(
+                      row.id === undefined &&
+                      typeof row.attemptAlias === 'string'
+                    )
+                  ) {
+                    const submission = submissionRecordSchema.strip().parse(row)
+                    Object.assign(value, {
+                      submittedAtSortKey: utcIsoSortKey(submission.submittedAt),
+                    })
+                  }
                   s[storeName].put(value, [nextGeneration, ...key.slice(1)])
                 }
                 count++
@@ -451,6 +464,12 @@ export function createArchiveGenerationRepository(local: LocalIdbStore) {
                   name === 'problemNotes'
                     ? value
                     : { ...value, archiveGeneration: nextGeneration }
+                if (name === 'submissions') {
+                  const submission = submissionRecordSchema.parse(value)
+                  Object.assign(stored, {
+                    submittedAtSortKey: utcIsoSortKey(submission.submittedAt),
+                  })
+                }
                 s[name].put(stored, key)
               }
             }

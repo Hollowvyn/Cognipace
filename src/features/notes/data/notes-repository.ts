@@ -1,3 +1,4 @@
+import { utcIsoSortKey } from '@/lib/utc-iso-sort-key'
 import { readReadyArchive } from '@/platform/db/local-root-validation'
 import { z } from 'zod'
 import { problemSlugSchema } from '@/features/problems/api/problems-contracts'
@@ -654,6 +655,7 @@ export function createNotesRepository(
                         s.submissions.put(
                           {
                             ...row!,
+                            submittedAtSortKey: utcIsoSortKey(row!.submittedAt),
                             reflection: document,
                             archiveGeneration: head.archiveGeneration,
                           },
@@ -749,7 +751,7 @@ export function createNotesRepository(
             const head = requireHead(value)
             const lower = [head.archiveGeneration, problemSlug]
             const upper = cursor
-              ? [...lower, cursor.submittedAt, cursor.id]
+              ? [...lower, utcIsoSortKey(cursor.submittedAt), cursor.id]
               : [...lower, []]
             const range = IDBKeyRange.bound(lower, upper, false, !!cursor)
             const request = s.submissions

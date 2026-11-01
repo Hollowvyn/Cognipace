@@ -1,8 +1,10 @@
+import { utcIsoSortKey } from '@/lib/utc-iso-sort-key'
 import { describe, expect, it, vi } from 'vitest'
 import { IDBObjectStore } from 'fake-indexeddb'
 import { createNotesTestContext } from '../testing/notes-test-context'
 import { makeNotesArchive } from '../testing/notes-fixtures'
 import { createNotesService } from '../server/notes-service'
+import { createArchiveGenerationRepository } from './archive-generation-repository'
 import type { SaveNoteCommand } from '../domain/notes-records'
 
 describe('notes durable commands', () => {
@@ -284,6 +286,7 @@ describe('notes durable commands', () => {
             stores.submissions.put(
               {
                 ...row,
+                submittedAtSortKey: utcIsoSortKey(row!.submittedAt),
                 id,
                 externalSubmissionId: null,
                 archiveGeneration: head.archiveGeneration,
@@ -508,6 +511,89 @@ it('atomically aborts saved AI membership, receipt, head and outbox, then permit
       collectionRevision: 1,
       savedAiNotes: [{ assessmentId: 'assessment-1' }],
     })
+  } finally {
+    await c.close()
+  }
+})
+
+it('pages arbitrary UTC precision chronologically through import, reflection, copy and reopen', async () => {
+  const c = await createNotesTestContext()
+  try {
+    const archive = await makeNotesArchive()
+    const base = archive.submissions[0]!
+    const timestamps = [
+      ['a', '2026-10-31T12:00:00Z'],
+      ['b', '2026-10-31T12:00Z'],
+      ['c', '2026-10-31T12:00:00.000000001Z'],
+      ['d', '2026-10-31T12:00:00.5Z'],
+      ['e', '2026-10-31T12:00:00.500Z'],
+      ['f', '2026-10-31T12:00:00.500000001Z'],
+      ['g', '2026-10-31T12:00:01Z'],
+    ]
+    archive.submissions = timestamps.map(([id, submittedAt]) => ({
+      ...base,
+      id: id!,
+      submittedAt: submittedAt!,
+      observedAttemptIds: [],
+      externalSubmissionId: null,
+    }))
+    archive.assessments = []
+    archive.savedAiNotes = []
+    const generations = createArchiveGenerationRepository(c.localStore)
+    const head = (await c.localStore.readHead())!
+    await generations.stageImportedArchive({
+      nextGeneration: 'precision',
+      archive,
+    })
+    await c.localStore.writeTechnicalRecord('active', {
+      ...head,
+      archiveGeneration: 'precision',
+    })
+    const scope = await c.repository.acquireScope('two-sum')
+    await c.repository.saveDocument({
+      commandId: 'reflect',
+      problemSlug: 'two-sum',
+      scope,
+      target: { kind: 'reflection', submissionId: 'f' },
+      expectedRevision: 0,
+      markdown: 'Retain the index.',
+    })
+    const opens = vi.spyOn(IDBObjectStore.prototype, 'getAll')
+    for (const generation of ['precision', 'copied']) {
+      if (generation === 'copied') {
+        await generations.stageArchiveGeneration({
+          sourceGeneration: 'precision',
+          nextGeneration: generation,
+          excludedProblemSlugs: [],
+        })
+        await c.localStore.writeTechnicalRecord('active', {
+          ...(await c.localStore.readHead())!,
+          archiveGeneration: generation,
+        })
+      }
+      const ids: string[] = []
+      let cursor: { submittedAt: string; id: string } | undefined
+      do {
+        const page = await c.repository.listSubmissionMetadata(
+          'two-sum',
+          2,
+          cursor,
+        )
+        expect(page.items.length).toBeLessThanOrEqual(2)
+        ids.push(...page.items.map((row) => row.id))
+        cursor = page.nextCursor ?? undefined
+      } while (cursor)
+      expect(ids).toEqual(['g', 'f', 'e', 'd', 'c', 'b', 'a'])
+    }
+    expect(opens).not.toHaveBeenCalled()
+    opens.mockRestore()
+    const exported = await generations.readArchiveGeneration('copied')
+    expect(
+      exported.submissions.map((row) => [row.id, row.submittedAt]),
+    ).toEqual(timestamps)
+    expect(
+      exported.submissions.every((row) => !('submittedAtSortKey' in row)),
+    ).toBe(true)
   } finally {
     await c.close()
   }

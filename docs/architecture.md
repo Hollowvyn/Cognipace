@@ -1033,7 +1033,7 @@ Phase 1 infrastructure is implemented; the Notes editor and new submission or
 assessment capture remain off. Existing live analysis/hints stay session-only.
 Imported/restored archive data is durable and exportable.
 
-The database name remains `cognipace-local-v1`, now at IndexedDB version 2.
+The database name remains `cognipace-local-v1`, now at IndexedDB version 3.
 `records` stores the versioned local head and technical state; `coreSnapshots`
 stores SQLite bytes. The head references one core snapshot, archive generation,
 dataset token and monotone revision. The preserving v1 upgrade moves existing
@@ -1045,6 +1045,14 @@ absence of an active record with surviving data is not a fresh install.
 Downgrade to a version-1 client is unsupported: preserve the profile and use a
 compatible build or a separately exported compatible backup in a disposable
 profile. Do not delete the new database to make an older build open it.
+
+The physical v2→v3 upgrade only backfills a lossless UTC timestamp sort key and
+recreates the submission chronology index, atomically. It preserves head
+`formatVersion: 2`, SQL, original timestamp strings, cores, recoveries, readiness,
+pending state, provenance and technical-write epoch; it does not rerun the v1
+binary split. The index and cursor share the normalized full-second/fraction key,
+retaining arbitrary precision and using ID ties for equivalent instants. Technical
+sort keys are excluded from exports. Corrupt indexed fields abort the upgrade.
 
 `features/notes` owns repository and service writes, revision CAS, document leases,
 scopes, durable acknowledgements/outbox recovery and runtime contracts.

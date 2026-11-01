@@ -22,7 +22,17 @@ fixes amend the current unpublished task commit before the next task begins.
    key and matching stable cursor while preserving original timestamp strings
    in records/exports. Cover fractional precision, equivalent instants, ties,
    multiple bounded pages, staging and reopen. Preserve v1 upgrade and fail-closed
-   behavior; no casual database-version or historical migration change.
+   behavior. The approved physical IndexedDB v3 change is index-only: atomically
+   backfill the normalized chronology key and recreate `byProblem` for existing
+   v2 rows. Pass the actual `oldVersion` and run the historical binary split only
+   below v2; preserve the head format version 2, SQL, technical epoch, readiness,
+   pending state, opaque recoveries and core/provenance identities. A derived
+   field alone cannot fix an already-created v2 raw-timestamp index. Genuine
+   records with corrupt indexed fields abort; legitimate attempt aliases skip.
+   Normalize omitted seconds and trailing fractional zeroes without truncating
+   submillisecond precision; retain original submittedAt in cursors and exports.
+   Rederive on import, generation copy and reflection writes. Historical Phase 1
+   handoff evidence remains unchanged.
 4. **Recover accepted prepublication work after worker restart.** Persist pending
    admission before archive staging, reconstruct the exact accepted descriptor,
    core bytes, source ownership and archive progress through production status and

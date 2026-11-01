@@ -66,13 +66,19 @@ phase adds no Google Drive or new Gist host permission.
 
 ## Local Database Recovery
 
-The database name remains `cognipace-local-v1`; its current IndexedDB version is 2. `records/active` is now a versioned head referencing SQLite bytes in
+The database name remains `cognipace-local-v1`; its current IndexedDB version is 3. `records/active` is now a versioned head referencing SQLite bytes in
 `coreSnapshots` and a matching archive generation. `records/recovery` retains one
 prior paired dataset; historical `recovery:<key>` entries can be core-only.
 Preserve the complete database, not just the active record. For a healthy
 profile, use Settings > Data Management to export a full v7 backup. For startup
 failure, keep the profile intact and preserve a private database copy before
 clearing any storage. Never post private binary bytes or study contents.
+
+The physical v2→v3 upgrade atomically backfills normalized submission chronology
+keys and replaces only that index. Head format version 2 and SQL are unchanged;
+original timestamps, active/recovery cores, readiness, pending work, provenance
+and technical-write epoch are preserved. Invalid indexed fields abort the upgrade
+with v2 data and index intact. Downgrade to a v2 database client is unsupported.
 
 Fresh creation requires verified absence of prior data. Existing v1 IndexedDB
 cores and supported legacy Chrome pairs migrate preserving original bytes and
@@ -159,8 +165,15 @@ restore creates fresh effective local write generations.
 
 - [ ] Preserve a private copy of a populated version-1 IndexedDB profile, then
       open the packaged current build. Verify upgrade keeps Practice content and
-      historical core-only recoveries. A current version-2 profile cannot be
+      historical core-only recoveries. A current version-3 profile cannot be
       downgraded in place: retain it and use a compatible build for recovery.
+- [ ] Preserve a private populated v2 profile and open the current build. Verify
+      the native database becomes v3 while head format remains 2, active/recovery
+      core identities, readiness, pending work and technical-write epoch stay
+      unchanged. With synthetic mixed whole-second, fractional and equivalent
+      `.5`/`.500` submission times, page metadata newest-first, save a reflection,
+      restart, and export; verify stable ID ties and verbatim timestamps. Repeat
+      with an interrupted upgrade and confirm the old v2 data/index remains intact.
 - [ ] Restore the fixture in Settings, restart the worker, and re-export. Compare
       every meaningful core/archive record and exact Markdown/code/report strings
       (including Unicode and trailing spaces), IDs, dates, FSRS and evidence.

@@ -24,9 +24,13 @@ export function createLocalIdbStore(
       const request = factory.open(databaseName, localDatabaseVersion)
       let settled = false
       let failure: unknown
-      request.onupgradeneeded = () => {
+      request.onupgradeneeded = (event) => {
         try {
-          upgradeLocalDatabase(request.result, request.transaction!)
+          upgradeLocalDatabase(
+            request.result,
+            request.transaction!,
+            event.oldVersion,
+          )
         } catch (error) {
           failure = error
           request.transaction!.abort()
