@@ -1,3 +1,18 @@
+import { waitForPendingDbSnapshot } from '@/platform/db/instance'
+import {
+  configureMutationQueue,
+  runInMutationQueue,
+  runGatedMutationQueue,
+  runConsistentRead,
+  resumePendingLocalSave,
+  isInMutationQueue,
+  isLocalSavePending,
+  setPendingLocalSave,
+  clearRecoveredMutationRetry,
+  setRecoveredMutationRetry,
+  takeRecoveredMutationRetry,
+  localSaveError,
+} from './mutation-queue'
 import {
   generateLeetCodeImplementationRequestSchema,
   generateLeetCodeImplementationResponseSchema,
@@ -260,6 +275,12 @@ const backupReplacement = createBackupReplacementCoordinator({
     },
   }),
 })
+configureMutationQueue({
+  ready: () => backupReplacement.ready(),
+  assertIdle: () => backupReplacement.assertIdle(),
+  flush: flushDbSnapshot,
+  waitForPendingCoreSave: waitForPendingDbSnapshot,
+})
 let clearPendingImportPersistence = () => {}
 let hasPendingImportPersistence = () => false
 const syncAutoSync = createSyncAutoSync({
@@ -345,15 +366,14 @@ export function registerBackgroundHandlers() {
         ? runInMutationQueue(async () => {
             backupReplacement.assertIdle()
             if (!hasPendingImportPersistence()) await resumePendingLocalSave()
-            recoveredGenericRetry = null
+            clearRecoveredMutationRetry()
             return work()
           })
         : runGatedMutationQueue(work),
     getDb: async () => (await getAppDb()).db,
     flush: flushDbSnapshot,
     onPersistencePending: (onDurable) => {
-      hasPendingLocalSave = true
-      pendingLocalSaveContinuation = onDurable
+      setPendingLocalSave(onDurable)
     },
     retrySharedPendingPersistence: resumePendingLocalSave,
     markDirty: markSyncLocalDataChangedBestEffort,
@@ -417,7 +437,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runGatedMutationQueue(async () => {
+    return runConsistentRead(async () => {
       const { db } = await getAppDb()
       return backupFileSchema.parse(await exportFullBackup(db))
     })
@@ -689,7 +709,7 @@ export function registerBackgroundHandlers() {
             const summary = await restorePreparedFullBackup(db, prepared)
             clearPendingImportPersistence()
             recoveredReviewRetry = null
-            recoveredGenericRetry = null
+            clearRecoveredMutationRetry()
             return summary
           },
           ...createLocalReplacementContinuations(request.surface),
@@ -723,7 +743,7 @@ export function registerBackgroundHandlers() {
             await resetLocalData(db)
             clearPendingImportPersistence()
             recoveredReviewRetry = null
-            recoveredGenericRetry = null
+            clearRecoveredMutationRetry()
             return null
           },
           ...createLocalReplacementContinuations(request.surface),
@@ -756,7 +776,7 @@ export function registerBackgroundHandlers() {
     return runInMutationQueue(async () => {
       await backupReplacement.ready()
       await resumePendingLocalSave()
-      recoveredGenericRetry = null
+      clearRecoveredMutationRetry()
       return backupReplacementResultSchema.parse(
         await backupReplacement.retry(),
       )
@@ -1770,7 +1790,7 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
             const summary = await work.commit()
             clearPendingImportPersistence()
             recoveredReviewRetry = null
-            recoveredGenericRetry = null
+            clearRecoveredMutationRetry()
             return summary
           },
         }),
@@ -1803,18 +1823,11 @@ function parseSyncActionResult(result: unknown) {
 
 type DbMutationSyncMode = 'mark-dirty' | 'none'
 
-let dbMutationQueue: Promise<void> = Promise.resolve()
-let dbMutationDepth = 0
 let hasPendingDirtyMarkRetry = false
-let hasPendingLocalSave = false
-let pendingLocalSaveContinuation: (() => Promise<void>) | null = null
 let recoveredReviewRetry: {
   key: string
   result: ReturnType<typeof practiceReviewCommandResultSchema.parse>
 } | null = null
-let recoveredGenericRetry: { key: string; result: unknown } | null = null
-const localSaveError =
-  'Local data still needs saving. Retry saving before editing.'
 
 function runPracticeReviewCommand(
   command: AcceptedPracticeReviewCommand,
@@ -1845,12 +1858,11 @@ function runPracticeReviewCommand(
     try {
       await flushDbSnapshot()
     } catch {
-      hasPendingLocalSave = true
       hasPendingDirtyMarkRetry = true
-      pendingLocalSaveContinuation = async () => {
+      setPendingLocalSave(async () => {
         await afterDurable()
         recoveredReviewRetry = { key, result }
-      }
+      })
       return practiceReviewCommandResultSchema.parse({
         ...result,
         status: 'persistence-pending',
@@ -1868,11 +1880,8 @@ function runDbMutation<T>(
 ) {
   const syncMode = options.syncMode ?? 'mark-dirty'
   return runGatedMutationQueue(async () => {
-    if (recoveredGenericRetry?.key === options.retryKey) {
-      const saved = recoveredGenericRetry.result as T
-      recoveredGenericRetry = null
-      return saved
-    }
+    const recovered = takeRecoveredMutationRetry<T>(options.retryKey)
+    if (recovered) return recovered.result
     const { db } = await getAppDb()
     const result = await write(db)
 
@@ -1891,11 +1900,10 @@ function runDbMutation<T>(
         flushDbSnapshot(),
       )
     } catch (error) {
-      hasPendingLocalSave = true
-      pendingLocalSaveContinuation = async () => {
+      setPendingLocalSave(async () => {
         await afterDurable()
-        recoveredGenericRetry = { key: options.retryKey, result }
-      }
+        setRecoveredMutationRetry(options.retryKey, result)
+      })
       throw new Error(localSaveError, { cause: error })
     }
     await afterDurable()
@@ -1906,47 +1914,6 @@ function runDbMutation<T>(
 
 function mutationRetryKey(method: string, request: unknown) {
   return JSON.stringify([method, request])
-}
-
-function runInMutationQueue<T>(work: () => Promise<T>) {
-  const queued = dbMutationQueue.then(async () => {
-    dbMutationDepth += 1
-
-    try {
-      return await work()
-    } finally {
-      dbMutationDepth -= 1
-    }
-  })
-  dbMutationQueue = queued.then(
-    () => undefined,
-    () => undefined,
-  )
-
-  return queued
-}
-
-function runGatedMutationQueue<T>(work: () => Promise<T>, retryKey?: string) {
-  return runInMutationQueue(async () => {
-    await backupReplacement.ready()
-    backupReplacement.assertIdle()
-    await resumePendingLocalSave()
-    if (recoveredGenericRetry?.key !== retryKey) recoveredGenericRetry = null
-    return work()
-  })
-}
-
-async function resumePendingLocalSave() {
-  if (!hasPendingLocalSave) return
-  try {
-    await flushDbSnapshot()
-  } catch (error) {
-    throw new Error(localSaveError, { cause: error })
-  }
-  hasPendingLocalSave = false
-  const continuation = pendingLocalSaveContinuation
-  pendingLocalSaveContinuation = null
-  await continuation?.()
 }
 
 function createLocalReplacementContinuations(surface: 'dashboard') {
@@ -1997,7 +1964,7 @@ async function retryPendingDirtyMark() {
   }
 
   try {
-    if (hasPendingLocalSave) await resumePendingLocalSave()
+    if (isLocalSavePending()) await resumePendingLocalSave()
     else await flushDbSnapshot()
     await markSyncLocalDataChanged()
     hasPendingDirtyMarkRetry = false
@@ -2025,7 +1992,7 @@ function runRemoteRestoreInMutationQueue<T>(
     return work()
   }
 
-  if (isInsideMutationQueue && dbMutationDepth > 0) {
+  if (isInsideMutationQueue && isInMutationQueue()) {
     return guardedWork()
   }
 

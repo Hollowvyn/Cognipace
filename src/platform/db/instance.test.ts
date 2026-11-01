@@ -26,6 +26,7 @@ import { createDb, createSqliteWasmLocator } from './client'
 import {
   getAppDb,
   flushDbSnapshot,
+  waitForPendingDbSnapshot,
   resetAppDbForTesting,
   beginDbReplacement,
   commitDbReplacementSnapshot,
@@ -49,6 +50,7 @@ import {
   computeFingerprint,
   serializeDb,
 } from './snapshot'
+import * as snapshot from './snapshot'
 import { setOnMutationHook } from './proxy'
 import { createSnapshotIdbStore } from './snapshot-idb'
 import {
@@ -1610,4 +1612,98 @@ describe('app database startup', () => {
     expect(fakeStorage.values[SNAPSHOT_KEY]).toBe(retriedSnapshot)
     expect(fakeStorage.values[FINGERPRINT_KEY]).toBe(originalFingerprint)
   })
+})
+
+it('flushes scheduled core data before archive work but leaves a clean archive path serialization-free', async () => {
+  installStorage()
+  const snapshotStore = createSnapshotIdbStore(
+    testIndexedDB,
+    `archive-gate-${crypto.randomUUID()}`,
+  )
+  const handle = await getAppDb({ snapshotStore })
+  openedHandles.push(handle)
+  const serialize = vi.spyOn(snapshot, 'serializeDb')
+  const commit = vi.spyOn(snapshotStore, 'commitSnapshot')
+  try {
+    await waitForPendingDbSnapshot()
+    expect(serialize).not.toHaveBeenCalled()
+    expect(commit).not.toHaveBeenCalled()
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await waitForPendingDbSnapshot()
+    expect(serialize).toHaveBeenCalledOnce()
+    expect(commit).toHaveBeenCalledOnce()
+    await waitForPendingDbSnapshot()
+    expect(serialize).toHaveBeenCalledOnce()
+  } finally {
+    serialize.mockRestore()
+    commit.mockRestore()
+  }
+})
+
+it('joins in-flight core publication and retains a failed join until an explicit retry saves it', async () => {
+  installStorage()
+  const snapshotStore = createSnapshotIdbStore(
+    testIndexedDB,
+    `core-join-${crypto.randomUUID()}`,
+  )
+  const handle = await getAppDb({ snapshotStore })
+  openedHandles.push(handle)
+  await createSettingsRepository(handle.db).updateSettings(
+    { appearance: { themeMode: 'dark' } },
+    now,
+  )
+  let reject!: (error: Error) => void
+  const commit = vi
+    .spyOn(snapshotStore, 'commitSnapshot')
+    .mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail
+        }),
+    )
+  const publication = flushDbSnapshot()
+  const publicationFailure = expect(publication).rejects.toThrow('disk full')
+  let joined = false
+  const join = waitForPendingDbSnapshot().then(() => {
+    joined = true
+  })
+  const joinFailure = expect(join).rejects.toThrow('disk full')
+  await vi.waitFor(() => expect(commit).toHaveBeenCalledOnce())
+  expect(joined).toBe(false)
+  reject(new Error('disk full'))
+  await Promise.all([publicationFailure, joinFailure])
+  await expect(waitForPendingDbSnapshot()).rejects.toThrow('disk full')
+  await flushDbSnapshot()
+  await expect(waitForPendingDbSnapshot()).resolves.toBeUndefined()
+  commit.mockRestore()
+})
+
+it('retains a failed automatic timer publication for the next shared gate', async () => {
+  installStorage()
+  const snapshotStore = createSnapshotIdbStore(
+    testIndexedDB,
+    `automatic-failure-${crypto.randomUUID()}`,
+  )
+  const handle = await getAppDb({ snapshotStore })
+  openedHandles.push(handle)
+  const commit = vi
+    .spyOn(snapshotStore, 'commitSnapshot')
+    .mockRejectedValueOnce(new Error('automatic disk full'))
+  try {
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await vi.waitFor(() => expect(commit).toHaveBeenCalledOnce())
+    await expect(waitForPendingDbSnapshot()).rejects.toThrow(
+      'automatic disk full',
+    )
+    await flushDbSnapshot()
+    await expect(waitForPendingDbSnapshot()).resolves.toBeUndefined()
+  } finally {
+    commit.mockRestore()
+  }
 })

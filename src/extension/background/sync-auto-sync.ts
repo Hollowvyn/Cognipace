@@ -191,6 +191,22 @@ export function createSyncAutoSync(deps: SyncAutoSyncDependencies) {
     })
   }
 
+  async function repairStartupAlarms() {
+    await deps.scheduler.repairStartupAlarms()
+    // The metadata reader also consults the durable head. A worker restart may
+    // have lost both the best-effort Chrome dirty write and the push alarm.
+    const metadata = await deps.readMetadata()
+    if (
+      metadata.enabled &&
+      metadata.gistId &&
+      (metadata.dirtySinceLastSync || deps.hasPendingDirtyMarkRetry?.())
+    ) {
+      await deps.scheduler.schedule(syncAutoPushAlarmName, {
+        delayInMinutes: syncAutoPushDelayMinutes,
+      })
+    }
+  }
+
   function registerJobs() {
     if (jobsRegistered) {
       return
@@ -222,7 +238,7 @@ export function createSyncAutoSync(deps: SyncAutoSyncDependencies) {
   return {
     clearPendingAutomaticSync,
     registerJobs,
-    repairStartupAlarms: deps.scheduler.repairStartupAlarms,
+    repairStartupAlarms,
     requestOpenCheckAfterSurfaceOpen,
     runAutoPush,
     runCleanPullCheck,

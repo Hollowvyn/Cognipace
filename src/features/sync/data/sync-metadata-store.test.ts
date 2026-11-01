@@ -1,3 +1,6 @@
+import { IDBFactory, IDBObjectStore } from 'fake-indexeddb'
+import { createSnapshotIdbStore } from '@/platform/db/snapshot-idb'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -158,4 +161,33 @@ describe('sync metadata store', () => {
       gistId: null,
     })
   })
+})
+
+it('recovers pending sync from the durable head after a worker restart loses the dirty flag', async () => {
+  const factory = new IDBFactory()
+  vi.stubGlobal('indexedDB', factory)
+  const store = createSnapshotIdbStore(factory)
+  await store.commitSnapshot(
+    new Uint8Array([1]),
+    'test',
+    new Date('2026-10-31T00:00:00.000Z'),
+  )
+  await writeSyncMetadata({
+    enabled: true,
+    gistId: 'gist_1',
+    dirtySinceLastSync: false,
+  })
+  const get = vi.spyOn(IDBObjectStore.prototype, 'get')
+  expect(await readSyncMetadata()).toMatchObject({
+    dirtySinceLastSync: true,
+    localDataUpdatedAt: '2026-10-31T00:00:00.000Z',
+  })
+  expect(
+    get.mock.instances.some(
+      (store) =>
+        store instanceof IDBObjectStore && store.name === 'coreSnapshots',
+    ),
+  ).toBe(false)
+  await store.acknowledgeVerifiedRevision(1)
+  expect((await readSyncMetadata()).dirtySinceLastSync).toBe(false)
 })

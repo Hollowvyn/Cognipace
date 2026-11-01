@@ -1,8 +1,12 @@
+import { IDBFactory } from 'fake-indexeddb'
+import { createSnapshotIdbStore } from '@/platform/db/snapshot-idb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { SyncActionResult } from '@/features/sync/api/sync-contracts'
 import {
   defaultSyncMetadata,
+  readSyncMetadata,
+  markLocalDataChanged,
   type SyncMetadata,
 } from '@/features/sync/data/sync-metadata-store'
 
@@ -339,6 +343,20 @@ describe('sync auto-sync orchestrator', () => {
     })
   })
 
+  it.each([
+    { enabled: false, gistId: 'gist_1', dirtySinceLastSync: true },
+    { enabled: true, gistId: null, dirtySinceLastSync: true },
+    { enabled: true, gistId: 'gist_1', dirtySinceLastSync: false },
+  ])(
+    'does not repair a pending push for unavailable or clean sync: %j',
+    async (patch) => {
+      metadata = createMetadata(patch)
+      await createSyncAutoSync(deps).repairStartupAlarms()
+      expect(deps.scheduler.schedule).not.toHaveBeenCalled()
+      expect(deps.runSafePush).not.toHaveBeenCalled()
+    },
+  )
+
   it('repairs startup alarms and clears pending automatic sync alarms through the scheduler', async () => {
     const syncAutoSync = createSyncAutoSync(deps)
 
@@ -444,3 +462,52 @@ function createActionResult(
     ...patch,
   }
 }
+
+it('repairs a lost push alarm on restart from the durable head when Chrome dirty writes failed', async () => {
+  const factory = new IDBFactory()
+  const stored = createMetadata()
+  vi.stubGlobal('indexedDB', factory)
+  vi.stubGlobal('chrome', {
+    storage: {
+      local: {
+        get: () => Promise.resolve({ cognipace_sync_metadata_v1: stored }),
+        set: () => Promise.reject(new Error('Chrome storage unavailable')),
+      },
+    },
+  })
+  try {
+    const snapshots = createSnapshotIdbStore(factory)
+    await snapshots.commitSnapshot(
+      new Uint8Array([1]),
+      'test',
+      new Date('2026-10-31T00:00:00.000Z'),
+    )
+    await expect(markLocalDataChanged()).rejects.toThrow(
+      'Chrome storage unavailable',
+    )
+    const original = createDeps({ readMetadata: readSyncMetadata })
+    vi.mocked(original.scheduler.schedule).mockRejectedValueOnce(
+      new Error('alarms unavailable'),
+    )
+    await expect(
+      createSyncAutoSync(original).scheduleAutoPushAfterMutation(),
+    ).rejects.toThrow('alarms unavailable')
+    const restarted = createDeps({ readMetadata: readSyncMetadata })
+    const sync = createSyncAutoSync(restarted)
+    await sync.repairStartupAlarms()
+    expect(restarted.scheduler.repairStartupAlarms).toHaveBeenCalledOnce()
+    expect(restarted.scheduler.schedule).toHaveBeenCalledExactlyOnceWith(
+      syncAutoPushAlarmName,
+      {
+        delayInMinutes: syncAutoPushDelayMinutes,
+      },
+    )
+    expect(restarted.runSafePush).not.toHaveBeenCalled()
+    await sync.runAutoPush()
+    // An unverified upload stays dirty, but never schedules itself in a tight loop.
+    expect((await readSyncMetadata()).dirtySinceLastSync).toBe(true)
+    expect(restarted.scheduler.schedule).toHaveBeenCalledOnce()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})

@@ -6,6 +6,19 @@ import {
   localHeadSchema,
 } from './local-store-types'
 
+export function nextDataHead<T extends { revision: number; savedAt: string }>(
+  head: T,
+  now: Date,
+): T {
+  if (
+    !Number.isSafeInteger(head.revision) ||
+    head.revision < 0 ||
+    head.revision === Number.MAX_SAFE_INTEGER
+  )
+    throw new Error('Snapshot revision limit reached.')
+  return { ...head, revision: head.revision + 1, savedAt: now.toISOString() }
+}
+
 export interface ActiveSnapshotRecord {
   key: 'active'
   fingerprint: string
@@ -375,9 +388,11 @@ export function createSnapshotIdbStore(
                   key: 'active',
                   fingerprint,
                   bytes: savedBytes,
-                  revision: previous.revision + 1,
+                  ...nextDataHead(
+                    { revision: previous.revision, savedAt },
+                    now,
+                  ),
                   lastVerifiedRevision: previous.lastVerifiedRevision,
-                  savedAt,
                   replacementId: input.replacementId,
                 }
                 const continuation: ReplacementContinuation = {
@@ -531,9 +546,11 @@ export function createSnapshotIdbStore(
                   key: 'active',
                   fingerprint,
                   bytes: savedBytes,
-                  revision: (previous?.revision ?? 0) + 1,
+                  ...nextDataHead(
+                    { revision: previous?.revision ?? 0, savedAt },
+                    now,
+                  ),
                   lastVerifiedRevision: previous?.lastVerifiedRevision ?? 0,
-                  savedAt,
                   ...(continuation
                     ? { replacementId: continuation.replacementId }
                     : {}),
@@ -555,35 +572,39 @@ export function createSnapshotIdbStore(
       if (!Number.isSafeInteger(revision) || revision < 0) {
         return Promise.reject(new Error('Invalid verified revision.'))
       }
-      return transact('readwrite', (_records, finish, fail, read, write) => {
-        const request = read('active')
-        request.onsuccess = () => {
-          try {
-            const previous = readRecord(request.result)
-            if (!previous || revision > previous.revision) {
-              fail(
-                new Error(
+      // Verification changes metadata only. Never hydrate or rewrite core bytes.
+      return local.transact(
+        ['records'],
+        'readwrite',
+        (stores, finish, fail) => {
+          const request = stores.records.get('active')
+          request.onsuccess = () => {
+            try {
+              const previous =
+                request.result === undefined
+                  ? null
+                  : localHeadSchema.parse(request.result)
+              if (!previous || revision > previous.revision)
+                throw new Error(
                   'Cannot verify a missing or future snapshot revision.',
-                ),
+                )
+              stores.records.put(
+                {
+                  ...previous,
+                  lastVerifiedRevision: Math.max(
+                    previous.lastVerifiedRevision,
+                    revision,
+                  ),
+                },
+                'active',
               )
-              return
+              finish(undefined)
+            } catch (error) {
+              fail(error)
             }
-            write(
-              {
-                ...previous,
-                lastVerifiedRevision: Math.max(
-                  previous.lastVerifiedRevision,
-                  revision,
-                ),
-              } satisfies ActiveSnapshotRecord,
-              'active',
-            )
-            finish()
-          } catch (error) {
-            fail(error)
           }
-        }
-      })
+        },
+      )
     },
   }
 

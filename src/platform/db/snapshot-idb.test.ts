@@ -5,7 +5,9 @@ import {
 } from 'fake-indexeddb'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createSnapshotIdbStore } from './snapshot-idb'
+import { createSnapshotIdbStore, nextDataHead } from './snapshot-idb'
+import { localHeadSchema } from './local-store-types'
+import * as snapshot from './snapshot'
 import { createLocalIdbStore } from './local-idb'
 
 const now = new Date('2026-10-16T00:00:00.000Z')
@@ -399,3 +401,91 @@ it.each(['active', 'replacement'])(
     }
   },
 )
+
+it('shares revisions across archive-only writes and later core saves without touching core payloads', async () => {
+  const name = `test-${crypto.randomUUID()}`
+  const local = createLocalIdbStore(testIndexedDB, name)
+  const snapshots = createSnapshotIdbStore(testIndexedDB, name)
+  await snapshots.commitSnapshot(new Uint8Array([1]), fingerprint, now)
+  const first = await local.readHead()
+  const serialize = vi.spyOn(snapshot, 'serializeDb')
+  const coreWrites = vi.spyOn(IDBObjectStore.prototype, 'add')
+  const puts = vi.spyOn(IDBObjectStore.prototype, 'put')
+  await local.transact(
+    ['records', 'problemNotes'],
+    'readwrite',
+    (stores, finish, fail) => {
+      const request = stores.records.get('active')
+      request.onsuccess = () => {
+        try {
+          const head = nextDataHead(localHeadSchema.parse(request.result), now)
+          stores.problemNotes.put(
+            { id: 'note-1', archiveGeneration: head.archiveGeneration },
+            'note-1',
+          )
+          stores.records.put(head, 'active')
+          finish(undefined)
+        } catch (error) {
+          fail(error)
+        }
+      }
+    },
+  )
+  expect(serialize).not.toHaveBeenCalled()
+  expect(coreWrites).not.toHaveBeenCalled()
+  expect(
+    puts.mock.instances.some(
+      (store) =>
+        store instanceof IDBObjectStore && store.name === 'coreSnapshots',
+    ),
+  ).toBe(false)
+  expect(await local.readHead()).toMatchObject({
+    revision: 2,
+    coreSnapshotId: first!.coreSnapshotId,
+  })
+  await snapshots.commitSnapshot(new Uint8Array([2]), fingerprint, now)
+  expect(await local.readHead()).toMatchObject({
+    revision: 3,
+    archiveGeneration: first!.archiveGeneration,
+  })
+  expect(await local.readRecord('active')).not.toHaveProperty('bytes')
+})
+
+it('acknowledges revision seven after an archive write creates eight without reading core bytes', async () => {
+  const name = `test-${crypto.randomUUID()}`
+  const local = createLocalIdbStore(testIndexedDB, name)
+  const snapshots = createSnapshotIdbStore(testIndexedDB, name)
+  for (let i = 0; i < 7; i++)
+    await snapshots.commitSnapshot(new Uint8Array([i]), fingerprint, now)
+  await local.transact(['records'], 'readwrite', (stores, finish) => {
+    const read = stores.records.get('active')
+    read.onsuccess = () => {
+      stores.records.put(
+        nextDataHead(localHeadSchema.parse(read.result), now),
+        'active',
+      )
+      finish(undefined)
+    }
+  })
+  const get = vi.spyOn(IDBObjectStore.prototype, 'get')
+  const put = vi.spyOn(IDBObjectStore.prototype, 'put')
+  await snapshots.acknowledgeVerifiedRevision(7)
+  expect(
+    get.mock.instances.some(
+      (store) =>
+        store instanceof IDBObjectStore && store.name === 'coreSnapshots',
+    ),
+  ).toBe(false)
+  expect(
+    put.mock.instances.some(
+      (store) =>
+        store instanceof IDBObjectStore && store.name === 'coreSnapshots',
+    ),
+  ).toBe(false)
+  expect(await local.readHead()).toMatchObject({
+    revision: 8,
+    lastVerifiedRevision: 7,
+  })
+  await snapshots.acknowledgeVerifiedRevision(6)
+  expect((await local.readHead())!.lastVerifiedRevision).toBe(7)
+})

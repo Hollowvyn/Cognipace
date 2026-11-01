@@ -1,3 +1,4 @@
+import { createLocalIdbStore } from './local-idb'
 import { createDb, createSqliteWasmLocator, type DbHandle } from './client'
 import { migrationEntries, migrationSql } from './migration-sql'
 import { openSnapshot, type PublishContext } from './open-snapshot'
@@ -44,6 +45,7 @@ let activeSnapshotStore: SnapshotIdbStore | null = null
 let openGeneration = 0
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null
 let snapshotWriteChain: Promise<void> = Promise.resolve()
+let pendingSnapshotWrite: Promise<void> = Promise.resolve()
 let lastPersistedBytes: Uint8Array | null = null
 let snapshotCommitNeedsReconciliation = false
 let replacementPublicationPending = false
@@ -52,6 +54,14 @@ export interface AppDbOptions {
   beforePublish?: (handle: DbHandle, context: PublishContext) => Promise<void>
   validateCurrentData?: (handle: DbHandle) => Promise<void>
   snapshotStore?: SnapshotIdbStore
+}
+
+// A head read is independent of SQLite opening/serialization and remains cheap
+// for sync status and startup alarm repair after the worker has restarted.
+export function readLocalDataHead() {
+  return typeof indexedDB === 'undefined'
+    ? Promise.resolve(null)
+    : createLocalIdbStore(indexedDB).readHead()
 }
 
 export function getAppDb(options: AppDbOptions = {}) {
@@ -75,6 +85,13 @@ export async function flushDbSnapshot() {
   }
 
   await writeSnapshotAfterPending()
+}
+
+// Join existing publication without exporting SQLite for clean archive-only work.
+// Scheduled SQLite mutations must publish before a mixed core/archive operation.
+export async function waitForPendingDbSnapshot() {
+  if (snapshotTimer) await flushDbSnapshot()
+  else await pendingSnapshotWrite
 }
 
 export function beginDbReplacement() {
@@ -124,6 +141,7 @@ export function resetAppDbForTesting() {
   lastPersistedBytes = null
   snapshotCommitNeedsReconciliation = false
   replacementPublicationPending = false
+  pendingSnapshotWrite = Promise.resolve()
 
   if (snapshotTimer) {
     clearTimeout(snapshotTimer)
@@ -342,7 +360,10 @@ function scheduleSnapshot() {
 
   snapshotTimer = setTimeout(() => {
     snapshotTimer = null
-    void writeSnapshotAfterPending(true)
+    void writeSnapshotAfterPending(true).catch(() => {
+      // Retain the rejection in pendingSnapshotWrite for the shared mutation
+      // gate to turn into a recoverable save, rather than an unhandled rejection.
+    })
   }, snapshotDebounceMs)
 }
 
@@ -352,6 +373,7 @@ async function writeSnapshotAfterPending(automatic = false) {
 
 function enqueueSnapshotWrite(write: () => Promise<void>) {
   const writePromise = snapshotWriteChain.then(write)
+  pendingSnapshotWrite = writePromise
   snapshotWriteChain = writePromise.catch(() => undefined)
   return writePromise
 }
