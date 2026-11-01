@@ -86,6 +86,23 @@ describe('bounded durable backup transfer', () => {
     })
     expect(restore).toHaveBeenCalledTimes(1)
   })
+  it.each(['\ufeff\ufeff{}', ' \ufeff{}'])(
+    'rejects an additional or nonleading BOM outside JSON: %j',
+    async (text) => {
+      const { service, preview, restore } = setup()
+      const session = await service.begin('document-a', { direction: 'import' })
+      await service.append('document-a', session, 0, text)
+      await expect(
+        service.finish('document-a', session, {
+          chunks: 1,
+          digest: await transferDigest(text),
+        }),
+      ).rejects.toThrow(SyntaxError)
+      expect(preview).not.toHaveBeenCalled()
+      expect(restore).not.toHaveBeenCalled()
+    },
+  )
+
   it('spools exports before serving and preserves JSON and Unicode exactly', async () => {
     const { service } = setup()
     const session = await service.begin('document-a', { direction: 'export' })

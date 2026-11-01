@@ -4,9 +4,11 @@ import {
   createBackupTransferService,
   transferBudgetKey,
   transferBeginKey,
+  transferChunkKey,
 } from '../server/backup-transfer-service'
 import { transferDigest } from './backup-transfer-contracts'
 import { File as NodeFile } from 'node:buffer'
+import { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryObserver } from '@tanstack/react-query'
@@ -20,6 +22,7 @@ import {
   downloadBackupFile,
   cancelBackupTransfer,
   validateFullBackupViaRuntime,
+  restoreFullBackupViaRuntime,
   exportFullBackupViaRuntime,
   useExportFullBackup,
   usePendingBackupReplacement,
@@ -164,6 +167,117 @@ describe('backup API hooks', () => {
         ),
     ).toBe(false)
   })
+
+  it.each(['native stream', 'split BOM bytes'])(
+    'previews and restores a BOM-prefixed File through durable transfer with %s',
+    async (streamMode) => {
+      const owner = 'bom-document'
+      const local = createLocalIdbStore(new IDBFactory())
+      const backup = {
+        ...validBackup,
+        source: { appVersion: 'before\ufeffafter' },
+      }
+      const text = `\ufeff${JSON.stringify(backup)}`
+      const bytes = new TextEncoder().encode(text)
+      const file = new NodeFile([bytes], 'bom-backup.json')
+      if (streamMode === 'split BOM bytes') {
+        vi.spyOn(file, 'stream').mockImplementation(
+          () =>
+            new NodeReadableStream({
+              start(controller) {
+                controller.enqueue(bytes.slice(0, 1))
+                controller.enqueue(bytes.slice(1, 2))
+                controller.enqueue(bytes.slice(2, 3))
+                controller.enqueue(bytes.slice(3))
+                controller.close()
+              },
+            }),
+        )
+      }
+      const preview = vi.fn(() => Promise.resolve(validSummary))
+      const restore = vi.fn(() => Promise.resolve(durableReplacement))
+      const service = createBackupTransferService({
+        local,
+        currentRevision: () => Promise.resolve(1),
+        exportSnapshot: async () => {},
+        preview,
+        restore,
+      })
+      vi.mocked(sendMessage).mockImplementation(async (method, data) => {
+        if (method === 'backup.beginTransfer')
+          return service.begin(
+            owner,
+            data as { direction: 'import'; requestId: string },
+          )
+        const handle = data as unknown as {
+          sessionId: string
+          ownerToken: string
+          sequence: number
+          text: string
+          chunks: number
+          digest: string
+          confirmationToken?: string
+        }
+        if (method === 'backup.appendTransferChunk')
+          return service.append(owner, handle, handle.sequence, handle.text)
+        if (method === 'backup.cancelTransfer')
+          return service.cancel(owner, handle)
+        if (method === 'backup.finishTransfer') {
+          // Checksum validation precedes parsing for both preview and restore.
+          await expect(
+            service.finish(owner, handle, {
+              ...handle,
+              digest: '0'.repeat(64),
+            }),
+          ).rejects.toThrow(/digest/i)
+          return service.finish(owner, handle, handle)
+        }
+        throw new Error('Unexpected transfer method')
+      })
+      const selected = await validateFullBackupViaRuntime(
+        file as unknown as File,
+      )
+      try {
+        expect(preview).toHaveBeenCalledExactlyOnceWith(
+          backup,
+          selected.transfer.sessionId,
+        )
+        expect(restore).not.toHaveBeenCalled()
+        expect(selected.transfer.digest).toBe(await transferDigest(text))
+        expect(
+          await local.readRecord(
+            transferChunkKey(selected.transfer.sessionId, 0),
+          ),
+        ).toBe(text)
+        expect(
+          await service.assertOwned(owner, selected.transfer),
+        ).toMatchObject({
+          status: 'ready',
+          bytes: bytes.length,
+          spooledBytes: bytes.length,
+          digest: selected.transfer.digest,
+        })
+        await expect(
+          restoreFullBackupViaRuntime({
+            transfer: selected.transfer,
+            confirmationToken: selected.confirmationToken,
+          }),
+        ).resolves.toEqual(durableReplacement)
+        expect(restore).toHaveBeenCalledExactlyOnceWith(
+          backup,
+          selected.confirmationToken,
+          selected.transfer.sessionId,
+        )
+        expect(
+          await local.readRecord(
+            transferChunkKey(selected.transfer.sessionId, 0),
+          ),
+        ).toBe(text)
+      } finally {
+        await cancelBackupTransfer(selected.transfer)
+      }
+    },
+  )
 
   it('reuses its durable begin identity after a lost worker response', async () => {
     const ids: string[] = []

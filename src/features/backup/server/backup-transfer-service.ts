@@ -499,7 +499,11 @@ export function createBackupTransferService<
       throw new Error('Transfer final digest does not match.')
     // Full parsing/preflight remains a whole-file allocation; Phase 4 measures
     // this separately. Finishing never applies without a confirmed preview.
-    const backup: unknown = JSON.parse(text)
+    // Preserve original spool bytes for checksums; accept one file-leading BOM
+    // only in the parsing input, as File.text() did before streaming imports.
+    const backup: unknown = JSON.parse(
+      text.startsWith('\ufeff') ? text.slice(1) : text,
+    )
     if (input.confirmationToken) {
       if (record.confirmationToken !== input.confirmationToken)
         throw new Error('Transfer confirmation does not match its preview.')
