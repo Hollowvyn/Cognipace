@@ -344,24 +344,6 @@ export function createArchiveGenerationRepository(local: LocalIdbStore) {
       ].flatMap((rows) => rows.map((row) => row.problemSlug))
       await assertArchiveReferences(original, problemSlugs)
       archive.payloads = original.payloads
-      const externalAliases = new Set<string>()
-      const attemptAliases = new Set<string>()
-      for (const submission of archive.submissions) {
-        if (submission.externalSubmissionId !== null) {
-          const alias = JSON.stringify([
-            submission.host,
-            submission.externalSubmissionId,
-          ])
-          if (externalAliases.has(alias))
-            throw new Error('Duplicate archive external submission alias.')
-          externalAliases.add(alias)
-        }
-        for (const alias of submission.observedAttemptIds) {
-          if (attemptAliases.has(alias))
-            throw new Error('Duplicate archive observed attempt alias.')
-          attemptAliases.add(alias)
-        }
-      }
       // Validate every existing immutable object before any staging write. Crypto
       // stays outside live IDB callbacks; final batch callbacks recheck the values
       // have not changed since this preflight.

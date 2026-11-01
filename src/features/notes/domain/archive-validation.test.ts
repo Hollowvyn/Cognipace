@@ -81,6 +81,46 @@ describe('retained learning archive validation', () => {
       assertArchiveReferences(archive, ['two-sum']),
     ).rejects.toThrow()
   })
+  it.each(['external', 'attempt', 'repeated-attempt'] as const)(
+    'rejects duplicate %s submission aliases',
+    async (fault) => {
+      const archive = await makeNotesArchive()
+      if (fault === 'repeated-attempt') {
+        archive.submissions[0]!.observedAttemptIds.push('attempt-1')
+      } else {
+        archive.submissions.push({
+          ...structuredClone(archive.submissions[0]!),
+          id: 'submission-2',
+          externalSubmissionId: fault === 'external' ? '123' : null,
+          observedAttemptIds: fault === 'attempt' ? ['attempt-1'] : [],
+        })
+      }
+      await expect(
+        assertArchiveReferences(archive, ['two-sum']),
+      ).rejects.toThrow(
+        fault === 'external'
+          ? 'Duplicate archive external submission alias.'
+          : 'Duplicate archive observed attempt alias.',
+      )
+    },
+  )
+  it('allows distinct aliases and multiple submissions without external IDs', async () => {
+    const archive = await makeNotesArchive()
+    archive.submissions.push({
+      ...structuredClone(archive.submissions[0]!),
+      id: 'submission-2',
+      externalSubmissionId: '456',
+      observedAttemptIds: ['attempt-2'],
+    })
+    await expect(
+      assertArchiveReferences(archive, ['two-sum']),
+    ).resolves.toBeUndefined()
+    for (const submission of archive.submissions)
+      submission.externalSubmissionId = null
+    await expect(
+      assertArchiveReferences(archive, ['two-sum']),
+    ).resolves.toBeUndefined()
+  })
   it('rejects absent problems for every problem-owned record', async () => {
     for (const key of [
       'notes',

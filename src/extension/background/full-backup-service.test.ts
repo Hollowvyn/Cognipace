@@ -146,6 +146,94 @@ it('publishes a full pair, rotates all catalog scopes, and exports only active r
     ).payloads.length,
   ).toBe(3)
 })
+it.each(['external', 'attempt', 'repeated-attempt'] as const)(
+  'rejects conflicting %s aliases before preview, candidate, or active pair writes',
+  async (fault) => {
+    const local = await fixture()
+    const archive = await makeNotesArchive()
+    const validInput = {
+      ...createFrozenV6BackupFixture(),
+      schemaVersion: 7,
+      notesArchive: structuredClone(archive),
+    }
+    if (fault === 'repeated-attempt') {
+      archive.submissions[0]!.observedAttemptIds.push('attempt-1')
+    } else {
+      archive.submissions.push({
+        ...structuredClone(archive.submissions[0]!),
+        id: 'submission-2',
+        externalSubmissionId: fault === 'external' ? '123' : null,
+        observedAttemptIds: fault === 'attempt' ? ['attempt-1'] : [],
+      })
+    }
+    expect(
+      (
+        await run(
+          local,
+          await prepareFullBackupRestore(validInput),
+          'alias-baseline',
+        )
+      ).status,
+    ).toBe('durable')
+    const invalidInput = { ...validInput, notesArchive: archive }
+    const error =
+      fault === 'external'
+        ? 'Duplicate archive external submission alias.'
+        : 'Duplicate archive observed attempt alias.'
+    const readRows = () =>
+      local.transact(
+        ['records', 'coreSnapshots'],
+        'readonly',
+        (stores, done) => {
+          const records = stores.records.getAll()
+          const cores = stores.coreSnapshots.getAll()
+          cores.onsuccess = () =>
+            done({ records: records.result, cores: cores.result })
+        },
+      )
+    const head = (await local.readHead())!
+    const activeArchive = await createArchiveGenerationRepository(
+      local,
+    ).readArchiveGeneration(head.archiveGeneration)
+    const beforePreview = await readRows()
+    await expect(createFullBackupPreview(local, invalidInput)).rejects.toThrow(
+      error,
+    )
+    expect(await readRows()).toEqual(beforePreview)
+
+    const preview = await createFullBackupPreview(local, validInput)
+    const beforeConfirmation = await readRows()
+    await expect(
+      validateFullBackupConfirmation(
+        local,
+        invalidInput,
+        preview.confirmationToken,
+      ),
+    ).rejects.toThrow(error)
+    expect(await readRows()).toEqual(beforeConfirmation)
+
+    await expect(
+      createArchiveGenerationRepository(local).stageImportedArchive({
+        nextGeneration: 'invalid-alias-generation',
+        archive,
+      }),
+    ).rejects.toThrow(error)
+    expect(
+      await local.readRecord([
+        'archive-generation',
+        'invalid-alias-generation',
+      ]),
+    ).toBeUndefined()
+    expect(await readRows()).toEqual(beforeConfirmation)
+    expect(await local.readHead()).toEqual(head)
+    expect(
+      await createArchiveGenerationRepository(local).readArchiveGeneration(
+        head.archiveGeneration,
+      ),
+    ).toEqual(activeArchive)
+  },
+)
+
 it('binds a legacy confirmation to exact input digest and local revision', async () => {
   const local = await fixture()
   const input = createFrozenV6BackupFixture()

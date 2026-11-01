@@ -45,6 +45,25 @@ export async function assertArchiveReferences(
     'saved AI inclusion',
   )
 
+  const externalAliases = new Set<string>()
+  const attemptAliases = new Set<string>()
+  for (const submission of parsed.submissions) {
+    if (submission.externalSubmissionId !== null) {
+      const alias = JSON.stringify([
+        submission.host,
+        submission.externalSubmissionId,
+      ])
+      if (externalAliases.has(alias))
+        throw new Error('Duplicate archive external submission alias.')
+      externalAliases.add(alias)
+    }
+    for (const alias of submission.observedAttemptIds) {
+      if (attemptAliases.has(alias))
+        throw new Error('Duplicate archive observed attempt alias.')
+      attemptAliases.add(alias)
+    }
+  }
+
   const requireProblem = (problemSlug: string) => {
     if (!problems.has(problemSlug))
       throw new Error('Archive references an absent problem.')
