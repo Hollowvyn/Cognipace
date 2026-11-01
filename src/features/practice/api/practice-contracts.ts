@@ -275,11 +275,14 @@ export type PracticeSetSuspendedRequest = z.infer<
   typeof practiceSetSuspendedRequestSchema
 >
 
-export const practiceResetScheduleRequestSchema = z.object({
-  surface: practiceRuntimeSurfaceSchema,
-  problemSlug: z.string(),
-  keepLog: z.boolean().optional(),
-})
+export const practiceResetScheduleRequestSchema = z
+  .object({
+    commandId: z.string().trim().min(1).optional(),
+    surface: practiceRuntimeSurfaceSchema,
+    problemSlug: z.string(),
+    keepLog: z.boolean().optional(),
+  })
+  .strict()
 
 export type PracticeResetScheduleRequest = z.infer<
   typeof practiceResetScheduleRequestSchema

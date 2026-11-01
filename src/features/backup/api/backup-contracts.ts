@@ -2,20 +2,14 @@ import { z } from 'zod'
 
 import { buildTopicGraph } from '@/features/problems/domain/topic-graph'
 import { buildTopicLookup } from '@/features/problems/domain/topic-taxonomy'
+import { notesArchiveSchema } from '@/features/notes/domain/notes-records'
 import {
-  practiceSchedulerProfileRecordSchema,
-  practiceReviewEvidenceRecordSchema,
-  practiceGenerationRecordSchema,
-  practiceCommandReceiptRecordSchema,
-} from '@/features/practice/domain'
-
-import {
-  backupDataV5Schema,
-  backupFileV5Schema,
-  backupLegacyPracticeDataSchema,
+  backupPracticeDataV6Schema,
+  backupDataV6Schema,
+  backupFileV6Schema,
   backupTracksDataV5Schema,
 } from './backup-legacy-contracts'
-import { normalizeLegacyBackupToV6 } from '../domain/backup-normalization'
+import { normalizeLegacyBackupToV7 } from '../domain/backup-normalization'
 
 export {
   backupProblemRowSchema,
@@ -36,32 +30,30 @@ export {
   backupSettingsKvRowSchema,
 } from './backup-legacy-contracts'
 
-export const backupSchemaVersion = 6
+export const backupSchemaVersion = 7
 export const minimumSupportedBackupSchemaVersion = 1
 const isoDatetimeSchema = z.iso.datetime()
-
-export const backupPracticeDataSchema = backupLegacyPracticeDataSchema.extend({
-  schedulerProfiles: z.array(practiceSchedulerProfileRecordSchema),
-  reviewEvidence: z.array(practiceReviewEvidenceRecordSchema),
-  generations: z.array(practiceGenerationRecordSchema),
-  commandReceipts: z.array(practiceCommandReceiptRecordSchema),
-})
+export const backupPracticeDataSchema = backupPracticeDataV6Schema
 export const backupTracksDataSchema = backupTracksDataV5Schema
-export const backupDataSchema = backupDataV5Schema.extend({
-  practice: backupPracticeDataSchema,
-})
-export const backupFileSchema = backupFileV5Schema.extend({
+export const backupDataSchema = backupDataV6Schema
+export const backupFileSchema = backupFileV6Schema.extend({
   schemaVersion: z.literal(backupSchemaVersion),
-  data: backupDataSchema,
+  notesArchive: z.lazy(() => notesArchiveSchema),
 })
 
 export const backupRequestSchema = z.strictObject({
   surface: z.literal('dashboard'),
 })
 
+export const backupResetRequestSchema = backupRequestSchema.extend({
+  commandId: z.string().trim().min(1).optional(),
+})
+export type BackupResetRequest = z.infer<typeof backupResetRequestSchema>
+
 export const backupPayloadRequestSchema = z.strictObject({
   surface: z.literal('dashboard'),
   backup: z.unknown(),
+  confirmationToken: z.string().min(1).optional(),
 })
 
 const backupSourceSchema = z.strictObject({
@@ -86,6 +78,11 @@ const backupSummaryCountsSchema = z.strictObject({
   trackProgress: z.number().int().min(0),
   trackSession: z.number().int().min(0),
   settings: z.number().int().min(0),
+  notes: z.number().int().min(0),
+  submissions: z.number().int().min(0),
+  assessments: z.number().int().min(0),
+  savedAiInclusions: z.number().int().min(0),
+  payloadBytes: z.number().int().min(0),
 })
 
 export const backupSummarySchema = z.strictObject({
@@ -94,6 +91,14 @@ export const backupSummarySchema = z.strictObject({
   source: backupSourceSchema,
   counts: backupSummaryCountsSchema,
 })
+
+export const backupRestorePreviewSchema = backupSummarySchema.extend({
+  confirmationToken: z.string().min(1),
+  sourceSchemaVersion: z.number().int().positive(),
+  archiveAbsent: z.boolean(),
+  removesCurrentArchive: z.boolean(),
+})
+export type BackupRestorePreview = z.infer<typeof backupRestorePreviewSchema>
 
 export type BackupFile = z.infer<typeof backupFileSchema>
 export type BackupData = z.infer<typeof backupDataSchema>
@@ -105,6 +110,8 @@ export const backupReplacementKindSchema = z.enum([
   'restore',
   'reset',
   'gist-pull',
+  'problem-reset',
+  'problem-delete',
 ])
 const pendingReplacementShape = {
   kind: backupReplacementKindSchema,
@@ -163,11 +170,11 @@ export function parseBackupFileForCurrentApp(input: unknown): BackupFile {
       `Unsupported backup version ${envelope.schemaVersion}. CogniPace supports backup versions ${minimumSupportedBackupSchemaVersion}-${backupSchemaVersion}.`,
     )
   }
-  const backup = backupFileSchema.parse(
+  const normalized =
     envelope.schemaVersion < backupSchemaVersion
-      ? normalizeLegacyBackupToV6(input)
-      : input,
-  )
+      ? normalizeLegacyBackupToV7(input)
+      : input
+  const backup = backupFileSchema.parse(normalized)
   buildTopicLookup(backup.data.topics, backup.data.topicAliases)
   buildTopicGraph(backup.data.topics, backup.data.topicRelations)
   return backup
@@ -195,6 +202,17 @@ export function createBackupSummary(backup: BackupFile): BackupSummary {
       trackProgress: backup.data.tracks.progress.length,
       trackSession: backup.data.tracks.session.length,
       settings: backup.data.settings.length,
+      notes: backup.notesArchive.notes.length,
+      submissions: backup.notesArchive.submissions.length,
+      assessments: backup.notesArchive.assessments.length,
+      savedAiInclusions: backup.notesArchive.savedAiNotes.length,
+      payloadBytes: backup.notesArchive.payloads.reduce(
+        (total, payload) => total + payload.byteLength,
+        0,
+      ),
     },
   })
 }
+
+// Data Management distinguishes logical archive bytes from the optional browser estimate.
+export { notesArchiveUsageSchema as dataManagementStorageStatusSchema } from '@/features/notes/domain/notes-usage'

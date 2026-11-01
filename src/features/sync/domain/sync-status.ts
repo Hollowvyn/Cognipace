@@ -25,6 +25,8 @@ export type SyncActionOutcome =
 export type SyncActionReason =
   | 'not-configured'
   | 'local-dirty'
+  | 'archive-review-required'
+  | 'backup-verification-unavailable'
   | 'remote-changed'
   | 'remote-unchanged'
   | 'auth'

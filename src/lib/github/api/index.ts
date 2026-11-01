@@ -1,5 +1,8 @@
-export { createGitHubGistClient } from './github-client'
-export type { GitHubGistClient } from './github-client'
+export {
+  createGitHubGistClient,
+  githubGistBackupCapabilities,
+} from './github-client'
+export type { GitHubGistClient, BackupCapabilities } from './github-client'
 export {
   cognipaceGistFileName,
   githubGistSchema,

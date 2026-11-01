@@ -1,3 +1,8 @@
+import {
+  createBackupSummary,
+  parseBackupFileForCurrentApp,
+} from '@/features/backup/api/backup-contracts'
+import { createFrozenV6BackupFixture } from '@/features/backup/testing/backup-v6-fixture'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -178,6 +183,54 @@ describe('GitHubSyncPanel', () => {
       /GitHub is temporarily unavailable/i,
     )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows the selected legacy remote preview and submits its bound confirmation token', async () => {
+    const user = userEvent.setup()
+    const restorePreview = {
+      ...createBackupSummary(
+        parseBackupFileForCurrentApp(createFrozenV6BackupFixture()),
+      ),
+      confirmationToken: 'remote-preview-token',
+      sourceSchemaVersion: 6,
+      archiveAbsent: true,
+      removesCurrentArchive: true,
+    }
+    const onPullLatest = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ...syncActionResult,
+        action: 'pull-latest',
+        direction: 'pull',
+        outcome: 'confirmation-required',
+        reason: null,
+        restorePreview,
+        message: 'Review selected remote backup.',
+      })
+      .mockResolvedValueOnce({
+        ...syncActionResult,
+        action: 'pull-latest',
+        direction: 'pull',
+        outcome: 'success',
+        reason: null,
+      })
+    render(
+      <GitHubSyncPanel
+        actions={createActions({ onPullLatest })}
+        status={configuredStatus}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Pull latest' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: /Force pull from Gist/i,
+    })
+    expect(dialog).toHaveTextContent(/backup version 6/i)
+    expect(dialog).toHaveTextContent(/contains no Notes archive/i)
+    await user.click(screen.getByRole('button', { name: /Force pull/i }))
+    expect(onPullLatest).toHaveBeenLastCalledWith({
+      confirmLocalOverwrite: true,
+      confirmationToken: 'remote-preview-token',
+    })
   })
 
   it('opens a force pull confirmation dialog when local changes block pulling', async () => {
@@ -528,3 +581,60 @@ const syncActionResult = {
   status: configuredStatus,
   occurredAt: '2026-05-26T12:00:00.000Z',
 } as const
+
+it('shows action-needed verification guidance before generic pending status', () => {
+  render(
+    <GitHubSyncPanel
+      actions={createActions()}
+      status={{
+        ...configuredStatus,
+        needsPush: true,
+        lastBlockingReason: 'backup-verification-unavailable',
+      }}
+    />,
+  )
+  expect(screen.getByText('Action needed')).toBeInTheDocument()
+  expect(
+    screen.getByText(/Automatic uploads are unavailable.*unverified/i),
+  ).toBeInTheDocument()
+  expect(screen.queryByText(/waiting to be pushed/i)).not.toBeInTheDocument()
+  expect(screen.queryByText('Auto-sync on')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Push local/i })).toBeEnabled()
+})
+
+it('offers a manual preview when a legacy backup would remove the archive', () => {
+  render(
+    <GitHubSyncPanel
+      actions={createActions()}
+      status={{
+        ...configuredStatus,
+        lastBlockingReason: 'archive-review-required',
+      }}
+    />,
+  )
+  expect(
+    screen.getByText(/older backup.*Pull latest.*preview/i),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Pull latest/i })).toBeEnabled()
+})
+
+it('keeps concrete sync errors visible when automatic backup verification is unavailable', () => {
+  render(
+    <GitHubSyncPanel
+      actions={createActions()}
+      status={{
+        ...configuredStatus,
+        lastBlockingReason: 'backup-verification-unavailable',
+        lastError: {
+          kind: 'auth',
+          message: 'Token needs replacement.',
+          occurredAt: '2026-05-26T12:00:00.000Z',
+          retryable: false,
+        },
+      }}
+    />,
+  )
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Token needs replacement.',
+  )
+})

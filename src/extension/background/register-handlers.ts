@@ -1,4 +1,66 @@
 import {
+  resumePendingReplacement,
+  validatePendingReplacement,
+} from './replacement-resume'
+import { createNotesMaintenanceService } from '@/features/notes/server/notes-maintenance-service'
+import { registerNotesMaintenance } from './scheduler/notes-maintenance'
+import { createTransferOwnerInventory } from './scheduler/transfer-owner-inventory'
+import { githubGistBackupCapabilities } from '@/lib/github'
+import {
+  createBackupTransferService,
+  reconcileCompletedBackupTransfers,
+  collectBackupTransferTechnicalBatch,
+} from '@/features/backup/server/backup-transfer-service'
+import {
+  beginTransferRequestSchema,
+  transferRequestSchema,
+  readTransferChunkRequestSchema,
+  appendTransferChunkRequestSchema,
+  finishTransferRequestSchema,
+  transferSessionSchema,
+  transferChunkSchema,
+  finishTransferResultSchema,
+} from '@/features/backup/api/backup-transfer-contracts'
+import { backupTransferDocumentOwner } from './runtime-policy'
+import {
+  exportDurableFullBackup,
+  createFullBackupPreview,
+  validateFullBackupConfirmation,
+  prepareFullBackupReplacement,
+  prepareGistFullBackupReplacement,
+} from './full-backup-service'
+import {
+  replacementCommandKey,
+  replacementCommandRecordSchema,
+} from '@/platform/db/snapshot-idb'
+import {
+  prepareProblemDataReplacement,
+  problemDataRequestFingerprint,
+  type ProblemDataReplacementInput,
+} from './problem-data-service'
+import { problemsResetProblemDataRequestSchema } from '@/features/problems/api/problems-contracts'
+import { registerNotesHandlers } from './notes-handlers'
+import { createNotesEditScopes } from './notes-edit-scopes'
+import { createNotesRepository } from '@/features/notes/data/notes-repository'
+import { createNotesService } from '@/features/notes/server/notes-service'
+import { getProblemContext } from '@/features/problems/server/problems-service'
+import { createLocalIdbStore } from '@/platform/db/local-idb'
+import { waitForPendingDbSnapshot } from '@/platform/db/instance'
+import {
+  configureMutationQueue,
+  runInMutationQueue,
+  runIdleMaintenanceBatch,
+  runGatedMutationQueue,
+  runConsistentRead,
+  resumePendingLocalSave,
+  isLocalSavePending,
+  setPendingLocalSave,
+  clearRecoveredMutationRetry,
+  setRecoveredMutationRetry,
+  takeRecoveredMutationRetry,
+  localSaveError,
+} from './mutation-queue'
+import {
   generateLeetCodeImplementationRequestSchema,
   generateLeetCodeImplementationResponseSchema,
   cancelLeetCodeImplementationRequestSchema,
@@ -10,10 +72,9 @@ import { timeOverlayStartup } from '@/lib/performance/overlay-startup-timing'
 import {
   analyticsSummaryRequestSchema,
   analyticsSummarySchema,
-  backupFileSchema,
   backupPayloadRequestSchema,
   backupRequestSchema,
-  backupSummarySchema,
+  backupResetRequestSchema,
   backupReplacementResultSchema,
   backupReplacementStateSchema,
   clearAiProviderSecretRequestSchema,
@@ -26,7 +87,6 @@ import {
   openDashboardRequestSchema,
   pingRequestSchema,
   problemBulkUpdateResponseSchema,
-  problemDeleteResponseSchema,
   problemForEditResponseSchema,
   problemLibraryResponseSchema,
   problemsBulkDeleteRequestSchema,
@@ -94,13 +154,6 @@ import {
   hintConnectionStatusSchema,
 } from '@/features/genai/api/hint-connection-contracts'
 import {
-  exportFullBackup,
-  resetLocalData,
-  prepareFullBackupRestore,
-  restorePreparedFullBackup,
-  validateFullBackup,
-} from '@/features/backup/server/backup-service'
-import {
   readLeetCodeProblemContentInBackground,
   readLeetCodeProblemMetadataInBackground,
   readLeetCodeSubmissionResultInBackground,
@@ -141,14 +194,11 @@ import {
   getPracticeDetails,
   previewPracticeReview,
   executePracticeReviewCommand,
-  resetPracticeSchedule,
   setPracticeSuspended,
 } from '@/features/practice/server/practice-service'
 import {
-  bulkDeleteProblems,
   bulkUpdateProblems,
   createProblem,
-  deleteProblem,
   getProblemForEdit,
   getProblemLibrary,
   updateProblem,
@@ -187,13 +237,7 @@ import {
   updateTrack,
 } from '@/features/tracks/server/tracks-service'
 import { getDashboardUrl } from '@/platform/chrome/extension-pages'
-import {
-  flushDbSnapshot,
-  beginDbReplacement,
-  abortDbReplacement,
-  commitDbReplacementSnapshot,
-  type Db,
-} from '@/platform/db'
+import { flushDbSnapshot, type Db } from '@/platform/db'
 import {
   createSnapshotIdbStore,
   type ReplacementContinuation,
@@ -221,7 +265,12 @@ import {
   assertCanSenderCallExtensionMethod,
   assertHintProblemSender,
 } from './runtime-policy'
-import { getBackgroundDb as getAppDb } from './app-db'
+import {
+  getBackgroundDb as getAppDb,
+  verifyBackgroundReplacementAdoption,
+  withBackgroundDb,
+  withBackgroundDbLoader,
+} from './app-db'
 import { createAlarmScheduler } from './scheduler/alarm-scheduler'
 import { createSyncAutoSync } from './sync-auto-sync'
 import {
@@ -231,12 +280,20 @@ import {
 } from './due-notification'
 
 const alarmScheduler = createAlarmScheduler()
+let requestNotesMaintenance: (() => Promise<unknown>) | undefined
 const replacementStore =
   typeof indexedDB === 'undefined'
     ? undefined
     : createSnapshotIdbStore(indexedDB)
 const backupReplacement = createBackupReplacementCoordinator({
   ...(replacementStore ? { store: replacementStore } : {}),
+  validatePrepared: (record) =>
+    validatePendingReplacement(createLocalIdbStore(indexedDB), record).then(
+      () => {},
+    ),
+  resumePrepared: (record) =>
+    resumePendingReplacement(createLocalIdbStore(indexedDB), record),
+  resumeAdoption: verifyBackgroundReplacementAdoption,
   resume: (record: ReplacementContinuation) => ({
     onDurable: () => broadcastDataManagementInvalidation('dashboard'),
     finishSyncMetadata: async () => {
@@ -260,9 +317,17 @@ const backupReplacement = createBackupReplacementCoordinator({
     },
   }),
 })
+configureMutationQueue({
+  ready: () => backupReplacement.ready(),
+  assertIdle: () => backupReplacement.assertIdle(),
+  assertReadable: () => backupReplacement.assertReadable(),
+  flush: flushDbSnapshot,
+  waitForPendingCoreSave: waitForPendingDbSnapshot,
+})
 let clearPendingImportPersistence = () => {}
 let hasPendingImportPersistence = () => false
 const syncAutoSync = createSyncAutoSync({
+  backupCapabilities: githubGistBackupCapabilities,
   scheduler: alarmScheduler,
   hasPendingDirtyMarkRetry: () => hasPendingDirtyMarkRetry,
   now: () => new Date(),
@@ -273,7 +338,9 @@ const syncAutoSync = createSyncAutoSync({
     const { db } = await getAppDb()
 
     return parseSyncActionResult(
-      await runQueuedSyncAction(db, (service) => service.pushLocal(input)),
+      await runQueuedSyncAction(db, (service) =>
+        service.pushLocal({ ...input, automatic: true }),
+      ),
     )
   },
   runCleanPullCheck: async () => {
@@ -295,15 +362,12 @@ const syncAutoSync = createSyncAutoSync({
 
 const dueNotification = createDueNotification({
   now: () => new Date(),
-  readSettings: async () => {
-    const { db } = await getAppDb()
-    return getSettings(db)
-  },
-  readQueueSummary: async () => {
-    const { db } = await getAppDb()
-    const queue = await getTodayQueue(db, new Date())
-    return { dueToday: queue.dueToday }
-  },
+  readSettings: () => withBackgroundDb(({ db }) => getSettings(db)),
+  readQueueSummary: () =>
+    withBackgroundDb(async ({ db }) => {
+      const queue = await getTodayQueue(db, new Date())
+      return { dueToday: queue.dueToday }
+    }),
   readState: readDueNotificationState,
   writeState: writeDueNotificationState,
   notify: async (title, message) => {
@@ -322,15 +386,214 @@ const dueNotification = createDueNotification({
 })
 
 export function registerBackgroundHandlers() {
+  // Register narrow infrastructure only. No Notes UI/capture is activated.
+  const notesLocal =
+    typeof indexedDB === 'undefined'
+      ? undefined
+      : createLocalIdbStore(indexedDB)
+  const requireNotesLocal = () => {
+    if (!notesLocal) throw new Error('Local Notes storage is unavailable.')
+    return notesLocal
+  }
+  const ownerIsAbsent = createTransferOwnerInventory(
+    typeof browser.runtime.getContexts === 'function'
+      ? (filter) => browser.runtime.getContexts(filter)
+      : undefined,
+  )
+  const maintenance = registerNotesMaintenance(alarmScheduler, () =>
+    runIdleMaintenanceBatch(async () => {
+      const local = requireNotesLocal()
+      // Complete bounded spool batches before starting a new archive mark.
+      // Startup/generic Retry saving owns settled-receipt reconciliation.
+      if (
+        (await local.readRecord(['notes-maintenance-progress'])) === undefined
+      ) {
+        const transfer = await collectBackupTransferTechnicalBatch(local, {
+          ownerIsAbsent,
+        })
+        if (transfer.hasMore) return transfer
+      }
+      const result = await createNotesMaintenanceService({
+        local,
+      }).collectBatch()
+      if (result.hasMore) return result
+      return collectBackupTransferTechnicalBatch(local, { ownerIsAbsent })
+    }),
+  )
+  requestNotesMaintenance = maintenance.request
+  async function retryReplacementWithTransferReceipts() {
+    const result = await backupReplacement.retry()
+    if (notesLocal && backupReplacement.getState().status === 'idle')
+      await reconcileCompletedBackupTransfers(notesLocal)
+    return result
+  }
+  const acceptedProblemOperations = new Map<
+    string,
+    {
+      fingerprint: string
+      result: import('@/features/backup/api/backup-contracts').BackupReplacementResult
+    }
+  >()
+  function runProblemDataReplacement(
+    input: Omit<ProblemDataReplacementInput, 'commandId'> & {
+      commandId?: string | undefined
+    },
+    surface: 'dashboard' | 'popup' | 'content-script',
+  ) {
+    if (!input.commandId)
+      throw new Error(
+        'Refresh required: reload CogniPace before resetting or deleting problem data.',
+      )
+    const commandId = input.commandId
+    const fingerprint = problemDataRequestFingerprint(input)
+    return runInMutationQueue(async () => {
+      await backupReplacement.ready()
+      const completed = await requireNotesLocal().readRecord(
+        replacementCommandKey(commandId),
+      )
+      if (completed !== undefined) {
+        const command = replacementCommandRecordSchema.parse(completed)
+        if (
+          command.requestFingerprint !== fingerprint ||
+          command.kind !== input.kind
+        )
+          throw new Error(
+            'Problem data command identity conflict. Refresh and try again.',
+          )
+        const continuation = await replacementStore?.readContinuation()
+        if (continuation?.replacementId === commandId)
+          return backupReplacementResultSchema.parse(
+            await backupReplacement.retry(),
+          )
+        return backupReplacementResultSchema.parse({
+          status: 'durable',
+          kind: input.kind,
+          summary: null,
+          syncMetadataPending: false,
+        })
+      }
+      const accepted = acceptedProblemOperations.get(commandId)
+      if (accepted) {
+        if (accepted.fingerprint !== fingerprint)
+          throw new Error(
+            'Problem data command identity conflict. Refresh and try again.',
+          )
+        if (backupReplacement.getState().status !== 'idle') {
+          accepted.result = backupReplacementResultSchema.parse(
+            await backupReplacement.retry(),
+          )
+        } else {
+          accepted.result = backupReplacementResultSchema.parse({
+            status: 'durable',
+            kind: input.kind,
+            summary: null,
+            syncMetadataPending: false,
+          })
+        }
+        return accepted.result
+      }
+      backupReplacement.assertIdle()
+      await resumePendingLocalSave()
+      await getAppDb()
+      await markSyncLocalDataChanged()
+      hasPendingDirtyMarkRetry = false
+      const result = backupReplacementResultSchema.parse(
+        await backupReplacement.run({
+          kind: input.kind,
+          prepare: () =>
+            prepareProblemDataReplacement(requireNotesLocal(), {
+              ...input,
+              commandId,
+            }),
+          onDurable: async () => {
+            clearPendingImportPersistence()
+            recoveredReviewRetry = null
+            clearRecoveredMutationRetry()
+            await broadcastDataManagementInvalidation(surface)
+          },
+          finishSyncMetadata: async () => {
+            await markSyncLocalDataChanged()
+            hasPendingDirtyMarkRetry = false
+            await scheduleAutoPushAfterMutationBestEffort()
+          },
+        }),
+      )
+      acceptedProblemOperations.set(commandId, { fingerprint, result })
+      return result
+    })
+  }
+  const notesLeases = () => createNotesEditScopes(requireNotesLocal())
+  registerNotesHandlers({
+    getService: async () => {
+      await getAppDb()
+      return createNotesService(
+        createNotesRepository(requireNotesLocal()),
+        (slug) =>
+          withBackgroundDb(
+            async ({ db: current }) =>
+              (await getProblemContext(current, slug)) !== null,
+          ),
+      )
+    },
+    getArchiveUsage: async () => {
+      await getAppDb()
+      const usage = await createNotesMaintenanceService({
+        local: requireNotesLocal(),
+      }).getArchiveUsage()
+      let browserStorageEstimate: import('@/features/notes/api/notes-contracts').NotesResult<'notes.getArchiveUsage'>['browserStorageEstimate'] =
+        null
+      try {
+        const estimate = await globalThis.navigator?.storage?.estimate?.()
+        if (estimate)
+          browserStorageEstimate = {
+            ...(estimate.usage !== undefined
+              ? { usageBytes: estimate.usage }
+              : {}),
+            ...(estimate.quota !== undefined
+              ? { quotaBytes: estimate.quota }
+              : {}),
+          }
+      } catch {
+        /* Optional physical estimate unavailable. */
+      }
+      return { ...usage, browserStorageEstimate }
+    },
+    getLeases: notesLeases,
+    runRead: runConsistentRead,
+    runMutation: runGatedMutationQueue,
+    // This check runs inside the same serialized callback as any legacy idle
+    // technical side effects; relaxed read admission alone never permits writes.
+    canMutate: () => {
+      try {
+        backupReplacement.assertIdle()
+        return true
+      } catch {
+        return false
+      }
+    },
+    emit: async (problemSlug, source, tags) => {
+      await markSyncLocalDataChanged()
+      await broadcastCacheInvalidation({
+        reason: 'notes-updated',
+        source,
+        problemSlug,
+        tags,
+      })
+      await scheduleAutoPushAfterMutationBestEffort()
+    },
+  })
   if (replacementStore) {
     void backupReplacement
       .ready()
       .then(() => {
-        if (backupReplacement.getState().status === 'idle') return
-        return runInMutationQueue(() => backupReplacement.retry())
+        // Startup may settle committed bookkeeping, but prepublication resume
+        // requires the existing authenticated generic Retry saving command.
+        if (backupReplacement.getState().status === 'persistence-pending')
+          return
+        return runInMutationQueue(retryReplacementWithTransferReceipts)
       })
       .catch(() => {
-        // A failed continuation remains gated for a later explicit retry.
+        // Failed continuation or receipt bookkeeping stays recoverable on retry.
       })
   }
   syncAutoSync.registerJobs()
@@ -345,15 +608,14 @@ export function registerBackgroundHandlers() {
         ? runInMutationQueue(async () => {
             backupReplacement.assertIdle()
             if (!hasPendingImportPersistence()) await resumePendingLocalSave()
-            recoveredGenericRetry = null
+            clearRecoveredMutationRetry()
             return work()
           })
         : runGatedMutationQueue(work),
     getDb: async () => (await getAppDb()).db,
     flush: flushDbSnapshot,
     onPersistencePending: (onDurable) => {
-      hasPendingLocalSave = true
-      pendingLocalSaveContinuation = onDurable
+      setPendingLocalSave(onDurable)
     },
     retrySharedPendingPersistence: resumePendingLocalSave,
     markDirty: markSyncLocalDataChangedBestEffort,
@@ -387,7 +649,7 @@ export function registerBackgroundHandlers() {
       getAppShellRuntimeSurface(request),
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       appShellDataSchema.parse(
         await timeOverlayStartup('worker.app-shell', () =>
           getAppShellData(db, request),
@@ -409,29 +671,119 @@ export function registerBackgroundHandlers() {
       .then(() => null)
   })
 
+  // Legacy object IPC is explicitly disabled by runtime policy. Internal
+  // object helpers remain available only to trusted owners and service tests.
   onMessage('backup.exportFullBackup', ({ data, sender }) => {
     const request = backupRequestSchema.parse(data)
-
     assertCanSenderCallExtensionMethod(
       'backup.exportFullBackup',
       request.surface,
       sender,
     )
-    return runGatedMutationQueue(async () => {
-      const { db } = await getAppDb()
-      return backupFileSchema.parse(await exportFullBackup(db))
-    })
+    throw new Error('Use bounded backup transfer sessions.')
   })
-
   onMessage('backup.validateFullBackup', ({ data, sender }) => {
     const request = backupPayloadRequestSchema.parse(data)
-
     assertCanSenderCallExtensionMethod(
       'backup.validateFullBackup',
       request.surface,
       sender,
     )
-    return backupSummarySchema.parse(validateFullBackup(request.backup))
+    throw new Error('Use bounded backup transfer sessions.')
+  })
+  onMessage('backup.restoreFullBackup', ({ data, sender }) => {
+    const request = backupPayloadRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.restoreFullBackup',
+      request.surface,
+      sender,
+    )
+    throw new Error('Use bounded backup transfer sessions.')
+  })
+  onMessage('backup.beginTransfer', ({ data, sender }) => {
+    const request = beginTransferRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.beginTransfer',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    const run =
+      request.direction === 'export'
+        ? runGatedMutationQueue
+        : runInMutationQueue
+    return run(async () =>
+      transferSessionSchema
+        .strip()
+        .parse(await transferFor(owner).begin(owner, request)),
+    )
+  })
+  onMessage('backup.appendTransferChunk', ({ data, sender }) => {
+    const request = appendTransferChunkRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.appendTransferChunk',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    return runInMutationQueue(async () =>
+      transferSessionSchema
+        .strip()
+        .parse(
+          await transferFor(owner).append(
+            owner,
+            request,
+            request.sequence,
+            request.text,
+          ),
+        ),
+    )
+  })
+  onMessage('backup.readTransferChunk', ({ data, sender }) => {
+    const request = readTransferChunkRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.readTransferChunk',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    return runInMutationQueue(async () =>
+      transferChunkSchema.parse(
+        await transferFor(owner).read(owner, request, request.sequence),
+      ),
+    )
+  })
+  onMessage('backup.finishTransfer', ({ data, sender }) => {
+    const request = finishTransferRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.finishTransfer',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    const run = request.confirmationToken
+      ? runInMutationQueue
+      : runGatedMutationQueue
+    const transfer = transferFor(owner)
+    return transfer
+      .assertOwned(owner, request)
+      .then(() =>
+        run(async () =>
+          finishTransferResultSchema.parse(
+            await transfer.finish(owner, request, request),
+          ),
+        ),
+      )
+  })
+  onMessage('backup.cancelTransfer', ({ data, sender }) => {
+    const request = transferRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.cancelTransfer',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    return runInMutationQueue(() => transferFor(owner).cancel(owner, request))
   })
 
   onMessage('sync.getStatus', ({ data, sender }) => {
@@ -442,7 +794,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       syncStatusSchema.parse(await createSyncServiceForDb(db).getStatus()),
     )
   })
@@ -455,7 +807,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.validateGithubToken(request.token),
@@ -472,7 +824,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.validateStoredGithubToken(),
@@ -489,7 +841,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.saveGithubToken(request.token),
@@ -506,7 +858,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) => service.deleteGithubToken()),
       )
@@ -527,7 +879,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) => service.createGithubGist()),
       )
@@ -548,7 +900,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.connectGithubGist(request.gistId),
@@ -565,7 +917,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.setEnabled(request.enabled),
@@ -588,7 +940,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) => service.checkRemoteOnOpen()),
       ),
@@ -621,11 +973,14 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.pullLatest({
             confirmLocalOverwrite: request.confirmLocalOverwrite,
+            ...(request.confirmationToken
+              ? { confirmationToken: request.confirmationToken }
+              : {}),
           }),
         ),
       )
@@ -646,7 +1001,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.pushLocal({
@@ -663,73 +1018,92 @@ export function registerBackgroundHandlers() {
     })
   })
 
-  onMessage('backup.restoreFullBackup', ({ data, sender }) => {
-    const request = backupPayloadRequestSchema.parse(data)
-
-    assertCanSenderCallExtensionMethod(
-      'backup.restoreFullBackup',
-      request.surface,
-      sender,
-    )
-    return runGatedMutationQueue(async () => {
-      const prepared = prepareFullBackupRestore(request.backup)
-      const { db } = await getAppDb()
-      await markSyncLocalDataChanged()
-      hasPendingDirtyMarkRetry = false
-      return backupReplacementResultSchema.parse(
-        await backupReplacement.run({
-          kind: 'restore',
-          ...(replacementStore
-            ? {
-                beforeCommit: beginDbReplacement,
-                abortCommit: abortDbReplacement,
-              }
-            : {}),
-          commit: async () => {
-            const summary = await restorePreparedFullBackup(db, prepared)
-            clearPendingImportPersistence()
-            recoveredReviewRetry = null
-            recoveredGenericRetry = null
-            return summary
-          },
-          ...createLocalReplacementContinuations(request.surface),
+  function transferFor(owner: string) {
+    return createBackupTransferService({
+      local: requireNotesLocal(),
+      currentRevision: async () =>
+        (await requireNotesLocal().readHead())?.revision ?? 0,
+      exportSnapshot: async (consume) => {
+        const snapshot = await exportDurableFullBackup(requireNotesLocal())
+        await consume(snapshot.backup, snapshot.revision)
+      },
+      preview: (backup, sessionId) =>
+        createFullBackupPreview(requireNotesLocal(), backup, {
+          sourceIdentity: JSON.stringify([
+            'dashboard-transfer',
+            owner,
+            sessionId,
+          ]),
         }),
-      )
+      restore: async (backup, confirmationToken, sessionId) => {
+        const sourceIdentity = JSON.stringify([
+          'dashboard-transfer',
+          owner,
+          sessionId,
+        ])
+        await backupReplacement.ready()
+        const local = requireNotesLocal()
+        const prepared = await validateFullBackupConfirmation(
+          local,
+          backup,
+          confirmationToken,
+          { sourceIdentity },
+        )
+        const commandId = confirmationToken
+        const completed = await local.readRecord(
+          replacementCommandKey(commandId),
+        )
+        if (completed !== undefined) {
+          const continuation = await replacementStore?.readContinuation()
+          return backupReplacementResultSchema.parse(
+            continuation?.replacementId === commandId
+              ? await backupReplacement.retry()
+              : {
+                  status: 'durable',
+                  kind: 'restore',
+                  summary: prepared.summary,
+                  syncMetadataPending: false,
+                },
+          )
+        }
+        backupReplacement.assertIdle()
+        await resumePendingLocalSave()
+        await markSyncLocalDataChanged()
+        hasPendingDirtyMarkRetry = false
+        return backupReplacementResultSchema.parse(
+          await backupReplacement.run({
+            kind: 'restore',
+            prepare: () =>
+              prepareFullBackupReplacement(local, { prepared, commandId }),
+            onDurable: async () => {
+              clearPendingImportPersistence()
+              recoveredReviewRetry = null
+              clearRecoveredMutationRetry()
+              await broadcastDataManagementInvalidation('dashboard')
+            },
+            finishSyncMetadata: async () => {
+              await markSyncLocalDataChanged()
+              hasPendingDirtyMarkRetry = false
+              await scheduleAutoPushAfterMutationBestEffort()
+            },
+          }),
+        )
+      },
     })
-  })
+  }
 
   onMessage('backup.resetLocalData', ({ data, sender }) => {
-    const request = backupRequestSchema.parse(data)
+    const request = backupResetRequestSchema.parse(data)
 
     assertCanSenderCallExtensionMethod(
       'backup.resetLocalData',
       request.surface,
       sender,
     )
-    return runGatedMutationQueue(async () => {
-      const { db } = await getAppDb()
-      await markSyncLocalDataChanged()
-      hasPendingDirtyMarkRetry = false
-      return backupReplacementResultSchema.parse(
-        await backupReplacement.run({
-          kind: 'reset',
-          ...(replacementStore
-            ? {
-                beforeCommit: beginDbReplacement,
-                abortCommit: abortDbReplacement,
-              }
-            : {}),
-          commit: async () => {
-            await resetLocalData(db)
-            clearPendingImportPersistence()
-            recoveredReviewRetry = null
-            recoveredGenericRetry = null
-            return null
-          },
-          ...createLocalReplacementContinuations(request.surface),
-        }),
-      )
-    })
+    return runProblemDataReplacement(
+      { kind: 'reset', problemSlugs: [], commandId: request.commandId },
+      request.surface,
+    )
   })
 
   onMessage('backup.getPendingReplacement', ({ data, sender }) => {
@@ -756,9 +1130,9 @@ export function registerBackgroundHandlers() {
     return runInMutationQueue(async () => {
       await backupReplacement.ready()
       await resumePendingLocalSave()
-      recoveredGenericRetry = null
+      clearRecoveredMutationRetry()
       return backupReplacementResultSchema.parse(
-        await backupReplacement.retry(),
+        await retryReplacementWithTransferReceipts(),
       )
     })
   })
@@ -792,7 +1166,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       problemLibraryResponseSchema.parse(await getProblemLibrary(db, request)),
     )
   })
@@ -805,7 +1179,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       problemForEditResponseSchema.parse(await getProblemForEdit(db, request)),
     )
   })
@@ -850,6 +1224,23 @@ export function registerBackgroundHandlers() {
     )
   })
 
+  onMessage('problems.resetProblemData', ({ data, sender }) => {
+    const request = problemsResetProblemDataRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'problems.resetProblemData',
+      request.surface,
+      sender,
+    )
+    return runProblemDataReplacement(
+      {
+        kind: 'problem-reset',
+        problemSlugs: request.problemSlugs,
+        commandId: request.commandId,
+      },
+      request.surface,
+    )
+  })
+
   onMessage('problems.deleteProblem', ({ data, sender }) => {
     const request = problemsDeleteProblemRequestSchema.parse(data)
 
@@ -858,15 +1249,13 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) =>
-        problemDeleteResponseSchema.parse(await deleteProblem(db, request)),
-      () =>
-        broadcastProblemCatalogInvalidation({
-          problemSlug: request.problemSlug,
-          source: request.surface,
-        }),
-      { retryKey: mutationRetryKey('problems.deleteProblem', request) },
+    return runProblemDataReplacement(
+      {
+        kind: 'problem-delete',
+        problemSlugs: [request.problemSlug],
+        commandId: request.commandId,
+      },
+      request.surface,
     )
   })
 
@@ -900,17 +1289,13 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) =>
-        problemDeleteResponseSchema.parse(
-          await bulkDeleteProblems(db, request),
-        ),
-      () =>
-        broadcastProblemCatalogInvalidation({
-          problemSlug: readSingleChangedProblemSlug(request.problemSlugs),
-          source: request.surface,
-        }),
-      { retryKey: mutationRetryKey('problems.bulkDelete', request) },
+    return runProblemDataReplacement(
+      {
+        kind: 'problem-delete',
+        problemSlugs: request.problemSlugs,
+        commandId: request.commandId,
+      },
+      request.surface,
     )
   })
 
@@ -922,7 +1307,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const details = await getPracticeDetails(db, request.problemSlug, {
         ...(request.at ? { now: new Date(request.at) } : {}),
       })
@@ -1017,21 +1402,13 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) => {
-        const details = await resetPracticeSchedule(db, {
-          problemSlug: request.problemSlug,
-          keepLog: request.keepLog,
-        })
-
-        return serializePracticeDetails(details)
+    return runProblemDataReplacement(
+      {
+        kind: 'problem-reset',
+        problemSlugs: [request.problemSlug],
+        commandId: request.commandId,
       },
-      () =>
-        broadcastPracticeInvalidation({
-          problemSlug: request.problemSlug,
-          source: request.surface,
-        }),
-      { retryKey: mutationRetryKey('practice.resetSchedule', request) },
+      request.surface,
     )
   })
 
@@ -1044,7 +1421,7 @@ export function registerBackgroundHandlers() {
       sender,
     )
 
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const summaryOptions = request.at
         ? {
             range: request.range,
@@ -1070,7 +1447,7 @@ export function registerBackgroundHandlers() {
 
     assertCanSenderCallExtensionMethod('devSmoke.run', request.surface, sender)
 
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const smoke = createDevSmokeService({
         now: () => new Date(),
         readAnalyticsSummary: () =>
@@ -1111,7 +1488,7 @@ export function registerBackgroundHandlers() {
           }),
         runNotificationDryRun: () =>
           runGatedMutationQueue(() => runNotificationSmokeDryRun(db)),
-        runLiveGenAi: () => runLiveGenAiSmoke(db),
+        runLiveGenAi: () => runLiveGenAiSmoke(),
         readCapacityStorage: () =>
           runGatedMutationQueue(() =>
             readChromeStorageCapacity(chrome.storage.local),
@@ -1139,7 +1516,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       serializeTodayQueue(
         await getTodayQueue(
           db,
@@ -1158,7 +1535,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       serializeActiveTrack(await getActiveTrack(db)),
     )
   })
@@ -1171,7 +1548,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       trackWorkspaceResponseSchema.parse(await getWorkspace(db, request)),
     )
   })
@@ -1184,7 +1561,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       trackForEditResponseSchema.parse(await getTrackForEdit(db, request)),
     )
   })
@@ -1350,7 +1727,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const settings = await getSettings(db)
       return settings satisfies UserSettings
     })
@@ -1469,9 +1846,9 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return testAiConnection(request, async () => (await getAppDb()).db).then(
-      (result) => testAiConnectionResponseSchema.parse(result),
-    )
+    return withBackgroundDbLoader((loadDb) =>
+      testAiConnection(request, loadDb),
+    ).then((result) => testAiConnectionResponseSchema.parse(result))
   })
 
   onMessage('genai.getHintConnection', ({ data, sender }) => {
@@ -1482,11 +1859,12 @@ export function registerBackgroundHandlers() {
       sender,
     )
     return withAiDeadline({ timeoutMs: 20_000 }, async (signal) => {
-      const { db } = await getAppDb()
-      signal.throwIfAborted()
-      const status = await getAiHintConnectionStatus(db)
-      signal.throwIfAborted()
-      return hintConnectionStatusSchema.parse(status)
+      return withBackgroundDb(async ({ db }) => {
+        signal.throwIfAborted()
+        const status = await getAiHintConnectionStatus(db)
+        signal.throwIfAborted()
+        return hintConnectionStatusSchema.parse(status)
+      })
     }).catch(() => {
       throw new Error('Saved AI connection could not be loaded. Please retry.')
     })
@@ -1506,10 +1884,8 @@ export function registerBackgroundHandlers() {
       request.connectionProvider,
       async (signal) =>
         generateLeetCodeHintsResponseSchema.parse(
-          await generateLeetCodeHintsInBackground(
-            request,
-            async () => (await getAppDb()).db,
-            signal,
+          await withBackgroundDbLoader((loadDb) =>
+            generateLeetCodeHintsInBackground(request, loadDb, signal),
           ),
         ),
     )
@@ -1544,10 +1920,8 @@ export function registerBackgroundHandlers() {
       request.requestId,
       async (signal) =>
         generateLeetCodeImplementationResponseSchema.parse(
-          await generateLeetCodeImplementationInBackground(
-            request,
-            async () => (await getAppDb()).db,
-            signal,
+          await withBackgroundDbLoader((loadDb) =>
+            generateLeetCodeImplementationInBackground(request, loadDb, signal),
           ),
         ),
     )
@@ -1578,10 +1952,8 @@ export function registerBackgroundHandlers() {
     const owner = analysisOwner(sender)
     return runOwnedAnalysis(owner, request.requestId, async (signal) =>
       analyzeLeetCodeSubmissionResponseSchema.parse(
-        await analyzeLeetCodeSubmissionInBackground(
-          request,
-          async () => (await getAppDb()).db,
-          signal,
+        await withBackgroundDbLoader((loadDb) =>
+          analyzeLeetCodeSubmissionInBackground(request, loadDb, signal),
         ),
       ),
     )
@@ -1658,8 +2030,10 @@ async function runNotificationSmokeDryRun(db: Db) {
   })
 }
 
-async function runLiveGenAiSmoke(db: Db) {
-  const config = await runGatedMutationQueue(() => loadActiveProviderConfig(db))
+async function runLiveGenAiSmoke() {
+  const config = await runGatedMutationQueue(() =>
+    withBackgroundDb(({ db }) => loadActiveProviderConfig(db)),
+  )
 
   if (!config) {
     return {
@@ -1750,30 +2124,80 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
       await broadcastDataManagementInvalidation('dashboard')
     },
     {
-      runRemoteRestore: (work, context) =>
-        runRemoteRestoreInMutationQueue(work, isInsideMutationQueue, context),
-      runReplacement: (work) =>
-        backupReplacement.run({
-          ...work,
-          ...(replacementStore
-            ? {
-                beforeCommit: beginDbReplacement,
-                abortCommit: abortDbReplacement,
-                flush: (
-                  input:
-                    | Parameters<typeof commitDbReplacementSnapshot>[0]
-                    | undefined,
-                ) => commitDbReplacementSnapshot(input!),
-              }
-            : {}),
-          commit: async () => {
-            const summary = await work.commit()
+      withDb: (work) => withBackgroundDb(({ db: current }) => work(current)),
+      acknowledgeVerifiedRevision: (revision) =>
+        createSnapshotIdbStore(indexedDB).acknowledgeVerifiedRevision(revision),
+      exportFullBackup: () => {
+        const work = () =>
+          exportDurableFullBackup(createLocalIdbStore(indexedDB))
+        return isInsideMutationQueue ? work() : runGatedMutationQueue(work)
+      },
+      previewRemoteRestore: (input, sourceIdentity) =>
+        createFullBackupPreview(createLocalIdbStore(indexedDB), input, {
+          kind: 'gist-pull',
+          sourceIdentity,
+        }),
+      reconcileRemoteRestore: async (confirmationToken) => {
+        const local = createLocalIdbStore(indexedDB)
+        const raw = await local.readRecord(
+          replacementCommandKey(confirmationToken),
+        )
+        if (raw === undefined) return null
+        const command = replacementCommandRecordSchema.parse(raw)
+        if (command.kind !== 'gist-pull')
+          throw new Error(
+            'Gist restore confirmation identity conflicts. Review a fresh preview.',
+          )
+        const continuation = await replacementStore?.readContinuation()
+        return continuation?.replacementId === confirmationToken
+          ? backupReplacement.retry()
+          : {
+              status: 'durable',
+              kind: 'gist-pull',
+              summary: null,
+              syncMetadataPending: false,
+            }
+      },
+      runFullBackupReplacement: async (prepared, continuations, context) => {
+        const local = createLocalIdbStore(indexedDB)
+        if (context?.confirmationToken) {
+          prepared = await validateFullBackupConfirmation(
+            local,
+            context.sourceInput,
+            context.confirmationToken,
+            { kind: 'gist-pull', sourceIdentity: context.sourceIdentity },
+          )
+        }
+        return backupReplacement.run({
+          kind: 'gist-pull',
+          prepare: () =>
+            context?.confirmationToken
+              ? prepareFullBackupReplacement(local, {
+                  prepared,
+                  commandId: context.confirmationToken,
+                  kind: 'gist-pull',
+                  sourceIdentity: context.sourceIdentity,
+                })
+              : prepareGistFullBackupReplacement(
+                  local,
+                  prepared,
+                  context?.sourceIdentity,
+                ),
+          ...continuations,
+          onDurable: async () => {
             clearPendingImportPersistence()
             recoveredReviewRetry = null
-            recoveredGenericRetry = null
-            return summary
+            clearRecoveredMutationRetry()
+            await continuations.onDurable()
           },
-        }),
+        })
+      },
+      runRemoteRestore: (work, context) =>
+        runRemoteRestoreInMutationQueue(work, isInsideMutationQueue, context),
+      runReplacement: () =>
+        Promise.reject(
+          new Error('Full backup restores require detached pair preparation.'),
+        ),
     },
   )
 }
@@ -1803,18 +2227,11 @@ function parseSyncActionResult(result: unknown) {
 
 type DbMutationSyncMode = 'mark-dirty' | 'none'
 
-let dbMutationQueue: Promise<void> = Promise.resolve()
-let dbMutationDepth = 0
 let hasPendingDirtyMarkRetry = false
-let hasPendingLocalSave = false
-let pendingLocalSaveContinuation: (() => Promise<void>) | null = null
 let recoveredReviewRetry: {
   key: string
   result: ReturnType<typeof practiceReviewCommandResultSchema.parse>
 } | null = null
-let recoveredGenericRetry: { key: string; result: unknown } | null = null
-const localSaveError =
-  'Local data still needs saving. Retry saving before editing.'
 
 function runPracticeReviewCommand(
   command: AcceptedPracticeReviewCommand,
@@ -1845,12 +2262,11 @@ function runPracticeReviewCommand(
     try {
       await flushDbSnapshot()
     } catch {
-      hasPendingLocalSave = true
       hasPendingDirtyMarkRetry = true
-      pendingLocalSaveContinuation = async () => {
+      setPendingLocalSave(async () => {
         await afterDurable()
         recoveredReviewRetry = { key, result }
-      }
+      })
       return practiceReviewCommandResultSchema.parse({
         ...result,
         status: 'persistence-pending',
@@ -1868,11 +2284,8 @@ function runDbMutation<T>(
 ) {
   const syncMode = options.syncMode ?? 'mark-dirty'
   return runGatedMutationQueue(async () => {
-    if (recoveredGenericRetry?.key === options.retryKey) {
-      const saved = recoveredGenericRetry.result as T
-      recoveredGenericRetry = null
-      return saved
-    }
+    const recovered = takeRecoveredMutationRetry<T>(options.retryKey)
+    if (recovered) return recovered.result
     const { db } = await getAppDb()
     const result = await write(db)
 
@@ -1891,11 +2304,10 @@ function runDbMutation<T>(
         flushDbSnapshot(),
       )
     } catch (error) {
-      hasPendingLocalSave = true
-      pendingLocalSaveContinuation = async () => {
+      setPendingLocalSave(async () => {
         await afterDurable()
-        recoveredGenericRetry = { key: options.retryKey, result }
-      }
+        setRecoveredMutationRetry(options.retryKey, result)
+      })
       throw new Error(localSaveError, { cause: error })
     }
     await afterDurable()
@@ -1906,63 +2318,6 @@ function runDbMutation<T>(
 
 function mutationRetryKey(method: string, request: unknown) {
   return JSON.stringify([method, request])
-}
-
-function runInMutationQueue<T>(work: () => Promise<T>) {
-  const queued = dbMutationQueue.then(async () => {
-    dbMutationDepth += 1
-
-    try {
-      return await work()
-    } finally {
-      dbMutationDepth -= 1
-    }
-  })
-  dbMutationQueue = queued.then(
-    () => undefined,
-    () => undefined,
-  )
-
-  return queued
-}
-
-function runGatedMutationQueue<T>(work: () => Promise<T>, retryKey?: string) {
-  return runInMutationQueue(async () => {
-    await backupReplacement.ready()
-    backupReplacement.assertIdle()
-    await resumePendingLocalSave()
-    if (recoveredGenericRetry?.key !== retryKey) recoveredGenericRetry = null
-    return work()
-  })
-}
-
-async function resumePendingLocalSave() {
-  if (!hasPendingLocalSave) return
-  try {
-    await flushDbSnapshot()
-  } catch (error) {
-    throw new Error(localSaveError, { cause: error })
-  }
-  hasPendingLocalSave = false
-  const continuation = pendingLocalSaveContinuation
-  pendingLocalSaveContinuation = null
-  await continuation?.()
-}
-
-function createLocalReplacementContinuations(surface: 'dashboard') {
-  return {
-    flush: replacementStore
-      ? (
-          input: Parameters<typeof commitDbReplacementSnapshot>[0] | undefined,
-        ) => commitDbReplacementSnapshot(input!)
-      : flushDbSnapshot,
-    onDurable: () => broadcastDataManagementInvalidation(surface),
-    finishSyncMetadata: async () => {
-      await markSyncLocalDataChanged()
-      hasPendingDirtyMarkRetry = false
-      await scheduleAutoPushAfterMutationBestEffort()
-    },
-  }
 }
 
 async function scheduleAutoPushAfterMutationBestEffort() {
@@ -1997,7 +2352,7 @@ async function retryPendingDirtyMark() {
   }
 
   try {
-    if (hasPendingLocalSave) await resumePendingLocalSave()
+    if (isLocalSavePending()) await resumePendingLocalSave()
     else await flushDbSnapshot()
     await markSyncLocalDataChanged()
     hasPendingDirtyMarkRetry = false
@@ -2025,7 +2380,7 @@ function runRemoteRestoreInMutationQueue<T>(
     return work()
   }
 
-  if (isInsideMutationQueue && dbMutationDepth > 0) {
+  if (isInsideMutationQueue) {
     return guardedWork()
   }
 
@@ -2037,6 +2392,7 @@ function readSingleChangedProblemSlug(problemSlugs: readonly string[]) {
 }
 
 function broadcastProblemCatalogInvalidation(input: {
+  archive?: boolean
   problemSlug?: string | undefined
   source: UiSurface
 }) {
@@ -2044,7 +2400,7 @@ function broadcastProblemCatalogInvalidation(input: {
     ...(input.problemSlug ? { problemSlug: input.problemSlug } : {}),
     reason: 'problem-catalog-updated',
     source: input.source,
-    tags: ['problems'],
+    tags: input.archive ? ['problems', 'notes', 'submissions'] : ['problems'],
   })
 }
 
@@ -2079,7 +2435,11 @@ function broadcastSyncInvalidation(source: 'dashboard') {
   })
 }
 
-function broadcastDataManagementInvalidation(source: 'dashboard') {
+function broadcastDataManagementInvalidation(
+  source: 'dashboard' | 'popup' | 'content-script',
+) {
+  // Best effort only: cleanup scheduling cannot fail durable saves/notifications.
+  void requestNotesMaintenance?.().catch(() => undefined)
   return broadcastCacheInvalidation({
     hintConnectionReset: true,
     reason: 'problem-catalog-updated',
@@ -2088,6 +2448,8 @@ function broadcastDataManagementInvalidation(source: 'dashboard') {
       'settings',
       'genai',
       'problems',
+      'notes',
+      'submissions',
       'practice',
       'queue',
       'tracks',

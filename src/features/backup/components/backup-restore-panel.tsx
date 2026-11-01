@@ -16,7 +16,7 @@ import { formatDateTime } from '@/utils/date-format'
 import type { BackupSummary } from '../api/backup-contracts'
 
 interface BackupRestorePanelProps {
-  backup: unknown
+  hasSelectedTransfer: boolean
   error: string | null
   isExporting: boolean
   isRestoring: boolean
@@ -30,7 +30,7 @@ interface BackupRestorePanelProps {
 }
 
 export function BackupRestorePanel({
-  backup,
+  hasSelectedTransfer,
   error,
   isExporting,
   isRestoring,
@@ -132,7 +132,10 @@ export function BackupRestorePanel({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             disabled={
-              !backup || isRestoring || isValidating || isReplacementPending
+              !hasSelectedTransfer ||
+              isRestoring ||
+              isValidating ||
+              isReplacementPending
             }
             onClick={onOpenRestoreDialog}
             size="sm"
@@ -156,7 +159,14 @@ export function BackupRestorePanel({
 
 export function BackupSummaryList({ summary }: { summary: BackupSummary }) {
   const metadataItems: Array<[string, string]> = [
-    ['Schema version', String(summary.schemaVersion)],
+    [
+      'Schema version',
+      String(
+        'sourceSchemaVersion' in summary
+          ? summary.sourceSchemaVersion
+          : summary.schemaVersion,
+      ),
+    ],
     ['Exported', formatDateTime(summary.exportedAt)],
   ]
   if (summary.source.appVersion) {
@@ -175,6 +185,11 @@ export function BackupSummaryList({ summary }: { summary: BackupSummary }) {
     ['FSRS cards', summary.counts.fsrsCards],
     ['Review attempts', summary.counts.reviewAttempts],
     ['Settings', summary.counts.settings],
+    ['Problem notes', summary.counts.notes],
+    ['Submissions', summary.counts.submissions],
+    ['AI assessments', summary.counts.assessments],
+    ['Saved AI notes', summary.counts.savedAiInclusions],
+    ['Archive payload bytes', summary.counts.payloadBytes],
   ]
 
   return (
@@ -225,6 +240,7 @@ export function BackupConfirmationDialog({
   description,
   error,
   isPending,
+  savingPending = false,
   onSecondaryAction,
   onCancel,
   onConfirm,
@@ -238,6 +254,7 @@ export function BackupConfirmationDialog({
   description: string
   error?: ReactNode | undefined
   isPending: boolean
+  savingPending?: boolean
   onSecondaryAction?: (() => void) | undefined
   onCancel: () => void
   onConfirm: () => void
@@ -286,7 +303,7 @@ export function BackupConfirmationDialog({
   }, [isDialogPending])
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape' && !isDialogPending) {
+    if (event.key === 'Escape' && !isDialogPending && !savingPending) {
       event.preventDefault()
       onCancel()
       return
@@ -331,7 +348,7 @@ export function BackupConfirmationDialog({
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) {
           event.preventDefault()
-          if (!isDialogPending) {
+          if (!isDialogPending && !savingPending) {
             onCancel()
           }
         }
@@ -369,7 +386,7 @@ export function BackupConfirmationDialog({
         {status ? <InlineStatus id={statusId}>{status}</InlineStatus> : null}
         <div className="flex flex-wrap justify-end gap-2">
           <Button
-            disabled={isDialogPending}
+            disabled={isDialogPending || savingPending}
             onClick={onCancel}
             ref={cancelButtonRef}
             size="sm"
@@ -385,7 +402,7 @@ export function BackupConfirmationDialog({
                   : undefined
               }
               data-cp-tone={secondaryActionTone}
-              disabled={isDialogPending}
+              disabled={isDialogPending || savingPending}
               onClick={onSecondaryAction}
               size="sm"
               variant="outline"

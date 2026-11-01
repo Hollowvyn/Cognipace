@@ -621,7 +621,9 @@ export class PracticeRepository {
     const preservedLog =
       input.keepLog === false ? normalizeReviewLogFields() : existing?.log
     const isSuspended =
-      existing?.isSuspended === true || existing?.status === 'suspended'
+      input.clearSuspension === true
+        ? false
+        : existing?.isSuspended === true || existing?.status === 'suspended'
 
     await writeDb
       .delete(practiceCommandReceipts)

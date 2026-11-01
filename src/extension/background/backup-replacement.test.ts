@@ -1,5 +1,7 @@
+import { beforeEach } from 'vitest'
+beforeEach(() => vi.stubGlobal('IDBKeyRange', IDBKeyRange))
 import { describe, expect, it, vi } from 'vitest'
-import { indexedDB as testIndexedDB } from 'fake-indexeddb'
+import { IDBKeyRange, indexedDB as testIndexedDB } from 'fake-indexeddb'
 import { createSnapshotIdbStore } from '@/platform/db/snapshot-idb'
 
 import type { BackupReplacementWork } from '@/features/backup/server/backup-replacement-work'
@@ -39,6 +41,7 @@ describe('backup replacement coordinator', () => {
     const replacement = work()
     const resumed = createBackupReplacementCoordinator({
       store: createSnapshotIdbStore(testIndexedDB, databaseName),
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -71,6 +74,7 @@ describe('backup replacement coordinator', () => {
       )
     const coordinator = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -85,6 +89,7 @@ describe('backup replacement coordinator', () => {
     const reopenedStore = createSnapshotIdbStore(testIndexedDB, databaseName)
     const reopened = createBackupReplacementCoordinator({
       store: reopenedStore,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -117,6 +122,7 @@ describe('backup replacement coordinator', () => {
     })
     const initial = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -129,6 +135,7 @@ describe('backup replacement coordinator', () => {
     expect((await direct.readContinuation())?.needsInvalidation).toBe(false)
     const reopened = createBackupReplacementCoordinator({
       store: direct,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -165,6 +172,7 @@ describe('backup replacement coordinator', () => {
     )
     const initial = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -177,6 +185,7 @@ describe('backup replacement coordinator', () => {
     expect((await direct.readContinuation())?.needsSyncMetadata).toBe(false)
     const reopened = createBackupReplacementCoordinator({
       store: direct,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -217,6 +226,7 @@ describe('backup replacement coordinator', () => {
       .mockRejectedValueOnce(new Error('readback unavailable'))
     const initial = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -229,6 +239,7 @@ describe('backup replacement coordinator', () => {
     expect(await direct.readContinuation()).toBeNull()
     const reopened = createBackupReplacementCoordinator({
       store: direct,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -259,6 +270,7 @@ describe('backup replacement coordinator', () => {
     )
     const initial = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -274,6 +286,7 @@ describe('backup replacement coordinator', () => {
     const reopenedStore = createSnapshotIdbStore(testIndexedDB, databaseName)
     const reopened = createBackupReplacementCoordinator({
       store: reopenedStore,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -304,6 +317,7 @@ describe('backup replacement coordinator', () => {
       kind: 'restore',
       summary: null,
     })
+    expect(() => coordinator.assertReadable()).toThrow('still needs saving')
     expect(() => coordinator.assertIdle()).toThrow(
       'Local data replacement still needs saving. Open Settings > Data Management and choose Retry saving.',
     )
@@ -390,4 +404,86 @@ describe('backup replacement coordinator', () => {
     expect(reopened.getState()).toEqual({ status: 'idle' })
     expect(await reopened.retry()).toEqual({ status: 'no-pending' })
   })
+})
+
+it('retains a prepared candidate and adopts it on lost publication acknowledgement before notification', async () => {
+  const store = createSnapshotIdbStore(
+    testIndexedDB,
+    `prepared-${crypto.randomUUID()}`,
+  )
+  await store.commitSnapshot(new Uint8Array([1]), 'schema', new Date())
+  const coordinator = createBackupReplacementCoordinator({ store })
+  const prepared = {
+    summary: null,
+    replacementId: 'prepared-1',
+    publish: vi.fn(async () => {
+      await store.commitReplacement(new Uint8Array([2]), 'schema', new Date(), {
+        kind: 'restore',
+        replacementId: 'prepared-1',
+      })
+      throw new Error('lost acknowledgement')
+    }),
+    adopt: vi
+      .fn()
+      .mockRejectedValueOnce(new Error('temporary readback failure'))
+      .mockResolvedValue(undefined),
+  }
+  const prepare = vi.fn().mockResolvedValue(prepared)
+  const replacement = { ...work(), prepare }
+  expect(await coordinator.run(replacement)).toMatchObject({
+    status: 'durable',
+    syncMetadataPending: true,
+  })
+  expect(replacement.onDurable).not.toHaveBeenCalled()
+  expect(() => coordinator.assertReadable()).toThrow('still needs saving')
+  expect(await coordinator.retry()).toMatchObject({
+    status: 'durable',
+    syncMetadataPending: false,
+  })
+  expect(prepare).toHaveBeenCalledTimes(1)
+  expect(replacement.commit).not.toHaveBeenCalled()
+  expect(prepared.publish).toHaveBeenCalledTimes(1)
+  expect(prepared.adopt).toHaveBeenCalledTimes(2)
+  expect(() => coordinator.assertReadable()).not.toThrow()
+  expect(Array.from((await store.readActive())!.bytes)).toEqual([2])
+})
+
+it('retries prepared archive staging without executing detached domain preparation again', async () => {
+  const store = createSnapshotIdbStore(
+    testIndexedDB,
+    `prepared-copy-${crypto.randomUUID()}`,
+  )
+  await store.commitSnapshot(new Uint8Array([1]), 'schema', new Date())
+  const prepared = {
+    summary: null,
+    replacementId: 'copy-retry',
+    adopt: vi.fn().mockResolvedValue(undefined),
+    publish: vi
+      .fn()
+      .mockRejectedValueOnce(new Error('archive batch aborted'))
+      .mockImplementationOnce(
+        (input: import('@/platform/db/snapshot-idb').ReplacementInput) =>
+          store.commitReplacement(
+            new Uint8Array([2]),
+            'schema',
+            new Date(),
+            input,
+          ),
+      ),
+  }
+  const prepare = vi.fn().mockResolvedValue(prepared)
+  const replacement = { ...work(), prepare }
+  const coordinator = createBackupReplacementCoordinator({ store })
+  expect(await coordinator.run(replacement)).toMatchObject({
+    status: 'persistence-pending',
+  })
+  expect((await store.readActive())!.bytes[0]).toBe(1)
+  expect(await coordinator.retry()).toMatchObject({
+    status: 'durable',
+    syncMetadataPending: false,
+  })
+  expect(prepare).toHaveBeenCalledTimes(1)
+  expect(replacement.commit).not.toHaveBeenCalled()
+  expect(prepared.publish).toHaveBeenCalledTimes(2)
+  expect(prepared.adopt).toHaveBeenCalledTimes(1)
 })

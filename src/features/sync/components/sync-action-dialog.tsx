@@ -1,3 +1,4 @@
+import type { BackupRestorePreview } from '@/features/backup/api/backup-contracts'
 import { CloudDownload, CloudUpload, Loader2 } from 'lucide-react'
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 
@@ -13,6 +14,7 @@ export type SyncDialogState =
   | {
       message: string
       type: 'force-pull'
+      preview?: BackupRestorePreview
     }
   | {
       message: string
@@ -196,7 +198,7 @@ export function SyncActionDialogForState({
   dialog: SyncDialogState
   isPending: boolean
   onClose: () => void
-  onForcePull: () => void
+  onForcePull: (preview?: BackupRestorePreview) => void
   onForcePush: () => void
 }) {
   if (dialog.type === 'force-pull') {
@@ -205,9 +207,9 @@ export function SyncActionDialogForState({
         confirmIcon={<CloudDownload aria-hidden="true" />}
         confirmLabel="Force pull"
         confirmVariant="destructive"
-        description={`${dialog.message} Force pull will replace this browser's local data with the Gist copy.`}
+        description={`${dialog.message} ${dialog.preview ? `Selected backup version ${dialog.preview.sourceSchemaVersion}: ${dialog.preview.counts.problems} problems, ${dialog.preview.counts.notes} problem notes, ${dialog.preview.counts.submissions} submissions, ${dialog.preview.counts.assessments} assessments, ${dialog.preview.counts.savedAiInclusions} saved AI notes. ${dialog.preview.archiveAbsent ? 'This older backup contains no Notes archive. Restoring removes all current problem notes, submission history, and saved AI notes. Export a full backup first to keep them.' : ''}` : ''} Force pull will replace this browser's local data with the Gist copy.`}
         onCancel={onClose}
-        onConfirm={onForcePull}
+        onConfirm={() => onForcePull(dialog.preview)}
         pending={isPending}
         title="Force pull from Gist"
         tone="warning"
@@ -246,6 +248,18 @@ export function createSyncActionDialogState(
   result: SyncActionResult | null | undefined | void,
   fallbackMessage: string,
 ): SyncDialogState {
+  if (
+    result?.action === 'pull-latest' &&
+    result.outcome === 'confirmation-required' &&
+    result.restorePreview
+  ) {
+    return {
+      type: 'force-pull',
+      message: result.message,
+      preview: result.restorePreview,
+    }
+  }
+
   if (
     result?.action === 'pull-latest' &&
     result.outcome === 'blocked' &&
@@ -299,6 +313,9 @@ function readDialogTitle(
     return 'Sync blocked'
   }
 
+  if (result?.reason === 'backup-verification-unavailable')
+    return 'Upload unverified'
+
   if (result?.action === 'pull-latest') {
     return 'Pull complete'
   }
@@ -318,6 +335,7 @@ function readDialogTone(
   }
 
   if (
+    result?.reason === 'backup-verification-unavailable' ||
     result?.outcome === 'blocked' ||
     result?.outcome === 'confirmation-required'
   ) {

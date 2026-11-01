@@ -1,3 +1,8 @@
+import {
+  createBackupSummary,
+  parseBackupFileForCurrentApp,
+} from '@/features/backup/api/backup-contracts'
+import { createFrozenV6BackupFixture } from '@/features/backup/testing/backup-v6-fixture'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -52,6 +57,58 @@ describe('DashboardSyncActionsView', () => {
     })
     expect(onPushLocal).toHaveBeenCalledWith({
       confirmRemoteOverwrite: false,
+    })
+  })
+
+  it('shows the selected legacy remote preview and submits its bound confirmation token', async () => {
+    const user = userEvent.setup()
+    const restorePreview = {
+      ...createBackupSummary(
+        parseBackupFileForCurrentApp(createFrozenV6BackupFixture()),
+      ),
+      confirmationToken: 'remote-preview-token',
+      sourceSchemaVersion: 6,
+      archiveAbsent: true,
+      removesCurrentArchive: true,
+    }
+    const onPullLatest = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ...confirmationRequiredResult,
+        action: 'pull-latest',
+        direction: 'pull',
+        outcome: 'confirmation-required',
+        reason: null,
+        restorePreview,
+        message: 'Review selected remote backup.',
+      })
+      .mockResolvedValueOnce({
+        ...confirmationRequiredResult,
+        action: 'pull-latest',
+        direction: 'pull',
+        outcome: 'success',
+        reason: null,
+      })
+    render(
+      <DashboardSyncActionsView
+        isPending={false}
+        onPullLatest={onPullLatest}
+        onPushLocal={vi.fn()}
+        status={configuredStatus}
+      />,
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Pull latest from Gist' }),
+    )
+    const dialog = await screen.findByRole('dialog', {
+      name: /Force pull from Gist/i,
+    })
+    expect(dialog).toHaveTextContent(/backup version 6/i)
+    expect(dialog).toHaveTextContent(/contains no Notes archive/i)
+    await user.click(screen.getByRole('button', { name: /Force pull/i }))
+    expect(onPullLatest).toHaveBeenLastCalledWith({
+      confirmLocalOverwrite: true,
+      confirmationToken: 'remote-preview-token',
     })
   })
 
@@ -337,3 +394,30 @@ const confirmationRequiredResult = {
   status: configuredStatus,
   occurredAt: '2026-05-26T12:00:00.000Z',
 } satisfies SyncActionResult
+
+it('shows manual unverified upload as a warning with pending changes', async () => {
+  const user = userEvent.setup()
+  render(
+    <DashboardSyncActionsView
+      isPending={false}
+      status={configuredStatus}
+      onPullLatest={vi.fn()}
+      onPushLocal={vi.fn().mockResolvedValue({
+        ...confirmationRequiredResult,
+        action: 'push-local',
+        outcome: 'success',
+        reason: 'backup-verification-unavailable',
+        message: 'Upload is unverified. Local changes remain pending.',
+      })}
+    />,
+  )
+  await user.click(screen.getByRole('button', { name: /Push local to Gist/i }))
+  expect(
+    screen.getByRole('dialog', { name: 'Upload unverified' }),
+  ).toBeInTheDocument()
+  expect(
+    screen
+      .getByText('Upload is unverified. Local changes remain pending.')
+      .closest('[data-cp-tone]'),
+  ).toHaveAttribute('data-cp-tone', 'warning')
+})

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
+import { describe, expect, it, vi } from 'vitest'
 
 import { defaultUserSettings } from '@/features/settings/domain'
 
@@ -16,6 +17,7 @@ import {
   backupFileV3Schema,
   backupFileV4Schema,
   backupFileV5Schema,
+  backupFileV6Schema,
   type BackupFileV1,
   type BackupFileV2,
   type BackupFileV3,
@@ -29,6 +31,7 @@ const timestamp = '2026-05-25T12:00:00.000Z'
 function createValidBackupFixture() {
   return {
     schemaVersion: backupSchemaVersion,
+    notesArchive: emptyNotesArchive(),
     app: 'cognipace',
     exportedAt: timestamp,
     source: {
@@ -283,6 +286,11 @@ describe('backup contracts', () => {
         trackProgress: 1,
         trackSession: 1,
         settings: 1,
+        notes: 0,
+        submissions: 0,
+        assessments: 0,
+        savedAiInclusions: 0,
+        payloadBytes: 0,
       },
     })
   })
@@ -319,7 +327,7 @@ describe('backup contracts', () => {
       const legacy = createLegacyBackupFixture(schemaVersion)
       const parsed = parseBackupFileForCurrentApp(legacy)
 
-      expect(parsed.schemaVersion).toBe(6)
+      expect(parsed.schemaVersion).toBe(7)
       expect(parsed.data.tracks.tracks[0]).toMatchObject({
         id: 'custom-track',
         allowExternalProgress: false,
@@ -1098,8 +1106,8 @@ describe('frozen legacy backup normalization', () => {
     },
   )
 
-  it('activates v6 as the current strict export format', () => {
-    expect(backupSchemaVersion).toBe(6)
+  it('activates v7 as the current strict export format', () => {
+    expect(backupSchemaVersion).toBe(7)
   })
 
   it.each([1, 2, 3, 4, 5] as const)(
@@ -1108,7 +1116,7 @@ describe('frozen legacy backup normalization', () => {
       const legacy = createFrozenLegacyFixture(version)
       const original = structuredClone(legacy)
       const normalized = parseBackupFileForCurrentApp(legacy)
-      expect(normalized.schemaVersion).toBe(6)
+      expect(normalized.schemaVersion).toBe(7)
       expect(normalized.data.practice.problemPractice).toEqual(
         legacy.data.practice.problemPractice,
       )
@@ -1196,7 +1204,7 @@ describe('frozen legacy backup normalization', () => {
         },
       },
     }
-    expect(backupFileSchema.safeParse(v6).success).toBe(true)
+    expect(backupFileV6Schema.safeParse(v6).success).toBe(true)
     for (const name of [
       'schedulerProfiles',
       'reviewEvidence',
@@ -1205,7 +1213,52 @@ describe('frozen legacy backup normalization', () => {
     ]) {
       const missing = structuredClone(v6)
       Reflect.deleteProperty(missing.data.practice, name)
-      expect(backupFileSchema.safeParse(missing).success).toBe(false)
+      expect(backupFileV6Schema.safeParse(missing).success).toBe(false)
     }
   })
 })
+
+it.each(['backup', 'notes', 'problems'] as const)(
+  'parses all cyclic runtime contracts after fresh %s-first module initialization',
+  async (first) => {
+    vi.resetModules()
+    if (first === 'backup') await import('./backup-contracts')
+    if (first === 'notes') await import('@/features/notes/domain/notes-records')
+    if (first === 'problems')
+      await import('@/features/problems/api/problems-contracts')
+    const backup = await import('./backup-contracts')
+    const notes = await import('@/features/notes/domain/notes-records')
+    const problems = await import('@/features/problems/api/problems-contracts')
+    expect(
+      backup.backupReplacementResultSchema.parse({ status: 'no-pending' }),
+    ).toEqual({ status: 'no-pending' })
+    expect(
+      problems.problemDeleteResponseSchema.parse({
+        status: 'durable',
+        kind: 'problem-delete',
+        summary: null,
+        syncMetadataPending: false,
+      }),
+    ).toMatchObject({ status: 'durable' })
+    const archive = await (
+      await import('@/features/notes/testing/notes-fixtures')
+    ).makeNotesArchive()
+    expect(notes.notesArchiveSchema.parse(archive)).toEqual(archive)
+    expect(
+      backup.backupReplacementResultSchema.parse({
+        status: 'durable',
+        kind: 'problem-reset',
+        summary: null,
+        syncMetadataPending: false,
+      }),
+    ).toMatchObject({ kind: 'problem-reset' })
+    const analysis =
+      await import('@/features/leetcode-review-assistant/api/code-analysis-contracts')
+    const request = (
+      await import('@/features/leetcode-review-assistant/testing/code-analysis-fixtures')
+    ).makeAnalysisRequest()
+    expect(
+      analysis.analyzeLeetCodeSubmissionRequestSchema.parse(request),
+    ).toEqual(request)
+  },
+)

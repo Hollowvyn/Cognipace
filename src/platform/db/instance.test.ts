@@ -1,5 +1,9 @@
 import { sql } from 'drizzle-orm'
-import { IDBObjectStore, indexedDB as testIndexedDB } from 'fake-indexeddb'
+import {
+  IDBKeyRange,
+  IDBObjectStore,
+  indexedDB as testIndexedDB,
+} from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./proxy', async (importOriginal) => {
@@ -26,6 +30,7 @@ import { createDb, createSqliteWasmLocator } from './client'
 import {
   getAppDb,
   flushDbSnapshot,
+  waitForPendingDbSnapshot,
   resetAppDbForTesting,
   beginDbReplacement,
   commitDbReplacementSnapshot,
@@ -49,6 +54,7 @@ import {
   computeFingerprint,
   serializeDb,
 } from './snapshot'
+import * as snapshot from './snapshot'
 import { setOnMutationHook } from './proxy'
 import { createSnapshotIdbStore } from './snapshot-idb'
 import {
@@ -93,6 +99,7 @@ class FakeStorage {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('IDBKeyRange', IDBKeyRange)
   resetAppDbForTesting()
 })
 
@@ -185,6 +192,12 @@ describe('committed snapshot publication', () => {
     const finishSyncMetadata = vi.fn().mockResolvedValue(undefined)
     const coordinator = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: async () => {
+        const handle = await getAppDb({ snapshotStore: store })
+        expect(Buffer.from(serializeDb(handle))).toEqual(
+          Buffer.from((await store.readActive())!.bytes),
+        )
+      },
       resume: () => ({ onDurable, finishSyncMetadata }),
     })
     await coordinator.ready()
@@ -1610,4 +1623,185 @@ describe('app database startup', () => {
     expect(fakeStorage.values[SNAPSHOT_KEY]).toBe(retriedSnapshot)
     expect(fakeStorage.values[FINGERPRINT_KEY]).toBe(originalFingerprint)
   })
+})
+
+it('flushes scheduled core data before archive work but leaves a clean archive path serialization-free', async () => {
+  installStorage()
+  const snapshotStore = createSnapshotIdbStore(
+    testIndexedDB,
+    `archive-gate-${crypto.randomUUID()}`,
+  )
+  const handle = await getAppDb({ snapshotStore })
+  openedHandles.push(handle)
+  const serialize = vi.spyOn(snapshot, 'serializeDb')
+  const commit = vi.spyOn(snapshotStore, 'commitSnapshot')
+  try {
+    await waitForPendingDbSnapshot()
+    expect(serialize).not.toHaveBeenCalled()
+    expect(commit).not.toHaveBeenCalled()
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await waitForPendingDbSnapshot()
+    expect(serialize).toHaveBeenCalledOnce()
+    expect(commit).toHaveBeenCalledOnce()
+    await waitForPendingDbSnapshot()
+    expect(serialize).toHaveBeenCalledOnce()
+  } finally {
+    serialize.mockRestore()
+    commit.mockRestore()
+  }
+})
+
+it('joins in-flight core publication and retains a failed join until an explicit retry saves it', async () => {
+  installStorage()
+  const snapshotStore = createSnapshotIdbStore(
+    testIndexedDB,
+    `core-join-${crypto.randomUUID()}`,
+  )
+  const handle = await getAppDb({ snapshotStore })
+  openedHandles.push(handle)
+  await createSettingsRepository(handle.db).updateSettings(
+    { appearance: { themeMode: 'dark' } },
+    now,
+  )
+  let reject!: (error: Error) => void
+  const commit = vi
+    .spyOn(snapshotStore, 'commitSnapshot')
+    .mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail
+        }),
+    )
+  const publication = flushDbSnapshot()
+  const publicationFailure = expect(publication).rejects.toThrow('disk full')
+  let joined = false
+  const join = waitForPendingDbSnapshot().then(() => {
+    joined = true
+  })
+  const joinFailure = expect(join).rejects.toThrow('disk full')
+  await vi.waitFor(() => expect(commit).toHaveBeenCalledOnce())
+  expect(joined).toBe(false)
+  reject(new Error('disk full'))
+  await Promise.all([publicationFailure, joinFailure])
+  await expect(waitForPendingDbSnapshot()).rejects.toThrow('disk full')
+  await flushDbSnapshot()
+  await expect(waitForPendingDbSnapshot()).resolves.toBeUndefined()
+  commit.mockRestore()
+})
+
+it('retains a failed automatic timer publication for the next shared gate', async () => {
+  installStorage()
+  const snapshotStore = createSnapshotIdbStore(
+    testIndexedDB,
+    `automatic-failure-${crypto.randomUUID()}`,
+  )
+  const handle = await getAppDb({ snapshotStore })
+  openedHandles.push(handle)
+  const commit = vi
+    .spyOn(snapshotStore, 'commitSnapshot')
+    .mockRejectedValueOnce(new Error('automatic disk full'))
+  try {
+    await createSettingsRepository(handle.db).updateSettings(
+      { appearance: { themeMode: 'dark' } },
+      now,
+    )
+    await vi.waitFor(() => expect(commit).toHaveBeenCalledOnce())
+    await expect(waitForPendingDbSnapshot()).rejects.toThrow(
+      'automatic disk full',
+    )
+    await flushDbSnapshot()
+    await expect(waitForPendingDbSnapshot()).resolves.toBeUndefined()
+  } finally {
+    commit.mockRestore()
+  }
+})
+
+it('adopts a detached candidate while an async reader retains the old handle and subsequent writes use the new core', async () => {
+  const {
+    withCurrentAppDb,
+    createDetachedCoreCandidate,
+    adoptPublishedCoreCandidate,
+    prepareDbReplacement,
+  } = await import('./instance')
+  installStorage()
+  const factory = new (await import('fake-indexeddb')).IDBFactory()
+  vi.stubGlobal('indexedDB', factory)
+  vi.stubGlobal('IDBKeyRange', (await import('fake-indexeddb')).IDBKeyRange)
+  const local = (await import('./local-idb')).createLocalIdbStore(factory)
+  const store = createSnapshotIdbStore(factory)
+  const original = await getAppDb({ snapshotStore: store })
+  let release!: () => void
+  let entered!: () => void
+  const running = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const reader = withCurrentAppDb(async (handle) => {
+    entered()
+    await gate
+    expect(() => handle.rawDb.exec('SELECT 1')).not.toThrow()
+  })
+  await running
+  await prepareDbReplacement()
+  const head = (await local.readHead())!
+  const detached = await createDetachedCoreCandidate(serializeDb(original))
+  await createSettingsRepository(detached.db).updateSettings(
+    { appearance: { themeMode: 'dark' } },
+    now,
+  )
+  const candidate = {
+    handle: detached,
+    descriptor: {
+      baseRevision: head.revision,
+      coreSnapshotId: 'detached-core',
+      archiveGeneration: 'detached-archive',
+      datasetToken: 'detached-dataset',
+      replacementId: 'detached-replacement',
+    },
+  }
+  const publication = (
+    await import('./composite-publication')
+  ).createCompositePublication(local, head.fingerprint)
+  await publication.prepare(candidate, async () => {
+    await local.writeTechnicalRecord(
+      ['archive-generation', 'detached-archive'],
+      { identity: 'fixture', status: 'ready', storeIndex: 5 },
+    )
+  })
+  const published = await publication.publishCompositeCandidate(candidate, {
+    kind: 'restore',
+    replacementId: 'detached-replacement',
+  })
+  await adoptPublishedCoreCandidate(candidate, published, local)
+  expect(await getAppDb()).toBe(detached)
+  expect(() => original.rawDb.exec('SELECT 1')).not.toThrow()
+  release()
+  await reader
+  expect(() => original.rawDb.exec('SELECT 1')).toThrow()
+  expect(
+    (await createSettingsRepository((await getAppDb()).db).getSettings())
+      .appearance.themeMode,
+  ).toBe('dark')
+  await store.markInvalidated('detached-replacement')
+  await store.markSyncMetadataComplete('detached-replacement')
+  await store.completeContinuation('detached-replacement')
+  await createSettingsRepository((await getAppDb()).db).updateSettings(
+    { appearance: { themeMode: 'light' } },
+    now,
+  )
+  await flushDbSnapshot()
+  const reopened = await createDetachedCoreCandidate(
+    new Uint8Array((await store.readActive())!.bytes),
+  )
+  expect(
+    (await createSettingsRepository(reopened.db).getSettings()).appearance
+      .themeMode,
+  ).toBe('light')
+  reopened.rawDb.close()
+  detached.rawDb.close()
 })

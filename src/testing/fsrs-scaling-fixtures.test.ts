@@ -54,7 +54,7 @@ describe('FSRS scaling fixtures', () => {
       expect(Math.max(...times)).toBeGreaterThanOrEqual(asOf - 30 * 86_400_000)
       expect(Math.max(...times)).toBeLessThanOrEqual(asOf)
       expect(
-        prepareFullBackupRestore(fixture.backup).summary.counts,
+        (await prepareFullBackupRestore(fixture.backup)).summary.counts,
       ).toMatchObject({
         problems,
         reviewAttempts: reviews,

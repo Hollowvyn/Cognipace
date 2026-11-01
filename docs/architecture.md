@@ -658,22 +658,19 @@ Notification scheduling uses Chrome alarms, local-calendar dedup state, and the
 queue summary `dueToday` semantics derived from Practice eligibility; React
 components must not call `chrome.notifications` directly.
 
-Automatic Gist sync is orchestrated in the background layer. After a local
-mutation commits, sync metadata is marked dirty, the database snapshot is
-flushed, normal invalidation is broadcast, and an alarm-backed auto-push is
-scheduled when Gist sync is configured. Alarm jobs run through the same mutation
-queue as manual sync work, so remote restores and local writes stay serialized.
+Gist sync runs through the background mutation queue. Local publication and dirty
+metadata stay authoritative. The production adapter advertises
+`verifiedFullBackup: false`: automatic upload stops with action-needed guidance,
+and explicit manual upload remains unverified with local changes pending. It
+cannot satisfy the complete remote Notes backup release capability. No automatic
+upload retry loop runs.
 
-Opening popup, dashboard, or overlay surfaces calls the safe
-`sync.checkRemoteOnOpen` runtime path. That path clean-pulls changed remote Gist
-data only when local metadata is not dirty; dirty local data skips the remote
-fetch. Manual `sync.pullLatest` and `sync.pushLocal` runtime methods remain
-dashboard-only. Pull requests default `confirmLocalOverwrite` to `false` and
-push requests default `confirmRemoteOverwrite` to `false`; the sync service
-enforces both defaults so force pull and force push only happen after a UI
-confirmation dialog. The `enabled` flag controls automatic sync only; manual
-directional actions remain available whenever token and Gist configuration are
-present.
+Safe open checks retain dirty-local protection; manual pull/push remain
+dashboard-authorized and enforce overwrite confirmation. Legacy remote restore
+preview retains original source version, remote identity and local head revision;
+changing either source or local data invalidates that confirmation. Gist envelopes
+remain version 1 and contain the full v7 core plus reachable active archive when
+manually uploaded. Tokens remain background-only and outside the envelope.
 
 ## External APIs And Secrets
 
@@ -1005,9 +1002,8 @@ its fingerprint matches the current migration SQL. Only the exact through-0007,
 through-0008, and through-0009 migration sequences allowlisted in
 `src/platform/db/snapshot-upgrade.ts` are eligible for automatic upgrade; the
 app validates the matching schema and runs only migrations after that supported
-prefix. When both snapshot keys are
-absent, the app treats the profile as a fresh install and creates and seeds a
-new database. A partial pair, malformed value, or unknown or unsupported
+prefix. Only verified absence of prior IndexedDB data and both legacy snapshot keys
+permits fresh install creation and seeding. A partial pair, malformed value, or unknown or unsupported
 fingerprint fails startup. Automatic downgrade is unsupported. On failure, the
 original available snapshot values remain available for recovery; the app does
 not clear them and silently seed a fresh database.
@@ -1030,6 +1026,88 @@ recovery values are private local data. Never log or
 share their contents in an issue; use the scoped local export procedure in
 `docs/testing.md` if recovery is needed. Startup diagnostics must describe the
 failure without printing snapshot bytes, topic values, tokens, or settings.
+
+### Notes Phase 1 Archive Foundation
+
+Phase 1 infrastructure is implemented; the Notes editor and new submission or
+assessment capture remain off. Existing live analysis/hints stay session-only.
+Imported/restored archive data is durable and exportable.
+
+The database name remains `cognipace-local-v1`, now at IndexedDB version 3.
+`records` stores the versioned local head and technical state; `coreSnapshots`
+stores SQLite bytes. The head references one core snapshot, archive generation,
+dataset token and monotone revision. The preserving v1 upgrade moves existing
+binary cores without changing their contents and distinguishes core-only legacy
+recoveries from paired recoveries. Archive stores contain notes, submissions,
+analysis reports, saved AI inclusions, immutable payloads and problem scopes.
+Corrupt/missing roots or readiness markers fail closed and preserve originals;
+absence of an active record with surviving data is not a fresh install.
+Downgrade to a version-1 client is unsupported: preserve the profile and use a
+compatible build or a separately exported compatible backup in a disposable
+profile. Do not delete the new database to make an older build open it.
+
+Ordinary core saves promptly retire only their outgoing immutable core after
+strict durable publication and readback of the new pair and binary. A separate
+small transaction rechecks the exact active identity and checks fixed pending
+replacement records plus compact provenance and candidate prefixes (at most 64
+each). Explicit paired, core-only and legacy recovery pointers pin their target;
+opaque head-like recovery fields do not invent provenance. Unresolved, malformed,
+capped or otherwise uncertain roots retain the old core for reachability
+maintenance. Completed candidates require their exact committed command fence before
+their preparation can be ignored, including their formerly published core. Recovery targets and their explicit pointers must agree; reserved recovery
+without provenance or dangling targets retain bytes. Active and paired-recovery
+readiness markers and the new active core key are rechecked inside proof/delete.
+Prefix discovery uses key-only lower-bound cursors that stop on the first
+namespace change, including array-valued provenance target keys; only matched
+compact metadata is fetched. Stale heads,
+readback failures and cleanup aborts retain old bytes without failing the already
+durable save. This avoids accumulating a full copy per ordinary Library mutation
+when reachability is provable, rather than guaranteeing constant physical storage.
+It does not scan archive rows or other binary bodies, change replacement
+publication, or rely on an age TTL or faster alarm.
+
+The physical v2→v3 upgrade only backfills a lossless UTC timestamp sort key and
+recreates the submission chronology index, atomically. It preserves head
+`formatVersion: 2`, SQL, original timestamp strings, cores, recoveries, readiness,
+pending state, provenance and technical-write epoch; it does not rerun the v1
+binary split. The index and cursor share the normalized full-second/fraction key,
+retaining arbitrary precision and using ID ties for equivalent instants. Technical
+sort keys are excluded from exports. Corrupt indexed fields abort the upgrade.
+
+`features/notes` owns repository and service writes, revision CAS, document leases,
+scopes, durable acknowledgements/outbox recovery and runtime contracts.
+`notes.openEditor`, `saveDocument`, `getProblemNotes`, `listSubmissions`,
+`getSubmission`, `getAssessment`, `setSavedAiNote` and dashboard-only
+`getArchiveUsage` provide the Phase 2 integration surface. Sender authorization,
+Zod parsing, problem/document/session ownership and stale-scope checks precede
+storage access. Metadata pages omit large bodies; detail reads fetch them lazily.
+
+Full v7 export reads only the active reachable archive under the mutation gate,
+checks stable head identity, and validates payload digests/references asynchronously.
+New Notes technical scopes, leases, receipts, outboxes and transfer records are
+excluded, as are prompts, raw provider responses and secrets. Frozen v6 Practice
+`generations` and `commandReceipts` remain included. Existing valid digests permit
+property-order-only reuse of an identical payload ID; meaningful string/code,
+Markdown and report whitespace stays verbatim.
+
+Backup transfers use bounded UTF-8 chunks and durable document-owned sessions;
+accepted restore input remains protected across restart. Before archive staging,
+replacement admission atomically records a pending pointer, prepared core,
+compact owner resume recipe and a separately referenced accepted-source body.
+Status/startup discover metadata and key existence only; authenticated generic
+Retry saving lazily validates the original source and prepared core, then resumes
+archive and scope staging with the original identities. Publication atomically
+replaces the pending pointer with the committed continuation. Startup can settle
+committed bookkeeping; it does not run prepublication staging. These technical
+source records never enter backups and are retired with completed candidates
+after continuation settlement. Maintenance runs bounded,
+yielding mark/sweep batches with root/provenance/readiness and technical-write-epoch
+checks. It reclaims unreachable technical data, never learning data by age.
+Unknown owner inventory retains pending transfers; confirmed absence can abandon
+unaccepted spools. Accepted publication remains rooted. Usage reports active
+logical counts/bytes separately from optional approximate browser physical usage.
+These bounds do not establish large-profile latency or capacity: whole-file
+parse/hash, root manifests and 10k archive measurements remain Phase 4 work.
 
 ### Problem Topic Graph
 
@@ -1078,16 +1156,16 @@ assignments after alias resolution. LeetCode capture writes use merge semantics:
 captured page topics are resolved and added to the existing direct topic set
 without clearing local or manual topics.
 
-Backup schema version 6 exports typed relations as
+Backup schema version 7 retains the frozen v6 core, exporting typed relations as
 `{ sourceTopicId, targetTopicId, kind, createdAt, updatedAt }` alongside
 `topics` and `topicAliases`, and requires `allowExternalProgress` on track rows.
-Import accepts backup versions 1 through 6 through frozen v1-v5 readers and
+Import accepts backup versions 1 through 7 through frozen v1-v6 readers and
 explicit normalization. It normalizes v1-v4 tracks to false
 before current validation; v3's untyped parent/child
 edges become `broader` edges with child as source and parent as target. Unknown
 future versions are rejected. Sync keeps its envelope version
 and its existing dirty-local, overwrite-confirmation, and authorization rules,
-but older clients cannot read newly exported v6 backups. The sync envelope
+but older clients cannot read newly exported v7 backups. The sync envelope
 remains version 1.
 
 The v6 Practice object adds `schedulerProfiles`, `reviewEvidence`, `generations`
@@ -1124,36 +1202,24 @@ so accepted save latency at scale remains a release gate until measured in
 Chrome. `unlimitedStorage` reduces quota pressure but cannot prevent disk or
 IndexedDB write failures.
 
-Background owns one replacement coordinator behind the existing mutation queue.
-It retains only the committed summary and publication/metadata continuations.
-Failed snapshot publication returns persistence pending; Retry saving flushes
-the committed state without importing again or rotating generations. Successful
-publication invalidates data once. Failed sync bookkeeping then retains a
-separate metadata-pending state whose retry writes only the captured metadata.
-Pending replacement blocks later writes, imports, exports and sync applications;
-authenticated status reads are read-only and retry remains serialized.
-Replacement settlement refreshes pending and Sync status queries. Sync-tag
-invalidation also refreshes pending replacement so automatic pull failures
-reveal recovery in an already mounted Settings screen.
+Background owns one replacement coordinator behind the shared mutation queue.
+Full restore, Clear, one/bulk problem reset and problem delete prepare detached
+SQLite and archive candidates. Publication atomically compare-and-swaps the
+expected head revision and both candidate identities in one native IndexedDB
+transaction. The old active pair remains the single prior local recovery pair;
+pre-publication abort leaves it active. Adoption and sync metadata follow durable
+publication. A durable descriptor and completed command fence let worker restart
+or lost-response retry resume the accepted operation without reapplying SQL or
+rotating generations again. Later mutation/export/sync waits for recovery.
 
-Local restore/reset complete preflight and strictly persist the existing sync
-dirty marker before committing. This protects the replacement if the DB's
-automatic publication timer runs and the worker restarts before final sync
-bookkeeping. Failed marking prevents commit; transaction rollback may leave a
-conservative dirty flag without changing the original database. Post-publication
-dirty marking stays strict, followed by best-effort automatic push scheduling.
-Gist pull instead captures its complete remote metadata patch once. Explicitly
-confirmed manual overwrite can replace dirty local data; automatic or
-unconfirmed application still rejects it. Automatic sync bookkeeping uses the
-same queue admission so it cannot race the retained patch.
-
-Accepted replacement clears an obsolete pending content-import acknowledgement
-only after commit. An old import retry then requests a fresh preview rather than
-claiming discarded content was saved; rollback retains its genuine retry.
-Recovery state is worker-local. Settings reload can query it without flushing,
-but worker restart loses continuations and reopens the last durable snapshot.
-Already published data survives; local replacements retain the persisted dirty
-marker. C does not guarantee replacement deduplication across worker restart.
+Local restore/reset strictly persists dirty metadata before publication; Gist pull
+captures its remote patch. Retry saving completes only the pending publication,
+adoption or metadata step. Invalidations occur after durability. Source-bound
+previews include input digest, original schema version and local head revision;
+Gist previews also bind remote identity. Legacy v1–v6 sources explicitly lack an
+archive and warn before replacing existing archive data. Restore keeps frozen v6
+Practice evidence/profiles/receipts in the backup format while creating fresh
+effective local write generations.
 
 Automatic database upgrade is a separate, deliberately narrow compatibility
 path: only the exact shipped 0000–0007, 0000–0008, and 0000–0009 migration SQL

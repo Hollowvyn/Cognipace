@@ -1,3 +1,4 @@
+import { backupRestorePreviewSchema } from '@/features/backup/api/backup-contracts'
 import { z } from 'zod'
 
 import { secretStatusSchema } from '@/platform/secrets'
@@ -30,6 +31,7 @@ export const syncSetEnabledRequestSchema = z.strictObject({
 export const syncPullLatestRequestSchema = z.strictObject({
   surface: z.literal('dashboard'),
   confirmLocalOverwrite: z.boolean().default(false),
+  confirmationToken: z.string().min(1).optional(),
 })
 
 export const syncPushLocalRequestSchema = z.strictObject({
@@ -62,6 +64,8 @@ export const syncActionOutcomeSchema = z.enum([
 export const syncActionReasonSchema = z.enum([
   'not-configured',
   'local-dirty',
+  'archive-review-required',
+  'backup-verification-unavailable',
   'remote-changed',
   'remote-unchanged',
   'auth',
@@ -116,6 +120,7 @@ export const syncStatusSchema = z.strictObject({
 })
 
 export const syncActionResultSchema = z.strictObject({
+  restorePreview: z.lazy(() => backupRestorePreviewSchema).optional(),
   action: syncActionSchema,
   direction: syncActionDirectionSchema,
   outcome: syncActionOutcomeSchema,

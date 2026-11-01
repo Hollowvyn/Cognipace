@@ -1,3 +1,7 @@
+import {
+  useProblemDataConfirmation,
+  type ProblemDataConfirmation,
+} from '../problem-row/use-problem-data-confirmation'
 import { RefreshCw } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -17,11 +21,13 @@ import { ProblemLibraryTable } from './problem-library-table'
 import { ProblemLibraryToolbar } from './problem-library-toolbar'
 import { useProblemLibraryTable } from './use-problem-library-table'
 
-export function ProblemLibraryScreen({
+function ProblemLibraryScreenContent({
+  confirmation,
   newProblemAction,
   renderEditProblemAction,
   renderSelectedRowsAction,
 }: {
+  confirmation: ProblemDataConfirmation
   newProblemAction: ReactNode
   renderEditProblemAction: (problem: SerializedProblem) => ReactNode
   renderSelectedRowsAction?: RenderSelectedRowsAction | undefined
@@ -95,6 +101,7 @@ export function ProblemLibraryScreen({
             ) : (
               <ProblemLibraryTable
                 options={library.options}
+                confirmation={confirmation}
                 renderEditProblemAction={renderEditProblemAction}
                 renderSelectedRowsAction={renderSelectedRowsAction}
                 table={table}
@@ -126,5 +133,20 @@ function ProblemLibraryNoResults() {
     <div className="border-t border-border px-4 py-5 md:px-5">
       <InlineStatus>No problems match these filters.</InlineStatus>
     </div>
+  )
+}
+
+export function ProblemLibraryScreen(
+  props: Omit<
+    Parameters<typeof ProblemLibraryScreenContent>[0],
+    'confirmation'
+  >,
+) {
+  const confirmation = useProblemDataConfirmation()
+  return (
+    <>
+      <ProblemLibraryScreenContent {...props} confirmation={confirmation} />
+      {confirmation.dialog}
+    </>
   )
 }

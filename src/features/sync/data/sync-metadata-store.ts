@@ -1,3 +1,4 @@
+import { readLocalDataHead } from '@/platform/db/instance'
 import { z } from 'zod'
 
 import {
@@ -46,17 +47,31 @@ export const defaultSyncMetadata: SyncMetadata = {
   conflict: null,
 }
 
-export async function readSyncMetadata(): Promise<SyncMetadata> {
+async function readStoredSyncMetadata(): Promise<SyncMetadata> {
   const result = await readChromeLocalStorage().get(syncMetadataKey)
   const parsed = syncMetadataSchema.safeParse(result[syncMetadataKey])
 
   return parsed.success ? parsed.data : { ...defaultSyncMetadata }
 }
 
+export async function readSyncMetadata(): Promise<SyncMetadata> {
+  const metadata = await readStoredSyncMetadata()
+  const head = await readLocalDataHead()
+  if (!head || head.revision <= head.lastVerifiedRevision) return metadata
+  return {
+    ...metadata,
+    dirtySinceLastSync: true,
+    localDataUpdatedAt:
+      !metadata.localDataUpdatedAt || head.savedAt > metadata.localDataUpdatedAt
+        ? head.savedAt
+        : metadata.localDataUpdatedAt,
+  }
+}
+
 export async function writeSyncMetadata(
   patch: Partial<SyncMetadata>,
 ): Promise<SyncMetadata> {
-  const current = await readSyncMetadata()
+  const current = await readStoredSyncMetadata()
   const next = syncMetadataSchema.parse({ ...current, ...patch })
 
   await readChromeLocalStorage().set({ [syncMetadataKey]: next })

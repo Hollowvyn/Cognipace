@@ -220,9 +220,11 @@ describe('runtime-policy', () => {
 
   it('keeps backup and local reset methods dashboard-only', () => {
     for (const method of [
-      'backup.exportFullBackup',
-      'backup.validateFullBackup',
-      'backup.restoreFullBackup',
+      'backup.beginTransfer',
+      'backup.readTransferChunk',
+      'backup.appendTransferChunk',
+      'backup.finishTransfer',
+      'backup.cancelTransfer',
       'backup.resetLocalData',
       'backup.getPendingReplacement',
       'backup.retryPendingReplacement',
@@ -538,4 +540,31 @@ it('authorizes implementation generation only for actual LeetCode content script
       },
     ),
   ).toThrow()
+})
+
+describe('notes runtime methods', () => {
+  it('permits dashboard and content script but denies popup', () => {
+    for (const method of [
+      'notes.openEditor',
+      'notes.saveDocument',
+      'notes.getProblemNotes',
+      'notes.listSubmissions',
+      'notes.getSubmission',
+      'notes.getAssessment',
+      'notes.setSavedAiNote',
+    ]) {
+      expect(canCallExtensionMethod(method, 'dashboard')).toBe(true)
+      expect(canCallExtensionMethod(method, 'content-script')).toBe(true)
+      expect(canCallExtensionMethod(method, 'popup')).toBe(false)
+    }
+  })
+})
+
+it('rejects legacy whole-object dashboard backup routes', () => {
+  for (const method of [
+    'backup.exportFullBackup',
+    'backup.validateFullBackup',
+    'backup.restoreFullBackup',
+  ])
+    expect(canCallExtensionMethod(method, 'dashboard')).toBe(false)
 })

@@ -1,3 +1,4 @@
+import type { ProblemDataConfirmation } from '../problem-row/use-problem-data-confirmation'
 import { useState } from 'react'
 
 import type { ProblemLibraryRow } from '../../api/problems-contracts'
@@ -16,9 +17,11 @@ export {
 } from '../problem-row/problem-row-actions'
 
 export function ProblemRowActions({
+  confirmation,
   renderEditProblemAction,
   row,
 }: {
+  confirmation: ProblemDataConfirmation
   renderEditProblemAction: RenderProblemEditAction
   row: ProblemLibraryRow
 }) {
@@ -28,12 +31,14 @@ export function ProblemRowActions({
   return (
     <ProblemRowActionsBar>
       <ProblemRowPracticeActions
+        confirmation={confirmation}
         disabled={isDeleteActionPending}
         onPendingChange={setIsPracticeActionPending}
         renderEditProblemAction={renderEditProblemAction}
         row={row}
       />
       <ProblemRowDeleteAction
+        confirmation={confirmation}
         disabled={isPracticeActionPending}
         onPendingChange={setIsDeleteActionPending}
         row={row}

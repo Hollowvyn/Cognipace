@@ -1,3 +1,5 @@
+import { backupSummarySchema } from '@/features/backup/api/backup-contracts'
+import type { PendingCompositePreparation } from '@/platform/db/composite-publication'
 import type {
   BackupReplacementResult,
   BackupReplacementState,
@@ -9,10 +11,29 @@ import type {
   SnapshotIdbStore,
 } from '@/platform/db/snapshot-idb'
 
+// Preparation executes detached domain writes exactly once. Publication retains
+// only the prepared candidate, archive staging callback and publication identity.
+export interface PreparedReplacement {
+  summary: BackupReplacementPending['summary']
+  replacementId: string
+  publish: (
+    input: import('@/platform/db/snapshot-idb').ReplacementInput,
+  ) => Promise<unknown>
+  adopt: () => Promise<void>
+}
+export type PreparedReplacementWork = Omit<
+  BackupReplacementWork,
+  'commit' | 'flush'
+> & {
+  prepare: () => Promise<PreparedReplacement>
+}
+
 const pendingMessage =
   'Local data replacement still needs saving. Open Settings > Data Management and choose Retry saving.'
 type PendingWork = BackupReplacementPending &
   Pick<BackupReplacementWork, 'flush' | 'onDurable' | 'finishSyncMetadata'> & {
+    adopt?: () => Promise<void>
+    adopted: boolean
     durable: boolean
     publicationAttempted: boolean
     invalidated: boolean
@@ -24,6 +45,11 @@ type PendingWork = BackupReplacementPending &
 export function createBackupReplacementCoordinator(
   options: {
     store?: SnapshotIdbStore
+    validatePrepared?: (record: PendingCompositePreparation) => Promise<void>
+    resumePrepared?: (
+      record: PendingCompositePreparation,
+    ) => Promise<PreparedReplacement>
+    resumeAdoption?: (record: ReplacementContinuation) => Promise<void>
     resume?: (
       record: ReplacementContinuation,
     ) => Pick<BackupReplacementWork, 'onDurable' | 'finishSyncMetadata'>
@@ -60,6 +86,14 @@ export function createBackupReplacementCoordinator(
             pending = {
               kind: record.kind,
               summary: null,
+              adopted: false,
+              adopt: async () => {
+                if (!options.resumeAdoption)
+                  throw new Error(
+                    'Replacement handle verification is required after restart.',
+                  )
+                await options.resumeAdoption(record)
+              },
               durable: true,
               publicationAttempted: true,
               invalidated: !record.needsInvalidation,
@@ -70,6 +104,64 @@ export function createBackupReplacementCoordinator(
                   new Error('Committed replacement cannot be published again.'),
                 ),
               ...options.resume(record),
+            }
+          }
+          const preparation = await options.store?.readPendingPreparation?.()
+          if (preparation) {
+            if (record)
+              throw new Error(
+                'Recovery required: conflicting replacement admission and continuation.',
+              )
+            await options.validatePrepared?.(preparation)
+            const resume = preparation.resume
+            let prepared: PreparedReplacement | undefined
+            const hydrate = async () => {
+              if (!prepared) {
+                if (!options.resumePrepared)
+                  throw new Error(
+                    'Recovery required: prepared replacement owner is unavailable.',
+                  )
+                prepared = await options.resumePrepared(preparation)
+              }
+              return prepared
+            }
+            const bookkeeping = options.resume?.({
+              key: 'replacement-continuation',
+              replacementId: preparation.descriptor.replacementId,
+              kind: resume.kind,
+              committedRevision: preparation.descriptor.baseRevision + 1,
+              needsInvalidation: true,
+              needsSyncMetadata: true,
+              ...(resume.syncMetadataPatch
+                ? { syncMetadataPatch: resume.syncMetadataPatch }
+                : {}),
+            })
+            pending = {
+              kind: resume.kind,
+              summary: backupSummarySchema.nullable().parse(resume.summary),
+              replacementId: preparation.descriptor.replacementId,
+              adopted: false,
+              durable: false,
+              publicationAttempted: false,
+              invalidated: false,
+              continuation: undefined,
+              flush: async (input) => (await hydrate()).publish(input!),
+              adopt: async () => (await hydrate()).adopt(),
+              onDurable:
+                bookkeeping?.onDurable ??
+                (() =>
+                  Promise.reject(
+                    new Error('Replacement bookkeeping owner is unavailable.'),
+                  )),
+              finishSyncMetadata:
+                bookkeeping?.finishSyncMetadata ??
+                (() =>
+                  Promise.reject(
+                    new Error('Replacement bookkeeping owner is unavailable.'),
+                  )),
+              ...(resume.syncMetadataPatch
+                ? { syncMetadataPatch: resume.syncMetadataPatch }
+                : {}),
             }
           }
           loaded = true
@@ -93,6 +185,13 @@ export function createBackupReplacementCoordinator(
 
   function assertIdle() {
     if (pending || running) throw new Error(pendingMessage)
+  }
+
+  // Bookkeeping/notification failure cannot make an already verified, adopted
+  // pair unsafe to read. Unpublished or unadopted candidates remain gated.
+  function assertReadable() {
+    if (pending ? !pending.durable || !pending.adopted : running)
+      throw new Error(pendingMessage)
   }
 
   async function settle(): Promise<BackupReplacementResult> {
@@ -137,6 +236,14 @@ export function createBackupReplacementCoordinator(
           current.durable = true
           current.continuation = committed
         }
+      }
+    }
+    if (!current.adopted) {
+      try {
+        await current.adopt?.()
+        current.adopted = true
+      } catch {
+        return { status: 'durable', syncMetadataPending: true, kind, summary }
       }
     }
     if (options.store) {
@@ -196,7 +303,7 @@ export function createBackupReplacementCoordinator(
   }
 
   async function run(
-    work: BackupReplacementWork,
+    work: BackupReplacementWork | PreparedReplacementWork,
   ): Promise<BackupReplacementResult> {
     if (options.store) await ready()
     assertIdle()
@@ -204,25 +311,39 @@ export function createBackupReplacementCoordinator(
     try {
       work.beforeCommit?.()
       let summary: BackupReplacementPending['summary']
+      let prepared: PreparedReplacement | undefined
       try {
-        summary = await work.commit()
+        if ('prepare' in work) {
+          prepared = await work.prepare()
+          summary = prepared.summary
+        } else summary = await work.commit()
       } catch (error) {
         work.abortCommit?.()
         throw error
       }
       // Keep publication continuations only. Commit and its full input are released.
-      const { kind, flush, onDurable, finishSyncMetadata } = work
+      const { kind, onDurable, finishSyncMetadata } = work
+      const flush = prepared
+        ? (input?: import('@/platform/db/snapshot-idb').ReplacementInput) =>
+            prepared.publish(input!)
+        : (work as BackupReplacementWork).flush
       pending = {
         kind,
         summary,
         flush,
         onDurable,
         finishSyncMetadata,
+        ...(prepared ? { adopt: prepared.adopt } : {}),
+        adopted: !prepared,
         durable: false,
         publicationAttempted: false,
         invalidated: false,
         continuation: undefined,
-        ...(options.store ? { replacementId: crypto.randomUUID() } : {}),
+        ...(prepared
+          ? { replacementId: prepared.replacementId }
+          : options.store
+            ? { replacementId: crypto.randomUUID() }
+            : {}),
         ...(work.syncMetadataPatch
           ? { syncMetadataPatch: work.syncMetadataPatch }
           : {}),
@@ -244,5 +365,5 @@ export function createBackupReplacementCoordinator(
     }
   }
 
-  return { ready, getState, assertIdle, run, retry }
+  return { ready, getState, assertIdle, assertReadable, run, retry }
 }

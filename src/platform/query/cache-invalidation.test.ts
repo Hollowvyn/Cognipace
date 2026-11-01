@@ -283,3 +283,10 @@ describe('public hint connection invalidation', () => {
     }
   })
 })
+
+it('invalidates notes and submissions independently without practice caches', () => {
+  expect(readQueryKeysForInvalidation(['notes', 'submissions'])).toEqual([
+    ['notes'],
+    ['submissions'],
+  ])
+})

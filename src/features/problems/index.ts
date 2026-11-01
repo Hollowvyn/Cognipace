@@ -88,3 +88,10 @@ export {
   type SerializedProblemTopic,
   type SerializedProblemTrackMembership,
 } from './api/problems-contracts'
+
+export { useResetProblemData } from './api/problems-api'
+
+export {
+  useProblemDataConfirmation,
+  type ProblemDataConfirmation,
+} from './components/problem-row/use-problem-data-confirmation'

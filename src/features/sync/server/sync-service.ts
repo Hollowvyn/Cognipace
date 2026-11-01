@@ -1,15 +1,24 @@
+import type { BackupRestorePreview } from '@/features/backup/api/backup-contracts'
+import type { PreparedBackupRestore } from '@/features/backup/domain/backup-preflight'
+import {
+  needsArchiveRestoreReview,
+  syncEnvelopeBackupInput,
+} from '../domain/sync-envelope'
 import {
   exportFullBackup,
-  restoreValidatedBackupData,
   prepareFullBackupRestore,
   type BackupReplacementWork,
 } from '@/features/backup/server/backup-service'
 import type {
   BackupFile,
-  BackupSummary,
   BackupReplacementResult,
 } from '@/features/backup/api/backup-contracts'
-import { createGitHubGistClient, type GitHubGistClient } from '@/lib/github'
+import {
+  createGitHubGistClient,
+  githubGistBackupCapabilities,
+  type BackupCapabilities,
+  type GitHubGistClient,
+} from '@/lib/github'
 import type { GitHubGistSummary } from '@/lib/github/api/gist-contracts'
 import type { Db } from '@/platform/db'
 import { flushDbSnapshot } from '@/platform/db'
@@ -50,11 +59,13 @@ import type {
 type MaybePromise<T> = T | Promise<T>
 
 type PushLocalOptions = {
+  automatic?: boolean
   confirmRemoteOverwrite?: boolean
 }
 
 type PullLatestOptions = {
   confirmLocalOverwrite?: boolean
+  confirmationToken?: string
 }
 
 export type SyncOperationCoordinator = {
@@ -67,7 +78,23 @@ type SyncOperationState = {
   running: boolean
 }
 
+export type RemoteRestoreContext = {
+  sourceInput: unknown
+  sourceIdentity: string
+  confirmationToken?: string
+}
 export type SyncServiceDependencies = {
+  backupCapabilities?: BackupCapabilities | undefined
+  acknowledgeVerifiedRevision?:
+    | ((revision: number) => Promise<void>)
+    | undefined
+  previewRemoteRestore?: (
+    input: unknown,
+    sourceIdentity: string,
+  ) => Promise<BackupRestorePreview>
+  reconcileRemoteRestore?: (
+    confirmationToken: string,
+  ) => Promise<BackupReplacementResult | null>
   readToken: () => Promise<string | null>
   saveToken: (token: string) => Promise<unknown>
   deleteToken: () => Promise<unknown>
@@ -75,8 +102,14 @@ export type SyncServiceDependencies = {
   createGitHubClient: (token: string) => GitHubGistClient
   readMetadata: () => Promise<SyncMetadata>
   writeMetadata: (patch: Partial<SyncMetadata>) => Promise<SyncMetadata>
-  exportFullBackup: () => Promise<BackupFile>
-  restoreBackup: (backup: BackupFile) => Promise<BackupSummary>
+  exportFullBackup: () => Promise<
+    BackupFile | { backup: BackupFile; revision: number }
+  >
+  runFullBackupReplacement?: (
+    prepared: PreparedBackupRestore,
+    continuations: Omit<BackupReplacementWork, 'kind' | 'commit'>,
+    context?: RemoteRestoreContext,
+  ) => Promise<BackupReplacementResult>
   flushDbSnapshot: () => Promise<unknown>
   broadcastInvalidation: () => MaybePromise<void>
   runReplacement: (
@@ -142,6 +175,8 @@ export function createSyncOperationCoordinator(
 
 export function createSyncService(deps: SyncServiceDependencies) {
   const syncCoordinator = deps.syncCoordinator ?? sharedSyncOperationCoordinator
+  const backupCapabilities =
+    deps.backupCapabilities ?? githubGistBackupCapabilities
 
   async function getStatus(): Promise<SerializedSyncStatus> {
     const [metadata, tokenStatus] = await Promise.all([
@@ -149,7 +184,12 @@ export function createSyncService(deps: SyncServiceDependencies) {
       deps.getTokenStatus(),
     ])
 
-    return createStatus(metadata, tokenStatus, syncCoordinator.isRunning())
+    return createStatus(
+      metadata,
+      tokenStatus,
+      syncCoordinator.isRunning(),
+      backupCapabilities,
+    )
   }
 
   async function validateGithubToken(token: string): Promise<SyncActionResult> {
@@ -224,14 +264,19 @@ export function createSyncService(deps: SyncServiceDependencies) {
       const client = await readConfiguredClient()
       const local = await createLocalEnvelopeContent()
       const gist = await client.createSyncGist(local.content)
-      await recordPush(gist, local.dataUpdatedAt)
+      await recordPush(gist, local, client)
 
-      return 'GitHub Gist created.'
+      return backupCapabilities.verifiedFullBackup
+        ? 'GitHub Gist created.'
+        : 'GitHub Gist created. Upload is unverified; local changes remain pending.'
     })
 
     return createActionResult({
       action: 'create-gist',
       direction: null,
+      reason: backupCapabilities.verifiedFullBackup
+        ? null
+        : 'backup-verification-unavailable',
       message,
     })
   }
@@ -247,11 +292,16 @@ export function createSyncService(deps: SyncServiceDependencies) {
       if (!gist.content) {
         const local = await createLocalEnvelopeContent()
         const updated = await client.updateSyncGist(gistId, local.content)
-        await recordPush(updated, local.dataUpdatedAt)
+        await recordPush(updated, local, client)
 
         return {
           direction: null,
-          message: 'GitHub Gist connected and initialized.',
+          reason: backupCapabilities.verifiedFullBackup
+            ? null
+            : 'backup-verification-unavailable',
+          message: backupCapabilities.verifiedFullBackup
+            ? 'GitHub Gist connected and initialized.'
+            : 'GitHub Gist connected and initialized. Upload is unverified; local changes remain pending.',
         } as const
       }
 
@@ -309,6 +359,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
     return createActionResult({
       action: 'connect-gist',
       direction: result.direction,
+      reason: 'reason' in result ? result.reason : null,
       message: result.message,
     })
   }
@@ -317,7 +368,11 @@ export function createSyncService(deps: SyncServiceDependencies) {
     const message = await runExclusive(async () => {
       await deps.writeMetadata({ enabled })
 
-      return enabled ? 'Auto-sync resumed.' : 'Auto-sync paused.'
+      return enabled
+        ? backupCapabilities.verifiedFullBackup
+          ? 'Auto-sync resumed.'
+          : 'Automatic clean pull checks resumed. Automatic uploads are unavailable without complete backup verification.'
+        : 'Auto-sync paused.'
     })
 
     return createActionResult({
@@ -350,7 +405,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
           direction: null,
           outcome: 'no-change',
           reason: 'local-dirty',
-          message: 'Remote check skipped: local changes need to be pushed.',
+          message: 'Remote check skipped: local changes remain pending backup.',
         })
       }
 
@@ -398,6 +453,27 @@ export function createSyncService(deps: SyncServiceDependencies) {
         deps.getTokenStatus(),
       ])
 
+      if (options.confirmationToken && deps.reconcileRemoteRestore) {
+        const accepted = await deps.reconcileRemoteRestore(
+          options.confirmationToken,
+        )
+        if (accepted)
+          return createReplacementActionResult(
+            accepted,
+            {
+              action: 'pull-latest',
+              message: 'Selected Gist restore was already accepted.',
+              metadata,
+              tokenStatus,
+            },
+            {},
+          )
+      }
+      if (options.confirmLocalOverwrite === true && !options.confirmationToken)
+        throw new Error(
+          'A current Gist backup preview is required. Pull latest again and review the selected backup before confirming.',
+        )
+
       if (!metadata.gistId || !tokenStatus.configured) {
         await deps.writeMetadata({ lastBlockingReason: 'not-configured' })
 
@@ -412,7 +488,11 @@ export function createSyncService(deps: SyncServiceDependencies) {
 
       const localIsDirty = metadata.dirtySinceLastSync
 
-      if (localIsDirty && options.confirmLocalOverwrite !== true) {
+      if (
+        localIsDirty &&
+        options.confirmLocalOverwrite !== true &&
+        !deps.previewRemoteRestore
+      ) {
         await deps.writeMetadata({
           lastBlockingReason: 'local-dirty',
           lastError: null,
@@ -430,7 +510,11 @@ export function createSyncService(deps: SyncServiceDependencies) {
       const client = await readConfiguredClient()
       const remote = await client.getGist(metadata.gistId)
 
-      if (!localIsDirty && !hasRemoteChanged(remote, metadata)) {
+      if (
+        !options.confirmationToken &&
+        !localIsDirty &&
+        !hasRemoteChanged(remote, metadata)
+      ) {
         await deps.writeMetadata({
           lastSyncAt: deps.now().toISOString(),
           lastSyncDirection: 'no-change',
@@ -449,10 +533,35 @@ export function createSyncService(deps: SyncServiceDependencies) {
         })
       }
 
+      if (!options.confirmationToken) {
+        if (!deps.previewRemoteRestore)
+          throw new Error(
+            'A selected Gist backup preview is required before replacement.',
+          )
+        const envelope = parseRemoteSyncEnvelope(remote)
+        const sourceInput = syncEnvelopeBackupInput(envelope)
+        const restorePreview = await deps.previewRemoteRestore(
+          sourceInput,
+          await remotePreviewIdentity(remote),
+        )
+        return createActionResult({
+          action: 'pull-latest',
+          direction: 'pull',
+          outcome: 'confirmation-required',
+          reason: null,
+          message:
+            'Review the selected Gist backup before replacing local data.',
+          restorePreview,
+        })
+      }
+
       return pullRemote(remote, {
         enabled: metadata.enabled,
         action: 'pull-latest',
         confirmLocalOverwrite: options.confirmLocalOverwrite === true,
+        ...(options.confirmationToken
+          ? { confirmationToken: options.confirmationToken }
+          : {}),
         metadata,
         tokenStatus,
         message: localIsDirty
@@ -483,6 +592,16 @@ export function createSyncService(deps: SyncServiceDependencies) {
         })
       }
 
+      if (options.automatic && !backupCapabilities.verifiedFullBackup) {
+        return createActionResult({
+          action: 'push-local',
+          direction: 'push',
+          outcome: 'blocked',
+          reason: 'backup-verification-unavailable',
+          message:
+            'Automatic uploads are unavailable without complete backup verification. Use Push local for an unverified manual upload.',
+        })
+      }
       const client = await readConfiguredClient()
       const remote = await client.getGist(metadata.gistId)
 
@@ -515,14 +634,19 @@ export function createSyncService(deps: SyncServiceDependencies) {
         metadata.gistId,
         local.content,
       )
-      await recordPush(updated, local.dataUpdatedAt, {
+      await recordPush(updated, local, client, {
         enabled: metadata.enabled,
       })
 
       return createActionResult({
         action: 'push-local',
         direction: 'push',
-        message: 'Local data pushed to Gist.',
+        reason: backupCapabilities.verifiedFullBackup
+          ? null
+          : 'backup-verification-unavailable',
+        message: backupCapabilities.verifiedFullBackup
+          ? 'Local data pushed to Gist.'
+          : 'Local data uploaded to Gist, but the backup is unverified. Local changes remain pending.',
       })
     })
   }
@@ -533,6 +657,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
       enabled: boolean
       automatic?: boolean
       confirmLocalOverwrite?: boolean
+      confirmationToken?: string
       action: SyncAction
       message: string
       metadata: SyncMetadata
@@ -540,7 +665,32 @@ export function createSyncService(deps: SyncServiceDependencies) {
     },
   ) {
     const envelope = parseRemoteSyncEnvelope(gist)
-    prepareFullBackupRestore(envelope.backup)
+    const sourceInput = syncEnvelopeBackupInput(envelope)
+    const prepared = await prepareFullBackupRestore(sourceInput)
+    if (options.automatic && prepared.sourceSchemaVersion < 7) {
+      const currentArchiveHasData = await exportedArchiveHasData()
+      if (
+        needsArchiveRestoreReview({
+          automatic: true,
+          sourceSchemaVersion: prepared.sourceSchemaVersion,
+          currentArchiveHasData,
+        })
+      ) {
+        await deps.writeMetadata({
+          lastBlockingReason: 'archive-review-required',
+          lastError: null,
+        })
+        return createActionResult({
+          action: options.action,
+          direction: 'pull',
+          outcome: 'blocked',
+          reason: 'archive-review-required',
+          message:
+            'This older backup has no Notes archive. Use Pull latest to review a full preview before replacing local data.',
+        })
+      }
+    }
+    const sourceIdentity = await remotePreviewIdentity(gist)
     const completedAt = deps.now().toISOString()
     const patch: Partial<SyncMetadata> = {
       enabled: options.enabled,
@@ -560,13 +710,22 @@ export function createSyncService(deps: SyncServiceDependencies) {
         : {}),
     }
     remoteReplacementMetadataSchema.parse(patch)
+    if (!deps.runFullBackupReplacement)
+      throw new Error('Detached full backup replacement is unavailable.')
+    const applyFullReplacement = deps.runFullBackupReplacement
     const result = await runRemoteRestore(
       () =>
-        deps.runReplacement({
-          kind: 'gist-pull',
-          commit: () => deps.restoreBackup(envelope.backup),
-          ...createRemoteReplacementContinuations(deps, patch),
-        }),
+        applyFullReplacement(
+          prepared,
+          createRemoteReplacementContinuations(deps, patch),
+          {
+            sourceInput,
+            sourceIdentity,
+            ...(options.confirmationToken
+              ? { confirmationToken: options.confirmationToken }
+              : {}),
+          },
+        ),
       { confirmLocalOverwrite: options.confirmLocalOverwrite === true },
     )
     return createReplacementActionResult(result, options, patch)
@@ -618,6 +777,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
         { ...knownMetadata, ...(error ? { lastError: error } : {}) },
         options.tokenStatus,
         syncCoordinator.isRunning(),
+        backupCapabilities,
       )
     }
     return {
@@ -634,9 +794,25 @@ export function createSyncService(deps: SyncServiceDependencies) {
 
   async function recordPush(
     gist: GitHubGistSummary,
-    dataUpdatedAt: string,
+    local: {
+      content: string
+      dataUpdatedAt: string
+      revision: number | undefined
+    },
+    client: GitHubGistClient,
     options: { enabled?: boolean } = {},
   ) {
+    const { dataUpdatedAt } = local
+    if (backupCapabilities.verifiedFullBackup) {
+      if (!client.verifyCompleteBackup)
+        throw new Error('Complete backup verification is unavailable.')
+      await client.verifyCompleteBackup(gist.id, local.content)
+      if (local.revision !== undefined) {
+        if (!deps.acknowledgeVerifiedRevision)
+          throw new Error('Verified revision acknowledgement is unavailable.')
+        await deps.acknowledgeVerifiedRevision(local.revision)
+      }
+    }
     const metadata = await deps.readMetadata()
     const changedDuringPush =
       metadata.dirtySinceLastSync &&
@@ -654,8 +830,11 @@ export function createSyncService(deps: SyncServiceDependencies) {
       localDataUpdatedAt: changedDuringPush
         ? metadata.localDataUpdatedAt
         : dataUpdatedAt,
-      dirtySinceLastSync: changedDuringPush,
-      lastBlockingReason: null,
+      dirtySinceLastSync:
+        !backupCapabilities.verifiedFullBackup || changedDuringPush,
+      lastBlockingReason: backupCapabilities.verifiedFullBackup
+        ? null
+        : 'backup-verification-unavailable',
       conflict: null,
       lastError: null,
     })
@@ -665,7 +844,9 @@ export function createSyncService(deps: SyncServiceDependencies) {
     const metadata = await deps.readMetadata()
     const dataUpdatedAt =
       metadata.localDataUpdatedAt ?? deps.now().toISOString()
-    const backup = await deps.exportFullBackup()
+    const exported = await deps.exportFullBackup()
+    const backup = 'backup' in exported ? exported.backup : exported
+    await prepareFullBackupRestore(backup)
 
     return {
       content: JSON.stringify(
@@ -678,7 +859,17 @@ export function createSyncService(deps: SyncServiceDependencies) {
         2,
       ),
       dataUpdatedAt,
+      revision: 'backup' in exported ? exported.revision : undefined,
     }
+  }
+
+  async function exportedArchiveHasData() {
+    const exported = await deps.exportFullBackup()
+    const archive = ('backup' in exported ? exported.backup : exported)
+      .notesArchive
+    return Object.values(archive).some(
+      (rows) => Array.isArray(rows) && rows.length > 0,
+    )
   }
 
   async function readConfiguredClient() {
@@ -698,8 +889,10 @@ export function createSyncService(deps: SyncServiceDependencies) {
     outcome?: SyncActionOutcome
     reason?: SyncActionReason | null
     retryable?: boolean
+    restorePreview?: BackupRestorePreview
   }): Promise<SyncActionResult> {
     return {
+      ...(input.restorePreview ? { restorePreview: input.restorePreview } : {}),
       action: input.action,
       direction: input.direction,
       outcome: input.outcome ?? 'success',
@@ -799,11 +992,19 @@ export function createBackgroundSyncService(
   broadcastInvalidation: () => MaybePromise<void>,
   options: {
     runReplacement: SyncServiceDependencies['runReplacement']
+    runFullBackupReplacement?: SyncServiceDependencies['runFullBackupReplacement']
+    previewRemoteRestore?: SyncServiceDependencies['previewRemoteRestore']
+    reconcileRemoteRestore?: SyncServiceDependencies['reconcileRemoteRestore']
+    exportFullBackup?: SyncServiceDependencies['exportFullBackup']
+    acknowledgeVerifiedRevision?: SyncServiceDependencies['acknowledgeVerifiedRevision']
+    withDb?: <T>(work: (db: Db) => Promise<T>) => Promise<T>
     runRemoteRestore?: SyncServiceDependencies['runRemoteRestore']
     syncCoordinator?: SyncOperationCoordinator
   },
 ) {
   return createSyncService({
+    backupCapabilities: githubGistBackupCapabilities,
+    acknowledgeVerifiedRevision: options.acknowledgeVerifiedRevision,
     readToken: () => readSecret('github:gist'),
     saveToken: (token) => saveSecret('github:gist', token),
     deleteToken: () => deleteSecret('github:gist'),
@@ -811,11 +1012,24 @@ export function createBackgroundSyncService(
     createGitHubClient: (token) => createGitHubGistClient({ token }),
     readMetadata: readSyncMetadata,
     writeMetadata: writeSyncMetadata,
-    exportFullBackup: () => exportFullBackup(db),
-    restoreBackup: (backup) => restoreValidatedBackupData(db, backup),
+    exportFullBackup:
+      options.exportFullBackup ??
+      (() =>
+        options.withDb
+          ? options.withDb(exportFullBackup)
+          : exportFullBackup(db)),
+    ...(options.runFullBackupReplacement
+      ? { runFullBackupReplacement: options.runFullBackupReplacement }
+      : {}),
     flushDbSnapshot,
     broadcastInvalidation,
     runReplacement: options.runReplacement,
+    ...(options.previewRemoteRestore
+      ? { previewRemoteRestore: options.previewRemoteRestore }
+      : {}),
+    ...(options.reconcileRemoteRestore
+      ? { reconcileRemoteRestore: options.reconcileRemoteRestore }
+      : {}),
     syncCoordinator: options.syncCoordinator ?? sharedSyncOperationCoordinator,
     ...(options.runRemoteRestore
       ? { runRemoteRestore: options.runRemoteRestore }
@@ -849,6 +1063,7 @@ function createStatus(
   metadata: SyncMetadata,
   tokenStatus: SecretStatus,
   isSyncing: boolean,
+  backupCapabilities: BackupCapabilities,
 ): SerializedSyncStatus {
   return {
     enabled: metadata.enabled,
@@ -862,7 +1077,14 @@ function createStatus(
     lastPullAt: metadata.lastPullAt,
     lastPushAt: metadata.lastPushAt,
     needsPush: metadata.dirtySinceLastSync,
-    lastBlockingReason: metadata.lastBlockingReason,
+    lastBlockingReason:
+      metadata.lastBlockingReason === 'archive-review-required'
+        ? 'archive-review-required'
+        : tokenStatus.configured &&
+            metadata.gistId &&
+            !backupCapabilities.verifiedFullBackup
+          ? 'backup-verification-unavailable'
+          : metadata.lastBlockingReason,
     lastError: metadata.lastError,
     conflict: metadata.conflict,
   }
@@ -1039,4 +1261,15 @@ function getUnknownErrorMessage(error: unknown) {
   }
 
   return 'Sync failed.'
+}
+
+async function remotePreviewIdentity(gist: GitHubGistSummary): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(gist.content ?? ''),
+  )
+  const hash = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+  return JSON.stringify([gist.id, gist.remoteVersion, gist.updatedAt, hash])
 }

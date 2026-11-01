@@ -1,4 +1,6 @@
 export const queryKeys = {
+  notes: { all: ['notes'] as const },
+  submissions: { all: ['submissions'] as const },
   analytics: {
     all: ['analytics'] as const,
     summary: (range: 30 | 90 | 'all', timeZone: string) =>

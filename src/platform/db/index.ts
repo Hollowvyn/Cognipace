@@ -2,6 +2,11 @@ export type { Db, DbHandle, DbSchema } from './client'
 export { createDb, createSqliteWasmLocator } from './client'
 export {
   getAppDb,
+  withCurrentAppDb,
+  acquireCurrentAppDb,
+  prepareDbReplacement,
+  createDetachedCoreCandidate,
+  adoptPublishedCoreCandidate,
   flushDbSnapshot,
   beginDbReplacement,
   abortDbReplacement,

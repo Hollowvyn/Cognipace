@@ -1,3 +1,6 @@
+import { assertArchiveReferences } from '@/features/notes/domain/archive-validation'
+import type { NotesArchive } from '@/features/notes/domain/notes-records'
+import { legacyArchiveDisposition } from './backup-normalization'
 import {
   validatePracticeStorageData,
   type PracticeStorageReferences,
@@ -21,17 +24,44 @@ import {
 } from '../api/backup-contracts'
 
 export type PreparedBackupRestore = Readonly<{
+  sourceInput: unknown
   data: BackupData
   summary: BackupSummary
+  notesArchive: NotesArchive
+  sourceSchemaVersion: number
+  archiveAbsent: boolean
+  removesCurrentArchive: boolean
+  inputDigest: string
 }>
 
 /** Every caller, including typed Sync payloads, crosses the same pure boundary. */
-export function prepareFullBackupRestore(
+export async function prepareFullBackupRestore(
   input: unknown,
-): PreparedBackupRestore {
-  const backup = parseBackupFileForCurrentApp(input)
+  options: { currentArchiveHasData?: boolean } = {},
+): Promise<PreparedBackupRestore> {
+  const snapshot = structuredClone(input)
+  const bytes = new TextEncoder().encode(JSON.stringify(snapshot))
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const inputDigest = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+  const backup = parseBackupFileForCurrentApp(snapshot)
   const data = prepareCurrentBackupData(backup.data, backup.exportedAt)
-  return { data, summary: createBackupSummary({ ...backup, data }) }
+  await assertArchiveReferences(
+    backup.notesArchive,
+    data.problems.map((row) => row.slug),
+  )
+  return {
+    sourceInput: snapshot,
+    data,
+    notesArchive: backup.notesArchive,
+    summary: createBackupSummary({ ...backup, data }),
+    inputDigest,
+    ...legacyArchiveDisposition(
+      (snapshot as { schemaVersion: number }).schemaVersion,
+      options.currentArchiveHasData ?? false,
+    ),
+  }
 }
 
 /** Reconcile the complete current payload before any destructive transaction. */

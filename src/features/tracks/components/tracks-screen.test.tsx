@@ -1683,7 +1683,7 @@ describe('TracksScreen', () => {
       '#/library/problems/two-sum/edit',
     )
     expect(screen.getByRole('button', { name: 'Suspend' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Reset Schedule' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Reset problem' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
   })
 })

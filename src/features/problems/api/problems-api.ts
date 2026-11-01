@@ -1,3 +1,4 @@
+import type { BackupReplacementResult } from '@/features/backup/api/backup-contracts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { sendMessage } from '@/extension/messaging'
@@ -6,6 +7,7 @@ import { queryKeys } from '@/platform/query/query-keys'
 
 import type {
   ProblemsBulkDeleteRequest,
+  ProblemsResetProblemDataRequest,
   ProblemsBulkUpdateProblemsRequest,
   ProblemsCreateProblemRequest,
   ProblemsDeleteProblemRequest,
@@ -88,7 +90,7 @@ export function useUpdateProblem() {
 }
 
 export function useDeleteProblem() {
-  return useProblemMutation(deleteProblemViaRuntime)
+  return useProblemDataMutation(deleteProblemViaRuntime)
 }
 
 export function useBulkUpdateProblems() {
@@ -96,7 +98,7 @@ export function useBulkUpdateProblems() {
 }
 
 export function useBulkDeleteProblems() {
-  return useProblemMutation(bulkDeleteProblemsViaRuntime)
+  return useProblemDataMutation(bulkDeleteProblemsViaRuntime)
 }
 
 function useProblemMutation<TRequest, TResponse>(
@@ -108,6 +110,42 @@ function useProblemMutation<TRequest, TResponse>(
     mutationFn,
     onSuccess: () => {
       void invalidateTaggedQueries(queryClient, ['problems'])
+    },
+  })
+}
+
+export function useResetProblemData() {
+  return useProblemDataMutation((request: ProblemsResetProblemDataRequest) =>
+    sendMessage('problems.resetProblemData', request),
+  )
+}
+
+function useProblemDataMutation<TRequest>(
+  mutationFn: (request: TRequest) => Promise<BackupReplacementResult>,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: (result) => {
+      // Keep the accepted request and confirmation mounted until publication and
+      // its continuation settle. Background publication owns broad invalidation.
+      if (result.status === 'persistence-pending') {
+        queryClient.setQueryData(queryKeys.backup.pendingReplacement(), result)
+        return
+      }
+      if (result.status === 'durable' && result.syncMetadataPending) {
+        queryClient.setQueryData(queryKeys.backup.pendingReplacement(), {
+          ...result,
+          status: 'durable-sync-metadata-pending',
+        })
+        return
+      }
+      if (result.status === 'durable') {
+        queryClient.setQueryData(queryKeys.backup.pendingReplacement(), {
+          status: 'idle',
+        })
+        void invalidateTaggedQueries(queryClient, ['problems'])
+      }
     },
   })
 }

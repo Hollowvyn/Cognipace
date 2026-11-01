@@ -1,3 +1,4 @@
+import type { ProblemDataConfirmation } from '../problem-row/use-problem-data-confirmation'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import {
@@ -24,11 +25,13 @@ import type { RenderProblemEditAction } from './problem-row-actions'
 
 export function ProblemLibraryTable({
   options,
+  confirmation,
   renderEditProblemAction,
   renderSelectedRowsAction,
   table,
 }: {
   options: ProblemLibraryOptions
+  confirmation: ProblemDataConfirmation
   renderEditProblemAction: RenderProblemEditAction
   renderSelectedRowsAction?: RenderSelectedRowsAction | undefined
   table: Table<ProblemLibraryRow>
@@ -57,6 +60,7 @@ export function ProblemLibraryTable({
             {table.getRowModel().rows.map((row) => (
               <ProblemLibraryTableRow
                 key={row.id}
+                confirmation={confirmation}
                 renderEditProblemAction={renderEditProblemAction}
                 row={row}
               />
@@ -68,6 +72,7 @@ export function ProblemLibraryTable({
         pageSizeOptions={[20, 30, 50]}
         bulkActions={
           <ProblemBulkActionBar
+            confirmation={confirmation}
             onClearSelection={() => table.resetRowSelection()}
             options={options}
             renderSelectedRowsAction={renderSelectedRowsAction}
@@ -123,9 +128,11 @@ function SortableHeader({
 }
 
 function ProblemLibraryTableRow({
+  confirmation,
   renderEditProblemAction,
   row,
 }: {
+  confirmation: ProblemDataConfirmation
   renderEditProblemAction: RenderProblemEditAction
   row: Row<ProblemLibraryRow>
 }) {
@@ -169,6 +176,7 @@ function ProblemLibraryTableRow({
             colSpan={row.getVisibleCells().length}
           >
             <ProblemLibraryRowDetails
+              confirmation={confirmation}
               renderEditProblemAction={renderEditProblemAction}
               row={row.original}
             />

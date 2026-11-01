@@ -114,6 +114,12 @@ export class ProblemsRepository {
     return savedProblem
   }
 
+  async listProblemSlugs() {
+    return (await this.db.select({ slug: problems.slug }).from(problems)).map(
+      (row) => row.slug,
+    )
+  }
+
   async getLibrary(options: ProblemLibraryReadOptions = {}) {
     const generatedAt = options.now ?? new Date()
     const topicReadModel = await readTopicReadModel(this.db)

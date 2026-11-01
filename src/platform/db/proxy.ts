@@ -50,12 +50,16 @@ export function setOnMutationHook(hook: ((sql: string) => void) | null) {
   onMutationHook = hook
 }
 
-export function createProxyCallback(rawDb: Database): RemoteCallback {
+export function createProxyCallback(
+  rawDb: Database,
+  onMutation?: ((sql: string) => void) | null,
+): RemoteCallback {
   return (sql, params, method) => {
     const result = execProxy(rawDb, sql, normalizeProxyParams(params), method)
 
-    if (method === 'run' && onMutationHook && isMutationStatement(sql)) {
-      onMutationHook(sql)
+    const hook = onMutation === undefined ? onMutationHook : onMutation
+    if (method === 'run' && hook && isMutationStatement(sql)) {
+      hook(sql)
     }
 
     return Promise.resolve(result)

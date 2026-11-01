@@ -1,3 +1,7 @@
+import {
+  githubGistBackupCapabilities,
+  type BackupCapabilities,
+} from '@/lib/github'
 import type { SyncActionResult } from '@/features/sync/api/sync-contracts'
 import type { SyncMetadata } from '@/features/sync/data/sync-metadata-store'
 import { readAutoSyncRetryDelayMinutes } from '@/features/sync/domain/sync-auto-retry'
@@ -14,6 +18,7 @@ export const syncOpenCheckDelayMs = 2000
 export const syncOpenCheckFallbackDelayMinutes = 0.5
 
 export type SyncAutoSyncDependencies = {
+  backupCapabilities?: BackupCapabilities
   hasPendingDirtyMarkRetry?: (() => boolean) | undefined
   now: () => Date
   readMetadata: () => Promise<SyncMetadata>
@@ -29,12 +34,27 @@ export type SyncAutoSyncDependencies = {
 }
 
 export function createSyncAutoSync(deps: SyncAutoSyncDependencies) {
+  const backupCapabilities =
+    deps.backupCapabilities ?? githubGistBackupCapabilities
+
+  async function blockUnsupportedAutoPush() {
+    if (backupCapabilities.verifiedFullBackup) return false
+    // Capability is authoritative across restarts and failed metadata/alarm writes.
+    // Stale upload alarms may fire, but can never initiate unsupported uploads.
+    await Promise.allSettled([
+      deps.scheduler.clear(syncAutoPushAlarmName),
+      deps.scheduler.clear(syncRetryAlarmName),
+    ])
+    return true
+  }
+
   let jobsRegistered = false
   let openCheckPending = false
   let openCheckRunning = false
   let openCheckTimer: ReturnType<typeof globalThis.setTimeout> | null = null
 
   async function scheduleAutoPushAfterMutation() {
+    if (await blockUnsupportedAutoPush()) return
     const metadata = await deps.readMetadata()
 
     if (!metadata.enabled || !metadata.gistId) {
@@ -47,6 +67,7 @@ export function createSyncAutoSync(deps: SyncAutoSyncDependencies) {
   }
 
   async function runAutoPush() {
+    if (await blockUnsupportedAutoPush()) return
     const metadata = await deps.readMetadata()
     const hasPendingDirtyMarkRetry = deps.hasPendingDirtyMarkRetry?.() ?? false
 
@@ -191,6 +212,23 @@ export function createSyncAutoSync(deps: SyncAutoSyncDependencies) {
     })
   }
 
+  async function repairStartupAlarms() {
+    await deps.scheduler.repairStartupAlarms()
+    if (await blockUnsupportedAutoPush()) return
+    // The metadata reader also consults the durable head. A worker restart may
+    // have lost both the best-effort Chrome dirty write and the push alarm.
+    const metadata = await deps.readMetadata()
+    if (
+      metadata.enabled &&
+      metadata.gistId &&
+      (metadata.dirtySinceLastSync || deps.hasPendingDirtyMarkRetry?.())
+    ) {
+      await deps.scheduler.schedule(syncAutoPushAlarmName, {
+        delayInMinutes: syncAutoPushDelayMinutes,
+      })
+    }
+  }
+
   function registerJobs() {
     if (jobsRegistered) {
       return
@@ -222,7 +260,7 @@ export function createSyncAutoSync(deps: SyncAutoSyncDependencies) {
   return {
     clearPendingAutomaticSync,
     registerJobs,
-    repairStartupAlarms: deps.scheduler.repairStartupAlarms,
+    repairStartupAlarms,
     requestOpenCheckAfterSurfaceOpen,
     runAutoPush,
     runCleanPullCheck,

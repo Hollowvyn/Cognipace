@@ -152,3 +152,7 @@ export async function bulkUpdateProblems(
 export function readProblemSlugFromSlugOrUrl(slugOrUrl: string) {
   return parseLeetCodeProblemInput(slugOrUrl)?.slug ?? null
 }
+
+export function listProblemSlugs(db: Db) {
+  return createProblemsRepository(db).listProblemSlugs()
+}

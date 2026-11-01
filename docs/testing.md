@@ -66,22 +66,25 @@ phase adds no Google Drive or new Gist host permission.
 
 ## Local Database Recovery
 
-The active complete SQLite snapshot lives in IndexedDB database
-`cognipace-local-v1`, object store `records`, key `active`. Replacement recovery
-uses key `recovery`, and supported legacy recovery records use `recovery:<key>`.
-For a healthy database, use Settings > Data Management to export a full backup.
-For startup failure, keep the profile intact and preserve a private copy of the
-IndexedDB database before clearing any extension storage. Do not post its binary
-bytes, fingerprints, or personal contents in an issue.
+The database name remains `cognipace-local-v1`; its current IndexedDB version is 3. `records/active` is now a versioned head referencing SQLite bytes in
+`coreSnapshots` and a matching archive generation. `records/recovery` retains one
+prior paired dataset; historical `recovery:<key>` entries can be core-only.
+Preserve the complete database, not just the active record. For a healthy
+profile, use Settings > Data Management to export a full v7 backup. For startup
+failure, keep the profile intact and preserve a private database copy before
+clearing any storage. Never post private binary bytes or study contents.
 
-When both the IndexedDB active record and legacy Chrome snapshot keys are absent,
-startup creates and seeds a fresh database. With no IndexedDB active record, a
-complete legacy Chrome storage pair is migrated into IndexedDB and read back
-before the old active pair is removed. Existing legacy recovery copies also
-migrate. A partial pair, malformed value, or unknown or unsupported fingerprint
-fails startup and retains the original available values for recovery.
-A failed IndexedDB read or publication requires recovery; do not clear the
-profile or interpret the failure as an empty install.
+The physical v2→v3 upgrade atomically backfills normalized submission chronology
+keys and replaces only that index. Head format version 2 and SQL are unchanged;
+original timestamps, active/recovery cores, readiness, pending work, provenance
+and technical-write epoch are preserved. Invalid indexed fields abort the upgrade
+with v2 data and index intact. Downgrade to a v2 database client is unsupported.
+
+Fresh creation requires verified absence of prior data. Existing v1 IndexedDB
+cores and supported legacy Chrome pairs migrate preserving original bytes and
+recoveries. Missing/corrupt roots, readiness markers, partial Chrome pairs,
+unsupported fingerprints, or failed reads/publication require controlled
+recovery; do not treat surviving data without an active head as empty.
 Automatic
 upgrades accept only the exact through-0007, through-0008, and through-0009
 migration prefixes allowlisted in
@@ -127,6 +130,101 @@ verifies six inferred unknown evidence rows and active generation scopes, and
 checks exact metadata/token equality on matching reopen. A real staged
 preparation failure rejects a malformed log without changing the stored
 original or first recovery record.
+
+### Notes Phase 1 Human Installed-Extension Proof
+
+**Pending: a human must run these happy-path and edge-case checks and attach
+redacted screenshots or a screen recording before PR review or merge.** Agent
+unit/integration checks and generated fixtures do not satisfy this gate. Notes
+editing and new submission/assessment capture remain off; typing/autosave proof
+belongs to Phase 3.
+
+Use `npm run build`/`npm run zip`, load `dist/chrome-mv3` in a disposable Chrome
+profile, and record the commit, Chrome version and package used. Never use an
+existing personal profile for fault injection. The synthetic restore file is
+[`notes-phase-1-v7.json`](superpowers/fixtures/notes-phase-1-v7.json). Its source is
+the final test in `src/features/backup/notes-backup.integration.test.ts`, using
+`createFrozenV6BackupFixture`, `makeNotesArchive`, the real `exportFullBackup`
+serializer and async `prepareFullBackupRestore`. Reproduce with the pinned Node
+and npm versions:
+
+```sh
+NOTES_WRITE_SMOKE_FIXTURE=1 npm test -- src/features/backup/notes-backup.integration.test.ts --maxWorkers=2
+shasum -a 256 docs/superpowers/fixtures/notes-phase-1-v7.json
+```
+
+The test independently exports twice at a fixed clock with deterministic synthetic
+UUIDs, checks byte equality and checked-in readback, and runs async preflight on
+the parsed artifact. SHA-256:
+`9bd4b399960121fd7c779faf2527313ffa99fe0504d44c3638be57e5e3c5fce6`.
+All inputs, notes, code, report/model metadata and dates are synthetic; no provider
+calls or real credentials are used. The file contains seeded catalog data plus
+Two Sum Practice/FSRS/evidence, notes, reflection, submitted code, feedback,
+implementation and saved AI inclusion. Fixture generations are test identities;
+restore creates fresh effective local write generations.
+
+- [ ] Preserve a private copy of a populated version-1 IndexedDB profile, then
+      open the packaged current build. Verify upgrade keeps Practice content and
+      historical core-only recoveries. A current version-3 profile cannot be
+      downgraded in place: retain it and use a compatible build for recovery.
+- [ ] Preserve a private populated v2 profile and open the current build. Verify
+      the native database becomes v3 while head format remains 2, active/recovery
+      core identities, readiness, pending work and technical-write epoch stay
+      unchanged. With synthetic mixed whole-second, fractional and equivalent
+      `.5`/`.500` submission times, page metadata newest-first, save a reflection,
+      restart, and export; verify stable ID ties and verbatim timestamps. Repeat
+      with an interrupted upgrade and confirm the old v2 data/index remains intact.
+- [ ] Restore the fixture in Settings, restart the worker, and re-export. Compare
+      every meaningful core/archive record and exact Markdown/code/report strings
+      (including Unicode and trailing spaces), IDs, dates, FSRS and evidence.
+      Ignore only new export timestamp/source metadata and effective write
+      generations; full-file byte equality after installed restore is not expected.
+      Confirm archive data survives, while Notes remains a placeholder and new
+      analysis/hints remain session-only.
+- [ ] In packaged worker DevTools Sources, pause inside the native readwrite
+      transaction created by `local-idb.ts` for composite publication; abort that
+      transaction before completion. Inspect the real IndexedDB database in
+      Application, then restart without DevTools keeping the worker alive. Verify
+      old core/archive pair survives together, Retry saving resumes safely, and
+      no mixed pair becomes active. Repeat reset and restore before publication,
+      after publication/before adoption, and with a lost response after completion.
+      Inspect head revision/command identity without copying study bodies into
+      proof. Do not intercept `chrome.storage.local` for this test.
+- [ ] Reset one problem, bulk reset, delete one/bulk problems, then Clear and
+      restore. Affected archives disappear from active data; sibling notes,
+      submissions and Practice remain unchanged for targeted operations. Restart
+      and retry the same accepted command: no duplicate rotation/reapply. Verify
+      the prior paired recovery remains readable; active reset is not secure erase.
+- [ ] Select a real frozen v6 backup with a populated archive currently active.
+      Verify explicit archive-absence/removal warning and confirm deliberately.
+      Change local data or selected file after preview: old confirmation rejects.
+      Repeat using a changed remote Gist identity; never reuse that confirmation.
+- [ ] Using the trusted dashboard runtime caller and actual document/session IDs,
+      attempt Notes detail/save and transfer continuation from a second document,
+      old session, wrong problem, popup and content-script usage request. Verify
+      authorization/stale rejection and unchanged storage; redact lease/token data.
+- [ ] Export/import a UTF-8 multibyte and large synthetic file; interrupt receiving
+      and ready-export sessions, restart worker while owner dashboard stays open,
+      then resume. Close the owner and verify only confirmed absent unaccepted
+      spools are eligible for cleanup. Unsupported/failed owner inventory retains
+      them; accepted restore input and completion replay remain protected.
+- [ ] In the disposable profile only, retain an untouched database copy, then
+      corrupt/remove active or recovery root readiness metadata. Verify controlled
+      recovery and preserved originals, no seeding or collection. During normal
+      maintenance insert a newly rooted staging/outbox/transfer record between
+      batches; epoch change prevents unsafe sweep. Queue foreground work during
+      cleanup and verify it gets a turn. Old reachable learning bodies survive
+      regardless of dates; optional browser physical estimates stay separate from
+      active logical usage. Do not claim 10k archive capacity or latency from this.
+- [ ] With a disposable Gist, verify action-needed/automatic-upload-paused guidance,
+      no repeated automatic uploads, explicit manual unverified result with pending
+      local changes, and source-bound legacy pull warning. Never claim complete
+      remote verification. Remove disposable remote data through GitHub afterward.
+
+Record expected/actual results and proof links for each item in the Phase 1
+handoff. Native Chrome quota, worker scheduling, real publication failure,
+large-profile parse/hash/memory/latency and future editor/provider behavior remain
+unproven until their corresponding human/Phase 4 measurements are recorded.
 
 ### IndexedDB Snapshot Scaling And Installed-Extension Proof
 
@@ -540,6 +638,10 @@ proof, alongside the coordinator/runtime/SQLite regressions. No production
 failure switch is added.
 
 #### Disposable-profile failure harness
+
+This historical Chrome-storage shim covers legacy mirroring and sync metadata
+only. It cannot prove current IndexedDB publication or worker-restart recovery.
+Use the Notes Phase 1 native-IDB checklist below for those gates.
 
 Build with `npm run build`, load `dist/chrome-mv3` unpacked into a disposable
 Chrome profile and open Settings > Data Management once so startup completes.
@@ -1232,7 +1334,7 @@ existing Library, capture, and backup flows:
    as `Tree / Graph` in a disposable problem. Save, reload, and edit again;
    confirm Unicode and slash text survive lookup and persistence.
 4. Export a backup and inspect only the disposable fixture's taxonomy rows.
-   Confirm it declares schema version 6 and typed relations have source,
+   Confirm it declares schema version 7 and typed relations have source,
    target, and kind fields. Import that file into another disposable profile
    and verify assignments, aliases, and both relation kinds round-trip.
 
@@ -2458,3 +2560,29 @@ Full verification:
 npm run check
 npm run format
 ```
+
+### Ordinary core retirement proof
+
+`src/testing/snapshot-retirement.integration.test.ts` exercises the standard
+250-problem/5,000-review fixture through the Library bulk action's service and
+snapshot-flush sequence for 20 suspended rows, both from an ordinary seed and
+a completed composite replacement. `src/platform/db/snapshot-idb.test.ts` covers
+explicit provenance, pending roots, bounded uncertainty, opaque lookalikes,
+changed heads, dangling/mismatched recovery provenance, missing reserved
+provenance, readiness or active-core disappearance between readback and cleanup,
+array-valued provenance/candidate keys, lazy namespace-boundary bodies, readback failure
+and retirement abort. These use native SQLite
+and fake IndexedDB; they do not establish Chrome quota, latency or realtime
+service-worker behavior. The measured 7,290,880-byte fixture retains one core
+(7,290,880 bytes) after 20 ordinary saves; after completed composite replacement
+it retains active and paired recovery cores (14,581,760 bytes). The old implementation
+retained 21 and 22 cores respectively under these same sequences.
+
+Human Chrome proof remains pending: on a disposable populated profile, suspend
+one default Library page, verify all 20 changes survive worker restart, record
+physical core counts/bytes before and after, and attach screenshot or recording.
+Repeat after a completed restore, verify the retained recovery export, and
+exercise failed publication and failed cleanup: publication failure preserves the
+old active pair; cleanup failure leaves the new saved data usable and retains
+old bytes for maintenance. Include pending/restarted replacement roots and
+capture exact failures without exposing study contents.

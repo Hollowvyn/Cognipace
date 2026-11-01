@@ -1,3 +1,7 @@
+import {
+  useProblemDataConfirmation,
+  type ProblemDataConfirmation,
+} from '@/features/problems'
 import { RefreshCw } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -24,12 +28,13 @@ export interface TracksScreenProps {
   renderEditTrackAction: RenderTrackEditAction
 }
 
-export function TracksScreen({
+function TracksScreenContent({
+  confirmation,
   importTrackAction,
   newTrackAction,
   renderEditProblemAction,
   renderEditTrackAction,
-}: TracksScreenProps) {
+}: TracksScreenProps & { confirmation: ProblemDataConfirmation }) {
   const workspaceQuery = useTrackWorkspace({ surface: 'dashboard' })
   const workspace = workspaceQuery.data
 
@@ -51,6 +56,7 @@ export function TracksScreen({
     <TracksWorkspaceView
       importTrackAction={importTrackAction}
       newTrackAction={newTrackAction}
+      confirmation={confirmation}
       renderEditProblemAction={renderEditProblemAction}
       renderEditTrackAction={renderEditTrackAction}
       workspace={workspace}
@@ -59,6 +65,7 @@ export function TracksScreen({
 }
 
 function TracksWorkspaceView({
+  confirmation,
   importTrackAction,
   newTrackAction,
   renderEditProblemAction,
@@ -69,6 +76,7 @@ function TracksWorkspaceView({
   newTrackAction: ReactNode
   renderEditProblemAction: RenderProblemEditAction
   renderEditTrackAction: RenderTrackEditAction
+  confirmation: ProblemDataConfirmation
   workspace: TrackWorkspaceResponse
 }) {
   if (workspace.tracks.length === 0) {
@@ -89,6 +97,7 @@ function TracksWorkspaceView({
           dueCount={workspace.dueCount}
           generatedAt={workspace.generatedAt}
           groups={workspace.activeTrackGroups}
+          confirmation={confirmation}
           renderEditProblemAction={renderEditProblemAction}
           renderEditTrackAction={renderEditTrackAction}
           rows={workspace.activeTrackRows}
@@ -186,3 +195,15 @@ function TracksFrame({ children }: { children: ReactNode }) {
 }
 
 export type { RenderTrackEditAction, SerializedTrack }
+
+export function TracksScreen(
+  props: Omit<Parameters<typeof TracksScreenContent>[0], 'confirmation'>,
+) {
+  const confirmation = useProblemDataConfirmation()
+  return (
+    <>
+      <TracksScreenContent {...props} confirmation={confirmation} />
+      {confirmation.dialog}
+    </>
+  )
+}

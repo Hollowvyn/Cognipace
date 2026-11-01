@@ -1,3 +1,4 @@
+import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { normalizeLegacyPracticeStorage } from '@/features/practice/domain'
 import { reconcileTopicRows } from '@/features/problems/domain/topic-reconciliation'
 import {
@@ -12,6 +13,8 @@ import {
   backupFileV3Schema,
   backupFileV4Schema,
   backupFileV5Schema,
+  backupFileV6Schema,
+  type BackupFileV6,
   type BackupFileV1,
   type BackupFileV2,
   type BackupFileV3,
@@ -117,7 +120,7 @@ export function normalizeBackupV4ToV5(backup: BackupFileV4): BackupFileV5 {
 
 export function normalizeBackupV5ToV6(input: BackupFileV5) {
   const backup = backupFileV5Schema.parse(input)
-  return {
+  return backupFileV6Schema.parse({
     ...backup,
     schemaVersion: 6 as const,
     data: {
@@ -127,7 +130,7 @@ export function normalizeBackupV5ToV6(input: BackupFileV5) {
         ...normalizeLegacyPracticeStorage(backup.data.practice.reviewAttempts),
       },
     },
-  }
+  })
 }
 
 /** Each historical step terminates in a frozen schema, including terminal v5. */
@@ -166,4 +169,31 @@ export function normalizeLegacyBackupToV6(input: unknown) {
       throw new Error(`Unsupported legacy backup version ${version}.`)
   }
   return normalizeBackupV5ToV6(v5)
+}
+
+export function normalizeBackupV6ToV7(input: BackupFileV6) {
+  const backup = backupFileV6Schema.parse(input)
+  return {
+    ...backup,
+    schemaVersion: 7 as const,
+    notesArchive: emptyNotesArchive(),
+  }
+}
+export function normalizeLegacyBackupToV7(input: unknown) {
+  const version = (input as { schemaVersion: number }).schemaVersion
+  return normalizeBackupV6ToV7(
+    version === 6
+      ? backupFileV6Schema.parse(input)
+      : normalizeLegacyBackupToV6(input),
+  )
+}
+export function legacyArchiveDisposition(
+  sourceSchemaVersion: number,
+  currentArchiveHasData: boolean,
+) {
+  return {
+    sourceSchemaVersion,
+    archiveAbsent: sourceSchemaVersion < 7,
+    removesCurrentArchive: sourceSchemaVersion < 7 && currentArchiveHasData,
+  }
 }

@@ -1,3 +1,8 @@
+import {
+  emptyNotesArchive,
+  assertArchiveReferences,
+} from '@/features/notes/domain/archive-validation'
+import type { NotesArchive } from '@/features/notes/domain/notes-records'
 import type { Db } from '@/platform/db'
 
 import {
@@ -16,6 +21,7 @@ export { prepareFullBackupRestore } from '../domain/backup-preflight'
 export type { BackupReplacementWork } from './backup-replacement-work'
 
 type ExportFullBackupOptions = {
+  notesArchive?: NotesArchive
   exportedAt?: Date
   appVersion?: string
   extensionVersion?: string
@@ -35,30 +41,39 @@ export async function exportFullBackup(
 
   const data = await createBackupRepository(db).readBackupData()
 
-  return backupFileSchema.parse({
+  const notesArchive = options.notesArchive ?? emptyNotesArchive()
+  await assertArchiveReferences(
+    notesArchive,
+    data.problems.map((row) => row.slug),
+  )
+  const backup = backupFileSchema.parse({
     schemaVersion: backupSchemaVersion,
     app: 'cognipace',
     exportedAt: exportedAt.toISOString(),
     source,
     data,
+    notesArchive,
   })
+  return backup
 }
 
-export function validateFullBackup(input: unknown): BackupSummary {
-  return prepareFullBackupRestore(input).summary
+export async function validateFullBackup(
+  input: unknown,
+): Promise<BackupSummary> {
+  return (await prepareFullBackupRestore(input)).summary
 }
 
 export async function restoreFullBackup(
   db: Db,
   input: unknown,
 ): Promise<BackupSummary> {
-  const prepared = prepareFullBackupRestore(input)
+  const prepared = await prepareFullBackupRestore(input)
   return restorePreparedFullBackup(db, prepared)
 }
 
 export async function restorePreparedFullBackup(
   db: Db,
-  prepared: ReturnType<typeof prepareFullBackupRestore>,
+  prepared: Awaited<ReturnType<typeof prepareFullBackupRestore>>,
 ): Promise<BackupSummary> {
   await clearAndRestoreBackupData(db, prepared)
   return prepared.summary

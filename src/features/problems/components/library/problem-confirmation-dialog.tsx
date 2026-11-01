@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 
 export function ProblemConfirmationDialog({
   confirmLabel,
+  savingPending = false,
+  error,
   description,
   onCancel,
   onConfirm,
@@ -12,6 +14,8 @@ export function ProblemConfirmationDialog({
   title,
 }: {
   confirmLabel: string
+  savingPending?: boolean
+  error?: string | null
   description: string
   onCancel: () => void
   onConfirm: () => void
@@ -30,14 +34,14 @@ export function ProblemConfirmationDialog({
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-background/75 p-4"
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && !pending) {
+        if (event.key === 'Escape' && !pending && !savingPending) {
           onCancel()
         }
       }}
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) {
           event.preventDefault()
-          if (!pending) {
+          if (!pending && !savingPending) {
             onCancel()
           }
         }
@@ -65,9 +69,16 @@ export function ProblemConfirmationDialog({
             {description}
           </p>
         </div>
+        {savingPending ? (
+          <p role="status">
+            Saving is incomplete. Retry saving, or open Settings → Data
+            Management to recover.
+          </p>
+        ) : null}
+        {error ? <p role="alert">{error}</p> : null}
         <div className="flex flex-wrap justify-end gap-2">
           <Button
-            disabled={pending}
+            disabled={pending || savingPending}
             onClick={onCancel}
             ref={cancelButtonRef}
             size="sm"
@@ -87,7 +98,7 @@ export function ProblemConfirmationDialog({
                 className="animate-spin motion-reduce:animate-none"
               />
             ) : null}
-            {confirmLabel}
+            {savingPending ? 'Retry saving' : confirmLabel}
           </Button>
         </div>
       </section>

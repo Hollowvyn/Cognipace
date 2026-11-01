@@ -14,6 +14,7 @@ This folder contains planning artifacts created through Superpowers workflows. T
 
 - [`specs/2026-10-31-agent-workflow-modes-design.md`](./specs/2026-10-31-agent-workflow-modes-design.md): approved collaborative default and explicit autonomous selector sharing governance, independent agent review, and unchanged scope and human smoke gates.
 
+- [`specs/2026-10-31-notes-and-submission-history-design.md`](./specs/2026-10-31-notes-and-submission-history-design.md): approved Notes and submission-history design grounded in the existing overlay and merged IndexedDB foundation; permanent learning records, saved AI sections, coordinated reset/recovery, and full local/remote backups. Phase 1 infrastructure is implemented locally; editor/capture activation remains off and later phases remain unexecuted. See the Phase 1 handoff.
 - [`specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md`](./specs/2026-10-16-reliable-drive-backup-and-key-recovery-design.md): user-approved written design for durable local saves, versioned Google Drive data backups, explicit force and restore recovery, Gist migration, and separate Google-account-protected key recovery; covered by the three plans below.
 - [`specs/2026-10-31-ai-data-flow-efficiency.md`](./specs/2026-10-31-ai-data-flow-efficiency.md): approved and implemented measured data-flow improvements: safe metrics, compact provider input and feedback-first/on-demand code in PR #214, plus exact snapshot interning in #203; human extension and live-provider proof remain pending.
 
@@ -87,6 +88,12 @@ This folder contains planning artifacts created through Superpowers workflows. T
 - [`specs/2026-05-24-tracks-phase-3-design.md`](./specs/2026-05-24-tracks-phase-3-design.md): Tracks phase 3 design artifact. Use as implementation history; verify current behavior against `docs/product.md` and source code.
 
 ## Plans
+
+- [`plans/2026-10-31-notes-and-submission-history.md`](./plans/2026-10-31-notes-and-submission-history.md): full roadmap, shared contracts, phase dependencies, coverage map and complete local/remote release gates for Notes and submission history; Phase 1 infrastructure is implemented locally; Phases 2–4 remain unexecuted.
+- [`plans/2026-10-31-notes-phase-1-archive-and-recovery.md`](./plans/2026-10-31-notes-phase-1-archive-and-recovery.md): preserving record-level IndexedDB archive, shared revisions, trusted editing, matching core/archive reset/recovery, v7 backup, bounded runtime transfers and safe technical cleanup.
+- [`plans/2026-10-31-notes-phase-2-submission-and-ai-retention.md`](./plans/2026-10-31-notes-phase-2-submission-and-ai-retention.md): independent forward submission capture, identity/enrichment, pinned code, retained feedback and optional implementation, saved-AI collection CAS and no Practice side effects.
+- [`plans/2026-10-31-notes-phase-3-overlay-notes.md`](./plans/2026-10-31-notes-phase-3-overlay-notes.md): existing Notes tab, flexible safe Markdown, 600/3000 ms autosave, revision conflicts, owned navigation flush and complete saved AI disclosures.
+- [`plans/2026-10-31-notes-phase-4-problem-details-and-release.md`](./plans/2026-10-31-notes-phase-4-problem-details-and-release.md): notes-first details page, full cursor history/reflections, cross-surface entry points, archive-scale/remote compatibility tests and required human release proof.
 
 - [`plans/2026-10-31-agent-workflow-modes.md`](./plans/2026-10-31-agent-workflow-modes.md): phase-sized docs/governance and skill implementation with baseline, scenario evaluation, validator, and independent-review evidence.
 
@@ -189,6 +196,10 @@ This folder contains planning artifacts created through Superpowers workflows. T
 Use these files to understand why work was shaped a certain way. Before changing product behavior, architecture, or tests, check the current docs and source code first.
 
 ## Handoffs
+
+- [`handoffs/2026-10-31-notes-phase-1.md`](./handoffs/2026-10-31-notes-phase-1.md): Phase 1 archive persistence/recovery, exact automated validation, deterministic synthetic v7 fixture and pending required human installed-extension proof.
+
+- [`handoffs/2026-10-31-notes-planning.md`](./handoffs/2026-10-31-notes-planning.md): completed full Notes planning, 31 tasks across four unexecuted phases, inline design/plan review, exact document validation/skips, preserved package edits and outstanding implementation/release gates.
 
 - [`handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md`](./handoffs/2026-10-12-responsive-overlay-phase-1-baseline.md): committed-source packaged warm/cold startup measurements, [validated compact evidence](./evidence/responsive-overlay/overlay-startup-standard.json), attribution limits, reproducible smoke steps and pending human installed-extension proof.
 

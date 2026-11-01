@@ -67,7 +67,7 @@ export async function generateLeetCodeHintsInBackground(
           signal,
         )
         signal.throwIfAborted()
-        const current = await readAiHintConnectionSnapshot(db)
+        const current = await readAiHintConnectionSnapshot(await loadDb())
         signal.throwIfAborted()
         if (current.identity !== snapshot.identity) return stale()
         if (result.status === 'error')

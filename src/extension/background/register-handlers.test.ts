@@ -1,10 +1,33 @@
+import { IDBFactory } from 'fake-indexeddb'
+import {
+  splitUtf8Text,
+  transferDigest,
+  type TransferSession,
+} from '@/features/backup/api/backup-transfer-contracts'
+import type { LocalIdbStore } from '@/platform/db/local-store-types'
+let transferLocalOverride: LocalIdbStore | undefined
+import { createElement } from 'react'
+import { act, fireEvent, render, screen, cleanup } from '@testing-library/react'
+import { GitHubSyncPanel } from '@/features/sync/components/github-sync-panel'
+import { createFrozenV6BackupFixture } from '@/features/backup/testing/backup-v6-fixture'
+import type {
+  BackupFile,
+  BackupSummary,
+} from '@/features/backup/api/backup-contracts'
+import type { PreparedBackupRestore } from '@/features/backup/domain/backup-preflight'
+import {
+  makeNotesArchive,
+  makeNotesPayload,
+} from '@/features/notes/testing/notes-fixtures'
+import { assertArchiveReferences } from '@/features/notes/domain/archive-validation'
+import { backupRestorePreviewSchema } from '@/features/backup/api/backup-contracts'
+import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { implementationIdentity } from '@/features/leetcode-review-assistant/api/code-implementation-contracts'
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 
 import {
   activeTrackSchema,
   backupFileSchema,
-  backupSummarySchema,
   devSmokeReportSchema,
   queueRequestSchema,
   syncActionResultSchema,
@@ -40,6 +63,7 @@ import type { PopupAppShellData } from '@/features/app-shell/api/app-shell-contr
 import {
   backupSchemaVersion,
   createBackupSummary,
+  parseBackupFileForCurrentApp,
 } from '@/features/backup/api/backup-contracts'
 import { analyticsSummarySchema } from '@/features/analytics/api/analytics-contracts'
 import { defaultUserSettings } from '@/features/settings/domain'
@@ -112,6 +136,7 @@ const backgroundMocks = vi.hoisted(() => {
     assertCanSenderCallExtensionMethod: vi.fn(),
     backupExportFullBackup: vi.fn(),
     backupResetLocalData: vi.fn(),
+    prepareProblemDataReplacement: vi.fn(),
     backupRestoreFullBackup: vi.fn(),
     backupPrepareFullBackupRestore: vi.fn(),
     backupValidateFullBackup: vi.fn(),
@@ -126,6 +151,8 @@ const backgroundMocks = vi.hoisted(() => {
     getAppShellData: vi.fn(),
     getProblemLibrary: vi.fn(),
     createProblem: vi.fn(),
+    deleteProblem: vi.fn(),
+    bulkDeleteProblems: vi.fn(),
     createTrack: vi.fn(),
     clearActiveTrack: vi.fn(),
     deleteTrack: vi.fn(),
@@ -211,7 +238,11 @@ const backgroundMocks = vi.hoisted(() => {
     },
   }
 })
-const extensionSender = { id: 'extension-id' }
+const extensionSender = {
+  id: 'extension-id',
+  documentId: 'dashboard-document',
+  url: 'chrome-extension://extension-id/dashboard.html',
+}
 
 vi.mock('@/extension/messaging', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/extension/messaging')>()
@@ -221,6 +252,66 @@ vi.mock('@/extension/messaging', async (importOriginal) => {
     onMessage: backgroundMocks.onMessage,
   }
 })
+
+// Handler tests isolate the already integration-tested detached pair owner.
+vi.mock('./full-backup-service', () => ({
+  exportDurableFullBackup: async () => ({
+    backup: (await backgroundMocks.backupExportFullBackup(
+      backgroundMocks.db,
+    )) as BackupFile,
+    revision: 1,
+  }),
+  createFullBackupPreview: async (_local: unknown, input: unknown) => ({
+    ...((await backgroundMocks.backupValidateFullBackup(
+      input,
+    )) as BackupSummary),
+    confirmationToken: 'a3e4bc9c-f233-4abc-b00c-026758671151',
+    sourceSchemaVersion: (input as { schemaVersion: number }).schemaVersion,
+    archiveAbsent: (input as { schemaVersion: number }).schemaVersion < 7,
+    removesCurrentArchive:
+      (input as { schemaVersion: number }).schemaVersion < 7,
+  }),
+  validateFullBackupConfirmation: (_local: unknown, input: unknown) =>
+    Promise.resolve(
+      backgroundMocks.backupPrepareFullBackupRestore(
+        input,
+      ) as PreparedBackupRestore,
+    ),
+  prepareGistFullBackupReplacement: async (
+    _local: unknown,
+    prepared: PreparedBackupRestore,
+  ) => ({
+    replacementId: 'gist-fixture',
+    summary: (await backgroundMocks.backupRestoreFullBackup(
+      backgroundMocks.db,
+      prepared,
+    )) as BackupSummary,
+    publish: () => backgroundMocks.flushDbSnapshot() as Promise<void>,
+    adopt: async () => {},
+  }),
+  prepareFullBackupReplacement: async (
+    _local: unknown,
+    input: { prepared: PreparedBackupRestore; commandId: string },
+  ) => ({
+    replacementId: input.commandId,
+    summary: (await backgroundMocks.backupRestoreFullBackup(
+      backgroundMocks.db,
+      input.prepared,
+    )) as BackupSummary,
+    publish: () => backgroundMocks.flushDbSnapshot() as Promise<void>,
+    adopt: async () => {},
+  }),
+}))
+
+vi.mock('./problem-data-service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./problem-data-service')>()),
+  prepareProblemDataReplacement: backgroundMocks.prepareProblemDataReplacement,
+}))
+vi.mock('@/platform/db/local-idb', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/platform/db/local-idb')>()),
+  createLocalIdbStore: () =>
+    transferLocalOverride ?? { readRecord: () => Promise.resolve(undefined) },
+}))
 
 vi.mock('wxt/browser', () => ({
   browser: {
@@ -313,6 +404,8 @@ vi.mock(
       ...actual,
       getProblemLibrary: backgroundMocks.getProblemLibrary,
       createProblem: backgroundMocks.createProblem,
+      deleteProblem: backgroundMocks.deleteProblem,
+      bulkDeleteProblems: backgroundMocks.bulkDeleteProblems,
       bulkUpdateProblems: backgroundMocks.bulkUpdateProblems,
     }
   },
@@ -355,7 +448,17 @@ vi.mock('@/platform/db', () => ({
 }))
 
 vi.mock('./app-db', () => ({
+  verifyBackgroundReplacementAdoption: () => Promise.resolve(),
   getBackgroundDb: backgroundMocks.getAppDb,
+  withBackgroundDbLoader: async (
+    work: (loadDb: () => Promise<unknown>) => Promise<unknown>,
+  ) =>
+    work(
+      async () => ((await backgroundMocks.getAppDb()) as { db: unknown }).db,
+    ),
+  withBackgroundDb: async (
+    work: (handle: { db: unknown }) => Promise<unknown>,
+  ) => work((await backgroundMocks.getAppDb()) as { db: unknown }),
 }))
 
 vi.mock('@/features/leetcode-capture/server/leetcode-capture-service', () => ({
@@ -416,12 +519,33 @@ vi.mock('./due-notification', () => ({
 
 describe('background handler registration', () => {
   beforeEach(() => {
+    transferLocalOverride = undefined
     vi.useFakeTimers()
+    vi.stubGlobal('indexedDB', {
+      open: () => {
+        throw new Error('Unexpected storage access in runtime harness')
+      },
+    })
+    backgroundMocks.prepareProblemDataReplacement.mockImplementation(
+      async (
+        _local: unknown,
+        input: import('./problem-data-service').ProblemDataReplacementInput,
+      ) => {
+        if (input.kind === 'reset')
+          await backgroundMocks.backupResetLocalData(backgroundMocks.db)
+        return {
+          replacementId: input.commandId,
+          summary: null,
+          publish: () => backgroundMocks.flushDbSnapshot() as Promise<void>,
+          adopt: async () => {},
+        }
+      },
+    )
     backgroundMocks.handlers.clear()
     vi.clearAllMocks()
     backgroundMocks.backupPrepareFullBackupRestore.mockImplementation(
       (input: unknown) => {
-        const backup = backupFileSchema.parse(input)
+        const backup = parseBackupFileForCurrentApp(input)
         return { data: backup.data, summary: createBackupSummary(backup) }
       },
     )
@@ -2104,6 +2228,120 @@ describe('background handler registration', () => {
     )
   })
 
+  it('requires refreshed command identities before reset or deletion mutates data', () => {
+    registerBackgroundHandlers()
+    for (const [method, data] of [
+      [
+        'practice.resetSchedule',
+        { surface: 'dashboard', problemSlug: 'two-sum', keepLog: true },
+      ],
+      [
+        'problems.resetProblemData',
+        { surface: 'dashboard', problemSlugs: ['two-sum'] },
+      ],
+      [
+        'problems.deleteProblem',
+        { surface: 'dashboard', problemSlug: 'two-sum' },
+      ],
+      [
+        'problems.bulkDelete',
+        { surface: 'dashboard', problemSlugs: ['two-sum'] },
+      ],
+      ['backup.resetLocalData', { surface: 'dashboard' }],
+    ] as const) {
+      expect(() =>
+        backgroundMocks.handlers.get(method)!({
+          data,
+          sender: extensionSender,
+        }),
+      ).toThrow('Refresh required')
+    }
+    expect(backgroundMocks.prepareProblemDataReplacement).not.toHaveBeenCalled()
+    expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+  })
+  it('binds one accepted bulk reset ID to all selected slugs, retries publication only and reconciles Data Management retry', async () => {
+    registerBackgroundHandlers()
+    const handler = backgroundMocks.handlers.get('problems.resetProblemData')!
+    const request = {
+      surface: 'dashboard',
+      commandId: 'accepted-bulk',
+      problemSlugs: ['two-sum', 'add-two-numbers'],
+    }
+    const message = (data: unknown) =>
+      handler({ data, sender: extensionSender })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('disk unavailable'),
+    )
+    expect(await message(request)).toMatchObject({
+      status: 'persistence-pending',
+    })
+    await expect(
+      message({ ...request, problemSlugs: ['two-sum'] }),
+    ).rejects.toThrow('identity conflict')
+    expect(await message(request)).toMatchObject({ status: 'durable' })
+    expect(backgroundMocks.prepareProblemDataReplacement).toHaveBeenCalledTimes(
+      1,
+    )
+    expect(await message(request)).toMatchObject({ status: 'durable' })
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(2)
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('disk unavailable'),
+    )
+    const second = { ...request, commandId: 'accepted-second' }
+    expect(await message(second)).toMatchObject({
+      status: 'persistence-pending',
+    })
+    expect(
+      await backgroundMocks.handlers.get('backup.retryPendingReplacement')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+    ).toMatchObject({ status: 'durable' })
+    expect(await message(second)).toMatchObject({ status: 'durable' })
+    expect(backgroundMocks.prepareProblemDataReplacement).toHaveBeenCalledTimes(
+      2,
+    )
+  })
+
+  it('routes single and bulk deletions through coordinated pair publication', async () => {
+    for (const [method, request] of [
+      [
+        'problems.deleteProblem',
+        {
+          surface: 'dashboard',
+          problemSlug: 'two-sum',
+          commandId: 'single-delete',
+        },
+      ],
+      [
+        'problems.bulkDelete',
+        {
+          surface: 'dashboard',
+          problemSlugs: ['two-sum', 'add-two-numbers'],
+          commandId: 'bulk-delete',
+        },
+      ],
+    ] as const) {
+      expect(await sendRuntimeMessage(method, request)).toMatchObject({
+        status: 'durable',
+        kind: 'problem-delete',
+      })
+    }
+    expect(backgroundMocks.prepareProblemDataReplacement).toHaveBeenCalledTimes(
+      2,
+    )
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        tags: expect.arrayContaining([
+          'notes',
+          'submissions',
+          'practice',
+          'tracks',
+        ]) as string[],
+      }),
+    )
+  })
+
   it('wires committed imports to snapshot, dirty-mark, invalidation, and sync scheduling', async () => {
     const response = await sendRuntimeMessage('imports.apply', {
       surface: 'dashboard',
@@ -2452,9 +2690,7 @@ describe('background handler registration', () => {
     await expect(
       sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
     ).rejects.toThrow('Local data still needs saving')
-    await sendRuntimeMessage('backup.exportFullBackup', {
-      surface: 'dashboard',
-    })
+    await exportTransferFixture()
     await expect(
       sendRuntimeMessage('settings.toggleStudyMode', { surface: 'popup' }),
     ).resolves.toBeNull()
@@ -2506,12 +2742,9 @@ describe('background handler registration', () => {
       new Error('IDB unavailable'),
     )
 
-    await expect(
-      sendRuntimeMessage('backup.restoreFullBackup', {
-        surface: 'dashboard',
-        backup: validBackup,
-      }),
-    ).rejects.toThrow('Local data still needs saving')
+    await expect(restoreTransferFixture(validBackup)).rejects.toThrow(
+      'Local data still needs saving',
+    )
     await expect(
       sendRuntimeMessage('backup.resetLocalData', {
         surface: 'dashboard',
@@ -2616,12 +2849,181 @@ describe('background handler registration', () => {
     expect(backgroundMocks.broadcastCacheInvalidation).not.toHaveBeenCalled()
   })
 
-  it('registers backup export handling with dashboard policy', async () => {
-    const response = await sendRuntimeMessage('backup.exportFullBackup', {
-      surface: 'dashboard',
+  it('routes a visible legacy Gist preview from Settings through the real handler and Sync service before applying its token', async () => {
+    vi.useRealTimers()
+    const actual = await vi.importActual<
+      typeof import('@/features/sync/server/sync-service')
+    >('@/features/sync/server/sync-service')
+    const { defaultSyncMetadata } = await vi.importActual<
+      typeof import('@/features/sync/data/sync-metadata-store')
+    >('@/features/sync/data/sync-metadata-store')
+    const metadata = {
+      ...defaultSyncMetadata,
+      ...cleanSyncMetadata,
+      lastSyncDirection: 'pull' as const,
+    }
+    const legacy = createFrozenV6BackupFixture()
+    const getGist = vi.fn().mockResolvedValue({
+      id: 'gist_1',
+      htmlUrl: 'https://gist.github.com/gist_1',
+      updatedAt: syncTimestamp,
+      remoteVersion: 'remote-preview-version',
+      content: JSON.stringify({
+        syncEnvelopeVersion: 1,
+        app: 'cognipace',
+        exportedAt: legacy.exportedAt,
+        dataUpdatedAt: legacy.exportedAt,
+        backup: legacy,
+      }),
+      contentTruncated: false,
+      rawUrl: null,
     })
+    backgroundMocks.createBackgroundSyncService.mockImplementation(
+      (_db: unknown, _broadcast: unknown, options: SyncFactoryOptions) =>
+        actual.createSyncService({
+          readToken: () => Promise.resolve('test-token'),
+          saveToken: () => Promise.resolve(),
+          deleteToken: () => Promise.resolve(),
+          getTokenStatus: () => Promise.resolve(syncStatus.tokenStatus),
+          createGitHubClient: () => ({
+            getGist,
+            validateToken: vi.fn(),
+            createSyncGist: vi.fn(),
+            updateSyncGist: vi.fn(),
+          }),
+          readMetadata: () => Promise.resolve(metadata),
+          writeMetadata: (patch) => Promise.resolve({ ...metadata, ...patch }),
+          exportFullBackup: options.exportFullBackup,
+          flushDbSnapshot:
+            backgroundMocks.flushDbSnapshot as () => Promise<void>,
+          broadcastInvalidation: () => Promise.resolve(),
+          runReplacement: options.runReplacement,
+          runFullBackupReplacement: options.runFullBackupReplacement,
+          previewRemoteRestore: options.previewRemoteRestore,
+          reconcileRemoteRestore: options.reconcileRemoteRestore,
+          runRemoteRestore: options.runRemoteRestore,
+          syncCoordinator: actual.createSyncOperationCoordinator(),
+          now: () => new Date(syncTimestamp),
+        }),
+    )
+    const onPullLatest = async (
+      input: {
+        confirmLocalOverwrite?: boolean
+        confirmationToken?: string
+      } = {},
+    ) =>
+      syncActionResultSchema.parse(
+        await sendRuntimeMessage('sync.pullLatest', {
+          surface: 'dashboard',
+          ...input,
+        }),
+      )
+    const panel = render(
+      createElement(GitHubSyncPanel, {
+        status: syncStatus,
+        actions: {
+          onPullLatest,
+          onConnectGist: vi.fn(),
+          onCreateGist: vi.fn(),
+          onDeleteToken: vi.fn(),
+          onPushLocal: vi.fn(),
+          onSaveToken: vi.fn(),
+          onSetAutoSyncEnabled: vi.fn(),
+          onValidateStoredToken: vi.fn(),
+          onValidateToken: vi.fn(),
+        },
+      }),
+    )
+    try {
+      act(() => {
+        fireEvent.click(screen.getByRole('button', { name: 'Pull latest' }))
+      })
+      await screen.findByRole('dialog', { name: 'Force pull from Gist' })
+      expect(
+        screen.getByRole('dialog', { name: 'Force pull from Gist' }),
+      ).toHaveTextContent('backup version 6')
+      expect(screen.getByRole('dialog')).toHaveTextContent(
+        'contains no Notes archive',
+      )
+      expect(backgroundMocks.backupRestoreFullBackup).not.toHaveBeenCalled()
+      act(() => {
+        fireEvent.click(screen.getByRole('button', { name: 'Force pull' }))
+      })
+      await screen.findByRole('dialog', { name: 'Pull complete' })
+      expect(backgroundMocks.backupRestoreFullBackup).toHaveBeenCalledTimes(1)
+      expect(getGist).toHaveBeenCalledTimes(2)
+      expect(
+        screen.getByRole('dialog', { name: 'Pull complete' }),
+      ).toBeVisible()
+    } finally {
+      panel.unmount()
+      cleanup()
+    }
+  })
 
-    expectRuntimePolicy('backup.exportFullBackup', 'dashboard')
+  it('exports inside an explicitly owned sync queue without nesting queue admission', async () => {
+    backgroundMocks.syncService.pushLocal.mockImplementationOnce(async () => {
+      const pair = await readLatestSyncFactoryOptions().exportFullBackup()
+      expect(pair).toEqual({ backup: validBackup, revision: 1 })
+      return syncActionResult
+    })
+    await expect(
+      sendRuntimeMessage('sync.pushLocal', { surface: 'dashboard' }),
+    ).resolves.toEqual(syncActionResult)
+  })
+
+  it('queues an unowned sync export behind an unrelated mutation even while that mutation owns the queue', async () => {
+    await sendRuntimeMessage('sync.getStatus', { surface: 'dashboard' })
+    const options = readLatestSyncFactoryOptions()
+    const { runInMutationQueue } = await import('./mutation-queue')
+    const gate = createDeferred<void>()
+    const started = vi.fn()
+    const mutation = runInMutationQueue(async () => {
+      started()
+      await gate.promise
+    })
+    await waitUntil(() => expect(started).toHaveBeenCalled())
+    const exported = options.exportFullBackup()
+    await Promise.resolve()
+    expect(backgroundMocks.backupExportFullBackup).not.toHaveBeenCalled()
+    gate.resolve()
+    await mutation
+    await expect(exported).resolves.toEqual({
+      backup: validBackup,
+      revision: 1,
+    })
+  })
+
+  it('preserves original validated report bytes in the registered export result', async () => {
+    const archive = await makeNotesArchive()
+    const report = archive.payloads.find((row) => row.kind === 'feedback-v1')!
+    if (report.kind !== 'feedback-v1') throw new Error('Missing report fixture')
+    const body = Object.fromEntries(
+      Object.entries(report.body).reverse(),
+    ) as typeof report.body
+    body.summary = '  registered export original bytes  '
+    archive.payloads[archive.payloads.indexOf(report)] = await makeNotesPayload(
+      'feedback-v1',
+      body,
+      report.id,
+    )
+    backgroundMocks.backupExportFullBackup.mockResolvedValue({
+      ...validBackup,
+      notesArchive: archive,
+    })
+    const result = (await exportTransferFixture()) as typeof validBackup
+    await assertArchiveReferences(result.notesArchive, ['two-sum'])
+    expect(
+      JSON.stringify(
+        result.notesArchive.payloads.find((row) => row.id === report.id)!.body,
+      ),
+    ).toBe(JSON.stringify(body))
+  })
+
+  it('registers backup export handling with dashboard policy', async () => {
+    const response = await exportTransferFixture()
+
+    expectRuntimePolicy('backup.beginTransfer', 'dashboard')
     expect(backgroundMocks.backupExportFullBackup).toHaveBeenCalledWith(
       backgroundMocks.db,
     )
@@ -2629,17 +3031,14 @@ describe('background handler registration', () => {
   })
 
   it('registers backup validation without flushing the snapshot', async () => {
-    const response = await sendRuntimeMessage('backup.validateFullBackup', {
-      surface: 'dashboard',
-      backup: validBackup,
-    })
+    const response = (await previewTransferFixture(validBackup)).preview
 
-    expectRuntimePolicy('backup.validateFullBackup', 'dashboard')
+    expectRuntimePolicy('backup.finishTransfer', 'dashboard')
     expect(backgroundMocks.backupValidateFullBackup).toHaveBeenCalledWith(
       validBackup,
     )
     expect(backgroundMocks.flushDbSnapshot).not.toHaveBeenCalled()
-    expect(backupSummarySchema.parse(response).counts.problems).toBe(
+    expect(backupRestorePreviewSchema.parse(response).counts.problems).toBe(
       validBackupSummary.counts.problems,
     )
   })
@@ -2651,25 +3050,25 @@ describe('background handler registration', () => {
       schemaVersion: backupSchemaVersion + 1,
     }
 
-    const response = await sendRuntimeMessage('backup.validateFullBackup', {
-      surface: 'dashboard',
-      backup: mismatchedBackup,
-    })
+    const response = (await previewTransferFixture(mismatchedBackup)).preview
 
-    expectRuntimePolicy('backup.validateFullBackup', 'dashboard')
+    expectRuntimePolicy('backup.finishTransfer', 'dashboard')
     expect(backgroundMocks.backupValidateFullBackup).toHaveBeenCalledWith(
       mismatchedBackup,
     )
-    expect(response).toEqual(validBackupSummary)
+    expect(response).toEqual({
+      ...validBackupSummary,
+      confirmationToken: 'a3e4bc9c-f233-4abc-b00c-026758671151',
+      sourceSchemaVersion: backupSchemaVersion + 1,
+      archiveAbsent: false,
+      removesCurrentArchive: false,
+    })
   })
 
   it('registers restore handling with snapshot flush and broad invalidation', async () => {
-    const response = await sendRuntimeMessage('backup.restoreFullBackup', {
-      surface: 'dashboard',
-      backup: validBackup,
-    })
+    const response = await restoreTransferFixture(validBackup)
 
-    expectRuntimePolicy('backup.restoreFullBackup', 'dashboard')
+    expectRuntimePolicy('backup.finishTransfer', 'dashboard')
     expect(backgroundMocks.backupRestoreFullBackup).toHaveBeenCalledWith(
       backgroundMocks.db,
       { data: validBackup.data, summary: validBackupSummary },
@@ -2688,6 +3087,8 @@ describe('background handler registration', () => {
         'settings',
         'genai',
         'problems',
+        'notes',
+        'submissions',
         'practice',
         'queue',
         'tracks',
@@ -2696,6 +3097,213 @@ describe('background handler registration', () => {
     })
     expectFlushBeforeBroadcast()
   })
+
+  it('authenticates strict transfer methods and disabled object routes before any storage access', async () => {
+    await enableTransferStore()
+    const storage = vi.spyOn(transferLocalOverride!, 'transact')
+    const actual =
+      await vi.importActual<typeof import('./runtime-policy')>(
+        './runtime-policy',
+      )
+    backgroundMocks.assertCanSenderCallExtensionMethod.mockImplementation(
+      actual.assertCanSenderCallExtensionMethod,
+    )
+    registerBackgroundHandlers()
+    storage.mockClear()
+    const handle = {
+      sessionId: crypto.randomUUID(),
+      ownerToken: crypto.randomUUID(),
+    }
+    const cases = [
+      [
+        'backup.beginTransfer',
+        { direction: 'import', requestId: crypto.randomUUID() },
+      ],
+      ['backup.readTransferChunk', { ...handle, sequence: 0 }],
+      ['backup.appendTransferChunk', { ...handle, sequence: 0, text: '{}' }],
+      [
+        'backup.finishTransfer',
+        { ...handle, chunks: 1, digest: '0'.repeat(64) },
+      ],
+      ['backup.cancelTransfer', handle],
+    ] as const
+    for (const [method, payload] of cases) {
+      const handler = backgroundMocks.handlers.get(method)!
+      expect(() =>
+        handler({
+          data: { surface: 'dashboard', ...payload, callerOwner: 'forged' },
+          sender: extensionSender,
+        }),
+      ).toThrow()
+      expect(() =>
+        handler({
+          data: { surface: 'dashboard', ...payload },
+          sender: {
+            url: 'https://leetcode.com/problems/two-sum/',
+            tab: { id: 1 },
+            documentId: 'bad',
+          },
+        }),
+      ).toThrow(/cannot claim/)
+      expect(() =>
+        handler({
+          data: { surface: 'dashboard', ...payload },
+          sender: { url: extensionSender.url },
+        }),
+      ).toThrow(/document identity/)
+    }
+    for (const [method, payload] of [
+      ['backup.exportFullBackup', {}],
+      ['backup.validateFullBackup', { backup: validBackup }],
+      [
+        'backup.restoreFullBackup',
+        { backup: validBackup, confirmationToken: crypto.randomUUID() },
+      ],
+    ] as const)
+      expect(() =>
+        backgroundMocks.handlers.get(method)!({
+          data: { surface: 'dashboard', ...payload },
+          sender: extensionSender,
+        }),
+      ).toThrow(/not allowed/)
+    expect(storage).not.toHaveBeenCalled()
+    expect(backgroundMocks.getAppDb).not.toHaveBeenCalled()
+  })
+  it('binds transfer input, preview, finish, read and explicit resume to the actual dashboard document and capability', async () => {
+    const selected = await previewTransferFixture(validBackup)
+    const handlers = new Map(backgroundMocks.handlers)
+    const forged = {
+      ...extensionSender,
+      documentId: 'different-dashboard-document',
+    }
+    const finishes = () =>
+      handlers.get('backup.finishTransfer')!({
+        data: {
+          surface: 'dashboard',
+          ...selected.finish,
+          confirmationToken: selected.preview.confirmationToken,
+        },
+        sender: forged,
+      })
+    await expect(finishes()).rejects.toThrow(/owner/i)
+    await expect(
+      handlers.get('backup.beginTransfer')!({
+        data: {
+          surface: 'dashboard',
+          direction: 'import',
+          requestId: crypto.randomUUID(),
+          resume: {
+            sessionId: selected.finish.sessionId,
+            ownerToken: selected.finish.ownerToken,
+          },
+        },
+        sender: forged,
+      }),
+    ).rejects.toThrow(/owner/i)
+    await expect(
+      handlers.get('backup.cancelTransfer')!({
+        data: {
+          surface: 'dashboard',
+          sessionId: selected.finish.sessionId,
+          ownerToken: crypto.randomUUID(),
+        },
+        sender: extensionSender,
+      }),
+    ).rejects.toThrow(/owner/i)
+    await expect(
+      handlers.get('backup.readTransferChunk')!({
+        data: {
+          surface: 'dashboard',
+          sessionId: selected.finish.sessionId,
+          ownerToken: selected.finish.ownerToken,
+          sequence: 0,
+        },
+        sender: forged,
+      }),
+    ).rejects.toThrow(/owner/i)
+    expect(backgroundMocks.backupRestoreFullBackup).not.toHaveBeenCalled()
+    await selected.message('backup.finishTransfer', {
+      surface: 'dashboard',
+      ...selected.finish,
+      confirmationToken: selected.preview.confirmationToken,
+    })
+    expect(backgroundMocks.backupRestoreFullBackup).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['persistence', 'metadata'] as const)(
+    'completes transfer receipts after generic Retry saving settles %s without applying SQL again',
+    async (failure) => {
+      const selected = await previewTransferFixture(validBackup)
+      const token = selected.preview.confirmationToken
+      if (failure === 'persistence')
+        backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+          new Error('disk down'),
+        )
+      else
+        backgroundMocks.markSyncLocalDataChanged
+          .mockResolvedValueOnce(dirtySyncMetadata)
+          .mockRejectedValueOnce(new Error('metadata down'))
+      const first = await selected.message('backup.finishTransfer', {
+        surface: 'dashboard',
+        ...selected.finish,
+        confirmationToken: token,
+      })
+      expect(first).toMatchObject(
+        failure === 'persistence'
+          ? { status: 'persistence-pending' }
+          : { status: 'durable', syncMetadataPending: true },
+      )
+      const local = transferLocalOverride!
+      const inputDigest = 'a'.repeat(64)
+      await local.writeTechnicalRecord(['backup-preview', token], {
+        inputDigest,
+        revision: 1,
+        sourceSchemaVersion: 7,
+        kind: 'restore',
+        sourceIdentity: JSON.stringify([
+          'dashboard-transfer',
+          extensionSender.documentId,
+          selected.finish.sessionId,
+        ]),
+      })
+      await local.writeTechnicalRecord(['replacement-command', token], {
+        commandId: token,
+        kind: 'restore',
+        requestFingerprint: JSON.stringify(['restore', inputDigest]),
+        status: 'committed',
+      })
+      const recovered = await selected.message(
+        'backup.retryPendingReplacement',
+        { surface: 'dashboard' },
+      )
+      expect(recovered).toMatchObject({
+        status: 'durable',
+        syncMetadataPending: false,
+      })
+      const key = ['backup-transfer-session', selected.finish.sessionId]
+      expect(await local.readRecord(key)).toMatchObject({
+        status: 'complete',
+        confirmationToken: token,
+      })
+      await local.transact(['records'], 'readwrite', (stores, done) => {
+        for (let index = 0; index < selected.finish.chunks; index++)
+          stores.records.delete([
+            'backup-transfer-chunk',
+            selected.finish.sessionId,
+            index,
+          ])
+        done(undefined)
+      })
+      expect(
+        await selected.message('backup.finishTransfer', {
+          surface: 'dashboard',
+          ...selected.finish,
+          confirmationToken: token,
+        }),
+      ).toMatchObject({ status: 'durable', syncMetadataPending: false })
+      expect(backgroundMocks.backupRestoreFullBackup).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it('registers local reset handling with snapshot flush and broad invalidation', async () => {
     const response = await sendRuntimeMessage('backup.resetLocalData', {
@@ -2720,6 +3328,8 @@ describe('background handler registration', () => {
         'settings',
         'genai',
         'problems',
+        'notes',
+        'submissions',
         'practice',
         'queue',
         'tracks',
@@ -2762,12 +3372,17 @@ describe('background handler registration', () => {
   })
 
   it('blocks writes, exports, imports and sync until authenticated retry saves the replacement', async () => {
-    const restore = readRegisteredHandler('backup.restoreFullBackup')
+    const selected = await previewTransferFixture(validBackup)
     const handlers = new Map(backgroundMocks.handlers)
+    const restore = handlers.get('backup.finishTransfer')!
     backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(new Error('disk'))
     expect(
       await restore({
-        data: { surface: 'dashboard', backup: validBackup },
+        data: {
+          surface: 'dashboard',
+          ...selected.finish,
+          confirmationToken: 'a3e4bc9c-f233-4abc-b00c-026758671151',
+        },
         sender: extensionSender,
       }),
     ).toMatchObject({ status: 'persistence-pending' })
@@ -2777,12 +3392,19 @@ describe('background handler registration', () => {
     ).toMatchObject({ status: 'persistence-pending', kind: 'restore' })
     expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
     const rejected = [
-      ['backup.exportFullBackup', { surface: 'dashboard' }],
-      ['backup.resetLocalData', { surface: 'dashboard' }],
       [
-        'backup.restoreFullBackup',
-        { surface: 'dashboard', backup: validBackup },
+        'backup.beginTransfer',
+        {
+          surface: 'dashboard',
+          direction: 'export',
+          requestId: crypto.randomUUID(),
+        },
       ],
+      [
+        'backup.resetLocalData',
+        { surface: 'dashboard', commandId: 'queued-reset' },
+      ],
+      ['backup.finishTransfer', { surface: 'dashboard', ...selected.finish }],
       ['settings.toggleStudyMode', { surface: 'dashboard' }],
       ['imports.preview', { surface: 'dashboard', fileText: '{}' }],
       [
@@ -2818,13 +3440,9 @@ describe('background handler registration', () => {
   })
 
   it('validates detached input and persists a strict dirty marker before destructive commit', async () => {
-    const restore = readRegisteredHandler('backup.restoreFullBackup')
-    await expect(
-      restore({
-        data: { surface: 'dashboard', backup: { bad: true } },
-        sender: extensionSender,
-      }),
-    ).rejects.toThrow()
+    await expect(restoreTransferFixture({ bad: true })).rejects.toThrow()
+    const selected = await previewTransferFixture(validBackup)
+    const restore = backgroundMocks.handlers.get('backup.finishTransfer')!
     expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
     expect(backgroundMocks.backupRestoreFullBackup).not.toHaveBeenCalled()
     backgroundMocks.markSyncLocalDataChanged.mockRejectedValueOnce(
@@ -2832,7 +3450,11 @@ describe('background handler registration', () => {
     )
     await expect(
       restore({
-        data: { surface: 'dashboard', backup: validBackup },
+        data: {
+          surface: 'dashboard',
+          ...selected.finish,
+          confirmationToken: 'a3e4bc9c-f233-4abc-b00c-026758671151',
+        },
         sender: extensionSender,
       }),
     ).rejects.toThrow('metadata down')
@@ -2843,7 +3465,11 @@ describe('background handler registration', () => {
     )
     await expect(
       restore({
-        data: { surface: 'dashboard', backup: validBackup },
+        data: {
+          surface: 'dashboard',
+          ...selected.finish,
+          confirmationToken: 'a3e4bc9c-f233-4abc-b00c-026758671151',
+        },
         sender: extensionSender,
       }),
     ).rejects.toThrow('rollback')
@@ -2863,6 +3489,7 @@ describe('background handler registration', () => {
 
   it('rejects work already queued behind a replacement when its publication becomes pending', async () => {
     const flushGate = createDeferred<void>()
+    await enableTransferStore()
     const reset = readRegisteredHandler('backup.resetLocalData')
     const handlers = new Map(backgroundMocks.handlers)
     backgroundMocks.flushDbSnapshot.mockReturnValueOnce(flushGate.promise)
@@ -2874,8 +3501,12 @@ describe('background handler registration', () => {
       expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1),
     )
     const queued = [
-      handlers.get('backup.exportFullBackup')!({
-        data: { surface: 'dashboard' },
+      handlers.get('backup.beginTransfer')!({
+        data: {
+          surface: 'dashboard',
+          direction: 'export',
+          requestId: crypto.randomUUID(),
+        },
         sender: extensionSender,
       }),
       handlers.get('settings.toggleStudyMode')!({
@@ -2916,7 +3547,10 @@ describe('background handler registration', () => {
       .mockResolvedValueOnce(dirtySyncMetadata)
       .mockRejectedValueOnce(new Error('metadata down'))
     expect(
-      await reset({ data: { surface: 'dashboard' }, sender: extensionSender }),
+      await reset({
+        data: { surface: 'dashboard', commandId: 'accepted-clear' },
+        sender: extensionSender,
+      }),
     ).toEqual({
       status: 'durable',
       syncMetadataPending: true,
@@ -2943,6 +3577,7 @@ describe('background handler registration', () => {
   it.each(['restore', 'reset', 'gist-pull'] as const)(
     'clears obsolete import persistence only after accepted %s commit',
     async (kind) => {
+      await enableTransferStore()
       registerBackgroundHandlers()
       const handlers = new Map(backgroundMocks.handlers)
       const message = (method: string, data: unknown) =>
@@ -2961,28 +3596,29 @@ describe('background handler registration', () => {
         backgroundMocks.syncService.pullLatest.mockImplementationOnce(
           async () => {
             const options = readLatestSyncFactoryOptions()
-            await options.runRemoteRestore(() =>
-              options.runReplacement({
-                kind,
-                commit: () => Promise.resolve(validBackupSummary),
-                flush: backgroundMocks.flushDbSnapshot,
-                onDurable: () => Promise.resolve(),
-                finishSyncMetadata: () => Promise.resolve(),
-              }),
+            await options.runRemoteRestore(async () =>
+              options.runFullBackupReplacement(
+                (await backgroundMocks.backupPrepareFullBackupRestore(
+                  validBackup,
+                )) as PreparedBackupRestore,
+                {
+                  flush: backgroundMocks.flushDbSnapshot,
+                  onDurable: () => Promise.resolve(),
+                  finishSyncMetadata: () => Promise.resolve(),
+                },
+              ),
             )
             return syncActionResult
           },
         )
         await message('sync.pullLatest', { surface: 'dashboard' })
+      } else if (kind === 'restore') {
+        await restoreTransferFixture(validBackup, message)
       } else {
-        await message(
-          kind === 'restore'
-            ? 'backup.restoreFullBackup'
-            : 'backup.resetLocalData',
-          kind === 'restore'
-            ? { surface: 'dashboard', backup: validBackup }
-            : { surface: 'dashboard' },
-        )
+        await message('backup.resetLocalData', {
+          surface: 'dashboard',
+          commandId: 'accepted-clear',
+        })
       }
       const flushCount = backgroundMocks.flushDbSnapshot.mock.calls.length
       expect(
@@ -3007,7 +3643,10 @@ describe('background handler registration', () => {
       new Error('rollback'),
     )
     await expect(
-      message('backup.resetLocalData', { surface: 'dashboard' }),
+      message('backup.resetLocalData', {
+        surface: 'dashboard',
+        commandId: 'reset-operation',
+      }),
     ).rejects.toThrow('rollback')
     expect(
       await message('imports.retryPersistence', { surface: 'dashboard' }),
@@ -3123,20 +3762,23 @@ describe('background handler registration', () => {
     const metadataStarted = vi.fn()
     backgroundMocks.syncService.pullLatest.mockImplementationOnce(async () => {
       const options = readLatestSyncFactoryOptions()
-      await options.runRemoteRestore(() =>
-        options.runReplacement({
-          kind: 'gist-pull',
-          commit: () => Promise.resolve(validBackupSummary),
-          flush: backgroundMocks.flushDbSnapshot,
-          onDurable: () => Promise.resolve(),
-          finishSyncMetadata: async () => {
-            metadataStarted()
-            await finishGate.promise
-            await backgroundMocks.writeSyncMetadata({
-              dirtySinceLastSync: false,
-            })
+      await options.runRemoteRestore(async () =>
+        options.runFullBackupReplacement(
+          (await backgroundMocks.backupPrepareFullBackupRestore(
+            validBackup,
+          )) as PreparedBackupRestore,
+          {
+            flush: backgroundMocks.flushDbSnapshot,
+            onDurable: () => Promise.resolve(),
+            finishSyncMetadata: async () => {
+              metadataStarted()
+              await finishGate.promise
+              await backgroundMocks.writeSyncMetadata({
+                dirtySinceLastSync: false,
+              })
+            },
           },
-        }),
+        ),
       )
       return syncActionResult
     })
@@ -3205,7 +3847,6 @@ describe('background handler registration', () => {
       readMetadata: () => Promise.resolve(persisted),
       writeMetadata: (patch) => Promise.resolve({ ...persisted, ...patch }),
       exportFullBackup: () => Promise.resolve(validBackup),
-      restoreBackup: restore,
       flushDbSnapshot: () => Promise.resolve(),
       broadcastInvalidation: () => Promise.resolve(),
       runReplacement: reopened.run,
@@ -3644,9 +4285,7 @@ describe('background handler registration', () => {
       backgroundMocks.syncAutoSync.scheduleAutoPushAfterMutation,
     ).not.toHaveBeenCalled()
 
-    await sendRuntimeMessage('backup.exportFullBackup', {
-      surface: 'dashboard',
-    })
+    await exportTransferFixture()
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenCalledWith({
       problemSlug: 'two-sum',
       reason: 'practice-updated',
@@ -3674,6 +4313,7 @@ describe('background handler registration', () => {
   })
 
   it('protects a pending review from automatic remote replacement and recovers publication before sync admission', async () => {
+    vi.stubGlobal('indexedDB', undefined)
     const { createTestDb } = await import('@/platform/db/test-db')
     const { preparePracticeStorage } =
       await import('@/features/practice/server/practice-storage-service')
@@ -3756,10 +4396,12 @@ describe('background handler registration', () => {
         readMetadata: syncMetadata.readSyncMetadata,
         writeMetadata: syncMetadata.writeSyncMetadata,
         exportFullBackup: () => backup.exportFullBackup(handle.db),
-        restoreBackup,
         flushDbSnapshot: backgroundMocks.flushDbSnapshot,
         broadcastInvalidation: () => Promise.resolve(),
-        ...readLatestSyncFactoryOptions(),
+        runRemoteRestore: readLatestSyncFactoryOptions().runRemoteRestore,
+        runReplacement: readLatestSyncFactoryOptions().runReplacement,
+        runFullBackupReplacement:
+          readLatestSyncFactoryOptions().runFullBackupReplacement,
         syncCoordinator: createSyncOperationCoordinator(),
         now: () => new Date(),
       })
@@ -3818,6 +4460,7 @@ describe('background handler registration', () => {
   })
 
   it('persists review dirty intent before publication so a fresh sync worker protects a saved review while invalidation stalls', async () => {
+    vi.stubGlobal('indexedDB', undefined)
     const metadata = await vi.importActual<
       typeof import('@/features/sync/data/sync-metadata-store')
     >('@/features/sync/data/sync-metadata-store')
@@ -3869,7 +4512,6 @@ describe('background handler registration', () => {
         readMetadata: metadata.readSyncMetadata,
         writeMetadata: metadata.writeSyncMetadata,
         exportFullBackup: () => Promise.resolve(validBackup),
-        restoreBackup,
         flushDbSnapshot: () => Promise.resolve(),
         broadcastInvalidation: () => Promise.resolve(),
         runReplacement: createBackupReplacementCoordinator().run,
@@ -4131,13 +4773,121 @@ describe('background handler serializers', () => {
   })
 })
 
+type TransferInvoke = (method: string, data: unknown) => unknown
+async function enableTransferStore() {
+  vi.useRealTimers()
+  if (!transferLocalOverride) {
+    const actual = await vi.importActual<
+      typeof import('@/platform/db/local-idb')
+    >('@/platform/db/local-idb')
+    transferLocalOverride = actual.createLocalIdbStore(
+      new IDBFactory(),
+      'handler-transfer',
+    )
+  }
+}
+async function transferInvoker(): Promise<TransferInvoke> {
+  await enableTransferStore()
+  registerBackgroundHandlers()
+  const handlers = new Map(backgroundMocks.handlers)
+  return (method, data) =>
+    handlers.get(method)!({ data, sender: extensionSender })
+}
+async function previewTransferFixture(
+  backup: unknown,
+  invoke?: TransferInvoke,
+) {
+  const message = invoke ?? (await transferInvoker())
+  const session = (await message('backup.beginTransfer', {
+    surface: 'dashboard',
+    direction: 'import',
+    requestId: crypto.randomUUID(),
+  })) as TransferSession
+  const text = JSON.stringify(backup)
+  let chunks = 0
+  for (const part of splitUtf8Text(text))
+    await message('backup.appendTransferChunk', {
+      surface: 'dashboard',
+      sessionId: session.sessionId,
+      ownerToken: session.ownerToken,
+      sequence: chunks++,
+      text: part,
+    })
+  const finish = {
+    sessionId: session.sessionId,
+    ownerToken: session.ownerToken,
+    chunks,
+    digest: await transferDigest(text),
+  }
+  const preview = backupRestorePreviewSchema.parse(
+    await message('backup.finishTransfer', { surface: 'dashboard', ...finish }),
+  )
+  return { finish, preview, message }
+}
+async function restoreTransferFixture(
+  backup: unknown,
+  invoke?: TransferInvoke,
+) {
+  const selected = await previewTransferFixture(backup, invoke)
+  return selected.message('backup.finishTransfer', {
+    surface: 'dashboard',
+    ...selected.finish,
+    confirmationToken: selected.preview.confirmationToken,
+  })
+}
+async function exportTransferFixture() {
+  const message = await transferInvoker()
+  const session = (await message('backup.beginTransfer', {
+    surface: 'dashboard',
+    direction: 'export',
+    requestId: crypto.randomUUID(),
+  })) as TransferSession
+  let text = ''
+  for (let sequence = 0; sequence < session.nextSequence; sequence++) {
+    const chunk = (await message('backup.readTransferChunk', {
+      surface: 'dashboard',
+      sessionId: session.sessionId,
+      ownerToken: session.ownerToken,
+      sequence,
+    })) as { text: string }
+    expect(new TextEncoder().encode(chunk.text).length).toBeLessThanOrEqual(
+      262144,
+    )
+    text += chunk.text
+  }
+  expect(await transferDigest(text)).toBe(session.digest)
+  await message('backup.cancelTransfer', {
+    surface: 'dashboard',
+    sessionId: session.sessionId,
+    ownerToken: session.ownerToken,
+  })
+  return JSON.parse(text) as unknown
+}
+
 function readRegisteredHandler(method: string) {
   registerBackgroundHandlers()
 
   const handler = backgroundMocks.handlers.get(method)
   expect(handler).toBeDefined()
 
-  return handler!
+  return (message: Parameters<NonNullable<typeof handler>>[0]) => {
+    if (
+      [
+        'backup.resetLocalData',
+        'problems.resetProblemData',
+        'problems.deleteProblem',
+        'problems.bulkDelete',
+        'practice.resetSchedule',
+      ].includes(method)
+    ) {
+      const data = message.data as Record<string, unknown>
+      return handler!({
+        ...message,
+        data: { commandId: crypto.randomUUID(), ...data },
+      })
+    }
+    return handler!(message)
+  }
 }
 
 function sendRuntimeMessage(
@@ -4195,6 +4945,23 @@ function isSyncAutoSyncDeps(value: unknown): value is SyncAutoSyncDeps {
 }
 
 type SyncFactoryOptions = {
+  previewRemoteRestore: NonNullable<
+    import('@/features/sync/server/sync-service').SyncServiceDependencies['previewRemoteRestore']
+  >
+  reconcileRemoteRestore: NonNullable<
+    import('@/features/sync/server/sync-service').SyncServiceDependencies['reconcileRemoteRestore']
+  >
+  exportFullBackup: () => Promise<{ backup: BackupFile; revision: number }>
+  runFullBackupReplacement: (
+    prepared: import('@/features/backup/domain/backup-preflight').PreparedBackupRestore,
+    continuations: Omit<
+      import('@/features/backup/server/backup-replacement-work').BackupReplacementWork,
+      'kind' | 'commit'
+    >,
+    context?: import('@/features/sync/server/sync-service').RemoteRestoreContext,
+  ) => Promise<
+    import('@/features/backup/api/backup-contracts').BackupReplacementResult
+  >
   runRemoteRestore: <T>(
     work: () => Promise<T>,
     context?: { confirmLocalOverwrite?: boolean },
@@ -4313,7 +5080,8 @@ async function waitUntil(assertion: () => void) {
       return
     } catch (error) {
       lastError = error
-      await Promise.resolve()
+      if (vi.isFakeTimers()) await Promise.resolve()
+      else await new Promise((resolve) => setTimeout(resolve, 0))
     }
   }
 
@@ -4529,6 +5297,7 @@ const dirtySyncMetadata = {
 }
 const validBackup = backupFileSchema.parse({
   schemaVersion: backupSchemaVersion,
+  notesArchive: emptyNotesArchive(),
   app: 'cognipace',
   exportedAt: backupTimestamp,
   source: { appVersion: '0.0.0' },

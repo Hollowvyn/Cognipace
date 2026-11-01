@@ -26,6 +26,7 @@ interface DashboardSyncActionsViewProps {
   isPending: boolean
   onPullLatest: (options?: {
     confirmLocalOverwrite?: boolean
+    confirmationToken?: string
   }) => DashboardSyncActionResult
   onPushLocal: (options: {
     confirmRemoteOverwrite: boolean
@@ -65,13 +66,17 @@ export function DashboardSyncActionsView({
   async function handlePullLatest(
     confirmLocalOverwrite = false,
     options: { clearDialog?: boolean } = {},
+    confirmationToken?: string,
   ) {
     if (options.clearDialog !== false) {
       setDialog(null)
     }
 
     try {
-      const result = await onPullLatest({ confirmLocalOverwrite })
+      const result = await onPullLatest({
+        confirmLocalOverwrite,
+        ...(confirmationToken ? { confirmationToken } : {}),
+      })
       setDialog(createSyncActionDialogState(result, 'Pulled latest from Gist.'))
     } catch (error) {
       setDialog(
@@ -131,8 +136,12 @@ export function DashboardSyncActionsView({
           onClose={() => {
             setDialog(null)
           }}
-          onForcePull={() => {
-            void handlePullLatest(true, { clearDialog: false })
+          onForcePull={(preview) => {
+            void handlePullLatest(
+              true,
+              { clearDialog: false },
+              preview?.confirmationToken,
+            )
           }}
           onForcePush={() => {
             void handlePushLocal(true, { clearDialog: false })

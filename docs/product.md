@@ -93,7 +93,7 @@ Current behavior:
   next-step guidance in Solve; the full review footer appears only in Solve
 - existing completed-submission analysis in AI, with loading, error, unavailable,
   and disabled explanations plus Settings and Retry where useful
-- a reserved Notes placeholder without editing or persistence
+- a reserved Notes placeholder without editor or new submission/archive capture
 - settings access from the overlay
 - compact expanded-mode Help access that opens a YouTube search for the current problem in a new tab
 - an explicit AI hints action beside YouTube in Solve's Help row, using the
@@ -120,7 +120,8 @@ Current behavior:
 
 Hints exist only in the current overlay session. They never write review/log
 fields, rating, solve time, FSRS, Analytics, backup, or sync data. Notes remains
-a reserved, deferred tab without editing or persistence.
+a reserved, deferred editor tab. Phase 1 archive infrastructure is implemented;
+imported/restored archives persist locally, while new capture and editing remain off.
 
 Missing, ambiguous or oversized editor capture shows a retryable unavailable
 state rather than using visible lines or generating generic problem-only advice.
@@ -173,8 +174,9 @@ Suggested code is labeled AI-generated and Untested, with Copy feedback and
 complexity assumptions. CogniPace never executes or submits that code. A
 report may explain why no responsible implementation is available.
 
-Analysis remains in overlay session state: no report database, query-cache
-entry, export, sync payload, or analytics score. Saving a review stays immediate
+New live analysis remains in overlay session state: it does not write the archive,
+query cache, export, sync payload, or Analytics. Imported/restored saved analysis
+is durable archive data and is included in full v7 exports and manual Gist uploads. Saving a review stays immediate
 while analysis is pending. AI never selects or changes recall rating,
 correctness, solve time, FSRS scheduling, or track progress, and report arrival
 causes no review write. The former AI recall-rating override has been retired.
@@ -228,16 +230,19 @@ Current behavior:
   order and placements, and practice progress. Missing, null, and empty
   optional data does not clear local content. See the
   [content format reference](import-format.md) for the v1 contract.
-- Full backups export version 6 and accept supported versions 1–6. Restore
-  preserves recorded history and scheduling evidence; older backups explicitly
-  retain unknown historical configuration. Existing due dates and progress are
-  not recalculated by restore. Newly exported backups require an updated client.
-  If replacement still needs publication, Data Management shows Retry saving.
-  It finishes saving the already applied data rather than restoring again. If
-  data is saved but sync bookkeeping failed, the same action retries only sync
-  status. Further writes, imports, exports and sync wait for recovery. The
-  selected restore draft remains available while pending; Settings reload can
-  show recovery while the same background worker remains alive.
+- Full backups export version 7 and accept supported versions 1–7 through
+  frozen legacy readers. The active reachable archive includes problem notes,
+  submission code and reflections, assessment feedback and implementations,
+  and saved AI inclusions. Prompts, raw provider responses and secrets are excluded.
+  Existing v6 Practice profiles, evidence, generations and command receipts remain
+  in the format; restore creates fresh effective write generations. Versions 1–6
+  contain no archive: preview explicitly warns when restore will remove current
+  archive data, and confirmation is bound to the selected source and local revision.
+  Review dates and scheduling evidence are preserved without replaying history.
+- Reset, delete, Clear local data and restore publish a paired core/archive head
+  atomically. Retry saving and worker restart resume accepted publication or
+  bookkeeping without reapplying the operation. One prior local pair is retained
+  for recovery; resets change active data and do not promise secure erasure.
 - The dashboard header shows compact pull and push shortcuts after GitHub Gist
   sync is configured.
 - Analytics shows four selected-period activity totals and ten local evidence
@@ -950,22 +955,19 @@ token form with a local-date CogniPace name, no expiration, and only Gists
 write access prefilled. Gists write includes the read access needed for pull
 actions.
 
-Local writes always save locally first, mark data as needing push, and schedule a
-safe background push through Chrome alarms. Opening popup, dashboard, or overlay
-surfaces performs a safe remote check and clean-pulls changed Gist data only
-when local data has no unpushed changes.
+Local writes save locally first and retain pending-change metadata. The current
+Gist adapter cannot verify a complete backup (`verifiedFullBackup: false`).
+Automatic uploads pause with action-needed guidance and do not run an upload
+retry loop. Explicit Push local is best effort and reports an unverified upload;
+it does not clear pending local changes or claim a verified complete remote backup.
+This complete-remote-backup capability remains unmet for Notes release.
 
-Automatic sync never force-overwrites local data or the Gist. Dirty local data
-blocks automatic pull, changed remote data blocks automatic push, and manual
-force pull or force push remains the recovery path after confirmation. Manual
-action feedback is shown in dialogs so the direction and result of the operation
-stay clear. Retryable sync failures do not roll back local saves.
-
-Settings is the setup and recovery surface; once sync is configured, the
-dashboard header also provides compact shortcuts for quick pull and push actions
-with the same force-pull and force-push confirmation rules. Pausing auto-sync
-only stops automatic open-check and mutation-triggered sync behavior; manual
-pull and push actions continue to work from Settings and the dashboard header.
+Safe remote checks retain dirty-local and changed-remote overwrite guards.
+Manual force pull/push requires confirmation. A v1–v6 remote backup previews its
+absent archive and requires a source-bound confirmation before replacing an
+existing archive. Changed remote identity or local data requires a fresh preview.
+Settings owns setup and recovery; dashboard header shortcuts share the same rules.
+Pausing auto-sync leaves manual directional actions available.
 
 GitHub tokens are stored in trusted `chrome.storage.local` extension storage and
 are only read by the background service worker. Tokens are not included in

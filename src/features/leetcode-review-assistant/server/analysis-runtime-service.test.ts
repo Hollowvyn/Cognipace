@@ -339,3 +339,19 @@ it('accepts a complete assessment after the previous 30 second deadline', async 
   await vi.advanceTimersByTimeAsync(35000)
   expect(await pending).toMatchObject({ status: 'ready' })
 })
+
+it('reacquires the adopted core before post-provider configuration validation', async () => {
+  const adopted = { kind: 'adopted-db' } as unknown as Db
+  loadDb.mockResolvedValueOnce(db).mockResolvedValueOnce(adopted)
+  loadConfig.mockImplementation((current) =>
+    Promise.resolve(
+      current === adopted ? { ...snapshot, identity: 'changed' } : snapshot,
+    ),
+  )
+  expect(await runAnalysis()).toMatchObject({
+    status: 'error',
+    code: 'stale-configuration',
+  })
+  expect(loadConfig).toHaveBeenLastCalledWith(adopted)
+  expect(analyzeMock).toHaveBeenCalledTimes(1)
+})

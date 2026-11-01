@@ -2,14 +2,27 @@ import type { ExtensionSurface } from '@/extension/messaging'
 import { isLeetCodeHost, parseLeetCodeProblemLocation } from '@/lib/leetcode'
 
 const methodSurfaceAccess = {
+  'notes.getArchiveUsage': ['dashboard'],
+  'notes.openEditor': ['dashboard', 'content-script'],
+  'notes.saveDocument': ['dashboard', 'content-script'],
+  'notes.getProblemNotes': ['dashboard', 'content-script'],
+  'notes.listSubmissions': ['dashboard', 'content-script'],
+  'notes.getSubmission': ['dashboard', 'content-script'],
+  'notes.getAssessment': ['dashboard', 'content-script'],
+  'notes.setSavedAiNote': ['dashboard', 'content-script'],
   'analytics.getSummary': ['dashboard'],
   'cache.invalidate': ['background'],
   'runtime.ping': ['background', 'popup', 'dashboard', 'content-script'],
   'app.getShellData': ['popup', 'dashboard', 'content-script'],
   'app.openDashboard': ['content-script'],
-  'backup.exportFullBackup': ['dashboard'],
-  'backup.validateFullBackup': ['dashboard'],
-  'backup.restoreFullBackup': ['dashboard'],
+  'backup.beginTransfer': ['dashboard'],
+  'backup.readTransferChunk': ['dashboard'],
+  'backup.appendTransferChunk': ['dashboard'],
+  'backup.finishTransfer': ['dashboard'],
+  'backup.cancelTransfer': ['dashboard'],
+  'backup.exportFullBackup': [],
+  'backup.validateFullBackup': [],
+  'backup.restoreFullBackup': [],
   'backup.resetLocalData': ['dashboard'],
   'backup.getPendingReplacement': ['dashboard'],
   'backup.retryPendingReplacement': ['dashboard'],
@@ -45,6 +58,7 @@ const methodSurfaceAccess = {
   'problems.getProblemForEdit': ['dashboard'],
   'problems.createProblem': ['dashboard'],
   'problems.updateProblem': ['dashboard'],
+  'problems.resetProblemData': ['dashboard'],
   'problems.deleteProblem': ['dashboard'],
   'problems.bulkUpdateProblems': ['dashboard'],
   'problems.bulkDelete': ['dashboard'],
@@ -231,4 +245,33 @@ function readUrl(value: string) {
   } catch {
     return null
   }
+}
+
+export function assertNotesProblemSender(sender: unknown, problemSlug: string) {
+  const url = readMessageSender(sender).url
+  const actual = url ? readUrl(url) : null
+  if (
+    !actual ||
+    actual.protocol !== 'https:' ||
+    !isLeetCodeHost(actual.hostname) ||
+    parseLeetCodeProblemLocation(actual)?.slug !== problemSlug
+  )
+    throw new Error(
+      'Notes problem must match the actual HTTPS LeetCode sender page.',
+    )
+}
+
+/** Chrome supplies documentId even when an extension page has no sender.tab.
+ * Never substitute caller data, tab identity, or a shared extension origin. */
+export function backupTransferDocumentOwner(sender: unknown): string {
+  if (
+    !isRecord(sender) ||
+    typeof sender.documentId !== 'string' ||
+    !sender.documentId ||
+    getMessageSenderSurface(sender) !== 'dashboard'
+  )
+    throw new Error(
+      'Backup transfer requires an actual dashboard document identity.',
+    )
+  return sender.documentId
 }

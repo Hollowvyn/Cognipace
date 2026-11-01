@@ -13,7 +13,7 @@ const identityFields = {
   requestId: id,
   attemptId: id,
   submissionId: z.string().regex(/^\d+$/),
-  problemSlug: problemSlugSchema,
+  problemSlug: z.lazy(() => problemSlugSchema),
   configurationRevision: z.number().int().nonnegative(),
 }
 const diagnostic = z.string().max(2000).nullable()
@@ -23,7 +23,7 @@ export const analyzeLeetCodeSubmissionRequestSchema = z
     surface: z.literal('content-script'),
     ...identityFields,
     problem: z.strictObject({
-      slug: problemSlugSchema,
+      slug: z.lazy(() => problemSlugSchema),
       title: nonBlankString(300),
       difficulty: z.enum(['Easy', 'Medium', 'Hard', 'Unknown']),
       topics: z.array(z.string().max(120)).max(40),

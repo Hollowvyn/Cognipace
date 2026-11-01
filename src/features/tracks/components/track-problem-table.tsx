@@ -1,3 +1,4 @@
+import type { ProblemDataConfirmation } from '@/features/problems'
 import { ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import {
@@ -30,9 +31,11 @@ import type { TrackProblemRow } from '../api/tracks-contracts'
 import { TrackProblemRemoveAction } from './track-problem-remove-action'
 
 export function TrackProblemTable({
+  confirmation,
   renderEditProblemAction,
   rows,
 }: {
+  confirmation: ProblemDataConfirmation
   renderEditProblemAction: RenderProblemEditAction
   rows: readonly TrackProblemRow[]
 }) {
@@ -119,6 +122,7 @@ export function TrackProblemTable({
             {table.getRowModel().rows.map((row) => (
               <TrackProblemTableRow
                 key={row.id}
+                confirmation={confirmation}
                 renderEditProblemAction={renderEditProblemAction}
                 row={row}
               />
@@ -132,9 +136,11 @@ export function TrackProblemTable({
 }
 
 function TrackProblemTableRow({
+  confirmation,
   renderEditProblemAction,
   row,
 }: {
+  confirmation: ProblemDataConfirmation
   renderEditProblemAction: RenderProblemEditAction
   row: Row<TrackProblemRow>
 }) {
@@ -205,6 +211,7 @@ function TrackProblemTableRow({
                     }
                     disabled={isRemoving}
                     onPendingChange={setIsPracticePending}
+                    confirmation={confirmation}
                     renderEditProblemAction={renderEditProblemAction}
                     row={row.original}
                   />

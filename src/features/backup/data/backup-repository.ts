@@ -1,3 +1,4 @@
+import { assertArchiveReferences } from '@/features/notes/domain/archive-validation'
 import type { Db } from '@/platform/db'
 import {
   clearPracticeStorageDataInTransaction,
@@ -180,6 +181,11 @@ export async function clearAndRestoreBackupData(
 ) {
   const summary = backupSummarySchema.parse(prepared.summary)
   const backupData = prepareCurrentBackupData(prepared.data, summary.exportedAt)
+
+  await assertArchiveReferences(
+    prepared.notesArchive,
+    backupData.problems.map((row) => row.slug),
+  )
 
   await db.transaction(async (transactionDb) => {
     const tx = transactionDb as unknown as Db

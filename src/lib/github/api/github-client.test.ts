@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createHttpClient, type HttpClient } from '@/platform/http'
 
-import { createGitHubGistClient } from './github-client'
+import {
+  createGitHubGistClient,
+  githubGistBackupCapabilities,
+} from './github-client'
 
 describe('GitHub Gist client', () => {
   it('validates a token through the authenticated user endpoint', async () => {
@@ -308,3 +311,9 @@ async function captureError(action: () => Promise<unknown>): Promise<unknown> {
 
   throw new Error('Expected action to throw.')
 }
+
+it('advertises no complete backup verification for the PATCH-only Gist adapter', () => {
+  const client = createGitHubGistClient({ token: 'test-token' })
+  expect(githubGistBackupCapabilities.verifiedFullBackup).toBe(false)
+  expect(client.verifyCompleteBackup).toBeUndefined()
+})

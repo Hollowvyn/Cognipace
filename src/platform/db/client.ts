@@ -13,6 +13,7 @@ export type DbSchema = typeof schema
 export type Db = SqliteRemoteDatabase<DbSchema>
 
 export interface CreateDbOptions {
+  onMutation?: ((sql: string) => void) | null
   filename?: string
   migrationSql?: string
   locateWasm?: (file: string) => string
@@ -84,7 +85,7 @@ export async function createDb(
   }
 
   return {
-    db: drizzle(createProxyCallback(rawDb), { schema }),
+    db: drizzle(createProxyCallback(rawDb, options.onMutation), { schema }),
     rawDb,
     sqlite3,
   }

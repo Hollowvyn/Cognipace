@@ -1,3 +1,10 @@
+import type * as Transfer from '@/features/backup/api/backup-transfer-contracts'
+import type { BackupRestorePreview } from '@/features/backup/api/backup-contracts'
+import type {
+  NotesRequest,
+  NotesResult,
+} from '@/features/notes/api/notes-contracts'
+export { notesRuntimeSchemas } from '@/features/notes/api/notes-contracts'
 import type {
   GenerateLeetCodeImplementationRequest,
   GenerateLeetCodeImplementationResponse,
@@ -21,7 +28,7 @@ import type {
   BackupFile,
   BackupPayloadRequest,
   BackupRequest,
-  BackupSummary,
+  BackupResetRequest,
   BackupReplacementState,
   BackupReplacementResult,
 } from '@/features/backup/api/backup-contracts'
@@ -29,6 +36,7 @@ export {
   backupFileSchema,
   backupPayloadRequestSchema,
   backupRequestSchema,
+  backupResetRequestSchema,
   backupSummarySchema,
   backupReplacementStateSchema,
   backupReplacementResultSchema,
@@ -113,6 +121,7 @@ import {
   type ProblemForEditResponse,
   type ProblemLibraryResponse,
   type ProblemsBulkDeleteRequest,
+  type ProblemsResetProblemDataRequest,
   type ProblemsBulkUpdateProblemsRequest,
   type ProblemsCreateProblemRequest,
   type ProblemsDeleteProblemRequest,
@@ -128,6 +137,7 @@ export {
   problemForEditResponseSchema,
   problemLibraryResponseSchema,
   problemsBulkDeleteRequestSchema,
+  problemsResetProblemDataRequestSchema,
   problemsBulkUpdateProblemsRequestSchema,
   problemsCreateProblemRequestSchema,
   problemsDeleteProblemRequestSchema,
@@ -237,6 +247,8 @@ export const uiSurfaceSchema = z.enum(['popup', 'dashboard', 'content-script'])
 export type UiSurface = z.infer<typeof uiSurfaceSchema>
 
 export const cacheInvalidationReasonSchema = z.enum([
+  'notes-updated',
+  'submissions-updated',
   'practice-updated',
   'problem-catalog-updated',
   'settings-updated',
@@ -335,6 +347,30 @@ export type LeetCodeSubmissionResultRemoteRuntimeRequest = z.infer<
 >
 
 export interface ProtocolMap {
+  'notes.getArchiveUsage'(
+    request: NotesRequest<'notes.getArchiveUsage'>,
+  ): NotesResult<'notes.getArchiveUsage'>
+  'notes.openEditor'(
+    request: NotesRequest<'notes.openEditor'>,
+  ): NotesResult<'notes.openEditor'>
+  'notes.saveDocument'(
+    request: NotesRequest<'notes.saveDocument'>,
+  ): NotesResult<'notes.saveDocument'>
+  'notes.getProblemNotes'(
+    request: NotesRequest<'notes.getProblemNotes'>,
+  ): NotesResult<'notes.getProblemNotes'>
+  'notes.listSubmissions'(
+    request: NotesRequest<'notes.listSubmissions'>,
+  ): NotesResult<'notes.listSubmissions'>
+  'notes.getSubmission'(
+    request: NotesRequest<'notes.getSubmission'>,
+  ): NotesResult<'notes.getSubmission'>
+  'notes.getAssessment'(
+    request: NotesRequest<'notes.getAssessment'>,
+  ): NotesResult<'notes.getAssessment'>
+  'notes.setSavedAiNote'(
+    request: NotesRequest<'notes.setSavedAiNote'>,
+  ): NotesResult<'notes.setSavedAiNote'>
   'analytics.getSummary'(
     request: AnalyticsSummaryRequest,
   ): SerializedAnalyticsSummary
@@ -342,12 +378,29 @@ export interface ProtocolMap {
   'runtime.ping'(request: PingRequest): PingResponse
   'app.getShellData'(request: AppShellRequest): AppShellData
   'app.openDashboard'(request: OpenDashboardRequest): null
+  'backup.beginTransfer'(
+    request: z.infer<typeof Transfer.beginTransferRequestSchema>,
+  ): Transfer.TransferSession
+  'backup.readTransferChunk'(
+    request: z.infer<typeof Transfer.readTransferChunkRequestSchema>,
+  ): z.infer<typeof Transfer.transferChunkSchema>
+  'backup.appendTransferChunk'(
+    request: z.infer<typeof Transfer.appendTransferChunkRequestSchema>,
+  ): Transfer.TransferSession
+  'backup.finishTransfer'(
+    request: z.infer<typeof Transfer.finishTransferRequestSchema>,
+  ): BackupRestorePreview | BackupReplacementResult
+  'backup.cancelTransfer'(
+    request: z.infer<typeof Transfer.transferRequestSchema>,
+  ): null
   'backup.exportFullBackup'(request: BackupRequest): BackupFile
-  'backup.validateFullBackup'(request: BackupPayloadRequest): BackupSummary
+  'backup.validateFullBackup'(
+    request: BackupPayloadRequest,
+  ): BackupRestorePreview
   'backup.restoreFullBackup'(
     request: BackupPayloadRequest,
   ): BackupReplacementResult
-  'backup.resetLocalData'(request: BackupRequest): BackupReplacementResult
+  'backup.resetLocalData'(request: BackupResetRequest): BackupReplacementResult
   'backup.getPendingReplacement'(request: BackupRequest): BackupReplacementState
   'backup.retryPendingReplacement'(
     request: BackupRequest,
@@ -418,6 +471,9 @@ export interface ProtocolMap {
   'problems.updateProblem'(
     request: ProblemsUpdateProblemRequest,
   ): ProblemForEditResponse
+  'problems.resetProblemData'(
+    request: ProblemsResetProblemDataRequest,
+  ): BackupReplacementResult
   'problems.deleteProblem'(
     request: ProblemsDeleteProblemRequest,
   ): ProblemDeleteResponse
@@ -444,7 +500,7 @@ export interface ProtocolMap {
   ): SerializedPracticeDetails
   'practice.resetSchedule'(
     request: PracticeResetScheduleRequest,
-  ): SerializedPracticeDetails
+  ): BackupReplacementResult
   'queue.getTodayQueue'(request: QueueRequest): SerializedTodayQueue
   'tracks.getActiveTrack'(
     request: TracksGetActiveTrackRequest,
@@ -478,11 +534,24 @@ export interface ProtocolMap {
 }
 
 export const protocolMethodNames = [
+  'notes.getArchiveUsage',
+  'notes.openEditor',
+  'notes.saveDocument',
+  'notes.getProblemNotes',
+  'notes.listSubmissions',
+  'notes.getSubmission',
+  'notes.getAssessment',
+  'notes.setSavedAiNote',
   'analytics.getSummary',
   'cache.invalidate',
   'runtime.ping',
   'app.getShellData',
   'app.openDashboard',
+  'backup.beginTransfer',
+  'backup.readTransferChunk',
+  'backup.appendTransferChunk',
+  'backup.finishTransfer',
+  'backup.cancelTransfer',
   'backup.exportFullBackup',
   'backup.validateFullBackup',
   'backup.restoreFullBackup',
@@ -522,6 +591,7 @@ export const protocolMethodNames = [
   'problems.createProblem',
   'problems.updateProblem',
   'problems.deleteProblem',
+  'problems.resetProblemData',
   'problems.bulkUpdateProblems',
   'problems.bulkDelete',
   'practice.saveReviewResult',
