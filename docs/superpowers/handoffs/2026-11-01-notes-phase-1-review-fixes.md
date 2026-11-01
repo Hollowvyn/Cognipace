@@ -56,7 +56,9 @@ manual copies remain honestly unverified and do not acknowledge a revision.
 | Complete discovery namespace                    | `150f7974`  | Independent SPEC and QUALITY passed                                      |
 | Bounded CI fixtures                             | `bca676a8`  | Independent SPEC and separate QUALITY passed                             |
 | Current persisted submission test seeds         | `90708761`  | Independent SPEC and separate QUALITY passed                             |
-| Validation handoff                              | This commit | Independent SPEC and separate QUALITY passed                             |
+| Original validation handoff                     | `84b4bc5c`  | Independent SPEC and separate QUALITY passed                             |
+| Native exact-byte test comparisons              | `f031d086`  | Independent SPEC and separate QUALITY passed                             |
+| Postpublication CI handoff                      | This commit | Independent factual review passed (root)                                 |
 
 Whole-fix product integration review passed for `6b341aeb..150f7974`: 18 targeted
 tests passed across six files, with 119 intentionally filtered out; no actionable
@@ -94,7 +96,59 @@ by interruption. Passing automated checks does not replace these review gates.
 - Copy-fixture comparison: local copy/abort-resume timings fell from 2,472/1,245 ms
   to 1,208/609 ms; all 25 file tests passed. The earlier remote CI run
   `41281258047` failed both original fixtures at 5,000 ms while 4,438 tests passed.
-  Remote CI has not been rerun; local improvement does not establish CI stability.
+  Remote CI had not yet been rerun at that point; local improvement does not
+  establish CI stability. The subsequent run is recorded below.
+
+## Postpublication CI Follow-Up
+
+After root published `84b4bc5c` to draft PR 218, CI run `41294002812` failed four
+tests at the unchanged 5,000 ms limit: all three alias-rejection variants in
+`full-backup-service.test.ts` and the two-valid-unresolved-candidates case in
+`replacement-restart.test.ts`. It reported 4,514 passing, four failing and 19
+skipped tests in 223.39 seconds. Build, formatting and the other reported checks
+passed. The earlier archive-copy fixtures passed; these were different failures.
+
+Actual-fixture probes isolated recursive binary assertion cost rather than IDB
+collection or archive preflight. Comparing 1,179,648 alias-snapshot bytes took
+1,312–1,404 ms with Vitest deep equality versus 0.137–0.355 ms with native exact
+byte equality; collecting the data took 0.332–0.938 ms. Two prepared cores of
+589,824 bytes each took 699–750 ms per comparison versus 0.142–0.219 ms; comparing
+1,769,472 mixed-root bytes took 2,127 ms versus 0.370 ms. Temporary probes were
+removed before commit.
+
+`f031d086` changes only those two test files. Binary values use Node's built-in
+`Buffer.equals` outside live IDB transactions; metadata, binary type tags, view
+windows, keys and counts remain checked. Two added negative proofs reject byte,
+metadata, key and count changes and exercise cross-realm buffers and offset views.
+No product code, dependencies, fixtures, assertions, timeout or workflow policy
+was relaxed. The four baseline cases took 4,291/4,135/4,092/4,891 ms locally;
+comparable revised focused timings were 239/143/136/1,291 ms. A subsequent warm
+whole-file run measured 148/140/135/170 ms. These are local observations, not proof
+that the next remote CI run passes.
+
+Focused validation passed all 44 tests across both files in 11.65 seconds,
+followed by typecheck, scoped ESLint, Prettier and diff checks. Initial inferred
+`unknown` typing and formatting issues were corrected before the final run.
+With the pinned environment prefix below, the exact affected commands were:
+
+```sh
+npm test -- src/extension/background/full-backup-service.test.ts src/extension/background/replacement-restart.test.ts --maxWorkers=2 -t 'rejects conflicting|two individually valid unresolved' --reporter=verbose
+npm test -- src/extension/background/full-backup-service.test.ts src/extension/background/replacement-restart.test.ts --maxWorkers=2 -t 'rejects conflicting|two individually valid unresolved|compares complete snapshot' --reporter=verbose
+npm test -- src/extension/background/full-backup-service.test.ts src/extension/background/replacement-restart.test.ts --maxWorkers=2 --reporter=verbose
+npm run typecheck
+npx eslint src/extension/background/full-backup-service.test.ts src/extension/background/replacement-restart.test.ts
+npx prettier --check src/extension/background/full-backup-service.test.ts src/extension/background/replacement-restart.test.ts
+```
+
+Independent SPEC passed all 44 affected tests with one worker in 15.09 seconds;
+separate QUALITY passed the two new negative-proof tests independently (42 other
+tests intentionally filtered). Both reviews found no actionable issue. The new
+full check passed 4,520 tests, with 19 skipped; 286 files passed and five skipped
+in 177.06 seconds. Database checks, WXT/TypeScript and lint also passed within the
+actual check pipeline. The previous product integration acceptance remains applicable because
+this follow-up changes tests only. Root owns the next push and remote CI watch.
+
+## Storage Measurement
 
 The standard synthetic 250-problem/5,000-review fixture performs 20 existing
 Library suspension-service mutations with snapshot flushes. Before correction,
@@ -118,7 +172,7 @@ rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:/opt/ho
 | ------------------------------------ | -------------------------------------------------- |
 | `npm run db:check`                   | Passed                                             |
 | `npm run lint`                       | Passed                                             |
-| `npm run check -- -- --maxWorkers=2` | Passed: 4,518 tests; 19 skipped                    |
+| `npm run check -- -- --maxWorkers=2` | Passed: 4,520 tests; 19 skipped                    |
 | `npm run build`                      | Passed: 5.41 MB                                    |
 | `npm run format`                     | Passed                                             |
 | `npm run zip`                        | Passed: `dist/cognipace-2.3.1-chrome.zip`, 1.75 MB |
@@ -126,7 +180,10 @@ rtk proxy env PATH=/Users/tobiolutimehin/.nvm/versions/node/v24.20.0/bin:/opt/ho
 
 Exact focused commands and failure/correction evidence are retained in the task
 execution records and `/private/tmp/cognipace-fix4-handoff.md`; final matrix logs
-use `/private/tmp/notes-review-fixes-*.log`.
+use `/private/tmp/notes-review-fixes-*.log`. The latest postpublication check is
+`notes-review-fixes-post-ci-check.log`; build/format/zip/store-check logs use the
+same `notes-review-fixes-post-ci-` prefix. Standalone database/lint checks passed
+earlier and both commands also passed in the latest full check.
 
 The first full check failed with 4,516 passing, two failing and 19 skipped tests
 (284 passing, two failing and five skipped files; 187.53 seconds). Both failures
@@ -134,7 +191,7 @@ were direct test seeds predating the new persisted submission shape: the Notes
 handler seed omitted its derived index key and the Practice recovery seed omitted
 the complete submission contract. Focused reproduction confirmed both failures;
 test-only corrections preserve every existing behavior assertion and raw historical
-payload. No production validation is relaxed. The final rerun passed: 4,518 tests
+payload. No production validation is relaxed. The prepublication rerun passed: 4,518 tests
 and 286 files passed; 19 tests and five files skipped; 186.53 seconds. The printed
 pipeline ran database checks, WXT generation/TypeScript, lint and
 `vitest run --maxWorkers=2`. Existing jsdom `scrollTo` notices remain.
@@ -148,8 +205,9 @@ larger than 500 kB (dashboard 837.42 kB); this task does not change chunk policy
 
 Skipped: `npm run db:generate`, because SQL/Drizzle schema and migrations are
 unchanged; the physical IDB index upgrade is implemented and tested separately.
-Remote CI and installed-extension smoke are not claimed. No push, posted review
-comment or PR publication occurred during this fix execution; root owns publication.
+Success for the next remote CI run and installed-extension smoke are not claimed.
+The coordinator made no push, posted review comment or PR edits. Root published
+the earlier accepted commits to draft PR 218 and owns the next publication.
 
 Baseline installation warnings remain unchanged: 27 dependency advisories
 (20 moderate, 5 high, 2 critical) and install-script approval warnings. The fixes
