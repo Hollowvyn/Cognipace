@@ -16,7 +16,8 @@ it('copies metadata in resumable batches, reuses bodies, preserves non-target sc
     ['problemNotes', 'problemScopes', 'payloads'],
     'readwrite',
     (s, done) => {
-      for (let n = 0; n < 1001; n++) {
+      // Cross the production 500-row cursor boundary even with one excluded row.
+      for (let n = 0; n < 501; n++) {
         const slug = `problem-${n}`
         s.problemNotes.put(
           {
@@ -49,6 +50,9 @@ it('copies metadata in resumable batches, reuses bodies, preserves non-target sc
     (s, done) => {
       const excluded = s.problemNotes.get(['new', 'problem-0'])
       excluded.onsuccess = () => expect(excluded.result).toBeUndefined()
+      const excludedScope = s.problemScopes.get(['new', 'problem-0'])
+      excludedScope.onsuccess = () =>
+        expect(excludedScope.result).toBeUndefined()
       const note = s.problemNotes.get(['new', 'problem-1'])
       note.onsuccess = () =>
         expect(
@@ -61,6 +65,27 @@ it('copies metadata in resumable batches, reuses bodies, preserves non-target sc
           datasetToken: 'dataset',
           problemToken: 'problem-1',
         })
+      // Unpadded string keys place problem-99 in the second cursor batch.
+      const tail = s.problemNotes.get(['new', 'problem-99'])
+      tail.onsuccess = () =>
+        expect(tail.result).toEqual({
+          problemSlug: 'problem-99',
+          savedAiCollectionRevision: 99,
+          document: { markdown: 'problem-99' },
+        })
+      const tailScope = s.problemScopes.get(['new', 'problem-99'])
+      tailScope.onsuccess = () =>
+        expect(tailScope.result).toEqual({
+          datasetToken: 'dataset',
+          problemToken: 'problem-99',
+        })
+      for (const store of [s.problemNotes, s.problemScopes]) {
+        const copied = store.count(IDBKeyRange.bound(['new'], ['new', []]))
+        copied.onsuccess = () => expect(copied.result).toBe(500)
+      }
+      const body = s.payloads.get('code')
+      body.onsuccess = () =>
+        expect(body.result).toEqual({ body: 'immutable code' })
       const count = s.payloads.count()
       count.onsuccess = () => {
         expect(count.result).toBe(1)
@@ -75,7 +100,7 @@ it('resumes from the last durable cursor after a mid-copy transaction abort', as
   const factory = new IDBFactory()
   const local = createLocalIdbStore(factory)
   await local.transact(['problemNotes'], 'readwrite', (s, done) => {
-    for (let n = 0; n < 1001; n++)
+    for (let n = 0; n < 501; n++)
       s.problemNotes.put(
         { problemSlug: `p-${n}`, document: { markdown: `body-${n}` } },
         ['old', `p-${n}`],
@@ -107,20 +132,45 @@ it('resumes from the last durable cursor after a mid-copy transaction abort', as
     createArchiveGenerationRepository(local).stageArchiveGeneration(input),
   ).rejects.toThrow()
   fault.mockRestore()
+  expect(writes).toBe(501)
+  expect(await local.readRecord(['archive-generation', 'new'])).toMatchObject({
+    status: 'staging',
+    storeIndex: 0,
+    lastKey: ['old', 'p-98'],
+  })
+  await local.transact(['problemNotes'], 'readonly', (s, done) => {
+    const tail = s.problemNotes.get(['new', 'p-99'])
+    tail.onsuccess = () => expect(tail.result).toBeUndefined()
+    const count = s.problemNotes.count(IDBKeyRange.bound(['new'], ['new', []]))
+    count.onsuccess = () => {
+      expect(count.result).toBe(500)
+      done(undefined)
+    }
+  })
   const reopened = createLocalIdbStore(factory)
   expect(
     await reopened.readRecord(['archive-generation', 'new']),
   ).toMatchObject({
     status: 'staging',
     storeIndex: 0,
+    lastKey: ['old', 'p-98'],
   })
   await createArchiveGenerationRepository(reopened).stageArchiveGeneration(
     input,
   )
+  expect(
+    await reopened.readRecord(['archive-generation', 'new']),
+  ).toMatchObject({ status: 'ready' })
   await reopened.transact(['problemNotes'], 'readonly', (s, done) => {
+    const tail = s.problemNotes.get(['new', 'p-99'])
+    tail.onsuccess = () =>
+      expect(tail.result).toEqual({
+        problemSlug: 'p-99',
+        document: { markdown: 'body-99' },
+      })
     const count = s.problemNotes.count(IDBKeyRange.bound(['new'], ['new', []]))
     count.onsuccess = () => {
-      expect(count.result).toBe(1001)
+      expect(count.result).toBe(501)
       done(undefined)
     }
   })
