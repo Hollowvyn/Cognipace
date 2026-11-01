@@ -2,16 +2,22 @@
 
 Date: 2026-10-31
 
-Status: consolidated draft for written review. The product direction, retention,
-full problem reset, dedicated archive, and remote-backup inclusion were approved
-in the brainstorming chat. This document does not authorize implementation
-before its written review and a phase-sized implementation plan.
+Status: written design accepted for implementation planning on 2026-10-31.
+The user requested the full implementation plan after receiving this written spec.
+The product direction, retention, full problem reset, dedicated archive and
+remote-backup inclusion are approved. The four phase-sized plans are indexed
+in `docs/superpowers/plans/2026-10-31-notes-and-submission-history.md`;
+application implementation has not started.
 
 ## Baseline and authority
 
 The design branch was created from fetched `origin/main` at `a004b007`,
 including storage merge `99f3ddfb` from
 [PR #212](https://github.com/Hollowvyn/Cognipace/pull/212).
+
+Before implementation planning, the clean design branch was rebased onto
+`origin/main` at `5fee022d`, which adds workflow documentation without changing
+this application baseline.
 
 That merged work already supplies binary IndexedDB SQLite snapshots, validated
 legacy migration, revision tracking, durable save acknowledgments, recovery
@@ -331,8 +337,8 @@ of affected problems before applying it.
 
 Reset problem clears that problem's:
 
-- FSRS state, practice review history, legacy learning-log fields, and completion
-  evidence using the existing owning services.
+- FSRS state, practice review history, practice suspension, legacy learning-log
+  fields, and completion evidence using the existing owning services.
 - Personal note and available recovery drafts.
 - Submission metadata, submitted code and reflections.
 - Stored assessments, generated implementations, and saved AI sections.
