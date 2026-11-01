@@ -24,7 +24,7 @@ export const noteDocumentSchema = z.strictObject({
 })
 export const saveNoteCommandSchema = z.strictObject({
   commandId: id,
-  problemSlug: problemSlugSchema,
+  problemSlug: z.lazy(() => problemSlugSchema),
   scope: notesScopeSchema,
   target: noteTargetSchema,
   expectedRevision: revision,
@@ -44,7 +44,7 @@ export const saveNoteResultSchema = z.discriminatedUnion('status', [
 ])
 export const savedAiCommandSchema = z.strictObject({
   commandId: id,
-  problemSlug: problemSlugSchema,
+  problemSlug: z.lazy(() => problemSlugSchema),
   scope: notesScopeSchema,
   assessmentId: id,
   expectedCollectionRevision: revision,
@@ -76,7 +76,7 @@ export type SavedAiCommand = z.infer<typeof savedAiCommandSchema>
 export type SavedAiResult = z.infer<typeof savedAiResultSchema>
 
 export const problemNoteRecordSchema = z.strictObject({
-  problemSlug: problemSlugSchema,
+  problemSlug: z.lazy(() => problemSlugSchema),
   document: noteDocumentSchema,
   savedAiCollectionRevision: revision,
 })
@@ -93,7 +93,7 @@ export const submissionDiagnosticsSchema = z.strictObject({
 })
 export const submissionRecordSchema = z.strictObject({
   id,
-  problemSlug: problemSlugSchema,
+  problemSlug: z.lazy(() => problemSlugSchema),
   observedAttemptIds: z.array(id),
   externalSubmissionId: id.nullable(),
   host: z.literal('leetcode.com'),
@@ -118,7 +118,7 @@ export const submissionRecordSchema = z.strictObject({
 })
 export const assessmentRecordSchema = z.strictObject({
   id,
-  problemSlug: problemSlugSchema,
+  problemSlug: z.lazy(() => problemSlugSchema),
   submissionId: id,
   requestId: id,
   generatedAt: z.iso.datetime(),
@@ -128,7 +128,7 @@ export const assessmentRecordSchema = z.strictObject({
   implementationPayloadId: id.nullable(),
 })
 export const savedAiNoteRecordSchema = z.strictObject({
-  problemSlug: problemSlugSchema,
+  problemSlug: z.lazy(() => problemSlugSchema),
   assessmentId: id,
   savedAt: z.iso.datetime(),
 })
@@ -160,7 +160,15 @@ export const notesArchiveSchema = z.strictObject({
   submissions: z.array(submissionRecordSchema),
   assessments: z.array(assessmentRecordSchema),
   savedAiNotes: z.array(savedAiNoteRecordSchema),
-  payloads: z.array(notesPayloadSchema),
+  // Validate body shape without applying report transforms. Digests bind the
+  // original JSON serialization, including property order and string whitespace.
+  payloads: z.array(
+    z
+      .custom<
+        z.infer<typeof notesPayloadSchema>
+      >((value) => notesPayloadSchema.safeParse(value).success, 'Invalid archive payload.')
+      .transform((value) => structuredClone(value)),
+  ),
 })
 export type ProblemNoteRecord = z.infer<typeof problemNoteRecordSchema>
 export type SubmissionRecord = z.infer<typeof submissionRecordSchema>

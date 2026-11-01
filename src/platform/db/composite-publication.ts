@@ -315,7 +315,9 @@ export function createCompositePublication(
                                     const cursor = scopes.result
                                     if (!cursor) {
                                       if (
-                                        input.kind === 'reset' &&
+                                        (input.kind === 'reset' ||
+                                          input.kind === 'restore' ||
+                                          input.kind === 'gist-pull') &&
                                         descriptor.commandFingerprint &&
                                         verifiedPreparedScopes.size !==
                                           preparedScopes.size
@@ -348,7 +350,9 @@ export function createCompositePublication(
                                       verifiedPreparedScopes.add(key[1])
                                     if (!isPreparedFreshScope) {
                                       if (
-                                        input.kind === 'reset' &&
+                                        (input.kind === 'reset' ||
+                                          input.kind === 'restore' ||
+                                          input.kind === 'gist-pull') &&
                                         descriptor.commandFingerprint &&
                                         preparedToken !== undefined
                                       )

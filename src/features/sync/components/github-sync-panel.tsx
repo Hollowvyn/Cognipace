@@ -38,6 +38,7 @@ export interface GitHubSyncPanelActions {
   onDeleteToken: () => GitHubSyncActionResult
   onPullLatest: (input?: {
     confirmLocalOverwrite?: boolean
+    confirmationToken?: string
   }) => GitHubSyncActionResult
   onPushLocal: (input?: {
     confirmRemoteOverwrite?: boolean
@@ -85,9 +86,14 @@ export function GitHubSyncPanel({
   async function runPullLatestAction(
     confirmLocalOverwrite = false,
     options: { clearDialog?: boolean } = {},
+    confirmationToken?: string,
   ) {
     await runPanelAction(
-      () => actions.onPullLatest({ confirmLocalOverwrite }),
+      () =>
+        actions.onPullLatest({
+          confirmLocalOverwrite,
+          ...(confirmationToken ? { confirmationToken } : {}),
+        }),
       'Latest Gist data pulled.',
       options,
     )
@@ -267,8 +273,12 @@ export function GitHubSyncPanel({
           onClose={() => {
             setDialog(null)
           }}
-          onForcePull={() => {
-            void runPullLatestAction(true, { clearDialog: false })
+          onForcePull={(preview) => {
+            void runPullLatestAction(
+              true,
+              { clearDialog: false },
+              preview?.confirmationToken,
+            )
           }}
           onForcePush={() => {
             void runPushLocalAction(true, { clearDialog: false })

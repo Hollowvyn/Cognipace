@@ -1,3 +1,4 @@
+import type { BackupRestorePreview } from '@/features/backup/api/backup-contracts'
 import type {
   NotesRequest,
   NotesResult,
@@ -27,7 +28,6 @@ import type {
   BackupPayloadRequest,
   BackupRequest,
   BackupResetRequest,
-  BackupSummary,
   BackupReplacementState,
   BackupReplacementResult,
 } from '@/features/backup/api/backup-contracts'
@@ -375,7 +375,9 @@ export interface ProtocolMap {
   'app.getShellData'(request: AppShellRequest): AppShellData
   'app.openDashboard'(request: OpenDashboardRequest): null
   'backup.exportFullBackup'(request: BackupRequest): BackupFile
-  'backup.validateFullBackup'(request: BackupPayloadRequest): BackupSummary
+  'backup.validateFullBackup'(
+    request: BackupPayloadRequest,
+  ): BackupRestorePreview
   'backup.restoreFullBackup'(
     request: BackupPayloadRequest,
   ): BackupReplacementResult

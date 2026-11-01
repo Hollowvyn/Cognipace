@@ -70,7 +70,13 @@ export const replacementCommandKey = (commandId: string): IDBValidKey => [
 ]
 export const replacementCommandRecordSchema = z.strictObject({
   commandId: z.string().min(1),
-  kind: z.enum(['reset', 'problem-reset', 'problem-delete']),
+  kind: z.enum([
+    'reset',
+    'problem-reset',
+    'problem-delete',
+    'restore',
+    'gist-pull',
+  ]),
   requestFingerprint: z.string().min(1),
   status: z.literal('committed'),
 })

@@ -1,3 +1,4 @@
+import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -76,7 +77,7 @@ describe('backup repository', () => {
     const original = await readPracticeStorageData(db)
     expect(data.practice.reviewEvidence).toEqual(original.reviewEvidence)
     expect(data.practice.generations).toEqual(original.generations)
-    const prepared = prepareData(data)
+    const prepared = await prepareData(data)
 
     await clearAndRestoreBackupData(db, prepared, now)
     const first = await readPracticeStorageData(db)
@@ -104,7 +105,7 @@ describe('backup repository', () => {
     const { db } = await createTestDb({ now })
     await insertCustomState(db)
     const before = await createBackupRepository(db).readBackupData()
-    const prepared = prepareData(before)
+    const prepared = await prepareData(before)
     prepared.data.practice.fsrsCards[0]!.stability = -1
     const transaction = vi.spyOn(db, 'transaction')
 
@@ -117,12 +118,14 @@ describe('backup repository', () => {
     const { db } = await createTestDb({ now })
     await insertCustomState(db)
     const before = await createBackupRepository(db).readBackupData()
-    const prepared = prepareData(before)
+    const prepared = await prepareData(before)
     prepared.data.topicAliases.find((row) => row.aliasKey === 'dp')!.topicId =
       'custom-topic'
     const transaction = vi.spyOn(db, 'transaction')
 
-    expect(() => prepareData(prepared.data)).toThrow(/Conflicting alias.*DP/i)
+    await expect(prepareData(prepared.data)).rejects.toThrow(
+      /Conflicting alias.*DP/i,
+    )
     await expect(clearAndRestoreBackupData(db, prepared, now)).rejects.toThrow(
       /Conflicting alias.*DP/i,
     )
@@ -134,7 +137,7 @@ describe('backup repository', () => {
     const { db } = await createTestDb({ now })
     await insertCustomState(db)
     const before = await createBackupRepository(db).readBackupData()
-    const prepared = prepareData(before)
+    const prepared = await prepareData(before)
     const uuid = vi.spyOn(crypto, 'randomUUID').mockImplementation(() => {
       throw new Error('generation creation failed')
     })
@@ -280,7 +283,7 @@ describe('backup repository', () => {
     await db.delete(companies)
     await db.delete(settingsKv)
 
-    await clearAndRestoreBackupData(db, prepareData(backupData), now)
+    await clearAndRestoreBackupData(db, await prepareData(backupData), now)
     await expect(createSettingsRepository(db).getSettings()).resolves.toEqual(
       JSON.parse(settingsValue),
     )
@@ -342,10 +345,10 @@ describe('backup repository', () => {
         clearAndRestoreBackupData(
           db,
           {
-            data: invalidBackupData,
-            summary: prepareData(
+            ...(await prepareData(
               await createBackupRepository(db).readBackupData(),
-            ).summary,
+            )),
+            data: invalidBackupData,
           },
           now,
         ),
@@ -577,6 +580,7 @@ async function insertCustomState(db: TestDb) {
 function prepareData(data: BackupData) {
   return prepareFullBackupRestore({
     schemaVersion: backupSchemaVersion,
+    notesArchive: emptyNotesArchive(),
     app: 'cognipace',
     exportedAt: now.toISOString(),
     source: {},

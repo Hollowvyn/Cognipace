@@ -1,3 +1,4 @@
+import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryObserver } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,7 +21,7 @@ import {
   type BackupFile,
   type BackupReplacementResult,
   type BackupReplacementState,
-  type BackupSummary,
+  type BackupRestorePreview,
 } from './backup-contracts'
 
 vi.mock('@/extension/messaging', () => ({
@@ -57,7 +58,10 @@ describe('backup API hooks', () => {
 
     await act(async () => {
       await validate.result.current.mutateAsync(validBackup)
-      await restore.result.current.mutateAsync(validBackup)
+      await restore.result.current.mutateAsync({
+        backup: validBackup,
+        confirmationToken: 'preview-token',
+      })
     })
 
     expect(sendMessage).toHaveBeenCalledWith('backup.validateFullBackup', {
@@ -67,6 +71,7 @@ describe('backup API hooks', () => {
     expect(sendMessage).toHaveBeenCalledWith('backup.restoreFullBackup', {
       surface: 'dashboard',
       backup: validBackup,
+      confirmationToken: 'preview-token',
     })
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: queryKeys.settings.all,
@@ -192,7 +197,10 @@ describe('backup API hooks', () => {
 
       await act(async () => {
         if (kind === 'restore') {
-          await restore.result.current.mutateAsync(validBackup)
+          await restore.result.current.mutateAsync({
+            backup: validBackup,
+            confirmationToken: 'preview-token',
+          })
         } else {
           await reset.result.current.mutateAsync('clear-command')
         }
@@ -228,7 +236,10 @@ describe('backup API hooks', () => {
 
       await act(async () => {
         if (kind === 'restore') {
-          await restore.result.current.mutateAsync(validBackup)
+          await restore.result.current.mutateAsync({
+            backup: validBackup,
+            confirmationToken: 'preview-token',
+          })
         } else {
           await reset.result.current.mutateAsync('clear-command')
         }
@@ -371,7 +382,10 @@ describe('backup API hooks', () => {
       await act(async () => {
         const operation =
           action === 'restore'
-            ? restore.result.current.mutateAsync(validBackup)
+            ? restore.result.current.mutateAsync({
+                backup: validBackup,
+                confirmationToken: 'preview-token',
+              })
             : action === 'reset'
               ? reset.result.current.mutateAsync('clear-command')
               : retry.result.current.mutateAsync()
@@ -402,7 +416,10 @@ describe('backup API hooks', () => {
     await waitFor(() => expect(pending.result.current.isSuccess).toBe(true))
 
     await act(async () => {
-      await restore.result.current.mutateAsync(validBackup)
+      await restore.result.current.mutateAsync({
+        backup: validBackup,
+        confirmationToken: 'preview-token',
+      })
     })
 
     await waitFor(() => expect(pending.result.current.isError).toBe(true))
@@ -420,7 +437,10 @@ describe('backup API hooks', () => {
     await waitFor(() => expect(pending.result.current.isSuccess).toBe(true))
 
     await act(async () => {
-      await restore.result.current.mutateAsync(validBackup)
+      await restore.result.current.mutateAsync({
+        backup: validBackup,
+        confirmationToken: 'preview-token',
+      })
     })
 
     await waitFor(() =>
@@ -461,6 +481,10 @@ describe('backup API hooks', () => {
 
 const validSummary = {
   schemaVersion: backupSchemaVersion,
+  confirmationToken: 'preview-token',
+  sourceSchemaVersion: 7,
+  archiveAbsent: false,
+  removesCurrentArchive: false,
   exportedAt: '2026-05-25T12:00:00.000Z',
   source: {},
   counts: {
@@ -480,8 +504,13 @@ const validSummary = {
     trackProgress: 0,
     trackSession: 0,
     settings: 0,
+    notes: 0,
+    submissions: 0,
+    assessments: 0,
+    savedAiInclusions: 0,
+    payloadBytes: 0,
   },
-} satisfies BackupSummary
+} satisfies BackupRestorePreview
 
 const pendingReplacement = {
   status: 'persistence-pending',
@@ -498,6 +527,7 @@ const durableReplacement = {
 
 const validBackup = {
   schemaVersion: backupSchemaVersion,
+  notesArchive: emptyNotesArchive(),
   app: 'cognipace',
   exportedAt: '2026-05-25T12:00:00.000Z',
   source: {},

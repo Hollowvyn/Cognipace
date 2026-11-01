@@ -15,12 +15,21 @@ const syncEnvelopePayloadSchema = z.strictObject({
   backup: z.unknown(),
 })
 
+const sourceInputs = new WeakMap<object, unknown>()
 export const syncEnvelopeSchema = syncEnvelopePayloadSchema.transform(
-  (envelope) => ({
-    ...envelope,
-    backup: parseBackupFileForCurrentApp(envelope.backup),
-  }),
+  (envelope) => {
+    const result = {
+      ...envelope,
+      backup: parseBackupFileForCurrentApp(envelope.backup),
+    }
+    sourceInputs.set(result, envelope.backup)
+    return result
+  },
 )
+/** Original format survives normalization without duplicating it in transport JSON. */
+export function syncEnvelopeBackupInput(envelope: SyncEnvelope): unknown {
+  return sourceInputs.get(envelope) ?? envelope.backup
+}
 
 export type SyncEnvelope = z.infer<typeof syncEnvelopeSchema>
 

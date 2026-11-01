@@ -156,7 +156,14 @@ export function BackupRestorePanel({
 
 export function BackupSummaryList({ summary }: { summary: BackupSummary }) {
   const metadataItems: Array<[string, string]> = [
-    ['Schema version', String(summary.schemaVersion)],
+    [
+      'Schema version',
+      String(
+        'sourceSchemaVersion' in summary
+          ? summary.sourceSchemaVersion
+          : summary.schemaVersion,
+      ),
+    ],
     ['Exported', formatDateTime(summary.exportedAt)],
   ]
   if (summary.source.appVersion) {
@@ -175,6 +182,11 @@ export function BackupSummaryList({ summary }: { summary: BackupSummary }) {
     ['FSRS cards', summary.counts.fsrsCards],
     ['Review attempts', summary.counts.reviewAttempts],
     ['Settings', summary.counts.settings],
+    ['Problem notes', summary.counts.notes],
+    ['Submissions', summary.counts.submissions],
+    ['AI assessments', summary.counts.assessments],
+    ['Saved AI notes', summary.counts.savedAiInclusions],
+    ['Archive payload bytes', summary.counts.payloadBytes],
   ]
 
   return (

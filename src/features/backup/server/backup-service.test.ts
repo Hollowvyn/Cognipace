@@ -1,3 +1,4 @@
+import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -120,9 +121,9 @@ describe('backup service', () => {
     expect(saved.cardId).toBe('card-custom')
     expect(corrected.cardId).toBe('card-custom')
     expect(await target.db.select().from(fsrsCards)).toHaveLength(1)
-    expect(() => validateFullBackup(backup)).not.toThrow()
+    await expect(validateFullBackup(backup)).resolves.toBeDefined()
     const exported = await exportFullBackup(target.db, { exportedAt: now })
-    expect(() => validateFullBackup(exported)).not.toThrow()
+    await expect(validateFullBackup(exported)).resolves.toBeDefined()
   })
 
   it('corrects a new captured Save after restore while preserving retained known history', async () => {
@@ -168,7 +169,7 @@ describe('backup service', () => {
       before.practice.schedulerProfiles,
     )
     const exported = await exportFullBackup(db, { exportedAt: now })
-    expect(() => validateFullBackup(exported)).not.toThrow()
+    await expect(validateFullBackup(exported)).resolves.toBeDefined()
   })
 
   it('round trips untouched suspension and accepts New cards with zero memory and no last review', async () => {
@@ -183,7 +184,7 @@ describe('backup service', () => {
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     })
-    expect(() => validateFullBackup(backup)).not.toThrow()
+    await expect(validateFullBackup(backup)).resolves.toBeDefined()
     await restoreFullBackup(db, backup)
     const exported = await exportFullBackup(db, { exportedAt: now })
     expect(exported.data.practice.problemPractice[0]).toMatchObject({
@@ -193,19 +194,18 @@ describe('backup service', () => {
     expect(exported.data.practice.fsrsCards).toEqual(
       backup.data.practice.fsrsCards,
     )
-    expect(() => validateFullBackup(exported)).not.toThrow()
+    await expect(validateFullBackup(exported)).resolves.toBeDefined()
   })
 
-  it('uses a detached synchronous preparation and preserves historical corrected receipts through restore', async () => {
+  it('uses a detached asynchronous preparation and preserves historical corrected receipts through restore', async () => {
     const { db } = await createTestDb({ now })
     await insertCustomState(db)
     const backup = withSchedulingHistory(
       await exportFullBackup(db, { exportedAt: now }),
     )
     const original = structuredClone(backup)
-    const prepared = prepareFullBackupRestore(backup)
-    expect(prepared).not.toBeInstanceOf(Promise)
-    expect(prepared.summary).toEqual(validateFullBackup(backup))
+    const prepared = await prepareFullBackupRestore(backup)
+    expect(prepared.summary).toEqual(await validateFullBackup(backup))
     expect(backup).toEqual(original)
     prepared.data.practice.reviewAttempts[0]!.notes = 'detached edit'
     expect(backup).toEqual(original)
@@ -221,7 +221,7 @@ describe('backup service', () => {
     )
     expect(exported.data.settings).toEqual(backup.data.settings)
     expect(exported.data.tracks.progress).toEqual(backup.data.tracks.progress)
-    expect(() => validateFullBackup(exported)).not.toThrow()
+    await expect(validateFullBackup(exported)).resolves.toBeDefined()
   })
 
   it.each([
@@ -322,7 +322,7 @@ describe('backup service', () => {
       receipt.commandSummaryJson = JSON.stringify(summary)
       const transaction = vi.spyOn(db, 'transaction')
 
-      expect(() => validateFullBackup(backup)).toThrow()
+      await expect(validateFullBackup(backup)).rejects.toThrow()
       await expect(restoreFullBackup(db, backup)).rejects.toThrow()
       await expect(restoreValidatedBackupData(db, backup)).rejects.toThrow()
       expect(transaction).not.toHaveBeenCalled()
@@ -358,7 +358,7 @@ describe('backup service', () => {
     const before = await createBackupRepository(db).readBackupData()
     const transaction = vi.spyOn(db, 'transaction')
 
-    expect(() => validateFullBackup(backup)).toThrow()
+    await expect(validateFullBackup(backup)).rejects.toThrow()
     await expect(restoreFullBackup(db, backup)).rejects.toThrow()
     expect(transaction).not.toHaveBeenCalled()
     expect(await createBackupRepository(db).readBackupData()).toEqual(before)
@@ -403,7 +403,9 @@ describe('backup service', () => {
     await insertCustomState(source.db)
     const current = await exportFullBackup(source.db, { exportedAt: now })
     const legacy = {
-      ...current,
+      ...Object.fromEntries(
+        Object.entries(current).filter(([key]) => key !== 'notesArchive'),
+      ),
       schemaVersion: 4,
       data: {
         ...current.data,
@@ -457,6 +459,7 @@ describe('backup service', () => {
 
     expect(backup).toMatchObject({
       schemaVersion: backupSchemaVersion,
+      notesArchive: emptyNotesArchive(),
       app: 'cognipace',
       exportedAt: now.toISOString(),
       source: { appVersion: '1.0.0', extensionVersion: '2.0.0' },
@@ -476,7 +479,7 @@ describe('backup service', () => {
     await insertCustomState(db)
     const backup = await exportFullBackup(db, { exportedAt: now })
 
-    const summary = validateFullBackup(backup)
+    const summary = await validateFullBackup(backup)
 
     expect(summary).toMatchObject({
       schemaVersion: backup.schemaVersion,
@@ -495,12 +498,12 @@ describe('backup service', () => {
     const { db } = await createTestDb({ now })
     const backup = await exportFullBackup(db, { exportedAt: now })
 
-    expect(() => validateFullBackup({ ...backup, app: 'other-app' })).toThrow(
-      /not a CogniPace backup/i,
-    )
-    expect(() =>
+    await expect(
+      validateFullBackup({ ...backup, app: 'other-app' }),
+    ).rejects.toThrow(/not a CogniPace backup/i)
+    await expect(
       validateFullBackup({ ...backup, schemaVersion: backupSchemaVersion + 1 }),
-    ).toThrow(/unsupported backup version/i)
+    ).rejects.toThrow(/unsupported backup version/i)
   })
 
   it('rejects broken references before restore writes and preserves existing rows', async () => {
@@ -623,7 +626,7 @@ describe('backup service', () => {
       },
     } satisfies BackupFile
 
-    expect(() => validateFullBackup(malformedBackup)).toThrow(
+    await expect(validateFullBackup(malformedBackup)).rejects.toThrow(
       /progress custom-problem references review attempt attempt-second for problem second-problem/i,
     )
   })
@@ -633,7 +636,7 @@ describe('backup service', () => {
     await insertCustomState(db)
     const backup = await exportFullBackup(db, { exportedAt: now })
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -649,9 +652,9 @@ describe('backup service', () => {
           ],
         },
       } satisfies BackupFile),
-    ).toThrow(/topic key collision for "custom topic"/i)
+    ).rejects.toThrow(/topic key collision for "custom topic"/i)
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -662,9 +665,9 @@ describe('backup service', () => {
           ],
         },
       } satisfies BackupFile),
-    ).toThrow(/duplicate company label Custom Company/i)
+    ).rejects.toThrow(/duplicate company label Custom Company/i)
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -683,7 +686,9 @@ describe('backup service', () => {
           },
         },
       } satisfies BackupFile),
-    ).toThrow(/duplicate FSRS card problem\/kind custom-problem:default/i)
+    ).rejects.toThrow(
+      /duplicate FSRS card problem\/kind custom-problem:default/i,
+    )
 
     expect(await rowsForProblem(db, 'custom-problem')).toHaveLength(1)
   })
@@ -693,7 +698,7 @@ describe('backup service', () => {
     await insertCustomState(db)
     const backup = await exportFullBackup(db, { exportedAt: now })
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -722,7 +727,7 @@ describe('backup service', () => {
           },
         },
       } satisfies BackupFile),
-    ).toThrow(/duplicate track problem identity/i)
+    ).rejects.toThrow(/duplicate track problem identity/i)
   })
 
   it('rejects invalid active track session states', async () => {
@@ -730,7 +735,7 @@ describe('backup service', () => {
     await insertCustomState(db)
     const backup = await exportFullBackup(db, { exportedAt: now })
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -746,9 +751,9 @@ describe('backup service', () => {
           },
         },
       } satisfies BackupFile),
-    ).toThrow(/unsupported track session id stale/i)
+    ).rejects.toThrow(/unsupported track session id stale/i)
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -765,9 +770,9 @@ describe('backup service', () => {
           },
         },
       } satisfies BackupFile),
-    ).toThrow(/cannot have an active group without an active track/i)
+    ).rejects.toThrow(/cannot have an active group without an active track/i)
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -797,7 +802,7 @@ describe('backup service', () => {
           },
         },
       } satisfies BackupFile),
-    ).toThrow(
+    ).rejects.toThrow(
       /active group custom-group does not belong to active track other-track/i,
     )
   })
@@ -807,7 +812,7 @@ describe('backup service', () => {
     await insertCustomState(db)
     const backup = await exportFullBackup(db, { exportedAt: now })
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -836,7 +841,7 @@ describe('backup service', () => {
           },
         },
       } satisfies BackupFile),
-    ).toThrow(/progress references missing membership other-track/i)
+    ).rejects.toThrow(/progress references missing membership other-track/i)
   })
 
   it('restores a backup over existing data', async () => {
@@ -1082,7 +1087,7 @@ describe('backup service', () => {
       const backup = await exportFullBackup(db, { exportedAt: now })
       const patchedData = patch(backup)
 
-      expect(() =>
+      await expect(
         validateFullBackup({
           ...backup,
           data: {
@@ -1090,7 +1095,7 @@ describe('backup service', () => {
             ...patchedData,
           },
         } satisfies BackupFile),
-      ).toThrow(message)
+      ).rejects.toThrow(message)
     },
   )
 
@@ -1099,7 +1104,7 @@ describe('backup service', () => {
     await insertCustomState(db)
     const backup = await exportFullBackup(db, { exportedAt: now })
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -1138,7 +1143,7 @@ describe('backup service', () => {
           ],
         },
       } satisfies BackupFile),
-    ).not.toThrow()
+    ).resolves.toBeDefined()
   })
 
   it('rejects cyclic topic relation graphs', async () => {
@@ -1146,7 +1151,7 @@ describe('backup service', () => {
     await insertCustomState(db)
     const backup = await exportFullBackup(db, { exportedAt: now })
 
-    expect(() =>
+    await expect(
       validateFullBackup({
         ...backup,
         data: {
@@ -1185,7 +1190,7 @@ describe('backup service', () => {
           ],
         },
       } satisfies BackupFile),
-    ).toThrow(/broader relations contain a cycle/i)
+    ).rejects.toThrow(/broader relations contain a cycle/i)
   })
 
   it('resets local data to seeded defaults', async () => {

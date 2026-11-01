@@ -260,7 +260,9 @@ export type ProblemsBulkDeleteRequest = z.infer<
   typeof problemsBulkDeleteRequestSchema
 >
 
-export const problemDeleteResponseSchema = backupReplacementResultSchema
+export const problemDeleteResponseSchema = z.lazy(
+  () => backupReplacementResultSchema,
+)
 
 export const problemsResetProblemDataRequestSchema = z.strictObject({
   surface: problemRuntimeSurfaceSchema,

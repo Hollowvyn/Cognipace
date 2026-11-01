@@ -336,3 +336,95 @@ export type LegacyBackupFile =
   | BackupFileV3
   | BackupFileV4
   | BackupFileV5
+
+// Frozen v6 Practice sidecars. Do not derive historical readers from current contracts.
+const opaqueId = z.string().min(1)
+const isoDate = z.string().refine((value) => {
+  const date = new Date(value)
+  return Number.isFinite(date.getTime()) && date.toISOString() === value
+}, 'Expected a canonical ISO date.')
+const nonNegativeInteger = z
+  .number()
+  .int()
+  .nonnegative()
+  .refine(Number.isSafeInteger)
+const positiveInteger = z.number().int().positive().refine(Number.isSafeInteger)
+
+export const backupV6PracticeSchedulerProfileRecordSchema = z.strictObject({
+  id: opaqueId,
+  profileJson: z.string().min(1),
+  createdAt: isoDate,
+})
+
+export const backupV6PracticeReviewEvidenceRecordSchema = z.strictObject({
+  reviewAttemptId: opaqueId,
+  cardId: opaqueId,
+  applicationSequence: positiveInteger,
+  revision: nonNegativeInteger,
+  sequenceSource: z.enum(['legacy-inferred', 'applied'] as const),
+  schedulingEvidenceKind: z.enum([
+    'unknown',
+    'captured',
+    'legacy-derived',
+  ] as const),
+  schedulerProfileId: opaqueId.nullable(),
+  preCardJson: z.string().min(1).nullable(),
+  assessmentEvidenceJson: z.string().min(1).nullable(),
+})
+
+export const backupV6PracticeGenerationRecordSchema = z
+  .strictObject({
+    scopeId: opaqueId,
+    problemSlug: opaqueId.nullable(),
+    generationToken: opaqueId,
+    createdAt: isoDate,
+  })
+  .refine(
+    (row) =>
+      row.scopeId ===
+      (row.problemSlug === null ? 'local' : `problem:${row.problemSlug}`),
+    'Invalid Practice generation scope.',
+  )
+
+export const backupV6PracticeCommandReceiptRecordSchema = z.strictObject({
+  generationKey: z.string().refine((key) => {
+    try {
+      const pair = z
+        .tuple([opaqueId, opaqueId.nullable()])
+        .parse(JSON.parse(key))
+      if (JSON.stringify(pair) !== key)
+        throw new Error('Noncanonical generation key')
+      return true
+    } catch {
+      return false
+    }
+  }, 'Invalid canonical Practice generation key.'),
+  commandId: opaqueId,
+  payloadFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  operation: z.enum(['save', 'update'] as const),
+  problemSlug: opaqueId,
+  cardId: opaqueId,
+  reviewAttemptId: opaqueId,
+  applicationSequence: positiveInteger,
+  revision: nonNegativeInteger,
+  acceptedAt: isoDate,
+  commandSummaryJson: z.string().min(1),
+  resultJson: z.string().min(1),
+})
+
+export const backupPracticeDataV6Schema = backupLegacyPracticeDataSchema.extend(
+  {
+    schedulerProfiles: z.array(backupV6PracticeSchedulerProfileRecordSchema),
+    reviewEvidence: z.array(backupV6PracticeReviewEvidenceRecordSchema),
+    generations: z.array(backupV6PracticeGenerationRecordSchema),
+    commandReceipts: z.array(backupV6PracticeCommandReceiptRecordSchema),
+  },
+)
+export const backupDataV6Schema = backupDataV5Schema.extend({
+  practice: backupPracticeDataV6Schema,
+})
+export const backupFileV6Schema = backupFileV5Schema.extend({
+  schemaVersion: z.literal(6),
+  data: backupDataV6Schema,
+})
+export type BackupFileV6 = z.infer<typeof backupFileV6Schema>

@@ -1,3 +1,6 @@
+import { parseBackupFileForCurrentApp } from '@/features/backup/api/backup-contracts'
+import { createFrozenV6BackupFixture } from '@/features/backup/testing/backup-v6-fixture'
+import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
@@ -23,6 +26,7 @@ const currentTime = '2026-05-26T12:30:00.000Z'
 
 const backup: BackupFile = {
   schemaVersion: backupSchemaVersion,
+  notesArchive: emptyNotesArchive(),
   app: 'cognipace',
   exportedAt: '2026-05-26T12:00:00.000Z',
   source: { appVersion: '0.0.0' },
@@ -145,6 +149,11 @@ const backupSummary: BackupSummary = {
     trackProgress: 0,
     trackSession: 0,
     settings: 0,
+    notes: 0,
+    submissions: 0,
+    assessments: 0,
+    savedAiInclusions: 0,
+    payloadBytes: 0,
   },
 }
 
@@ -353,7 +362,9 @@ describe('sync service', () => {
       }),
     )
 
-    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
       action: 'pull-latest',
       direction: 'pull',
       outcome: 'success',
@@ -394,7 +405,9 @@ describe('sync service', () => {
       }),
     )
 
-    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
       action: 'pull-latest',
       direction: 'pull',
       outcome: 'success',
@@ -437,7 +450,9 @@ describe('sync service', () => {
       }),
     )
 
-    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
       action: 'pull-latest',
       direction: 'pull',
       outcome: 'success',
@@ -458,6 +473,155 @@ describe('sync service', () => {
     ])
   })
 
+  it('requires a visible selected manual preview and rejects a boolean-only repeat without minting intent', async () => {
+    const legacy = createFrozenV6BackupFixture()
+    const previewRemoteRestore = vi
+      .fn<NonNullable<SyncServiceDependencies['previewRemoteRestore']>>()
+      .mockResolvedValue({
+        ...backupSummary,
+        confirmationToken: 'remote-token',
+        sourceSchemaVersion: 6,
+        archiveAbsent: true,
+        removesCurrentArchive: true,
+      })
+    const runFullBackupReplacement = vi
+      .fn<NonNullable<SyncServiceDependencies['runFullBackupReplacement']>>()
+      .mockResolvedValue({
+        status: 'durable',
+        kind: 'gist-pull',
+        summary: backupSummary,
+        syncMetadataPending: false,
+      })
+    const harness = createHarness({
+      previewRemoteRestore,
+      runFullBackupReplacement,
+    })
+    harness.setMetadata({
+      enabled: true,
+      gistId: 'gist_1',
+      dirtySinceLastSync: true,
+    })
+    harness.githubClient.getGist.mockResolvedValue(
+      createGistSummary({
+        id: 'gist_1',
+        content: JSON.stringify({
+          syncEnvelopeVersion: 1,
+          app: 'cognipace',
+          exportedAt: legacy.exportedAt,
+          dataUpdatedAt: legacy.exportedAt,
+          backup: legacy,
+        }),
+      }),
+    )
+    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+      outcome: 'confirmation-required',
+      restorePreview: {
+        confirmationToken: 'remote-token',
+        sourceSchemaVersion: 6,
+        archiveAbsent: true,
+      },
+    })
+    expect(runFullBackupReplacement).not.toHaveBeenCalled()
+    expect(previewRemoteRestore).toHaveBeenCalledTimes(1)
+    await expect(
+      harness.service.pullLatest({ confirmLocalOverwrite: true }),
+    ).resolves.toMatchObject({ outcome: 'error' })
+    expect(previewRemoteRestore).toHaveBeenCalledTimes(1)
+    expect(runFullBackupReplacement).not.toHaveBeenCalled()
+    await expect(
+      harness.service.pullLatest({
+        confirmLocalOverwrite: true,
+        confirmationToken: 'remote-token',
+      }),
+    ).resolves.toMatchObject({ outcome: 'success' })
+    expect(runFullBackupReplacement).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceSchemaVersion: 6 }),
+      expect.anything(),
+      expect.objectContaining({
+        confirmationToken: 'remote-token',
+        sourceIdentity: expect.any(String) as unknown,
+      }),
+    )
+  })
+
+  it('reconciles an already accepted manual token before a new remote fetch or preview', async () => {
+    const reconcileRemoteRestore = vi
+      .fn<NonNullable<SyncServiceDependencies['reconcileRemoteRestore']>>()
+      .mockResolvedValue({
+        status: 'durable',
+        kind: 'gist-pull',
+        summary: backupSummary,
+        syncMetadataPending: false,
+      })
+    const previewRemoteRestore =
+      vi.fn<NonNullable<SyncServiceDependencies['previewRemoteRestore']>>()
+    const harness = createHarness({
+      previewRemoteRestore,
+      reconcileRemoteRestore,
+    })
+    harness.setMetadata({ enabled: true, gistId: 'gist_1' })
+    await expect(
+      harness.service.pullLatest({
+        confirmLocalOverwrite: true,
+        confirmationToken: 'accepted-token',
+      }),
+    ).resolves.toMatchObject({ outcome: 'success' })
+    expect(harness.githubClient.getGist).not.toHaveBeenCalled()
+    expect(previewRemoteRestore).not.toHaveBeenCalled()
+    expect(harness.restoreBackup).not.toHaveBeenCalled()
+  })
+
+  it('routes legacy Gist input through the shared prepared full restore without losing its source version', async () => {
+    const runFullBackupReplacement = vi
+      .fn<NonNullable<SyncServiceDependencies['runFullBackupReplacement']>>()
+      .mockResolvedValue({
+        status: 'durable',
+        kind: 'gist-pull',
+        summary: backupSummary,
+        syncMetadataPending: false,
+      })
+    const harness = createHarness({ runFullBackupReplacement })
+    harness.setMetadata({
+      enabled: true,
+      gistId: 'gist_1',
+      dirtySinceLastSync: false,
+    })
+    const legacy = createFrozenV6BackupFixture()
+    harness.githubClient.getGist.mockResolvedValue(
+      createGistSummary({
+        id: 'gist_1',
+        content: JSON.stringify({
+          syncEnvelopeVersion: 1,
+          app: 'cognipace',
+          exportedAt: legacy.exportedAt,
+          dataUpdatedAt: legacy.exportedAt,
+          backup: legacy,
+        }),
+      }),
+    )
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
+      outcome: 'success',
+      direction: 'pull',
+    })
+    expect(runFullBackupReplacement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceSchemaVersion: 6,
+        archiveAbsent: true,
+        inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/) as unknown,
+      }),
+      expect.objectContaining({
+        syncMetadataPatch: expect.any(Object) as unknown,
+      }),
+      expect.objectContaining({
+        sourceInput: expect.any(Object) as unknown,
+        sourceIdentity: expect.any(String) as unknown,
+      }),
+    )
+    expect(harness.restoreBackup).not.toHaveBeenCalled()
+  })
+
   it('pullLatest normalizes a v3 remote topic graph before restore', async () => {
     const harness = createHarness()
     harness.setMetadata({
@@ -467,7 +631,9 @@ describe('sync service', () => {
       lastRemoteVersion: 'remote_1',
     })
     const v3Backup = {
-      ...backup,
+      ...Object.fromEntries(
+        Object.entries(backup).filter(([key]) => key !== 'notesArchive'),
+      ),
       schemaVersion: 3,
       data: {
         ...backup.data,
@@ -516,7 +682,9 @@ describe('sync service', () => {
       }),
     )
 
-    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
       outcome: 'success',
       direction: 'pull',
     })
@@ -554,7 +722,9 @@ describe('sync service', () => {
       }),
     )
 
-    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
       outcome: 'success',
       direction: 'pull',
     })
@@ -571,7 +741,9 @@ describe('sync service', () => {
     })
     const current = createExternalProgressBackup()
     const legacy = {
-      ...current,
+      ...Object.fromEntries(
+        Object.entries(current).filter(([key]) => key !== 'notesArchive'),
+      ),
       schemaVersion: 4,
       data: {
         ...current.data,
@@ -606,7 +778,9 @@ describe('sync service', () => {
       }),
     )
 
-    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
       outcome: 'success',
       direction: 'pull',
     })
@@ -676,7 +850,9 @@ describe('sync service', () => {
       }),
     )
 
-    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
       outcome: 'error',
     })
     expect(harness.restoreBackup).not.toHaveBeenCalled()
@@ -698,7 +874,9 @@ describe('sync service', () => {
       },
     })
 
-    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
       action: 'pull-latest',
       direction: 'pull',
       outcome: 'blocked',
@@ -738,12 +916,13 @@ describe('sync service', () => {
       }),
     )
 
-    const pullLatest = harness.service.pullLatest as (options: {
-      confirmLocalOverwrite: boolean
-    }) => Promise<unknown>
+    const pullLatest = harness.service.pullLatest
 
     await expect(
-      pullLatest({ confirmLocalOverwrite: true }),
+      pullLatest({
+        confirmLocalOverwrite: true,
+        confirmationToken: 'test-preview-token',
+      }),
     ).resolves.toMatchObject({
       action: 'pull-latest',
       direction: 'pull',
@@ -1176,7 +1355,9 @@ describe('sync service', () => {
       }),
     )
 
-    await harness.service.pullLatest()
+    await harness.service.pullLatest({
+      confirmationToken: 'test-preview-token',
+    })
 
     expect(harness.restoreBackup).toHaveBeenCalledWith(backup)
     expect(harness.flushDbSnapshot).toHaveBeenCalled()
@@ -1307,7 +1488,9 @@ describe('sync service', () => {
     })
     expect(harness.getMetadata().conflict).toBeNull()
 
-    await expect(harness.service.pullLatest()).resolves.toMatchObject({
+    await expect(
+      harness.service.pullLatest({ confirmationToken: 'test-preview-token' }),
+    ).resolves.toMatchObject({
       action: 'pull-latest',
       direction: 'pull',
       outcome: 'success',
@@ -1498,7 +1681,9 @@ describe('sync service', () => {
       }),
     )
 
-    await harness.service.pullLatest()
+    await harness.service.pullLatest({
+      confirmationToken: 'test-preview-token',
+    })
 
     expect(runRemoteRestoreCalls).toHaveLength(1)
     expect(metadataCleanedBeforeRestoreCoordinatorSettled).toBe(true)
@@ -1511,7 +1696,9 @@ describe('sync service', () => {
     const harness = configuredPullHarness()
     harness.flushDbSnapshot.mockRejectedValueOnce(new Error('disk unavailable'))
     harness.broadcastInvalidation.mockRejectedValueOnce(new Error('transport'))
-    const result = await harness.service.pullLatest()
+    const result = await harness.service.pullLatest({
+      confirmationToken: 'test-preview-token',
+    })
     expect(result).toMatchObject({
       outcome: 'error',
       reason: 'unknown',
@@ -1605,7 +1792,9 @@ describe('sync service', () => {
       })
       if (stage === 'persistence')
         harness.flushDbSnapshot.mockRejectedValueOnce(new Error('disk'))
-      const result = await harness.service.pullLatest()
+      const result = await harness.service.pullLatest({
+        confirmationToken: 'test-preview-token',
+      })
       expect(syncActionResultSchema.parse(result)).toEqual(result)
       expect(result.outcome).toBe(stage === 'completed' ? 'success' : 'error')
       expect(result.status.tokenStatus).toEqual(tokenStatus)
@@ -1634,7 +1823,11 @@ describe('sync service', () => {
         ...pullGist(),
         ...invalid,
       } as unknown as GitHubGistSummary)
-      expect(await harness.service.pullLatest()).toMatchObject({
+      expect(
+        await harness.service.pullLatest({
+          confirmationToken: 'test-preview-token',
+        }),
+      ).toMatchObject({
         outcome: 'error',
         reason: 'invalid-remote',
       })
@@ -1662,7 +1855,11 @@ describe('sync service', () => {
         buildSyncEnvelope({ backup: invalid, dataUpdatedAt: currentTime }),
       ),
     })
-    expect(await harness.service.pullLatest()).toMatchObject({
+    expect(
+      await harness.service.pullLatest({
+        confirmationToken: 'test-preview-token',
+      }),
+    ).toMatchObject({
       outcome: 'error',
       reason: 'invalid-remote',
     })
@@ -1680,7 +1877,10 @@ describe('sync service', () => {
     }
     const harness = configuredPullHarness({ runRemoteRestore })
     harness.setMetadata({ dirtySinceLastSync: true })
-    await harness.service.pullLatest({ confirmLocalOverwrite: true })
+    await harness.service.pullLatest({
+      confirmLocalOverwrite: true,
+      confirmationToken: 'test-preview-token',
+    })
     expect(guard).toHaveBeenCalledWith(expect.any(Function), {
       confirmLocalOverwrite: true,
     })
@@ -1735,7 +1935,14 @@ function configuredPullHarness(
 
 function createHarness(
   overrides: Partial<
-    Pick<SyncServiceDependencies, 'runRemoteRestore' | 'syncCoordinator'>
+    Pick<
+      SyncServiceDependencies,
+      | 'runRemoteRestore'
+      | 'syncCoordinator'
+      | 'runFullBackupReplacement'
+      | 'previewRemoteRestore'
+      | 'reconcileRemoteRestore'
+    >
   > = {},
 ) {
   let metadata: SyncMetadata = { ...defaultSyncMetadata }
@@ -1782,10 +1989,28 @@ function createHarness(
     readMetadata,
     writeMetadata,
     exportFullBackup,
-    restoreBackup,
     flushDbSnapshot,
     broadcastInvalidation,
     runReplacement: replacement.run,
+    ...(overrides.previewRemoteRestore
+      ? { previewRemoteRestore: overrides.previewRemoteRestore }
+      : {}),
+    ...(overrides.reconcileRemoteRestore
+      ? { reconcileRemoteRestore: overrides.reconcileRemoteRestore }
+      : {}),
+    runFullBackupReplacement:
+      overrides.runFullBackupReplacement ??
+      ((_prepared, continuations, context) =>
+        replacement.run({
+          kind: 'gist-pull',
+          commit: () => {
+            if (!context) throw new Error('Missing selected source fixture')
+            return restoreBackup(
+              parseBackupFileForCurrentApp(context.sourceInput),
+            )
+          },
+          ...continuations,
+        })),
     now,
     syncCoordinator:
       overrides.syncCoordinator ?? createSyncOperationCoordinator(),

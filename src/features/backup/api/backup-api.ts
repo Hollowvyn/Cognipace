@@ -103,10 +103,14 @@ export function validateFullBackupViaRuntime(backup: unknown) {
   })
 }
 
-export function restoreFullBackupViaRuntime(backup: unknown) {
+export function restoreFullBackupViaRuntime(input: {
+  backup: unknown
+  confirmationToken: string
+}) {
   return sendMessage('backup.restoreFullBackup', {
     surface: 'dashboard',
-    backup,
+    backup: input.backup,
+    confirmationToken: input.confirmationToken,
   })
 }
 

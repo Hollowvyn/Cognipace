@@ -1,4 +1,12 @@
 import {
+  exportDurableFullBackup,
+  createFullBackupPreview,
+  validateFullBackupConfirmation,
+  prepareFullBackupReplacement,
+  prepareGistFullBackupReplacement,
+} from './full-backup-service'
+import { backupRestorePreviewSchema } from '@/features/backup/api/backup-contracts'
+import {
   replacementCommandKey,
   replacementCommandRecordSchema,
 } from '@/platform/db/snapshot-idb'
@@ -21,7 +29,6 @@ import {
   runGatedMutationQueue,
   runConsistentRead,
   resumePendingLocalSave,
-  isInMutationQueue,
   isLocalSavePending,
   setPendingLocalSave,
   clearRecoveredMutationRetry,
@@ -41,11 +48,9 @@ import { timeOverlayStartup } from '@/lib/performance/overlay-startup-timing'
 import {
   analyticsSummaryRequestSchema,
   analyticsSummarySchema,
-  backupFileSchema,
   backupPayloadRequestSchema,
   backupRequestSchema,
   backupResetRequestSchema,
-  backupSummarySchema,
   backupReplacementResultSchema,
   backupReplacementStateSchema,
   clearAiProviderSecretRequestSchema,
@@ -124,12 +129,6 @@ import {
   hintConnectionRequestSchema,
   hintConnectionStatusSchema,
 } from '@/features/genai/api/hint-connection-contracts'
-import {
-  exportFullBackup,
-  prepareFullBackupRestore,
-  restorePreparedFullBackup,
-  validateFullBackup,
-} from '@/features/backup/server/backup-service'
 import {
   readLeetCodeProblemContentInBackground,
   readLeetCodeProblemMetadataInBackground,
@@ -214,13 +213,7 @@ import {
   updateTrack,
 } from '@/features/tracks/server/tracks-service'
 import { getDashboardUrl } from '@/platform/chrome/extension-pages'
-import {
-  flushDbSnapshot,
-  beginDbReplacement,
-  abortDbReplacement,
-  commitDbReplacementSnapshot,
-  type Db,
-} from '@/platform/db'
+import { flushDbSnapshot, type Db } from '@/platform/db'
 import {
   createSnapshotIdbStore,
   type ReplacementContinuation,
@@ -595,8 +588,7 @@ export function registerBackgroundHandlers() {
       sender,
     )
     return runGatedMutationQueue(async () => {
-      const { db } = await getAppDb()
-      return backupFileSchema.parse(await exportFullBackup(db))
+      return (await exportDurableFullBackup(requireNotesLocal())).backup
     })
   })
 
@@ -608,7 +600,11 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return backupSummarySchema.parse(validateFullBackup(request.backup))
+    return runGatedMutationQueue(async () =>
+      backupRestorePreviewSchema.parse(
+        await createFullBackupPreview(requireNotesLocal(), request.backup),
+      ),
+    )
   })
 
   onMessage('sync.getStatus', ({ data, sender }) => {
@@ -803,6 +799,9 @@ export function registerBackgroundHandlers() {
         await runQueuedSyncAction(db, (service) =>
           service.pullLatest({
             confirmLocalOverwrite: request.confirmLocalOverwrite,
+            ...(request.confirmationToken
+              ? { confirmationToken: request.confirmationToken }
+              : {}),
           }),
         ),
       )
@@ -848,28 +847,49 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runGatedMutationQueue(async () => {
-      const prepared = prepareFullBackupRestore(request.backup)
-      const { db } = await getAppDb()
+    return runInMutationQueue(async () => {
+      await backupReplacement.ready()
+      const local = requireNotesLocal()
+      const prepared = await validateFullBackupConfirmation(
+        local,
+        request.backup,
+        request.confirmationToken,
+      )
+      const commandId = request.confirmationToken!
+      const completed = await local.readRecord(replacementCommandKey(commandId))
+      if (completed !== undefined) {
+        const continuation = await replacementStore?.readContinuation()
+        return backupReplacementResultSchema.parse(
+          continuation?.replacementId === commandId
+            ? await backupReplacement.retry()
+            : {
+                status: 'durable',
+                kind: 'restore',
+                summary: prepared.summary,
+                syncMetadataPending: false,
+              },
+        )
+      }
+      backupReplacement.assertIdle()
+      await resumePendingLocalSave()
       await markSyncLocalDataChanged()
       hasPendingDirtyMarkRetry = false
       return backupReplacementResultSchema.parse(
         await backupReplacement.run({
           kind: 'restore',
-          ...(replacementStore
-            ? {
-                beforeCommit: beginDbReplacement,
-                abortCommit: abortDbReplacement,
-              }
-            : {}),
-          commit: async () => {
-            const summary = await restorePreparedFullBackup(db, prepared)
+          prepare: () =>
+            prepareFullBackupReplacement(local, { prepared, commandId }),
+          onDurable: async () => {
             clearPendingImportPersistence()
             recoveredReviewRetry = null
             clearRecoveredMutationRetry()
-            return summary
+            await broadcastDataManagementInvalidation(request.surface)
           },
-          ...createLocalReplacementContinuations(request.surface),
+          finishSyncMetadata: async () => {
+            await markSyncLocalDataChanged()
+            hasPendingDirtyMarkRetry = false
+            await scheduleAutoPushAfterMutationBestEffort()
+          },
         }),
       )
     })
@@ -1908,30 +1928,71 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
     },
     {
       withDb: (work) => withBackgroundDb(({ db: current }) => work(current)),
-      runRemoteRestore: (work, context) =>
-        runRemoteRestoreInMutationQueue(work, isInsideMutationQueue, context),
-      runReplacement: (work) =>
-        backupReplacement.run({
-          ...work,
-          ...(replacementStore
-            ? {
-                beforeCommit: beginDbReplacement,
-                abortCommit: abortDbReplacement,
-                flush: (
-                  input:
-                    | Parameters<typeof commitDbReplacementSnapshot>[0]
-                    | undefined,
-                ) => commitDbReplacementSnapshot(input!),
-              }
-            : {}),
-          commit: async () => {
-            const summary = await work.commit()
+      exportFullBackup: () => {
+        const work = () =>
+          exportDurableFullBackup(createLocalIdbStore(indexedDB))
+        return isInsideMutationQueue ? work() : runGatedMutationQueue(work)
+      },
+      previewRemoteRestore: (input, sourceIdentity) =>
+        createFullBackupPreview(createLocalIdbStore(indexedDB), input, {
+          kind: 'gist-pull',
+          sourceIdentity,
+        }),
+      reconcileRemoteRestore: async (confirmationToken) => {
+        const local = createLocalIdbStore(indexedDB)
+        const raw = await local.readRecord(
+          replacementCommandKey(confirmationToken),
+        )
+        if (raw === undefined) return null
+        const command = replacementCommandRecordSchema.parse(raw)
+        if (command.kind !== 'gist-pull')
+          throw new Error(
+            'Gist restore confirmation identity conflicts. Review a fresh preview.',
+          )
+        const continuation = await replacementStore?.readContinuation()
+        return continuation?.replacementId === confirmationToken
+          ? backupReplacement.retry()
+          : {
+              status: 'durable',
+              kind: 'gist-pull',
+              summary: null,
+              syncMetadataPending: false,
+            }
+      },
+      runFullBackupReplacement: async (prepared, continuations, context) => {
+        const local = createLocalIdbStore(indexedDB)
+        if (context?.confirmationToken) {
+          prepared = await validateFullBackupConfirmation(
+            local,
+            context.sourceInput,
+            context.confirmationToken,
+            { kind: 'gist-pull', sourceIdentity: context.sourceIdentity },
+          )
+        }
+        return backupReplacement.run({
+          kind: 'gist-pull',
+          prepare: () =>
+            context?.confirmationToken
+              ? prepareFullBackupReplacement(local, {
+                  prepared,
+                  commandId: context.confirmationToken,
+                })
+              : prepareGistFullBackupReplacement(local, prepared),
+          ...continuations,
+          onDurable: async () => {
             clearPendingImportPersistence()
             recoveredReviewRetry = null
             clearRecoveredMutationRetry()
-            return summary
+            await continuations.onDurable()
           },
-        }),
+        })
+      },
+      runRemoteRestore: (work, context) =>
+        runRemoteRestoreInMutationQueue(work, isInsideMutationQueue, context),
+      runReplacement: () =>
+        Promise.reject(
+          new Error('Full backup restores require detached pair preparation.'),
+        ),
     },
   )
 }
@@ -2054,22 +2115,6 @@ function mutationRetryKey(method: string, request: unknown) {
   return JSON.stringify([method, request])
 }
 
-function createLocalReplacementContinuations(surface: 'dashboard') {
-  return {
-    flush: replacementStore
-      ? (
-          input: Parameters<typeof commitDbReplacementSnapshot>[0] | undefined,
-        ) => commitDbReplacementSnapshot(input!)
-      : flushDbSnapshot,
-    onDurable: () => broadcastDataManagementInvalidation(surface),
-    finishSyncMetadata: async () => {
-      await markSyncLocalDataChanged()
-      hasPendingDirtyMarkRetry = false
-      await scheduleAutoPushAfterMutationBestEffort()
-    },
-  }
-}
-
 async function scheduleAutoPushAfterMutationBestEffort() {
   try {
     await syncAutoSync.scheduleAutoPushAfterMutation()
@@ -2130,7 +2175,7 @@ function runRemoteRestoreInMutationQueue<T>(
     return work()
   }
 
-  if (isInsideMutationQueue && isInMutationQueue()) {
+  if (isInsideMutationQueue) {
     return guardedWork()
   }
 

@@ -1,3 +1,4 @@
+import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,7 +13,7 @@ import {
   type BackupReplacementKind,
   type BackupReplacementResult,
   type BackupReplacementState,
-  type BackupSummary,
+  type BackupRestorePreview,
 } from '../api/backup-contracts'
 import { DataManagementScreen } from './data-management-screen'
 
@@ -164,6 +165,37 @@ describe('DataManagementScreen', () => {
     )
   })
 
+  it('warns that a legacy restore removes the current Notes archive', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendMessage).mockImplementation((method) =>
+      Promise.resolve(
+        method === 'backup.getPendingReplacement'
+          ? { status: 'idle' }
+          : {
+              ...validSummary,
+              sourceSchemaVersion: 6,
+              archiveAbsent: true,
+              removesCurrentArchive: true,
+            },
+      ),
+    )
+    const { wrapper } = createQueryTestHarness()
+    render(<DataManagementScreen />, { wrapper })
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      new File([JSON.stringify(validBackup)], 'legacy.json', {
+        type: 'application/json',
+      }),
+    )
+    await user.click(
+      await screen.findByRole('button', { name: 'Restore full backup' }),
+    )
+    expect(
+      screen.getByText(/This older backup contains no Notes archive/),
+    ).toBeVisible()
+    expect(screen.getByText('Schema version: 6')).toBeVisible()
+  })
+
   it('requires confirmation before restoring a full backup', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockImplementation((method) => {
@@ -203,6 +235,7 @@ describe('DataManagementScreen', () => {
     expect(sendMessage).toHaveBeenCalledWith('backup.restoreFullBackup', {
       surface: 'dashboard',
       backup: validBackup,
+      confirmationToken: 'preview-token',
     })
     expect(
       await screen.findByRole('status', { name: 'Data management feedback' }),
@@ -758,6 +791,10 @@ function formatExpectedDateTime(value: string) {
 
 const validSummary = {
   schemaVersion: backupSchemaVersion,
+  confirmationToken: 'preview-token',
+  sourceSchemaVersion: 7,
+  archiveAbsent: false,
+  removesCurrentArchive: false,
   exportedAt: '2026-05-25T12:00:00.000Z',
   source: {
     appVersion: '0.0.0',
@@ -779,11 +816,17 @@ const validSummary = {
     trackProgress: 1,
     trackSession: 1,
     settings: 1,
+    notes: 0,
+    submissions: 0,
+    assessments: 0,
+    savedAiInclusions: 0,
+    payloadBytes: 0,
   },
-} satisfies BackupSummary
+} satisfies BackupRestorePreview
 
 const validBackup = {
   schemaVersion: backupSchemaVersion,
+  notesArchive: emptyNotesArchive(),
   app: 'cognipace',
   exportedAt: '2026-05-25T12:00:00.000Z',
   source: {},

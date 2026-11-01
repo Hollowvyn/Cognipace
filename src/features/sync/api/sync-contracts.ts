@@ -1,3 +1,4 @@
+import { backupRestorePreviewSchema } from '@/features/backup/api/backup-contracts'
 import { z } from 'zod'
 
 import { secretStatusSchema } from '@/platform/secrets'
@@ -30,6 +31,7 @@ export const syncSetEnabledRequestSchema = z.strictObject({
 export const syncPullLatestRequestSchema = z.strictObject({
   surface: z.literal('dashboard'),
   confirmLocalOverwrite: z.boolean().default(false),
+  confirmationToken: z.string().min(1).optional(),
 })
 
 export const syncPushLocalRequestSchema = z.strictObject({
@@ -116,6 +118,7 @@ export const syncStatusSchema = z.strictObject({
 })
 
 export const syncActionResultSchema = z.strictObject({
+  restorePreview: z.lazy(() => backupRestorePreviewSchema).optional(),
   action: syncActionSchema,
   direction: syncActionDirectionSchema,
   outcome: syncActionOutcomeSchema,

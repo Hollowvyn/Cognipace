@@ -1,3 +1,7 @@
+import { createFrozenV6BackupFixture } from '@/features/backup/testing/backup-v6-fixture'
+import { prepareFullBackupRestore } from '@/features/backup/domain/backup-preflight'
+import { syncEnvelopeBackupInput } from './sync-envelope'
+import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -13,6 +17,7 @@ import {
 
 const backup: BackupFile = {
   schemaVersion: backupSchemaVersion,
+  notesArchive: emptyNotesArchive(),
   app: 'cognipace',
   exportedAt: '2026-05-26T12:00:00.000Z',
   source: { appVersion: '0.0.0' },
@@ -127,7 +132,7 @@ describe('sync envelope', () => {
       app: 'cognipace',
       exportedAt: '2026-05-26T12:00:01.000Z',
       dataUpdatedAt: '2026-05-26T12:00:00.000Z',
-      backup: { ...backup, schemaVersion: 6 },
+      backup: { ...backup, schemaVersion: 7 },
     })
   })
 
@@ -194,7 +199,9 @@ describe('sync envelope', () => {
 
   it('normalizes v3 topic rows inside the unchanged sync envelope version', () => {
     const v3Backup = {
-      ...backup,
+      ...Object.fromEntries(
+        Object.entries(backup).filter(([key]) => key !== 'notesArchive'),
+      ),
       schemaVersion: 3,
       data: {
         ...backup.data,
@@ -247,4 +254,34 @@ describe('sync envelope', () => {
       }),
     )
   })
+})
+
+it('retains original legacy format through envelope normalization without serializing a second backup', async () => {
+  const legacy = createFrozenV6BackupFixture()
+  const envelope = parseSyncEnvelopeForCurrentApp({
+    syncEnvelopeVersion: 1,
+    app: 'cognipace',
+    exportedAt: legacy.exportedAt,
+    dataUpdatedAt: legacy.exportedAt,
+    backup: legacy,
+  })
+  expect(envelope.backup.schemaVersion).toBe(7)
+  const prepared = await prepareFullBackupRestore(
+    syncEnvelopeBackupInput(envelope),
+  )
+  expect(prepared).toMatchObject({
+    sourceSchemaVersion: 6,
+    archiveAbsent: true,
+  })
+  expect(
+    Object.keys(
+      JSON.parse(JSON.stringify(envelope)) as Record<string, unknown>,
+    ),
+  ).toEqual([
+    'syncEnvelopeVersion',
+    'app',
+    'exportedAt',
+    'dataUpdatedAt',
+    'backup',
+  ])
 })

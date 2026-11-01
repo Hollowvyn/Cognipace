@@ -21,7 +21,7 @@ import {
 } from '../api/backup-api'
 import type {
   BackupReplacementResult,
-  BackupSummary,
+  BackupRestorePreview,
 } from '../api/backup-contracts'
 
 import {
@@ -42,7 +42,8 @@ export function DataManagementScreen() {
   const [selectedBackupFileName, setSelectedBackupFileName] = useState<
     string | null
   >(null)
-  const [backupSummary, setBackupSummary] = useState<BackupSummary | null>(null)
+  const [backupSummary, setBackupSummary] =
+    useState<BackupRestorePreview | null>(null)
   const [backupToast, setBackupToast] = useState<FeedbackToastStatus | null>(
     null,
   )
@@ -119,7 +120,10 @@ export function DataManagementScreen() {
     setRecoveryError(null)
 
     try {
-      const result = await restoreBackup.mutateAsync(selectedBackup)
+      const result = await restoreBackup.mutateAsync({
+        backup: selectedBackup,
+        confirmationToken: backupSummary!.confirmationToken,
+      })
       setRestoreDialogOpen(false)
       completeReplacement(result)
     } catch (error) {
@@ -289,7 +293,11 @@ export function DataManagementScreen() {
       {restoreDialogOpen ? (
         <BackupConfirmationDialog
           confirmLabel="Confirm restore"
-          description="This replaces current local CogniPace data with the selected backup."
+          description={
+            backupSummary?.archiveAbsent
+              ? 'This older backup contains no Notes archive. Restoring replaces current local data and removes all current problem notes, submission history, and saved AI notes. Export a full backup first to keep them.'
+              : 'This replaces current local CogniPace data, including notes, submission history, and saved AI notes, with the selected backup.'
+          }
           error={backupError}
           isPending={restoreBackup.isPending}
           onCancel={() => {

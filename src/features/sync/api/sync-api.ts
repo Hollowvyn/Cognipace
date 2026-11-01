@@ -23,6 +23,7 @@ const broadSyncInvalidationTags = [
 
 export type PullLatestOptions = {
   confirmLocalOverwrite?: boolean
+  confirmationToken?: string
 }
 
 export function getSyncStatusViaRuntime(surface: UiSurface = 'dashboard') {
@@ -66,6 +67,9 @@ export function pullLatestViaRuntime(options: PullLatestOptions = {}) {
   return sendMessage('sync.pullLatest', {
     surface: 'dashboard',
     confirmLocalOverwrite: options.confirmLocalOverwrite ?? false,
+    ...(options.confirmationToken
+      ? { confirmationToken: options.confirmationToken }
+      : {}),
   })
 }
 
