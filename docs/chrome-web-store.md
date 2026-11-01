@@ -27,7 +27,10 @@ recall ratings, organize ordered study tracks, and review progress in the
 dashboard.
 
 Core study data stays in the local Chrome profile. Backup export and restore
-are built in. Users may optionally connect GitHub Gist sync: new Gists created
+are built in, including imported/restored saved archive content. Notes editing and
+new archive capture remain off. Users may optionally connect GitHub Gist sync;
+manual uploads include the full archive but remain unverified, and automatic
+uploads pause pending complete-backup verification. New Gists created
 by CogniPace are private, while an existing connected Gist may be public or
 private according to its GitHub visibility. Users may also optionally configure
 their own OpenAI, Anthropic, Google Gemini, or OpenRouter API key for AI-assisted

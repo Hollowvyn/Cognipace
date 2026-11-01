@@ -1,3 +1,5 @@
+import { readFile, writeFile } from 'node:fs/promises'
+import { format } from 'prettier'
 import { assertArchiveReferences } from '@/features/notes/domain/archive-validation'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -105,4 +107,61 @@ it('retains original v6 source metadata and explicitly previews archive replacem
     removesCurrentArchive: true,
     notesArchive: { notes: [], payloads: [] },
   })
+})
+
+it('reproduces the synthetic Phase 1 human smoke backup through the owning serializer', async () => {
+  const fixturePath = 'docs/superpowers/fixtures/notes-phase-1-v7.json'
+  const now = new Date('2026-10-31T12:00:00.000Z')
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(now)
+  let nextId = 0
+  const uuid = vi
+    .spyOn(crypto, 'randomUUID')
+    .mockImplementation(
+      () => `00000000-0000-4000-8000-${String(++nextId).padStart(12, '0')}`,
+    )
+  const serialize = async () => {
+    nextId = 0
+    const source = await createTestDb()
+    try {
+      await restoreFullBackup(source.db, createFrozenV6BackupFixture())
+      const archive = await makeNotesArchive()
+      archive.notes[0]!.document = {
+        formatVersion: 1,
+        revision: 3,
+        markdown:
+          '# Synthetic study note\n\n反省: preserve trailing space.  \n',
+        updatedAt: now.toISOString(),
+      }
+      archive.submissions[0]!.reflection = {
+        formatVersion: 1,
+        revision: 2,
+        markdown: 'Check duplicate complements.  \n',
+        updatedAt: now.toISOString(),
+      }
+      const backup = await exportFullBackup(source.db, {
+        exportedAt: now,
+        appVersion: '2.3.1',
+        notesArchive: archive,
+      })
+      const prepared = await prepareFullBackupRestore(backup)
+      expect(prepared.sourceSchemaVersion).toBe(7)
+      expect(prepared.notesArchive).toEqual(archive)
+      return format(JSON.stringify(backup), { parser: 'json' })
+    } finally {
+      source.rawDb.close()
+    }
+  }
+  try {
+    const first = await serialize()
+    expect(await serialize()).toBe(first)
+    if (process.env.NOTES_WRITE_SMOKE_FIXTURE === '1') {
+      await writeFile(fixturePath, first)
+    }
+    expect(await readFile(fixturePath, 'utf8')).toBe(first)
+    await prepareFullBackupRestore(JSON.parse(first))
+  } finally {
+    uuid.mockRestore()
+    vi.useRealTimers()
+  }
 })

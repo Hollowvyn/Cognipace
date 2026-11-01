@@ -1,6 +1,6 @@
 # CogniPace Privacy Policy
 
-Effective date: October 5, 2026
+Effective date: October 31, 2026
 
 CogniPace is a local-first Chrome extension for planning and recording deliberate LeetCode practice. This policy explains what information the extension handles, why it handles it, and the optional third-party services a user can choose to connect.
 
@@ -18,6 +18,8 @@ CogniPace is a local-first Chrome extension for planning and recording deliberat
 
 CogniPace stores its problem catalog, practice records, review schedules, recall ratings, study tracks, settings, derived analytics, backup metadata, and sync status in the extension's local browser storage.
 
+Imported or restored archives also persist problem notes, submitted code, reflections, assessment feedback, suggested implementations and saved AI inclusions locally. New Notes editing and new submission/assessment archive capture are not activated in Phase 1. Full v7 backups include the active reachable archive, and an explicitly requested manual Gist upload includes that archive. Treat these files and Gists as private study data.
+
 ### LeetCode page and submission data
 
 On supported LeetCode problem pages, CogniPace may read the problem URL and slug, title, difficulty, topic labels, problem statement, editor language, solution code, submission status, runtime, memory result, passed and total test counts, failure diagnostics, and timing needed for the user-facing practice and review workflow. CogniPace does not monitor unrelated websites.
@@ -25,6 +27,8 @@ On supported LeetCode problem pages, CogniPace may read the problem URL and slug
 ### GitHub Gist sync data
 
 If the user enables GitHub Gist sync, CogniPace stores the user-provided GitHub token locally, calls GitHub to validate it, reads the associated GitHub login, and transfers a CogniPace backup envelope to or from a Gist. New Gists created by CogniPace are private; if the user connects an existing Gist, its existing visibility may be public or private and remains governed by the user's GitHub settings. Gist content and retention are also governed by the user's GitHub account and GitHub's policies.
+
+The current Gist adapter cannot verify a complete remote backup. Automatic uploads pause with action-needed guidance; manual uploads are best effort, explicitly unverified, and retain pending local changes. A successful upload response does not prove remote completeness.
 
 ### Optional AI assessment data
 
@@ -53,9 +57,11 @@ and the serving provider's terms, data policies, and account privacy settings
 govern that processing. The app does not override OpenRouter account privacy
 routing settings. See [OpenRouter provider data policies](https://openrouter.ai/docs/guides/privacy/provider-logging).
 
-Provider retention varies by provider policy and settings. CogniPace does not
-persist raw provider payloads or analysis reports in the app database, backups,
-or sync. Reports remain in the active analysis session. Analysis does not save
+Provider retention varies by provider policy and settings. New live analysis
+reports remain in the active analysis session until later archive capture is
+activated. Imported/restored saved reports are durable local archive data and
+are included in full v7 backups and configured manual Gist uploads. Prompts and
+raw provider responses are excluded from these archives and transfers. Analysis does not save
 a review automatically; the local workflow stores only review information the
 user separately chooses to save. API keys are excluded from backups, sync,
 logs, query caches, and returned runtime data.
@@ -81,7 +87,7 @@ Raw GitHub tokens and AI-provider API keys are kept in local extension storage. 
 ## Retention and Deletion
 
 Local information remains in the browser profile until the user changes or clears it, restores another backup, removes the extension and its associated browser data, or the browser removes that data.
-The Settings page provides backup export, backup restore, and local-data clear controls. The local-data clear control resets local study and database data; it does not clear GitHub or AI-provider secrets stored separately in `chrome.storage.local` or sync metadata. Those secrets require their separate removal or revocation controls, or extension-data removal where applicable. Because backups intentionally exclude credentials, GitHub and AI-provider secrets must be re-entered after moving to another extension installation.
+The Settings page provides backup export, backup restore, and local-data clear controls. Archives have no age-based learning-data eviction. Replacement retains one prior local core/archive pair for recovery, and temporary technical records may survive until safe cleanup. Reset, delete and Clear change active data; they do not promise secure erasure of recovery copies, browser storage, exported files or third-party copies. The local-data clear control resets local study and database data; it does not clear GitHub or AI-provider secrets stored separately in `chrome.storage.local` or sync metadata. Those secrets require their separate removal or revocation controls, or extension-data removal where applicable. Because backups intentionally exclude credentials, GitHub and AI-provider secrets must be re-entered after moving to another extension installation.
 Deleting local data does not delete information already sent to an optional third-party service. Users must manage Gist visibility and delete Gists through GitHub, and manage provider-side assessment data through the selected AI provider.
 
 ## Security

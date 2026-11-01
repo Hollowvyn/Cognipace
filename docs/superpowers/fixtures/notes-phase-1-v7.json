@@ -1,0 +1,2812 @@
+{
+  "schemaVersion": 7,
+  "app": "cognipace",
+  "exportedAt": "2026-10-31T12:00:00.000Z",
+  "source": { "appVersion": "2.3.1" },
+  "data": {
+    "problems": [
+      {
+        "slug": "two-sum",
+        "title": "Two Sum",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "slug": "valid-parentheses",
+        "title": "Valid Parentheses",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "two-sum-ii-input-array-is-sorted",
+        "title": "Pair Sum - Sorted",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "3sum",
+        "title": "Triplet Sum",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "valid-palindrome",
+        "title": "Is Palindrome Valid",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "container-with-most-water",
+        "title": "Largest Container",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "move-zeroes",
+        "title": "Shift Zeros to the End",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "next-permutation",
+        "title": "Next Lexicographical Sequence",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "valid-sudoku",
+        "title": "Verify Sudoku Board",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "set-matrix-zeroes",
+        "title": "Zero Striping",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "longest-consecutive-sequence",
+        "title": "Longest Chain of Consecutive Numbers",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "tuple-with-same-product",
+        "title": "Geometric Sequence Triplets",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "reverse-linked-list",
+        "title": "Linked List Reversal",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "remove-nth-node-from-end-of-list",
+        "title": "Remove the Kth Last Node From a Linked List",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "intersection-of-two-linked-lists",
+        "title": "Linked List Intersection",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "lru-cache",
+        "title": "LRU Cache",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "palindrome-linked-list",
+        "title": "Palindromic Linked List",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "flatten-a-multilevel-doubly-linked-list",
+        "title": "Flatten a Multi-Level Linked List",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "linked-list-cycle",
+        "title": "Linked List Loop",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "middle-of-the-linked-list",
+        "title": "Linked List Midpoint",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "happy-number",
+        "title": "Happy Number",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "find-all-anagrams-in-a-string",
+        "title": "Substring Anagrams",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "longest-substring-without-repeating-characters",
+        "title": "Longest Substring With Unique Characters",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "longest-repeating-character-replacement",
+        "title": "Longest Uniform Substring After Replacements",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "search-insert-position",
+        "title": "Find the Insertion Index",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "find-first-and-last-position-of-element-in-sorted-array",
+        "title": "First and Last Occurrences of a Number",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "cutting-ribbons",
+        "title": "Cutting Wood",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "search-in-rotated-sorted-array",
+        "title": "Find the Target in a Rotated Sorted Array",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "median-of-two-sorted-arrays",
+        "title": "Find the Median From Two Sorted Arrays",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "search-a-2d-matrix",
+        "title": "Matrix Search",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "find-peak-element",
+        "title": "Local Maxima in Array",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "random-pick-with-weight",
+        "title": "Weighted Random Selection",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "next-greater-element-i",
+        "title": "Next Largest Number to the Right",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "evaluate-reverse-polish-notation",
+        "title": "Evaluate Expression",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "remove-all-adjacent-duplicates-in-string",
+        "title": "Repeated Removal of Adjacent Duplicates",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "implement-queue-using-stacks",
+        "title": "Implement a Queue using Stacks",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "sliding-window-maximum",
+        "title": "Maximums of Sliding Window",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "top-k-frequent-words",
+        "title": "K Most Frequent Strings",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "merge-k-sorted-lists",
+        "title": "Combine Sorted Linked Lists",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "find-median-from-data-stream",
+        "title": "Median of an Integer Stream",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "sort-characters-by-frequency",
+        "title": "Sort a K-Sorted Array",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "merge-intervals",
+        "title": "Merge Overlapping Intervals",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "interval-list-intersections",
+        "title": "Identify All Interval Overlaps",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "meeting-rooms-ii",
+        "title": "Largest Overlap of Intervals",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "range-sum-query-immutable",
+        "title": "Sum Between Range",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "subarray-sum-equals-k",
+        "title": "K-Sum Subarrays",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "product-of-array-except-self",
+        "title": "Product Array Without Current Element",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "invert-binary-tree",
+        "title": "Invert Binary Tree",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "balanced-binary-tree",
+        "title": "Balanced Binary Tree Validation",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "binary-tree-right-side-view",
+        "title": "Rightmost Nodes of a Binary Tree",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "maximum-width-of-binary-tree",
+        "title": "Widest Binary Tree Level",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "validate-binary-search-tree",
+        "title": "Binary Search Tree Validation",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "lowest-common-ancestor-of-a-binary-tree",
+        "title": "Lowest Common Ancestor",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "construct-binary-tree-from-preorder-and-inorder-traversal",
+        "title": "Build Binary Tree From Preorder and Inorder Traversals",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "binary-tree-maximum-path-sum",
+        "title": "Maximum Sum of a Continuous Path in a Binary Tree",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "symmetric-tree",
+        "title": "Binary Tree Symmetry",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "binary-tree-vertical-order-traversal",
+        "title": "Binary Tree Columns",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "kth-smallest-element-in-a-bst",
+        "title": "Kth Smallest Number in a Binary Search Tree",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "serialize-and-deserialize-binary-tree",
+        "title": "Serialize and Deserialize a Binary Tree",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "implement-trie-prefix-tree",
+        "title": "Design a Trie",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "design-add-and-search-words-data-structure",
+        "title": "Insert and Search Words with Wildcards",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "word-search-ii",
+        "title": "Find All Words on a Board",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "clone-graph",
+        "title": "Graph Deep Copy",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "number-of-islands",
+        "title": "Count Islands",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "rotting-oranges",
+        "title": "Matrix Infection",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "is-graph-bipartite",
+        "title": "Bipartite Graph Validation",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "longest-increasing-path-in-a-matrix",
+        "title": "Longest Increasing Path",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "word-ladder",
+        "title": "Shortest Transformation Sequence",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "accounts-merge",
+        "title": "Merging Communities",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "course-schedule",
+        "title": "Prerequisites",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "network-delay-time",
+        "title": "Shortest Path",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "number-of-connected-components-in-an-undirected-graph",
+        "title": "Connect the Dots",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "permutations",
+        "title": "Find All Permutations",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "subsets",
+        "title": "Find All Subsets",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "n-queens",
+        "title": "N Queens",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "combination-sum",
+        "title": "Combinations of a Sum",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "letter-combinations-of-a-phone-number",
+        "title": "Phone Keypad Combinations",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "climbing-stairs",
+        "title": "Climbing Stairs",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "coin-change",
+        "title": "Minimum Coin Combination",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "unique-paths",
+        "title": "Matrix Pathways",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "house-robber",
+        "title": "Neighborhood Burglary",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "longest-common-subsequence",
+        "title": "Longest Common Subsequence",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "longest-palindromic-substring",
+        "title": "Longest Palindrome in a String",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "maximum-subarray",
+        "title": "Maximum Subarray Sum",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "ones-and-zeroes",
+        "title": "0/1 Knapsack",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "maximal-square",
+        "title": "Largest Square in a Matrix",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "jump-game",
+        "title": "Jump to the End",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "gas-station",
+        "title": "Gas Stations",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "candy",
+        "title": "Candies",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "sort-list",
+        "title": "Sort Linked List",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "sort-an-array",
+        "title": "Sort Array",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "kth-largest-element-in-an-array",
+        "title": "Kth Largest Integer",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "sort-colors",
+        "title": "Dutch National Flag",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "number-of-1-bits",
+        "title": "Hamming Weights of Integers",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "single-number",
+        "title": "Lonely Integer",
+        "difficulty": "easy",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "reverse-bits",
+        "title": "Swap Odd and Even Bits",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "spiral-matrix",
+        "title": "Spiral Traversal",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "reverse-integer",
+        "title": "Reverse 32-Bit Integer",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "max-points-on-a-line",
+        "title": "Maximum Collinear Points",
+        "difficulty": "hard",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "find-the-winner-of-the-circular-game",
+        "title": "The Josephus Problem",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "slug": "valid-triangle-number",
+        "title": "Triangle Numbers",
+        "difficulty": "medium",
+        "isPremium": false,
+        "createdAt": "2026-10-31T12:00:00.000Z",
+        "updatedAt": "2026-10-31T12:00:00.000Z"
+      }
+    ],
+    "topics": [
+      {
+        "id": "1-d-dynamic-programming",
+        "label": "1-D Dynamic Programming",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "2-d-dynamic-programming",
+        "label": "2-D Dynamic Programming",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "array",
+        "label": "Array",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "backtracking",
+        "label": "Backtracking",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "biconnected-component",
+        "label": "Biconnected Component",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "binary-indexed-tree",
+        "label": "Binary Indexed Tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "binary-search",
+        "label": "Binary Search",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "binary-search-tree",
+        "label": "Binary Search Tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "binary-tree",
+        "label": "Binary Tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "bit-manipulation",
+        "label": "Bit Manipulation",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "bitmask",
+        "label": "Bitmask",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "brainteaser",
+        "label": "Brainteaser",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "breadth-first-search",
+        "label": "Breadth-First Search",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "bucket-sort",
+        "label": "Bucket Sort",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "combinatorics",
+        "label": "Combinatorics",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "concurrency",
+        "label": "Concurrency",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "counting",
+        "label": "Counting",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "counting-sort",
+        "label": "Counting Sort",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "data-stream",
+        "label": "Data Stream",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "database",
+        "label": "Database",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "depth-first-search",
+        "label": "Depth-First Search",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "design",
+        "label": "Design",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "divide-and-conquer",
+        "label": "Divide and Conquer",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "doubly-linked-list",
+        "label": "Doubly-Linked List",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "dynamic-programming",
+        "label": "Dynamic Programming",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "enumeration",
+        "label": "Enumeration",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "eulerian-circuit",
+        "label": "Eulerian Circuit",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "fast-and-slow-pointers",
+        "label": "Fast And Slow Pointers",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "game-theory",
+        "label": "Game Theory",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "geometry",
+        "label": "Geometry",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "graph-theory",
+        "label": "Graph Theory",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "greedy",
+        "label": "Greedy",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "hash-function",
+        "label": "Hash Function",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "hash-map",
+        "label": "Hash Map",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "hash-set",
+        "label": "Hash Set",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "hash-table",
+        "label": "Hash Table",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "heap-priority-queue",
+        "label": "Heap (Priority Queue)",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "interactive",
+        "label": "Interactive",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "intervals",
+        "label": "Intervals",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "iterator",
+        "label": "Iterator",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "kmp",
+        "label": "KMP",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "linked-list",
+        "label": "Linked List",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "math",
+        "label": "Math",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "matrix",
+        "label": "Matrix",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "meet-in-the-middle",
+        "label": "Meet in the Middle",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "memoization",
+        "label": "Memoization",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "merge-sort",
+        "label": "Merge Sort",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "minimax",
+        "label": "Minimax",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "minimum-spanning-tree",
+        "label": "Minimum Spanning Tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "monotonic-queue",
+        "label": "Monotonic Queue",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "monotonic-stack",
+        "label": "Monotonic Stack",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "number-theory",
+        "label": "Number Theory",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "ordered-set",
+        "label": "Ordered Set",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "prefix-sum",
+        "label": "Prefix Sum",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "probability-and-statistics",
+        "label": "Probability and Statistics",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "queue",
+        "label": "Queue",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "quickselect",
+        "label": "Quickselect",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "rabin-karp",
+        "label": "Rabin-Karp",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "radix-sort",
+        "label": "Radix Sort",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "randomized",
+        "label": "Randomized",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "recursion",
+        "label": "Recursion",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "rejection-sampling",
+        "label": "Rejection Sampling",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "reservoir-sampling",
+        "label": "Reservoir Sampling",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "rolling-hash",
+        "label": "Rolling Hash",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "segment-tree",
+        "label": "Segment Tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "shell",
+        "label": "Shell",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "shortest-path",
+        "label": "Shortest Path",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "simulation",
+        "label": "Simulation",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "sliding-window",
+        "label": "Sliding Window",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "sorting",
+        "label": "Sorting",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "stack",
+        "label": "Stack",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "string",
+        "label": "String",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "string-matching",
+        "label": "String Matching",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "strongly-connected-component",
+        "label": "Strongly Connected Component",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "suffix-array",
+        "label": "Suffix Array",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "sweep-line",
+        "label": "Sweep Line",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "topological-sort",
+        "label": "Topological Sort",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "tree",
+        "label": "Tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "trie",
+        "label": "Trie",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "two-pointers",
+        "label": "Two Pointers",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "id": "union-find",
+        "label": "Union-Find",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      }
+    ],
+    "topicAliases": [
+      {
+        "aliasKey": "1-d dp",
+        "label": "1-D DP",
+        "topicId": "1-d-dynamic-programming",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "2-d dp",
+        "label": "2-D DP",
+        "topicId": "2-d-dynamic-programming",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "arrays",
+        "label": "Arrays",
+        "topicId": "array",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "bfs",
+        "label": "BFS",
+        "topicId": "breadth-first-search",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "bit",
+        "label": "BIT",
+        "topicId": "binary-indexed-tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "bit mask",
+        "label": "Bit Mask",
+        "topicId": "bitmask",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "bst",
+        "label": "BST",
+        "topicId": "binary-search-tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "custom hash",
+        "label": "Custom Hash",
+        "topicId": "hash-table",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "dfs",
+        "label": "DFS",
+        "topicId": "depth-first-search",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "disjoint set union",
+        "label": "Disjoint Set Union",
+        "topicId": "union-find",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "dp",
+        "label": "DP",
+        "topicId": "dynamic-programming",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "dsu",
+        "label": "DSU",
+        "topicId": "union-find",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "fenwick tree",
+        "label": "Fenwick Tree",
+        "topicId": "binary-indexed-tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "graph",
+        "label": "Graph",
+        "topicId": "graph-theory",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "graphs",
+        "label": "Graphs",
+        "topicId": "graph-theory",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "heap",
+        "label": "Heap",
+        "topicId": "heap-priority-queue",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "heap / priority queue",
+        "label": "Heap / Priority Queue",
+        "topicId": "heap-priority-queue",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "heaps",
+        "label": "Heaps",
+        "topicId": "heap-priority-queue",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "knuth-morris-pratt",
+        "label": "Knuth-Morris-Pratt",
+        "topicId": "kmp",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "linked lists",
+        "label": "Linked Lists",
+        "topicId": "linked-list",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "mst",
+        "label": "MST",
+        "topicId": "minimum-spanning-tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "prefix sums",
+        "label": "Prefix Sums",
+        "topicId": "prefix-sum",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "priority queue",
+        "label": "Priority Queue",
+        "topicId": "heap-priority-queue",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "scc",
+        "label": "SCC",
+        "topicId": "strongly-connected-component",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "stacks",
+        "label": "Stacks",
+        "topicId": "stack",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "trees",
+        "label": "Trees",
+        "topicId": "tree",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "tries",
+        "label": "Tries",
+        "topicId": "trie",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "union find",
+        "label": "Union Find",
+        "topicId": "union-find",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "aliasKey": "动态规划",
+        "label": "动态规划",
+        "topicId": "dynamic-programming",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      }
+    ],
+    "topicRelations": [
+      {
+        "sourceTopicId": "breadth-first-search",
+        "targetTopicId": "graph-theory",
+        "kind": "applies-to",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "breadth-first-search",
+        "targetTopicId": "tree",
+        "kind": "applies-to",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "depth-first-search",
+        "targetTopicId": "graph-theory",
+        "kind": "applies-to",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "depth-first-search",
+        "targetTopicId": "tree",
+        "kind": "applies-to",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "memoization",
+        "targetTopicId": "dynamic-programming",
+        "kind": "applies-to",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "memoization",
+        "targetTopicId": "recursion",
+        "kind": "applies-to",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "rolling-hash",
+        "targetTopicId": "string",
+        "kind": "applies-to",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "union-find",
+        "targetTopicId": "graph-theory",
+        "kind": "applies-to",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "1-d-dynamic-programming",
+        "targetTopicId": "dynamic-programming",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "2-d-dynamic-programming",
+        "targetTopicId": "dynamic-programming",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "biconnected-component",
+        "targetTopicId": "graph-theory",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "binary-search-tree",
+        "targetTopicId": "binary-tree",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "binary-tree",
+        "targetTopicId": "tree",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "bitmask",
+        "targetTopicId": "bit-manipulation",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "bucket-sort",
+        "targetTopicId": "sorting",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "combinatorics",
+        "targetTopicId": "math",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "counting-sort",
+        "targetTopicId": "sorting",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "doubly-linked-list",
+        "targetTopicId": "linked-list",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "eulerian-circuit",
+        "targetTopicId": "graph-theory",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "fast-and-slow-pointers",
+        "targetTopicId": "two-pointers",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "geometry",
+        "targetTopicId": "math",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "hash-map",
+        "targetTopicId": "hash-table",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "hash-set",
+        "targetTopicId": "hash-table",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "hash-table",
+        "targetTopicId": "array",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "kmp",
+        "targetTopicId": "string-matching",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "merge-sort",
+        "targetTopicId": "divide-and-conquer",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "merge-sort",
+        "targetTopicId": "sorting",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "minimum-spanning-tree",
+        "targetTopicId": "graph-theory",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "monotonic-queue",
+        "targetTopicId": "queue",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "monotonic-stack",
+        "targetTopicId": "stack",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "number-theory",
+        "targetTopicId": "math",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "probability-and-statistics",
+        "targetTopicId": "math",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "quickselect",
+        "targetTopicId": "divide-and-conquer",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "rabin-karp",
+        "targetTopicId": "string-matching",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "radix-sort",
+        "targetTopicId": "sorting",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "segment-tree",
+        "targetTopicId": "tree",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "shortest-path",
+        "targetTopicId": "graph-theory",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "string-matching",
+        "targetTopicId": "string",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "strongly-connected-component",
+        "targetTopicId": "graph-theory",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "suffix-array",
+        "targetTopicId": "string",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "topological-sort",
+        "targetTopicId": "graph-theory",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      },
+      {
+        "sourceTopicId": "trie",
+        "targetTopicId": "tree",
+        "kind": "broader",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      }
+    ],
+    "companies": [{ "id": "meta", "label": "Meta" }],
+    "problemTopics": [{ "problemSlug": "two-sum", "topicId": "array" }],
+    "problemCompanies": [{ "problemSlug": "two-sum", "companyId": "meta" }],
+    "practice": {
+      "problemPractice": [
+        {
+          "problemSlug": "two-sum",
+          "status": "review",
+          "firstSeenAt": "2026-05-25T12:00:00.000Z",
+          "lastSeenAt": "2026-05-25T12:00:00.000Z",
+          "lastReviewedAt": "2026-05-25T12:00:00.000Z",
+          "lastRating": "good",
+          "lastElapsedSeconds": 600,
+          "bestElapsedSeconds": 600,
+          "interviewPattern": "hash-map",
+          "timeComplexity": "O(n)",
+          "spaceComplexity": "O(n)",
+          "languages": "TypeScript",
+          "notes": "review note",
+          "solvedCount": 1,
+          "attemptCount": 1,
+          "isSuspended": false,
+          "createdAt": "2026-05-25T12:00:00.000Z",
+          "updatedAt": "2026-05-25T12:00:00.000Z"
+        }
+      ],
+      "fsrsCards": [
+        {
+          "id": "card-1",
+          "problemSlug": "two-sum",
+          "cardKind": "default",
+          "dueAt": "2026-05-25T12:00:00.000Z",
+          "stability": 2.5,
+          "difficulty": 4.5,
+          "elapsedDays": 0,
+          "scheduledDays": 1,
+          "learningSteps": 0,
+          "reps": 1,
+          "lapses": 0,
+          "state": "review",
+          "lastReviewAt": "2026-05-25T12:00:00.000Z",
+          "createdAt": "2026-05-25T12:00:00.000Z",
+          "updatedAt": "2026-05-25T12:00:00.000Z"
+        }
+      ],
+      "reviewAttempts": [
+        {
+          "id": "attempt-1",
+          "problemSlug": "two-sum",
+          "cardId": "card-1",
+          "rating": "good",
+          "reviewMode": "manual",
+          "reviewedAt": "2026-05-25T12:00:00.000Z",
+          "elapsedSeconds": 600,
+          "isCorrect": true,
+          "interviewPattern": "hash-map",
+          "timeComplexity": "O(n)",
+          "spaceComplexity": "O(n)",
+          "languages": "TypeScript",
+          "notes": "review note",
+          "fsrsReviewLog": null,
+          "createdAt": "2026-05-25T12:00:00.000Z",
+          "updatedAt": "2026-05-25T12:00:00.000Z"
+        }
+      ],
+      "schedulerProfiles": [],
+      "reviewEvidence": [
+        {
+          "reviewAttemptId": "attempt-1",
+          "cardId": "card-1",
+          "applicationSequence": 1,
+          "revision": 0,
+          "sequenceSource": "legacy-inferred",
+          "schedulingEvidenceKind": "unknown",
+          "schedulerProfileId": null,
+          "preCardJson": null,
+          "assessmentEvidenceJson": null
+        }
+      ],
+      "generations": [
+        {
+          "scopeId": "local",
+          "problemSlug": null,
+          "generationToken": "00000000-0000-4000-8000-000000000001",
+          "createdAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "scopeId": "problem:two-sum",
+          "problemSlug": "two-sum",
+          "generationToken": "00000000-0000-4000-8000-000000000002",
+          "createdAt": "2026-10-31T12:00:00.000Z"
+        }
+      ],
+      "commandReceipts": []
+    },
+    "tracks": {
+      "tracks": [
+        {
+          "id": "custom-track",
+          "slug": "custom-track",
+          "title": "Custom Track",
+          "description": "A local track",
+          "dueAt": null,
+          "createdAt": "2026-05-25T12:00:00.000Z",
+          "updatedAt": "2026-05-25T12:00:00.000Z",
+          "allowExternalProgress": true
+        },
+        {
+          "id": "bytebytego-coding-patterns-101",
+          "slug": "bytebytego-coding-patterns-101",
+          "title": "ByteByteGo Coding Patterns 101",
+          "description": "ByteByteGo's coding patterns path, organized by interview pattern.",
+          "dueAt": null,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z",
+          "allowExternalProgress": false
+        },
+        {
+          "id": "leetcode-75",
+          "slug": "leetcode-75",
+          "title": "LeetCode 75",
+          "description": "Focused starter track for high-signal interview patterns.",
+          "dueAt": null,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z",
+          "allowExternalProgress": false
+        },
+        {
+          "id": "grind-75",
+          "slug": "grind-75",
+          "title": "Grind 75",
+          "description": "Compact practice set for repeated algorithm review.",
+          "dueAt": null,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z",
+          "allowExternalProgress": false
+        }
+      ],
+      "groups": [
+        {
+          "id": "custom-track:arrays",
+          "trackId": "custom-track",
+          "title": "Arrays",
+          "position": 1,
+          "createdAt": "2026-05-25T12:00:00.000Z",
+          "updatedAt": "2026-05-25T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:two-pointers",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Two Pointers",
+          "position": 1,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:hash-maps-and-sets",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Hash Maps And Sets",
+          "position": 2,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:linked-lists",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Linked Lists",
+          "position": 3,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:fast-and-slow-pointers",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Fast And Slow Pointers",
+          "position": 4,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:sliding-window",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Sliding Window",
+          "position": 5,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:binary-search",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Binary Search",
+          "position": 6,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:stacks",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Stacks",
+          "position": 7,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:heaps",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Heaps",
+          "position": 8,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:intervals",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Intervals",
+          "position": 9,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:prefix-sums",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Prefix Sums",
+          "position": 10,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:trees",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Trees",
+          "position": 11,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:tries",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Tries",
+          "position": 12,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:graphs",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Graphs",
+          "position": 13,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:backtracking",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Backtracking",
+          "position": 14,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:dynamic-programming",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Dynamic Programming",
+          "position": 15,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:greedy",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Greedy",
+          "position": 16,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:sort-and-search",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Sort And Search",
+          "position": 17,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:bit-manipulation",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Bit Manipulation",
+          "position": 18,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "bytebytego-coding-patterns-101:math-and-geometry",
+          "trackId": "bytebytego-coding-patterns-101",
+          "title": "Math And Geometry",
+          "position": 19,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "leetcode-75:arrays-hashing",
+          "trackId": "leetcode-75",
+          "title": "Arrays and Hashing",
+          "position": 1,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        {
+          "id": "grind-75:stack",
+          "trackId": "grind-75",
+          "title": "Stack",
+          "position": 1,
+          "createdAt": "2026-10-31T12:00:00.000Z",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        }
+      ],
+      "memberships": [
+        {
+          "trackGroupId": "custom-track:arrays",
+          "problemSlug": "two-sum",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:two-pointers",
+          "problemSlug": "two-sum-ii-input-array-is-sorted",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:two-pointers",
+          "problemSlug": "3sum",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:two-pointers",
+          "problemSlug": "valid-palindrome",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:two-pointers",
+          "problemSlug": "container-with-most-water",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:two-pointers",
+          "problemSlug": "move-zeroes",
+          "position": 5
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:two-pointers",
+          "problemSlug": "next-permutation",
+          "position": 6
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:hash-maps-and-sets",
+          "problemSlug": "two-sum",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:hash-maps-and-sets",
+          "problemSlug": "valid-sudoku",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:hash-maps-and-sets",
+          "problemSlug": "set-matrix-zeroes",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:hash-maps-and-sets",
+          "problemSlug": "longest-consecutive-sequence",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:hash-maps-and-sets",
+          "problemSlug": "tuple-with-same-product",
+          "position": 5
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:linked-lists",
+          "problemSlug": "reverse-linked-list",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:linked-lists",
+          "problemSlug": "remove-nth-node-from-end-of-list",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:linked-lists",
+          "problemSlug": "intersection-of-two-linked-lists",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:linked-lists",
+          "problemSlug": "lru-cache",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:linked-lists",
+          "problemSlug": "palindrome-linked-list",
+          "position": 5
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:linked-lists",
+          "problemSlug": "flatten-a-multilevel-doubly-linked-list",
+          "position": 6
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:fast-and-slow-pointers",
+          "problemSlug": "linked-list-cycle",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:fast-and-slow-pointers",
+          "problemSlug": "middle-of-the-linked-list",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:fast-and-slow-pointers",
+          "problemSlug": "happy-number",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:sliding-window",
+          "problemSlug": "find-all-anagrams-in-a-string",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:sliding-window",
+          "problemSlug": "longest-substring-without-repeating-characters",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:sliding-window",
+          "problemSlug": "longest-repeating-character-replacement",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:binary-search",
+          "problemSlug": "search-insert-position",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:binary-search",
+          "problemSlug": "find-first-and-last-position-of-element-in-sorted-array",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:binary-search",
+          "problemSlug": "cutting-ribbons",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:binary-search",
+          "problemSlug": "search-in-rotated-sorted-array",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:binary-search",
+          "problemSlug": "median-of-two-sorted-arrays",
+          "position": 5
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:binary-search",
+          "problemSlug": "search-a-2d-matrix",
+          "position": 6
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:binary-search",
+          "problemSlug": "find-peak-element",
+          "position": 7
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:binary-search",
+          "problemSlug": "random-pick-with-weight",
+          "position": 8
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:stacks",
+          "problemSlug": "valid-parentheses",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:stacks",
+          "problemSlug": "next-greater-element-i",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:stacks",
+          "problemSlug": "evaluate-reverse-polish-notation",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:stacks",
+          "problemSlug": "remove-all-adjacent-duplicates-in-string",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:stacks",
+          "problemSlug": "implement-queue-using-stacks",
+          "position": 5
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:stacks",
+          "problemSlug": "sliding-window-maximum",
+          "position": 6
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:heaps",
+          "problemSlug": "top-k-frequent-words",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:heaps",
+          "problemSlug": "merge-k-sorted-lists",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:heaps",
+          "problemSlug": "find-median-from-data-stream",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:heaps",
+          "problemSlug": "sort-characters-by-frequency",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:intervals",
+          "problemSlug": "merge-intervals",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:intervals",
+          "problemSlug": "interval-list-intersections",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:intervals",
+          "problemSlug": "meeting-rooms-ii",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:prefix-sums",
+          "problemSlug": "range-sum-query-immutable",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:prefix-sums",
+          "problemSlug": "subarray-sum-equals-k",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:prefix-sums",
+          "problemSlug": "product-of-array-except-self",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "invert-binary-tree",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "balanced-binary-tree",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "binary-tree-right-side-view",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "maximum-width-of-binary-tree",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "validate-binary-search-tree",
+          "position": 5
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "lowest-common-ancestor-of-a-binary-tree",
+          "position": 6
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "construct-binary-tree-from-preorder-and-inorder-traversal",
+          "position": 7
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "binary-tree-maximum-path-sum",
+          "position": 8
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "symmetric-tree",
+          "position": 9
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "binary-tree-vertical-order-traversal",
+          "position": 10
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "kth-smallest-element-in-a-bst",
+          "position": 11
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:trees",
+          "problemSlug": "serialize-and-deserialize-binary-tree",
+          "position": 12
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:tries",
+          "problemSlug": "implement-trie-prefix-tree",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:tries",
+          "problemSlug": "design-add-and-search-words-data-structure",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:tries",
+          "problemSlug": "word-search-ii",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "clone-graph",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "number-of-islands",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "rotting-oranges",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "is-graph-bipartite",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "longest-increasing-path-in-a-matrix",
+          "position": 5
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "word-ladder",
+          "position": 6
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "accounts-merge",
+          "position": 7
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "course-schedule",
+          "position": 8
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "network-delay-time",
+          "position": 9
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:graphs",
+          "problemSlug": "number-of-connected-components-in-an-undirected-graph",
+          "position": 10
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:backtracking",
+          "problemSlug": "permutations",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:backtracking",
+          "problemSlug": "subsets",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:backtracking",
+          "problemSlug": "n-queens",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:backtracking",
+          "problemSlug": "combination-sum",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:backtracking",
+          "problemSlug": "letter-combinations-of-a-phone-number",
+          "position": 5
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:dynamic-programming",
+          "problemSlug": "climbing-stairs",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:dynamic-programming",
+          "problemSlug": "coin-change",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:dynamic-programming",
+          "problemSlug": "unique-paths",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:dynamic-programming",
+          "problemSlug": "house-robber",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:dynamic-programming",
+          "problemSlug": "longest-common-subsequence",
+          "position": 5
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:dynamic-programming",
+          "problemSlug": "longest-palindromic-substring",
+          "position": 6
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:dynamic-programming",
+          "problemSlug": "maximum-subarray",
+          "position": 7
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:dynamic-programming",
+          "problemSlug": "ones-and-zeroes",
+          "position": 8
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:dynamic-programming",
+          "problemSlug": "maximal-square",
+          "position": 9
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:greedy",
+          "problemSlug": "jump-game",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:greedy",
+          "problemSlug": "gas-station",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:greedy",
+          "problemSlug": "candy",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:sort-and-search",
+          "problemSlug": "sort-list",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:sort-and-search",
+          "problemSlug": "sort-an-array",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:sort-and-search",
+          "problemSlug": "kth-largest-element-in-an-array",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:sort-and-search",
+          "problemSlug": "sort-colors",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:bit-manipulation",
+          "problemSlug": "number-of-1-bits",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:bit-manipulation",
+          "problemSlug": "single-number",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:bit-manipulation",
+          "problemSlug": "reverse-bits",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:math-and-geometry",
+          "problemSlug": "spiral-matrix",
+          "position": 1
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:math-and-geometry",
+          "problemSlug": "reverse-integer",
+          "position": 2
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:math-and-geometry",
+          "problemSlug": "max-points-on-a-line",
+          "position": 3
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:math-and-geometry",
+          "problemSlug": "find-the-winner-of-the-circular-game",
+          "position": 4
+        },
+        {
+          "trackGroupId": "bytebytego-coding-patterns-101:math-and-geometry",
+          "problemSlug": "valid-triangle-number",
+          "position": 5
+        },
+        {
+          "trackGroupId": "leetcode-75:arrays-hashing",
+          "problemSlug": "two-sum",
+          "position": 1
+        },
+        {
+          "trackGroupId": "grind-75:stack",
+          "problemSlug": "valid-parentheses",
+          "position": 1
+        }
+      ],
+      "progress": [
+        {
+          "trackId": "custom-track",
+          "problemSlug": "two-sum",
+          "reviewAttemptId": null,
+          "completedAt": "2026-05-25T12:00:00.000Z",
+          "completedRating": "good",
+          "createdAt": "2026-05-25T12:00:00.000Z",
+          "updatedAt": "2026-05-25T12:00:00.000Z"
+        }
+      ],
+      "session": [
+        {
+          "id": "active",
+          "activeTrackId": "custom-track",
+          "activeGroupId": "custom-track:arrays",
+          "startedAt": "2026-05-25T12:00:00.000Z",
+          "updatedAt": "2026-05-25T12:00:00.000Z"
+        }
+      ]
+    },
+    "settings": [
+      {
+        "key": "user-settings",
+        "value": "{\"schemaVersion\":1,\"practice\":{\"dailyGoal\":5,\"mode\":\"studyPlan\",\"problemFilters\":{\"skipPremium\":true}},\"review\":{\"targetRetention\":0.75,\"order\":\"dueFirst\"},\"assessment\":{\"requireSolveTime\":false,\"strictTiming\":false,\"timeTargetsMinutes\":{\"easy\":15,\"medium\":30,\"hard\":45}},\"overlay\":{\"autoDetectSolved\":true},\"reminders\":{\"daily\":{\"enabled\":false,\"time\":\"09:00\"}}}",
+        "updatedAt": "2026-05-25T12:00:00.000Z"
+      }
+    ]
+  },
+  "notesArchive": {
+    "formatVersion": 1,
+    "notes": [
+      {
+        "problemSlug": "two-sum",
+        "document": {
+          "formatVersion": 1,
+          "revision": 3,
+          "markdown": "# Synthetic study note\n\n反省: preserve trailing space.  \n",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        },
+        "savedAiCollectionRevision": 1
+      }
+    ],
+    "submissions": [
+      {
+        "id": "submission-1",
+        "problemSlug": "two-sum",
+        "observedAttemptIds": ["attempt-1"],
+        "externalSubmissionId": "123",
+        "host": "leetcode.com",
+        "submittedAt": "2026-10-31T12:00:00.000Z",
+        "status": "accepted",
+        "statusText": "Accepted",
+        "language": "JavaScript",
+        "completeness": "complete",
+        "codePayloadId": "code-1",
+        "diagnostics": {
+          "errorMessage": null,
+          "compileError": null,
+          "runtimeError": null,
+          "failingTestcase": null,
+          "lastTestcase": null,
+          "codeOutput": null,
+          "expectedOutput": null,
+          "stdOutput": null
+        },
+        "omittedDiagnostics": [],
+        "reflection": {
+          "formatVersion": 1,
+          "revision": 2,
+          "markdown": "Check duplicate complements.  \n",
+          "updatedAt": "2026-10-31T12:00:00.000Z"
+        }
+      }
+    ],
+    "assessments": [
+      {
+        "id": "assessment-1",
+        "problemSlug": "two-sum",
+        "submissionId": "submission-1",
+        "requestId": "request-1",
+        "generatedAt": "2026-10-31T12:00:00.000Z",
+        "feedbackSchemaVersion": 1,
+        "feedbackPayloadId": "feedback-1",
+        "providerMetadata": {
+          "provider": "openai",
+          "model": "test-model",
+          "durationMs": 10
+        },
+        "implementationPayloadId": "implementation-1"
+      }
+    ],
+    "savedAiNotes": [
+      {
+        "problemSlug": "two-sum",
+        "assessmentId": "assessment-1",
+        "savedAt": "2026-10-31T12:00:00.000Z"
+      }
+    ],
+    "payloads": [
+      {
+        "id": "code-1",
+        "kind": "submitted-code",
+        "body": "function twoSum() {}",
+        "byteLength": 20,
+        "sha256": "0893775e7c86061cc7d0dcfe504226657e24d6f0b8cc75d75d207876168bc9b8"
+      },
+      {
+        "id": "feedback-1",
+        "kind": "feedback-v1",
+        "body": {
+          "version": "leetcode-code-feedback-v1",
+          "summary": "Use a map to find complements.",
+          "approach": {
+            "score": 3,
+            "rationale": "Pair enumeration is correct.",
+            "confidence": "high",
+            "strategyAssessment": "material-improvement",
+            "current": ["Pair enumeration"],
+            "suggested": ["Hash map"],
+            "keyIdea": "Look up the complement.",
+            "consider": null
+          },
+          "efficiency": {
+            "score": 3,
+            "rationale": "A map improves expected time.",
+            "confidence": "high",
+            "current": { "time": "O(n²)", "space": "O(1)", "assumptions": [] },
+            "suggested": { "time": "O(n)", "space": "O(n)", "assumptions": [] },
+            "timeComparison": "better",
+            "spaceComparison": "worse",
+            "suggestions": []
+          },
+          "codeStyle": {
+            "score": 4,
+            "rationale": "The code is clear.",
+            "confidence": "high",
+            "readability": "Good",
+            "structure": "Good",
+            "suggestions": []
+          }
+        },
+        "byteLength": 732,
+        "sha256": "4aaf20a1d60396f2b2613b73762c19930b8730dc38c836ff9aa7cb5d8fcf452d"
+      },
+      {
+        "id": "implementation-1",
+        "kind": "implementation-v1",
+        "body": {
+          "version": "leetcode-code-implementation-v1",
+          "status": "ready",
+          "implementation": {
+            "language": "JavaScript",
+            "code": "function twoSum(nums, target) { return []; }",
+            "changes": [],
+            "complexity": {
+              "time": "O(n)",
+              "space": "O(n)",
+              "assumptions": []
+            },
+            "assumptions": []
+          }
+        },
+        "byteLength": 250,
+        "sha256": "5d1f7d8b9da7b84c0c6aff77a0203c3217d686b1fec818d4a42f428aee13bb68"
+      }
+    ]
+  }
+}
