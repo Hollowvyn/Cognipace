@@ -11,6 +11,7 @@ import { createNotesRepository } from '@/features/notes/data/notes-repository'
 import { createNotesService } from '@/features/notes/server/notes-service'
 import { createNotesEditScopes } from './notes-edit-scopes'
 import { makeNotesArchive } from '@/features/notes/testing/notes-fixtures'
+import { utcIsoSortKey } from '@/lib/utc-iso-sort-key'
 
 const handlers = vi.hoisted(
   () =>
@@ -351,7 +352,11 @@ describe('Notes runtime with owning service and durable IDB', () => {
           stores.payloads.put(payload, payload.id)
           const row = archive.submissions[0]!
           stores.submissions.put(
-            { ...row, archiveGeneration: head.archiveGeneration },
+            {
+              ...row,
+              archiveGeneration: head.archiveGeneration,
+              submittedAtSortKey: utcIsoSortKey(row.submittedAt),
+            },
             [head.archiveGeneration, row.id],
           )
           done(undefined)
@@ -403,7 +408,11 @@ describe('Notes runtime with owning service and durable IDB', () => {
           stores.payloads.put(payload, payload.id)
           const row = archive.submissions[0]!
           stores.submissions.put(
-            { ...row, archiveGeneration: initial.archiveGeneration },
+            {
+              ...row,
+              archiveGeneration: initial.archiveGeneration,
+              submittedAtSortKey: utcIsoSortKey(row.submittedAt),
+            },
             [initial.archiveGeneration, row.id],
           )
           done(undefined)
@@ -732,6 +741,9 @@ describe('Notes runtime with owning service and durable IDB', () => {
                 id: 'submission-' + i,
                 externalSubmissionId: 'external-' + i,
                 archiveGeneration: head.archiveGeneration,
+                submittedAtSortKey: utcIsoSortKey(
+                  archive.submissions[0]!.submittedAt,
+                ),
               },
               [head.archiveGeneration, 'submission-' + i],
             )

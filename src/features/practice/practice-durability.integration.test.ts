@@ -30,6 +30,8 @@ import {
   readPreservationRows,
 } from '@/testing/fixtures/fsrs-preservation'
 import { expectedV9MigrationFingerprint } from '@/testing/fixtures/fsrs-remediation-legacy-migrations'
+import { makeNotesArchive } from '@/features/notes/testing/notes-fixtures'
+import { utcIsoSortKey } from '@/lib/utc-iso-sort-key'
 
 const handles: DbHandle[] = []
 const values: Record<string, unknown> = {}
@@ -293,12 +295,19 @@ it('recovers exact prior archive bodies with fresh Notes and Practice write scop
   }
   await notes.saveDocument(noteCommand)
   const baseline = (await local.readHead())!
+  const submission = (await makeNotesArchive()).submissions[0]!
   await local.transact(
     ['submissions', 'analysisReports', 'payloads'],
     'readwrite',
     (s, done) => {
       s.submissions.put(
-        { problemSlug: 'two-sum', codePayloadId: 'recovery-code' },
+        {
+          ...submission,
+          id: 'submission',
+          codePayloadId: 'recovery-code',
+          archiveGeneration: baseline.archiveGeneration,
+          submittedAtSortKey: utcIsoSortKey(submission.submittedAt),
+        },
         [baseline.archiveGeneration, 'submission'],
       )
       s.analysisReports.put(
