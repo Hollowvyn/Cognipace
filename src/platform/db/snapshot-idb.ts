@@ -1,3 +1,11 @@
+import { createLocalIdbStore } from './local-idb'
+import {
+  coreRecordReferenceKey,
+  coreRecordReferenceSchema,
+  isBinary,
+  localHeadSchema,
+} from './local-store-types'
+
 export interface ActiveSnapshotRecord {
   key: 'active'
   fingerprint: string
@@ -145,104 +153,156 @@ function readRecord(value: unknown): ActiveSnapshotRecord | null {
   return value === undefined ? null : validateActive(value)
 }
 
-function asError(value: unknown): Error {
-  return value instanceof Error ? value : new Error(String(value))
-}
-
 export function createSnapshotIdbStore(
   factory: IDBFactory,
   databaseName = 'cognipace-local-v1',
 ): SnapshotIdbStore {
-  function openDatabase(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = factory.open(databaseName, 1)
-      let settled = false
-      request.onupgradeneeded = () => {
-        request.result.createObjectStore('records')
-      }
-      request.onsuccess = () => {
-        if (settled) {
-          request.result.close()
-          return
-        }
-        settled = true
-        resolve(request.result)
-      }
-      request.onerror = () => {
-        if (settled) return
-        settled = true
-        reject(asError(request.error))
-      }
-      request.onblocked = () => {
-        if (settled) return
-        settled = true
-        reject(new Error('The snapshot database is blocked.'))
-      }
-    })
-  }
-
-  async function transact<T>(
+  const local = createLocalIdbStore(factory, databaseName)
+  function transact<T>(
     mode: IDBTransactionMode,
     operate: (
       records: IDBObjectStore,
       finish: (value: T) => void,
       fail: (error: unknown) => void,
+      read: (key: IDBValidKey) => {
+        result: unknown
+        onsuccess: (() => void) | null
+      },
+      write: (value: unknown, key: IDBValidKey) => void,
     ) => void,
   ): Promise<T> {
-    const database = await openDatabase()
-    return new Promise<T>((resolve, reject) => {
-      let result: T
-      let failure: Error | null = null
-      let transaction: IDBTransaction
-      try {
-        transaction = database.transaction('records', mode)
-      } catch (error) {
-        database.close()
-        reject(asError(error))
-        return
-      }
-
-      transaction.oncomplete = () => {
-        database.close()
-        resolve(result)
-      }
-      transaction.onerror = () => {
-        database.close()
-        reject(asError(failure ?? transaction.error))
-      }
-      transaction.onabort = () => {
-        database.close()
-        reject(
-          asError(
-            failure ??
-              transaction.error ??
-              new Error('Snapshot transaction aborted.'),
-          ),
-        )
-      }
-
-      try {
-        operate(
-          transaction.objectStore('records'),
-          (value) => {
-            result = value
-          },
-          (error) => {
-            failure = error instanceof Error ? error : new Error(String(error))
-            transaction.abort()
-          },
-        )
-      } catch (error) {
-        failure = error instanceof Error ? error : new Error(String(error))
-        transaction.abort()
-      }
-    })
+    return local.transact(
+      ['records', 'coreSnapshots'],
+      mode,
+      (stores, finish, fail) => {
+        const records = stores.records
+        const cores = stores.coreSnapshots
+        const heads = new Map<IDBValidKey, Record<string, unknown>>()
+        const binaries = new Map<IDBValidKey, Uint8Array>()
+        function read(key: IDBValidKey) {
+          const output: { result: unknown; onsuccess: (() => void) | null } = {
+            result: undefined,
+            onsuccess: null,
+          }
+          const request = records.get(key)
+          request.onsuccess = () => {
+            try {
+              const value: unknown = request.result
+              if (
+                typeof value === 'object' &&
+                value !== null &&
+                'formatVersion' in value &&
+                value.formatVersion === 2 &&
+                'coreSnapshotId' in value &&
+                'key' in value &&
+                (value.key === 'active' || value.key === 'replacement')
+              ) {
+                if (key === 'active') localHeadSchema.parse(value)
+                const hydrate = () => {
+                  if (typeof value.coreSnapshotId !== 'string')
+                    throw new Error('The stored core reference is invalid.')
+                  heads.set(key, value)
+                  const core = cores.get(value.coreSnapshotId)
+                  core.onsuccess = () => {
+                    try {
+                      if (!isBinary(core.result))
+                        throw new Error(
+                          'The stored core snapshot is missing or invalid.',
+                        )
+                      binaries.set(key, core.result)
+                      const metadata = { ...value } as Record<string, unknown>
+                      delete metadata.formatVersion
+                      delete metadata.coreSnapshotId
+                      delete metadata.archiveGeneration
+                      delete metadata.datasetToken
+                      output.result = { ...metadata, bytes: core.result }
+                      output.onsuccess?.()
+                    } catch (error) {
+                      fail(error)
+                    }
+                  }
+                }
+                if (key === 'active') hydrate()
+                else {
+                  // Recovery values are historically opaque. Only separately
+                  // recorded provenance authorizes treating one as a core head.
+                  const reference = cores.get(coreRecordReferenceKey(key))
+                  reference.onsuccess = () => {
+                    try {
+                      if (reference.result === undefined) {
+                        output.result = value
+                        output.onsuccess?.()
+                        return
+                      }
+                      const pointer = coreRecordReferenceSchema.parse(
+                        reference.result,
+                      )
+                      if (pointer.coreSnapshotId !== value.coreSnapshotId)
+                        throw new Error(
+                          'The stored recovery core reference is invalid.',
+                        )
+                      hydrate()
+                    } catch (error) {
+                      fail(error)
+                    }
+                  }
+                }
+              } else {
+                output.result = value
+                output.onsuccess?.()
+              }
+            } catch (error) {
+              fail(error)
+            }
+          }
+          return output
+        }
+        function write(value: unknown, key: IDBValidKey) {
+          if (
+            typeof value === 'object' &&
+            value !== null &&
+            'bytes' in value &&
+            isBinary(value.bytes) &&
+            'key' in value &&
+            (value.key === 'active' || value.key === 'replacement')
+          ) {
+            const { bytes, ...metadata } = value
+            const previous = heads.get(key)
+            const coreSnapshotId =
+              previous && binaries.get(key) === bytes
+                ? String(previous.coreSnapshotId)
+                : crypto.randomUUID()
+            if (!previous || binaries.get(key) !== bytes)
+              cores.add(bytes, coreSnapshotId)
+            if (key !== 'active')
+              cores.put({ coreSnapshotId }, coreRecordReferenceKey(key))
+            records.put(
+              {
+                ...metadata,
+                formatVersion: 2,
+                coreSnapshotId,
+                ...(key === 'active'
+                  ? {
+                      archiveGeneration:
+                        previous?.archiveGeneration ?? crypto.randomUUID(),
+                      datasetToken:
+                        previous?.datasetToken ?? crypto.randomUUID(),
+                    }
+                  : {}),
+              },
+              key,
+            )
+          } else records.put(value, key)
+        }
+        operate(records, finish, fail, read, write)
+      },
+    )
   }
 
   return {
     listReplacementRecoveries() {
-      return transact('readonly', (records, finish, fail) => {
-        const request = records.get('recovery')
+      return transact('readonly', (_records, finish, fail, read) => {
+        const request = read('recovery')
         request.onsuccess = () => {
           try {
             const record = readReplacementRecoveryRecord(request.result)
@@ -267,8 +327,8 @@ export function createSnapshotIdbStore(
       })
     },
     readReplacementRecovery(replacementId) {
-      return transact('readonly', (records, finish, fail) => {
-        const request = records.get('recovery')
+      return transact('readonly', (_records, finish, fail, read) => {
+        const request = read('recovery')
         request.onsuccess = () => {
           try {
             const record = readReplacementRecoveryRecord(request.result)
@@ -280,8 +340,8 @@ export function createSnapshotIdbStore(
       })
     },
     readContinuation() {
-      return transact('readonly', (records, finish, fail) => {
-        const request = records.get('replacement-continuation')
+      return transact('readonly', (_records, finish, fail, read) => {
+        const request = read('replacement-continuation')
         request.onsuccess = () => {
           try {
             finish(readContinuationRecord(request.result))
@@ -295,15 +355,15 @@ export function createSnapshotIdbStore(
     commitReplacement(bytes, fingerprint, now, input) {
       const savedBytes = bytes.slice()
       const savedAt = now.toISOString()
-      return transact('readwrite', (records, finish, fail) => {
-        const continuationRequest = records.get('replacement-continuation')
+      return transact('readwrite', (records, finish, fail, read, write) => {
+        const continuationRequest = read('replacement-continuation')
         continuationRequest.onsuccess = () => {
           try {
             if (readContinuationRecord(continuationRequest.result))
               throw new Error(
                 'An earlier replacement continuation is unresolved.',
               )
-            const activeRequest = records.get('active')
+            const activeRequest = read('active')
             activeRequest.onsuccess = () => {
               try {
                 const previous = readRecord(activeRequest.result)
@@ -331,7 +391,7 @@ export function createSnapshotIdbStore(
                     ? { syncMetadataPatch: input.syncMetadataPatch }
                     : {}),
                 }
-                records.put(
+                write(
                   {
                     key: 'replacement',
                     replacementId: input.replacementId,
@@ -342,8 +402,8 @@ export function createSnapshotIdbStore(
                   } satisfies ReplacementRecoveryRecord,
                   'recovery',
                 )
-                records.put(next, 'active')
-                records.put(continuation, 'replacement-continuation')
+                write(next, 'active')
+                write(continuation, 'replacement-continuation')
                 const legacyCursor = records.openCursor()
                 legacyCursor.onsuccess = () => {
                   const cursor = legacyCursor.result
@@ -352,8 +412,12 @@ export function createSnapshotIdbStore(
                     typeof cursor.key === 'string' &&
                     (cursor.key === 'recovery:replacement' ||
                       cursor.key.startsWith('recovery:replacement:'))
-                  )
+                  ) {
                     cursor.delete()
+                    records.transaction
+                      .objectStore('coreSnapshots')
+                      .delete(coreRecordReferenceKey(cursor.key))
+                  }
                   cursor.continue()
                 }
                 finish(next)
@@ -375,8 +439,8 @@ export function createSnapshotIdbStore(
       return updateContinuation(replacementId, 'needsSyncMetadata', false)
     },
     completeContinuation(replacementId) {
-      return transact('readwrite', (records, finish, fail) => {
-        const request = records.get('replacement-continuation')
+      return transact('readwrite', (records, finish, fail, read) => {
+        const request = read('replacement-continuation')
         request.onsuccess = () => {
           try {
             const current = readContinuationRecord(request.result)
@@ -396,8 +460,8 @@ export function createSnapshotIdbStore(
       })
     },
     readRecovery(key) {
-      return transact('readonly', (records, finish) => {
-        const request = records.get(`recovery:${key}`)
+      return transact('readonly', (_records, finish, _fail, read) => {
+        const request = read(`recovery:${key}`)
         request.onsuccess = () =>
           finish(
             request.result === undefined ? null : { value: request.result },
@@ -406,8 +470,8 @@ export function createSnapshotIdbStore(
     },
 
     commitRecovery(key, value) {
-      return transact('readwrite', (records, finish, fail) => {
-        const request = records.get(`recovery:${key}`)
+      return transact('readwrite', (_records, finish, fail, read, write) => {
+        const request = read(`recovery:${key}`)
         request.onsuccess = () => {
           if (request.result !== undefined) {
             fail(
@@ -417,15 +481,15 @@ export function createSnapshotIdbStore(
             )
             return
           }
-          records.put(value, `recovery:${key}`)
+          write(value, `recovery:${key}`)
           finish()
         }
       })
     },
 
     readActive() {
-      return transact('readonly', (records, finish, fail) => {
-        const request = records.get('active')
+      return transact('readonly', (_records, finish, fail, read) => {
+        const request = read('active')
         request.onsuccess = () => {
           try {
             finish(readRecord(request.result))
@@ -439,14 +503,14 @@ export function createSnapshotIdbStore(
     commitSnapshot(bytes, fingerprint, now) {
       const savedBytes = bytes.slice()
       const savedAt = now.toISOString()
-      return transact('readwrite', (records, finish, fail) => {
-        const continuationRequest = records.get('replacement-continuation')
+      return transact('readwrite', (_records, finish, fail, read, write) => {
+        const continuationRequest = read('replacement-continuation')
         continuationRequest.onsuccess = () => {
           try {
             const continuation = readContinuationRecord(
               continuationRequest.result,
             )
-            const request = records.get('active')
+            const request = read('active')
             request.onsuccess = () => {
               try {
                 const previous = readRecord(request.result)
@@ -474,7 +538,7 @@ export function createSnapshotIdbStore(
                     ? { replacementId: continuation.replacementId }
                     : {}),
                 }
-                records.put(next, 'active')
+                write(next, 'active')
                 finish(next)
               } catch (error) {
                 fail(error)
@@ -491,8 +555,8 @@ export function createSnapshotIdbStore(
       if (!Number.isSafeInteger(revision) || revision < 0) {
         return Promise.reject(new Error('Invalid verified revision.'))
       }
-      return transact('readwrite', (records, finish, fail) => {
-        const request = records.get('active')
+      return transact('readwrite', (_records, finish, fail, read, write) => {
+        const request = read('active')
         request.onsuccess = () => {
           try {
             const previous = readRecord(request.result)
@@ -504,7 +568,7 @@ export function createSnapshotIdbStore(
               )
               return
             }
-            records.put(
+            write(
               {
                 ...previous,
                 lastVerifiedRevision: Math.max(
@@ -528,14 +592,14 @@ export function createSnapshotIdbStore(
     flag: 'needsInvalidation' | 'needsSyncMetadata',
     value: false,
   ): Promise<void> {
-    return transact('readwrite', (records, finish, fail) => {
-      const request = records.get('replacement-continuation')
+    return transact('readwrite', (_records, finish, fail, read, write) => {
+      const request = read('replacement-continuation')
       request.onsuccess = () => {
         try {
           const current = readContinuationRecord(request.result)
           if (!current || current.replacementId !== replacementId)
             throw new Error('Replacement continuation does not match.')
-          records.put({ ...current, [flag]: value }, 'replacement-continuation')
+          write({ ...current, [flag]: value }, 'replacement-continuation')
           finish()
         } catch (error) {
           fail(error)

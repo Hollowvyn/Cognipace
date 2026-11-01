@@ -6,6 +6,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createSnapshotIdbStore } from './snapshot-idb'
+import { createLocalIdbStore } from './local-idb'
 
 const now = new Date('2026-10-16T00:00:00.000Z')
 const fingerprint = 'abcd1234'
@@ -358,3 +359,43 @@ describe('binary IndexedDB snapshot ledger', () => {
     await expect(store.readActive()).rejects.toThrow()
   })
 })
+
+it('keeps the published head binary-free and composes the legacy API after acknowledgement', async () => {
+  const name = `test-${crypto.randomUUID()}`
+  const local = createLocalIdbStore(testIndexedDB, name)
+  const snapshots = createSnapshotIdbStore(testIndexedDB, name)
+  await snapshots.commitSnapshot(new Uint8Array([3, 5]), fingerprint, now)
+  const first = await local.readHead()
+  expect(first).not.toHaveProperty('bytes')
+  await snapshots.acknowledgeVerifiedRevision(1)
+  const verified = await local.readHead()
+  expect(verified!.coreSnapshotId).toBe(first!.coreSnapshotId)
+  expect(verified!.lastVerifiedRevision).toBe(1)
+  await snapshots.commitSnapshot(new Uint8Array([7]), fingerprint, now)
+  const next = await local.readHead()
+  expect(next!.coreSnapshotId).not.toBe(first!.coreSnapshotId)
+  expect(next!.archiveGeneration).toBe(first!.archiveGeneration)
+  expect(next!.datasetToken).toBe(first!.datasetToken)
+  expect(Array.from((await local.readCore(first!.coreSnapshotId))!)).toEqual([
+    3, 5,
+  ])
+  expect((await snapshots.readActive())!.bytes[0]).toBe(7)
+})
+
+it.each(['active', 'replacement'])(
+  'preserves historical technical recovery values with key %s that resemble head references',
+  async (key) => {
+    const store = createStore()
+    for (const coreSnapshotId of ['historical-label', null, 42]) {
+      const value = {
+        formatVersion: 2,
+        coreSnapshotId,
+        snapshot: 'base64',
+        key,
+      }
+      const slot = `historical-${String(coreSnapshotId)}`
+      await store.commitRecovery(slot, value)
+      expect(await store.readRecovery(slot)).toEqual({ value })
+    }
+  },
+)
