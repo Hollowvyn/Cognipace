@@ -313,6 +313,9 @@ function readDialogTitle(
     return 'Sync blocked'
   }
 
+  if (result?.reason === 'backup-verification-unavailable')
+    return 'Upload unverified'
+
   if (result?.action === 'pull-latest') {
     return 'Pull complete'
   }
@@ -332,6 +335,7 @@ function readDialogTone(
   }
 
   if (
+    result?.reason === 'backup-verification-unavailable' ||
     result?.outcome === 'blocked' ||
     result?.outcome === 'confirmation-required'
   ) {

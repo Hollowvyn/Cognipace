@@ -7,7 +7,18 @@ import {
   validateGitHubToken,
 } from './gist-requests'
 
+export type BackupCapabilities = Readonly<{ verifiedFullBackup: boolean }>
+
+// PATCH success is not a complete post-upload readback, including truncated files.
+export const githubGistBackupCapabilities: BackupCapabilities = Object.freeze({
+  verifiedFullBackup: false,
+})
+
 export interface GitHubGistClient {
+  /** Trusted transport completion: complete readback must match these exact bytes.
+   * The current Gist adapter deliberately does not implement this capability. */
+  verifyCompleteBackup?: (gistId: string, content: string) => Promise<void>
+
   validateToken(): Promise<Awaited<ReturnType<typeof validateGitHubToken>>>
   getGist(gistId: string): Promise<Awaited<ReturnType<typeof getGitHubGist>>>
   createSyncGist(

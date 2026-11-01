@@ -10,6 +10,7 @@ import {
 } from '@/features/backup/api/backup-contracts'
 
 import {
+  needsArchiveRestoreReview,
   buildSyncEnvelope,
   parseSyncEnvelopeForCurrentApp,
   syncEnvelopeVersion,
@@ -284,4 +285,35 @@ it('retains original legacy format through envelope normalization without serial
     'dataUpdatedAt',
     'backup',
   ])
+})
+
+it('requires review only for automatic legacy replacement of a populated archive', () => {
+  expect(
+    needsArchiveRestoreReview({
+      automatic: true,
+      sourceSchemaVersion: 6,
+      currentArchiveHasData: true,
+    }),
+  ).toBe(true)
+  expect(
+    needsArchiveRestoreReview({
+      automatic: false,
+      sourceSchemaVersion: 6,
+      currentArchiveHasData: true,
+    }),
+  ).toBe(false)
+  expect(
+    needsArchiveRestoreReview({
+      automatic: true,
+      sourceSchemaVersion: 7,
+      currentArchiveHasData: true,
+    }),
+  ).toBe(false)
+  expect(
+    needsArchiveRestoreReview({
+      automatic: true,
+      sourceSchemaVersion: 6,
+      currentArchiveHasData: false,
+    }),
+  ).toBe(false)
 })

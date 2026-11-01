@@ -394,3 +394,30 @@ const confirmationRequiredResult = {
   status: configuredStatus,
   occurredAt: '2026-05-26T12:00:00.000Z',
 } satisfies SyncActionResult
+
+it('shows manual unverified upload as a warning with pending changes', async () => {
+  const user = userEvent.setup()
+  render(
+    <DashboardSyncActionsView
+      isPending={false}
+      status={configuredStatus}
+      onPullLatest={vi.fn()}
+      onPushLocal={vi.fn().mockResolvedValue({
+        ...confirmationRequiredResult,
+        action: 'push-local',
+        outcome: 'success',
+        reason: 'backup-verification-unavailable',
+        message: 'Upload is unverified. Local changes remain pending.',
+      })}
+    />,
+  )
+  await user.click(screen.getByRole('button', { name: /Push local to Gist/i }))
+  expect(
+    screen.getByRole('dialog', { name: 'Upload unverified' }),
+  ).toBeInTheDocument()
+  expect(
+    screen
+      .getByText('Upload is unverified. Local changes remain pending.')
+      .closest('[data-cp-tone]'),
+  ).toHaveAttribute('data-cp-tone', 'warning')
+})

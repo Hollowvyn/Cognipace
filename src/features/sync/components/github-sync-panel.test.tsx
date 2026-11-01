@@ -581,3 +581,60 @@ const syncActionResult = {
   status: configuredStatus,
   occurredAt: '2026-05-26T12:00:00.000Z',
 } as const
+
+it('shows action-needed verification guidance before generic pending status', () => {
+  render(
+    <GitHubSyncPanel
+      actions={createActions()}
+      status={{
+        ...configuredStatus,
+        needsPush: true,
+        lastBlockingReason: 'backup-verification-unavailable',
+      }}
+    />,
+  )
+  expect(screen.getByText('Action needed')).toBeInTheDocument()
+  expect(
+    screen.getByText(/Automatic uploads are unavailable.*unverified/i),
+  ).toBeInTheDocument()
+  expect(screen.queryByText(/waiting to be pushed/i)).not.toBeInTheDocument()
+  expect(screen.queryByText('Auto-sync on')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Push local/i })).toBeEnabled()
+})
+
+it('offers a manual preview when a legacy backup would remove the archive', () => {
+  render(
+    <GitHubSyncPanel
+      actions={createActions()}
+      status={{
+        ...configuredStatus,
+        lastBlockingReason: 'archive-review-required',
+      }}
+    />,
+  )
+  expect(
+    screen.getByText(/older backup.*Pull latest.*preview/i),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Pull latest/i })).toBeEnabled()
+})
+
+it('keeps concrete sync errors visible when automatic backup verification is unavailable', () => {
+  render(
+    <GitHubSyncPanel
+      actions={createActions()}
+      status={{
+        ...configuredStatus,
+        lastBlockingReason: 'backup-verification-unavailable',
+        lastError: {
+          kind: 'auth',
+          message: 'Token needs replacement.',
+          occurredAt: '2026-05-26T12:00:00.000Z',
+          retryable: false,
+        },
+      }}
+    />,
+  )
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Token needs replacement.',
+  )
+})

@@ -146,10 +146,18 @@ export function GitHubSyncPanel({
           </Badge>
           {status.configured ? (
             <Badge
-              tone={status.enabled ? 'success' : 'warning'}
+              tone={
+                status.enabled && !needsSyncAction(status)
+                  ? 'success'
+                  : 'warning'
+              }
               variant="outline"
             >
-              {status.enabled ? 'Auto-sync on' : 'Auto-sync paused'}
+              {status.enabled
+                ? needsSyncAction(status)
+                  ? 'Automatic checks on'
+                  : 'Auto-sync on'
+                : 'Auto-sync paused'}
             </Badge>
           ) : null}
         </div>
@@ -317,6 +325,24 @@ function SyncStatusBlock({ status }: { status: SerializedSyncStatus }) {
     )
   }
 
+  if (status.lastBlockingReason === 'archive-review-required') {
+    return (
+      <InlineStatus tone="warning">
+        This older backup has no Notes archive. Use Pull latest to review a full
+        preview before replacing local data.
+      </InlineStatus>
+    )
+  }
+  if (status.lastBlockingReason === 'backup-verification-unavailable') {
+    return (
+      <InlineStatus tone="warning">
+        Automatic uploads are unavailable without complete backup verification.
+        Push local makes an unverified manual upload; local changes remain
+        pending. Export a full local backup to keep a recovery copy.
+      </InlineStatus>
+    )
+  }
+
   if (status.lastBlockingReason === 'local-dirty') {
     return (
       <InlineStatus tone="warning">
@@ -343,6 +369,13 @@ function SyncStatusBlock({ status }: { status: SerializedSyncStatus }) {
   )
 }
 
+function needsSyncAction(status: SerializedSyncStatus) {
+  return (
+    status.lastBlockingReason === 'backup-verification-unavailable' ||
+    status.lastBlockingReason === 'archive-review-required'
+  )
+}
+
 function readConnectionLabel(status: SerializedSyncStatus) {
   if (status.conflict) {
     return 'Conflict'
@@ -352,6 +385,8 @@ function readConnectionLabel(status: SerializedSyncStatus) {
     return status.lastError.retryable ? 'Retry needed' : 'Error'
   }
 
+  if (needsSyncAction(status)) return 'Action needed'
+
   if (status.configured) {
     return 'Connected'
   }
@@ -360,7 +395,11 @@ function readConnectionLabel(status: SerializedSyncStatus) {
 }
 
 function readConnectionTone(status: SerializedSyncStatus) {
-  if (status.conflict || status.lastError?.retryable) {
+  if (
+    needsSyncAction(status) ||
+    status.conflict ||
+    status.lastError?.retryable
+  ) {
     return 'warning'
   }
 

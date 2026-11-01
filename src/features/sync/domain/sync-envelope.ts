@@ -69,3 +69,15 @@ export function parseSyncEnvelopeForCurrentApp(input: unknown): SyncEnvelope {
 
   return syncEnvelopeSchema.parse(input)
 }
+
+export function needsArchiveRestoreReview(input: {
+  automatic: boolean
+  sourceSchemaVersion: number
+  currentArchiveHasData: boolean
+}): boolean {
+  return (
+    input.automatic &&
+    input.sourceSchemaVersion < 7 &&
+    input.currentArchiveHasData
+  )
+}

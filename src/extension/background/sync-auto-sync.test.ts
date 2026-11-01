@@ -382,6 +382,7 @@ function createDeps(
   overrides: Partial<SyncAutoSyncDependencies> = {},
 ): SyncAutoSyncDependencies {
   return {
+    backupCapabilities: { verifiedFullBackup: true },
     now: () => new Date('2026-05-31T12:00:00.000Z'),
     readMetadata: vi.fn(() => Promise.resolve(createMetadata())),
     writeMetadata: vi.fn((patch: Partial<SyncMetadata>) =>
@@ -510,4 +511,27 @@ it('repairs a lost push alarm on restart from the durable head when Chrome dirty
   } finally {
     vi.unstubAllGlobals()
   }
+})
+
+it('never retries unsupported automatic uploads across worker restarts or metadata and alarm failures', async () => {
+  const deps = createDeps({
+    backupCapabilities: { verifiedFullBackup: false },
+    readMetadata: vi.fn(() =>
+      Promise.resolve(
+        createMetadata({ dirtySinceLastSync: true, lastBlockingReason: null }),
+      ),
+    ),
+    writeMetadata: vi.fn(() => Promise.reject(new Error('storage failed'))),
+  })
+  vi.mocked(deps.scheduler.clear).mockRejectedValue(new Error('alarm failed'))
+  for (let restart = 0; restart < 3; restart++) {
+    const sync = createSyncAutoSync(deps)
+    await sync.repairStartupAlarms()
+    await sync.scheduleAutoPushAfterMutation()
+    await sync.runAutoPush()
+  }
+  expect(deps.runSafePush).not.toHaveBeenCalled()
+  expect(deps.scheduler.schedule).not.toHaveBeenCalled()
+  expect(deps.scheduler.clear).toHaveBeenCalledWith(syncAutoPushAlarmName)
+  expect(deps.scheduler.clear).toHaveBeenCalledWith(syncRetryAlarmName)
 })

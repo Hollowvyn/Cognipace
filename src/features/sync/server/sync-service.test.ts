@@ -1,3 +1,12 @@
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
+import { createLocalIdbStore } from '@/platform/db/local-idb'
+import { createSnapshotIdbStore } from '@/platform/db/snapshot-idb'
+import { createNotesRepository } from '@/features/notes/data/notes-repository'
+import { createArchiveGenerationRepository } from '@/features/notes/data/archive-generation-repository'
+import {
+  markLocalDataChanged,
+  readSyncMetadata,
+} from '../data/sync-metadata-store'
 import { parseBackupFileForCurrentApp } from '@/features/backup/api/backup-contracts'
 import { createFrozenV6BackupFixture } from '@/features/backup/testing/backup-v6-fixture'
 import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
@@ -1010,7 +1019,7 @@ describe('sync service', () => {
       outcome: 'no-change',
       reason: 'local-dirty',
       retryable: false,
-      message: 'Remote check skipped: local changes need to be pushed.',
+      message: 'Remote check skipped: local changes remain pending backup.',
     })
     expect(harness.githubClient.getGist).not.toHaveBeenCalled()
     expect(harness.restoreBackup).not.toHaveBeenCalled()
@@ -1937,6 +1946,8 @@ function createHarness(
   overrides: Partial<
     Pick<
       SyncServiceDependencies,
+      | 'backupCapabilities'
+      | 'acknowledgeVerifiedRevision'
       | 'runRemoteRestore'
       | 'syncCoordinator'
       | 'runFullBackupReplacement'
@@ -1950,7 +1961,7 @@ function createHarness(
     .fn<(backup: BackupFile) => Promise<BackupSummary>>()
     .mockResolvedValue(backupSummary)
   const exportFullBackup = vi
-    .fn<() => Promise<BackupFile>>()
+    .fn<SyncServiceDependencies['exportFullBackup']>()
     .mockResolvedValue(backup)
   const flushDbSnapshot = vi
     .fn<() => Promise<void>>()
@@ -1959,6 +1970,9 @@ function createHarness(
     .fn<() => Promise<void>>()
     .mockResolvedValue(undefined)
   const githubClient = {
+    verifyCompleteBackup: vi
+      .fn<(gistId: string, content: string) => Promise<void>>()
+      .mockResolvedValue(undefined),
     validateToken: vi
       .fn<() => Promise<{ ok: true; login: string }>>()
       .mockResolvedValue({ ok: true, login: 'octocat' }),
@@ -1981,6 +1995,11 @@ function createHarness(
   const now = vi.fn(() => new Date(currentTime))
 
   const service = createSyncService({
+    backupCapabilities: overrides.backupCapabilities ?? {
+      verifiedFullBackup: true,
+    },
+    acknowledgeVerifiedRevision:
+      overrides.acknowledgeVerifiedRevision ?? vi.fn(async () => {}),
     readToken,
     saveToken,
     deleteToken: vi.fn().mockResolvedValue(undefined),
@@ -2184,3 +2203,290 @@ it('queued background sync export resolves the adopted database after remote I/O
     exportBackup.mockRestore()
   }
 })
+
+describe('complete archive backup policy', () => {
+  it('blocks automatic legacy replacement before calling restore when the current archive is populated', async () => {
+    const harness = configuredPullHarness()
+    const current = parseBackupFileForCurrentApp(createFrozenV6BackupFixture())
+    current.notesArchive.notes.push({
+      problemSlug: 'two-sum',
+      savedAiCollectionRevision: 0,
+      document: {
+        formatVersion: 1,
+        revision: 1,
+        markdown: 'Keep this note',
+        updatedAt: currentTime,
+      },
+    })
+    harness.exportFullBackup.mockResolvedValue({ backup: current, revision: 7 })
+    harness.githubClient.getGist.mockResolvedValue(
+      createGistSummary({
+        ...pullGist(),
+        content: JSON.stringify({
+          ...JSON.parse(pullGist().content!),
+          backup: createFrozenV6BackupFixture(),
+        }),
+      }),
+    )
+    expect(await harness.service.checkRemoteOnOpen()).toMatchObject({
+      outcome: 'blocked',
+      reason: 'archive-review-required',
+      retryable: false,
+    })
+    expect(harness.restoreBackup).not.toHaveBeenCalled()
+  })
+
+  it('preserves pending data and never acknowledges an HTTP-only manual upload', async () => {
+    const acknowledgeVerifiedRevision = vi.fn()
+    const harness = configuredPullHarness({
+      backupCapabilities: { verifiedFullBackup: false },
+      acknowledgeVerifiedRevision,
+    })
+    harness.setMetadata({ dirtySinceLastSync: true })
+    harness.exportFullBackup.mockResolvedValue({ backup, revision: 7 })
+    harness.githubClient.updateSyncGist.mockResolvedValue(pullGist())
+    const result = await harness.service.pushLocal({
+      confirmRemoteOverwrite: true,
+    })
+    expect(result).toMatchObject({
+      outcome: 'success',
+      reason: 'backup-verification-unavailable',
+      status: {
+        needsPush: true,
+        lastBlockingReason: 'backup-verification-unavailable',
+      },
+    })
+    expect(result.message).toMatch(/unverified/i)
+    expect(acknowledgeVerifiedRevision).not.toHaveBeenCalled()
+    expect(harness.githubClient.verifyCompleteBackup).not.toHaveBeenCalled()
+    const content = JSON.parse(
+      harness.githubClient.updateSyncGist.mock.calls[0]![1],
+    ) as { backup: BackupFile }
+    expect(content.backup.schemaVersion).toBe(7)
+    expect(content.backup.notesArchive).toEqual(backup.notesArchive)
+  })
+
+  it('acknowledges only the captured export revision after complete verification while a newer edit remains pending', async () => {
+    const head = { revision: 7, lastVerifiedRevision: 6 }
+    const acknowledgeVerifiedRevision = vi.fn((revision: number) => {
+      head.lastVerifiedRevision = revision
+      return Promise.resolve()
+    })
+    const harness = configuredPullHarness({ acknowledgeVerifiedRevision })
+    harness.setMetadata({
+      dirtySinceLastSync: true,
+      localDataUpdatedAt: currentTime,
+    })
+    harness.exportFullBackup.mockResolvedValue({ backup, revision: 7 })
+    harness.githubClient.updateSyncGist.mockImplementation(() => {
+      head.revision = 8
+      harness.setMetadata({
+        dirtySinceLastSync: true,
+        localDataUpdatedAt: '2026-05-26T13:00:00.000Z',
+      })
+      return Promise.resolve(pullGist())
+    })
+    harness.githubClient.verifyCompleteBackup.mockImplementation(() => {
+      expect(acknowledgeVerifiedRevision).not.toHaveBeenCalled()
+      return Promise.resolve()
+    })
+    const result = await harness.service.pushLocal({
+      confirmRemoteOverwrite: true,
+    })
+    expect(harness.githubClient.verifyCompleteBackup).toHaveBeenCalledWith(
+      'gist_1',
+      harness.githubClient.updateSyncGist.mock.calls[0]![1],
+    )
+    expect(acknowledgeVerifiedRevision).toHaveBeenCalledExactlyOnceWith(7)
+    expect(head).toEqual({ revision: 8, lastVerifiedRevision: 7 })
+    expect(result.status.needsPush).toBe(true)
+  })
+
+  it('does not acknowledge when complete readback verification fails', async () => {
+    const acknowledgeVerifiedRevision = vi.fn()
+    const harness = configuredPullHarness({ acknowledgeVerifiedRevision })
+    harness.exportFullBackup.mockResolvedValue({ backup, revision: 7 })
+    harness.githubClient.updateSyncGist.mockResolvedValue(pullGist())
+    harness.githubClient.verifyCompleteBackup.mockRejectedValue(
+      new Error('Backup readback mismatch'),
+    )
+    expect(
+      await harness.service.pushLocal({ confirmRemoteOverwrite: true }),
+    ).toMatchObject({ outcome: 'error' })
+    expect(acknowledgeVerifiedRevision).not.toHaveBeenCalled()
+  })
+})
+
+it('blocks direct automatic upload from the unsupported adapter without network or metadata writes', async () => {
+  const harness = configuredPullHarness({
+    backupCapabilities: { verifiedFullBackup: false },
+  })
+  harness.writeMetadata.mockRejectedValue(new Error('metadata unavailable'))
+  expect(await harness.service.pushLocal({ automatic: true })).toMatchObject({
+    outcome: 'blocked',
+    reason: 'backup-verification-unavailable',
+    retryable: false,
+  })
+  expect(harness.githubClient.getGist).not.toHaveBeenCalled()
+  expect(harness.githubClient.updateSyncGist).not.toHaveBeenCalled()
+  expect(harness.writeMetadata).not.toHaveBeenCalled()
+})
+
+it('derives unsupported backup status after a mutation clears the stored blocker', async () => {
+  const harness = configuredPullHarness({
+    backupCapabilities: { verifiedFullBackup: false },
+  })
+  harness.setMetadata({ dirtySinceLastSync: true, lastBlockingReason: null })
+  expect(await harness.service.getStatus()).toMatchObject({
+    needsPush: true,
+    lastBlockingReason: 'backup-verification-unavailable',
+  })
+})
+
+it('keeps a note-only save durable and blocks automatic pull after failed dirty metadata and alarm writes plus restart', async () => {
+  const factory = new IDBFactory()
+  vi.stubGlobal('indexedDB', factory)
+  vi.stubGlobal('IDBKeyRange', IDBKeyRange)
+  vi.stubGlobal('chrome', {
+    storage: {
+      local: {
+        get: () =>
+          Promise.resolve({
+            cognipace_sync_metadata_v1: {
+              ...defaultSyncMetadata,
+              enabled: true,
+              gistId: 'gist_1',
+            },
+          }),
+        set: () => Promise.reject(new Error('Chrome write failed')),
+      },
+    },
+  })
+  try {
+    const snapshots = createSnapshotIdbStore(factory)
+    const local = createLocalIdbStore(factory)
+    await snapshots.commitSnapshot(
+      new Uint8Array([1]),
+      'test',
+      new Date(currentTime),
+    )
+    await snapshots.acknowledgeVerifiedRevision(1)
+    const repository = createNotesRepository(local)
+    const scope = await repository.acquireScope('two-sum')
+    await repository.saveDocument({
+      commandId: 'note-only',
+      problemSlug: 'two-sum',
+      scope,
+      target: { kind: 'problem' },
+      expectedRevision: 0,
+      markdown: 'durable note',
+    })
+    await expect(markLocalDataChanged()).rejects.toThrow('Chrome write failed')
+    const { createSyncAutoSync } =
+      await import('@/extension/background/sync-auto-sync')
+    const schedule = vi.fn(() =>
+      Promise.reject(new Error('alarm write failed')),
+    )
+    const runSafePush = vi.fn()
+    const runCleanPullCheck = vi.fn()
+    const sync = createSyncAutoSync({
+      now: () => new Date(currentTime),
+      readMetadata: readSyncMetadata,
+      writeMetadata: () => Promise.reject(new Error('Chrome write failed')),
+      runSafePush,
+      runCleanPullCheck,
+      scheduler: {
+        schedule,
+        clear: vi.fn(() => Promise.reject(new Error('alarm clear failed'))),
+        repairStartupAlarms: vi.fn(async () => {}),
+        register: vi.fn(),
+      },
+    })
+    await sync.scheduleAutoPushAfterMutation()
+    await sync.repairStartupAlarms()
+    await sync.runAutoPush()
+    await sync.runCleanPullCheck()
+    expect(runSafePush).not.toHaveBeenCalled()
+    expect(runCleanPullCheck).not.toHaveBeenCalled()
+    const harness = configuredPullHarness({
+      backupCapabilities: { verifiedFullBackup: false },
+    })
+    harness.readMetadata.mockImplementation(readSyncMetadata)
+    expect(await harness.service.checkRemoteOnOpen()).toMatchObject({
+      reason: 'local-dirty',
+    })
+    expect(harness.githubClient.getGist).not.toHaveBeenCalled()
+    const head = (await local.readHead())!
+    expect(head).toMatchObject({ revision: 2, lastVerifiedRevision: 1 })
+    const archive = await createArchiveGenerationRepository(
+      local,
+    ).readArchiveGeneration(head.archiveGeneration)
+    expect(archive.notes[0]!.document.markdown).toBe('durable note')
+    const full = parseBackupFileForCurrentApp(createFrozenV6BackupFixture())
+    full.notesArchive = archive
+    harness.exportFullBackup.mockResolvedValue({
+      backup: full,
+      revision: head.revision,
+    })
+    harness.githubClient.getGist.mockResolvedValue(pullGist())
+    harness.githubClient.updateSyncGist.mockResolvedValue(pullGist())
+    harness.githubClient.updateSyncGist.mockRejectedValueOnce(
+      new Error('network offline'),
+    )
+    expect(
+      await harness.service.pushLocal({ confirmRemoteOverwrite: true }),
+    ).toMatchObject({ outcome: 'error', retryable: true })
+    expect(
+      await repository.readDocument('two-sum', { kind: 'problem' }),
+    ).toMatchObject({ markdown: 'durable note' })
+    expect(await local.readHead()).toMatchObject({
+      revision: 2,
+      lastVerifiedRevision: 1,
+    })
+    // A manual upload cannot acknowledge or undo the already committed local note.
+    expect(
+      await harness.service.pushLocal({ confirmRemoteOverwrite: true }),
+    ).toMatchObject({ status: { needsPush: true } })
+    const uploaded = JSON.parse(
+      harness.githubClient.updateSyncGist.mock.calls[0]![1],
+    ) as { backup: BackupFile }
+    expect(uploaded.backup).toMatchObject({
+      schemaVersion: 7,
+      notesArchive: { notes: [{ document: { markdown: 'durable note' } }] },
+    })
+    expect(await local.readHead()).toMatchObject({
+      revision: 2,
+      lastVerifiedRevision: 1,
+    })
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+it.each(['create', 'connect-empty'] as const)(
+  'keeps %s Gist initialization unverified and pending',
+  async (action) => {
+    const acknowledgeVerifiedRevision = vi.fn()
+    const harness = configuredPullHarness({
+      backupCapabilities: { verifiedFullBackup: false },
+      acknowledgeVerifiedRevision,
+    })
+    harness.exportFullBackup.mockResolvedValue({ backup, revision: 7 })
+    harness.githubClient.createSyncGist.mockResolvedValue(pullGist())
+    harness.githubClient.getGist.mockResolvedValue(
+      createGistSummary({ ...pullGist(), content: null }),
+    )
+    harness.githubClient.updateSyncGist.mockResolvedValue(pullGist())
+    const result =
+      action === 'create'
+        ? await harness.service.createGithubGist()
+        : await harness.service.connectGithubGist('gist_1')
+    expect(syncActionResultSchema.parse(result)).toMatchObject({
+      outcome: 'success',
+      reason: 'backup-verification-unavailable',
+      status: { needsPush: true },
+    })
+    expect(result.message).toMatch(/unverified.*pending/i)
+    expect(acknowledgeVerifiedRevision).not.toHaveBeenCalled()
+  },
+)

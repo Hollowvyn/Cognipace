@@ -64,6 +64,8 @@ export const syncActionOutcomeSchema = z.enum([
 export const syncActionReasonSchema = z.enum([
   'not-configured',
   'local-dirty',
+  'archive-review-required',
+  'backup-verification-unavailable',
   'remote-changed',
   'remote-unchanged',
   'auth',

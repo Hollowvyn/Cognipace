@@ -1,3 +1,4 @@
+import { githubGistBackupCapabilities } from '@/lib/github'
 import {
   createBackupTransferService,
   reconcileCompletedBackupTransfers,
@@ -310,6 +311,7 @@ configureMutationQueue({
 let clearPendingImportPersistence = () => {}
 let hasPendingImportPersistence = () => false
 const syncAutoSync = createSyncAutoSync({
+  backupCapabilities: githubGistBackupCapabilities,
   scheduler: alarmScheduler,
   hasPendingDirtyMarkRetry: () => hasPendingDirtyMarkRetry,
   now: () => new Date(),
@@ -320,7 +322,9 @@ const syncAutoSync = createSyncAutoSync({
     const { db } = await getAppDb()
 
     return parseSyncActionResult(
-      await runQueuedSyncAction(db, (service) => service.pushLocal(input)),
+      await runQueuedSyncAction(db, (service) =>
+        service.pushLocal({ ...input, automatic: true }),
+      ),
     )
   },
   runCleanPullCheck: async () => {
@@ -2050,6 +2054,8 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
     },
     {
       withDb: (work) => withBackgroundDb(({ db: current }) => work(current)),
+      acknowledgeVerifiedRevision: (revision) =>
+        createSnapshotIdbStore(indexedDB).acknowledgeVerifiedRevision(revision),
       exportFullBackup: () => {
         const work = () =>
           exportDurableFullBackup(createLocalIdbStore(indexedDB))
