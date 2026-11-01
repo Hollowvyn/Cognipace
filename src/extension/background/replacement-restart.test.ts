@@ -1,3 +1,6 @@
+import { Buffer } from 'node:buffer'
+import { isAnyArrayBuffer } from 'node:util/types'
+import { runInNewContext } from 'node:vm'
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { LocalIdbStore } from '@/platform/db/local-store-types'
@@ -506,7 +509,10 @@ async function assertRecoveryGatesPreserveRoots(
         'Recovery required: prepared replacement admission cannot be verified.',
       cause: { message: cause },
     })
-  expect(await replacementRoots(local)).toEqual(before)
+  const current = await replacementRoots(local)
+  expect(current.recordKeys).toEqual(before.recordKeys)
+  expect(current.records).toEqual(before.records)
+  expectCoreSnapshotsEqual(current, before)
   expect(fetch).not.toHaveBeenCalled()
 }
 it.each(['nested', 'extra-segment'])(
@@ -704,7 +710,7 @@ it('two individually valid unresolved candidates reach multiple-candidate recove
       candidate.descriptor.replacementId,
       candidate.descriptor.commandFingerprint!,
     )
-    expect(prepared?.bytes).toEqual(new Uint8Array(bytes))
+    expectSnapshotBytesEqual(prepared?.bytes, new Uint8Array(bytes))
     expect(await compositeDigest(prepared!.bytes)).toBe(candidate.coreDigest)
   }
   await assertRecoveryGatesPreserveRoots(
@@ -1096,4 +1102,88 @@ it('metadata-only maintenance retains pending source and retires it after settle
   expect(
     await local.readRecord(['composite-candidate', selected.token]),
   ).toBeUndefined()
+})
+
+// Native equality checks every byte without recursively visiting SQLite buffers.
+function snapshotBytes(value: unknown) {
+  if (ArrayBuffer.isView(value))
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+  return isAnyArrayBuffer(value) ? Buffer.from(value) : null
+}
+function expectSnapshotBytesEqual(actual: unknown, expected: unknown) {
+  expect(Object.prototype.toString.call(actual)).toBe(
+    Object.prototype.toString.call(expected),
+  )
+  const actualBytes = snapshotBytes(actual)
+  const expectedBytes = snapshotBytes(expected)
+  expect(actualBytes).not.toBeNull()
+  expect(expectedBytes).not.toBeNull()
+  expect(actualBytes!.equals(expectedBytes!)).toBe(true)
+}
+function expectCoreSnapshotsEqual(
+  actual: { coreKeys: IDBValidKey[]; cores: unknown[] },
+  expected: { coreKeys: IDBValidKey[]; cores: unknown[] },
+) {
+  expect(actual.coreKeys).toEqual(expected.coreKeys)
+  expect(actual.cores).toHaveLength(expected.cores.length)
+  for (const [index, value] of expected.cores.entries()) {
+    if (snapshotBytes(value))
+      expectSnapshotBytesEqual(actual.cores[index], value)
+    else expect(actual.cores[index]).toEqual(value)
+  }
+}
+it('compares complete snapshot bytes, view windows, metadata and keys exactly', () => {
+  const expected = {
+    coreKeys: ['body', 'provenance', 'cross-realm'],
+    cores: [
+      new Uint8Array([1, 2, 3]),
+      { kind: 'provenance', revision: 1 },
+      new Uint8Array([4, 5]).buffer,
+    ],
+  }
+  const actual = {
+    ...expected,
+    cores: [
+      runInNewContext(
+        'new Uint8Array([9, 1, 2, 3, 9]).subarray(1, 4)',
+      ) as unknown,
+      { kind: 'provenance', revision: 1 },
+      runInNewContext('new Uint8Array([4, 5]).buffer') as unknown,
+    ],
+  }
+  expectCoreSnapshotsEqual(actual, expected)
+  expect(() =>
+    expectCoreSnapshotsEqual(
+      {
+        ...actual,
+        cores: [new Uint8Array([1, 2, 4]), ...actual.cores.slice(1)],
+      },
+      expected,
+    ),
+  ).toThrow()
+  expect(() =>
+    expectCoreSnapshotsEqual(
+      {
+        ...actual,
+        cores: [
+          actual.cores[0],
+          { kind: 'provenance', revision: 2 },
+          actual.cores[2],
+        ],
+      },
+      expected,
+    ),
+  ).toThrow()
+  expect(() =>
+    expectCoreSnapshotsEqual(
+      { ...actual, coreKeys: ['other', 'provenance', 'cross-realm'] },
+      expected,
+    ),
+  ).toThrow()
+  expect(() =>
+    expectCoreSnapshotsEqual(
+      { ...actual, cores: actual.cores.slice(1) },
+      expected,
+    ),
+  ).toThrow()
 })

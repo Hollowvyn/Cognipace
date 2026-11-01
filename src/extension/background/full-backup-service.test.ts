@@ -1,3 +1,6 @@
+import { Buffer } from 'node:buffer'
+import { isAnyArrayBuffer } from 'node:util/types'
+import { runInNewContext } from 'node:vm'
 import { resumePendingReplacement } from './replacement-resume'
 import {
   createBackupTransferService,
@@ -182,16 +185,20 @@ it.each(['external', 'attempt', 'repeated-attempt'] as const)(
         ? 'Duplicate archive external submission alias.'
         : 'Duplicate archive observed attempt alias.'
     const readRows = () =>
-      local.transact(
-        ['records', 'coreSnapshots'],
-        'readonly',
-        (stores, done) => {
-          const records = stores.records.getAll()
-          const cores = stores.coreSnapshots.getAll()
-          cores.onsuccess = () =>
-            done({ records: records.result, cores: cores.result })
-        },
-      )
+      local.transact<
+        { records: unknown[]; coreKeys: IDBValidKey[]; cores: unknown[] },
+        'records' | 'coreSnapshots'
+      >(['records', 'coreSnapshots'], 'readonly', (stores, done) => {
+        const records = stores.records.getAll()
+        const cores = stores.coreSnapshots.getAll()
+        const coreKeys = stores.coreSnapshots.getAllKeys()
+        coreKeys.onsuccess = () =>
+          done({
+            records: records.result,
+            coreKeys: coreKeys.result,
+            cores: cores.result as unknown[],
+          })
+      })
     const head = (await local.readHead())!
     const activeArchive = await createArchiveGenerationRepository(
       local,
@@ -200,7 +207,11 @@ it.each(['external', 'attempt', 'repeated-attempt'] as const)(
     await expect(createFullBackupPreview(local, invalidInput)).rejects.toThrow(
       error,
     )
-    expect(await readRows()).toEqual(beforePreview)
+    {
+      const current = await readRows()
+      expect(current.records).toEqual(beforePreview.records)
+      expectCoreSnapshotsEqual(current, beforePreview)
+    }
 
     const preview = await createFullBackupPreview(local, validInput)
     const beforeConfirmation = await readRows()
@@ -211,7 +222,11 @@ it.each(['external', 'attempt', 'repeated-attempt'] as const)(
         preview.confirmationToken,
       ),
     ).rejects.toThrow(error)
-    expect(await readRows()).toEqual(beforeConfirmation)
+    {
+      const current = await readRows()
+      expect(current.records).toEqual(beforeConfirmation.records)
+      expectCoreSnapshotsEqual(current, beforeConfirmation)
+    }
 
     await expect(
       createArchiveGenerationRepository(local).stageImportedArchive({
@@ -225,7 +240,11 @@ it.each(['external', 'attempt', 'repeated-attempt'] as const)(
         'invalid-alias-generation',
       ]),
     ).toBeUndefined()
-    expect(await readRows()).toEqual(beforeConfirmation)
+    {
+      const current = await readRows()
+      expect(current.records).toEqual(beforeConfirmation.records)
+      expectCoreSnapshotsEqual(current, beforeConfirmation)
+    }
     expect(await local.readHead()).toEqual(head)
     expect(
       await createArchiveGenerationRepository(local).readArchiveGeneration(
@@ -738,4 +757,88 @@ it('rejects valid-digest immutable body collisions before accepting a new durabl
   })
   await restarted.ready()
   expect(restarted.getState()).toEqual({ status: 'idle' })
+})
+
+// Native equality checks every byte without recursively visiting SQLite buffers.
+function snapshotBytes(value: unknown) {
+  if (ArrayBuffer.isView(value))
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+  return isAnyArrayBuffer(value) ? Buffer.from(value) : null
+}
+function expectSnapshotBytesEqual(actual: unknown, expected: unknown) {
+  expect(Object.prototype.toString.call(actual)).toBe(
+    Object.prototype.toString.call(expected),
+  )
+  const actualBytes = snapshotBytes(actual)
+  const expectedBytes = snapshotBytes(expected)
+  expect(actualBytes).not.toBeNull()
+  expect(expectedBytes).not.toBeNull()
+  expect(actualBytes!.equals(expectedBytes!)).toBe(true)
+}
+function expectCoreSnapshotsEqual(
+  actual: { coreKeys: IDBValidKey[]; cores: unknown[] },
+  expected: { coreKeys: IDBValidKey[]; cores: unknown[] },
+) {
+  expect(actual.coreKeys).toEqual(expected.coreKeys)
+  expect(actual.cores).toHaveLength(expected.cores.length)
+  for (const [index, value] of expected.cores.entries()) {
+    if (snapshotBytes(value))
+      expectSnapshotBytesEqual(actual.cores[index], value)
+    else expect(actual.cores[index]).toEqual(value)
+  }
+}
+it('compares complete snapshot bytes, view windows, metadata and keys exactly', () => {
+  const expected = {
+    coreKeys: ['body', 'provenance', 'cross-realm'],
+    cores: [
+      new Uint8Array([1, 2, 3]),
+      { kind: 'provenance', revision: 1 },
+      new Uint8Array([4, 5]).buffer,
+    ],
+  }
+  const actual = {
+    ...expected,
+    cores: [
+      runInNewContext(
+        'new Uint8Array([9, 1, 2, 3, 9]).subarray(1, 4)',
+      ) as unknown,
+      { kind: 'provenance', revision: 1 },
+      runInNewContext('new Uint8Array([4, 5]).buffer') as unknown,
+    ],
+  }
+  expectCoreSnapshotsEqual(actual, expected)
+  expect(() =>
+    expectCoreSnapshotsEqual(
+      {
+        ...actual,
+        cores: [new Uint8Array([1, 2, 4]), ...actual.cores.slice(1)],
+      },
+      expected,
+    ),
+  ).toThrow()
+  expect(() =>
+    expectCoreSnapshotsEqual(
+      {
+        ...actual,
+        cores: [
+          actual.cores[0],
+          { kind: 'provenance', revision: 2 },
+          actual.cores[2],
+        ],
+      },
+      expected,
+    ),
+  ).toThrow()
+  expect(() =>
+    expectCoreSnapshotsEqual(
+      { ...actual, coreKeys: ['other', 'provenance', 'cross-realm'] },
+      expected,
+    ),
+  ).toThrow()
+  expect(() =>
+    expectCoreSnapshotsEqual(
+      { ...actual, cores: actual.cores.slice(1) },
+      expected,
+    ),
+  ).toThrow()
 })
