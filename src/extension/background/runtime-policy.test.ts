@@ -220,9 +220,11 @@ describe('runtime-policy', () => {
 
   it('keeps backup and local reset methods dashboard-only', () => {
     for (const method of [
-      'backup.exportFullBackup',
-      'backup.validateFullBackup',
-      'backup.restoreFullBackup',
+      'backup.beginTransfer',
+      'backup.readTransferChunk',
+      'backup.appendTransferChunk',
+      'backup.finishTransfer',
+      'backup.cancelTransfer',
       'backup.resetLocalData',
       'backup.getPendingReplacement',
       'backup.retryPendingReplacement',
@@ -556,4 +558,13 @@ describe('notes runtime methods', () => {
       expect(canCallExtensionMethod(method, 'popup')).toBe(false)
     }
   })
+})
+
+it('rejects legacy whole-object dashboard backup routes', () => {
+  for (const method of [
+    'backup.exportFullBackup',
+    'backup.validateFullBackup',
+    'backup.restoreFullBackup',
+  ])
+    expect(canCallExtensionMethod(method, 'dashboard')).toBe(false)
 })

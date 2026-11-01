@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,9 @@ import { GitHubSyncSettingsSection } from '@/features/sync'
 
 import {
   downloadBackupFile,
+  cancelBackupTransfer,
+  retryBackupTransferCleanup,
+  type SelectedBackupTransfer,
   useExportFullBackup,
   usePendingBackupReplacement,
   useResetLocalData,
@@ -38,7 +41,8 @@ export function DataManagementScreen() {
   const resetCommandId = useRef<string | null>(null)
   const pendingReplacement = usePendingBackupReplacement()
   const retryReplacement = useRetryPendingBackupReplacement()
-  const [selectedBackup, setSelectedBackup] = useState<unknown>(null)
+  const [selectedBackup, setSelectedBackup] =
+    useState<SelectedBackupTransfer | null>(null)
   const [selectedBackupFileName, setSelectedBackupFileName] = useState<
     string | null
   >(null)
@@ -78,35 +82,61 @@ export function DataManagementScreen() {
     }
   }
 
+  const fileSelectionEpoch = useRef({ value: 0 })
+  const selectedTransferLifetime = useRef<{
+    transfer: SelectedBackupTransfer
+    retained: boolean
+  } | null>(null)
+  useEffect(() => {
+    const selectionEpoch = fileSelectionEpoch.current
+    void retryBackupTransferCleanup().catch((error) =>
+      setBackupError(
+        readErrorMessage(
+          error,
+          'Backup transfer cleanup failed. Select a file to retry.',
+        ),
+      ),
+    )
+    return () => {
+      ++selectionEpoch.value
+      const selected = selectedTransferLifetime.current
+      if (selected && !selected.retained)
+        void cancelBackupTransfer(selected.transfer).catch(() => {})
+    }
+  }, [])
   async function handleFileSelect(file: File) {
     if (isReplacementPending) {
       return
     }
-    setSelectedBackup(null)
-    setSelectedBackupFileName(file.name)
-    setBackupSummary(null)
+    const epoch = ++fileSelectionEpoch.current.value
     setBackupToast(null)
     setBackupError(null)
 
-    let parsedBackup: unknown
-
     try {
-      parsedBackup = JSON.parse(await readFileText(file))
-    } catch {
-      setBackupError('Invalid JSON backup file.')
-      return
-    }
-
-    try {
-      const summary = await validateBackup.mutateAsync(parsedBackup)
-      setSelectedBackup(parsedBackup)
+      const previous = selectedTransferLifetime.current
+      if (previous) await cancelBackupTransfer(previous.transfer)
+      selectedTransferLifetime.current = null
+      setSelectedBackup(null)
+      setSelectedBackupFileName(file.name)
+      setBackupSummary(null)
+      const summary = await validateBackup.mutateAsync(file)
+      if (epoch !== fileSelectionEpoch.current.value) {
+        await cancelBackupTransfer(summary.transfer)
+        return
+      }
+      selectedTransferLifetime.current = {
+        transfer: summary.transfer,
+        retained: false,
+      }
+      setSelectedBackup(summary.transfer)
       setBackupSummary(summary)
       setBackupToast({
         message: 'Backup ready to restore.',
         tone: 'success',
       })
     } catch (error) {
-      setBackupError(readErrorMessage(error, 'Backup validation failed.'))
+      if (epoch === fileSelectionEpoch.current.value)
+        setBackupError(readErrorMessage(error, 'Backup validation failed.'))
     }
   }
 
@@ -120,8 +150,10 @@ export function DataManagementScreen() {
     setRecoveryError(null)
 
     try {
+      if (selectedTransferLifetime.current)
+        selectedTransferLifetime.current.retained = true
       const result = await restoreBackup.mutateAsync({
-        backup: selectedBackup,
+        transfer: selectedBackup,
         confirmationToken: backupSummary!.confirmationToken,
       })
       setRestoreDialogOpen(false)
@@ -167,6 +199,7 @@ export function DataManagementScreen() {
     }
 
     if (result.kind === 'restore') {
+      selectedTransferLifetime.current = null
       setSelectedBackup(null)
       setSelectedBackupFileName(null)
       setBackupSummary(null)
@@ -253,7 +286,7 @@ export function DataManagementScreen() {
       ) : null}
 
       <BackupRestorePanel
-        backup={selectedBackup}
+        hasSelectedTransfer={selectedBackup !== null}
         error={backupError}
         isExporting={exportBackup.isPending}
         isRestoring={restoreBackup.isPending}
@@ -355,28 +388,6 @@ export function DataManagementScreen() {
       ) : null}
     </section>
   )
-}
-
-async function readFileText(file: File) {
-  if ('text' in file && typeof file.text === 'function') {
-    return file.text()
-  }
-
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result)
-        return
-      }
-
-      reject(new Error('Failed to read backup file.'))
-    })
-    reader.addEventListener('error', () => {
-      reject(reader.error ?? new Error('Failed to read backup file.'))
-    })
-    reader.readAsText(file)
-  })
 }
 
 function readErrorMessage(error: unknown, fallback: string) {

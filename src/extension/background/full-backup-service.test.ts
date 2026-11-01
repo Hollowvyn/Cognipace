@@ -1,3 +1,11 @@
+import {
+  createBackupTransferService,
+  reconcileCompletedBackupTransfers,
+  transferSessionKey,
+  transferChunkKey,
+  transferBudgetKey,
+} from '@/features/backup/server/backup-transfer-service'
+import { transferDigest } from '@/features/backup/api/backup-transfer-contracts'
 import { prepareGistFullBackupReplacement } from './full-backup-service'
 import * as archiveOwner from '@/features/notes/data/archive-generation-repository'
 import * as backupOwner from '@/features/backup/server/backup-service'
@@ -300,5 +308,154 @@ it.each(['future', 'digest', 'duplicate', 'dangling', 'practice'] as const)(
       true,
     )
     expect(await local.readHead()).toEqual(before)
+  },
+)
+
+it('binds a local transfer preview capability to its actual document and transfer identity', async () => {
+  const local = await fixture()
+  const input = createFrozenV6BackupFixture()
+  const sourceIdentity = JSON.stringify([
+    'dashboard-transfer',
+    'document-a',
+    'transfer-a',
+  ])
+  const preview = await createFullBackupPreview(local, input, {
+    sourceIdentity,
+  })
+  for (const identity of [
+    JSON.stringify(['dashboard-transfer', 'document-b', 'transfer-a']),
+    JSON.stringify(['dashboard-transfer', 'document-a', 'transfer-b']),
+  ]) {
+    await expect(
+      validateFullBackupConfirmation(local, input, preview.confirmationToken, {
+        sourceIdentity: identity,
+      }),
+    ).rejects.toThrow(/preview no longer matches/i)
+  }
+  await expect(
+    validateFullBackupConfirmation(local, input, preview.confirmationToken, {
+      sourceIdentity,
+    }),
+  ).resolves.toMatchObject({ sourceSchemaVersion: 6 })
+})
+
+it.each(['persistence', 'metadata'] as const)(
+  'reconciles a real full-pair transfer after %s recovery and replays its receipt after body cleanup',
+  async (failure) => {
+    const local = await fixture()
+    const coordinator = createBackupReplacementCoordinator({
+      store: createSnapshotIdbStore(indexedDB),
+    })
+    const sql = vi.spyOn(backupOwner, 'restorePreparedFullBackup')
+    let failPublish = failure === 'persistence',
+      failMetadata = failure === 'metadata'
+    const sourceIdentity = (id: string) =>
+      JSON.stringify(['dashboard-transfer', 'document-a', id])
+    const dependencies = {
+      local,
+      currentRevision: () =>
+        local.readHead().then((head) => head?.revision ?? 0),
+      exportSnapshot: () => Promise.reject(new Error('unused export')),
+      preview: (input: unknown, id: string) =>
+        createFullBackupPreview(local, input, {
+          sourceIdentity: sourceIdentity(id),
+        }),
+      restore: async (input: unknown, token: string, id: string) => {
+        const prepared = await validateFullBackupConfirmation(
+          local,
+          input,
+          token,
+          { sourceIdentity: sourceIdentity(id) },
+        )
+        return coordinator.run({
+          kind: 'restore',
+          prepare: async () => {
+            const candidate = await prepareFullBackupReplacement(local, {
+              prepared,
+              commandId: token,
+            })
+            return {
+              ...candidate,
+              publish: async (
+                ...args: Parameters<typeof candidate.publish>
+              ) => {
+                if (failPublish) {
+                  failPublish = false
+                  throw new Error('disk down')
+                }
+                await candidate.publish(...args)
+              },
+            }
+          },
+          onDurable: () => Promise.resolve(),
+          finishSyncMetadata: () => {
+            if (failMetadata) {
+              failMetadata = false
+              return Promise.reject(new Error('metadata down'))
+            }
+            return Promise.resolve()
+          },
+        })
+      },
+    }
+    const service = createBackupTransferService(dependencies)
+    const session = await service.begin('document-a', { direction: 'import' })
+    const text = JSON.stringify(createFrozenV6BackupFixture())
+    await service.append('document-a', session, 0, text)
+    const finish = { chunks: 1, digest: await transferDigest(text) }
+    const preview = await service.finish('document-a', session, finish)
+    if (!('confirmationToken' in preview)) throw new Error('Preview missing')
+    const confirmed = {
+      ...finish,
+      confirmationToken: preview.confirmationToken,
+    }
+    const first = await service.finish('document-a', session, confirmed)
+    expect(first).toMatchObject(
+      failure === 'persistence'
+        ? { status: 'persistence-pending' }
+        : { status: 'durable', syncMetadataPending: true },
+    )
+    expect(await reconcileCompletedBackupTransfers(local)).toBe(0)
+    expect(
+      await local.readRecord(transferSessionKey(session.sessionId)),
+    ).toMatchObject({ status: 'ready' })
+    expect(await coordinator.retry()).toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
+    coordinator.assertIdle()
+    expect(await reconcileCompletedBackupTransfers(local)).toBe(1)
+    const completed = (await local.readRecord(
+      transferSessionKey(session.sessionId),
+    )) as { spooledBytes: number }
+    expect(completed).toMatchObject({ status: 'complete' })
+    await local.transact(['records'], 'readwrite', (stores, done) => {
+      const budget = stores.records.get(transferBudgetKey)
+      budget.onsuccess = () => {
+        const current = budget.result as { bytes: number; sessions: number }
+        stores.records.delete(transferChunkKey(session.sessionId, 0))
+        stores.records.put(
+          { ...current, bytes: current.bytes - completed.spooledBytes },
+          transferBudgetKey,
+        )
+        stores.records.put(
+          { ...completed, spooledBytes: 0 },
+          transferSessionKey(session.sessionId),
+        )
+        done(undefined)
+      }
+    })
+    const noReplay = vi.fn(() =>
+      Promise.reject(new Error('SQL replay forbidden')),
+    )
+    const restarted = createBackupTransferService({
+      ...dependencies,
+      restore: noReplay,
+    })
+    expect(
+      await restarted.finish('document-a', session, confirmed),
+    ).toMatchObject({ status: 'durable', syncMetadataPending: false })
+    expect(noReplay).not.toHaveBeenCalled()
+    expect(sql).toHaveBeenCalledTimes(1)
   },
 )

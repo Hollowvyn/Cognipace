@@ -1,11 +1,25 @@
 import {
+  createBackupTransferService,
+  reconcileCompletedBackupTransfers,
+} from '@/features/backup/server/backup-transfer-service'
+import {
+  beginTransferRequestSchema,
+  transferRequestSchema,
+  readTransferChunkRequestSchema,
+  appendTransferChunkRequestSchema,
+  finishTransferRequestSchema,
+  transferSessionSchema,
+  transferChunkSchema,
+  finishTransferResultSchema,
+} from '@/features/backup/api/backup-transfer-contracts'
+import { backupTransferDocumentOwner } from './runtime-policy'
+import {
   exportDurableFullBackup,
   createFullBackupPreview,
   validateFullBackupConfirmation,
   prepareFullBackupReplacement,
   prepareGistFullBackupReplacement,
 } from './full-backup-service'
-import { backupRestorePreviewSchema } from '@/features/backup/api/backup-contracts'
 import {
   replacementCommandKey,
   replacementCommandRecordSchema,
@@ -361,6 +375,12 @@ export function registerBackgroundHandlers() {
     if (!notesLocal) throw new Error('Local Notes storage is unavailable.')
     return notesLocal
   }
+  async function retryReplacementWithTransferReceipts() {
+    const result = await backupReplacement.retry()
+    if (notesLocal && backupReplacement.getState().status === 'idle')
+      await reconcileCompletedBackupTransfers(notesLocal)
+    return result
+  }
   const acceptedProblemOperations = new Map<
     string,
     {
@@ -496,12 +516,9 @@ export function registerBackgroundHandlers() {
   if (replacementStore) {
     void backupReplacement
       .ready()
-      .then(() => {
-        if (backupReplacement.getState().status === 'idle') return
-        return runInMutationQueue(() => backupReplacement.retry())
-      })
+      .then(() => runInMutationQueue(retryReplacementWithTransferReceipts))
       .catch(() => {
-        // A failed continuation remains gated for a later explicit retry.
+        // Failed continuation or receipt bookkeeping stays recoverable on retry.
       })
   }
   syncAutoSync.registerJobs()
@@ -579,32 +596,119 @@ export function registerBackgroundHandlers() {
       .then(() => null)
   })
 
+  // Legacy object IPC is explicitly disabled by runtime policy. Internal
+  // object helpers remain available only to trusted owners and service tests.
   onMessage('backup.exportFullBackup', ({ data, sender }) => {
     const request = backupRequestSchema.parse(data)
-
     assertCanSenderCallExtensionMethod(
       'backup.exportFullBackup',
       request.surface,
       sender,
     )
-    return runGatedMutationQueue(async () => {
-      return (await exportDurableFullBackup(requireNotesLocal())).backup
-    })
+    throw new Error('Use bounded backup transfer sessions.')
   })
-
   onMessage('backup.validateFullBackup', ({ data, sender }) => {
     const request = backupPayloadRequestSchema.parse(data)
-
     assertCanSenderCallExtensionMethod(
       'backup.validateFullBackup',
       request.surface,
       sender,
     )
-    return runGatedMutationQueue(async () =>
-      backupRestorePreviewSchema.parse(
-        await createFullBackupPreview(requireNotesLocal(), request.backup),
+    throw new Error('Use bounded backup transfer sessions.')
+  })
+  onMessage('backup.restoreFullBackup', ({ data, sender }) => {
+    const request = backupPayloadRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.restoreFullBackup',
+      request.surface,
+      sender,
+    )
+    throw new Error('Use bounded backup transfer sessions.')
+  })
+  onMessage('backup.beginTransfer', ({ data, sender }) => {
+    const request = beginTransferRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.beginTransfer',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    const run =
+      request.direction === 'export'
+        ? runGatedMutationQueue
+        : runInMutationQueue
+    return run(async () =>
+      transferSessionSchema
+        .strip()
+        .parse(await transferFor(owner).begin(owner, request)),
+    )
+  })
+  onMessage('backup.appendTransferChunk', ({ data, sender }) => {
+    const request = appendTransferChunkRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.appendTransferChunk',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    return runInMutationQueue(async () =>
+      transferSessionSchema
+        .strip()
+        .parse(
+          await transferFor(owner).append(
+            owner,
+            request,
+            request.sequence,
+            request.text,
+          ),
+        ),
+    )
+  })
+  onMessage('backup.readTransferChunk', ({ data, sender }) => {
+    const request = readTransferChunkRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.readTransferChunk',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    return runInMutationQueue(async () =>
+      transferChunkSchema.parse(
+        await transferFor(owner).read(owner, request, request.sequence),
       ),
     )
+  })
+  onMessage('backup.finishTransfer', ({ data, sender }) => {
+    const request = finishTransferRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.finishTransfer',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    const run = request.confirmationToken
+      ? runInMutationQueue
+      : runGatedMutationQueue
+    const transfer = transferFor(owner)
+    return transfer
+      .assertOwned(owner, request)
+      .then(() =>
+        run(async () =>
+          finishTransferResultSchema.parse(
+            await transfer.finish(owner, request, request),
+          ),
+        ),
+      )
+  })
+  onMessage('backup.cancelTransfer', ({ data, sender }) => {
+    const request = transferRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'backup.cancelTransfer',
+      request.surface,
+      sender,
+    )
+    const owner = backupTransferDocumentOwner(sender)
+    return runInMutationQueue(() => transferFor(owner).cancel(owner, request))
   })
 
   onMessage('sync.getStatus', ({ data, sender }) => {
@@ -839,61 +943,79 @@ export function registerBackgroundHandlers() {
     })
   })
 
-  onMessage('backup.restoreFullBackup', ({ data, sender }) => {
-    const request = backupPayloadRequestSchema.parse(data)
-
-    assertCanSenderCallExtensionMethod(
-      'backup.restoreFullBackup',
-      request.surface,
-      sender,
-    )
-    return runInMutationQueue(async () => {
-      await backupReplacement.ready()
-      const local = requireNotesLocal()
-      const prepared = await validateFullBackupConfirmation(
-        local,
-        request.backup,
-        request.confirmationToken,
-      )
-      const commandId = request.confirmationToken!
-      const completed = await local.readRecord(replacementCommandKey(commandId))
-      if (completed !== undefined) {
-        const continuation = await replacementStore?.readContinuation()
-        return backupReplacementResultSchema.parse(
-          continuation?.replacementId === commandId
-            ? await backupReplacement.retry()
-            : {
-                status: 'durable',
-                kind: 'restore',
-                summary: prepared.summary,
-                syncMetadataPending: false,
-              },
-        )
-      }
-      backupReplacement.assertIdle()
-      await resumePendingLocalSave()
-      await markSyncLocalDataChanged()
-      hasPendingDirtyMarkRetry = false
-      return backupReplacementResultSchema.parse(
-        await backupReplacement.run({
-          kind: 'restore',
-          prepare: () =>
-            prepareFullBackupReplacement(local, { prepared, commandId }),
-          onDurable: async () => {
-            clearPendingImportPersistence()
-            recoveredReviewRetry = null
-            clearRecoveredMutationRetry()
-            await broadcastDataManagementInvalidation(request.surface)
-          },
-          finishSyncMetadata: async () => {
-            await markSyncLocalDataChanged()
-            hasPendingDirtyMarkRetry = false
-            await scheduleAutoPushAfterMutationBestEffort()
-          },
+  function transferFor(owner: string) {
+    return createBackupTransferService({
+      local: requireNotesLocal(),
+      currentRevision: async () =>
+        (await requireNotesLocal().readHead())?.revision ?? 0,
+      exportSnapshot: async (consume) => {
+        const snapshot = await exportDurableFullBackup(requireNotesLocal())
+        await consume(snapshot.backup, snapshot.revision)
+      },
+      preview: (backup, sessionId) =>
+        createFullBackupPreview(requireNotesLocal(), backup, {
+          sourceIdentity: JSON.stringify([
+            'dashboard-transfer',
+            owner,
+            sessionId,
+          ]),
         }),
-      )
+      restore: async (backup, confirmationToken, sessionId) => {
+        const sourceIdentity = JSON.stringify([
+          'dashboard-transfer',
+          owner,
+          sessionId,
+        ])
+        await backupReplacement.ready()
+        const local = requireNotesLocal()
+        const prepared = await validateFullBackupConfirmation(
+          local,
+          backup,
+          confirmationToken,
+          { sourceIdentity },
+        )
+        const commandId = confirmationToken
+        const completed = await local.readRecord(
+          replacementCommandKey(commandId),
+        )
+        if (completed !== undefined) {
+          const continuation = await replacementStore?.readContinuation()
+          return backupReplacementResultSchema.parse(
+            continuation?.replacementId === commandId
+              ? await backupReplacement.retry()
+              : {
+                  status: 'durable',
+                  kind: 'restore',
+                  summary: prepared.summary,
+                  syncMetadataPending: false,
+                },
+          )
+        }
+        backupReplacement.assertIdle()
+        await resumePendingLocalSave()
+        await markSyncLocalDataChanged()
+        hasPendingDirtyMarkRetry = false
+        return backupReplacementResultSchema.parse(
+          await backupReplacement.run({
+            kind: 'restore',
+            prepare: () =>
+              prepareFullBackupReplacement(local, { prepared, commandId }),
+            onDurable: async () => {
+              clearPendingImportPersistence()
+              recoveredReviewRetry = null
+              clearRecoveredMutationRetry()
+              await broadcastDataManagementInvalidation('dashboard')
+            },
+            finishSyncMetadata: async () => {
+              await markSyncLocalDataChanged()
+              hasPendingDirtyMarkRetry = false
+              await scheduleAutoPushAfterMutationBestEffort()
+            },
+          }),
+        )
+      },
     })
-  })
+  }
 
   onMessage('backup.resetLocalData', ({ data, sender }) => {
     const request = backupResetRequestSchema.parse(data)
@@ -935,7 +1057,7 @@ export function registerBackgroundHandlers() {
       await resumePendingLocalSave()
       clearRecoveredMutationRetry()
       return backupReplacementResultSchema.parse(
-        await backupReplacement.retry(),
+        await retryReplacementWithTransferReceipts(),
       )
     })
   })

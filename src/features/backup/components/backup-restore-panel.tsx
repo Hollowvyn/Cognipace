@@ -16,7 +16,7 @@ import { formatDateTime } from '@/utils/date-format'
 import type { BackupSummary } from '../api/backup-contracts'
 
 interface BackupRestorePanelProps {
-  backup: unknown
+  hasSelectedTransfer: boolean
   error: string | null
   isExporting: boolean
   isRestoring: boolean
@@ -30,7 +30,7 @@ interface BackupRestorePanelProps {
 }
 
 export function BackupRestorePanel({
-  backup,
+  hasSelectedTransfer,
   error,
   isExporting,
   isRestoring,
@@ -132,7 +132,10 @@ export function BackupRestorePanel({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             disabled={
-              !backup || isRestoring || isValidating || isReplacementPending
+              !hasSelectedTransfer ||
+              isRestoring ||
+              isValidating ||
+              isReplacementPending
             }
             onClick={onOpenRestoreDialog}
             size="sm"

@@ -1,3 +1,12 @@
+import { IDBFactory } from 'fake-indexeddb'
+import { createLocalIdbStore } from '@/platform/db/local-idb'
+import {
+  createBackupTransferService,
+  transferBudgetKey,
+  transferBeginKey,
+} from '../server/backup-transfer-service'
+import { transferDigest } from './backup-transfer-contracts'
+import { File as NodeFile } from 'node:buffer'
 import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryObserver } from '@tanstack/react-query'
@@ -9,6 +18,9 @@ import { createQueryTestHarness } from '@/testing/query-test-harness'
 
 import {
   downloadBackupFile,
+  cancelBackupTransfer,
+  validateFullBackupViaRuntime,
+  exportFullBackupViaRuntime,
   useExportFullBackup,
   usePendingBackupReplacement,
   useResetLocalData,
@@ -33,58 +45,335 @@ describe('backup API hooks', () => {
     vi.clearAllMocks()
   })
 
-  it('exports through the dashboard runtime surface', async () => {
-    vi.mocked(sendMessage).mockResolvedValue(validBackup)
+  it('exports bounded chunks through dashboard sessions and verifies download bytes', async () => {
+    const text = JSON.stringify(validBackup)
+    const digest = await transferDigest(text)
+    vi.mocked(sendMessage).mockImplementation(async (method) => {
+      await Promise.resolve()
+      if (method === 'backup.beginTransfer')
+        return {
+          ...selectedTransfer,
+          direction: 'export',
+          nextSequence: 1,
+          bytes: text.length,
+          status: 'ready',
+          sourceRevision: 1,
+          digest,
+        }
+      if (method === 'backup.readTransferChunk') return { sequence: 0, text }
+      return null
+    })
     const { wrapper } = createQueryTestHarness()
     const { result } = renderHook(() => useExportFullBackup(), { wrapper })
-
     await act(async () => {
-      await result.current.mutateAsync()
+      const download = await result.current.mutateAsync()
+      expect(await download.blob.text()).toBe(text)
     })
-
-    expect(sendMessage).toHaveBeenCalledWith('backup.exportFullBackup', {
+    expect(sendMessage).toHaveBeenCalledWith(
+      'backup.beginTransfer',
+      expect.objectContaining({ surface: 'dashboard', direction: 'export' }),
+    )
+    expect(sendMessage).toHaveBeenCalledWith('backup.cancelTransfer', {
       surface: 'dashboard',
+      sessionId: selectedTransfer.sessionId,
+      ownerToken: selectedTransfer.ownerToken,
     })
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.some(([method]) => method === 'backup.exportFullBackup'),
+    ).toBe(false)
   })
-
-  it('validates and restores selected backup payloads', async () => {
-    vi.mocked(sendMessage)
-      .mockResolvedValueOnce(validSummary)
-      .mockResolvedValueOnce(durableReplacement)
+  it('streams a selected File in bounded ordered chunks and confirms only its selected preview', async () => {
+    const text = JSON.stringify({
+      ...validBackup,
+      source: { appVersion: '😀'.repeat(150000) },
+    })
+    const file = new NodeFile([text], 'backup.json', {
+      type: 'application/json',
+    }) as unknown as File
+    const uploaded: string[] = []
+    vi.mocked(sendMessage).mockImplementation(async (method, data) => {
+      await Promise.resolve()
+      if (method === 'backup.beginTransfer')
+        return {
+          ...selectedTransfer,
+          direction: 'import',
+          nextSequence: 0,
+          bytes: 0,
+          digest: null,
+          status: 'receiving',
+          sourceRevision: null,
+        }
+      if (method === 'backup.appendTransferChunk') {
+        const chunk = data as { sequence: number; text: string }
+        expect(chunk.sequence).toBe(uploaded.length)
+        expect(new TextEncoder().encode(chunk.text).length).toBeLessThanOrEqual(
+          262144,
+        )
+        uploaded.push(chunk.text)
+        return {
+          ...selectedTransfer,
+          direction: 'import',
+          nextSequence: uploaded.length,
+          bytes: 0,
+          digest: null,
+          status: 'receiving',
+          sourceRevision: null,
+        }
+      }
+      if (
+        method === 'backup.finishTransfer' &&
+        !('confirmationToken' in (data as object))
+      )
+        return validSummary
+      return durableReplacement
+    })
     const { queryClient, wrapper } = createQueryTestHarness()
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
     const validate = renderHook(() => useValidateFullBackup(), { wrapper })
     const restore = renderHook(() => useRestoreFullBackup(), { wrapper })
-
     await act(async () => {
-      await validate.result.current.mutateAsync(validBackup)
+      const preview = await validate.result.current.mutateAsync(file)
+      expect(uploaded.join('')).toBe(text)
+      expect(uploaded.length).toBeGreaterThan(2)
       await restore.result.current.mutateAsync({
-        backup: validBackup,
-        confirmationToken: 'preview-token',
+        transfer: preview.transfer,
+        confirmationToken: preview.confirmationToken,
       })
     })
-
-    expect(sendMessage).toHaveBeenCalledWith('backup.validateFullBackup', {
-      surface: 'dashboard',
-      backup: validBackup,
-    })
-    expect(sendMessage).toHaveBeenCalledWith('backup.restoreFullBackup', {
-      surface: 'dashboard',
-      backup: validBackup,
-      confirmationToken: 'preview-token',
-    })
+    expect(sendMessage).toHaveBeenCalledWith(
+      'backup.finishTransfer',
+      expect.objectContaining({
+        surface: 'dashboard',
+        chunks: uploaded.length,
+        digest: await transferDigest(text),
+        confirmationToken: 'preview-token',
+      }),
+    )
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: queryKeys.settings.all,
     })
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: queryKeys.problems.all,
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.some(
+          ([method]) =>
+            method === 'backup.validateFullBackup' ||
+            method === 'backup.restoreFullBackup',
+        ),
+    ).toBe(false)
+  })
+
+  it('reuses its durable begin identity after a lost worker response', async () => {
+    const ids: string[] = []
+    vi.mocked(sendMessage).mockImplementation(async (method, data) => {
+      await Promise.resolve()
+      if (method === 'backup.beginTransfer') {
+        ids.push((data as { requestId: string }).requestId)
+        if (ids.length === 1) throw new Error('worker response lost')
+        return {
+          ...selectedTransfer,
+          direction: 'export',
+          status: 'ready',
+          nextSequence: 1,
+          bytes: 2,
+          sourceRevision: 1,
+          digest: await transferDigest('{}'),
+        }
+      }
+      if (method === 'backup.readTransferChunk')
+        return { sequence: 0, text: '{}' }
+      return null
     })
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: queryKeys.appShell.all,
+    await expect(exportFullBackupViaRuntime()).rejects.toThrow(
+      'worker response lost',
+    )
+    expect(await (await exportFullBackupViaRuntime()).blob.text()).toBe('{}')
+    expect(ids).toHaveLength(2)
+    expect(ids[0]).toBe(ids[1])
+  })
+
+  it.each(['spool failure', 'lost resume response'] as const)(
+    'recovers a rotated export capability after %s before cleanup and subsequent import',
+    async (failure) => {
+      const local = createLocalIdbStore(
+        new IDBFactory(),
+        'export-resume-quality',
+      )
+      const owner = 'actual-dashboard-document'
+      let interrupted = true
+      let spoolAttempts = 0
+      let originalOwnerToken: string | undefined
+      const service = createBackupTransferService({
+        local,
+        budgetBytes: failure === 'spool failure' ? 3 : 64,
+        currentRevision: () => Promise.resolve(1),
+        exportSnapshot: async (consume) => {
+          spoolAttempts++
+          if (interrupted) {
+            interrupted = false
+            throw new Error('worker interrupted before spool')
+          }
+          await consume({ value: 'x' }, 1)
+        },
+        preview: () => Promise.resolve(validSummary),
+        restore: () => Promise.resolve(durableReplacement),
+      })
+      let first = true
+      const exportRequests: string[] = []
+      const cancelledTokens: string[] = []
+      vi.mocked(sendMessage).mockImplementation(async (method, data) => {
+        if (method === 'backup.beginTransfer') {
+          const request = data as {
+            direction: 'import' | 'export'
+            requestId: string
+            resume?: { sessionId: string; ownerToken: string }
+          }
+          if (request.direction === 'export')
+            exportRequests.push(request.requestId)
+          if (first) {
+            first = false
+            await expect(service.begin(owner, request)).rejects.toThrow(
+              'worker interrupted before spool',
+            )
+          }
+          const result = await service.begin(owner, request)
+          if (originalOwnerToken === undefined)
+            originalOwnerToken = result.ownerToken
+          if (request.resume && failure === 'lost resume response')
+            throw new Error('resume response lost')
+          return result
+        }
+        const handle = data as unknown as {
+          sessionId: string
+          ownerToken: string
+          sequence: number
+          text: string
+          chunks: number
+          digest: string
+        }
+        if (method === 'backup.cancelTransfer') {
+          cancelledTokens.push(handle.ownerToken)
+          return service.cancel(owner, handle)
+        }
+        if (method === 'backup.appendTransferChunk')
+          return service.append(owner, handle, handle.sequence, handle.text)
+        if (method === 'backup.finishTransfer')
+          return service.finish(owner, handle, handle)
+        if (method === 'backup.readTransferChunk')
+          return service.read(owner, handle, handle.sequence)
+        throw new Error('Unexpected transfer method')
+      })
+      try {
+        await expect(exportFullBackupViaRuntime()).rejects.toThrow(
+          failure === 'spool failure' ? /budget/ : /resume response lost/,
+        )
+        const preview = await validateFullBackupViaRuntime(
+          new NodeFile(['{}'], 'after-failed-export.json') as unknown as File,
+        )
+        expect(preview.transfer.chunks).toBe(1)
+        expect(new Set(exportRequests).size).toBe(1)
+        expect(exportRequests.length).toBeGreaterThanOrEqual(3)
+        expect(cancelledTokens).toHaveLength(1)
+        expect(cancelledTokens[0]).not.toBe(originalOwnerToken)
+        expect(spoolAttempts).toBe(2)
+        expect(await local.readRecord(transferBudgetKey)).toEqual({
+          bytes: 2,
+          sessions: 1,
+        })
+        await cancelBackupTransfer(preview.transfer)
+      } finally {
+        // Keep a failing RED run isolated: recover the current capability using
+        // the same actual owner/request receipt, never retry the bulk spool.
+        const requestId = exportRequests[0]!
+        if (
+          (await local.readRecord(transferBeginKey(owner, requestId))) !==
+          undefined
+        ) {
+          const current = await service.begin(owner, {
+            direction: 'export',
+            requestId,
+          })
+          await cancelBackupTransfer(current)
+        }
+      }
+    },
+  )
+
+  it('retains failed import cleanup and refuses a new spool until cancellation is acknowledged', async () => {
+    const begins: string[] = []
+    let cancelFails = true
+    vi.mocked(sendMessage).mockImplementation((method, data) => {
+      if (method === 'backup.beginTransfer') {
+        begins.push((data as { requestId: string }).requestId)
+        return Promise.resolve({
+          ...selectedTransfer,
+          direction: 'import',
+          status: 'receiving',
+          nextSequence: 0,
+          bytes: 0,
+          sourceRevision: null,
+          digest: null,
+        })
+      }
+      if (method === 'backup.appendTransferChunk')
+        return Promise.reject(new Error('append response lost'))
+      if (method === 'backup.cancelTransfer')
+        return cancelFails
+          ? Promise.reject(new Error('cancel not delivered'))
+          : Promise.resolve(null)
+      return Promise.resolve(null)
     })
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: queryKeys.backup.pendingReplacement(),
-    })
+    const file = new NodeFile(['{}'], 'failed.json') as unknown as File
+    await expect(validateFullBackupViaRuntime(file)).rejects.toThrow(/cleanup/i)
+    await expect(validateFullBackupViaRuntime(file)).rejects.toThrow(
+      /cancel|cleanup/i,
+    )
+    expect(begins).toHaveLength(1)
+    cancelFails = false
+    await expect(validateFullBackupViaRuntime(file)).rejects.toThrow(
+      'append response lost',
+    )
+    expect(begins).toHaveLength(2)
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.filter(([method]) => method === 'backup.cancelTransfer')
+        .length,
+    ).toBeGreaterThanOrEqual(3)
+  })
+
+  it('flushes the streaming decoder at EOF and cancels malformed UTF8 without previewing', async () => {
+    vi.mocked(sendMessage).mockImplementation((method) =>
+      Promise.resolve(
+        method === 'backup.beginTransfer'
+          ? {
+              ...selectedTransfer,
+              direction: 'import',
+              status: 'receiving',
+              nextSequence: 0,
+              bytes: 0,
+              digest: null,
+              sourceRevision: null,
+            }
+          : null,
+      ),
+    )
+    const file = new NodeFile(
+      [new Uint8Array([0xf0, 0x9f])],
+      'truncated.json',
+    ) as unknown as File
+    await expect(validateFullBackupViaRuntime(file)).rejects.toThrow()
+    expect(sendMessage).toHaveBeenCalledWith(
+      'backup.cancelTransfer',
+      expect.objectContaining({ sessionId: selectedTransfer.sessionId }),
+    )
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.some(([method]) => method === 'backup.finishTransfer'),
+    ).toBe(false)
   })
 
   it('resets local data and invalidates DB-backed query families', async () => {
@@ -198,7 +487,7 @@ describe('backup API hooks', () => {
       await act(async () => {
         if (kind === 'restore') {
           await restore.result.current.mutateAsync({
-            backup: validBackup,
+            transfer: selectedTransfer,
             confirmationToken: 'preview-token',
           })
         } else {
@@ -237,7 +526,7 @@ describe('backup API hooks', () => {
       await act(async () => {
         if (kind === 'restore') {
           await restore.result.current.mutateAsync({
-            backup: validBackup,
+            transfer: selectedTransfer,
             confirmationToken: 'preview-token',
           })
         } else {
@@ -383,7 +672,7 @@ describe('backup API hooks', () => {
         const operation =
           action === 'restore'
             ? restore.result.current.mutateAsync({
-                backup: validBackup,
+                transfer: selectedTransfer,
                 confirmationToken: 'preview-token',
               })
             : action === 'reset'
@@ -417,7 +706,7 @@ describe('backup API hooks', () => {
 
     await act(async () => {
       await restore.result.current.mutateAsync({
-        backup: validBackup,
+        transfer: selectedTransfer,
         confirmationToken: 'preview-token',
       })
     })
@@ -438,7 +727,7 @@ describe('backup API hooks', () => {
 
     await act(async () => {
       await restore.result.current.mutateAsync({
-        backup: validBackup,
+        transfer: selectedTransfer,
         confirmationToken: 'preview-token',
       })
     })
@@ -467,7 +756,13 @@ describe('backup API hooks', () => {
       createElement,
     } as unknown as Document
 
-    downloadBackupFile(validBackup, documentRef)
+    downloadBackupFile(
+      {
+        blob: new Blob([JSON.stringify(validBackup)]),
+        exportedAt: validBackup.exportedAt,
+      },
+      documentRef,
+    )
 
     expect(createElement).toHaveBeenCalledWith('a')
     expect(anchor.download).toBe('cognipace-backup-2026-05-25.json')
@@ -558,3 +853,10 @@ const validBackup = {
     settings: [],
   },
 } satisfies BackupFile
+
+const selectedTransfer = {
+  sessionId: 'b4b22db1-74f2-443e-ae5c-2d41d1d28127',
+  ownerToken: '976ba5f6-7e65-40db-83f9-8895d9ca4dcc',
+  chunks: 1,
+  digest: '0'.repeat(64),
+}

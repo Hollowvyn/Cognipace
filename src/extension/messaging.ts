@@ -1,3 +1,4 @@
+import type * as Transfer from '@/features/backup/api/backup-transfer-contracts'
 import type { BackupRestorePreview } from '@/features/backup/api/backup-contracts'
 import type {
   NotesRequest,
@@ -374,6 +375,21 @@ export interface ProtocolMap {
   'runtime.ping'(request: PingRequest): PingResponse
   'app.getShellData'(request: AppShellRequest): AppShellData
   'app.openDashboard'(request: OpenDashboardRequest): null
+  'backup.beginTransfer'(
+    request: z.infer<typeof Transfer.beginTransferRequestSchema>,
+  ): Transfer.TransferSession
+  'backup.readTransferChunk'(
+    request: z.infer<typeof Transfer.readTransferChunkRequestSchema>,
+  ): z.infer<typeof Transfer.transferChunkSchema>
+  'backup.appendTransferChunk'(
+    request: z.infer<typeof Transfer.appendTransferChunkRequestSchema>,
+  ): Transfer.TransferSession
+  'backup.finishTransfer'(
+    request: z.infer<typeof Transfer.finishTransferRequestSchema>,
+  ): BackupRestorePreview | BackupReplacementResult
+  'backup.cancelTransfer'(
+    request: z.infer<typeof Transfer.transferRequestSchema>,
+  ): null
   'backup.exportFullBackup'(request: BackupRequest): BackupFile
   'backup.validateFullBackup'(
     request: BackupPayloadRequest,
@@ -527,6 +543,11 @@ export const protocolMethodNames = [
   'runtime.ping',
   'app.getShellData',
   'app.openDashboard',
+  'backup.beginTransfer',
+  'backup.readTransferChunk',
+  'backup.appendTransferChunk',
+  'backup.finishTransfer',
+  'backup.cancelTransfer',
   'backup.exportFullBackup',
   'backup.validateFullBackup',
   'backup.restoreFullBackup',

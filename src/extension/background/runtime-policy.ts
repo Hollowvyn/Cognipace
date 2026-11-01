@@ -14,9 +14,14 @@ const methodSurfaceAccess = {
   'runtime.ping': ['background', 'popup', 'dashboard', 'content-script'],
   'app.getShellData': ['popup', 'dashboard', 'content-script'],
   'app.openDashboard': ['content-script'],
-  'backup.exportFullBackup': ['dashboard'],
-  'backup.validateFullBackup': ['dashboard'],
-  'backup.restoreFullBackup': ['dashboard'],
+  'backup.beginTransfer': ['dashboard'],
+  'backup.readTransferChunk': ['dashboard'],
+  'backup.appendTransferChunk': ['dashboard'],
+  'backup.finishTransfer': ['dashboard'],
+  'backup.cancelTransfer': ['dashboard'],
+  'backup.exportFullBackup': [],
+  'backup.validateFullBackup': [],
+  'backup.restoreFullBackup': [],
   'backup.resetLocalData': ['dashboard'],
   'backup.getPendingReplacement': ['dashboard'],
   'backup.retryPendingReplacement': ['dashboard'],
@@ -253,4 +258,19 @@ export function assertNotesProblemSender(sender: unknown, problemSlug: string) {
     throw new Error(
       'Notes problem must match the actual HTTPS LeetCode sender page.',
     )
+}
+
+/** Chrome supplies documentId even when an extension page has no sender.tab.
+ * Never substitute caller data, tab identity, or a shared extension origin. */
+export function backupTransferDocumentOwner(sender: unknown): string {
+  if (
+    !isRecord(sender) ||
+    typeof sender.documentId !== 'string' ||
+    !sender.documentId ||
+    getMessageSenderSurface(sender) !== 'dashboard'
+  )
+    throw new Error(
+      'Backup transfer requires an actual dashboard document identity.',
+    )
+  return sender.documentId
 }

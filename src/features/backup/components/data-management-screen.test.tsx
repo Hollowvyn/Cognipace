@@ -1,3 +1,5 @@
+import { File as NodeFile } from 'node:buffer'
+import { transferDigest } from '../api/backup-transfer-contracts'
 import { emptyNotesArchive } from '@/features/notes/domain/archive-validation'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -30,7 +32,8 @@ vi.mock('@/features/sync', () => ({
 describe('DataManagementScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(sendMessage).mockImplementation((method) => {
+    vi.stubGlobal('File', NodeFile)
+    mockTransferRuntime((method) => {
       if (method === 'backup.getPendingReplacement') {
         return Promise.resolve({ status: 'idle' })
       }
@@ -46,7 +49,7 @@ describe('DataManagementScreen', () => {
 
   it('exports a full backup and shows completion feedback', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) =>
+    mockTransferRuntime((method) =>
       Promise.resolve(
         method === 'backup.getPendingReplacement'
           ? { status: 'idle' }
@@ -60,13 +63,130 @@ describe('DataManagementScreen', () => {
 
     await user.click(screen.getByRole('button', { name: 'Export backup' }))
 
-    expect(sendMessage).toHaveBeenCalledWith('backup.exportFullBackup', {
-      surface: 'dashboard',
-    })
+    expect(sendMessage).toHaveBeenCalledWith(
+      'backup.beginTransfer',
+      expect.objectContaining({ surface: 'dashboard', direction: 'export' }),
+    )
     expect(
       await screen.findByRole('status', { name: 'Data management feedback' }),
     ).toHaveTextContent('Backup exported.')
     expect(within(backupPanel).queryByText('Backup exported.')).toBeNull()
+  })
+
+  it('cancels an unconfirmed selected transfer when Data Management closes', async () => {
+    const user = userEvent.setup()
+    mockTransferRuntime(() => Promise.resolve(validSummary))
+    const { wrapper } = createQueryTestHarness()
+    const view = render(<DataManagementScreen />, { wrapper })
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      createBackupFile(validBackup),
+    )
+    await screen.findByRole('button', { name: 'Restore full backup' })
+    vi.mocked(sendMessage).mockClear()
+    view.unmount()
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        'backup.cancelTransfer',
+        expect.objectContaining({ surface: 'dashboard' }),
+      ),
+    )
+  })
+
+  it('keeps a selected capability when cancellation fails before replacing its preview', async () => {
+    const user = userEvent.setup()
+    mockTransferRuntime(() => Promise.resolve(validSummary))
+    const { wrapper } = createQueryTestHarness()
+    const view = render(<DataManagementScreen />, { wrapper })
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      createBackupFile(validBackup),
+    )
+    await screen.findByRole('button', { name: 'Restore full backup' })
+    const original = vi.mocked(sendMessage).getMockImplementation()!
+    let cancelFails = true
+    vi.mocked(sendMessage).mockImplementation((method, data, arg) =>
+      method === 'backup.cancelTransfer' && cancelFails
+        ? Promise.reject(new Error('cancel not delivered'))
+        : original(method, data, arg),
+    )
+    vi.mocked(sendMessage).mockClear()
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      new File([JSON.stringify(validBackup)], 'next.json', {
+        type: 'application/json',
+      }),
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'cancel not delivered',
+    )
+    expect(screen.getByText('backup.json')).toBeVisible()
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.filter(([method]) => method === 'backup.beginTransfer'),
+    ).toHaveLength(0)
+    cancelFails = false
+    view.unmount()
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(sendMessage)
+          .mock.calls.filter(([method]) => method === 'backup.cancelTransfer'),
+      ).toHaveLength(2),
+    )
+  })
+
+  it('recovers an undelivered unmount cancellation on remount before allocating another import', async () => {
+    const user = userEvent.setup()
+    mockTransferRuntime(() => Promise.resolve(validSummary))
+    const { wrapper } = createQueryTestHarness()
+    const first = render(<DataManagementScreen />, { wrapper })
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      createBackupFile(validBackup),
+    )
+    await screen.findByRole('button', { name: 'Restore full backup' })
+    const original = vi.mocked(sendMessage).getMockImplementation()!
+    let cancelFails = true
+    vi.mocked(sendMessage).mockImplementation((method, data, arg) =>
+      method === 'backup.cancelTransfer' && cancelFails
+        ? Promise.reject(new Error('cancel not delivered'))
+        : original(method, data, arg),
+    )
+    first.unmount()
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        'backup.cancelTransfer',
+        expect.anything(),
+      ),
+    )
+    vi.mocked(sendMessage).mockClear()
+    const second = render(<DataManagementScreen />, { wrapper })
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'cancel not delivered',
+    )
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      createBackupFile(validBackup),
+    )
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.filter(([method]) => method === 'backup.beginTransfer'),
+    ).toHaveLength(0)
+    cancelFails = false
+    await user.upload(
+      screen.getByLabelText('Backup file'),
+      createBackupFile(validBackup),
+    )
+    await screen.findByRole('button', { name: 'Restore full backup' })
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.filter(([method]) => method === 'backup.beginTransfer'),
+    ).toHaveLength(1)
+    second.unmount()
   })
 
   it('renders GitHub sync settings before import content and reset', () => {
@@ -99,7 +219,7 @@ describe('DataManagementScreen', () => {
 
   it('validates an imported backup, shows the selected file, and keeps restore calm', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) =>
+    mockTransferRuntime((method) =>
       Promise.resolve(
         method === 'backup.getPendingReplacement'
           ? { status: 'idle' }
@@ -121,10 +241,14 @@ describe('DataManagementScreen', () => {
       createBackupFile(validBackup),
     )
 
-    expect(sendMessage).toHaveBeenCalledWith('backup.validateFullBackup', {
-      surface: 'dashboard',
-      backup: validBackup,
-    })
+    expect(sendMessage).toHaveBeenCalledWith(
+      'backup.finishTransfer',
+      expect.objectContaining({
+        surface: 'dashboard',
+        chunks: 1,
+        digest: await transferDigest(JSON.stringify(validBackup)),
+      }),
+    )
     expect(
       await screen.findByRole('status', { name: 'Data management feedback' }),
     ).toHaveTextContent('Backup ready to restore.')
@@ -145,7 +269,7 @@ describe('DataManagementScreen', () => {
     ).not.toHaveClass('bg-destructive')
   })
 
-  it('shows an alert for invalid JSON without calling runtime validation', async () => {
+  it('shows worker validation failure for invalid JSON', async () => {
     const user = userEvent.setup()
     const { wrapper } = createQueryTestHarness()
 
@@ -159,15 +283,15 @@ describe('DataManagementScreen', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Invalid JSON backup file.',
     )
-    expect(sendMessage).not.toHaveBeenCalledWith(
-      'backup.validateFullBackup',
-      expect.anything(),
+    expect(sendMessage).toHaveBeenCalledWith(
+      'backup.finishTransfer',
+      expect.objectContaining({ surface: 'dashboard' }),
     )
   })
 
   it('warns that a legacy restore removes the current Notes archive', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) =>
+    mockTransferRuntime((method) =>
       Promise.resolve(
         method === 'backup.getPendingReplacement'
           ? { status: 'idle' }
@@ -198,16 +322,16 @@ describe('DataManagementScreen', () => {
 
   it('requires confirmation before restoring a full backup', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) => {
+    mockTransferRuntime((method, data) => {
       if (method === 'backup.getPendingReplacement') {
         return Promise.resolve({ status: 'idle' })
       }
 
-      if (method === 'backup.validateFullBackup') {
+      if (method === 'backup.finishTransfer' && !hasConfirmation(data)) {
         return Promise.resolve(validSummary)
       }
 
-      if (method === 'backup.restoreFullBackup') {
+      if (method === 'backup.finishTransfer' && hasConfirmation(data)) {
         return Promise.resolve(durableResult('restore'))
       }
 
@@ -232,11 +356,13 @@ describe('DataManagementScreen', () => {
 
     await user.click(screen.getByRole('button', { name: 'Confirm restore' }))
 
-    expect(sendMessage).toHaveBeenCalledWith('backup.restoreFullBackup', {
-      surface: 'dashboard',
-      backup: validBackup,
-      confirmationToken: 'preview-token',
-    })
+    expect(sendMessage).toHaveBeenCalledWith(
+      'backup.finishTransfer',
+      expect.objectContaining({
+        surface: 'dashboard',
+        confirmationToken: 'preview-token',
+      }),
+    )
     expect(
       await screen.findByRole('status', { name: 'Data management feedback' }),
     ).toHaveTextContent('Backup restored.')
@@ -251,12 +377,12 @@ describe('DataManagementScreen', () => {
 
   it('offers a backup export inside the clear confirmation dialog', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) => {
+    mockTransferRuntime((method) => {
       if (method === 'backup.getPendingReplacement') {
         return Promise.resolve({ status: 'idle' })
       }
 
-      if (method === 'backup.exportFullBackup') {
+      if (method === 'backup.beginTransfer') {
         return Promise.resolve(validBackup)
       }
 
@@ -279,9 +405,10 @@ describe('DataManagementScreen', () => {
       within(dialog).getByRole('button', { name: 'Export backup first' }),
     )
 
-    expect(sendMessage).toHaveBeenCalledWith('backup.exportFullBackup', {
-      surface: 'dashboard',
-    })
+    expect(sendMessage).toHaveBeenCalledWith(
+      'backup.beginTransfer',
+      expect.objectContaining({ surface: 'dashboard', direction: 'export' }),
+    )
     const exportedButton = await within(dialog).findByRole('button', {
       name: 'Backup exported',
     })
@@ -293,7 +420,7 @@ describe('DataManagementScreen', () => {
 
   it('cancels and confirms clearing local data through a confirmation dialog', async () => {
     const user = userEvent.setup()
-    vi.mocked(sendMessage).mockImplementation((method) =>
+    mockTransferRuntime((method) =>
       Promise.resolve(
         method === 'backup.getPendingReplacement'
           ? { status: 'idle' }
@@ -338,7 +465,7 @@ describe('DataManagementScreen', () => {
   it('reuses the accepted Clear command ID after a lost response without reopening confirmation', async () => {
     const user = userEvent.setup()
     let calls = 0
-    vi.mocked(sendMessage).mockImplementation((method) => {
+    mockTransferRuntime((method) => {
       if (method === 'backup.getPendingReplacement')
         return Promise.resolve({ status: 'idle' })
       if (method === 'backup.resetLocalData')
@@ -459,7 +586,10 @@ describe('DataManagementScreen', () => {
     expect(
       vi
         .mocked(sendMessage)
-        .mock.calls.filter(([method]) => method === 'backup.restoreFullBackup'),
+        .mock.calls.filter(
+          ([method, data]) =>
+            method === 'backup.finishTransfer' && hasConfirmation(data),
+        ),
     ).toHaveLength(1)
     expect(
       await screen.findByRole('status', { name: 'Data management feedback' }),
@@ -563,7 +693,7 @@ describe('DataManagementScreen', () => {
   it('reveals Gist recovery when the sync action refreshes pending replacement status', async () => {
     const user = userEvent.setup()
     let pending = false
-    vi.mocked(sendMessage).mockImplementation((method) => {
+    mockTransferRuntime((method) => {
       if (method === 'backup.getPendingReplacement') {
         return Promise.resolve(
           pending
@@ -632,16 +762,16 @@ describe('DataManagementScreen', () => {
   it('keeps retry saving available after a read-status failure and reports retry errors outside a dialog', async () => {
     const user = userEvent.setup()
     let committed = false
-    vi.mocked(sendMessage).mockImplementation((method) => {
+    mockTransferRuntime((method, data) => {
       if (method === 'backup.getPendingReplacement') {
         return committed
           ? Promise.reject(new Error('Status unavailable.'))
           : Promise.resolve({ status: 'idle' })
       }
-      if (method === 'backup.validateFullBackup') {
+      if (method === 'backup.finishTransfer' && !hasConfirmation(data)) {
         return Promise.resolve(validSummary)
       }
-      if (method === 'backup.restoreFullBackup') {
+      if (method === 'backup.finishTransfer' && hasConfirmation(data)) {
         committed = true
         return Promise.resolve(pendingState('restore', 'persistence-pending'))
       }
@@ -701,15 +831,15 @@ function mockReplacementRuntime({
   let state: BackupReplacementState = initialPending
     ? pendingState(kind, status)
     : { status: 'idle' }
-  vi.mocked(sendMessage).mockImplementation((method) => {
+  mockTransferRuntime((method, data) => {
     if (method === 'backup.getPendingReplacement') {
       return Promise.resolve(state)
     }
-    if (method === 'backup.validateFullBackup') {
+    if (method === 'backup.finishTransfer' && !hasConfirmation(data)) {
       return Promise.resolve(validSummary)
     }
     if (
-      method === 'backup.restoreFullBackup' ||
+      (method === 'backup.finishTransfer' && hasConfirmation(data)) ||
       method === 'backup.resetLocalData'
     ) {
       state = pendingState(kind, status)
@@ -982,3 +1112,61 @@ const validBackup = {
     ],
   },
 } satisfies BackupFile
+
+function hasConfirmation(data: unknown) {
+  return (
+    typeof data === 'object' && data !== null && 'confirmationToken' in data
+  )
+}
+function mockTransferRuntime(
+  implementation: (
+    method: Parameters<typeof sendMessage>[0],
+    data?: unknown,
+  ) => Promise<Awaited<ReturnType<typeof sendMessage>>>,
+) {
+  const text = JSON.stringify(validBackup)
+  const handle = {
+    sessionId: 'b4b22db1-74f2-443e-ae5c-2d41d1d28127',
+    ownerToken: '976ba5f6-7e65-40db-83f9-8895d9ca4dcc',
+  }
+  let uploaded = ''
+  vi.mocked(sendMessage).mockImplementation(async (method, data) => {
+    if (method === 'backup.beginTransfer') {
+      const request = data as { direction: 'import' | 'export' }
+      if (request.direction === 'export') await implementation(method, data)
+      uploaded = ''
+      return {
+        ...handle,
+        direction: request.direction,
+        status: request.direction === 'export' ? 'ready' : 'receiving',
+        nextSequence: request.direction === 'export' ? 1 : 0,
+        bytes: text.length,
+        sourceRevision: 1,
+        digest:
+          request.direction === 'export' ? await transferDigest(text) : null,
+      }
+    }
+    if (method === 'backup.readTransferChunk') return { sequence: 0, text }
+    if (method === 'backup.appendTransferChunk') {
+      uploaded += (data as { text: string }).text
+      return {
+        ...handle,
+        nextSequence: 1,
+        direction: 'import' as const,
+        status: 'receiving' as const,
+        bytes: uploaded.length,
+        digest: null,
+        sourceRevision: null,
+      }
+    }
+    if (method === 'backup.cancelTransfer') return null
+    if (method === 'backup.finishTransfer' && !hasConfirmation(data)) {
+      try {
+        JSON.parse(uploaded)
+      } catch {
+        throw new Error('Invalid JSON backup file.')
+      }
+    }
+    return implementation(method, data)
+  })
+}
