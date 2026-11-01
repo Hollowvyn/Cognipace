@@ -255,3 +255,185 @@ describe('durable accepted review commands', () => {
     )
   })
 })
+
+it('recovers exact prior archive bodies with fresh Notes and Practice write scopes through an injected owner hook', async () => {
+  const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb')
+  vi.stubGlobal('indexedDB', new IDBFactory())
+  vi.stubGlobal('IDBKeyRange', IDBKeyRange)
+  const { handle, command } = await fixture()
+  await executePracticeReviewCommand(handle.db, command)
+  await flushDbSnapshot()
+  const { createLocalIdbStore } = await import('@/platform/db/local-idb')
+  const { createSnapshotIdbStore } = await import('@/platform/db/snapshot-idb')
+  const { createCompositePublication } =
+    await import('@/platform/db/composite-publication')
+  const {
+    createDetachedCoreCandidate,
+    prepareDbReplacement,
+    adoptPublishedCoreCandidate,
+  } = await import('@/platform/db/instance')
+  const { createNotesRepository } =
+    await import('@/features/notes/data/notes-repository')
+  const { createArchiveGenerationRepository } =
+    await import('@/features/notes/data/archive-generation-repository')
+  const { replacePracticeStorageDataInTransaction } =
+    await import('./server/practice-storage-service')
+  const local = createLocalIdbStore(indexedDB)
+  const store = createSnapshotIdbStore(indexedDB)
+  const notes = createNotesRepository(local)
+  const archive = createArchiveGenerationRepository(local)
+  const scope = await notes.acquireScope('two-sum')
+  const noteCommand = {
+    commandId: 'old-note',
+    problemSlug: 'two-sum',
+    scope,
+    target: { kind: 'problem' as const },
+    expectedRevision: 0,
+    markdown: 'historical markdown',
+  }
+  await notes.saveDocument(noteCommand)
+  const baseline = (await local.readHead())!
+  await local.transact(
+    ['submissions', 'analysisReports', 'payloads'],
+    'readwrite',
+    (s, done) => {
+      s.submissions.put(
+        { problemSlug: 'two-sum', codePayloadId: 'recovery-code' },
+        [baseline.archiveGeneration, 'submission'],
+      )
+      s.analysisReports.put(
+        { problemSlug: 'two-sum', feedbackPayloadId: 'recovery-report' },
+        [baseline.archiveGeneration, 'assessment'],
+      )
+      s.payloads.put({ body: 'return historical solution' }, 'recovery-code')
+      s.payloads.put({ body: 'historical report body' }, 'recovery-report')
+      done(undefined)
+    },
+  )
+  const publication = createCompositePublication(local, baseline.fingerprint)
+  async function publish(
+    handle: DbHandle,
+    sourceGeneration: string | null,
+    id: string,
+  ) {
+    const head = (await local.readHead())!
+    const candidate = {
+      handle,
+      descriptor: {
+        baseRevision: head.revision,
+        coreSnapshotId: `core-${id}`,
+        archiveGeneration: `archive-${id}`,
+        datasetToken: `dataset-${id}`,
+        replacementId: id,
+      },
+    }
+    await publication.prepare(candidate, () =>
+      sourceGeneration
+        ? archive.stageArchiveGeneration({
+            sourceGeneration,
+            nextGeneration: candidate.descriptor.archiveGeneration,
+            excludedProblemSlugs: [],
+          })
+        : archive.stageImportedArchive({
+            nextGeneration: candidate.descriptor.archiveGeneration,
+            archive: {
+              formatVersion: 1,
+              notes: [],
+              submissions: [],
+              assessments: [],
+              savedAiNotes: [],
+              payloads: [],
+            },
+          }),
+    )
+    const published = await publication.publishCompositeCandidate(candidate, {
+      kind: 'restore',
+      replacementId: id,
+    })
+    await adoptPublishedCoreCandidate(candidate, published, local)
+    await store.markInvalidated(id)
+    await store.markSyncMetadataComplete(id)
+    await store.completeContinuation(id)
+  }
+  await prepareDbReplacement()
+  const replacement = await createDetachedCoreCandidate(serializeDb(handle))
+  handles.push(replacement)
+  await publish(replacement, null, 'replacement')
+  const prior = (await store.readReplacementRecovery('replacement'))!
+  expect(prior.archiveGeneration).toBe(baseline.archiveGeneration)
+  await prepareDbReplacement()
+  let ownerHookCalled = false
+  const recovered = await createDetachedCoreCandidate(
+    new Uint8Array(prior.bytes),
+    async (candidate) => {
+      ownerHookCalled = true
+      const historical = await readPracticeStorageData(candidate.db)
+      await candidate.db.transaction((tx) =>
+        replacePracticeStorageDataInTransaction(tx, historical),
+      )
+    },
+  )
+  handles.push(recovered)
+  await publish(recovered, prior.archiveGeneration!, 'recovery')
+  expect(ownerHookCalled).toBe(true)
+  await local.transact(['problemScopes'], 'readonly', (s, done) => {
+    const request = s.problemScopes.get(['archive-recovery', 'two-sum'])
+    request.onsuccess = () => {
+      expect(request.result).toMatchObject({ datasetToken: 'dataset-recovery' })
+      expect(
+        (request.result as { problemToken: string }).problemToken,
+      ).not.toBe(scope.problemToken)
+      done(undefined)
+    }
+  })
+  expect(
+    (await notes.readDocument('two-sum', { kind: 'problem' })).markdown,
+  ).toBe('historical markdown')
+  const head = (await local.readHead())!
+  await local.transact(
+    ['submissions', 'analysisReports', 'payloads'],
+    'readonly',
+    (s, done) => {
+      const sub = s.submissions.get([head.archiveGeneration, 'submission'])
+      sub.onsuccess = () => {
+        const code = s.payloads.get(
+          (sub.result as { codePayloadId: string }).codePayloadId,
+        )
+        code.onsuccess = () =>
+          expect((code.result as { body: string }).body).toBe(
+            'return historical solution',
+          )
+      }
+      const report = s.analysisReports.get([
+        head.archiveGeneration,
+        'assessment',
+      ])
+      report.onsuccess = () => {
+        const body = s.payloads.get(
+          (report.result as { feedbackPayloadId: string }).feedbackPayloadId,
+        )
+        body.onsuccess = () => {
+          expect((body.result as { body: string }).body).toBe(
+            'historical report body',
+          )
+          done(undefined)
+        }
+      }
+    },
+  )
+  expect(await notes.saveDocument(noteCommand)).toEqual({
+    status: 'stale-scope',
+  })
+  expect(
+    await executePracticeReviewCommand((await getAppDb()).db, command),
+  ).toMatchObject({ status: 'conflict', reason: 'stale-generation' })
+  const active = (await getAppDb()).db
+  expect(
+    await executePracticeReviewCommand(active, {
+      ...command,
+      commandId: 'after-recovery',
+      generation: (await getPracticeDetails(active, 'two-sum')).generation!,
+    }),
+  ).toMatchObject({ status: 'saved' })
+  await flushDbSnapshot()
+})

@@ -67,7 +67,7 @@ export async function testAiConnection(
           signal,
         })
         signal.throwIfAborted()
-        const currentSettings = await getSettings(db)
+        const currentSettings = await getSettings(await loadDb())
         signal.throwIfAborted()
         const currentSecret =
           await loadAiProviderSecretSnapshotFromTrustedStorage(request.provider)

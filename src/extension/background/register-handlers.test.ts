@@ -360,6 +360,15 @@ vi.mock('@/platform/db', () => ({
 
 vi.mock('./app-db', () => ({
   getBackgroundDb: backgroundMocks.getAppDb,
+  withBackgroundDbLoader: async (
+    work: (loadDb: () => Promise<unknown>) => Promise<unknown>,
+  ) =>
+    work(
+      async () => ((await backgroundMocks.getAppDb()) as { db: unknown }).db,
+    ),
+  withBackgroundDb: async (
+    work: (handle: { db: unknown }) => Promise<unknown>,
+  ) => work((await backgroundMocks.getAppDb()) as { db: unknown }),
 }))
 
 vi.mock('@/features/leetcode-capture/server/leetcode-capture-service', () => ({

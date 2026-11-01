@@ -43,7 +43,7 @@ export async function analyzeLeetCodeSubmissionInBackground(
           Math.max(0, analysisTimeoutMs - (Date.now() - startedAt)),
         )
         signal.throwIfAborted()
-        const current = await loadActiveProviderConfigSnapshot(db)
+        const current = await loadActiveProviderConfigSnapshot(await loadDb())
         signal.throwIfAborted()
         if (!current || current.identity !== snapshot.identity)
           return {

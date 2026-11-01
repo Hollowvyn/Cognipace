@@ -799,6 +799,7 @@ export function createBackgroundSyncService(
   broadcastInvalidation: () => MaybePromise<void>,
   options: {
     runReplacement: SyncServiceDependencies['runReplacement']
+    withDb?: <T>(work: (db: Db) => Promise<T>) => Promise<T>
     runRemoteRestore?: SyncServiceDependencies['runRemoteRestore']
     syncCoordinator?: SyncOperationCoordinator
   },
@@ -811,8 +812,14 @@ export function createBackgroundSyncService(
     createGitHubClient: (token) => createGitHubGistClient({ token }),
     readMetadata: readSyncMetadata,
     writeMetadata: writeSyncMetadata,
-    exportFullBackup: () => exportFullBackup(db),
-    restoreBackup: (backup) => restoreValidatedBackupData(db, backup),
+    exportFullBackup: () =>
+      options.withDb ? options.withDb(exportFullBackup) : exportFullBackup(db),
+    restoreBackup: (backup) =>
+      options.withDb
+        ? options.withDb((current) =>
+            restoreValidatedBackupData(current, backup),
+          )
+        : restoreValidatedBackupData(db, backup),
     flushDbSnapshot,
     broadcastInvalidation,
     runReplacement: options.runReplacement,

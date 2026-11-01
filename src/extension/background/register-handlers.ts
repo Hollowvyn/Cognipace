@@ -242,7 +242,11 @@ import {
   assertCanSenderCallExtensionMethod,
   assertHintProblemSender,
 } from './runtime-policy'
-import { getBackgroundDb as getAppDb } from './app-db'
+import {
+  getBackgroundDb as getAppDb,
+  withBackgroundDb,
+  withBackgroundDbLoader,
+} from './app-db'
 import { createAlarmScheduler } from './scheduler/alarm-scheduler'
 import { createSyncAutoSync } from './sync-auto-sync'
 import {
@@ -322,15 +326,12 @@ const syncAutoSync = createSyncAutoSync({
 
 const dueNotification = createDueNotification({
   now: () => new Date(),
-  readSettings: async () => {
-    const { db } = await getAppDb()
-    return getSettings(db)
-  },
-  readQueueSummary: async () => {
-    const { db } = await getAppDb()
-    const queue = await getTodayQueue(db, new Date())
-    return { dueToday: queue.dueToday }
-  },
+  readSettings: () => withBackgroundDb(({ db }) => getSettings(db)),
+  readQueueSummary: () =>
+    withBackgroundDb(async ({ db }) => {
+      const queue = await getTodayQueue(db, new Date())
+      return { dueToday: queue.dueToday }
+    }),
   readState: readDueNotificationState,
   writeState: writeDueNotificationState,
   notify: async (title, message) => {
@@ -361,10 +362,14 @@ export function registerBackgroundHandlers() {
   const notesLeases = () => createNotesEditScopes(requireNotesLocal())
   registerNotesHandlers({
     getService: async () => {
-      const { db } = await getAppDb()
+      await getAppDb()
       return createNotesService(
         createNotesRepository(requireNotesLocal()),
-        async (slug) => (await getProblemContext(db, slug)) !== null,
+        (slug) =>
+          withBackgroundDb(
+            async ({ db: current }) =>
+              (await getProblemContext(current, slug)) !== null,
+          ),
       )
     },
     getLeases: notesLeases,
@@ -444,7 +449,7 @@ export function registerBackgroundHandlers() {
       getAppShellRuntimeSurface(request),
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       appShellDataSchema.parse(
         await timeOverlayStartup('worker.app-shell', () =>
           getAppShellData(db, request),
@@ -499,7 +504,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       syncStatusSchema.parse(await createSyncServiceForDb(db).getStatus()),
     )
   })
@@ -512,7 +517,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.validateGithubToken(request.token),
@@ -529,7 +534,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.validateStoredGithubToken(),
@@ -546,7 +551,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.saveGithubToken(request.token),
@@ -563,7 +568,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) => service.deleteGithubToken()),
       )
@@ -584,7 +589,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) => service.createGithubGist()),
       )
@@ -605,7 +610,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.connectGithubGist(request.gistId),
@@ -622,7 +627,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.setEnabled(request.enabled),
@@ -645,7 +650,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       parseSyncActionResult(
         await runQueuedSyncAction(db, (service) => service.checkRemoteOnOpen()),
       ),
@@ -678,7 +683,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.pullLatest({
@@ -703,7 +708,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const result = parseSyncActionResult(
         await runQueuedSyncAction(db, (service) =>
           service.pushLocal({
@@ -849,7 +854,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       problemLibraryResponseSchema.parse(await getProblemLibrary(db, request)),
     )
   })
@@ -862,7 +867,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       problemForEditResponseSchema.parse(await getProblemForEdit(db, request)),
     )
   })
@@ -981,7 +986,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const details = await getPracticeDetails(db, request.problemSlug, {
         ...(request.at ? { now: new Date(request.at) } : {}),
       })
@@ -1103,7 +1108,7 @@ export function registerBackgroundHandlers() {
       sender,
     )
 
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const summaryOptions = request.at
         ? {
             range: request.range,
@@ -1129,7 +1134,7 @@ export function registerBackgroundHandlers() {
 
     assertCanSenderCallExtensionMethod('devSmoke.run', request.surface, sender)
 
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const smoke = createDevSmokeService({
         now: () => new Date(),
         readAnalyticsSummary: () =>
@@ -1170,7 +1175,7 @@ export function registerBackgroundHandlers() {
           }),
         runNotificationDryRun: () =>
           runGatedMutationQueue(() => runNotificationSmokeDryRun(db)),
-        runLiveGenAi: () => runLiveGenAiSmoke(db),
+        runLiveGenAi: () => runLiveGenAiSmoke(),
         readCapacityStorage: () =>
           runGatedMutationQueue(() =>
             readChromeStorageCapacity(chrome.storage.local),
@@ -1198,7 +1203,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       serializeTodayQueue(
         await getTodayQueue(
           db,
@@ -1217,7 +1222,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       serializeActiveTrack(await getActiveTrack(db)),
     )
   })
@@ -1230,7 +1235,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       trackWorkspaceResponseSchema.parse(await getWorkspace(db, request)),
     )
   })
@@ -1243,7 +1248,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) =>
+    return withBackgroundDb(async ({ db }) =>
       trackForEditResponseSchema.parse(await getTrackForEdit(db, request)),
     )
   })
@@ -1409,7 +1414,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return getAppDb().then(async ({ db }) => {
+    return withBackgroundDb(async ({ db }) => {
       const settings = await getSettings(db)
       return settings satisfies UserSettings
     })
@@ -1528,9 +1533,9 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return testAiConnection(request, async () => (await getAppDb()).db).then(
-      (result) => testAiConnectionResponseSchema.parse(result),
-    )
+    return withBackgroundDbLoader((loadDb) =>
+      testAiConnection(request, loadDb),
+    ).then((result) => testAiConnectionResponseSchema.parse(result))
   })
 
   onMessage('genai.getHintConnection', ({ data, sender }) => {
@@ -1541,11 +1546,12 @@ export function registerBackgroundHandlers() {
       sender,
     )
     return withAiDeadline({ timeoutMs: 20_000 }, async (signal) => {
-      const { db } = await getAppDb()
-      signal.throwIfAborted()
-      const status = await getAiHintConnectionStatus(db)
-      signal.throwIfAborted()
-      return hintConnectionStatusSchema.parse(status)
+      return withBackgroundDb(async ({ db }) => {
+        signal.throwIfAborted()
+        const status = await getAiHintConnectionStatus(db)
+        signal.throwIfAborted()
+        return hintConnectionStatusSchema.parse(status)
+      })
     }).catch(() => {
       throw new Error('Saved AI connection could not be loaded. Please retry.')
     })
@@ -1565,10 +1571,8 @@ export function registerBackgroundHandlers() {
       request.connectionProvider,
       async (signal) =>
         generateLeetCodeHintsResponseSchema.parse(
-          await generateLeetCodeHintsInBackground(
-            request,
-            async () => (await getAppDb()).db,
-            signal,
+          await withBackgroundDbLoader((loadDb) =>
+            generateLeetCodeHintsInBackground(request, loadDb, signal),
           ),
         ),
     )
@@ -1603,10 +1607,8 @@ export function registerBackgroundHandlers() {
       request.requestId,
       async (signal) =>
         generateLeetCodeImplementationResponseSchema.parse(
-          await generateLeetCodeImplementationInBackground(
-            request,
-            async () => (await getAppDb()).db,
-            signal,
+          await withBackgroundDbLoader((loadDb) =>
+            generateLeetCodeImplementationInBackground(request, loadDb, signal),
           ),
         ),
     )
@@ -1637,10 +1639,8 @@ export function registerBackgroundHandlers() {
     const owner = analysisOwner(sender)
     return runOwnedAnalysis(owner, request.requestId, async (signal) =>
       analyzeLeetCodeSubmissionResponseSchema.parse(
-        await analyzeLeetCodeSubmissionInBackground(
-          request,
-          async () => (await getAppDb()).db,
-          signal,
+        await withBackgroundDbLoader((loadDb) =>
+          analyzeLeetCodeSubmissionInBackground(request, loadDb, signal),
         ),
       ),
     )
@@ -1717,8 +1717,10 @@ async function runNotificationSmokeDryRun(db: Db) {
   })
 }
 
-async function runLiveGenAiSmoke(db: Db) {
-  const config = await runGatedMutationQueue(() => loadActiveProviderConfig(db))
+async function runLiveGenAiSmoke() {
+  const config = await runGatedMutationQueue(() =>
+    withBackgroundDb(({ db }) => loadActiveProviderConfig(db)),
+  )
 
   if (!config) {
     return {
@@ -1809,6 +1811,7 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
       await broadcastDataManagementInvalidation('dashboard')
     },
     {
+      withDb: (work) => withBackgroundDb(({ db: current }) => work(current)),
       runRemoteRestore: (work, context) =>
         runRemoteRestoreInMutationQueue(work, isInsideMutationQueue, context),
       runReplacement: (work) =>

@@ -1,3 +1,5 @@
+import type { LocalHead, LocalIdbStore } from './local-store-types'
+import type { CompositeCandidate } from './composite-publication'
 import { createLocalIdbStore } from './local-idb'
 import { createDb, createSqliteWasmLocator, type DbHandle } from './client'
 import { migrationEntries, migrationSql } from './migration-sql'
@@ -49,6 +51,8 @@ let pendingSnapshotWrite: Promise<void> = Promise.resolve()
 let lastPersistedBytes: Uint8Array | null = null
 let snapshotCommitNeedsReconciliation = false
 let replacementPublicationPending = false
+const handleReaders = new Map<DbHandle, number>()
+const retiredHandles = new Set<DbHandle>()
 
 export interface AppDbOptions {
   beforePublish?: (handle: DbHandle, context: PublishContext) => Promise<void>
@@ -76,6 +80,118 @@ export function getAppDb(options: AppDbOptions = {}) {
     handlePromise = opening
   }
   return handlePromise
+}
+
+// Readers hold the handle they started with until the complete async operation
+// settles. Adoption changes future acquisitions, without closing an owned reader.
+export async function acquireCurrentAppDb(options: AppDbOptions = {}) {
+  let handle = await getAppDb(options)
+  while (handle !== activeHandle) handle = await getAppDb(options)
+  handleReaders.set(handle, (handleReaders.get(handle) ?? 0) + 1)
+  let released = false
+  return {
+    handle,
+    release() {
+      if (released) return
+      released = true
+      const remaining = (handleReaders.get(handle) ?? 1) - 1
+      if (remaining) handleReaders.set(handle, remaining)
+      else {
+        handleReaders.delete(handle)
+        closeRetiredHandle(handle)
+      }
+    },
+  }
+}
+
+export async function withCurrentAppDb<T>(
+  work: (handle: DbHandle) => Promise<T>,
+  options: AppDbOptions = {},
+) {
+  const lease = await acquireCurrentAppDb(options)
+  try {
+    return await work(lease.handle)
+  } finally {
+    lease.release()
+  }
+}
+
+export async function prepareDbReplacement() {
+  // The caller owns the shared replacement/mutation barrier. Drain prior live
+  // publications before pinning its base; later automatic jobs see the barrier.
+  await flushDbSnapshot()
+  beginDbReplacement()
+}
+
+export async function createDetachedCoreCandidate(
+  bytes: Uint8Array,
+  prepare?: (handle: DbHandle) => Promise<void>,
+): Promise<DbHandle> {
+  const handle = await createManagedDb()
+  try {
+    deserializeDb(handle, bytes)
+    await prepare?.(handle)
+    return handle
+  } catch (error) {
+    closeFailedHandle(handle)
+    throw error
+  }
+}
+
+export async function adoptPublishedCoreCandidate(
+  candidate: CompositeCandidate,
+  published: LocalHead,
+  local: LocalIdbStore,
+) {
+  const head = await local.readHead()
+  const descriptor = candidate.descriptor
+  const bytes = await local.readCore(descriptor.coreSnapshotId)
+  if (
+    !head ||
+    head.replacementId !== descriptor.replacementId ||
+    head.revision !== descriptor.baseRevision + 1 ||
+    head.revision !== published.revision ||
+    head.coreSnapshotId !== descriptor.coreSnapshotId ||
+    head.archiveGeneration !== descriptor.archiveGeneration ||
+    head.datasetToken !== descriptor.datasetToken ||
+    !bytes ||
+    !sameBytes(bytes, serializeDb(candidate.handle))
+  )
+    throw new Error(
+      'Database recovery required: published candidate cannot be adopted.',
+    )
+  if (activeHandle === candidate.handle) {
+    replacementPublicationPending = false
+    return
+  }
+  const prior = activeHandle
+  activeHandle = candidate.handle
+  handlePromise = Promise.resolve(candidate.handle)
+  lastPersistedBytes = new Uint8Array(bytes)
+  snapshotCommitNeedsReconciliation = false
+  replacementPublicationPending = false
+  if (prior) {
+    retiredHandles.add(prior)
+    closeRetiredHandle(prior)
+  }
+}
+
+function closeRetiredHandle(handle: DbHandle) {
+  if (retiredHandles.has(handle) && !handleReaders.has(handle)) {
+    retiredHandles.delete(handle)
+    closeFailedHandle(handle)
+  }
+}
+
+async function createManagedDb(options: Parameters<typeof createDb>[0] = {}) {
+  const handle = await createDb({
+    ...options,
+    locateWasm: createSqliteWasmLocator(),
+    onMutation: () => {
+      if (activeHandle === handle) scheduleSnapshot()
+    },
+  })
+  return handle
 }
 
 export async function flushDbSnapshot() {
@@ -220,10 +336,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
         : preserveRecovery(storage, raw, new Date(), key)
     },
     fresh: async () => {
-      const freshHandle = await createDb({
-        migrationSql,
-        locateWasm: createSqliteWasmLocator(),
-      })
+      const freshHandle = await createManagedDb({ migrationSql })
       try {
         await seedInitialCatalog(freshHandle.db)
         return freshHandle
@@ -234,9 +347,7 @@ async function openAppDb(options: AppDbOptions, generation: number) {
     },
     restore: async (bytes) => {
       openingState.stage = 'restoration'
-      const restoredHandle = await createDb({
-        locateWasm: createSqliteWasmLocator(),
-      })
+      const restoredHandle = await createManagedDb()
       try {
         deserializeDb(restoredHandle, bytes)
         return restoredHandle

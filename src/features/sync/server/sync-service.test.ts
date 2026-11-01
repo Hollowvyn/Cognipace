@@ -1886,3 +1886,76 @@ function createGistSummary(
     rawUrl: input.rawUrl ?? null,
   }
 }
+
+it('queued background sync export resolves the adopted database after remote I/O', async () => {
+  const secret = await import('@/platform/secrets')
+  const github = await import('@/lib/github')
+  const backupOwner = await import('@/features/backup/server/backup-service')
+  const metadataOwner = await import('../data/sync-metadata-store')
+  const { createBackgroundSyncService } = await import('./sync-service')
+  const oldDb = { id: 'old' } as unknown as import('@/platform/db').Db
+  const newDb = { id: 'adopted' } as unknown as import('@/platform/db').Db
+  let current = oldDb
+  let release!: () => void
+  let entered!: () => void
+  const waiting = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const readToken = vi.spyOn(secret, 'readSecret').mockResolvedValue('token')
+  const tokenStatus = vi
+    .spyOn(secret, 'getSecretStatus')
+    .mockResolvedValue({ configured: true } as SecretStatus)
+  const read = vi.spyOn(metadataOwner, 'readSyncMetadata').mockResolvedValue({
+    ...defaultSyncMetadata,
+    enabled: true,
+    gistId: 'gist',
+  })
+  const write = vi.spyOn(metadataOwner, 'writeSyncMetadata').mockResolvedValue({
+    ...defaultSyncMetadata,
+    enabled: true,
+    gistId: 'gist',
+  })
+  const client = vi.spyOn(github, 'createGitHubGistClient').mockReturnValue({
+    getGist: async () => {
+      entered()
+      await gate
+      return {
+        id: 'gist',
+        updatedAt: currentTime,
+        remoteVersion: 'v1',
+        content: null,
+      }
+    },
+    updateSyncGist: vi.fn().mockResolvedValue({
+      id: 'gist',
+      updatedAt: currentTime,
+      remoteVersion: 'v2',
+    }),
+  } as unknown as import('@/lib/github').GitHubGistClient)
+  const exportBackup = vi
+    .spyOn(backupOwner, 'exportFullBackup')
+    .mockResolvedValue(backup)
+  try {
+    const service = createBackgroundSyncService(oldDb, () => {}, {
+      runReplacement: vi.fn(),
+      syncCoordinator: createSyncOperationCoordinator(),
+      withDb: (work) => work(current),
+    })
+    const pending = service.pushLocal({ confirmRemoteOverwrite: true })
+    await waiting
+    current = newDb
+    release()
+    expect(await pending).toMatchObject({ outcome: 'success' })
+    expect(exportBackup).toHaveBeenCalledExactlyOnceWith(newDb)
+  } finally {
+    readToken.mockRestore()
+    tokenStatus.mockRestore()
+    read.mockRestore()
+    write.mockRestore()
+    client.mockRestore()
+    exportBackup.mockRestore()
+  }
+})

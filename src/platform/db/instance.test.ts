@@ -1707,3 +1707,90 @@ it('retains a failed automatic timer publication for the next shared gate', asyn
     commit.mockRestore()
   }
 })
+
+it('adopts a detached candidate while an async reader retains the old handle and subsequent writes use the new core', async () => {
+  const {
+    withCurrentAppDb,
+    createDetachedCoreCandidate,
+    adoptPublishedCoreCandidate,
+    prepareDbReplacement,
+  } = await import('./instance')
+  installStorage()
+  const factory = new (await import('fake-indexeddb')).IDBFactory()
+  vi.stubGlobal('indexedDB', factory)
+  vi.stubGlobal('IDBKeyRange', (await import('fake-indexeddb')).IDBKeyRange)
+  const local = (await import('./local-idb')).createLocalIdbStore(factory)
+  const store = createSnapshotIdbStore(factory)
+  const original = await getAppDb({ snapshotStore: store })
+  let release!: () => void
+  let entered!: () => void
+  const running = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const reader = withCurrentAppDb(async (handle) => {
+    entered()
+    await gate
+    expect(() => handle.rawDb.exec('SELECT 1')).not.toThrow()
+  })
+  await running
+  await prepareDbReplacement()
+  const head = (await local.readHead())!
+  const detached = await createDetachedCoreCandidate(serializeDb(original))
+  await createSettingsRepository(detached.db).updateSettings(
+    { appearance: { themeMode: 'dark' } },
+    now,
+  )
+  const candidate = {
+    handle: detached,
+    descriptor: {
+      baseRevision: head.revision,
+      coreSnapshotId: 'detached-core',
+      archiveGeneration: 'detached-archive',
+      datasetToken: 'detached-dataset',
+      replacementId: 'detached-replacement',
+    },
+  }
+  const publication = (
+    await import('./composite-publication')
+  ).createCompositePublication(local, head.fingerprint)
+  await publication.prepare(candidate, async () => {
+    await local.writeTechnicalRecord(
+      ['archive-generation', 'detached-archive'],
+      { status: 'ready' },
+    )
+  })
+  const published = await publication.publishCompositeCandidate(candidate, {
+    kind: 'restore',
+    replacementId: 'detached-replacement',
+  })
+  await adoptPublishedCoreCandidate(candidate, published, local)
+  expect(await getAppDb()).toBe(detached)
+  expect(() => original.rawDb.exec('SELECT 1')).not.toThrow()
+  release()
+  await reader
+  expect(() => original.rawDb.exec('SELECT 1')).toThrow()
+  expect(
+    (await createSettingsRepository((await getAppDb()).db).getSettings())
+      .appearance.themeMode,
+  ).toBe('dark')
+  await store.markInvalidated('detached-replacement')
+  await store.markSyncMetadataComplete('detached-replacement')
+  await store.completeContinuation('detached-replacement')
+  await createSettingsRepository((await getAppDb()).db).updateSettings(
+    { appearance: { themeMode: 'light' } },
+    now,
+  )
+  await flushDbSnapshot()
+  const reopened = await createDetachedCoreCandidate(
+    new Uint8Array((await store.readActive())!.bytes),
+  )
+  expect(
+    (await createSettingsRepository(reopened.db).getSettings()).appearance
+      .themeMode,
+  ).toBe('light')
+  reopened.rawDb.close()
+  detached.rawDb.close()
+})

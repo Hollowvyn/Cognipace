@@ -9,10 +9,29 @@ import type {
   SnapshotIdbStore,
 } from '@/platform/db/snapshot-idb'
 
+// Preparation executes detached domain writes exactly once. Publication retains
+// only the prepared candidate, archive staging callback and publication identity.
+export interface PreparedReplacement {
+  summary: BackupReplacementPending['summary']
+  replacementId: string
+  publish: (
+    input: import('@/platform/db/snapshot-idb').ReplacementInput,
+  ) => Promise<unknown>
+  adopt: () => Promise<void>
+}
+export type PreparedReplacementWork = Omit<
+  BackupReplacementWork,
+  'commit' | 'flush'
+> & {
+  prepare: () => Promise<PreparedReplacement>
+}
+
 const pendingMessage =
   'Local data replacement still needs saving. Open Settings > Data Management and choose Retry saving.'
 type PendingWork = BackupReplacementPending &
   Pick<BackupReplacementWork, 'flush' | 'onDurable' | 'finishSyncMetadata'> & {
+    adopt?: () => Promise<void>
+    adopted: boolean
     durable: boolean
     publicationAttempted: boolean
     invalidated: boolean
@@ -60,6 +79,7 @@ export function createBackupReplacementCoordinator(
             pending = {
               kind: record.kind,
               summary: null,
+              adopted: true,
               durable: true,
               publicationAttempted: true,
               invalidated: !record.needsInvalidation,
@@ -139,6 +159,14 @@ export function createBackupReplacementCoordinator(
         }
       }
     }
+    if (!current.adopted) {
+      try {
+        await current.adopt?.()
+        current.adopted = true
+      } catch {
+        return { status: 'durable', syncMetadataPending: true, kind, summary }
+      }
+    }
     if (options.store) {
       const persisted = await options.store.readContinuation().catch(() => null)
       if (!persisted || persisted.replacementId !== current.replacementId)
@@ -196,7 +224,7 @@ export function createBackupReplacementCoordinator(
   }
 
   async function run(
-    work: BackupReplacementWork,
+    work: BackupReplacementWork | PreparedReplacementWork,
   ): Promise<BackupReplacementResult> {
     if (options.store) await ready()
     assertIdle()
@@ -204,25 +232,39 @@ export function createBackupReplacementCoordinator(
     try {
       work.beforeCommit?.()
       let summary: BackupReplacementPending['summary']
+      let prepared: PreparedReplacement | undefined
       try {
-        summary = await work.commit()
+        if ('prepare' in work) {
+          prepared = await work.prepare()
+          summary = prepared.summary
+        } else summary = await work.commit()
       } catch (error) {
         work.abortCommit?.()
         throw error
       }
       // Keep publication continuations only. Commit and its full input are released.
-      const { kind, flush, onDurable, finishSyncMetadata } = work
+      const { kind, onDurable, finishSyncMetadata } = work
+      const flush = prepared
+        ? (input?: import('@/platform/db/snapshot-idb').ReplacementInput) =>
+            prepared.publish(input!)
+        : (work as BackupReplacementWork).flush
       pending = {
         kind,
         summary,
         flush,
         onDurable,
         finishSyncMetadata,
+        ...(prepared ? { adopt: prepared.adopt } : {}),
+        adopted: !prepared,
         durable: false,
         publicationAttempted: false,
         invalidated: false,
         continuation: undefined,
-        ...(options.store ? { replacementId: crypto.randomUUID() } : {}),
+        ...(prepared
+          ? { replacementId: prepared.replacementId }
+          : options.store
+            ? { replacementId: crypto.randomUUID() }
+            : {}),
         ...(work.syncMetadataPatch
           ? { syncMetadataPatch: work.syncMetadataPatch }
           : {}),

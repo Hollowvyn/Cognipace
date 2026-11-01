@@ -30,6 +30,9 @@ export interface ActiveSnapshotRecord {
 }
 
 export interface ReplacementRecoveryRecord {
+  archiveGeneration?: string
+  datasetToken?: string
+  coreSnapshotId?: string
   key: 'replacement'
   replacementId: string
   revision: number
@@ -226,8 +229,10 @@ export function createSnapshotIdbStore(
                       const metadata = { ...value } as Record<string, unknown>
                       delete metadata.formatVersion
                       delete metadata.coreSnapshotId
-                      delete metadata.archiveGeneration
-                      delete metadata.datasetToken
+                      if (key === 'active') {
+                        delete metadata.archiveGeneration
+                        delete metadata.datasetToken
+                      }
                       output.result = { ...metadata, bytes: core.result }
                       output.onsuccess?.()
                     } catch (error) {
