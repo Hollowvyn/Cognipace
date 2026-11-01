@@ -81,7 +81,7 @@ export async function createFsrsScalingFixture(
       exportedAt: new Date(fixtureAsOf),
       appVersion: '2.2.0',
     })
-    prepareFullBackupRestore(backup)
+    await prepareFullBackupRestore(backup)
     if (
       backup.data.problems.length !== counts.problems ||
       backup.data.practice.reviewAttempts.length !== counts.reviews
