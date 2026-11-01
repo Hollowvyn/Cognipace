@@ -807,3 +807,57 @@ describe('Notes runtime with owning service and durable IDB', () => {
     }
   })
 })
+
+it('exposes logical archive usage only to the actual dashboard before any storage access', async () => {
+  handlers.clear()
+  const getArchiveUsage = vi.fn(() =>
+    Promise.resolve({
+      active: {
+        notes: 1,
+        submissions: 2,
+        assessments: 1,
+        savedAiNotes: 0,
+        payloads: 3,
+        logicalPayloadBytes: 40,
+      },
+      recoveryLogicalPayloadBytes: 70,
+      technicalRecords: 8,
+      browserStorageEstimate: { usageBytes: 1000, quotaBytes: 2000 },
+    }),
+  )
+  registerNotesHandlers({
+    getService: vi.fn(),
+    getLeases: vi.fn(),
+    getArchiveUsage,
+    runRead: (work) => work(),
+    runMutation: (work) => work(),
+    canMutate: () => true,
+    emit: vi.fn(),
+  })
+  const handler = handlers.get('notes.getArchiveUsage')!
+  for (const [surface, url] of [
+    ['content-script', 'https://leetcode.com/problems/two-sum/'],
+    ['popup', 'chrome-extension://id/popup.html'],
+    ['dashboard', 'https://evil.example/'],
+  ] as const)
+    await expect(
+      async () =>
+        await handler({
+          data: { surface },
+          sender: { url, documentId: 'doc' },
+        }),
+    ).rejects.toThrow()
+  expect(getArchiveUsage).not.toHaveBeenCalled()
+  expect(
+    await handler({
+      data: { surface: 'dashboard' },
+      sender: {
+        url: 'chrome-extension://id/dashboard.html',
+        documentId: 'doc',
+      },
+    }),
+  ).toMatchObject({
+    active: { logicalPayloadBytes: 40 },
+    browserStorageEstimate: { usageBytes: 1000 },
+  })
+})

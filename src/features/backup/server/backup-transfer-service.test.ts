@@ -1,8 +1,9 @@
-import { IDBFactory } from 'fake-indexeddb'
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createLocalIdbStore } from '@/platform/db/local-idb'
 import {
   createBackupTransferService,
+  collectBackupTransferTechnicalBatch,
   splitUtf8Text,
   transferDigest,
   transferSessionKey,
@@ -10,6 +11,7 @@ import {
 } from './backup-transfer-service'
 
 function setup(limit = 4 * 1024 * 1024) {
+  vi.stubGlobal('IDBKeyRange', IDBKeyRange)
   const local = createLocalIdbStore(new IDBFactory(), 'transfer-test')
   const preview = vi.fn(() =>
     Promise.resolve({ confirmationToken: 'confirmed' }),
@@ -334,4 +336,149 @@ it('acknowledges a repeated owner cancellation after restart without charging or
     bytes: 4,
     sessions: 1,
   })
+})
+
+it('reclaims completed body spools once while retaining owner-bound logical replay and active admission', async () => {
+  const { service, local } = setup()
+  const session = await service.begin('document-a', { direction: 'import' })
+  const text = '{}'
+  await service.append('document-a', session, 0, text)
+  const close = { chunks: 1, digest: await transferDigest(text) }
+  await service.finish('document-a', session, close)
+  await service.finish('document-a', session, {
+    ...close,
+    confirmationToken: 'confirmed',
+  })
+  await collectBackupTransferTechnicalBatch(local)
+  expect(await local.readRecord(['backup-transfer-budget'])).toEqual({
+    bytes: 0,
+    sessions: 0,
+  })
+  expect(
+    await service.finish('document-a', session, {
+      ...close,
+      confirmationToken: 'confirmed',
+    }),
+  ).toEqual({ status: 'durable' })
+  await collectBackupTransferTechnicalBatch(local)
+  await service.cancel('document-a', session)
+  expect(await local.readRecord(['backup-transfer-budget'])).toEqual({
+    bytes: 0,
+    sessions: 0,
+  })
+  for (let n = 0; n < 16; n++)
+    await service.begin('document-a', { direction: 'import' })
+})
+it('abandons only observed-absent unconfirmed spools and rechecks accepted publication in the deletion batch', async () => {
+  const { service, local } = setup()
+  const unconfirmed = await service.begin('document-gone', {
+    direction: 'import',
+  })
+  const accepted = await service.begin('document-gone', { direction: 'import' })
+  await service.append('document-gone', unconfirmed, 0, '{}')
+  await service.append('document-gone', accepted, 0, '{}')
+  await service.finish('document-gone', accepted, {
+    chunks: 1,
+    digest: await transferDigest('{}'),
+  })
+  const absent = vi.fn(async () => {
+    await local.writeTechnicalRecord(['composite-candidate', 'confirmed'], {
+      accepted: true,
+    })
+    return true
+  })
+  await collectBackupTransferTechnicalBatch(local, { ownerIsAbsent: absent })
+  await expect(
+    service.assertOwned('document-gone', unconfirmed),
+  ).rejects.toThrow()
+  expect(await service.assertOwned('document-gone', accepted)).toMatchObject({
+    status: 'ready',
+  })
+  expect(await local.readRecord(['backup-transfer-budget'])).toEqual({
+    bytes: 2,
+    sessions: 1,
+  })
+})
+it.each([
+  undefined,
+  () => Promise.resolve(false),
+  () => Promise.reject(new Error('unsupported')),
+])(
+  'keeps unresolved spools when owner absence is unknown',
+  async (ownerIsAbsent) => {
+    const { service, local } = setup()
+    const session = await service.begin('document-a', { direction: 'import' })
+    await service.append('document-a', session, 0, '{}')
+    await collectBackupTransferTechnicalBatch(local, { ownerIsAbsent })
+    expect(await service.assertOwned('document-a', session)).toMatchObject({
+      status: 'receiving',
+      spooledBytes: 2,
+    })
+  },
+)
+
+it('cycles an exhausted cleanup cursor so a newly completed lower UUID releases its body and budget once', async () => {
+  const uuid = vi
+    .spyOn(crypto, 'randomUUID')
+    .mockReturnValueOnce('ffffffff-ffff-4fff-8fff-ffffffffffff')
+    .mockReturnValueOnce('11111111-1111-4111-8111-111111111111')
+    .mockReturnValueOnce('00000000-0000-4000-8000-000000000000')
+    .mockReturnValueOnce('22222222-2222-4222-8222-222222222222')
+  try {
+    const { service, local } = setup()
+    const close = { chunks: 1, digest: await transferDigest('{}') }
+    const complete = async () => {
+      const session = await service.begin('document-a', { direction: 'import' })
+      await service.append('document-a', session, 0, '{}')
+      await service.finish('document-a', session, close)
+      await service.finish('document-a', session, {
+        ...close,
+        confirmationToken: 'confirmed',
+      })
+      return session
+    }
+    const high = await complete()
+    expect(await collectBackupTransferTechnicalBatch(local)).toMatchObject({
+      removedChunks: 1,
+    })
+    // Also repair a durable terminal cursor left by the previous worker.
+    await local.writeTechnicalRecord(
+      ['backup-transfer-cleanup-progress'],
+      high.sessionId,
+    )
+    expect(await collectBackupTransferTechnicalBatch(local)).toEqual({
+      hasMore: false,
+      removedChunks: 0,
+    })
+    expect(
+      await local.readRecord(['backup-transfer-cleanup-progress']),
+    ).toBeUndefined()
+    const low = await complete()
+    expect(low.sessionId < high.sessionId).toBe(true)
+    expect(await collectBackupTransferTechnicalBatch(local)).toMatchObject({
+      removedChunks: 1,
+    })
+    expect(
+      await local.readRecord(['backup-transfer-chunk', low.sessionId, 0]),
+    ).toBeUndefined()
+    expect(await local.readRecord(['backup-transfer-budget'])).toEqual({
+      bytes: 0,
+      sessions: 0,
+    })
+    for (const session of [high, low])
+      expect(
+        await service.finish('document-a', session, {
+          ...close,
+          confirmationToken: 'confirmed',
+        }),
+      ).toEqual({ status: 'durable' })
+    await collectBackupTransferTechnicalBatch(local)
+    await service.cancel('document-a', low)
+    expect(await local.readRecord(['backup-transfer-budget'])).toEqual({
+      bytes: 0,
+      sessions: 0,
+    })
+  } finally {
+    uuid.mockRestore()
+  }
 })

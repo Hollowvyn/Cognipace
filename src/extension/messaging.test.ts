@@ -42,6 +42,22 @@ describe('registered Notes protocol schemas', () => {
       ),
     )
     const samples = {
+      'notes.getArchiveUsage': {
+        request: { surface: 'dashboard' },
+        result: {
+          active: {
+            notes: 1,
+            submissions: 2,
+            assessments: 3,
+            savedAiNotes: 1,
+            payloads: 3,
+            logicalPayloadBytes: 120,
+          },
+          recoveryLogicalPayloadBytes: 40,
+          technicalRecords: 6,
+          browserStorageEstimate: { usageBytes: 1000, quotaBytes: 2000 },
+        },
+      },
       'notes.openEditor': {
         request: { ...base, target: { kind: 'problem' } },
         result: { scope, editLeaseId: 'lease', document },

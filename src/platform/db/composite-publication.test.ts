@@ -251,6 +251,8 @@ it('rejects a changed base and reconciles a committed replacement after lost rea
   const publication = createCompositePublication(local, 'test')
   await publication.prepare(candidate, () =>
     local.writeTechnicalRecord(['archive-generation', 'new'], {
+      identity: 'test:ready',
+      storeIndex: 5,
       status: 'ready',
     }),
   )
@@ -277,6 +279,8 @@ it('rejects a changed base and reconciles a committed replacement after lost rea
   }
   await publication.prepare(next, () =>
     local.writeTechnicalRecord(['archive-generation', 'new2'], {
+      identity: 'test:ready',
+      storeIndex: 5,
       status: 'ready',
     }),
   )
@@ -341,7 +345,7 @@ it.each(['historical', 'unbound-new-dataset', 'prepared-new-dataset'] as const)(
     await publication.prepare(candidate, () =>
       local.writeTechnicalRecord(
         ['archive-generation', descriptor.archiveGeneration],
-        { status: 'ready' },
+        { identity: 'test:ready', storeIndex: 5, status: 'ready' },
       ),
     )
     await publication.publishCompositeCandidate(candidate, {
@@ -406,7 +410,7 @@ it.each(['missing', 'mismatched'] as const)(
     await publication.prepare(candidate, () =>
       local.writeTechnicalRecord(
         ['archive-generation', descriptor.archiveGeneration],
-        { status: 'ready' },
+        { identity: 'test:ready', storeIndex: 5, status: 'ready' },
       ),
     )
     await expect(
@@ -420,3 +424,38 @@ it.each(['missing', 'mismatched'] as const)(
     expect(await store.readContinuation()).toBeNull()
   },
 )
+
+it('rejects a corrupt ready generation before committing a replacement head', async () => {
+  vi.stubGlobal('IDBKeyRange', IDBKeyRange)
+  const factory = new IDBFactory(),
+    local = createLocalIdbStore(factory),
+    store = createSnapshotIdbStore(factory),
+    handle = await core('live')
+  await store.commitSnapshot(serializeDb(handle), 'test', new Date())
+  const head = (await local.readHead())!,
+    publication = createCompositePublication(local, 'test')
+  const candidate = {
+    handle,
+    descriptor: {
+      baseRevision: head.revision,
+      coreSnapshotId: 'corrupt-core',
+      archiveGeneration: 'corrupt-generation',
+      datasetToken: 'fresh',
+      replacementId: 'corrupt-ready',
+    },
+  }
+  await publication.prepare(candidate, () =>
+    local.writeTechnicalRecord(['archive-generation', 'corrupt-generation'], {
+      identity: 'bad',
+      status: 'ready',
+      storeIndex: 4,
+    }),
+  )
+  await expect(
+    publication.publishCompositeCandidate(candidate, {
+      kind: 'restore',
+      replacementId: 'corrupt-ready',
+    }),
+  ).rejects.toThrow(/readiness|incomplete/i)
+  expect(await local.readHead()).toEqual(head)
+})

@@ -1,3 +1,5 @@
+import { notesArchiveUsageSchema } from '../domain/notes-usage'
+export { notesArchiveUsageSchema } from '../domain/notes-usage'
 import { z } from 'zod'
 import { problemSlugSchema } from '@/features/problems/api/problems-contracts'
 import { codeFeedbackSchema } from '@/features/leetcode-review-assistant/domain/code-feedback-schema'
@@ -33,6 +35,10 @@ export const submissionMetadataSchema = submissionRecordSchema.omit({
   codePayloadId: true,
 })
 export const notesRuntimeSchemas = {
+  'notes.getArchiveUsage': {
+    request: z.strictObject({ surface: z.literal('dashboard') }),
+    result: notesArchiveUsageSchema,
+  },
   'notes.openEditor': {
     request: z.strictObject({ ...base, target: noteTargetSchema }),
     result: z.strictObject({

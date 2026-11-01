@@ -213,3 +213,6 @@ export function createBackupSummary(backup: BackupFile): BackupSummary {
     },
   })
 }
+
+// Data Management distinguishes logical archive bytes from the optional browser estimate.
+export { notesArchiveUsageSchema as dataManagementStorageStatusSchema } from '@/features/notes/domain/notes-usage'

@@ -72,6 +72,13 @@ it('preserves every binary root and continuation during the v2 upgrade', async (
     revision: 8,
     lastVerifiedRevision: 6,
   })
+  expect(
+    await local.readRecord(['archive-generation', 'legacy']),
+  ).toMatchObject({
+    identity: 'initial:legacy',
+    status: 'ready',
+    storeIndex: 5,
+  })
   expect(head).not.toHaveProperty('bytes')
   expect(await local.readRecord('active')).not.toHaveProperty('bytes')
   expect(await local.readRecord('recovery')).not.toHaveProperty('bytes')
@@ -251,4 +258,27 @@ it('uses compound out-of-line keys and omits absent external aliases from the un
       finish(undefined)
     }),
   ).rejects.toThrow()
+})
+
+it('keeps preserving v1 recovery provenance usable by bounded technical maintenance', async () => {
+  const { IDBKeyRange } = await import('fake-indexeddb')
+  vi.stubGlobal('IDBKeyRange', IDBKeyRange)
+  const factory = new IDBFactory()
+  ;(await seed(factory)).close()
+  const local = createLocalIdbStore(factory, 'test')
+  await local.readHead()
+  const { createNotesMaintenanceService } =
+    await import('@/features/notes/server/notes-maintenance-service')
+  const maintenance = createNotesMaintenanceService({ local })
+  for (let i = 0; i < 40; i++) {
+    if (!(await maintenance.collectBatch()).hasMore) break
+  }
+  expect(await local.readCore('legacy:active')).not.toBeNull()
+  expect(await local.readCore('legacy:recovery')).not.toBeNull()
+  expect(
+    await createSnapshotIdbStore(factory, 'test').readReplacementRecovery(
+      'restore',
+    ),
+  ).toMatchObject({ replacementId: 'restore', revision: 7 })
+  vi.unstubAllGlobals()
 })

@@ -1,3 +1,7 @@
+import {
+  archiveGenerationProgressSchema,
+  readReadyArchive,
+} from '@/platform/db/local-root-validation'
 import { z } from 'zod'
 import {
   assertArchiveReferences,
@@ -24,12 +28,7 @@ const metadataStores = [
   'problemScopes',
 ] as const
 const batchSize = 500
-const progressSchema = z.object({
-  identity: z.string(),
-  status: z.enum(['staging', 'ready']),
-  storeIndex: z.number().int().nonnegative(),
-  lastKey: z.custom<IDBValidKey>().optional(),
-})
+const progressSchema = archiveGenerationProgressSchema
 type Progress = z.infer<typeof progressSchema>
 const rowSchema = z.object({ problemSlug: z.string().optional() }).passthrough()
 
@@ -147,6 +146,7 @@ export function createArchiveGenerationRepository(local: LocalIdbStore) {
         return Promise.reject(new Error('Archive generation is required.'))
       return local.transact(
         [
+          'records',
           'problemNotes',
           'submissions',
           'analysisReports',
@@ -163,78 +163,87 @@ export function createArchiveGenerationRepository(local: LocalIdbStore) {
             'savedAiNotes',
           ] as const
           let remaining = names.length
-          names.forEach((name, index) => {
-            const request = s[name].getAll(
-              IDBKeyRange.bound([generation], [generation, []]),
-            )
-            request.onsuccess = () => {
-              try {
-                metadata[index] = request.result as unknown
-                if (--remaining) return
-                const archive: NotesArchive = {
-                  formatVersion: 1,
-                  notes: z
-                    .array(problemNoteRecordSchema.strip())
-                    .parse(metadata[0]),
-                  submissions: z.array(submissionRecordSchema.strip()).parse(
-                    z
-                      .array(z.record(z.string(), z.unknown()))
-                      .parse(metadata[1])
-                      .filter(
-                        (row) =>
-                          !(
-                            typeof row.attemptAlias === 'string' &&
-                            row.id === undefined
-                          ),
-                      ),
-                  ),
-                  assessments: z
-                    .array(assessmentRecordSchema.strip())
-                    .parse(metadata[2]),
-                  savedAiNotes: z
-                    .array(savedAiNoteRecordSchema.strip())
-                    .parse(metadata[3]),
-                  payloads: [],
-                }
-                // Payloads are global immutable objects. Enumerating this store would
-                // leak recovery-only/orphan bodies into an active-generation export.
-                const ids = new Set<string>()
-                for (const row of archive.submissions)
-                  if (row.codePayloadId) ids.add(row.codePayloadId)
-                for (const row of archive.assessments) {
-                  ids.add(row.feedbackPayloadId)
-                  if (row.implementationPayloadId)
-                    ids.add(row.implementationPayloadId)
-                }
-                if (!ids.size) {
-                  done(archive)
-                  return
-                }
-                let pending = ids.size
-                for (const id of ids) {
-                  const body = s.payloads.get(id)
-                  body.onsuccess = () => {
-                    try {
-                      // Validate shape without rewriting immutable digest-bearing bodies.
-                      const raw: unknown = body.result
-                      notesPayloadSchema.parse(raw)
-                      const payload = raw as NotesPayload
-                      if (payload.id !== id)
-                        throw new Error(
-                          'Archive payload identity does not match its reference.',
-                        )
-                      archive.payloads.push(payload)
-                      if (--pending === 0) done(archive)
-                    } catch (error) {
-                      fail(error)
+          readReadyArchive(
+            s.records,
+            generation,
+            () => {
+              names.forEach((name, index) => {
+                const request = s[name].getAll(
+                  IDBKeyRange.bound([generation], [generation, []]),
+                )
+                request.onsuccess = () => {
+                  try {
+                    metadata[index] = request.result as unknown
+                    if (--remaining) return
+                    const archive: NotesArchive = {
+                      formatVersion: 1,
+                      notes: z
+                        .array(problemNoteRecordSchema.strip())
+                        .parse(metadata[0]),
+                      submissions: z
+                        .array(submissionRecordSchema.strip())
+                        .parse(
+                          z
+                            .array(z.record(z.string(), z.unknown()))
+                            .parse(metadata[1])
+                            .filter(
+                              (row) =>
+                                !(
+                                  typeof row.attemptAlias === 'string' &&
+                                  row.id === undefined
+                                ),
+                            ),
+                        ),
+                      assessments: z
+                        .array(assessmentRecordSchema.strip())
+                        .parse(metadata[2]),
+                      savedAiNotes: z
+                        .array(savedAiNoteRecordSchema.strip())
+                        .parse(metadata[3]),
+                      payloads: [],
                     }
+                    // Payloads are global immutable objects. Enumerating this store would
+                    // leak recovery-only/orphan bodies into an active-generation export.
+                    const ids = new Set<string>()
+                    for (const row of archive.submissions)
+                      if (row.codePayloadId) ids.add(row.codePayloadId)
+                    for (const row of archive.assessments) {
+                      ids.add(row.feedbackPayloadId)
+                      if (row.implementationPayloadId)
+                        ids.add(row.implementationPayloadId)
+                    }
+                    if (!ids.size) {
+                      done(archive)
+                      return
+                    }
+                    let pending = ids.size
+                    for (const id of ids) {
+                      const body = s.payloads.get(id)
+                      body.onsuccess = () => {
+                        try {
+                          // Validate shape without rewriting immutable digest-bearing bodies.
+                          const raw: unknown = body.result
+                          notesPayloadSchema.parse(raw)
+                          const payload = raw as NotesPayload
+                          if (payload.id !== id)
+                            throw new Error(
+                              'Archive payload identity does not match its reference.',
+                            )
+                          archive.payloads.push(payload)
+                          if (--pending === 0) done(archive)
+                        } catch (error) {
+                          fail(error)
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    fail(error)
                   }
                 }
-              } catch (error) {
-                fail(error)
-              }
-            }
-          })
+              })
+            },
+            fail,
+          )
         },
       )
     },

@@ -172,3 +172,22 @@ it('keeps pending core-save joining and recovery under safe adopted-pair read ad
   )
   expect(read).toHaveBeenCalledOnce()
 })
+
+// A bounded maintenance pass never waits ahead of already queued foreground work.
+it('postpones idle maintenance behind queued foreground work', async () => {
+  const { runIdleMaintenanceBatch, runInMutationQueue } =
+    await import('./mutation-queue')
+  let release!: () => void
+  const foreground = runInMutationQueue(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      }),
+  )
+  const maintenance = vi.fn(() => Promise.resolve(true))
+  expect(await runIdleMaintenanceBatch(maintenance)).toBeNull()
+  expect(maintenance).not.toHaveBeenCalled()
+  await Promise.resolve()
+  release()
+  await foreground
+})

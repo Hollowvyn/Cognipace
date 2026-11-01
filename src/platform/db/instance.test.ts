@@ -1765,7 +1765,7 @@ it('adopts a detached candidate while an async reader retains the old handle and
   await publication.prepare(candidate, async () => {
     await local.writeTechnicalRecord(
       ['archive-generation', 'detached-archive'],
-      { status: 'ready' },
+      { identity: 'fixture', status: 'ready', storeIndex: 5 },
     )
   })
   const published = await publication.publishCompositeCandidate(candidate, {

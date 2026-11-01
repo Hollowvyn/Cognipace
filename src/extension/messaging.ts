@@ -347,6 +347,9 @@ export type LeetCodeSubmissionResultRemoteRuntimeRequest = z.infer<
 >
 
 export interface ProtocolMap {
+  'notes.getArchiveUsage'(
+    request: NotesRequest<'notes.getArchiveUsage'>,
+  ): NotesResult<'notes.getArchiveUsage'>
   'notes.openEditor'(
     request: NotesRequest<'notes.openEditor'>,
   ): NotesResult<'notes.openEditor'>
@@ -531,6 +534,7 @@ export interface ProtocolMap {
 }
 
 export const protocolMethodNames = [
+  'notes.getArchiveUsage',
   'notes.openEditor',
   'notes.saveDocument',
   'notes.getProblemNotes',

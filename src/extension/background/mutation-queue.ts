@@ -11,6 +11,7 @@ type MutationQueueDependencies = {
 let dependencies: MutationQueueDependencies
 let dbMutationQueue: Promise<void> = Promise.resolve()
 let dbMutationDepth = 0
+let queuedWork = 0
 let hasPendingLocalSave = false
 let pendingLocalSaveContinuation: (() => Promise<void>) | null = null
 let recoveredGenericRetry: { key: string; result: unknown } | null = null
@@ -52,12 +53,14 @@ export function takeRecoveredMutationRetry<T>(
 }
 
 export function runInMutationQueue<T>(work: () => Promise<T>) {
+  queuedWork += 1
   const queued = dbMutationQueue.then(async () => {
     dbMutationDepth += 1
     try {
       return await work()
     } finally {
       dbMutationDepth -= 1
+      queuedWork -= 1
     }
   })
   dbMutationQueue = queued.then(
@@ -116,4 +119,23 @@ export async function resumePendingLocalSave() {
   const continuation = pendingLocalSaveContinuation
   pendingLocalSaveContinuation = null
   await continuation?.()
+}
+
+// Trusted worker-only admission: no caller flags and no mutation-depth proxy.
+// Submit at most one bounded batch, yielding to foreground work between passes.
+export function runIdleMaintenanceBatch<T>(
+  work: () => Promise<T>,
+): Promise<T | null> {
+  if (queuedWork !== 0 || hasPendingLocalSave) return Promise.resolve(null)
+  return runInMutationQueue(async () => {
+    await dependencies.ready()
+    if (hasPendingLocalSave) return null
+    try {
+      dependencies.assertIdle()
+      await dependencies.waitForPendingCoreSave()
+    } catch {
+      return null
+    }
+    return work()
+  })
 }

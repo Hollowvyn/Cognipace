@@ -148,6 +148,7 @@ export async function prepareProblemDataReplacement(
         input.kind === 'reset' ? crypto.randomUUID() : head.datasetToken,
       replacementId: input.commandId,
       commandFingerprint: fingerprint,
+      commandKind: input.kind,
       targetProblemScopes: slugs.map((problemSlug) => ({
         problemSlug,
         problemToken: crypto.randomUUID(),

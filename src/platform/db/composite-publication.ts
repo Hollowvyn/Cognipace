@@ -1,3 +1,4 @@
+import { assertReadyArchive } from './local-root-validation'
 import { z } from 'zod'
 import type { DbHandle } from './client'
 import { serializeDb } from './snapshot'
@@ -23,6 +24,9 @@ export const compositeDescriptorSchema = z.strictObject({
   datasetToken: z.string().min(1),
   replacementId: z.string().min(1),
   commandFingerprint: z.string().min(1).optional(),
+  commandKind: z
+    .enum(['restore', 'gist-pull', 'reset', 'problem-reset', 'problem-delete'])
+    .optional(),
   targetProblemScopes: z
     .array(
       z.strictObject({
@@ -41,6 +45,49 @@ export const compositeDescriptorSchema = z.strictObject({
     .optional(),
 })
 export type CompositeDescriptor = z.infer<typeof compositeDescriptorSchema>
+// Cleanup may discard completed preparation only with the exact accepted fence.
+export function isCommittedCompositeCandidate(
+  descriptor: CompositeDescriptor,
+  rawFence: unknown,
+  head: LocalHead,
+) {
+  if (rawFence !== undefined) {
+    const fence = replacementCommandRecordSchema.parse(rawFence)
+    const kind =
+      descriptor.commandKind ??
+      z
+        .tuple([
+          z.enum([
+            'restore',
+            'gist-pull',
+            'reset',
+            'problem-reset',
+            'problem-delete',
+          ]),
+          z.unknown(),
+        ])
+        .parse(JSON.parse(descriptor.commandFingerprint ?? 'null'))[0]
+    if (
+      fence.commandId !== descriptor.replacementId ||
+      fence.requestFingerprint !== descriptor.commandFingerprint ||
+      fence.kind !== kind
+    )
+      throw new Error(
+        'Recovery required: completed replacement fence conflicts with prepared roots.',
+      )
+    return true
+  }
+  if (descriptor.replacementId !== head.replacementId) return false
+  if (
+    descriptor.coreSnapshotId !== head.coreSnapshotId ||
+    descriptor.archiveGeneration !== head.archiveGeneration ||
+    descriptor.datasetToken !== head.datasetToken
+  )
+    throw new Error(
+      'Recovery required: published replacement identity conflicts with prepared roots.',
+    )
+  return true
+}
 export interface CompositeCandidate {
   handle: DbHandle
   descriptor: CompositeDescriptor
@@ -57,7 +104,7 @@ const problemScopeSchema = z.strictObject({
   problemToken: z.string().min(1),
 })
 
-const preparedSchema = z.strictObject({
+export const preparedCompositeCandidateSchema = z.strictObject({
   descriptor: compositeDescriptorSchema,
   fingerprint: z.string(),
   status: z.literal('prepared'),
@@ -72,7 +119,7 @@ export function createCompositePublication(
     async loadPrepared(replacementId: string, commandFingerprint: string) {
       const raw = await local.readRecord(key(replacementId))
       if (raw === undefined) return null
-      const parsed = preparedSchema.safeParse(raw)
+      const parsed = preparedCompositeCandidateSchema.safeParse(raw)
       if (!parsed.success || parsed.data.fingerprint !== fingerprint)
         throw new Error(
           'Recovery required: prepared replacement metadata is incomplete or incompatible.',
@@ -135,7 +182,9 @@ export function createCompositePublication(
           existing.onsuccess = () => {
             try {
               if (existing.result !== undefined) {
-                const prior = preparedSchema.parse(existing.result)
+                const prior = preparedCompositeCandidateSchema.parse(
+                  existing.result,
+                )
                 if (
                   JSON.stringify(prior.descriptor) !==
                     JSON.stringify(descriptor) ||
@@ -178,6 +227,8 @@ export function createCompositePublication(
         throw new Error(
           'Prepared replacement request fingerprint does not match.',
         )
+      if (descriptor.commandKind && input.kind !== descriptor.commandKind)
+        throw new Error('Prepared replacement command kind does not match.')
       if (input.replacementId !== descriptor.replacementId)
         throw new Error('Replacement identity does not match candidate.')
       // Retry after a lost commit/readback response reconciles identity before CAS.
@@ -206,7 +257,9 @@ export function createCompositePublication(
               const prepared = s.records.get(key(descriptor.replacementId))
               prepared.onsuccess = () => {
                 try {
-                  const value = preparedSchema.parse(prepared.result)
+                  const value = preparedCompositeCandidateSchema.parse(
+                    prepared.result,
+                  )
                   if (
                     JSON.stringify(value.descriptor) !==
                       JSON.stringify(descriptor) ||
@@ -221,14 +274,7 @@ export function createCompositePublication(
                   ])
                   staged.onsuccess = () => {
                     try {
-                      if (
-                        z
-                          .object({ status: z.literal('ready') })
-                          .safeParse(staged.result).success === false
-                      )
-                        throw new Error(
-                          'Replacement archive staging is incomplete.',
-                        )
+                      assertReadyArchive(staged.result)
                       const continuation = s.records.get(
                         'replacement-continuation',
                       )
@@ -267,7 +313,12 @@ export function createCompositePublication(
                                 'recovery',
                               )
                               s.coreSnapshots.put(
-                                { coreSnapshotId: prior.coreSnapshotId },
+                                {
+                                  kind: 'paired',
+                                  coreSnapshotId: prior.coreSnapshotId,
+                                  archiveGeneration: prior.archiveGeneration,
+                                  datasetToken: prior.datasetToken,
+                                },
                                 coreRecordReferenceKey('recovery'),
                               )
                               if (input.commandFingerprint) {

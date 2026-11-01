@@ -108,8 +108,12 @@ async function fixture() {
   archive.payloads.push(...siblingArchive.payloads)
   const head = (await local.readHead())!
   await createArchiveGenerationRepository(local).stageImportedArchive({
-    nextGeneration: head.archiveGeneration,
+    nextGeneration: 'fixture-archive',
     archive,
+  })
+  await local.writeTechnicalRecord('active', {
+    ...head,
+    archiveGeneration: 'fixture-archive',
   })
   const scope = await notes.acquireScope('two-sum')
   const siblingScope = await notes.acquireScope('valid-parentheses')

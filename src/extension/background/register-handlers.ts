@@ -1,7 +1,11 @@
+import { createNotesMaintenanceService } from '@/features/notes/server/notes-maintenance-service'
+import { registerNotesMaintenance } from './scheduler/notes-maintenance'
+import { createTransferOwnerInventory } from './scheduler/transfer-owner-inventory'
 import { githubGistBackupCapabilities } from '@/lib/github'
 import {
   createBackupTransferService,
   reconcileCompletedBackupTransfers,
+  collectBackupTransferTechnicalBatch,
 } from '@/features/backup/server/backup-transfer-service'
 import {
   beginTransferRequestSchema,
@@ -41,6 +45,7 @@ import { waitForPendingDbSnapshot } from '@/platform/db/instance'
 import {
   configureMutationQueue,
   runInMutationQueue,
+  runIdleMaintenanceBatch,
   runGatedMutationQueue,
   runConsistentRead,
   resumePendingLocalSave,
@@ -271,6 +276,7 @@ import {
 } from './due-notification'
 
 const alarmScheduler = createAlarmScheduler()
+let requestNotesMaintenance: (() => Promise<unknown>) | undefined
 const replacementStore =
   typeof indexedDB === 'undefined'
     ? undefined
@@ -379,6 +385,32 @@ export function registerBackgroundHandlers() {
     if (!notesLocal) throw new Error('Local Notes storage is unavailable.')
     return notesLocal
   }
+  const ownerIsAbsent = createTransferOwnerInventory(
+    typeof browser.runtime.getContexts === 'function'
+      ? (filter) => browser.runtime.getContexts(filter)
+      : undefined,
+  )
+  const maintenance = registerNotesMaintenance(alarmScheduler, () =>
+    runIdleMaintenanceBatch(async () => {
+      const local = requireNotesLocal()
+      // Complete bounded spool batches before starting a new archive mark.
+      // Startup/generic Retry saving owns settled-receipt reconciliation.
+      if (
+        (await local.readRecord(['notes-maintenance-progress'])) === undefined
+      ) {
+        const transfer = await collectBackupTransferTechnicalBatch(local, {
+          ownerIsAbsent,
+        })
+        if (transfer.hasMore) return transfer
+      }
+      const result = await createNotesMaintenanceService({
+        local,
+      }).collectBatch()
+      if (result.hasMore) return result
+      return collectBackupTransferTechnicalBatch(local, { ownerIsAbsent })
+    }),
+  )
+  requestNotesMaintenance = maintenance.request
   async function retryReplacementWithTransferReceipts() {
     const result = await backupReplacement.retry()
     if (notesLocal && backupReplacement.getState().status === 'idle')
@@ -492,6 +524,29 @@ export function registerBackgroundHandlers() {
               (await getProblemContext(current, slug)) !== null,
           ),
       )
+    },
+    getArchiveUsage: async () => {
+      await getAppDb()
+      const usage = await createNotesMaintenanceService({
+        local: requireNotesLocal(),
+      }).getArchiveUsage()
+      let browserStorageEstimate: import('@/features/notes/api/notes-contracts').NotesResult<'notes.getArchiveUsage'>['browserStorageEstimate'] =
+        null
+      try {
+        const estimate = await globalThis.navigator?.storage?.estimate?.()
+        if (estimate)
+          browserStorageEstimate = {
+            ...(estimate.usage !== undefined
+              ? { usageBytes: estimate.usage }
+              : {}),
+            ...(estimate.quota !== undefined
+              ? { quotaBytes: estimate.quota }
+              : {}),
+          }
+      } catch {
+        /* Optional physical estimate unavailable. */
+      }
+      return { ...usage, browserStorageEstimate }
     },
     getLeases: notesLeases,
     runRead: runConsistentRead,
@@ -2361,6 +2416,8 @@ function broadcastSyncInvalidation(source: 'dashboard') {
 function broadcastDataManagementInvalidation(
   source: 'dashboard' | 'popup' | 'content-script',
 ) {
+  // Best effort only: cleanup scheduling cannot fail durable saves/notifications.
+  void requestNotesMaintenance?.().catch(() => undefined)
   return broadcastCacheInvalidation({
     hintConnectionReset: true,
     reason: 'problem-catalog-updated',

@@ -46,6 +46,9 @@ const budgetSchema = z.strictObject({
 export const transferRecordSchema = transferSessionSchema.extend({
   documentOwner: z.string(),
   spooledBytes: z.number().int().min(0),
+  spoolCharged: z.boolean().optional(),
+  cleanupNextSequence: z.number().int().nonnegative().optional(),
+  abandoned: z.boolean().optional(),
   completionResult: z.unknown().optional(),
   beginRequestId: z.string().optional(),
   pinnedHeader: z.unknown().optional(),
@@ -137,6 +140,10 @@ export function createBackupTransferService<
     return record
   }
   function assertOwner(record: Record, owner: string, handle: TransferHandle) {
+    if (record.abandoned)
+      throw new Error(
+        'Backup selection is stale. Reselect the file before continuing.',
+      )
     if (
       record.documentOwner !== owner ||
       record.ownerToken !== handle.ownerToken
@@ -266,7 +273,7 @@ export function createBackupTransferService<
       return {
         budget: {
           bytes: budget.bytes - record.spooledBytes,
-          sessions: budget.sessions - 1,
+          sessions: budget.sessions - (record.spoolCharged === false ? 0 : 1),
         },
         result: null,
       }
@@ -646,6 +653,318 @@ export async function reconcileCompletedBackupTransfers(local: LocalIdbStore) {
           }
         }
       }
+    },
+  )
+}
+
+/** Owning cleanup. Caller holds trusted idle queue admission. Active-owner
+ * observations are only a scout: status/accepted publication are rechecked in
+ * the SAME transaction that deletes bodies. Unknown observations keep data. */
+export async function collectBackupTransferTechnicalBatch(
+  local: LocalIdbStore,
+  options: {
+    ownerIsAbsent?: ((owner: string) => Promise<boolean>) | undefined
+  } = {},
+) {
+  const progressKey = ['backup-transfer-cleanup-progress']
+  const selected = await local.transact<
+    { sessions: Record[]; more: boolean; after: string | undefined },
+    'records'
+  >(['records'], 'readonly', (s, done, fail) => {
+    const progress = s.records.get(progressKey)
+    progress.onsuccess = () => {
+      try {
+        const last =
+          progress.result === undefined
+            ? undefined
+            : z.string().parse(progress.result)
+        const lower =
+          last === undefined
+            ? ['backup-transfer-session']
+            : ['backup-transfer-session', last]
+        const request = s.records.openKeyCursor(
+          IDBKeyRange.bound(
+            lower,
+            ['backup-transfer-session', []],
+            last !== undefined,
+          ),
+        )
+        const sessions: Record[] = []
+        let scanned = 0
+        request.onsuccess = () => {
+          try {
+            const cursor = request.result
+            if (!cursor) {
+              done({ sessions, more: false, after: last })
+              return
+            }
+            const value = s.records.get(cursor.key)
+            value.onsuccess = () => {
+              try {
+                sessions.push(transferRecordSchema.parse(value.result))
+                if (++scanned === 100)
+                  done({ sessions, more: true, after: last })
+                else cursor.continue()
+              } catch (error) {
+                fail(error)
+              }
+            }
+          } catch (error) {
+            fail(error)
+          }
+        }
+      } catch (error) {
+        fail(error)
+      }
+    }
+  })
+  const absent = new Set<string>()
+  for (const record of selected.sessions) {
+    if (
+      record.status === 'complete' ||
+      record.abandoned ||
+      !options.ownerIsAbsent
+    )
+      continue
+    try {
+      if (await options.ownerIsAbsent(record.documentOwner))
+        absent.add(record.sessionId)
+    } catch {
+      /* UNKNOWN keeps unresolved input. */
+    }
+  }
+  // A no-work scout stays read-only unless a persisted exhausted cursor needs
+  // resetting. UUID order is not creation order: the next scan must wrap.
+  const eligible = selected.sessions.filter(
+    (record) =>
+      record.spoolCharged !== false &&
+      (record.status === 'complete' ||
+        record.abandoned ||
+        absent.has(record.sessionId)),
+  )
+  if (!eligible.length && !selected.more) {
+    if (selected.after === undefined)
+      return { hasMore: false, removedChunks: 0 }
+    return local.transact<
+      { hasMore: boolean; removedChunks: number },
+      'records'
+    >(['records'], 'readwrite', (s, done) => {
+      const current = s.records.get(progressKey)
+      current.onsuccess = () => {
+        // Do not erase progress advanced by another admitted cleanup pass.
+        if (current.result === selected.after) s.records.delete(progressKey)
+        done({
+          hasMore:
+            current.result !== undefined && current.result !== selected.after,
+          removedChunks: 0,
+        })
+      }
+    })
+  }
+  return local.transact<{ hasMore: boolean; removedChunks: number }, 'records'>(
+    ['records'],
+    'readwrite',
+    (s, done, fail) => {
+      let removedChunks = 0,
+        index = 0
+      const finish = (more: boolean, last?: string) => {
+        if (last) s.records.put(last, progressKey)
+        else s.records.delete(progressKey)
+        done({ hasMore: more, removedChunks })
+      }
+      const next = () => {
+        const observed = eligible[index++]
+        if (!observed) {
+          finish(
+            selected.more,
+            selected.more ? selected.sessions.at(-1)?.sessionId : undefined,
+          )
+          return
+        }
+        const request = s.records.get(transferSessionKey(observed.sessionId))
+        request.onsuccess = () => {
+          try {
+            if (request.result === undefined) {
+              next()
+              return
+            }
+            const record = transferRecordSchema.parse(request.result)
+            if (record.spoolCharged === false) {
+              next()
+              return
+            }
+            const abandoning = record.status !== 'complete'
+            // A resumed/changed owner session after scout is never abandoned.
+            if (
+              abandoning &&
+              !record.abandoned &&
+              (!absent.has(record.sessionId) ||
+                JSON.stringify(record) !== JSON.stringify(observed))
+            ) {
+              next()
+              return
+            }
+            const checkAccepted = () => {
+              if (!abandoning) {
+                clean(record)
+                return
+              }
+              const continuation = s.records.get('replacement-continuation')
+              continuation.onsuccess = () => {
+                if (continuation.result !== undefined) {
+                  next()
+                  return
+                }
+                if (!record.confirmationToken) {
+                  clean(record)
+                  return
+                }
+                const fence = s.records.get(
+                  replacementCommandKey(record.confirmationToken),
+                )
+                fence.onsuccess = () => {
+                  if (fence.result !== undefined) {
+                    next()
+                    return
+                  }
+                  const candidate = s.records.get([
+                    'composite-candidate',
+                    record.confirmationToken!,
+                  ])
+                  candidate.onsuccess = () => {
+                    if (candidate.result !== undefined) next()
+                    else clean(record)
+                  }
+                }
+              }
+            }
+            checkAccepted()
+          } catch (error) {
+            fail(error)
+          }
+        }
+      }
+      function clean(record: Record) {
+        const budgetRequest = s.records.get(transferBudgetKey)
+        budgetRequest.onsuccess = () => {
+          try {
+            const budget = budgetSchema.parse(budgetRequest.result)
+            const begin = record.cleanupNextSequence ?? 0
+            if (begin > record.nextSequence)
+              throw new Error('Invalid transfer cleanup cursor.')
+            const end = Math.min(begin + 64, record.nextSequence)
+            let sequence = begin,
+              bytes = 0
+            const read = () => {
+              if (sequence === end) {
+                commit()
+                return
+              }
+              const chunk = s.records.get(
+                transferChunkKey(record.sessionId, sequence),
+              )
+              chunk.onsuccess = () => {
+                try {
+                  if (typeof chunk.result !== 'string')
+                    throw new Error(
+                      'Transfer cleanup found a missing or invalid body chunk.',
+                    )
+                  bytes += encoder.encode(chunk.result).byteLength
+                  s.records.delete(
+                    transferChunkKey(record.sessionId, sequence++),
+                  )
+                  removedChunks++
+                  read()
+                } catch (error) {
+                  fail(error)
+                }
+              }
+            }
+            const commit = () => {
+              const remaining = record.spooledBytes - bytes
+              if (
+                remaining < 0 ||
+                (end === record.nextSequence && remaining !== 0)
+              )
+                throw new Error(
+                  'Transfer cleanup budget does not match body charges.',
+                )
+              const complete = end === record.nextSequence
+              const nextBudget = budgetSchema.parse({
+                bytes: budget.bytes - bytes,
+                sessions: budget.sessions - (complete ? 1 : 0),
+              })
+              s.records.put(nextBudget, transferBudgetKey)
+              if (complete && record.status !== 'complete') {
+                s.records.delete(transferSessionKey(record.sessionId))
+                if (record.beginRequestId)
+                  s.records.delete(
+                    transferBeginKey(
+                      record.documentOwner,
+                      record.beginRequestId,
+                    ),
+                  )
+                s.records.put(
+                  {
+                    documentOwner: record.documentOwner,
+                    ownerToken: record.ownerToken,
+                  },
+                  transferCancelKey(record.sessionId),
+                )
+                // Never sweep Gist/other previews based on a missing transfer. Only this
+                // explicitly owned unconfirmed local preview may be discarded.
+                if (record.confirmationToken) {
+                  const preview = s.records.get([
+                    'backup-preview',
+                    record.confirmationToken,
+                  ])
+                  preview.onsuccess = () => {
+                    try {
+                      const owned = z
+                        .object({ sourceIdentity: z.string() })
+                        .safeParse(preview.result)
+                      if (
+                        owned.success &&
+                        owned.data.sourceIdentity ===
+                          JSON.stringify([
+                            'dashboard-transfer',
+                            record.documentOwner,
+                            record.sessionId,
+                          ])
+                      )
+                        s.records.delete([
+                          'backup-preview',
+                          record.confirmationToken!,
+                        ])
+                    } catch (error) {
+                      fail(error)
+                    }
+                  }
+                }
+              } else
+                s.records.put(
+                  {
+                    ...record,
+                    spooledBytes: remaining,
+                    spoolCharged: !complete,
+                    cleanupNextSequence: end,
+                    ...(record.status !== 'complete'
+                      ? { abandoned: true }
+                      : {}),
+                  },
+                  transferSessionKey(record.sessionId),
+                )
+              // One session/body batch per admission. Foreground work gets a turn.
+              const more = !complete || selected.more || index < eligible.length
+              finish(more, complete && more ? record.sessionId : undefined)
+            }
+            read()
+          } catch (error) {
+            fail(error)
+          }
+        }
+      }
+      next()
     },
   )
 }

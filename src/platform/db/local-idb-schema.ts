@@ -57,6 +57,8 @@ export function upgradeLocalDatabase(
   createArchiveStores(database)
   const records = transaction.objectStore('records')
   const cores = transaction.objectStore('coreSnapshots')
+  // Initialized atomically on fresh creation and preserving v1 upgrade.
+  records.put(0, ['local-technical-write-epoch'])
   const request = records.openCursor()
   request.onsuccess = () => {
     const cursor = request.result
@@ -77,8 +79,16 @@ export function upgradeLocalDatabase(
       const { bytes, ...metadata } = value
       const coreSnapshotId = `legacy:${encodeURIComponent(String(cursor.key))}`
       cores.put(bytes, coreSnapshotId)
+      if (cursor.key === 'active')
+        records.put(
+          { identity: 'initial:legacy', status: 'ready', storeIndex: 5 },
+          ['archive-generation', 'legacy'],
+        )
       if (cursor.key !== 'active')
-        cores.put({ coreSnapshotId }, coreRecordReferenceKey(cursor.key))
+        cores.put(
+          { kind: 'core-only', coreSnapshotId },
+          coreRecordReferenceKey(cursor.key),
+        )
       cursor.update({
         ...metadata,
         formatVersion: 2,

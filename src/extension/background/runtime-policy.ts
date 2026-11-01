@@ -2,6 +2,7 @@ import type { ExtensionSurface } from '@/extension/messaging'
 import { isLeetCodeHost, parseLeetCodeProblemLocation } from '@/lib/leetcode'
 
 const methodSurfaceAccess = {
+  'notes.getArchiveUsage': ['dashboard'],
   'notes.openEditor': ['dashboard', 'content-script'],
   'notes.saveDocument': ['dashboard', 'content-script'],
   'notes.getProblemNotes': ['dashboard', 'content-script'],

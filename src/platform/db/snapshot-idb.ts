@@ -1,3 +1,9 @@
+import { archiveStoreNames } from './local-idb-schema'
+import {
+  assertFreshLocalStores,
+  initialArchiveMarker,
+  readReadyArchive,
+} from './local-root-validation'
 import { z } from 'zod'
 import { createLocalIdbStore } from './local-idb'
 import {
@@ -139,7 +145,7 @@ function readReplacementRecoveryRecord(
   return value as ReplacementRecoveryRecord
 }
 
-function readContinuationRecord(
+export function readContinuationRecord(
   value: unknown,
 ): ReplacementContinuation | null {
   if (value === undefined) return null
@@ -221,7 +227,7 @@ export function createSnapshotIdbStore(
     ) => void,
   ): Promise<T> {
     return local.transact(
-      ['records', 'coreSnapshots'],
+      ['records', 'coreSnapshots', ...archiveStoreNames],
       mode,
       (stores, finish, fail) => {
         const records = stores.records
@@ -273,7 +279,17 @@ export function createSnapshotIdbStore(
                     }
                   }
                 }
-                if (key === 'active') hydrate()
+                if (key === 'active')
+                  readReadyArchive(
+                    records,
+                    String(
+                      'archiveGeneration' in value
+                        ? value.archiveGeneration
+                        : '',
+                    ),
+                    hydrate,
+                    fail,
+                  )
                 else {
                   // Recovery values are historically opaque. Only separately
                   // recorded provenance authorizes treating one as a core head.
@@ -292,15 +308,43 @@ export function createSnapshotIdbStore(
                         throw new Error(
                           'The stored recovery core reference is invalid.',
                         )
-                      hydrate()
+                      if ('kind' in pointer && pointer.kind === 'paired') {
+                        if (
+                          !('archiveGeneration' in value) ||
+                          value.archiveGeneration !==
+                            pointer.archiveGeneration ||
+                          !('datasetToken' in value) ||
+                          value.datasetToken !== pointer.datasetToken
+                        )
+                          throw new Error(
+                            'The stored recovery archive provenance is invalid.',
+                          )
+                        readReadyArchive(
+                          records,
+                          pointer.archiveGeneration,
+                          hydrate,
+                          fail,
+                        )
+                      } else hydrate()
                     } catch (error) {
                       fail(error)
                     }
                   }
                 }
               } else {
-                output.result = value
-                output.onsuccess?.()
+                if (key === 'active' && value === undefined)
+                  assertFreshLocalStores(
+                    stores,
+                    () => {
+                      output.result = value
+                      output.onsuccess?.()
+                    },
+                    fail,
+                  )
+                else {
+                  output.result = value
+                  output.onsuccess?.()
+                }
               }
             } catch (error) {
               fail(error)
@@ -317,8 +361,17 @@ export function createSnapshotIdbStore(
             'key' in value &&
             (value.key === 'active' || value.key === 'replacement')
           ) {
-            const { bytes, ...metadata } = value
-            const previous = heads.get(key)
+            const { bytes, ...rawMetadata } = value
+            const metadata: Record<string, unknown> = rawMetadata
+            const activePrior =
+              key !== 'active' && binaries.get('active') === bytes
+                ? heads.get('active')
+                : undefined
+            if (activePrior) {
+              metadata.archiveGeneration = activePrior.archiveGeneration
+              metadata.datasetToken = activePrior.datasetToken
+            }
+            const previous = heads.get(key) ?? activePrior
             const coreSnapshotId =
               previous && binaries.get(key) === bytes
                 ? String(previous.coreSnapshotId)
@@ -326,7 +379,25 @@ export function createSnapshotIdbStore(
             if (!previous || binaries.get(key) !== bytes)
               cores.add(bytes, coreSnapshotId)
             if (key !== 'active')
-              cores.put({ coreSnapshotId }, coreRecordReferenceKey(key))
+              cores.put(
+                activePrior
+                  ? {
+                      kind: 'paired',
+                      coreSnapshotId,
+                      archiveGeneration: activePrior.archiveGeneration,
+                      datasetToken: activePrior.datasetToken,
+                    }
+                  : { kind: 'core-only', coreSnapshotId },
+                coreRecordReferenceKey(key),
+              )
+            const archiveGeneration = previous
+              ? z.string().min(1).parse(previous.archiveGeneration)
+              : crypto.randomUUID()
+            if (key === 'active' && !previous)
+              records.put(initialArchiveMarker, [
+                'archive-generation',
+                archiveGeneration,
+              ])
             records.put(
               {
                 ...metadata,
@@ -334,8 +405,7 @@ export function createSnapshotIdbStore(
                 coreSnapshotId,
                 ...(key === 'active'
                   ? {
-                      archiveGeneration:
-                        previous?.archiveGeneration ?? crypto.randomUUID(),
+                      archiveGeneration: archiveGeneration,
                       datasetToken:
                         previous?.datasetToken ?? crypto.randomUUID(),
                     }

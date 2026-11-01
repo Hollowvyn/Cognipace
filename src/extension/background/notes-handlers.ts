@@ -2,6 +2,7 @@ import type { NotesInvalidation } from '@/features/notes/data/notes-repository'
 import { onMessage } from '@/extension/messaging'
 import {
   notesRuntimeSchemas,
+  type NotesResult,
   type NotesMethod,
 } from '@/features/notes/api/notes-contracts'
 import type { createNotesService } from '@/features/notes/server/notes-service'
@@ -14,6 +15,7 @@ import { notesEditOwner, type createNotesEditScopes } from './notes-edit-scopes'
 type Service = ReturnType<typeof createNotesService>
 export interface NotesHandlerDependencies {
   getService(): Promise<Service>
+  getArchiveUsage?(): Promise<NotesResult<'notes.getArchiveUsage'>>
   getLeases(): ReturnType<typeof createNotesEditScopes>
   runRead<T>(work: () => Promise<T>): Promise<T>
   runMutation<T>(work: () => Promise<T>): Promise<T>
@@ -86,6 +88,16 @@ export function registerNotesHandlers(deps: NotesHandlerDependencies) {
       // Failed outbox reads retain all durable work for a later operation.
     }
   }
+  onMessage('notes.getArchiveUsage', ({ data, sender }) => {
+    const schema = notesRuntimeSchemas['notes.getArchiveUsage']
+    const request = schema.request.parse(data)
+    authorize('notes.getArchiveUsage', request.surface, sender)
+    return deps.runRead(async () => {
+      if (!deps.getArchiveUsage)
+        throw new Error('Archive usage is unavailable.')
+      return schema.result.parse(await deps.getArchiveUsage())
+    })
+  })
   onMessage('notes.openEditor', ({ data, sender }) => {
     const schema = notesRuntimeSchemas['notes.openEditor']
     const request = schema.request.parse(data)

@@ -139,7 +139,7 @@ it('stages an imported archive without changing active data or duplicating immut
   const repository = createArchiveGenerationRepository(local)
   await repository.stageImportedArchive({ nextGeneration: 'imported', archive })
   await repository.stageImportedArchive({ nextGeneration: 'imported', archive })
-  expect(await local.readHead()).toBeNull()
+  await expect(local.readHead()).rejects.toThrow(/Recovery required/)
   await local.transact(['payloads'], 'readonly', (s, done) => {
     const request = s.payloads.get('code')
     request.onsuccess = () => {
@@ -222,6 +222,16 @@ it('reads only generation-reachable bodies, excluding prior recovery and orphan 
       'submission',
     ])
     done(undefined)
+  })
+  await local.writeTechnicalRecord(['archive-generation', 'active'], {
+    identity: 'fixture',
+    status: 'ready',
+    storeIndex: 5,
+  })
+  await local.writeTechnicalRecord(['archive-generation', 'recovery'], {
+    identity: 'fixture',
+    status: 'ready',
+    storeIndex: 5,
   })
   const exported = await repository.readArchiveGeneration('active')
   expect(exported).toEqual(archive)

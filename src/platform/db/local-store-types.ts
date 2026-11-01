@@ -43,9 +43,21 @@ export function isBinary(value: unknown): value is Uint8Array {
 // Technical provenance entries share coreSnapshots, using array keys so they
 // cannot collide with immutable binary payload IDs (which are strings).
 // Reachability/cleanup must follow these pointers together with record heads.
-export const coreRecordReferenceSchema = z.object({
-  coreSnapshotId: z.string().min(1),
-})
+export const coreRecordReferenceSchema = z.union([
+  z.strictObject({
+    kind: z.literal('paired'),
+    coreSnapshotId: z.string().min(1),
+    archiveGeneration: z.string().min(1),
+    datasetToken: z.string().min(1),
+  }),
+  z.strictObject({
+    kind: z.literal('core-only'),
+    coreSnapshotId: z.string().min(1),
+  }),
+  // Legacy untyped provenance can still hydrate the original binary. It never
+  // authorizes maintenance to infer an archive pointer from opaque raw fields.
+  z.strictObject({ coreSnapshotId: z.string().min(1) }),
+])
 export type CoreRecordReference = z.infer<typeof coreRecordReferenceSchema>
 export function coreRecordReferenceKey(recordKey: IDBValidKey): IDBValidKey[] {
   return ['recordReference', recordKey]

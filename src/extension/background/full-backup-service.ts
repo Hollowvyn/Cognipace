@@ -158,9 +158,22 @@ export async function validateFullBackupConfirmation(
 /** Detached owner composition; caller holds the shared mutation queue. */
 export async function prepareFullBackupReplacement(
   local: LocalIdbStore,
-  input: { prepared: PreparedBackupRestore; commandId: string },
+  input: {
+    prepared: PreparedBackupRestore
+    commandId: string
+    kind?: 'restore' | 'gist-pull'
+  },
 ): Promise<PreparedReplacement> {
   const fingerprint = fullBackupRequestFingerprint(input.prepared)
+  const previewCapability = await local.readRecord([
+    'backup-preview',
+    input.commandId,
+  ])
+  const commandKind =
+    input.kind ??
+    (previewCapability === undefined
+      ? 'restore'
+      : previewRecordSchema.parse(previewCapability).kind)
   const completed = await local.readRecord(
     replacementCommandKey(input.commandId),
   )
@@ -201,6 +214,7 @@ export async function prepareFullBackupReplacement(
       datasetToken: crypto.randomUUID(),
       replacementId: input.commandId,
       commandFingerprint: fingerprint,
+      commandKind,
       initializedProblemScopes: problemSlugs.map((problemSlug) => ({
         problemSlug,
         problemToken: crypto.randomUUID(),
@@ -272,5 +286,6 @@ export async function prepareGistFullBackupReplacement(
   return prepareFullBackupReplacement(local, {
     prepared,
     commandId: `gist-${prepared.inputDigest}-${head.revision}`,
+    kind: 'gist-pull',
   })
 }

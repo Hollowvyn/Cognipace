@@ -1,3 +1,4 @@
+import { readReadyArchive } from '@/platform/db/local-root-validation'
 import { z } from 'zod'
 import { problemSlugSchema } from '@/features/problems/api/problems-contracts'
 import {
@@ -80,6 +81,16 @@ function onRead(
     }
   }
 }
+function onHead(
+  records: IDBObjectStore,
+  fail: (error: unknown) => void,
+  consume: (value: unknown) => void,
+) {
+  onRead(records.get('active'), fail, (value) => {
+    const head = requireHead(value)
+    readReadyArchive(records, head.archiveGeneration, () => consume(head), fail)
+  })
+}
 function requireHead(value: unknown): LocalHead {
   return localHeadSchema.parse(value)
 }
@@ -116,7 +127,7 @@ export function createNotesRepository(
       Array<NotesInvalidation & { key: IDBValidKey }>
     > {
       return local.transact(['records'], 'readonly', (s, done, fail) => {
-        onRead(s.records.get('active'), fail, (value) => {
+        onHead(s.records, fail, (value) => {
           const head = requireHead(value)
           const request = s.records.openCursor(
             IDBKeyRange.bound(
@@ -165,7 +176,7 @@ export function createNotesRepository(
         ['records', 'problemNotes', 'savedAiNotes'],
         'readonly',
         (s, done, fail) => {
-          onRead(s.records.get('active'), fail, (value) => {
+          onHead(s.records, fail, (value) => {
             const h = requireHead(value)
             onRead(
               s.problemNotes.get([h.archiveGeneration, problemSlug]),
@@ -208,7 +219,7 @@ export function createNotesRepository(
         ['records', 'analysisReports', 'payloads'],
         'readonly',
         (s, done, fail) => {
-          onRead(s.records.get('active'), fail, (value) => {
+          onHead(s.records, fail, (value) => {
             const h = requireHead(value)
             onRead(
               s.analysisReports.get([h.archiveGeneration, assessmentId]),
@@ -267,7 +278,7 @@ export function createNotesRepository(
         import('../api/notes-contracts').NotesResult<'notes.getSubmission'>,
         'records' | 'submissions' | 'payloads'
       >(['records', 'submissions', 'payloads'], 'readonly', (s, done, fail) => {
-        onRead(s.records.get('active'), fail, (value) => {
+        onHead(s.records, fail, (value) => {
           const h = requireHead(value)
           onRead(
             s.submissions.get([h.archiveGeneration, submissionId]),
@@ -319,7 +330,7 @@ export function createNotesRepository(
         ],
         'readwrite',
         (s, done, fail) => {
-          onRead(s.records.get('active'), fail, (value) => {
+          onHead(s.records, fail, (value) => {
             const h = requireHead(value)
             const noteKey = [h.archiveGeneration, command.problemSlug]
             onRead(s.problemScopes.get(noteKey), fail, (value) => {
@@ -451,7 +462,7 @@ export function createNotesRepository(
         ['records', 'problemScopes'],
         'readonly',
         (s, done, fail) => {
-          onRead(s.records.get('active'), fail, (value) => {
+          onHead(s.records, fail, (value) => {
             const head = requireHead(value)
             onRead(
               s.problemScopes.get([head.archiveGeneration, problemSlug]),
@@ -472,7 +483,7 @@ export function createNotesRepository(
         ['records', 'problemScopes'],
         'readwrite',
         (s, done, fail) => {
-          onRead(s.records.get('active'), fail, (value) => {
+          onHead(s.records, fail, (value) => {
             const head = requireHead(value)
             const key = [head.archiveGeneration, problemSlug]
             onRead(s.problemScopes.get(key), fail, (value) => {
@@ -502,7 +513,7 @@ export function createNotesRepository(
         ['records', 'problemNotes', 'submissions'],
         'readonly',
         (s, done, fail) => {
-          onRead(s.records.get('active'), fail, (value) => {
+          onHead(s.records, fail, (value) => {
             const head = requireHead(value)
             const request =
               target.kind === 'problem'
@@ -550,7 +561,7 @@ export function createNotesRepository(
         ['records', 'problemScopes', 'problemNotes', 'submissions'],
         'readwrite',
         (s, done, fail) => {
-          onRead(s.records.get('active'), fail, (value) => {
+          onHead(s.records, fail, (value) => {
             const head = requireHead(value)
             onRead(
               s.problemScopes.get([
@@ -701,7 +712,7 @@ export function createNotesRepository(
         ['records', 'submissions'],
         'readonly',
         (s, done, fail) => {
-          onRead(s.records.get('active'), fail, (value) => {
+          onHead(s.records, fail, (value) => {
             const head = requireHead(value)
             onRead(
               s.submissions.get([head.archiveGeneration, submissionId]),
@@ -734,7 +745,7 @@ export function createNotesRepository(
         ['records', 'submissions'],
         'readonly',
         (s, done, fail) => {
-          onRead(s.records.get('active'), fail, (value) => {
+          onHead(s.records, fail, (value) => {
             const head = requireHead(value)
             const lower = [head.archiveGeneration, problemSlug]
             const upper = cursor

@@ -1,3 +1,8 @@
+import { archiveStoreNames } from './local-idb-schema'
+import {
+  assertFreshLocalStores,
+  readReadyArchive,
+} from './local-root-validation'
 import { localDatabaseVersion, upgradeLocalDatabase } from './local-idb-schema'
 import {
   isBinary,
@@ -64,7 +69,12 @@ export function createLocalIdbStore(
         let transaction: IDBTransaction
         try {
           transaction = database.transaction(
-            [...names],
+            [
+              ...new Set([
+                ...names,
+                ...(mode === 'readwrite' ? ['records'] : []),
+              ]),
+            ],
             mode,
             mode === 'readwrite' ? { durability: 'strict' } : undefined,
           )
@@ -101,13 +111,37 @@ export function createLocalIdbStore(
           const stores = Object.fromEntries(
             names.map((name) => [name, transaction.objectStore(name)]),
           ) as LocalStores<Name>
-          operate(
-            stores,
-            (value) => {
-              result = value
-            },
-            fail,
-          )
+          const invoke = () =>
+            operate(
+              stores,
+              (value) => {
+                result = value
+              },
+              fail,
+            )
+          if (mode === 'readwrite') {
+            const records = transaction.objectStore('records')
+            const epoch = records.get(['local-technical-write-epoch'])
+            epoch.onsuccess = () => {
+              try {
+                const current: unknown = epoch.result
+                if (
+                  !Number.isSafeInteger(current) ||
+                  Number(current) < 0 ||
+                  Number(current) >= Number.MAX_SAFE_INTEGER
+                )
+                  throw new Error(
+                    'Recovery required: local technical-write epoch is invalid.',
+                  )
+                records.put(Number(current) + 1, [
+                  'local-technical-write-epoch',
+                ])
+                invoke()
+              } catch (error) {
+                fail(error)
+              }
+            }
+          } else invoke()
         } catch (error) {
           fail(error)
         }
@@ -126,8 +160,30 @@ export function createLocalIdbStore(
       })
     },
     async readHead() {
-      const value = await store.readRecord('active')
-      return value === undefined ? null : localHeadSchema.parse(value)
+      return store.transact(
+        ['records', 'coreSnapshots', ...archiveStoreNames],
+        'readonly',
+        (stores, done, fail) => {
+          const request = stores.records.get('active')
+          request.onsuccess = () => {
+            try {
+              if (request.result === undefined) {
+                assertFreshLocalStores(stores, () => done(null), fail)
+                return
+              }
+              const head = localHeadSchema.parse(request.result)
+              readReadyArchive(
+                stores.records,
+                head.archiveGeneration,
+                () => done(head),
+                fail,
+              )
+            } catch (error) {
+              fail(error)
+            }
+          }
+        },
+      )
     },
     readCore(id) {
       return store.transact(

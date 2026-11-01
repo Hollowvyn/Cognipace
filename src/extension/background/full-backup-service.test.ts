@@ -459,3 +459,96 @@ it.each(['persistence', 'metadata'] as const)(
     expect(sql).toHaveBeenCalledTimes(1)
   },
 )
+
+it('collects technical orphans then recovers the retained pair with exact note, code and report bodies', async () => {
+  const local = await fixture(),
+    archive = await makeNotesArchive()
+  archive.notes[0]!.document.markdown = 'Keep forever.'
+  const input = {
+    ...createFrozenV6BackupFixture(),
+    schemaVersion: 7,
+    notesArchive: archive,
+  }
+  expect(
+    await run(local, await prepareFullBackupRestore(input), 'long-lived-notes'),
+  ).toMatchObject({ status: 'durable' })
+  const store = createSnapshotIdbStore(indexedDB)
+  expect(
+    await createBackupReplacementCoordinator({ store }).run({
+      kind: 'reset',
+      prepare: () =>
+        prepareProblemDataReplacement(local, {
+          kind: 'reset',
+          problemSlugs: [],
+          commandId: 'clear-after-notes',
+        }),
+      onDurable: async () => {},
+      finishSyncMetadata: async () => {},
+    }),
+  ).toMatchObject({ status: 'durable' })
+  const { createNotesMaintenanceService } =
+    await import('@/features/notes/server/notes-maintenance-service')
+  const maintenance = createNotesMaintenanceService({
+    local,
+    now: () => new Date('2090-01-01'),
+  })
+  for (let i = 0; i < 80; i++)
+    if (!(await maintenance.collectBatch()).hasMore) break
+  const prior = (await store.readReplacementRecovery('clear-after-notes'))!
+  const generationOwner = createArchiveGenerationRepository(local)
+  expect(
+    await generationOwner.readArchiveGeneration(prior.archiveGeneration!),
+  ).toEqual(archive)
+  const {
+    prepareDbReplacement,
+    createDetachedCoreCandidate,
+    adoptPublishedCoreCandidate,
+  } = await import('@/platform/db/instance')
+  const { readPracticeStorageData, replacePracticeStorageDataInTransaction } =
+    await import('@/features/practice/server/practice-storage-service')
+  await prepareDbReplacement()
+  const recovered = await createDetachedCoreCandidate(
+    new Uint8Array(prior.bytes),
+    async (candidate) => {
+      const historical = await readPracticeStorageData(candidate.db)
+      await candidate.db.transaction((tx) =>
+        replacePracticeStorageDataInTransaction(tx, historical),
+      )
+    },
+  )
+  const head = (await local.readHead())!,
+    descriptor = {
+      baseRevision: head.revision,
+      coreSnapshotId: 'recovered-core',
+      archiveGeneration: 'recovered-archive',
+      datasetToken: 'recovered-dataset',
+      replacementId: 'recover-prior',
+    }
+  const publication = createCompositePublication(local, head.fingerprint),
+    candidate = { handle: recovered, descriptor }
+  await publication.prepare(candidate, () =>
+    generationOwner.stageArchiveGeneration({
+      sourceGeneration: prior.archiveGeneration!,
+      nextGeneration: descriptor.archiveGeneration,
+      excludedProblemSlugs: [],
+    }),
+  )
+  const published = await publication.publishCompositeCandidate(candidate, {
+    kind: 'restore',
+    replacementId: descriptor.replacementId,
+  })
+  await adoptPublishedCoreCandidate(candidate, published, local)
+  await store.markInvalidated(descriptor.replacementId)
+  await store.markSyncMetadataComplete(descriptor.replacementId)
+  await store.completeContinuation(descriptor.replacementId)
+  const exported = await exportDurableFullBackup(local)
+  expect(exported.backup.notesArchive).toEqual(archive)
+  expect(exported.backup.notesArchive.notes[0]!.document.markdown).toBe(
+    'Keep forever.',
+  )
+  expect(
+    exported.backup.notesArchive.payloads.map((payload) =>
+      JSON.stringify(payload.body),
+    ),
+  ).toEqual(archive.payloads.map((payload) => JSON.stringify(payload.body)))
+})
