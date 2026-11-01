@@ -1,3 +1,9 @@
+import {
+  configureMutationQueue,
+  runConsistentRead,
+  runGatedMutationQueue,
+} from './mutation-queue'
+import { createBackupReplacementCoordinator } from './backup-replacement'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { registerNotesHandlers } from './notes-handlers'
 import { createNotesTestContext } from '@/features/notes/testing/notes-test-context'
@@ -23,7 +29,9 @@ describe('notes handler authorization before database access', () => {
     registerNotesHandlers({
       getService,
       getLeases: vi.fn(),
-      run: (work) => work(),
+      runRead: (work) => work(),
+      runMutation: (work) => work(),
+      canMutate: () => true,
       emit: vi.fn(),
     })
     const content = {
@@ -97,11 +105,16 @@ describe('Notes runtime with owning service and durable IDB', () => {
     )
     const getService = vi.fn(() => Promise.resolve(service))
     const emit = vi.fn(() => Promise.resolve(undefined))
+    let now = 0
+    const clock = () => now
     const register = () =>
       registerNotesHandlers({
         getService,
+        now: clock,
         getLeases: () => createNotesEditScopes(c.localStore),
-        run: (work) => work(),
+        runRead: (work) => work(),
+        runMutation: (work) => work(),
+        canMutate: () => true,
         emit,
       })
     register()
@@ -122,7 +135,19 @@ describe('Notes runtime with owning service and durable IDB', () => {
         scope: { datasetToken: string; problemToken: string }
         editLeaseId: string
       }
-    return { ...c, service, getService, emit, register, call, open }
+    return {
+      ...c,
+      service,
+      getService,
+      emit,
+      register,
+      call,
+      open,
+      clock,
+      advanceOutboxRetry: () => {
+        now += 1000
+      },
+    }
   }
   it('allows a dashboard document without tab identity and rejects URL-only leases', async () => {
     const c = await setup()
@@ -302,6 +327,7 @@ describe('Notes runtime with owning service and durable IDB', () => {
       expect(await c.call('notes.saveDocument', request)).toEqual(first)
       expect(await c.localStore.readHead()).toEqual(head)
       c.emit.mockResolvedValue(undefined)
+      c.advanceOutboxRetry()
       await c.call('notes.getProblemNotes', {
         surface: 'content-script',
         problemSlug: 'two-sum',
@@ -422,7 +448,9 @@ describe('Notes runtime with owning service and durable IDB', () => {
       registerNotesHandlers({
         getService: () => Promise.resolve(service),
         getLeases: () => createNotesEditScopes(c.localStore),
-        run: (work) => work(),
+        runRead: (work) => work(),
+        runMutation: (work) => work(),
+        canMutate: () => true,
         emit,
       })
       expect(
@@ -448,6 +476,246 @@ describe('Notes runtime with owning service and durable IDB', () => {
       await c.close()
     }
   })
+  it.each(['acknowledgement', 'partial-emission'] as const)(
+    'bounds emitted-refetch retry when %s fails and retains the durable outbox until recovery',
+    async (failure) => {
+      const c = await setup()
+      try {
+        const lease = await c.open()
+        const coordinator = createBackupReplacementCoordinator()
+        configureMutationQueue({
+          ready: coordinator.ready,
+          assertIdle: coordinator.assertIdle,
+          assertReadable: coordinator.assertReadable,
+          flush: () => Promise.resolve(),
+          waitForPendingCoreSave: () => Promise.resolve(),
+        })
+        registerNotesHandlers({
+          getService: c.getService,
+          getLeases: () => createNotesEditScopes(c.localStore),
+          runRead: runConsistentRead,
+          runMutation: runGatedMutationQueue,
+          canMutate: () => {
+            coordinator.assertIdle()
+            return true
+          },
+          now: c.clock,
+          emit: c.emit,
+        })
+        const acknowledge = c.service.acknowledgeInvalidation.bind(c.service)
+        const ack = vi.spyOn(c.service, 'acknowledgeInvalidation')
+        if (failure === 'acknowledgement')
+          ack.mockRejectedValue(new Error('ack transaction aborted'))
+        let refetch: Promise<unknown> | undefined
+        let emits = 0
+        c.emit.mockImplementation(() => {
+          if (++emits === 1)
+            refetch = c.call('notes.getProblemNotes', {
+              surface: 'content-script',
+              problemSlug: 'two-sum',
+            })
+          return failure === 'partial-emission'
+            ? Promise.reject(
+                new Error('one recipient failed after another received'),
+              )
+            : Promise.resolve(undefined)
+        })
+        await c.call('notes.saveDocument', {
+          surface: 'content-script',
+          editLeaseId: lease.editLeaseId,
+          command: {
+            commandId: 'save-with-refetch',
+            problemSlug: 'two-sum',
+            scope: lease.scope,
+            target: { kind: 'problem' },
+            expectedRevision: 0,
+            markdown: 'durable',
+          },
+        })
+        await refetch
+        expect(c.emit).toHaveBeenCalledTimes(1)
+        expect(await c.repository.listPendingInvalidations()).toHaveLength(1)
+        c.advanceOutboxRetry()
+        ack.mockImplementation(acknowledge)
+        c.emit.mockResolvedValue(undefined)
+        await c.call('notes.getProblemNotes', {
+          surface: 'content-script',
+          problemSlug: 'two-sum',
+        })
+        expect(await c.repository.listPendingInvalidations()).toEqual([])
+        expect(c.emit).toHaveBeenCalledTimes(
+          failure === 'acknowledgement' ? 1 : 2,
+        )
+      } finally {
+        await c.close()
+      }
+    },
+  )
+
+  it('preserves idle lazy scope initialization and drains outbox once only after explicit full mutation admission', async () => {
+    const c = await setup()
+    try {
+      const coordinator = createBackupReplacementCoordinator()
+      configureMutationQueue({
+        ready: coordinator.ready,
+        assertIdle: coordinator.assertIdle,
+        assertReadable: coordinator.assertReadable,
+        flush: () => Promise.resolve(),
+        waitForPendingCoreSave: () => Promise.resolve(),
+      })
+      const admit = vi.fn(() => {
+        coordinator.assertIdle()
+        return true
+      })
+      registerNotesHandlers({
+        getService: c.getService,
+        getLeases: () => createNotesEditScopes(c.localStore),
+        runRead: runConsistentRead,
+        runMutation: runGatedMutationQueue,
+        canMutate: admit,
+        emit: c.emit,
+      })
+      expect(await c.repository.readScope('two-sum')).toBeNull()
+      const request = { surface: 'content-script', problemSlug: 'two-sum' }
+      await c.call('notes.getProblemNotes', request)
+      const scope = (await c.repository.readScope('two-sum'))!
+      expect(scope).not.toBeNull()
+      await c.repository.saveDocument({
+        commandId: 'idle-outbox',
+        problemSlug: 'two-sum',
+        scope,
+        target: { kind: 'problem' },
+        expectedRevision: 0,
+        markdown: 'idle',
+      })
+      await c.call('notes.getProblemNotes', request)
+      await c.call('notes.getProblemNotes', request)
+      expect(c.emit).toHaveBeenCalledTimes(1)
+      expect(await c.repository.listPendingInvalidations()).toEqual([])
+      expect(admit).toHaveBeenCalled()
+    } finally {
+      await c.close()
+    }
+  })
+
+  it.each(['sync-metadata', 'notification-flag'] as const)(
+    'keeps runtime document and saved-AI mutations gated during adopted %s pending while read refetch stays read-only',
+    async (failure) => {
+      const c = await setup()
+      try {
+        const lease = await c.open()
+        await c.repository.saveDocument({
+          commandId: 'before-pending',
+          problemSlug: 'two-sum',
+          scope: lease.scope,
+          target: { kind: 'problem' },
+          expectedRevision: 0,
+          markdown: 'original',
+        })
+        const coordinator = createBackupReplacementCoordinator()
+        await coordinator.run({
+          kind: 'reset',
+          commit: () => Promise.resolve(null),
+          flush: () => Promise.resolve(),
+          onDurable: () =>
+            failure === 'notification-flag'
+              ? Promise.reject(new Error('notification unavailable'))
+              : Promise.resolve(),
+          finishSyncMetadata: () =>
+            Promise.reject(new Error('metadata unavailable')),
+        })
+        configureMutationQueue({
+          ready: coordinator.ready,
+          assertIdle: coordinator.assertIdle,
+          assertReadable: coordinator.assertReadable,
+          flush: () => Promise.resolve(),
+          waitForPendingCoreSave: () => Promise.resolve(),
+        })
+        registerNotesHandlers({
+          getService: c.getService,
+          getLeases: () => createNotesEditScopes(c.localStore),
+          runRead: runConsistentRead,
+          runMutation: runGatedMutationQueue,
+          canMutate: () => coordinator.getState().status === 'idle',
+          emit: c.emit,
+        })
+        c.emit.mockClear()
+        const before = await c.localStore.readHead()
+        await expect(
+          c.call('notes.saveDocument', {
+            surface: 'content-script',
+            editLeaseId: lease.editLeaseId,
+            command: {
+              commandId: 'blocked-save',
+              problemSlug: 'two-sum',
+              scope: lease.scope,
+              target: { kind: 'problem' },
+              expectedRevision: 1,
+              markdown: 'must not save',
+            },
+          }),
+        ).rejects.toThrow('still needs saving')
+        await expect(
+          c.call('notes.setSavedAiNote', {
+            surface: 'content-script',
+            editLeaseId: lease.editLeaseId,
+            command: {
+              commandId: 'blocked-include',
+              problemSlug: 'two-sum',
+              scope: lease.scope,
+              assessmentId: 'assessment-1',
+              expectedCollectionRevision: 0,
+              saved: true,
+            },
+          }),
+        ).rejects.toThrow('still needs saving')
+        const transact = c.localStore.transact.bind(c.localStore)
+        const pureRead = vi
+          .spyOn(c.localStore, 'transact')
+          .mockImplementation((...args) => {
+            if (args[1] !== 'readonly')
+              throw new Error('Pending read attempted a write transaction')
+            return transact(...args)
+          })
+        await expect(
+          c.call('notes.getProblemNotes', {
+            surface: 'content-script',
+            problemSlug: 'two-sum',
+          }),
+        ).resolves.toMatchObject({
+          document: { markdown: 'original', revision: 1 },
+        })
+        await expect(
+          c.call('notes.listSubmissions', {
+            surface: 'content-script',
+            problemSlug: 'two-sum',
+          }),
+        ).resolves.toMatchObject({ items: [] })
+        await expect(
+          c.call('notes.getSubmission', {
+            surface: 'content-script',
+            problemSlug: 'two-sum',
+            submissionId: 'missing',
+          }),
+        ).resolves.toBeNull()
+        await expect(
+          c.call('notes.getAssessment', {
+            surface: 'content-script',
+            problemSlug: 'two-sum',
+            assessmentId: 'missing',
+          }),
+        ).resolves.toBeNull()
+        pureRead.mockRestore()
+
+        expect(await c.localStore.readHead()).toEqual(before)
+        expect(c.emit).not.toHaveBeenCalled()
+        expect(await c.repository.listPendingInvalidations()).toHaveLength(1)
+      } finally {
+        await c.close()
+      }
+    },
+  )
+
   it('returns only selected archive bodies, metadata pages and scoped cursors', async () => {
     const c = await setup()
     try {

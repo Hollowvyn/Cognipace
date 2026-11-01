@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { createLocalIdbStore } from './local-idb'
 import {
   coreRecordReferenceKey,
@@ -46,7 +47,12 @@ export type ReplacementRecoverySummary = Omit<
   'bytes'
 > & { byteLength: number }
 
-export type ReplacementKind = 'restore' | 'reset' | 'gist-pull'
+export type ReplacementKind =
+  | 'restore'
+  | 'reset'
+  | 'gist-pull'
+  | 'problem-reset'
+  | 'problem-delete'
 export interface ReplacementContinuation {
   key: 'replacement-continuation'
   replacementId: string
@@ -57,10 +63,25 @@ export interface ReplacementContinuation {
   syncMetadataPatch?: Record<string, unknown>
 }
 
+// Compact global fences survive dataset clears and never reference physical roots.
+export const replacementCommandKey = (commandId: string): IDBValidKey => [
+  'replacement-command',
+  commandId,
+]
+export const replacementCommandRecordSchema = z.strictObject({
+  commandId: z.string().min(1),
+  kind: z.enum(['reset', 'problem-reset', 'problem-delete']),
+  requestFingerprint: z.string().min(1),
+  status: z.literal('committed'),
+})
+export type ReplacementCommandRecord = z.infer<
+  typeof replacementCommandRecordSchema
+>
+
 export type ReplacementInput = Pick<
   ReplacementContinuation,
   'replacementId' | 'kind' | 'syncMetadataPatch'
->
+> & { commandFingerprint?: string }
 
 export interface SnapshotIdbStore {
   readActive(): Promise<ActiveSnapshotRecord | null>
@@ -124,7 +145,13 @@ function readContinuationRecord(
     !('replacementId' in value) ||
     typeof value.replacementId !== 'string' ||
     !('kind' in value) ||
-    !['restore', 'reset', 'gist-pull'].includes(String(value.kind)) ||
+    ![
+      'restore',
+      'reset',
+      'gist-pull',
+      'problem-reset',
+      'problem-delete',
+    ].includes(String(value.kind)) ||
     !('committedRevision' in value) ||
     !Number.isSafeInteger(value.committedRevision) ||
     !('needsInvalidation' in value) ||

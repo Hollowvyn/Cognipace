@@ -10,6 +10,8 @@ import {
 } from './local-store-types'
 import {
   nextDataHead,
+  replacementCommandKey,
+  replacementCommandRecordSchema,
   type ReplacementInput,
   type ReplacementContinuation,
 } from './snapshot-idb'
@@ -20,6 +22,23 @@ export const compositeDescriptorSchema = z.strictObject({
   archiveGeneration: z.string().min(1),
   datasetToken: z.string().min(1),
   replacementId: z.string().min(1),
+  commandFingerprint: z.string().min(1).optional(),
+  targetProblemScopes: z
+    .array(
+      z.strictObject({
+        problemSlug: z.string().min(1),
+        problemToken: z.string().min(1),
+      }),
+    )
+    .optional(),
+  initializedProblemScopes: z
+    .array(
+      z.strictObject({
+        problemSlug: z.string().min(1),
+        problemToken: z.string().min(1),
+      }),
+    )
+    .optional(),
 })
 export type CompositeDescriptor = z.infer<typeof compositeDescriptorSchema>
 export interface CompositeCandidate {
@@ -33,6 +52,11 @@ export function assertCandidateBase(
   if (head.revision !== descriptor.baseRevision)
     throw new Error('Local data changed before replacement publication.')
 }
+const problemScopeSchema = z.strictObject({
+  datasetToken: z.string().min(1),
+  problemToken: z.string().min(1),
+})
+
 const preparedSchema = z.strictObject({
   descriptor: compositeDescriptorSchema,
   fingerprint: z.string(),
@@ -45,6 +69,39 @@ export function createCompositePublication(
 ) {
   const key = (id: string): IDBValidKey => ['composite-candidate', id]
   return {
+    async loadPrepared(replacementId: string, commandFingerprint: string) {
+      const raw = await local.readRecord(key(replacementId))
+      if (raw === undefined) return null
+      const parsed = preparedSchema.safeParse(raw)
+      if (!parsed.success || parsed.data.fingerprint !== fingerprint)
+        throw new Error(
+          'Recovery required: prepared replacement metadata is incomplete or incompatible.',
+        )
+      const { descriptor } = parsed.data
+      if (descriptor.commandFingerprint === undefined)
+        throw new Error(
+          'Recovery required: prepared replacement request identity is missing.',
+        )
+      if (
+        descriptor.replacementId !== replacementId ||
+        descriptor.commandFingerprint !== commandFingerprint
+      )
+        throw new Error(
+          'Problem data command identity conflict. Refresh and try again.',
+        )
+      const head = await local.readHead()
+      if (!head)
+        throw new Error(
+          'Recovery required: active replacement base is missing.',
+        )
+      assertCandidateBase(head, descriptor)
+      const bytes = await local.readCore(descriptor.coreSnapshotId)
+      if (!bytes || !isBinary(bytes) || bytes.byteLength === 0)
+        throw new Error(
+          'Recovery required: prepared replacement core is missing or invalid.',
+        )
+      return { descriptor, bytes: new Uint8Array(bytes) }
+    },
     async prepare(
       candidate: CompositeCandidate,
       stageArchive: () => Promise<void>,
@@ -114,6 +171,13 @@ export function createCompositePublication(
       input: ReplacementInput,
     ): Promise<LocalHead> {
       const descriptor = compositeDescriptorSchema.parse(candidate.descriptor)
+      if (
+        descriptor.commandFingerprint !== undefined &&
+        input.commandFingerprint !== descriptor.commandFingerprint
+      )
+        throw new Error(
+          'Prepared replacement request fingerprint does not match.',
+        )
       if (input.replacementId !== descriptor.replacementId)
         throw new Error('Replacement identity does not match candidate.')
       // Retry after a lost commit/readback response reconciles identity before CAS.
@@ -206,13 +270,40 @@ export function createCompositePublication(
                                 { coreSnapshotId: prior.coreSnapshotId },
                                 coreRecordReferenceKey('recovery'),
                               )
+                              if (input.commandFingerprint) {
+                                const command =
+                                  replacementCommandRecordSchema.parse({
+                                    commandId: descriptor.replacementId,
+                                    kind: input.kind,
+                                    requestFingerprint:
+                                      input.commandFingerprint,
+                                    status: 'committed',
+                                  })
+                                s.records.add(
+                                  command,
+                                  replacementCommandKey(
+                                    descriptor.replacementId,
+                                  ),
+                                )
+                              }
                               s.records.put(next, 'active')
                               if (
                                 descriptor.datasetToken !== prior.datasetToken
                               ) {
                                 // Recovery/full restore never revives historical
-                                // problem scopes. Rotate staged scope rows in the
-                                // same transaction as the new pair's head.
+                                // problem scopes. Preserve only verified descriptor-bound
+                                // fresh scopes; rotate copied historical rows atomically.
+                                const preparedScopes = new Map(
+                                  [
+                                    ...(descriptor.targetProblemScopes ?? []),
+                                    ...(descriptor.initializedProblemScopes ??
+                                      []),
+                                  ].map((scope) => [
+                                    scope.problemSlug,
+                                    scope.problemToken,
+                                  ]),
+                                )
+                                const verifiedPreparedScopes = new Set<string>()
                                 const scopes = s.problemScopes.openCursor(
                                   IDBKeyRange.bound(
                                     [descriptor.archiveGeneration],
@@ -222,11 +313,53 @@ export function createCompositePublication(
                                 scopes.onsuccess = () => {
                                   try {
                                     const cursor = scopes.result
-                                    if (!cursor) return
-                                    cursor.update({
-                                      datasetToken: descriptor.datasetToken,
-                                      problemToken: crypto.randomUUID(),
-                                    })
+                                    if (!cursor) {
+                                      if (
+                                        input.kind === 'reset' &&
+                                        descriptor.commandFingerprint &&
+                                        verifiedPreparedScopes.size !==
+                                          preparedScopes.size
+                                      )
+                                        throw new Error(
+                                          'Prepared Clear scopes are incomplete.',
+                                        )
+                                      return
+                                    }
+                                    const key = cursor.key
+                                    if (
+                                      !Array.isArray(key) ||
+                                      typeof key[1] !== 'string'
+                                    )
+                                      throw new Error(
+                                        'Invalid staged problem scope key.',
+                                      )
+                                    const row = problemScopeSchema.parse(
+                                      cursor.value,
+                                    )
+                                    const preparedToken = preparedScopes.get(
+                                      key[1],
+                                    )
+                                    const isPreparedFreshScope =
+                                      row.datasetToken ===
+                                        descriptor.datasetToken &&
+                                      preparedToken !== undefined &&
+                                      row.problemToken === preparedToken
+                                    if (isPreparedFreshScope)
+                                      verifiedPreparedScopes.add(key[1])
+                                    if (!isPreparedFreshScope) {
+                                      if (
+                                        input.kind === 'reset' &&
+                                        descriptor.commandFingerprint &&
+                                        preparedToken !== undefined
+                                      )
+                                        throw new Error(
+                                          'Prepared Clear scope tokens do not match their descriptor.',
+                                        )
+                                      cursor.update({
+                                        datasetToken: descriptor.datasetToken,
+                                        problemToken: crypto.randomUUID(),
+                                      })
+                                    }
                                     cursor.continue()
                                   } catch (error) {
                                     fail(error)

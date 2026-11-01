@@ -225,6 +225,7 @@ export function BackupConfirmationDialog({
   description,
   error,
   isPending,
+  savingPending = false,
   onSecondaryAction,
   onCancel,
   onConfirm,
@@ -238,6 +239,7 @@ export function BackupConfirmationDialog({
   description: string
   error?: ReactNode | undefined
   isPending: boolean
+  savingPending?: boolean
   onSecondaryAction?: (() => void) | undefined
   onCancel: () => void
   onConfirm: () => void
@@ -286,7 +288,7 @@ export function BackupConfirmationDialog({
   }, [isDialogPending])
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape' && !isDialogPending) {
+    if (event.key === 'Escape' && !isDialogPending && !savingPending) {
       event.preventDefault()
       onCancel()
       return
@@ -331,7 +333,7 @@ export function BackupConfirmationDialog({
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) {
           event.preventDefault()
-          if (!isDialogPending) {
+          if (!isDialogPending && !savingPending) {
             onCancel()
           }
         }
@@ -369,7 +371,7 @@ export function BackupConfirmationDialog({
         {status ? <InlineStatus id={statusId}>{status}</InlineStatus> : null}
         <div className="flex flex-wrap justify-end gap-2">
           <Button
-            disabled={isDialogPending}
+            disabled={isDialogPending || savingPending}
             onClick={onCancel}
             ref={cancelButtonRef}
             size="sm"
@@ -385,7 +387,7 @@ export function BackupConfirmationDialog({
                   : undefined
               }
               data-cp-tone={secondaryActionTone}
-              disabled={isDialogPending}
+              disabled={isDialogPending || savingPending}
               onClick={onSecondaryAction}
               size="sm"
               variant="outline"

@@ -43,6 +43,7 @@ type PendingWork = BackupReplacementPending &
 export function createBackupReplacementCoordinator(
   options: {
     store?: SnapshotIdbStore
+    resumeAdoption?: (record: ReplacementContinuation) => Promise<void>
     resume?: (
       record: ReplacementContinuation,
     ) => Pick<BackupReplacementWork, 'onDurable' | 'finishSyncMetadata'>
@@ -79,7 +80,14 @@ export function createBackupReplacementCoordinator(
             pending = {
               kind: record.kind,
               summary: null,
-              adopted: true,
+              adopted: false,
+              adopt: async () => {
+                if (!options.resumeAdoption)
+                  throw new Error(
+                    'Replacement handle verification is required after restart.',
+                  )
+                await options.resumeAdoption(record)
+              },
               durable: true,
               publicationAttempted: true,
               invalidated: !record.needsInvalidation,
@@ -113,6 +121,13 @@ export function createBackupReplacementCoordinator(
 
   function assertIdle() {
     if (pending || running) throw new Error(pendingMessage)
+  }
+
+  // Bookkeeping/notification failure cannot make an already verified, adopted
+  // pair unsafe to read. Unpublished or unadopted candidates remain gated.
+  function assertReadable() {
+    if (pending ? !pending.durable || !pending.adopted : running)
+      throw new Error(pendingMessage)
   }
 
   async function settle(): Promise<BackupReplacementResult> {
@@ -286,5 +301,5 @@ export function createBackupReplacementCoordinator(
     }
   }
 
-  return { ready, getState, assertIdle, run, retry }
+  return { ready, getState, assertIdle, assertReadable, run, retry }
 }

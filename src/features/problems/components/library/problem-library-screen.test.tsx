@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Button } from '@/components/ui/button'
 import { sendMessage } from '@/extension/messaging'
 import {
+  useProblemDataConfirmation,
   ProblemRowActionsBar,
   ProblemRowDetails,
   ProblemRowPracticeActions,
@@ -546,6 +547,20 @@ describe('ProblemLibraryScreen', () => {
   it('shows row actions and runs practice-owned suspend and reset writes', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockImplementation((method) => {
+      if (
+        method === 'problems.resetProblemData' ||
+        method === 'problems.deleteProblem' ||
+        method === 'problems.bulkDelete'
+      )
+        return Promise.resolve({
+          status: 'durable',
+          kind:
+            method === 'problems.resetProblemData'
+              ? 'problem-reset'
+              : 'problem-delete',
+          summary: null,
+          syncMetadataPending: false,
+        })
       if (method === 'problems.getLibrary') {
         return Promise.resolve(libraryResponse)
       }
@@ -568,7 +583,7 @@ describe('ProblemLibraryScreen', () => {
       '#/library/problems/two-sum/edit',
     )
     expect(screen.getByRole('button', { name: 'Suspend' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Reset Schedule' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Reset problem' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: 'Suspend' }))
@@ -578,18 +593,158 @@ describe('ProblemLibraryScreen', () => {
       suspended: true,
     })
 
-    await user.click(screen.getByRole('button', { name: 'Reset Schedule' }))
-    const resetDialog = screen.getByRole('dialog', { name: 'Reset schedule?' })
+    await user.click(screen.getByRole('button', { name: 'Reset problem' }))
+    const resetDialog = screen.getByRole('dialog', { name: 'Reset problem?' })
     expect(resetDialog).toBeVisible()
 
     await user.click(
-      within(resetDialog).getByRole('button', { name: 'Reset Schedule' }),
+      within(resetDialog).getByRole('button', { name: 'Reset problem' }),
     )
-    expect(sendMessage).toHaveBeenCalledWith('practice.resetSchedule', {
+    expect(sendMessage).toHaveBeenCalledWith('problems.resetProblemData', {
       surface: 'dashboard',
-      problemSlug: 'two-sum',
+      problemSlugs: ['two-sum'],
+      commandId: expect.any(String) as string,
     })
   })
+
+  it('keeps an accepted reset dialog and command identity through pending publication without refetching the Library', async () => {
+    const user = userEvent.setup()
+    let resetCalls = 0
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'problems.getLibrary')
+        return Promise.resolve(libraryResponse)
+      if (method === 'problems.resetProblemData')
+        return Promise.resolve(
+          ++resetCalls === 1
+            ? {
+                status: 'persistence-pending',
+                kind: 'problem-reset',
+                summary: null,
+              }
+            : {
+                status: 'durable',
+                kind: 'problem-reset',
+                summary: null,
+                syncMetadataPending: false,
+              },
+        )
+      return Promise.resolve(undefined)
+    })
+    renderProblemLibrary()
+    await user.click(
+      await screen.findByRole('button', { name: 'Expand Two Sum' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Reset problem' }))
+    const dialog = screen.getByRole('dialog', { name: 'Reset problem?' })
+    expect(dialog).toHaveTextContent(
+      'notes, submission history, saved AI, practice history',
+    )
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Reset problem' }),
+    )
+    await within(dialog).findByRole('button', { name: 'Retry saving' })
+    expect(
+      within(dialog).getByRole('button', { name: 'Cancel' }),
+    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Suspend' })).toBeDisabled()
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.filter(([method]) => method === 'problems.getLibrary'),
+    ).toHaveLength(1)
+    const accepted = vi
+      .mocked(sendMessage)
+      .mock.calls.find(([method]) => method === 'problems.resetProblemData')![1]
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Retry saving' }),
+    )
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Reset problem?' }),
+      ).toBeNull(),
+    )
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.filter(([method]) => method === 'problems.resetProblemData')
+        .map(([, request]) => request),
+    ).toEqual([accepted, accepted])
+  })
+
+  it.each(['reset', 'delete', 'bulk-reset', 'bulk-delete'] as const)(
+    'reuses the complete accepted %s request after a lost response',
+    async (action) => {
+      const user = userEvent.setup()
+      const bulk = action.startsWith('bulk')
+      const resetting = action.endsWith('reset')
+      const method = resetting
+        ? 'problems.resetProblemData'
+        : bulk
+          ? 'problems.bulkDelete'
+          : 'problems.deleteProblem'
+      let calls = 0
+      vi.mocked(sendMessage).mockImplementation((name) => {
+        if (name === 'problems.getLibrary')
+          return Promise.resolve(libraryResponse)
+        if (name === method)
+          return ++calls === 1
+            ? Promise.reject(new Error('Lost response'))
+            : Promise.resolve({
+                status: 'durable',
+                kind: resetting ? 'problem-reset' : 'problem-delete',
+                summary: null,
+                syncMetadataPending: false,
+              })
+        return Promise.resolve(undefined)
+      })
+      renderProblemLibrary()
+      if (bulk) {
+        await user.click(
+          await screen.findByRole('checkbox', { name: 'Select Two Sum' }),
+        )
+        await user.click(
+          screen.getByRole('checkbox', { name: 'Select Binary Search' }),
+        )
+        await user.click(
+          within(
+            screen.getByRole('region', { name: 'Bulk actions' }),
+          ).getByRole('button', {
+            name: resetting ? 'Reset problem' : 'Delete Problems',
+          }),
+        )
+      } else {
+        await user.click(
+          await screen.findByRole('button', { name: 'Expand Two Sum' }),
+        )
+        await user.click(
+          screen.getByRole('button', {
+            name: resetting ? 'Reset problem' : 'Delete',
+          }),
+        )
+      }
+      const dialog = screen.getByRole('dialog')
+      const label = resetting
+        ? 'Reset problem'
+        : bulk
+          ? 'Delete Problems'
+          : 'Delete Problem'
+      await user.click(within(dialog).getByRole('button', { name: label }))
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Lost response',
+      )
+      const accepted = vi
+        .mocked(sendMessage)
+        .mock.calls.find(([name]) => name === method)![1]
+      await user.click(within(dialog).getByRole('button', { name: label }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+      expect(
+        vi
+          .mocked(sendMessage)
+          .mock.calls.filter(([name]) => name === method)
+          .map(([, request]) => request),
+      ).toEqual([accepted, accepted])
+    },
+  )
 
   it('shows resume for suspended rows', async () => {
     const user = userEvent.setup()
@@ -648,24 +803,32 @@ describe('ProblemLibraryScreen', () => {
       throw new Error('Expected library response to include a problem row.')
     }
 
-    render(
-      <ProblemRowDetails
-        actions={
-          <ProblemRowActionsBar>
-            <ProblemRowPracticeActions
-              renderEditProblemAction={(problem) => (
-                <Button asChild size="sm" variant="ghost">
-                  <a href={`#/tracks/problems/${problem.slug}`}>Edit</a>
-                </Button>
-              )}
-              row={row}
-            />
-          </ProblemRowActionsBar>
-        }
-        row={row}
-      />,
-      { wrapper },
-    )
+    const testRow = row
+    function PracticeOnlyDetails() {
+      const confirmation = useProblemDataConfirmation()
+      return (
+        <>
+          <ProblemRowDetails
+            actions={
+              <ProblemRowActionsBar>
+                <ProblemRowPracticeActions
+                  confirmation={confirmation}
+                  renderEditProblemAction={(problem) => (
+                    <Button asChild size="sm" variant="ghost">
+                      <a href={`#/tracks/problems/${problem.slug}`}>Edit</a>
+                    </Button>
+                  )}
+                  row={testRow}
+                />
+              </ProblemRowActionsBar>
+            }
+            row={testRow}
+          />
+          {confirmation.dialog}
+        </>
+      )
+    }
+    render(<PracticeOnlyDetails />, { wrapper })
 
     expect(screen.getByRole('heading', { name: 'Details' })).toBeVisible()
     expect(
@@ -676,13 +839,27 @@ describe('ProblemLibraryScreen', () => {
       '#/tracks/problems/two-sum',
     )
     expect(screen.getByRole('button', { name: 'Suspend' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Reset Schedule' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Reset problem' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
   })
 
   it('deletes any library problem with confirmation', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockImplementation((method) => {
+      if (
+        method === 'problems.resetProblemData' ||
+        method === 'problems.deleteProblem' ||
+        method === 'problems.bulkDelete'
+      )
+        return Promise.resolve({
+          status: 'durable',
+          kind:
+            method === 'problems.resetProblemData'
+              ? 'problem-reset'
+              : 'problem-delete',
+          summary: null,
+          syncMetadataPending: false,
+        })
       if (method === 'problems.getLibrary') {
         return Promise.resolve(libraryResponse)
       }
@@ -703,6 +880,7 @@ describe('ProblemLibraryScreen', () => {
       within(deleteDialog).getByRole('button', { name: 'Delete Problem' }),
     )
     expect(sendMessage).toHaveBeenCalledWith('problems.deleteProblem', {
+      commandId: expect.any(String) as string,
       surface: 'dashboard',
       problemSlug: 'two-sum',
     })
@@ -734,6 +912,7 @@ describe('ProblemLibraryScreen', () => {
       screen.queryByRole('dialog', { name: 'Delete problem?' }),
     ).not.toBeInTheDocument()
     expect(sendMessage).not.toHaveBeenCalledWith('problems.deleteProblem', {
+      commandId: expect.any(String) as string,
       surface: 'dashboard',
       problemSlug: 'two-sum',
     })
@@ -742,12 +921,22 @@ describe('ProblemLibraryScreen', () => {
   it('runs bulk suspend, resume, reset, and delete actions for selected rows', async () => {
     const user = userEvent.setup()
     vi.mocked(sendMessage).mockImplementation((method) => {
+      if (
+        method === 'problems.resetProblemData' ||
+        method === 'problems.deleteProblem' ||
+        method === 'problems.bulkDelete'
+      )
+        return Promise.resolve({
+          status: 'durable',
+          kind:
+            method === 'problems.resetProblemData'
+              ? 'problem-reset'
+              : 'problem-delete',
+          summary: null,
+          syncMetadataPending: false,
+        })
       if (method === 'problems.getLibrary') {
         return Promise.resolve(libraryResponse)
-      }
-
-      if (method === 'problems.bulkDelete') {
-        return Promise.resolve(undefined)
       }
 
       return Promise.resolve(createSerializedPracticeDetails())
@@ -789,22 +978,23 @@ describe('ProblemLibraryScreen', () => {
     })
 
     await user.click(
-      within(bulkBar).getByRole('button', { name: 'Reset Schedule' }),
+      within(bulkBar).getByRole('button', { name: 'Reset problem' }),
     )
     const resetDialog = screen.getByRole('dialog', {
-      name: 'Reset selected schedules?',
+      name: 'Reset selected problems?',
     })
     await user.click(
-      within(resetDialog).getByRole('button', { name: 'Reset Schedule' }),
+      within(resetDialog).getByRole('button', { name: 'Reset problem' }),
     )
-    expect(sendMessage).toHaveBeenCalledWith('practice.resetSchedule', {
+    expect(sendMessage).toHaveBeenCalledWith('problems.resetProblemData', {
       surface: 'dashboard',
-      problemSlug: 'two-sum',
+      problemSlugs: ['two-sum', 'binary-search'],
+      commandId: expect.any(String) as string,
     })
-    expect(sendMessage).toHaveBeenCalledWith('practice.resetSchedule', {
-      surface: 'dashboard',
-      problemSlug: 'binary-search',
-    })
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      'practice.resetSchedule',
+      expect.anything(),
+    )
 
     await user.click(screen.getByRole('checkbox', { name: 'Select Two Sum' }))
     await user.click(
@@ -825,6 +1015,7 @@ describe('ProblemLibraryScreen', () => {
     )
 
     expect(sendMessage).toHaveBeenCalledWith('problems.bulkDelete', {
+      commandId: expect.any(String) as string,
       surface: 'dashboard',
       problemSlugs: ['two-sum', 'binary-search', '01-matrix'],
     })

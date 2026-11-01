@@ -144,8 +144,15 @@ export function createNotesRepository(
         done(undefined)
       })
     },
-    async getProblemNotes(problemSlug: string) {
-      const scope = await repository.acquireScope(problemSlug)
+    async getProblemNotes(
+      problemSlug: string,
+      options: { readOnly?: boolean } = {},
+    ) {
+      const scope = options.readOnly
+        ? await repository.readScope(problemSlug)
+        : await repository.acquireScope(problemSlug)
+      if (!scope)
+        throw new Error('Notes scope is unavailable until saving finishes.')
       return local.transact<
         {
           document: NoteDocument
@@ -434,6 +441,27 @@ export function createNotesRepository(
                 })
               })
             })
+          })
+        },
+      )
+    },
+    readScope(problemSlug: string): Promise<NotesScope | null> {
+      problemSlugSchema.parse(problemSlug)
+      return local.transact(
+        ['records', 'problemScopes'],
+        'readonly',
+        (s, done, fail) => {
+          onRead(s.records.get('active'), fail, (value) => {
+            const head = requireHead(value)
+            onRead(
+              s.problemScopes.get([head.archiveGeneration, problemSlug]),
+              fail,
+              (value) => {
+                const scope =
+                  value === undefined ? null : notesScopeSchema.parse(value)
+                done(scope?.datasetToken === head.datasetToken ? scope : null)
+              },
+            )
           })
         },
       )

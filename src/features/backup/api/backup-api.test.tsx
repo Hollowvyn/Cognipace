@@ -93,10 +93,11 @@ describe('backup API hooks', () => {
     const { result } = renderHook(() => useResetLocalData(), { wrapper })
 
     await act(async () => {
-      await result.current.mutateAsync()
+      await result.current.mutateAsync('clear-command')
     })
 
     expect(sendMessage).toHaveBeenCalledWith('backup.resetLocalData', {
+      commandId: 'clear-command',
       surface: 'dashboard',
     })
     expect(invalidateQueries).toHaveBeenCalledWith({
@@ -193,7 +194,7 @@ describe('backup API hooks', () => {
         if (kind === 'restore') {
           await restore.result.current.mutateAsync(validBackup)
         } else {
-          await reset.result.current.mutateAsync()
+          await reset.result.current.mutateAsync('clear-command')
         }
       })
 
@@ -211,7 +212,7 @@ describe('backup API hooks', () => {
   )
 
   it.each(['restore', 'reset'] as const)(
-    '%s broad-invalidates durable data while retaining pending sync metadata',
+    '%s retains metadata-pending UI without broad invalidation',
     async (kind) => {
       const replacement = {
         ...durableReplacement,
@@ -229,21 +230,25 @@ describe('backup API hooks', () => {
         if (kind === 'restore') {
           await restore.result.current.mutateAsync(validBackup)
         } else {
-          await reset.result.current.mutateAsync()
+          await reset.result.current.mutateAsync('clear-command')
         }
       })
 
-      expect(invalidateQueries).toHaveBeenCalledWith({
+      expect(invalidateQueries).not.toHaveBeenCalledWith({
         queryKey: queryKeys.settings.all,
       })
-      expect(invalidateQueries).toHaveBeenCalledWith({
+      expect(invalidateQueries).not.toHaveBeenCalledWith({
         queryKey: queryKeys.problems.all,
       })
-      expect(invalidateQueries).toHaveBeenCalledWith({
+      expect(invalidateQueries).not.toHaveBeenCalledWith({
         queryKey: queryKeys.appShell.all,
       })
       expect(invalidateQueries).toHaveBeenCalledWith({
         queryKey: queryKeys.backup.pendingReplacement(),
+      })
+      expect(invalidateQueries).toHaveBeenCalledTimes(2)
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: queryKeys.sync.all,
       })
       expect(
         queryClient.getQueryData(queryKeys.backup.pendingReplacement()),
@@ -278,7 +283,21 @@ describe('backup API hooks', () => {
         kind: 'restore',
         summary: validSummary,
       },
-      invalidatesData: true,
+      invalidatesData: false,
+    },
+    {
+      replacement: {
+        ...durableReplacement,
+        kind: 'reset',
+        summary: null,
+        syncMetadataPending: true,
+      },
+      pendingState: {
+        status: 'durable-sync-metadata-pending',
+        kind: 'reset',
+        summary: null,
+      },
+      invalidatesData: false,
     },
   ] satisfies {
     replacement: BackupReplacementResult
@@ -354,7 +373,7 @@ describe('backup API hooks', () => {
           action === 'restore'
             ? restore.result.current.mutateAsync(validBackup)
             : action === 'reset'
-              ? reset.result.current.mutateAsync()
+              ? reset.result.current.mutateAsync('clear-command')
               : retry.result.current.mutateAsync()
         await expect(operation).rejects.toThrow('Storage unavailable.')
       })

@@ -1,3 +1,8 @@
+import type { ReactNode } from 'react'
+import {
+  type ProblemDataConfirmation,
+  useProblemDataConfirmation,
+} from '@/features/problems'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
@@ -201,15 +206,20 @@ function workspaceElement(trackId: string, groupId: string) {
   }))
 
   return (
-    <ActiveTrackWorkspace
-      activeTrack={track}
-      dueCount={0}
-      generatedAt="2026-10-02T04:00:00.000Z"
-      groups={[group]}
-      renderEditProblemAction={() => null}
-      renderEditTrackAction={() => null}
-      rows={rows}
-    />
+    <ConfirmationHost>
+      {(confirmation) => (
+        <ActiveTrackWorkspace
+          confirmation={confirmation}
+          activeTrack={track}
+          dueCount={0}
+          generatedAt="2026-10-02T04:00:00.000Z"
+          groups={[group]}
+          renderEditProblemAction={() => null}
+          renderEditTrackAction={() => null}
+          rows={rows}
+        />
+      )}
+    </ConfirmationHost>
   )
 }
 
@@ -226,8 +236,31 @@ function createRows(count: number) {
   })
 }
 
+function ConfirmationHost({
+  children,
+}: {
+  children: (confirmation: ProblemDataConfirmation) => ReactNode
+}) {
+  const confirmation = useProblemDataConfirmation()
+  return (
+    <>
+      {children(confirmation)}
+      {confirmation.dialog}
+    </>
+  )
+}
 function tableElement(rows: ReturnType<typeof createRows>) {
-  return <TrackProblemTable renderEditProblemAction={() => null} rows={rows} />
+  return (
+    <ConfirmationHost>
+      {(confirmation) => (
+        <TrackProblemTable
+          confirmation={confirmation}
+          renderEditProblemAction={() => null}
+          rows={rows}
+        />
+      )}
+    </ConfirmationHost>
+  )
 }
 
 function renderTable(rows: ReturnType<typeof createRows>) {

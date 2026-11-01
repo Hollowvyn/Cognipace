@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,7 @@ export function DataManagementScreen() {
   const validateBackup = useValidateFullBackup()
   const restoreBackup = useRestoreFullBackup()
   const resetLocalData = useResetLocalData()
+  const resetCommandId = useRef<string | null>(null)
   const pendingReplacement = usePendingBackupReplacement()
   const retryReplacement = useRetryPendingBackupReplacement()
   const [selectedBackup, setSelectedBackup] = useState<unknown>(null)
@@ -128,6 +129,7 @@ export function DataManagementScreen() {
 
   async function handleResetConfirm() {
     if (isReplacementPending) {
+      await handleRetrySaving()
       return
     }
     setResetError(null)
@@ -135,8 +137,10 @@ export function DataManagementScreen() {
     setRecoveryError(null)
 
     try {
-      const result = await resetLocalData.mutateAsync()
-      setResetDialogOpen(false)
+      resetCommandId.current ??= crypto.randomUUID()
+      const result = await resetLocalData.mutateAsync(resetCommandId.current)
+      if (result.status === 'durable' && !result.syncMetadataPending)
+        setResetDialogOpen(false)
       completeReplacement(result)
     } catch (error) {
       setResetError(readErrorMessage(error, 'Failed to clear local data.'))
@@ -165,6 +169,7 @@ export function DataManagementScreen() {
       setBackupError(null)
       setBackupToast({ message: 'Backup restored.', tone: 'success' })
     } else if (result.kind === 'reset') {
+      setResetDialogOpen(false)
       setResetError(null)
       setResetStatus('Local data cleared.')
     }
@@ -211,8 +216,11 @@ export function DataManagementScreen() {
           <InlineStatus>
             {replacementState.status === 'persistence-pending'
               ? replacementState.kind === 'reset'
-                ? 'Your data was cleared, but it still needs saving. Keep this extension open and choose Retry saving.'
-                : 'Your data was restored, but it still needs saving. Keep this extension open and choose Retry saving.'
+                ? 'Clearing local data still needs saving. Keep this extension open and choose Retry saving.'
+                : replacementState.kind === 'problem-reset' ||
+                    replacementState.kind === 'problem-delete'
+                  ? 'Your problem data change still needs saving. Keep this extension open and choose Retry saving.'
+                  : 'Your data was restored, but it still needs saving. Keep this extension open and choose Retry saving.'
               : 'Your data is saved. Sync status still needs saving.'}
           </InlineStatus>
           {recoveryError ? (
@@ -271,6 +279,7 @@ export function DataManagementScreen() {
         isResetting={resetLocalData.isPending}
         isReplacementPending={isReplacementPending}
         onOpenResetDialog={() => {
+          resetCommandId.current = null
           setResetError(null)
           setResetDialogOpen(true)
         }}
@@ -297,15 +306,27 @@ export function DataManagementScreen() {
 
       {resetDialogOpen ? (
         <BackupConfirmationDialog
-          confirmLabel="Clear local data"
-          description="Are you sure? This clears local CogniPace data from this extension install. Export a backup first if you might need this data later."
+          confirmLabel={
+            isReplacementPending ? 'Retry saving' : 'Clear local data'
+          }
+          description="Are you sure? This clears notes, submission history, saved AI, practice history and schedules, problems, tracks, and settings from this extension install. Export a backup first if you might need this data later."
           error={resetError}
-          isPending={resetLocalData.isPending}
+          savingPending={isReplacementPending}
+          status={
+            isReplacementPending
+              ? 'Saving is incomplete. Retry saving to finish clearing local data.'
+              : undefined
+          }
+          isPending={resetLocalData.isPending || retryReplacement.isPending}
           onSecondaryAction={() => {
             void handleExport('reset')
           }}
           onCancel={() => {
-            if (!resetLocalData.isPending && !exportBackup.isPending) {
+            if (
+              !isReplacementPending &&
+              !resetLocalData.isPending &&
+              !exportBackup.isPending
+            ) {
               setResetDialogOpen(false)
             }
           }}

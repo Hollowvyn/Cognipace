@@ -6,6 +6,7 @@ import {
 import type { LocalIdbStore } from '@/platform/db/local-store-types'
 import {
   notesArchiveSchema,
+  notesScopeSchema,
   problemNoteRecordSchema,
   submissionRecordSchema,
   assessmentRecordSchema,
@@ -60,6 +61,87 @@ export function createArchiveGenerationRepository(local: LocalIdbStore) {
     )
   }
   return {
+    readProblemScopes(generation: string) {
+      return local.transact<
+        Array<{
+          problemSlug: string
+          datasetToken: string
+          problemToken: string
+        }>,
+        'problemScopes'
+      >(['problemScopes'], 'readonly', (s, done, fail) => {
+        const result: Array<{
+          problemSlug: string
+          datasetToken: string
+          problemToken: string
+        }> = []
+        const request = s.problemScopes.openCursor(
+          IDBKeyRange.bound([generation], [generation, []]),
+        )
+        request.onsuccess = () => {
+          try {
+            const cursor = request.result
+            if (!cursor) {
+              done(result)
+              return
+            }
+            if (!Array.isArray(cursor.key) || typeof cursor.key[1] !== 'string')
+              throw new Error('Invalid problem scope key.')
+            result.push({
+              problemSlug: cursor.key[1],
+              ...notesScopeSchema.parse(cursor.value),
+            })
+            cursor.continue()
+          } catch (error) {
+            fail(error)
+          }
+        }
+      })
+    },
+    async stageProblemScopes(input: {
+      nextGeneration: string
+      datasetToken: string
+      rotated: ReadonlyArray<{ problemSlug: string; problemToken: string }>
+      initialized: ReadonlyArray<{ problemSlug: string; problemToken: string }>
+    }) {
+      const rows = [
+        ...input.rotated.map((scope) => ({ ...scope, replace: true })),
+        ...input.initialized.map((scope) => ({ ...scope, replace: false })),
+      ]
+      for (let offset = 0; offset < rows.length; offset += batchSize)
+        await local.transact(
+          ['problemScopes'],
+          'readwrite',
+          (s, done, fail) => {
+            for (const row of rows.slice(offset, offset + batchSize)) {
+              const key = [input.nextGeneration, row.problemSlug]
+              const request = s.problemScopes.get(key)
+              request.onsuccess = () => {
+                try {
+                  const existing =
+                    request.result === undefined
+                      ? null
+                      : notesScopeSchema.parse(request.result)
+                  if (
+                    row.replace ||
+                    existing?.datasetToken !== input.datasetToken
+                  )
+                    s.problemScopes.put(
+                      {
+                        datasetToken: input.datasetToken,
+                        problemToken: row.problemToken,
+                      },
+                      key,
+                    )
+                } catch (error) {
+                  fail(error)
+                }
+              }
+            }
+            done(undefined)
+          },
+        )
+    },
     readArchiveGeneration(generation: string): Promise<NotesArchive> {
       if (!generation)
         return Promise.reject(new Error('Archive generation is required.'))

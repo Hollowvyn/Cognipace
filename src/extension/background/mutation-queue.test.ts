@@ -33,9 +33,9 @@ describe('shared mutation gate', () => {
       const durable = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
       const work = vi.fn<() => Promise<string>>().mockResolvedValue('read')
       const run =
-        operation === 'archive mutation'
-          ? queue.runGatedMutationQueue
-          : queue.runConsistentRead
+        operation === 'mixed read'
+          ? queue.runConsistentRead
+          : queue.runGatedMutationQueue
       queue.setPendingLocalSave(durable)
       flush.mockRejectedValueOnce(new Error('disk full'))
       await expect(run(work)).rejects.toThrow('Local data still needs saving')
@@ -138,4 +138,37 @@ it('turns a failed automatic-publication join into a retryable core save', async
   expect(flush).toHaveBeenCalledOnce()
   expect(work).toHaveBeenCalledOnce()
   expect(queue.isLocalSavePending()).toBe(false)
+})
+
+it('keeps pending core-save joining and recovery under safe adopted-pair read admission', async () => {
+  const { queue, flush, ready, assertIdle, waitForPendingCoreSave } =
+    await setup()
+  const assertReadable = vi.fn()
+  assertIdle.mockImplementation(() => {
+    throw new Error('replacement pending')
+  })
+  queue.configureMutationQueue({
+    flush,
+    ready,
+    assertIdle,
+    assertReadable,
+    waitForPendingCoreSave,
+  })
+  waitForPendingCoreSave.mockRejectedValueOnce(
+    new Error('core save unavailable'),
+  )
+  const read = vi.fn(() => Promise.resolve('paired read'))
+  await expect(queue.runConsistentRead(read)).rejects.toThrow(
+    'Local data still needs saving',
+  )
+  expect(queue.isLocalSavePending()).toBe(true)
+  expect(read).not.toHaveBeenCalled()
+  await expect(queue.runConsistentRead(read)).resolves.toBe('paired read')
+  expect(assertReadable).toHaveBeenCalledTimes(2)
+  expect(flush).toHaveBeenCalledOnce()
+  expect(queue.isLocalSavePending()).toBe(false)
+  await expect(queue.runGatedMutationQueue(read)).rejects.toThrow(
+    'replacement pending',
+  )
+  expect(read).toHaveBeenCalledOnce()
 })

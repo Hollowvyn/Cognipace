@@ -2,17 +2,13 @@ import { useEffect, useState, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { InlineStatus } from '@/components/ui/inline-status'
-import { useDeleteProblem } from '@/features/problems/api/problems-api'
 import type {
   ProblemLibraryRow,
   SerializedProblem,
 } from '@/features/problems/api/problems-contracts'
-import {
-  useResetPracticeSchedule,
-  useSetPracticeSuspended,
-} from '@/features/practice'
+import { useSetPracticeSuspended } from '@/features/practice'
 
-import { ProblemConfirmationDialog } from '../library/problem-confirmation-dialog'
+import { type ProblemDataConfirmation } from './use-problem-data-confirmation'
 
 export type RenderProblemEditAction = (problem: SerializedProblem) => ReactNode
 
@@ -21,24 +17,25 @@ export function ProblemRowActionsBar({ children }: { children: ReactNode }) {
 }
 
 export function ProblemRowPracticeActions({
+  confirmation,
   disabled = false,
   afterEditAction,
   onPendingChange,
   renderEditProblemAction,
   row,
 }: {
+  confirmation: ProblemDataConfirmation
   disabled?: boolean | undefined
   afterEditAction?: ReactNode
   onPendingChange?: ((isPending: boolean) => void) | undefined
   renderEditProblemAction: RenderProblemEditAction
   row: ProblemLibraryRow
 }) {
-  const resetSchedule = useResetPracticeSchedule()
+  const controller = confirmation
   const setSuspended = useSetPracticeSuspended()
-  const [isResetConfirmationOpen, setIsResetConfirmationOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isSuspended = row.state.isSuspended || row.status === 'suspended'
-  const isPending = resetSchedule.isPending || setSuspended.isPending
+  const isPending = controller.pending || setSuspended.isPending
   const isDisabled = disabled || isPending
 
   useEffect(() => {
@@ -57,16 +54,6 @@ export function ProblemRowPracticeActions({
           : 'Problem action failed.',
       )
     }
-  }
-
-  async function confirmReset() {
-    await runAction(async () => {
-      await resetSchedule.mutateAsync({
-        surface: 'dashboard',
-        problemSlug: row.problem.slug,
-      })
-      setIsResetConfirmationOpen(false)
-    })
   }
 
   return (
@@ -96,102 +83,50 @@ export function ProblemRowPracticeActions({
       </Button>
       <Button
         disabled={isDisabled}
-        onClick={() => setIsResetConfirmationOpen(true)}
+        onClick={() => {
+          controller.begin({ kind: 'reset', problemSlugs: [row.problem.slug] })
+        }}
         size="sm"
         variant="ghost"
       >
-        Reset Schedule
+        Reset problem
       </Button>
-
-      {isResetConfirmationOpen ? (
-        <ProblemConfirmationDialog
-          confirmLabel="Reset Schedule"
-          description="This clears the FSRS schedule and review history for this problem."
-          onCancel={() => setIsResetConfirmationOpen(false)}
-          onConfirm={() => {
-            void confirmReset()
-          }}
-          pending={isDisabled}
-          title="Reset schedule?"
-        />
-      ) : null}
     </>
   )
 }
 
 export function ProblemRowDeleteAction({
+  confirmation,
   disabled = false,
   onPendingChange,
   row,
 }: {
+  confirmation: ProblemDataConfirmation
   disabled?: boolean | undefined
   onPendingChange?: ((isPending: boolean) => void) | undefined
   row: ProblemLibraryRow
 }) {
-  const deleteProblem = useDeleteProblem()
-  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] =
-    useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const isPending = deleteProblem.isPending
+  const controller = confirmation
+  const isPending = controller.pending
   const isDisabled = disabled || isPending
 
   useEffect(() => {
     onPendingChange?.(isPending)
   }, [isPending, onPendingChange])
 
-  async function runAction(action: () => Promise<unknown>) {
-    setError(null)
-
-    try {
-      await action()
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : 'Problem action failed.',
-      )
-    }
-  }
-
-  async function confirmDelete() {
-    await runAction(async () => {
-      await deleteProblem.mutateAsync({
-        surface: 'dashboard',
-        problemSlug: row.problem.slug,
-      })
-      setIsDeleteConfirmationOpen(false)
-    })
-  }
-
   return (
     <>
-      {error ? (
-        <InlineStatus className="basis-full" role="alert" tone="danger">
-          {error}
-        </InlineStatus>
-      ) : null}
       <Button
         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
         disabled={isDisabled}
-        onClick={() => setIsDeleteConfirmationOpen(true)}
+        onClick={() => {
+          controller.begin({ kind: 'delete', problemSlugs: [row.problem.slug] })
+        }}
         size="sm"
         variant="ghost"
       >
         Delete
       </Button>
-
-      {isDeleteConfirmationOpen ? (
-        <ProblemConfirmationDialog
-          confirmLabel="Delete Problem"
-          description="This permanently deletes this problem and its practice data."
-          onCancel={() => setIsDeleteConfirmationOpen(false)}
-          onConfirm={() => {
-            void confirmDelete()
-          }}
-          pending={isDisabled}
-          title="Delete problem?"
-        />
-      ) : null}
     </>
   )
 }

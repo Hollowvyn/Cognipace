@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { backupReplacementResultSchema } from '@/features/backup/api/backup-contracts'
+
 import { normalizedPracticeStateSchema } from '@/features/practice/api/practice-contracts'
 import { problemDifficulties } from '../domain'
 
@@ -213,10 +215,13 @@ export type ProblemsUpdateProblemRequest = z.infer<
   typeof problemsUpdateProblemRequestSchema
 >
 
-export const problemsDeleteProblemRequestSchema = z.object({
-  surface: problemRuntimeSurfaceSchema,
-  problemSlug: problemSlugSchema,
-})
+export const problemsDeleteProblemRequestSchema = z
+  .object({
+    commandId: z.string().trim().min(1).optional(),
+    surface: problemRuntimeSurfaceSchema,
+    problemSlug: problemSlugSchema,
+  })
+  .strict()
 
 export type ProblemsDeleteProblemRequest = z.infer<
   typeof problemsDeleteProblemRequestSchema
@@ -243,16 +248,28 @@ export type ProblemsBulkUpdateProblemsRequest = z.infer<
   typeof problemsBulkUpdateProblemsRequestSchema
 >
 
-export const problemsBulkDeleteRequestSchema = z.object({
-  surface: problemRuntimeSurfaceSchema,
-  problemSlugs: z.array(problemSlugSchema).min(1),
-})
+export const problemsBulkDeleteRequestSchema = z
+  .object({
+    commandId: z.string().trim().min(1).optional(),
+    surface: problemRuntimeSurfaceSchema,
+    problemSlugs: z.array(problemSlugSchema).min(1),
+  })
+  .strict()
 
 export type ProblemsBulkDeleteRequest = z.infer<
   typeof problemsBulkDeleteRequestSchema
 >
 
-export const problemDeleteResponseSchema = z.void()
+export const problemDeleteResponseSchema = backupReplacementResultSchema
+
+export const problemsResetProblemDataRequestSchema = z.strictObject({
+  surface: problemRuntimeSurfaceSchema,
+  commandId: z.string().trim().min(1).optional(),
+  problemSlugs: z.array(problemSlugSchema).min(1),
+})
+export type ProblemsResetProblemDataRequest = z.infer<
+  typeof problemsResetProblemDataRequestSchema
+>
 
 export type ProblemDeleteResponse = z.infer<typeof problemDeleteResponseSchema>
 

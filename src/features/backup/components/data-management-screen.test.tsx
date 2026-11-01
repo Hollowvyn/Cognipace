@@ -297,8 +297,50 @@ describe('DataManagementScreen', () => {
     )
 
     expect(sendMessage).toHaveBeenCalledWith('backup.resetLocalData', {
+      commandId: expect.any(String) as string,
       surface: 'dashboard',
     })
+  })
+
+  it('reuses the accepted Clear command ID after a lost response without reopening confirmation', async () => {
+    const user = userEvent.setup()
+    let calls = 0
+    vi.mocked(sendMessage).mockImplementation((method) => {
+      if (method === 'backup.getPendingReplacement')
+        return Promise.resolve({ status: 'idle' })
+      if (method === 'backup.resetLocalData')
+        return ++calls === 1
+          ? Promise.reject(new Error('Lost response'))
+          : Promise.resolve(durableResult('reset'))
+      return Promise.reject(new Error('Unexpected method'))
+    })
+    const { wrapper } = createQueryTestHarness()
+    render(<DataManagementScreen />, { wrapper })
+    await user.click(screen.getByRole('button', { name: 'Clear local data' }))
+    const dialog = screen.getByRole('dialog', { name: 'Clear local data?' })
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Clear local data' }),
+    )
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Lost response',
+    )
+    const accepted = vi
+      .mocked(sendMessage)
+      .mock.calls.find(([method]) => method === 'backup.resetLocalData')![1]
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Clear local data' }),
+    )
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Clear local data?' }),
+      ).toBeNull(),
+    )
+    expect(
+      vi
+        .mocked(sendMessage)
+        .mock.calls.filter(([method]) => method === 'backup.resetLocalData')
+        .map(([, request]) => request),
+    ).toEqual([accepted, accepted])
   })
 
   it('closes clear confirmation when the backdrop is clicked', async () => {
@@ -413,13 +455,19 @@ describe('DataManagementScreen', () => {
         name: 'Clear local data',
       }),
     )
-    await screen.findByRole('button', { name: 'Retry saving' })
+    await within(screen.getByRole('dialog')).findByRole('button', {
+      name: 'Retry saving',
+    })
     expect(screen.getByText(resetPersistenceMessage)).toBeVisible()
     expect(screen.queryByText(persistenceMessage)).not.toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeVisible()
     expect(screen.queryByText('Local data cleared.')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Retry saving' }))
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Retry saving',
+      }),
+    )
 
     expect(await screen.findByText('Local data cleared.')).toBeVisible()
     expect(screen.getByText('backup.json')).toBeVisible()
@@ -588,7 +636,7 @@ describe('DataManagementScreen', () => {
 const persistenceMessage =
   'Your data was restored, but it still needs saving. Keep this extension open and choose Retry saving.'
 const resetPersistenceMessage =
-  'Your data was cleared, but it still needs saving. Keep this extension open and choose Retry saving.'
+  'Clearing local data still needs saving. Keep this extension open and choose Retry saving.'
 const metadataMessage = 'Your data is saved. Sync status still needs saving.'
 
 function pendingState<

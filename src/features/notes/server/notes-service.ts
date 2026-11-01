@@ -21,9 +21,12 @@ export function createNotesService(
     listPendingInvalidations: () => repository.listPendingInvalidations(),
     acknowledgeInvalidation: (key: IDBValidKey) =>
       repository.acknowledgeInvalidation(key),
-    async getProblemNotes(problemSlug: string) {
+    async getProblemNotes(
+      problemSlug: string,
+      options: { readOnly?: boolean } = {},
+    ) {
       await requireProblem(problemSlug)
-      return repository.getProblemNotes(problemSlug)
+      return repository.getProblemNotes(problemSlug, options)
     },
     async readAssessment(problemSlug: string, assessmentId: string) {
       await requireProblem(problemSlug)
@@ -36,6 +39,10 @@ export function createNotesService(
     async setSavedAiNote(command: SavedAiCommand) {
       await requireProblem(command.problemSlug)
       return repository.setSavedAiNote(command)
+    },
+    async readScope(problemSlug: string) {
+      await requireProblem(problemSlug)
+      return repository.readScope(problemSlug)
     },
     async acquireScope(problemSlug: string) {
       await requireProblem(problemSlug)

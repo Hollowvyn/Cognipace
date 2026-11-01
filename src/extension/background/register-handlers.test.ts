@@ -112,6 +112,7 @@ const backgroundMocks = vi.hoisted(() => {
     assertCanSenderCallExtensionMethod: vi.fn(),
     backupExportFullBackup: vi.fn(),
     backupResetLocalData: vi.fn(),
+    prepareProblemDataReplacement: vi.fn(),
     backupRestoreFullBackup: vi.fn(),
     backupPrepareFullBackupRestore: vi.fn(),
     backupValidateFullBackup: vi.fn(),
@@ -223,6 +224,15 @@ vi.mock('@/extension/messaging', async (importOriginal) => {
     onMessage: backgroundMocks.onMessage,
   }
 })
+
+vi.mock('./problem-data-service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./problem-data-service')>()),
+  prepareProblemDataReplacement: backgroundMocks.prepareProblemDataReplacement,
+}))
+vi.mock('@/platform/db/local-idb', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/platform/db/local-idb')>()),
+  createLocalIdbStore: () => ({ readRecord: () => Promise.resolve(undefined) }),
+}))
 
 vi.mock('wxt/browser', () => ({
   browser: {
@@ -359,6 +369,7 @@ vi.mock('@/platform/db', () => ({
 }))
 
 vi.mock('./app-db', () => ({
+  verifyBackgroundReplacementAdoption: () => Promise.resolve(),
   getBackgroundDb: backgroundMocks.getAppDb,
   withBackgroundDbLoader: async (
     work: (loadDb: () => Promise<unknown>) => Promise<unknown>,
@@ -430,6 +441,26 @@ vi.mock('./due-notification', () => ({
 describe('background handler registration', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    vi.stubGlobal('indexedDB', {
+      open: () => {
+        throw new Error('Unexpected storage access in runtime harness')
+      },
+    })
+    backgroundMocks.prepareProblemDataReplacement.mockImplementation(
+      async (
+        _local: unknown,
+        input: import('./problem-data-service').ProblemDataReplacementInput,
+      ) => {
+        if (input.kind === 'reset')
+          await backgroundMocks.backupResetLocalData(backgroundMocks.db)
+        return {
+          replacementId: input.commandId,
+          summary: null,
+          publish: () => backgroundMocks.flushDbSnapshot() as Promise<void>,
+          adopt: async () => {},
+        }
+      },
+    )
     backgroundMocks.handlers.clear()
     vi.clearAllMocks()
     backgroundMocks.backupPrepareFullBackupRestore.mockImplementation(
@@ -2117,29 +2148,117 @@ describe('background handler registration', () => {
     )
   })
 
-  it('invalidates Notes and Submissions after single and bulk problem deletion', async () => {
-    await sendRuntimeMessage('problems.deleteProblem', {
+  it('requires refreshed command identities before reset or deletion mutates data', () => {
+    registerBackgroundHandlers()
+    for (const [method, data] of [
+      [
+        'practice.resetSchedule',
+        { surface: 'dashboard', problemSlug: 'two-sum', keepLog: true },
+      ],
+      [
+        'problems.resetProblemData',
+        { surface: 'dashboard', problemSlugs: ['two-sum'] },
+      ],
+      [
+        'problems.deleteProblem',
+        { surface: 'dashboard', problemSlug: 'two-sum' },
+      ],
+      [
+        'problems.bulkDelete',
+        { surface: 'dashboard', problemSlugs: ['two-sum'] },
+      ],
+      ['backup.resetLocalData', { surface: 'dashboard' }],
+    ] as const) {
+      expect(() =>
+        backgroundMocks.handlers.get(method)!({
+          data,
+          sender: extensionSender,
+        }),
+      ).toThrow('Refresh required')
+    }
+    expect(backgroundMocks.prepareProblemDataReplacement).not.toHaveBeenCalled()
+    expect(backgroundMocks.markSyncLocalDataChanged).not.toHaveBeenCalled()
+  })
+  it('binds one accepted bulk reset ID to all selected slugs, retries publication only and reconciles Data Management retry', async () => {
+    registerBackgroundHandlers()
+    const handler = backgroundMocks.handlers.get('problems.resetProblemData')!
+    const request = {
       surface: 'dashboard',
-      problemSlug: 'two-sum',
-    })
-    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenLastCalledWith(
-      {
-        reason: 'problem-catalog-updated',
-        source: 'dashboard',
-        problemSlug: 'two-sum',
-        tags: ['problems', 'notes', 'submissions'],
-      },
-    )
-    await sendRuntimeMessage('problems.bulkDelete', {
-      surface: 'dashboard',
+      commandId: 'accepted-bulk',
       problemSlugs: ['two-sum', 'add-two-numbers'],
+    }
+    const message = (data: unknown) =>
+      handler({ data, sender: extensionSender })
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('disk unavailable'),
+    )
+    expect(await message(request)).toMatchObject({
+      status: 'persistence-pending',
     })
+    await expect(
+      message({ ...request, problemSlugs: ['two-sum'] }),
+    ).rejects.toThrow('identity conflict')
+    expect(await message(request)).toMatchObject({ status: 'durable' })
+    expect(backgroundMocks.prepareProblemDataReplacement).toHaveBeenCalledTimes(
+      1,
+    )
+    expect(await message(request)).toMatchObject({ status: 'durable' })
+    expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(2)
+    backgroundMocks.flushDbSnapshot.mockRejectedValueOnce(
+      new Error('disk unavailable'),
+    )
+    const second = { ...request, commandId: 'accepted-second' }
+    expect(await message(second)).toMatchObject({
+      status: 'persistence-pending',
+    })
+    expect(
+      await backgroundMocks.handlers.get('backup.retryPendingReplacement')!({
+        data: { surface: 'dashboard' },
+        sender: extensionSender,
+      }),
+    ).toMatchObject({ status: 'durable' })
+    expect(await message(second)).toMatchObject({ status: 'durable' })
+    expect(backgroundMocks.prepareProblemDataReplacement).toHaveBeenCalledTimes(
+      2,
+    )
+  })
+
+  it('routes single and bulk deletions through coordinated pair publication', async () => {
+    for (const [method, request] of [
+      [
+        'problems.deleteProblem',
+        {
+          surface: 'dashboard',
+          problemSlug: 'two-sum',
+          commandId: 'single-delete',
+        },
+      ],
+      [
+        'problems.bulkDelete',
+        {
+          surface: 'dashboard',
+          problemSlugs: ['two-sum', 'add-two-numbers'],
+          commandId: 'bulk-delete',
+        },
+      ],
+    ] as const) {
+      expect(await sendRuntimeMessage(method, request)).toMatchObject({
+        status: 'durable',
+        kind: 'problem-delete',
+      })
+    }
+    expect(backgroundMocks.prepareProblemDataReplacement).toHaveBeenCalledTimes(
+      2,
+    )
     expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenLastCalledWith(
-      {
-        reason: 'problem-catalog-updated',
-        source: 'dashboard',
-        tags: ['problems', 'notes', 'submissions'],
-      },
+      expect.objectContaining({
+        tags: expect.arrayContaining([
+          'notes',
+          'submissions',
+          'practice',
+          'tracks',
+        ]) as string[],
+      }),
     )
   })
 
@@ -2821,7 +2940,10 @@ describe('background handler registration', () => {
     expect(backgroundMocks.flushDbSnapshot).toHaveBeenCalledTimes(1)
     const rejected = [
       ['backup.exportFullBackup', { surface: 'dashboard' }],
-      ['backup.resetLocalData', { surface: 'dashboard' }],
+      [
+        'backup.resetLocalData',
+        { surface: 'dashboard', commandId: 'queued-reset' },
+      ],
       [
         'backup.restoreFullBackup',
         { surface: 'dashboard', backup: validBackup },
@@ -2959,7 +3081,10 @@ describe('background handler registration', () => {
       .mockResolvedValueOnce(dirtySyncMetadata)
       .mockRejectedValueOnce(new Error('metadata down'))
     expect(
-      await reset({ data: { surface: 'dashboard' }, sender: extensionSender }),
+      await reset({
+        data: { surface: 'dashboard', commandId: 'accepted-clear' },
+        sender: extensionSender,
+      }),
     ).toEqual({
       status: 'durable',
       syncMetadataPending: true,
@@ -3024,7 +3149,7 @@ describe('background handler registration', () => {
             : 'backup.resetLocalData',
           kind === 'restore'
             ? { surface: 'dashboard', backup: validBackup }
-            : { surface: 'dashboard' },
+            : { surface: 'dashboard', commandId: 'accepted-clear' },
         )
       }
       const flushCount = backgroundMocks.flushDbSnapshot.mock.calls.length
@@ -3050,7 +3175,10 @@ describe('background handler registration', () => {
       new Error('rollback'),
     )
     await expect(
-      message('backup.resetLocalData', { surface: 'dashboard' }),
+      message('backup.resetLocalData', {
+        surface: 'dashboard',
+        commandId: 'reset-operation',
+      }),
     ).rejects.toThrow('rollback')
     expect(
       await message('imports.retryPersistence', { surface: 'dashboard' }),
@@ -3717,6 +3845,7 @@ describe('background handler registration', () => {
   })
 
   it('protects a pending review from automatic remote replacement and recovers publication before sync admission', async () => {
+    vi.stubGlobal('indexedDB', undefined)
     const { createTestDb } = await import('@/platform/db/test-db')
     const { preparePracticeStorage } =
       await import('@/features/practice/server/practice-storage-service')
@@ -3861,6 +3990,7 @@ describe('background handler registration', () => {
   })
 
   it('persists review dirty intent before publication so a fresh sync worker protects a saved review while invalidation stalls', async () => {
+    vi.stubGlobal('indexedDB', undefined)
     const metadata = await vi.importActual<
       typeof import('@/features/sync/data/sync-metadata-store')
     >('@/features/sync/data/sync-metadata-store')
@@ -4180,7 +4310,24 @@ function readRegisteredHandler(method: string) {
   const handler = backgroundMocks.handlers.get(method)
   expect(handler).toBeDefined()
 
-  return handler!
+  return (message: Parameters<NonNullable<typeof handler>>[0]) => {
+    if (
+      [
+        'backup.resetLocalData',
+        'problems.resetProblemData',
+        'problems.deleteProblem',
+        'problems.bulkDelete',
+        'practice.resetSchedule',
+      ].includes(method)
+    ) {
+      const data = message.data as Record<string, unknown>
+      return handler!({
+        ...message,
+        data: { commandId: crypto.randomUUID(), ...data },
+      })
+    }
+    return handler!(message)
+  }
 }
 
 function sendRuntimeMessage(

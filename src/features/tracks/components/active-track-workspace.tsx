@@ -1,3 +1,4 @@
+import type { ProblemDataConfirmation } from '@/features/problems'
 import {
   CalendarClock,
   ChevronLeft,
@@ -35,6 +36,7 @@ export type RenderTrackEditAction = (track: SerializedTrack) => ReactNode
 export function ActiveTrackWorkspace({
   activeTrack,
   groups,
+  confirmation,
   renderEditProblemAction,
   renderEditTrackAction,
   rows,
@@ -45,6 +47,7 @@ export function ActiveTrackWorkspace({
   dueCount: number
   generatedAt: string
   groups: readonly SerializedTrackGroup[]
+  confirmation: ProblemDataConfirmation
   renderEditProblemAction: RenderProblemEditAction
   renderEditTrackAction: RenderTrackEditAction
   rows: readonly TrackProblemRow[]
@@ -87,6 +90,7 @@ export function ActiveTrackWorkspace({
       ) : (
         <TrackProblemTable
           key={`${activeTrack.track.id}:${activeGroupId}`}
+          confirmation={confirmation}
           renderEditProblemAction={renderEditProblemAction}
           rows={activeRows}
         />

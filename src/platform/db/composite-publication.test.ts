@@ -299,3 +299,124 @@ it('rejects a changed base and reconciles a committed replacement after lost rea
   })
   expect((await local.readHead())!.revision).toBe(committed.revision)
 })
+
+it.each(['historical', 'unbound-new-dataset', 'prepared-new-dataset'] as const)(
+  'preserves only descriptor-bound fresh scope tokens, rotating %s scopes otherwise',
+  async (provenance) => {
+    vi.stubGlobal('IDBKeyRange', IDBKeyRange)
+    const factory = new IDBFactory()
+    const local = createLocalIdbStore(factory)
+    const store = createSnapshotIdbStore(factory)
+    const handle = await core('scope-problem')
+    await store.commitSnapshot(serializeDb(handle), 'test', new Date())
+    const head = (await local.readHead())!
+    const descriptor = {
+      baseRevision: head.revision,
+      coreSnapshotId: 'scope-core',
+      archiveGeneration: 'scope-archive',
+      datasetToken: 'fresh-dataset',
+      replacementId: 'scope-replacement',
+      initializedProblemScopes: [
+        { problemSlug: 'scope-problem', problemToken: 'prepared-token' },
+      ],
+    }
+    await local.transact(['problemScopes'], 'readwrite', (s, done) => {
+      s.problemScopes.put(
+        {
+          datasetToken:
+            provenance === 'historical'
+              ? head.datasetToken
+              : descriptor.datasetToken,
+          problemToken:
+            provenance === 'unbound-new-dataset'
+              ? 'unbound-token'
+              : 'prepared-token',
+        },
+        [descriptor.archiveGeneration, 'scope-problem'],
+      )
+      done(undefined)
+    })
+    const publication = createCompositePublication(local, 'test')
+    const candidate = { handle, descriptor }
+    await publication.prepare(candidate, () =>
+      local.writeTechnicalRecord(
+        ['archive-generation', descriptor.archiveGeneration],
+        { status: 'ready' },
+      ),
+    )
+    await publication.publishCompositeCandidate(candidate, {
+      kind: 'restore',
+      replacementId: descriptor.replacementId,
+    })
+    const scope = await local.transact<
+      { datasetToken: string; problemToken: string },
+      'problemScopes'
+    >(['problemScopes'], 'readonly', (s, done) => {
+      const request = s.problemScopes.get([
+        descriptor.archiveGeneration,
+        'scope-problem',
+      ])
+      request.onsuccess = () =>
+        done(request.result as { datasetToken: string; problemToken: string })
+    })
+    expect(scope.datasetToken).toBe(descriptor.datasetToken)
+    if (provenance === 'prepared-new-dataset')
+      expect(scope.problemToken).toBe('prepared-token')
+    else
+      expect(scope.problemToken).not.toBe(
+        provenance === 'historical' ? 'prepared-token' : 'unbound-token',
+      )
+  },
+)
+
+it.each(['missing', 'mismatched'] as const)(
+  'rejects %s descriptor-bound Clear scope staging without changing the active pair',
+  async (failure) => {
+    vi.stubGlobal('IDBKeyRange', IDBKeyRange)
+    const factory = new IDBFactory()
+    const local = createLocalIdbStore(factory)
+    const store = createSnapshotIdbStore(factory)
+    const handle = await core('clear-scope')
+    await store.commitSnapshot(serializeDb(handle), 'test', new Date())
+    const head = (await local.readHead())!
+    const descriptor = {
+      baseRevision: head.revision,
+      coreSnapshotId: 'clear-core',
+      archiveGeneration: 'clear-archive',
+      datasetToken: 'clear-dataset',
+      replacementId: 'clear-operation',
+      commandFingerprint: 'clear-request',
+      initializedProblemScopes: [
+        { problemSlug: 'clear-scope', problemToken: 'prepared-clear-token' },
+      ],
+    }
+    if (failure === 'mismatched')
+      await local.transact(['problemScopes'], 'readwrite', (s, done) => {
+        s.problemScopes.put(
+          {
+            datasetToken: descriptor.datasetToken,
+            problemToken: 'unexpected-token',
+          },
+          [descriptor.archiveGeneration, 'clear-scope'],
+        )
+        done(undefined)
+      })
+    const publication = createCompositePublication(local, 'test')
+    const candidate = { handle, descriptor }
+    await publication.prepare(candidate, () =>
+      local.writeTechnicalRecord(
+        ['archive-generation', descriptor.archiveGeneration],
+        { status: 'ready' },
+      ),
+    )
+    await expect(
+      publication.publishCompositeCandidate(candidate, {
+        kind: 'reset',
+        replacementId: descriptor.replacementId,
+        commandFingerprint: descriptor.commandFingerprint,
+      }),
+    ).rejects.toThrow('Prepared Clear scope')
+    expect(await local.readHead()).toEqual(head)
+    expect(await store.readContinuation()).toBeNull()
+  },
+)

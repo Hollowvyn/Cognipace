@@ -52,6 +52,7 @@ const methodSurfaceAccess = {
   'problems.getProblemForEdit': ['dashboard'],
   'problems.createProblem': ['dashboard'],
   'problems.updateProblem': ['dashboard'],
+  'problems.resetProblemData': ['dashboard'],
   'problems.deleteProblem': ['dashboard'],
   'problems.bulkUpdateProblems': ['dashboard'],
   'problems.bulkDelete': ['dashboard'],

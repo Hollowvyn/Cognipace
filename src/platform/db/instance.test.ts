@@ -187,6 +187,12 @@ describe('committed snapshot publication', () => {
     const finishSyncMetadata = vi.fn().mockResolvedValue(undefined)
     const coordinator = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: async () => {
+        const handle = await getAppDb({ snapshotStore: store })
+        expect(Buffer.from(serializeDb(handle))).toEqual(
+          Buffer.from((await store.readActive())!.bytes),
+        )
+      },
       resume: () => ({ onDurable, finishSyncMetadata }),
     })
     await coordinator.ready()

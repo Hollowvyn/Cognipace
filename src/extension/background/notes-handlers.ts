@@ -15,7 +15,12 @@ type Service = ReturnType<typeof createNotesService>
 export interface NotesHandlerDependencies {
   getService(): Promise<Service>
   getLeases(): ReturnType<typeof createNotesEditScopes>
-  run<T>(work: () => Promise<T>): Promise<T>
+  runRead<T>(work: () => Promise<T>): Promise<T>
+  runMutation<T>(work: () => Promise<T>): Promise<T>
+  // Trusted runtime admission check, evaluated inside this queue callback.
+  // Never derived from request fields or a global mutation-depth flag.
+  canMutate(): boolean
+  now?: () => number
   emit(
     problemSlug: string,
     source: 'dashboard' | 'content-script',
@@ -23,6 +28,12 @@ export interface NotesHandlerDependencies {
   ): Promise<unknown>
 }
 export function registerNotesHandlers(deps: NotesHandlerDependencies) {
+  const outboxRetryDelayMs = 1000
+  const deliveryAttempts = new Map<
+    string,
+    { emitted: boolean; retryAt: number }
+  >()
+
   function authorize(
     method: NotesMethod,
     surface: 'dashboard' | 'content-script',
@@ -37,15 +48,42 @@ export function registerNotesHandlers(deps: NotesHandlerDependencies) {
     service: Service,
     source: 'dashboard' | 'content-script',
   ) {
-    // A failed delivery retains the compact durable outbox. Never reexecute a
-    // committed command merely to retry a cache or sync notification.
+    // Reads may perform these technical writes only after the trusted runtime
+    // independently proves full mutation admission in this same queue callback.
+    if (!deps.canMutate()) return
     try {
-      for (const pending of await service.listPendingInvalidations()) {
-        await deps.emit(pending.problemSlug, source, pending.tags)
-        await service.acknowledgeInvalidation(pending.key)
+      const pendingRows = await service.listPendingInvalidations()
+      const keys = new Set(pendingRows.map((row) => JSON.stringify(row.key)))
+      for (const key of deliveryAttempts.keys())
+        if (!keys.has(key)) deliveryAttempts.delete(key)
+      for (const pending of pendingRows) {
+        const key = JSON.stringify(pending.key)
+        const now = deps.now?.() ?? performance.now()
+        const attempt = deliveryAttempts.get(key) ?? {
+          emitted: false,
+          retryAt: 0,
+        }
+        if (now < attempt.retryAt) continue
+        // Set cooldown before delivery: partial success can already schedule a
+        // refetch even if another recipient makes emit reject.
+        attempt.retryAt = now + outboxRetryDelayMs
+        deliveryAttempts.set(key, attempt)
+        try {
+          if (!attempt.emitted) {
+            await deps.emit(pending.problemSlug, source, pending.tags)
+            attempt.emitted = true
+          }
+          // A delivered event is never emitted again just because its durable
+          // acknowledgement aborted. Later operations retry only that ack.
+          await service.acknowledgeInvalidation(pending.key)
+          deliveryAttempts.delete(key)
+        } catch {
+          // The durable outbox remains. Retry after cooldown on a later
+          // authorized operation, or retry safely in a fresh worker.
+        }
       }
     } catch {
-      /* Retry on the next authorized Notes operation. */
+      // Failed outbox reads retain all durable work for a later operation.
     }
   }
   onMessage('notes.openEditor', ({ data, sender }) => {
@@ -53,7 +91,7 @@ export function registerNotesHandlers(deps: NotesHandlerDependencies) {
     const request = schema.request.parse(data)
     authorize('notes.openEditor', request.surface, sender, request.problemSlug)
     const owner = notesEditOwner(request.surface, sender)
-    return deps.run(async () => {
+    return deps.runMutation(async () => {
       const service = await deps.getService()
       await drain(service, request.surface)
       const document = await service.readDocument(
@@ -72,7 +110,7 @@ export function registerNotesHandlers(deps: NotesHandlerDependencies) {
     const request = schema.request.parse(data)
     authorize('notes.saveDocument', request.surface, sender)
     const owner = notesEditOwner(request.surface, sender)
-    return deps.run(async () => {
+    return deps.runMutation(async () => {
       await deps.getLeases().assert(request.editLeaseId, owner, request.command)
       const service = await deps.getService()
       const result = schema.result.parse(
@@ -87,7 +125,7 @@ export function registerNotesHandlers(deps: NotesHandlerDependencies) {
     const request = schema.request.parse(data)
     authorize('notes.setSavedAiNote', request.surface, sender)
     const owner = notesEditOwner(request.surface, sender)
-    return deps.run(async () => {
+    return deps.runMutation(async () => {
       await deps.getLeases().assert(request.editLeaseId, owner, {
         ...request.command,
         target: { kind: 'problem' },
@@ -109,11 +147,13 @@ export function registerNotesHandlers(deps: NotesHandlerDependencies) {
       sender,
       request.problemSlug,
     )
-    return deps.run(async () => {
+    return deps.runRead(async () => {
       const service = await deps.getService()
       await drain(service, request.surface)
       return schema.result.parse(
-        await service.getProblemNotes(request.problemSlug),
+        await service.getProblemNotes(request.problemSlug, {
+          readOnly: !deps.canMutate(),
+        }),
       )
     })
   })
@@ -131,10 +171,14 @@ export function registerNotesHandlers(deps: NotesHandlerDependencies) {
       request.cursor.problemSlug !== request.problemSlug
     )
       throw new Error('Submission cursor does not match the problem.')
-    return deps.run(async () => {
+    return deps.runRead(async () => {
       const service = await deps.getService()
       await drain(service, request.surface)
-      const scope = await service.acquireScope(request.problemSlug)
+      const scope = deps.canMutate()
+        ? await service.acquireScope(request.problemSlug)
+        : await service.readScope(request.problemSlug)
+      if (!scope)
+        throw new Error('Notes scope is unavailable until saving finishes.')
       if (
         request.cursor &&
         (request.cursor.scope.datasetToken !== scope.datasetToken ||
@@ -165,7 +209,7 @@ export function registerNotesHandlers(deps: NotesHandlerDependencies) {
       sender,
       request.problemSlug,
     )
-    return deps.run(async () => {
+    return deps.runRead(async () => {
       const service = await deps.getService()
       await drain(service, request.surface)
       return schema.result.parse(
@@ -185,7 +229,7 @@ export function registerNotesHandlers(deps: NotesHandlerDependencies) {
       sender,
       request.problemSlug,
     )
-    return deps.run(async () => {
+    return deps.runRead(async () => {
       const service = await deps.getService()
       await drain(service, request.surface)
       return schema.result.parse(

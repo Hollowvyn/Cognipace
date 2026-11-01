@@ -41,8 +41,8 @@ export function useRestoreFullBackup() {
 }
 
 export function useResetLocalData() {
-  return useBackupReplacementAction(() =>
-    sendMessage('backup.resetLocalData', { surface: 'dashboard' }),
+  return useBackupReplacementAction((commandId: string) =>
+    sendMessage('backup.resetLocalData', { surface: 'dashboard', commandId }),
   )
 }
 
@@ -83,7 +83,7 @@ function useBackupReplacementAction<TVariables = void>(
         queryKeys.backup.pendingReplacement(),
         pendingState,
       )
-      if (result.status === 'durable') {
+      if (result.status === 'durable' && !result.syncMetadataPending) {
         void invalidateTaggedQueries(queryClient, broadBackupInvalidationTags)
       }
     },

@@ -88,6 +88,7 @@ export interface SetPracticeSuspendedInput {
 export interface ResetPracticeScheduleInput {
   problemSlug: ProblemSlug
   keepLog?: boolean | undefined
+  clearSuspension?: boolean | undefined
 }
 
 export interface ReviewResult {

@@ -1,3 +1,13 @@
+import {
+  replacementCommandKey,
+  replacementCommandRecordSchema,
+} from '@/platform/db/snapshot-idb'
+import {
+  prepareProblemDataReplacement,
+  problemDataRequestFingerprint,
+  type ProblemDataReplacementInput,
+} from './problem-data-service'
+import { problemsResetProblemDataRequestSchema } from '@/features/problems/api/problems-contracts'
 import { registerNotesHandlers } from './notes-handlers'
 import { createNotesEditScopes } from './notes-edit-scopes'
 import { createNotesRepository } from '@/features/notes/data/notes-repository'
@@ -34,6 +44,7 @@ import {
   backupFileSchema,
   backupPayloadRequestSchema,
   backupRequestSchema,
+  backupResetRequestSchema,
   backupSummarySchema,
   backupReplacementResultSchema,
   backupReplacementStateSchema,
@@ -47,7 +58,6 @@ import {
   openDashboardRequestSchema,
   pingRequestSchema,
   problemBulkUpdateResponseSchema,
-  problemDeleteResponseSchema,
   problemForEditResponseSchema,
   problemLibraryResponseSchema,
   problemsBulkDeleteRequestSchema,
@@ -116,7 +126,6 @@ import {
 } from '@/features/genai/api/hint-connection-contracts'
 import {
   exportFullBackup,
-  resetLocalData,
   prepareFullBackupRestore,
   restorePreparedFullBackup,
   validateFullBackup,
@@ -162,14 +171,11 @@ import {
   getPracticeDetails,
   previewPracticeReview,
   executePracticeReviewCommand,
-  resetPracticeSchedule,
   setPracticeSuspended,
 } from '@/features/practice/server/practice-service'
 import {
-  bulkDeleteProblems,
   bulkUpdateProblems,
   createProblem,
-  deleteProblem,
   getProblemForEdit,
   getProblemLibrary,
   updateProblem,
@@ -244,6 +250,7 @@ import {
 } from './runtime-policy'
 import {
   getBackgroundDb as getAppDb,
+  verifyBackgroundReplacementAdoption,
   withBackgroundDb,
   withBackgroundDbLoader,
 } from './app-db'
@@ -262,6 +269,7 @@ const replacementStore =
     : createSnapshotIdbStore(indexedDB)
 const backupReplacement = createBackupReplacementCoordinator({
   ...(replacementStore ? { store: replacementStore } : {}),
+  resumeAdoption: verifyBackgroundReplacementAdoption,
   resume: (record: ReplacementContinuation) => ({
     onDurable: () => broadcastDataManagementInvalidation('dashboard'),
     finishSyncMetadata: async () => {
@@ -288,6 +296,7 @@ const backupReplacement = createBackupReplacementCoordinator({
 configureMutationQueue({
   ready: () => backupReplacement.ready(),
   assertIdle: () => backupReplacement.assertIdle(),
+  assertReadable: () => backupReplacement.assertReadable(),
   flush: flushDbSnapshot,
   waitForPendingCoreSave: waitForPendingDbSnapshot,
 })
@@ -359,6 +368,101 @@ export function registerBackgroundHandlers() {
     if (!notesLocal) throw new Error('Local Notes storage is unavailable.')
     return notesLocal
   }
+  const acceptedProblemOperations = new Map<
+    string,
+    {
+      fingerprint: string
+      result: import('@/features/backup/api/backup-contracts').BackupReplacementResult
+    }
+  >()
+  function runProblemDataReplacement(
+    input: Omit<ProblemDataReplacementInput, 'commandId'> & {
+      commandId?: string | undefined
+    },
+    surface: 'dashboard' | 'popup' | 'content-script',
+  ) {
+    if (!input.commandId)
+      throw new Error(
+        'Refresh required: reload CogniPace before resetting or deleting problem data.',
+      )
+    const commandId = input.commandId
+    const fingerprint = problemDataRequestFingerprint(input)
+    return runInMutationQueue(async () => {
+      await backupReplacement.ready()
+      const completed = await requireNotesLocal().readRecord(
+        replacementCommandKey(commandId),
+      )
+      if (completed !== undefined) {
+        const command = replacementCommandRecordSchema.parse(completed)
+        if (
+          command.requestFingerprint !== fingerprint ||
+          command.kind !== input.kind
+        )
+          throw new Error(
+            'Problem data command identity conflict. Refresh and try again.',
+          )
+        const continuation = await replacementStore?.readContinuation()
+        if (continuation?.replacementId === commandId)
+          return backupReplacementResultSchema.parse(
+            await backupReplacement.retry(),
+          )
+        return backupReplacementResultSchema.parse({
+          status: 'durable',
+          kind: input.kind,
+          summary: null,
+          syncMetadataPending: false,
+        })
+      }
+      const accepted = acceptedProblemOperations.get(commandId)
+      if (accepted) {
+        if (accepted.fingerprint !== fingerprint)
+          throw new Error(
+            'Problem data command identity conflict. Refresh and try again.',
+          )
+        if (backupReplacement.getState().status !== 'idle') {
+          accepted.result = backupReplacementResultSchema.parse(
+            await backupReplacement.retry(),
+          )
+        } else {
+          accepted.result = backupReplacementResultSchema.parse({
+            status: 'durable',
+            kind: input.kind,
+            summary: null,
+            syncMetadataPending: false,
+          })
+        }
+        return accepted.result
+      }
+      backupReplacement.assertIdle()
+      await resumePendingLocalSave()
+      await getAppDb()
+      await markSyncLocalDataChanged()
+      hasPendingDirtyMarkRetry = false
+      const result = backupReplacementResultSchema.parse(
+        await backupReplacement.run({
+          kind: input.kind,
+          prepare: () =>
+            prepareProblemDataReplacement(requireNotesLocal(), {
+              ...input,
+              commandId,
+            }),
+          onDurable: async () => {
+            clearPendingImportPersistence()
+            recoveredReviewRetry = null
+            clearRecoveredMutationRetry()
+            await broadcastDataManagementInvalidation(surface)
+          },
+          finishSyncMetadata: async () => {
+            await markSyncLocalDataChanged()
+            hasPendingDirtyMarkRetry = false
+            await scheduleAutoPushAfterMutationBestEffort()
+          },
+        }),
+      )
+      acceptedProblemOperations.set(commandId, { fingerprint, result })
+      return result
+    })
+  }
   const notesLeases = () => createNotesEditScopes(requireNotesLocal())
   registerNotesHandlers({
     getService: async () => {
@@ -373,7 +477,18 @@ export function registerBackgroundHandlers() {
       )
     },
     getLeases: notesLeases,
-    run: runConsistentRead,
+    runRead: runConsistentRead,
+    runMutation: runGatedMutationQueue,
+    // This check runs inside the same serialized callback as any legacy idle
+    // technical side effects; relaxed read admission alone never permits writes.
+    canMutate: () => {
+      try {
+        backupReplacement.assertIdle()
+        return true
+      } catch {
+        return false
+      }
+    },
     emit: async (problemSlug, source, tags) => {
       await markSyncLocalDataChanged()
       await broadcastCacheInvalidation({
@@ -479,7 +594,7 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runConsistentRead(async () => {
+    return runGatedMutationQueue(async () => {
       const { db } = await getAppDb()
       return backupFileSchema.parse(await exportFullBackup(db))
     })
@@ -761,37 +876,17 @@ export function registerBackgroundHandlers() {
   })
 
   onMessage('backup.resetLocalData', ({ data, sender }) => {
-    const request = backupRequestSchema.parse(data)
+    const request = backupResetRequestSchema.parse(data)
 
     assertCanSenderCallExtensionMethod(
       'backup.resetLocalData',
       request.surface,
       sender,
     )
-    return runGatedMutationQueue(async () => {
-      const { db } = await getAppDb()
-      await markSyncLocalDataChanged()
-      hasPendingDirtyMarkRetry = false
-      return backupReplacementResultSchema.parse(
-        await backupReplacement.run({
-          kind: 'reset',
-          ...(replacementStore
-            ? {
-                beforeCommit: beginDbReplacement,
-                abortCommit: abortDbReplacement,
-              }
-            : {}),
-          commit: async () => {
-            await resetLocalData(db)
-            clearPendingImportPersistence()
-            recoveredReviewRetry = null
-            clearRecoveredMutationRetry()
-            return null
-          },
-          ...createLocalReplacementContinuations(request.surface),
-        }),
-      )
-    })
+    return runProblemDataReplacement(
+      { kind: 'reset', problemSlugs: [], commandId: request.commandId },
+      request.surface,
+    )
   })
 
   onMessage('backup.getPendingReplacement', ({ data, sender }) => {
@@ -912,6 +1007,23 @@ export function registerBackgroundHandlers() {
     )
   })
 
+  onMessage('problems.resetProblemData', ({ data, sender }) => {
+    const request = problemsResetProblemDataRequestSchema.parse(data)
+    assertCanSenderCallExtensionMethod(
+      'problems.resetProblemData',
+      request.surface,
+      sender,
+    )
+    return runProblemDataReplacement(
+      {
+        kind: 'problem-reset',
+        problemSlugs: request.problemSlugs,
+        commandId: request.commandId,
+      },
+      request.surface,
+    )
+  })
+
   onMessage('problems.deleteProblem', ({ data, sender }) => {
     const request = problemsDeleteProblemRequestSchema.parse(data)
 
@@ -920,16 +1032,13 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) =>
-        problemDeleteResponseSchema.parse(await deleteProblem(db, request)),
-      () =>
-        broadcastProblemCatalogInvalidation({
-          problemSlug: request.problemSlug,
-          source: request.surface,
-          archive: true,
-        }),
-      { retryKey: mutationRetryKey('problems.deleteProblem', request) },
+    return runProblemDataReplacement(
+      {
+        kind: 'problem-delete',
+        problemSlugs: [request.problemSlug],
+        commandId: request.commandId,
+      },
+      request.surface,
     )
   })
 
@@ -963,18 +1072,13 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) =>
-        problemDeleteResponseSchema.parse(
-          await bulkDeleteProblems(db, request),
-        ),
-      () =>
-        broadcastProblemCatalogInvalidation({
-          problemSlug: readSingleChangedProblemSlug(request.problemSlugs),
-          source: request.surface,
-          archive: true,
-        }),
-      { retryKey: mutationRetryKey('problems.bulkDelete', request) },
+    return runProblemDataReplacement(
+      {
+        kind: 'problem-delete',
+        problemSlugs: request.problemSlugs,
+        commandId: request.commandId,
+      },
+      request.surface,
     )
   })
 
@@ -1081,21 +1185,13 @@ export function registerBackgroundHandlers() {
       request.surface,
       sender,
     )
-    return runDbMutation(
-      async (db) => {
-        const details = await resetPracticeSchedule(db, {
-          problemSlug: request.problemSlug,
-          keepLog: request.keepLog,
-        })
-
-        return serializePracticeDetails(details)
+    return runProblemDataReplacement(
+      {
+        kind: 'problem-reset',
+        problemSlugs: [request.problemSlug],
+        commandId: request.commandId,
       },
-      () =>
-        broadcastPracticeInvalidation({
-          problemSlug: request.problemSlug,
-          source: request.surface,
-        }),
-      { retryKey: mutationRetryKey('practice.resetSchedule', request) },
+      request.surface,
     )
   })
 
@@ -2089,7 +2185,9 @@ function broadcastSyncInvalidation(source: 'dashboard') {
   })
 }
 
-function broadcastDataManagementInvalidation(source: 'dashboard') {
+function broadcastDataManagementInvalidation(
+  source: 'dashboard' | 'popup' | 'content-script',
+) {
   return broadcastCacheInvalidation({
     hintConnectionReset: true,
     reason: 'problem-catalog-updated',

@@ -1,3 +1,6 @@
+import { createLocalIdbStore } from '@/platform/db/local-idb'
+import type { ReplacementContinuation } from '@/platform/db/snapshot-idb'
+import { serializeDb } from '@/platform/db/snapshot'
 import { reconcileTopicTaxonomy } from '@/features/problems/data/topic-reconciliation'
 import {
   preparePracticeStorage,
@@ -67,4 +70,48 @@ export async function withBackgroundDbLoader<T>(
     finished = true
     leases.forEach((lease) => lease.release())
   }
+}
+
+/** Reconstructed bookkeeping must verify the opened handle against the active
+ * core/archive head before the coordinator can admit paired readers. */
+export function verifyBackgroundReplacementAdoption(
+  record: ReplacementContinuation,
+) {
+  return withBackgroundDb(async (handle) => {
+    if (typeof indexedDB === 'undefined')
+      throw new Error('Replacement storage is unavailable.')
+    const local = createLocalIdbStore(indexedDB)
+    const head = await local.readHead()
+    if (
+      !head ||
+      head.replacementId !== record.replacementId ||
+      head.revision < record.committedRevision
+    )
+      throw new Error(
+        'Replacement active pair does not match its continuation.',
+      )
+    const bytes = await local.readCore(head.coreSnapshotId)
+    const current = serializeDb(handle)
+    if (
+      !bytes ||
+      bytes.length !== current.length ||
+      !bytes.every((byte, index) => byte === current[index])
+    )
+      throw new Error(
+        'Replacement current handle does not match its active core snapshot.',
+      )
+    const verified = await local.readHead()
+    if (
+      !verified ||
+      verified.revision !== head.revision ||
+      verified.coreSnapshotId !== head.coreSnapshotId ||
+      verified.archiveGeneration !== head.archiveGeneration ||
+      verified.datasetToken !== head.datasetToken ||
+      verified.fingerprint !== head.fingerprint ||
+      verified.replacementId !== head.replacementId
+    )
+      throw new Error(
+        'Replacement active pair changed during handle verification.',
+      )
+  })
 }

@@ -26,6 +26,7 @@ import type {
   BackupFile,
   BackupPayloadRequest,
   BackupRequest,
+  BackupResetRequest,
   BackupSummary,
   BackupReplacementState,
   BackupReplacementResult,
@@ -34,6 +35,7 @@ export {
   backupFileSchema,
   backupPayloadRequestSchema,
   backupRequestSchema,
+  backupResetRequestSchema,
   backupSummarySchema,
   backupReplacementStateSchema,
   backupReplacementResultSchema,
@@ -118,6 +120,7 @@ import {
   type ProblemForEditResponse,
   type ProblemLibraryResponse,
   type ProblemsBulkDeleteRequest,
+  type ProblemsResetProblemDataRequest,
   type ProblemsBulkUpdateProblemsRequest,
   type ProblemsCreateProblemRequest,
   type ProblemsDeleteProblemRequest,
@@ -133,6 +136,7 @@ export {
   problemForEditResponseSchema,
   problemLibraryResponseSchema,
   problemsBulkDeleteRequestSchema,
+  problemsResetProblemDataRequestSchema,
   problemsBulkUpdateProblemsRequestSchema,
   problemsCreateProblemRequestSchema,
   problemsDeleteProblemRequestSchema,
@@ -375,7 +379,7 @@ export interface ProtocolMap {
   'backup.restoreFullBackup'(
     request: BackupPayloadRequest,
   ): BackupReplacementResult
-  'backup.resetLocalData'(request: BackupRequest): BackupReplacementResult
+  'backup.resetLocalData'(request: BackupResetRequest): BackupReplacementResult
   'backup.getPendingReplacement'(request: BackupRequest): BackupReplacementState
   'backup.retryPendingReplacement'(
     request: BackupRequest,
@@ -446,6 +450,9 @@ export interface ProtocolMap {
   'problems.updateProblem'(
     request: ProblemsUpdateProblemRequest,
   ): ProblemForEditResponse
+  'problems.resetProblemData'(
+    request: ProblemsResetProblemDataRequest,
+  ): BackupReplacementResult
   'problems.deleteProblem'(
     request: ProblemsDeleteProblemRequest,
   ): ProblemDeleteResponse
@@ -472,7 +479,7 @@ export interface ProtocolMap {
   ): SerializedPracticeDetails
   'practice.resetSchedule'(
     request: PracticeResetScheduleRequest,
-  ): SerializedPracticeDetails
+  ): BackupReplacementResult
   'queue.getTodayQueue'(request: QueueRequest): SerializedTodayQueue
   'tracks.getActiveTrack'(
     request: TracksGetActiveTrackRequest,
@@ -557,6 +564,7 @@ export const protocolMethodNames = [
   'problems.createProblem',
   'problems.updateProblem',
   'problems.deleteProblem',
+  'problems.resetProblemData',
   'problems.bulkUpdateProblems',
   'problems.bulkDelete',
   'practice.saveReviewResult',

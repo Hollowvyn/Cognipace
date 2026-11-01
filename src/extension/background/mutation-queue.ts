@@ -3,6 +3,7 @@
 type MutationQueueDependencies = {
   ready: () => Promise<unknown>
   assertIdle: () => void
+  assertReadable?: () => void
   flush: () => Promise<void>
   waitForPendingCoreSave: () => Promise<void>
 }
@@ -73,22 +74,35 @@ export function runGatedMutationQueue<T>(
   return runInMutationQueue(async () => {
     await dependencies.ready()
     dependencies.assertIdle()
-    await resumePendingLocalSave()
-    try {
-      await dependencies.waitForPendingCoreSave()
-    } catch (error) {
-      setPendingLocalSave(() => Promise.resolve())
-      throw new Error(localSaveError, { cause: error })
-    }
+    await admitPriorCoreSave()
     if (recoveredGenericRetry?.key !== retryKey) recoveredGenericRetry = null
     return work()
   })
 }
 
-// Mixed core/archive reads and exports must observe the same durability gates
-// as writes. Do not use a second read queue or bypass a pending replacement.
+// Mixed core/archive reads stay on the same queue and still join pending core
+// publication. Once the current pair is durable and adopted, bookkeeping may
+// remain pending without breaking notification-triggered read-only refetches.
+// Exports intentionally use runGatedMutationQueue and retain the full write gate.
 export function runConsistentRead<T>(read: () => Promise<T>) {
-  return runGatedMutationQueue(read)
+  return runInMutationQueue(async () => {
+    await dependencies.ready()
+    const assertReadable =
+      dependencies.assertReadable ?? dependencies.assertIdle
+    assertReadable()
+    await admitPriorCoreSave()
+    return read()
+  })
+}
+
+async function admitPriorCoreSave() {
+  await resumePendingLocalSave()
+  try {
+    await dependencies.waitForPendingCoreSave()
+  } catch (error) {
+    setPendingLocalSave(() => Promise.resolve())
+    throw new Error(localSaveError, { cause: error })
+  }
 }
 
 export async function resumePendingLocalSave() {

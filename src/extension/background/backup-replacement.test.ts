@@ -39,6 +39,7 @@ describe('backup replacement coordinator', () => {
     const replacement = work()
     const resumed = createBackupReplacementCoordinator({
       store: createSnapshotIdbStore(testIndexedDB, databaseName),
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -71,6 +72,7 @@ describe('backup replacement coordinator', () => {
       )
     const coordinator = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -85,6 +87,7 @@ describe('backup replacement coordinator', () => {
     const reopenedStore = createSnapshotIdbStore(testIndexedDB, databaseName)
     const reopened = createBackupReplacementCoordinator({
       store: reopenedStore,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -117,6 +120,7 @@ describe('backup replacement coordinator', () => {
     })
     const initial = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -129,6 +133,7 @@ describe('backup replacement coordinator', () => {
     expect((await direct.readContinuation())?.needsInvalidation).toBe(false)
     const reopened = createBackupReplacementCoordinator({
       store: direct,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -165,6 +170,7 @@ describe('backup replacement coordinator', () => {
     )
     const initial = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -177,6 +183,7 @@ describe('backup replacement coordinator', () => {
     expect((await direct.readContinuation())?.needsSyncMetadata).toBe(false)
     const reopened = createBackupReplacementCoordinator({
       store: direct,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -217,6 +224,7 @@ describe('backup replacement coordinator', () => {
       .mockRejectedValueOnce(new Error('readback unavailable'))
     const initial = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -229,6 +237,7 @@ describe('backup replacement coordinator', () => {
     expect(await direct.readContinuation()).toBeNull()
     const reopened = createBackupReplacementCoordinator({
       store: direct,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -259,6 +268,7 @@ describe('backup replacement coordinator', () => {
     )
     const initial = createBackupReplacementCoordinator({
       store,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -274,6 +284,7 @@ describe('backup replacement coordinator', () => {
     const reopenedStore = createSnapshotIdbStore(testIndexedDB, databaseName)
     const reopened = createBackupReplacementCoordinator({
       store: reopenedStore,
+      resumeAdoption: () => Promise.resolve(),
       resume: () => ({
         onDurable: replacement.onDurable,
         finishSyncMetadata: replacement.finishSyncMetadata,
@@ -304,6 +315,7 @@ describe('backup replacement coordinator', () => {
       kind: 'restore',
       summary: null,
     })
+    expect(() => coordinator.assertReadable()).toThrow('still needs saving')
     expect(() => coordinator.assertIdle()).toThrow(
       'Local data replacement still needs saving. Open Settings > Data Management and choose Retry saving.',
     )
@@ -421,6 +433,7 @@ it('retains a prepared candidate and adopts it on lost publication acknowledgeme
     syncMetadataPending: true,
   })
   expect(replacement.onDurable).not.toHaveBeenCalled()
+  expect(() => coordinator.assertReadable()).toThrow('still needs saving')
   expect(await coordinator.retry()).toMatchObject({
     status: 'durable',
     syncMetadataPending: false,
@@ -429,6 +442,7 @@ it('retains a prepared candidate and adopts it on lost publication acknowledgeme
   expect(replacement.commit).not.toHaveBeenCalled()
   expect(prepared.publish).toHaveBeenCalledTimes(1)
   expect(prepared.adopt).toHaveBeenCalledTimes(2)
+  expect(() => coordinator.assertReadable()).not.toThrow()
   expect(Array.from((await store.readActive())!.bytes)).toEqual([2])
 })
 

@@ -59,6 +59,11 @@ export const backupRequestSchema = z.strictObject({
   surface: z.literal('dashboard'),
 })
 
+export const backupResetRequestSchema = backupRequestSchema.extend({
+  commandId: z.string().trim().min(1).optional(),
+})
+export type BackupResetRequest = z.infer<typeof backupResetRequestSchema>
+
 export const backupPayloadRequestSchema = z.strictObject({
   surface: z.literal('dashboard'),
   backup: z.unknown(),
@@ -105,6 +110,8 @@ export const backupReplacementKindSchema = z.enum([
   'restore',
   'reset',
   'gist-pull',
+  'problem-reset',
+  'problem-delete',
 ])
 const pendingReplacementShape = {
   kind: backupReplacementKindSchema,
