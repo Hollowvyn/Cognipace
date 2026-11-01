@@ -3,6 +3,8 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { queryKeys } from './query-keys'
 
 export const cacheInvalidationTags = [
+  'notes',
+  'submissions',
   'analytics',
   'app-shell',
   'genai',
@@ -17,6 +19,8 @@ export const cacheInvalidationTags = [
 export type CacheInvalidationTag = (typeof cacheInvalidationTags)[number]
 
 const queryKeysByInvalidationTag = {
+  notes: [queryKeys.notes.all],
+  submissions: [queryKeys.submissions.all],
   analytics: [queryKeys.analytics.all],
   'app-shell': [queryKeys.appShell.all],
   genai: [queryKeys.genai.all, queryKeys.appShell.all],

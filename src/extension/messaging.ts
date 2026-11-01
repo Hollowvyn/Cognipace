@@ -1,4 +1,9 @@
 import type {
+  NotesRequest,
+  NotesResult,
+} from '@/features/notes/api/notes-contracts'
+export { notesRuntimeSchemas } from '@/features/notes/api/notes-contracts'
+import type {
   GenerateLeetCodeImplementationRequest,
   GenerateLeetCodeImplementationResponse,
 } from '@/features/leetcode-review-assistant/api/code-implementation-contracts'
@@ -237,6 +242,8 @@ export const uiSurfaceSchema = z.enum(['popup', 'dashboard', 'content-script'])
 export type UiSurface = z.infer<typeof uiSurfaceSchema>
 
 export const cacheInvalidationReasonSchema = z.enum([
+  'notes-updated',
+  'submissions-updated',
   'practice-updated',
   'problem-catalog-updated',
   'settings-updated',
@@ -335,6 +342,27 @@ export type LeetCodeSubmissionResultRemoteRuntimeRequest = z.infer<
 >
 
 export interface ProtocolMap {
+  'notes.openEditor'(
+    request: NotesRequest<'notes.openEditor'>,
+  ): NotesResult<'notes.openEditor'>
+  'notes.saveDocument'(
+    request: NotesRequest<'notes.saveDocument'>,
+  ): NotesResult<'notes.saveDocument'>
+  'notes.getProblemNotes'(
+    request: NotesRequest<'notes.getProblemNotes'>,
+  ): NotesResult<'notes.getProblemNotes'>
+  'notes.listSubmissions'(
+    request: NotesRequest<'notes.listSubmissions'>,
+  ): NotesResult<'notes.listSubmissions'>
+  'notes.getSubmission'(
+    request: NotesRequest<'notes.getSubmission'>,
+  ): NotesResult<'notes.getSubmission'>
+  'notes.getAssessment'(
+    request: NotesRequest<'notes.getAssessment'>,
+  ): NotesResult<'notes.getAssessment'>
+  'notes.setSavedAiNote'(
+    request: NotesRequest<'notes.setSavedAiNote'>,
+  ): NotesResult<'notes.setSavedAiNote'>
   'analytics.getSummary'(
     request: AnalyticsSummaryRequest,
   ): SerializedAnalyticsSummary
@@ -478,6 +506,13 @@ export interface ProtocolMap {
 }
 
 export const protocolMethodNames = [
+  'notes.openEditor',
+  'notes.saveDocument',
+  'notes.getProblemNotes',
+  'notes.listSubmissions',
+  'notes.getSubmission',
+  'notes.getAssessment',
+  'notes.setSavedAiNote',
   'analytics.getSummary',
   'cache.invalidate',
   'runtime.ping',

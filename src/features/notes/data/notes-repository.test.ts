@@ -308,3 +308,207 @@ describe('notes durable commands', () => {
     }
   })
 })
+
+describe('saved AI owner and selected reads', () => {
+  it('replays original applied revision with current inclusion, independent of document revision', async () => {
+    const c = await createNotesTestContext()
+    try {
+      const archive = await makeNotesArchive()
+      const h = (await c.localStore.readHead())!
+      await c.localStore.transact(
+        ['analysisReports', 'payloads', 'submissions'],
+        'readwrite',
+        (s, done) => {
+          for (const row of archive.assessments)
+            s.analysisReports.put(
+              { ...row, archiveGeneration: h.archiveGeneration },
+              [h.archiveGeneration, row.id],
+            )
+          for (const row of archive.payloads) s.payloads.put(row, row.id)
+          for (const row of archive.submissions)
+            s.submissions.put(
+              { ...row, archiveGeneration: h.archiveGeneration },
+              [h.archiveGeneration, row.id],
+            )
+          done(undefined)
+        },
+      )
+      const scope = await c.repository.acquireScope('two-sum')
+      const command = {
+        commandId: 'include',
+        problemSlug: 'two-sum',
+        scope,
+        assessmentId: 'assessment-1',
+        expectedCollectionRevision: 0,
+        saved: true,
+      }
+      expect(await c.repository.setSavedAiNote(command)).toMatchObject({
+        status: 'saved',
+        appliedRevision: 1,
+        collectionRevision: 1,
+        saved: true,
+      })
+      await c.repository.setSavedAiNote({
+        ...command,
+        commandId: 'remove',
+        expectedCollectionRevision: 1,
+        saved: false,
+      })
+      expect(await c.repository.setSavedAiNote(command)).toMatchObject({
+        status: 'saved',
+        appliedRevision: 1,
+        collectionRevision: 2,
+        saved: false,
+      })
+      expect(
+        (await c.repository.getProblemNotes('two-sum')).document.revision,
+      ).toBe(0)
+      expect(
+        await c.repository.readAssessment('two-sum', 'assessment-1'),
+      ).toMatchObject({
+        feedback: archive.payloads[1]!.body,
+        implementation: archive.payloads[2]!.body,
+      })
+      expect(
+        await c.repository.readAssessment('other', 'assessment-1'),
+      ).toBeNull()
+      expect(
+        await c.repository.readSubmissionEntry('two-sum', 'submission-1'),
+      ).toMatchObject({ code: 'function twoSum() {}' })
+      await expect(
+        c.repository.setSavedAiNote({
+          ...command,
+          commandId: 'different',
+          assessmentId: 'missing',
+          expectedCollectionRevision: 2,
+        }),
+      ).rejects.toThrow()
+      await expect(
+        c.repository.setSavedAiNote({ ...command, saved: false }),
+      ).rejects.toThrow('Command identity reused')
+      const head = (await c.localStore.readHead())!
+      await c.localStore.writeTechnicalRecord('active', {
+        ...head,
+        datasetToken: 'reset',
+      })
+      expect(await c.repository.setSavedAiNote(command)).toEqual({
+        status: 'stale-scope',
+      })
+    } finally {
+      await c.close()
+    }
+  })
+})
+
+it('retains independent outbox entries for the same client command ID on different problems', async () => {
+  const c = await createNotesTestContext()
+  try {
+    for (const problemSlug of ['two-sum', 'add-two-numbers']) {
+      const scope = await c.repository.acquireScope(problemSlug)
+      await c.repository.saveDocument({
+        commandId: 'same-id',
+        problemSlug,
+        scope,
+        target: { kind: 'problem' },
+        expectedRevision: 0,
+        markdown: 'Draft',
+      })
+    }
+    expect(
+      (await c.repository.listPendingInvalidations())
+        .map((row) => row.problemSlug)
+        .sort(),
+    ).toEqual(['add-two-numbers', 'two-sum'])
+  } finally {
+    await c.close()
+  }
+})
+
+it('atomically aborts saved AI membership, receipt, head and outbox, then permits an exact retry', async () => {
+  const c = await createNotesTestContext()
+  try {
+    const archive = await makeNotesArchive()
+    const head = (await c.localStore.readHead())!
+    await c.localStore.transact(['analysisReports'], 'readwrite', (s, done) => {
+      const assessment = archive.assessments[0]!
+      s.analysisReports.put(
+        { ...assessment, archiveGeneration: head.archiveGeneration },
+        [head.archiveGeneration, assessment.id],
+      )
+      done(undefined)
+    })
+    const scope = await c.repository.acquireScope('two-sum')
+    const command = {
+      commandId: 'include',
+      problemSlug: 'two-sum',
+      scope,
+      assessmentId: 'assessment-1',
+      expectedCollectionRevision: 0,
+      saved: true,
+    }
+    const original = c.localStore.transact.bind(c.localStore)
+    const spy = vi
+      .spyOn(c.localStore, 'transact')
+      .mockImplementation((names, mode, operate) =>
+        original(names, mode, (stores, done, fail) =>
+          operate(
+            stores,
+            (value) => {
+              done(value)
+              if (mode === 'readwrite') fail(new Error('injected abort'))
+            },
+            fail,
+          ),
+        ),
+      )
+    await expect(c.repository.setSavedAiNote(command)).rejects.toThrow(
+      'injected abort',
+    )
+    spy.mockRestore()
+    expect(await c.localStore.readHead()).toEqual(head)
+    expect(await c.repository.listPendingInvalidations()).toEqual([])
+    expect(await c.repository.getProblemNotes('two-sum')).toMatchObject({
+      collectionRevision: 0,
+      savedAiNotes: [],
+    })
+    expect(await c.repository.setSavedAiNote(command)).toMatchObject({
+      status: 'saved',
+      appliedRevision: 1,
+      collectionRevision: 1,
+      saved: true,
+    })
+    expect(await c.repository.listPendingInvalidations()).toHaveLength(1)
+    const committed = await c.localStore.readHead()
+    expect(
+      await c.repository.setSavedAiNote({ ...command, commandId: 'stale' }),
+    ).toEqual({ status: 'conflict', collectionRevision: 1 })
+    expect(
+      await c.repository.setSavedAiNote({
+        ...command,
+        commandId: 'no-op',
+        expectedCollectionRevision: 1,
+      }),
+    ).toMatchObject({
+      status: 'saved',
+      appliedRevision: 1,
+      collectionRevision: 1,
+      saved: true,
+    })
+    expect(await c.localStore.readHead()).toEqual(committed)
+    await c.repository.saveDocument({
+      commandId: 'document',
+      problemSlug: 'two-sum',
+      scope,
+      target: { kind: 'problem' },
+      expectedRevision: 0,
+      markdown: 'Independent',
+    })
+    expect(await c.repository.getProblemNotes('two-sum')).toMatchObject({
+      document: { revision: 1 },
+      collectionRevision: 1,
+      savedAiNotes: [{ assessmentId: 'assessment-1' }],
+    })
+  } finally {
+    await c.close()
+  }
+})

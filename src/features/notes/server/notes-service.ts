@@ -3,6 +3,7 @@ import {
   saveNoteCommandSchema,
   type SaveNoteCommand,
   type NoteTarget,
+  type SavedAiCommand,
 } from '../domain/notes-records'
 import type { NotesRepository } from '../data/notes-repository'
 
@@ -17,6 +18,25 @@ export function createNotesService(
       throw new Error('Problem does not exist.')
   }
   return {
+    listPendingInvalidations: () => repository.listPendingInvalidations(),
+    acknowledgeInvalidation: (key: IDBValidKey) =>
+      repository.acknowledgeInvalidation(key),
+    async getProblemNotes(problemSlug: string) {
+      await requireProblem(problemSlug)
+      return repository.getProblemNotes(problemSlug)
+    },
+    async readAssessment(problemSlug: string, assessmentId: string) {
+      await requireProblem(problemSlug)
+      return repository.readAssessment(problemSlug, assessmentId)
+    },
+    async readSubmissionEntry(problemSlug: string, submissionId: string) {
+      await requireProblem(problemSlug)
+      return repository.readSubmissionEntry(problemSlug, submissionId)
+    },
+    async setSavedAiNote(command: SavedAiCommand) {
+      await requireProblem(command.problemSlug)
+      return repository.setSavedAiNote(command)
+    },
     async acquireScope(problemSlug: string) {
       await requireProblem(problemSlug)
       return repository.acquireScope(problemSlug)

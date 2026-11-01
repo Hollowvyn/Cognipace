@@ -539,3 +539,21 @@ it('authorizes implementation generation only for actual LeetCode content script
     ),
   ).toThrow()
 })
+
+describe('notes runtime methods', () => {
+  it('permits dashboard and content script but denies popup', () => {
+    for (const method of [
+      'notes.openEditor',
+      'notes.saveDocument',
+      'notes.getProblemNotes',
+      'notes.listSubmissions',
+      'notes.getSubmission',
+      'notes.getAssessment',
+      'notes.setSavedAiNote',
+    ]) {
+      expect(canCallExtensionMethod(method, 'dashboard')).toBe(true)
+      expect(canCallExtensionMethod(method, 'content-script')).toBe(true)
+      expect(canCallExtensionMethod(method, 'popup')).toBe(false)
+    }
+  })
+})

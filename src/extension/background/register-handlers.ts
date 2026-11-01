@@ -1,3 +1,9 @@
+import { registerNotesHandlers } from './notes-handlers'
+import { createNotesEditScopes } from './notes-edit-scopes'
+import { createNotesRepository } from '@/features/notes/data/notes-repository'
+import { createNotesService } from '@/features/notes/server/notes-service'
+import { getProblemContext } from '@/features/problems/server/problems-service'
+import { createLocalIdbStore } from '@/platform/db/local-idb'
 import { waitForPendingDbSnapshot } from '@/platform/db/instance'
 import {
   configureMutationQueue,
@@ -343,6 +349,37 @@ const dueNotification = createDueNotification({
 })
 
 export function registerBackgroundHandlers() {
+  // Register narrow infrastructure only. No Notes UI/capture is activated.
+  const notesLocal =
+    typeof indexedDB === 'undefined'
+      ? undefined
+      : createLocalIdbStore(indexedDB)
+  const requireNotesLocal = () => {
+    if (!notesLocal) throw new Error('Local Notes storage is unavailable.')
+    return notesLocal
+  }
+  const notesLeases = () => createNotesEditScopes(requireNotesLocal())
+  registerNotesHandlers({
+    getService: async () => {
+      const { db } = await getAppDb()
+      return createNotesService(
+        createNotesRepository(requireNotesLocal()),
+        async (slug) => (await getProblemContext(db, slug)) !== null,
+      )
+    },
+    getLeases: notesLeases,
+    run: runConsistentRead,
+    emit: async (problemSlug, source, tags) => {
+      await markSyncLocalDataChanged()
+      await broadcastCacheInvalidation({
+        reason: 'notes-updated',
+        source,
+        problemSlug,
+        tags,
+      })
+      await scheduleAutoPushAfterMutationBestEffort()
+    },
+  })
   if (replacementStore) {
     void backupReplacement
       .ready()
@@ -885,6 +922,7 @@ export function registerBackgroundHandlers() {
         broadcastProblemCatalogInvalidation({
           problemSlug: request.problemSlug,
           source: request.surface,
+          archive: true,
         }),
       { retryKey: mutationRetryKey('problems.deleteProblem', request) },
     )
@@ -929,6 +967,7 @@ export function registerBackgroundHandlers() {
         broadcastProblemCatalogInvalidation({
           problemSlug: readSingleChangedProblemSlug(request.problemSlugs),
           source: request.surface,
+          archive: true,
         }),
       { retryKey: mutationRetryKey('problems.bulkDelete', request) },
     )
@@ -2004,6 +2043,7 @@ function readSingleChangedProblemSlug(problemSlugs: readonly string[]) {
 }
 
 function broadcastProblemCatalogInvalidation(input: {
+  archive?: boolean
   problemSlug?: string | undefined
   source: UiSurface
 }) {
@@ -2011,7 +2051,7 @@ function broadcastProblemCatalogInvalidation(input: {
     ...(input.problemSlug ? { problemSlug: input.problemSlug } : {}),
     reason: 'problem-catalog-updated',
     source: input.source,
-    tags: ['problems'],
+    tags: input.archive ? ['problems', 'notes', 'submissions'] : ['problems'],
   })
 }
 
@@ -2055,6 +2095,8 @@ function broadcastDataManagementInvalidation(source: 'dashboard') {
       'settings',
       'genai',
       'problems',
+      'notes',
+      'submissions',
       'practice',
       'queue',
       'tracks',

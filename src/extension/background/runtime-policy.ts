@@ -2,6 +2,13 @@ import type { ExtensionSurface } from '@/extension/messaging'
 import { isLeetCodeHost, parseLeetCodeProblemLocation } from '@/lib/leetcode'
 
 const methodSurfaceAccess = {
+  'notes.openEditor': ['dashboard', 'content-script'],
+  'notes.saveDocument': ['dashboard', 'content-script'],
+  'notes.getProblemNotes': ['dashboard', 'content-script'],
+  'notes.listSubmissions': ['dashboard', 'content-script'],
+  'notes.getSubmission': ['dashboard', 'content-script'],
+  'notes.getAssessment': ['dashboard', 'content-script'],
+  'notes.setSavedAiNote': ['dashboard', 'content-script'],
   'analytics.getSummary': ['dashboard'],
   'cache.invalidate': ['background'],
   'runtime.ping': ['background', 'popup', 'dashboard', 'content-script'],
@@ -231,4 +238,18 @@ function readUrl(value: string) {
   } catch {
     return null
   }
+}
+
+export function assertNotesProblemSender(sender: unknown, problemSlug: string) {
+  const url = readMessageSender(sender).url
+  const actual = url ? readUrl(url) : null
+  if (
+    !actual ||
+    actual.protocol !== 'https:' ||
+    !isLeetCodeHost(actual.hostname) ||
+    parseLeetCodeProblemLocation(actual)?.slug !== problemSlug
+  )
+    throw new Error(
+      'Notes problem must match the actual HTTPS LeetCode sender page.',
+    )
 }

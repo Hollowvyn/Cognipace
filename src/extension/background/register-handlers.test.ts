@@ -126,6 +126,8 @@ const backgroundMocks = vi.hoisted(() => {
     getAppShellData: vi.fn(),
     getProblemLibrary: vi.fn(),
     createProblem: vi.fn(),
+    deleteProblem: vi.fn(),
+    bulkDeleteProblems: vi.fn(),
     createTrack: vi.fn(),
     clearActiveTrack: vi.fn(),
     deleteTrack: vi.fn(),
@@ -313,6 +315,8 @@ vi.mock(
       ...actual,
       getProblemLibrary: backgroundMocks.getProblemLibrary,
       createProblem: backgroundMocks.createProblem,
+      deleteProblem: backgroundMocks.deleteProblem,
+      bulkDeleteProblems: backgroundMocks.bulkDeleteProblems,
       bulkUpdateProblems: backgroundMocks.bulkUpdateProblems,
     }
   },
@@ -2104,6 +2108,32 @@ describe('background handler registration', () => {
     )
   })
 
+  it('invalidates Notes and Submissions after single and bulk problem deletion', async () => {
+    await sendRuntimeMessage('problems.deleteProblem', {
+      surface: 'dashboard',
+      problemSlug: 'two-sum',
+    })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenLastCalledWith(
+      {
+        reason: 'problem-catalog-updated',
+        source: 'dashboard',
+        problemSlug: 'two-sum',
+        tags: ['problems', 'notes', 'submissions'],
+      },
+    )
+    await sendRuntimeMessage('problems.bulkDelete', {
+      surface: 'dashboard',
+      problemSlugs: ['two-sum', 'add-two-numbers'],
+    })
+    expect(backgroundMocks.broadcastCacheInvalidation).toHaveBeenLastCalledWith(
+      {
+        reason: 'problem-catalog-updated',
+        source: 'dashboard',
+        tags: ['problems', 'notes', 'submissions'],
+      },
+    )
+  })
+
   it('wires committed imports to snapshot, dirty-mark, invalidation, and sync scheduling', async () => {
     const response = await sendRuntimeMessage('imports.apply', {
       surface: 'dashboard',
@@ -2688,6 +2718,8 @@ describe('background handler registration', () => {
         'settings',
         'genai',
         'problems',
+        'notes',
+        'submissions',
         'practice',
         'queue',
         'tracks',
@@ -2720,6 +2752,8 @@ describe('background handler registration', () => {
         'settings',
         'genai',
         'problems',
+        'notes',
+        'submissions',
         'practice',
         'queue',
         'tracks',

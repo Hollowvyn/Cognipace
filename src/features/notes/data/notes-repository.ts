@@ -7,6 +7,12 @@ import {
 } from '@/platform/db/local-store-types'
 import { nextDataHead } from '@/platform/db/snapshot-idb'
 import {
+  assessmentRecordSchema,
+  notesPayloadSchema,
+  savedAiNoteRecordSchema,
+  savedAiCommandSchema,
+  type SavedAiCommand,
+  type SavedAiResult,
   noteTargetSchema,
   notesScopeSchema,
   problemNoteRecordSchema,
@@ -29,6 +35,15 @@ const receiptSchema = z.strictObject({
   globalRevision: z.number().int().positive(),
 })
 export type NoteCommandReceipt = z.infer<typeof receiptSchema>
+const pendingInvalidationSchema = z.strictObject({
+  problemSlug: problemSlugSchema,
+  tags: z.union([
+    z.tuple([z.literal('notes'), z.literal('sync')]),
+    z.tuple([z.literal('notes'), z.literal('submissions'), z.literal('sync')]),
+  ]),
+})
+export type NotesInvalidation = z.infer<typeof pendingInvalidationSchema>
+
 export type SubmissionMetadata = Omit<
   SubmissionRecord,
   'reflection' | 'diagnostics' | 'observedAttemptIds' | 'codePayloadId'
@@ -73,7 +88,7 @@ function submission(value: unknown): SubmissionRecord | null {
   // Storage index fields are infrastructure, outside the archive schema.
   return submissionRecordSchema.strip().parse(value)
 }
-async function digest(command: SaveNoteCommand) {
+async function digest(command: SaveNoteCommand | SavedAiCommand) {
   const bytes = new TextEncoder().encode(JSON.stringify(command))
   return Array.from(
     new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
@@ -85,7 +100,344 @@ export function createNotesRepository(
   local: LocalIdbStore,
   now: () => Date = () => new Date(),
 ) {
+  const outboxKey = (
+    scope: NotesScope,
+    kind: 'document' | 'saved-ai',
+    commandId: string,
+  ): IDBValidKey => [
+    'notes-outbox',
+    scope.datasetToken,
+    scope.problemToken,
+    kind,
+    commandId,
+  ]
   const repository = {
+    async listPendingInvalidations(): Promise<
+      Array<NotesInvalidation & { key: IDBValidKey }>
+    > {
+      return local.transact(['records'], 'readonly', (s, done, fail) => {
+        onRead(s.records.get('active'), fail, (value) => {
+          const head = requireHead(value)
+          const request = s.records.openCursor(
+            IDBKeyRange.bound(
+              ['notes-outbox', head.datasetToken],
+              ['notes-outbox', head.datasetToken, []],
+            ),
+          )
+          const rows: Array<NotesInvalidation & { key: IDBValidKey }> = []
+          onRead(request, fail, (value) => {
+            const cursor = value as IDBCursorWithValue | null
+            if (!cursor) {
+              done(rows)
+              return
+            }
+            const row = pendingInvalidationSchema.parse(cursor.value)
+            rows.push({ key: cursor.key, ...row })
+            cursor.continue()
+          })
+        })
+      })
+    },
+    acknowledgeInvalidation(key: IDBValidKey): Promise<void> {
+      return local.transact(['records'], 'readwrite', (s, done) => {
+        s.records.delete(key)
+        done(undefined)
+      })
+    },
+    async getProblemNotes(problemSlug: string) {
+      const scope = await repository.acquireScope(problemSlug)
+      return local.transact<
+        {
+          document: NoteDocument
+          scope: NotesScope
+          collectionRevision: number
+          savedAiNotes: Array<z.infer<typeof savedAiNoteRecordSchema>>
+        },
+        'records' | 'problemNotes' | 'savedAiNotes'
+      >(
+        ['records', 'problemNotes', 'savedAiNotes'],
+        'readonly',
+        (s, done, fail) => {
+          onRead(s.records.get('active'), fail, (value) => {
+            const h = requireHead(value)
+            onRead(
+              s.problemNotes.get([h.archiveGeneration, problemSlug]),
+              fail,
+              (value) => {
+                const note =
+                  value === undefined
+                    ? null
+                    : problemNoteRecordSchema.parse(value)
+                const prefix = [h.archiveGeneration, problemSlug]
+                onRead(
+                  s.savedAiNotes
+                    .index('byProblem')
+                    .getAll(IDBKeyRange.bound(prefix, [...prefix, []])),
+                  fail,
+                  (value) => {
+                    done({
+                      document: note?.document ?? emptyDocument(),
+                      scope,
+                      collectionRevision: note?.savedAiCollectionRevision ?? 0,
+                      savedAiNotes: z
+                        .array(savedAiNoteRecordSchema.strip())
+                        .parse(value),
+                    })
+                  },
+                )
+              },
+            )
+          })
+        },
+      )
+    },
+    readAssessment(problemSlug: string, assessmentId: string) {
+      problemSlugSchema.parse(problemSlug)
+      assessmentRecordSchema.shape.id.parse(assessmentId)
+      return local.transact<
+        import('../api/notes-contracts').NotesResult<'notes.getAssessment'>,
+        'records' | 'analysisReports' | 'payloads'
+      >(
+        ['records', 'analysisReports', 'payloads'],
+        'readonly',
+        (s, done, fail) => {
+          onRead(s.records.get('active'), fail, (value) => {
+            const h = requireHead(value)
+            onRead(
+              s.analysisReports.get([h.archiveGeneration, assessmentId]),
+              fail,
+              (value) => {
+                if (value === undefined) {
+                  done(null)
+                  return
+                }
+                const assessment = assessmentRecordSchema.strip().parse(value)
+                if (assessment.problemSlug !== problemSlug) {
+                  done(null)
+                  return
+                }
+                onRead(
+                  s.payloads.get(assessment.feedbackPayloadId),
+                  fail,
+                  (value) => {
+                    const feedback = notesPayloadSchema.parse(value)
+                    if (feedback.kind !== 'feedback-v1')
+                      throw new Error('Invalid feedback payload.')
+                    if (!assessment.implementationPayloadId) {
+                      done({
+                        assessment,
+                        feedback: feedback.body,
+                        implementation: null,
+                      })
+                      return
+                    }
+                    onRead(
+                      s.payloads.get(assessment.implementationPayloadId),
+                      fail,
+                      (value) => {
+                        const implementation = notesPayloadSchema.parse(value)
+                        if (implementation.kind !== 'implementation-v1')
+                          throw new Error('Invalid implementation payload.')
+                        done({
+                          assessment,
+                          feedback: feedback.body,
+                          implementation: implementation.body,
+                        })
+                      },
+                    )
+                  },
+                )
+              },
+            )
+          })
+        },
+      )
+    },
+    readSubmissionEntry(problemSlug: string, submissionId: string) {
+      problemSlugSchema.parse(problemSlug)
+      submissionRecordSchema.shape.id.parse(submissionId)
+      return local.transact<
+        import('../api/notes-contracts').NotesResult<'notes.getSubmission'>,
+        'records' | 'submissions' | 'payloads'
+      >(['records', 'submissions', 'payloads'], 'readonly', (s, done, fail) => {
+        onRead(s.records.get('active'), fail, (value) => {
+          const h = requireHead(value)
+          onRead(
+            s.submissions.get([h.archiveGeneration, submissionId]),
+            fail,
+            (value) => {
+              const row = submission(value)
+              if (!row || row.problemSlug !== problemSlug) {
+                done(null)
+                return
+              }
+              if (!row.codePayloadId) {
+                done({ submission: row, code: null })
+                return
+              }
+              onRead(s.payloads.get(row.codePayloadId), fail, (value) => {
+                const payload = notesPayloadSchema.parse(value)
+                if (payload.kind !== 'submitted-code')
+                  throw new Error('Invalid submitted code payload.')
+                done({ submission: row, code: payload.body })
+              })
+            },
+          )
+        })
+      })
+    },
+    async setSavedAiNote(input: SavedAiCommand): Promise<SavedAiResult> {
+      const command = savedAiCommandSchema.parse(input)
+      const commandDigest = await digest(command)
+      const key: IDBValidKey = [
+        'notes-ai-command',
+        command.scope.datasetToken,
+        command.scope.problemToken,
+        command.commandId,
+      ]
+      return local.transact<
+        SavedAiResult,
+        | 'records'
+        | 'problemScopes'
+        | 'problemNotes'
+        | 'analysisReports'
+        | 'savedAiNotes'
+      >(
+        [
+          'records',
+          'problemScopes',
+          'problemNotes',
+          'analysisReports',
+          'savedAiNotes',
+        ],
+        'readwrite',
+        (s, done, fail) => {
+          onRead(s.records.get('active'), fail, (value) => {
+            const h = requireHead(value)
+            const noteKey = [h.archiveGeneration, command.problemSlug]
+            onRead(s.problemScopes.get(noteKey), fail, (value) => {
+              if (
+                value === undefined ||
+                h.datasetToken !== command.scope.datasetToken ||
+                !sameScope(notesScopeSchema.parse(value), command.scope)
+              ) {
+                done({ status: 'stale-scope' })
+                return
+              }
+              onRead(s.problemNotes.get(noteKey), fail, (value) => {
+                const note =
+                  value === undefined
+                    ? null
+                    : problemNoteRecordSchema.parse(value)
+                const collectionRevision = note?.savedAiCollectionRevision ?? 0
+                const memberKey = [
+                  h.archiveGeneration,
+                  command.problemSlug,
+                  command.assessmentId,
+                ]
+                onRead(s.savedAiNotes.get(memberKey), fail, (member) => {
+                  onRead(s.records.get(key), fail, (value) => {
+                    if (value !== undefined) {
+                      const receipt = z
+                        .strictObject({
+                          commandDigest: z.string(),
+                          appliedRevision: z.number().int().nonnegative(),
+                        })
+                        .parse(value)
+                      if (receipt.commandDigest !== commandDigest)
+                        throw new Error(
+                          'Command identity reused with different content.',
+                        )
+                      done({
+                        status: 'saved',
+                        commandId: command.commandId,
+                        appliedRevision: receipt.appliedRevision,
+                        collectionRevision,
+                        saved: member !== undefined,
+                      })
+                      return
+                    }
+                    if (
+                      command.expectedCollectionRevision !== collectionRevision
+                    ) {
+                      done({ status: 'conflict', collectionRevision })
+                      return
+                    }
+                    onRead(
+                      s.analysisReports.get([
+                        h.archiveGeneration,
+                        command.assessmentId,
+                      ]),
+                      fail,
+                      (value) => {
+                        if (
+                          value === undefined ||
+                          assessmentRecordSchema.strip().parse(value)
+                            .problemSlug !== command.problemSlug
+                        )
+                          throw new Error(
+                            'Assessment does not belong to this problem.',
+                          )
+                        const changed = (member !== undefined) !== command.saved
+                        if (
+                          changed &&
+                          collectionRevision >= Number.MAX_SAFE_INTEGER
+                        )
+                          throw new Error('Collection revision limit reached.')
+                        const appliedRevision =
+                          collectionRevision + (changed ? 1 : 0)
+                        if (changed) {
+                          const time = now()
+                          if (command.saved)
+                            s.savedAiNotes.put(
+                              {
+                                problemSlug: command.problemSlug,
+                                assessmentId: command.assessmentId,
+                                savedAt: time.toISOString(),
+                                archiveGeneration: h.archiveGeneration,
+                              },
+                              memberKey,
+                            )
+                          else s.savedAiNotes.delete(memberKey)
+                          s.problemNotes.put(
+                            {
+                              problemSlug: command.problemSlug,
+                              document: note?.document ?? emptyDocument(),
+                              savedAiCollectionRevision: appliedRevision,
+                            },
+                            noteKey,
+                          )
+                          s.records.put(nextDataHead(h, time), 'active')
+                          s.records.put(
+                            {
+                              problemSlug: command.problemSlug,
+                              tags: ['notes', 'sync'],
+                            },
+                            outboxKey(
+                              command.scope,
+                              'saved-ai',
+                              command.commandId,
+                            ),
+                          )
+                        }
+                        s.records.add({ commandDigest, appliedRevision }, key)
+                        done({
+                          status: 'saved',
+                          commandId: command.commandId,
+                          appliedRevision,
+                          collectionRevision: appliedRevision,
+                          saved: command.saved,
+                        })
+                      },
+                    )
+                  })
+                })
+              })
+            })
+          })
+        },
+      )
+    },
     acquireScope(problemSlug: string): Promise<NotesScope> {
       problemSlugSchema.parse(problemSlug)
       return local.transact(
@@ -269,6 +621,16 @@ export function createNotesRepository(
                           key,
                         )
                       s.records.put(next, 'active')
+                      s.records.put(
+                        {
+                          problemSlug: command.problemSlug,
+                          tags:
+                            target.kind === 'reflection'
+                              ? ['notes', 'submissions', 'sync']
+                              : ['notes', 'sync'],
+                        },
+                        outboxKey(command.scope, 'document', command.commandId),
+                      )
                     }
                     const receipt: NoteCommandReceipt = {
                       status: 'saved',
