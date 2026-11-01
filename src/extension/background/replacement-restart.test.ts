@@ -464,14 +464,21 @@ it.each([
 )
 async function replacementRoots(local: LocalIdbStore) {
   return local.transact<
-    { records: unknown[]; coreKeys: IDBValidKey[]; cores: unknown[] },
+    {
+      recordKeys: IDBValidKey[]
+      records: unknown[]
+      coreKeys: IDBValidKey[]
+      cores: unknown[]
+    },
     'records' | 'coreSnapshots'
   >(['records', 'coreSnapshots'], 'readonly', (stores, done) => {
     const records = stores.records.getAll()
+    const recordKeys = stores.records.getAllKeys()
     const coreKeys = stores.coreSnapshots.getAllKeys()
     const cores = stores.coreSnapshots.getAll()
     cores.onsuccess = () =>
       done({
+        recordKeys: recordKeys.result,
         records: records.result as unknown[],
         coreKeys: coreKeys.result,
         cores: cores.result as unknown[],
@@ -502,6 +509,84 @@ async function assertRecoveryGatesPreserveRoots(
   expect(await replacementRoots(local)).toEqual(before)
   expect(fetch).not.toHaveBeenCalled()
 }
+it.each(['nested', 'extra-segment'])(
+  'candidate key %s without a pointer requires recovery and preserves roots',
+  async (shape) => {
+    const { local } = await fixture()
+    const { selected, raw } = await interruptRestore(local)
+    await local.transact(['records'], 'readwrite', (stores, done) => {
+      stores.records.delete(['composite-candidate', selected.token])
+      stores.records.delete('replacement-prepublication')
+      stores.records.put(
+        raw,
+        shape === 'nested'
+          ? ['composite-candidate', ['bad-key']]
+          : ['composite-candidate', selected.token, 'unexpected-segment'],
+      )
+      done(undefined)
+    })
+    await assertRecoveryGatesPreserveRoots(
+      local,
+      'Recovery required: invalid prepared replacement root.',
+    )
+  },
+)
+
+it('candidate discovery reads only matched metadata through pending and completed states', async () => {
+  const { local } = await fixture()
+  const { selected } = await interruptRestore(local)
+  const { readPendingCompositePreparation } =
+    await import('@/platform/db/composite-publication')
+  // The next namespace after candidates contains the separately stored source.
+  // Neither crossing the boundary nor checking core/source existence may hydrate it.
+  const get = Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, 'get')!
+    .value as typeof IDBObjectStore.prototype.get
+  const cursor = Object.getOwnPropertyDescriptor(
+    IDBObjectStore.prototype,
+    'openCursor',
+  )!.value as typeof IDBObjectStore.prototype.openCursor
+  const reads: IDBValidKey[] = []
+  function guardDiscovery() {
+    const guardGet = vi
+      .spyOn(IDBObjectStore.prototype, 'get')
+      .mockImplementation(function (this: IDBObjectStore, query) {
+        if (
+          this.name === 'coreSnapshots' ||
+          (Array.isArray(query) && query[0] === 'replacement-source')
+        )
+          throw new Error('Discovery hydrated a replacement body')
+        if (this.name === 'records') reads.push(query as IDBValidKey)
+        return get.call(this, query)
+      })
+    const guardCursor = vi
+      .spyOn(IDBObjectStore.prototype, 'openCursor')
+      .mockImplementation(function (this: IDBObjectStore, ...args) {
+        if (this.name === 'records' || this.name === 'coreSnapshots')
+          throw new Error('Discovery used a value cursor')
+        return cursor.apply(this, args)
+      })
+    return () => {
+      guardGet.mockRestore()
+      guardCursor.mockRestore()
+    }
+  }
+  const restore = guardDiscovery()
+  expect(await readPendingCompositePreparation(local)).toMatchObject({
+    descriptor: { replacementId: selected.token },
+  })
+  expect(reads).toContainEqual(['composite-candidate', selected.token])
+  restore()
+  await restart()
+  expect(await message('backup.retryPendingReplacement')).toMatchObject({
+    status: 'durable',
+  })
+  expect(
+    await local.readRecord(['composite-candidate', selected.token]),
+  ).toBeDefined()
+  guardDiscovery()
+  expect(await readPendingCompositePreparation(local)).toBeNull()
+})
+
 it('literal legacy unresolved candidate without recipe or pointer requires controlled recovery and preserves every root', async () => {
   const { local } = await fixture()
   const { selected, raw } = await interruptRestore(local)

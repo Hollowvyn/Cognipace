@@ -184,16 +184,30 @@ async function readPendingPreparation(
   const candidates = await local.transact<
     Array<{ key: IDBValidKey; value: unknown }>,
     'records'
-  >(['records'], 'readonly', (s, done) => {
+  >(['records'], 'readonly', (s, done, fail) => {
     const rows: Array<{ key: IDBValidKey; value: unknown }> = []
-    const request = s.records.openCursor(
-      IDBKeyRange.bound(['composite-candidate'], ['composite-candidate', []]),
+    const request = s.records.openKeyCursor(
+      IDBKeyRange.lowerBound(['composite-candidate']),
     )
     request.onsuccess = () => {
       const cursor = request.result
-      if (!cursor) return done(rows)
-      rows.push({ key: cursor.key, value: cursor.value })
-      cursor.continue()
+      if (
+        !cursor ||
+        !Array.isArray(cursor.key) ||
+        cursor.key[0] !== 'composite-candidate'
+      )
+        return done(rows)
+      // Nested keys also belong to this namespace. Only hydrate matched compact
+      // metadata; the first following namespace may contain a full source body.
+      try {
+        const value = s.records.get(cursor.key)
+        value.onsuccess = () => {
+          rows.push({ key: cursor.key, value: value.result as unknown })
+          cursor.continue()
+        }
+      } catch (error) {
+        fail(error)
+      }
     }
   })
   let unresolved: z.infer<typeof preparedCompositeCandidateSchema> | undefined
@@ -203,6 +217,7 @@ async function readPendingPreparation(
     if (
       !head ||
       !Array.isArray(row.key) ||
+      row.key.length !== 2 ||
       row.key[1] !== descriptor.replacementId
     )
       throw new Error('Recovery required: invalid prepared replacement root.')
