@@ -60,7 +60,47 @@ export function createArchiveGenerationRepository(local: LocalIdbStore) {
       },
     )
   }
+  async function validateImportedPayloads(archive: NotesArchive) {
+    const existingPayloads = new Map<string, string>()
+    for (
+      let offset = 0;
+      offset < archive.payloads.length;
+      offset += batchSize
+    ) {
+      const incoming = archive.payloads.slice(offset, offset + batchSize)
+      const existing = await local.transact<
+        Array<{ id: string; value: unknown }>,
+        'payloads'
+      >(['payloads'], 'readonly', (s, done) => {
+        const rows: Array<{ id: string; value: unknown }> = []
+        for (const payload of incoming) {
+          const request = s.payloads.get(payload.id)
+          request.onsuccess = () => {
+            rows.push({ id: payload.id, value: request.result as unknown })
+            if (rows.length === incoming.length) done(rows)
+          }
+        }
+      })
+      const retained = existing.filter((row) => row.value !== undefined)
+      await assertArchiveReferences(
+        {
+          ...emptyNotesArchive(),
+          payloads: retained.map((row) => row.value) as NotesPayload[],
+        },
+        [],
+      )
+      const byId = new Map(incoming.map((payload) => [payload.id, payload]))
+      for (const row of retained) {
+        const payload = row.value as NotesPayload
+        if (canonicalPayload(payload) !== canonicalPayload(byId.get(row.id)!))
+          throw new Error('Immutable archive payload identity collision.')
+        existingPayloads.set(row.id, stableJson(payload))
+      }
+    }
+    return existingPayloads
+  }
   return {
+    validateImportedArchive: validateImportedPayloads,
     readProblemScopes(generation: string) {
       return local.transact<
         Array<{
@@ -360,42 +400,7 @@ export function createArchiveGenerationRepository(local: LocalIdbStore) {
       // Validate every existing immutable object before any staging write. Crypto
       // stays outside live IDB callbacks; final batch callbacks recheck the values
       // have not changed since this preflight.
-      const existingPayloads = new Map<string, string>()
-      for (
-        let offset = 0;
-        offset < archive.payloads.length;
-        offset += batchSize
-      ) {
-        const incoming = archive.payloads.slice(offset, offset + batchSize)
-        const existing = await local.transact<
-          Array<{ id: string; value: unknown }>,
-          'payloads'
-        >(['payloads'], 'readonly', (s, done) => {
-          const rows: Array<{ id: string; value: unknown }> = []
-          for (const payload of incoming) {
-            const request = s.payloads.get(payload.id)
-            request.onsuccess = () => {
-              rows.push({ id: payload.id, value: request.result as unknown })
-              if (rows.length === incoming.length) done(rows)
-            }
-          }
-        })
-        const retained = existing.filter((row) => row.value !== undefined)
-        await assertArchiveReferences(
-          {
-            ...emptyNotesArchive(),
-            payloads: retained.map((row) => row.value) as NotesPayload[],
-          },
-          [],
-        )
-        const byId = new Map(incoming.map((payload) => [payload.id, payload]))
-        for (const row of retained) {
-          const payload = row.value as NotesPayload
-          if (canonicalPayload(payload) !== canonicalPayload(byId.get(row.id)!))
-            throw new Error('Immutable archive payload identity collision.')
-          existingPayloads.set(row.id, stableJson(payload))
-        }
-      }
+      const existingPayloads = await validateImportedPayloads(archive)
       const { nextGeneration } = input
       // Archive validation and hashing finish before opening staging writes.
       const identity = `import:${Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableJson(archive)))), (n) => n.toString(16).padStart(2, '0')).join('')}`

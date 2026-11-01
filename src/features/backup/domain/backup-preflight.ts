@@ -24,6 +24,7 @@ import {
 } from '../api/backup-contracts'
 
 export type PreparedBackupRestore = Readonly<{
+  sourceInput: unknown
   data: BackupData
   summary: BackupSummary
   notesArchive: NotesArchive
@@ -51,6 +52,7 @@ export async function prepareFullBackupRestore(
     data.problems.map((row) => row.slug),
   )
   return {
+    sourceInput: snapshot,
     data,
     notesArchive: backup.notesArchive,
     summary: createBackupSummary({ ...backup, data }),

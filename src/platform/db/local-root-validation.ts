@@ -78,13 +78,15 @@ export function assertFreshLocalStores(
         [
           'archive-generation',
           'composite-candidate',
+          'replacement-source',
           'notes-command',
           'notes-ai-command',
           'notes-outbox',
           'notes-edit-lease',
         ].includes(key[0])) ||
       key === 'recovery' ||
-      key === 'replacement-continuation'
+      key === 'replacement-continuation' ||
+      key === 'replacement-prepublication'
     ) {
       fail(
         new Error(

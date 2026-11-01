@@ -14,6 +14,7 @@ import {
 import {
   preparedCompositeCandidateSchema,
   isCommittedCompositeCandidate,
+  replacementSourceKey,
 } from '@/platform/db/composite-publication'
 import { readContinuationRecord } from '@/platform/db/snapshot-idb'
 import {
@@ -543,9 +544,25 @@ export function createNotesMaintenanceService({
                               fence,
                               head,
                             )
-                          )
-                            remove()
-                          next()
+                          ) {
+                            consume(
+                              s.records.get('replacement-continuation'),
+                              abort,
+                              (continuation) => {
+                                if (continuation === undefined) {
+                                  const prepared = preparedSchema.parse(value)
+                                  if (prepared.sourceReference)
+                                    s.records.delete(
+                                      replacementSourceKey(
+                                        prepared.sourceReference,
+                                      ),
+                                    )
+                                  remove()
+                                }
+                                next()
+                              },
+                            )
+                          } else next()
                         },
                       )
                     })

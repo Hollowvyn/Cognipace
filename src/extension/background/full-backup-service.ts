@@ -6,7 +6,10 @@ import {
   prepareDbReplacement,
   flushDbSnapshot,
 } from '@/platform/db'
-import { createCompositePublication } from '@/platform/db/composite-publication'
+import {
+  createCompositePublication,
+  compositeDigest,
+} from '@/platform/db/composite-publication'
 import type { LocalHead, LocalIdbStore } from '@/platform/db/local-store-types'
 import {
   replacementCommandKey,
@@ -162,6 +165,7 @@ export async function prepareFullBackupReplacement(
     prepared: PreparedBackupRestore
     commandId: string
     kind?: 'restore' | 'gist-pull'
+    sourceIdentity?: string
   },
 ): Promise<PreparedReplacement> {
   const fingerprint = fullBackupRequestFingerprint(input.prepared)
@@ -189,6 +193,17 @@ export async function prepareFullBackupReplacement(
   try {
     const head = await local.readHead()
     if (!head) throw new Error('Active local data is unavailable.')
+    // Store-dependent permanent collisions reject before candidate admission.
+    await createArchiveGenerationRepository(local).validateImportedArchive(
+      input.prepared.notesArchive,
+    )
+    if (
+      (await compositeDigest(input.prepared.sourceInput)) !==
+      input.prepared.inputDigest
+    )
+      throw new Error(
+        'Recovery required: accepted backup source digest changed.',
+      )
     const publication = createCompositePublication(local, head.fingerprint)
     const stored = await publication.loadPrepared(input.commandId, fingerprint)
     const bytes = stored?.bytes ?? (await local.readCore(head.coreSnapshotId))
@@ -238,18 +253,46 @@ export async function prepareFullBackupReplacement(
       replacementId: input.commandId,
       summary: input.prepared.summary,
       publish: async (publicationInput) => {
-        await publication.prepare(candidate, async () => {
-          await archive.stageImportedArchive({
-            nextGeneration: descriptor.archiveGeneration,
-            archive: input.prepared.notesArchive,
-          })
-          await archive.stageProblemScopes({
-            nextGeneration: descriptor.archiveGeneration,
-            datasetToken: descriptor.datasetToken,
-            rotated: [],
-            initialized: descriptor.initializedProblemScopes!,
-          })
-        })
+        await publication.prepare(
+          candidate,
+          async () => {
+            await archive.stageImportedArchive({
+              nextGeneration: descriptor.archiveGeneration,
+              archive: input.prepared.notesArchive,
+            })
+            await archive.stageProblemScopes({
+              nextGeneration: descriptor.archiveGeneration,
+              datasetToken: descriptor.datasetToken,
+              rotated: [],
+              initialized: descriptor.initializedProblemScopes!,
+            })
+          },
+          {
+            resume: {
+              kind: commandKind,
+              summary: input.prepared.summary,
+              recipe: {
+                owner: 'full-backup',
+                commandId: input.commandId,
+                inputDigest: input.prepared.inputDigest,
+                sourceSchemaVersion: input.prepared.sourceSchemaVersion,
+                sourceIdentity:
+                  previewCapability === undefined
+                    ? (input.sourceIdentity ?? null)
+                    : previewRecordSchema.parse(previewCapability)
+                        .sourceIdentity,
+                preview: previewCapability ?? null,
+                sourceArchiveGeneration: head.archiveGeneration,
+                sourceCoreSnapshotId: head.coreSnapshotId,
+                sourceDatasetToken: head.datasetToken,
+              },
+              ...(publicationInput.syncMetadataPatch
+                ? { syncMetadataPatch: publicationInput.syncMetadataPatch }
+                : {}),
+            },
+            source: input.prepared.sourceInput,
+          },
+        )
         await assertArchiveReferences(
           await archive.readArchiveGeneration(descriptor.archiveGeneration),
           problemSlugs,
@@ -278,6 +321,7 @@ export async function prepareFullBackupReplacement(
 export async function prepareGistFullBackupReplacement(
   local: LocalIdbStore,
   prepared: PreparedBackupRestore,
+  sourceIdentity?: string,
 ): Promise<PreparedReplacement> {
   await getBackgroundDb()
   await flushDbSnapshot()
@@ -287,5 +331,6 @@ export async function prepareGistFullBackupReplacement(
     prepared,
     commandId: `gist-${prepared.inputDigest}-${head.revision}`,
     kind: 'gist-pull',
+    ...(sourceIdentity ? { sourceIdentity } : {}),
   })
 }

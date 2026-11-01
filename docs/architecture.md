@@ -1071,7 +1071,16 @@ property-order-only reuse of an identical payload ID; meaningful string/code,
 Markdown and report whitespace stays verbatim.
 
 Backup transfers use bounded UTF-8 chunks and durable document-owned sessions;
-accepted restore input remains protected across restart. Maintenance runs bounded,
+accepted restore input remains protected across restart. Before archive staging,
+replacement admission atomically records a pending pointer, prepared core,
+compact owner resume recipe and a separately referenced accepted-source body.
+Status/startup discover metadata and key existence only; authenticated generic
+Retry saving lazily validates the original source and prepared core, then resumes
+archive and scope staging with the original identities. Publication atomically
+replaces the pending pointer with the committed continuation. Startup can settle
+committed bookkeeping; it does not run prepublication staging. These technical
+source records never enter backups and are retired with completed candidates
+after continuation settlement. Maintenance runs bounded,
 yielding mark/sweep batches with root/provenance/readiness and technical-write-epoch
 checks. It reclaims unreachable technical data, never learning data by age.
 Unknown owner inventory retains pending transfers; confirmed absence can abandon

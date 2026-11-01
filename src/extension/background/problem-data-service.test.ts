@@ -1,3 +1,7 @@
+import {
+  resumePendingReplacement,
+  validatePendingReplacement,
+} from './replacement-resume'
 import { verifyBackgroundReplacementAdoption } from './app-db'
 import {
   configureMutationQueue,
@@ -376,15 +380,20 @@ it.each(['problem-reset', 'reset'] as const)(
     await getAppDb()
     const coordinator = createBackupReplacementCoordinator({
       store: createSnapshotIdbStore(indexedDB),
-    })
-    expect(
-      await coordinator.run({
-        kind: input.kind,
-        prepare: () => prepareProblemDataReplacement(f.local, input),
+      validatePrepared: (record) =>
+        validatePendingReplacement(f.local, record).then(() => {}),
+      resumePrepared: (record) => resumePendingReplacement(f.local, record),
+      resume: () => ({
         onDurable: async () => {},
         finishSyncMetadata: async () => {},
       }),
-    ).toMatchObject({ status: 'durable' })
+    })
+    await coordinator.ready()
+    expect(coordinator.getState()).toMatchObject({
+      status: 'persistence-pending',
+      kind,
+    })
+    expect(await coordinator.retry()).toMatchObject({ status: 'durable' })
     const head = (await f.local.readHead())!
     expect(head).toMatchObject({
       coreSnapshotId: prepared.descriptor.coreSnapshotId,

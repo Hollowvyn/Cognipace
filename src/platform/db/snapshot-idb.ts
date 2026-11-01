@@ -1,3 +1,7 @@
+import {
+  readPendingCompositePreparation,
+  type PendingCompositePreparation,
+} from './composite-publication'
 import { archiveStoreNames } from './local-idb-schema'
 import {
   assertFreshLocalStores,
@@ -111,6 +115,7 @@ export interface SnapshotIdbStore {
     now: Date,
     input: ReplacementInput,
   ): Promise<ActiveSnapshotRecord>
+  readPendingPreparation?(): Promise<PendingCompositePreparation | null>
   readContinuation(): Promise<ReplacementContinuation | null>
   markInvalidated(replacementId: string): Promise<void>
   markSyncMetadataComplete(replacementId: string): Promise<void>
@@ -609,6 +614,8 @@ export function createSnapshotIdbStore(
         }
       })
     },
+
+    readPendingPreparation: () => readPendingCompositePreparation(local),
 
     readActive() {
       return transact('readonly', (_records, finish, fail, read) => {

@@ -184,32 +184,43 @@ export async function prepareProblemDataReplacement(
       throw new Error(
         'Recovery required: prepared initial problem scopes are incomplete.',
       )
+    const resumeRecipe = {
+      owner: 'problem-data',
+      input: { ...input, problemSlugs: slugs },
+      sourceArchiveGeneration: head.archiveGeneration,
+      sourceCoreSnapshotId: head.coreSnapshotId,
+      sourceDatasetToken: head.datasetToken,
+    }
     const candidate = { handle, descriptor }
     let published: LocalHead | undefined
     return {
       replacementId: input.commandId,
       summary: null,
       publish: async (publicationInput) => {
-        await publication.prepare(candidate, async () => {
-          if (input.kind === 'reset')
-            await archive.stageImportedArchive({
+        await publication.prepare(
+          candidate,
+          async () => {
+            if (input.kind === 'reset')
+              await archive.stageImportedArchive({
+                nextGeneration: candidate.descriptor.archiveGeneration,
+                archive: emptyNotesArchive(),
+              })
+            else {
+              await archive.stageArchiveGeneration({
+                sourceGeneration: head.archiveGeneration,
+                nextGeneration: candidate.descriptor.archiveGeneration,
+                excludedProblemSlugs: slugs,
+              })
+            }
+            await archive.stageProblemScopes({
               nextGeneration: candidate.descriptor.archiveGeneration,
-              archive: emptyNotesArchive(),
+              datasetToken: candidate.descriptor.datasetToken,
+              rotated: scopes,
+              initialized: initializedScopes,
             })
-          else {
-            await archive.stageArchiveGeneration({
-              sourceGeneration: head.archiveGeneration,
-              nextGeneration: candidate.descriptor.archiveGeneration,
-              excludedProblemSlugs: slugs,
-            })
-          }
-          await archive.stageProblemScopes({
-            nextGeneration: candidate.descriptor.archiveGeneration,
-            datasetToken: candidate.descriptor.datasetToken,
-            rotated: scopes,
-            initialized: initializedScopes,
-          })
-        })
+          },
+          { resume: { kind: input.kind, summary: null, recipe: resumeRecipe } },
+        )
         // Hydrated/copy staging must still prove complete logical ownership and
         // immutable body integrity before changing the active pair.
         await assertArchiveReferences(

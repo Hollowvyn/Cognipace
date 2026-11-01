@@ -1,5 +1,7 @@
+import { beforeEach } from 'vitest'
+beforeEach(() => vi.stubGlobal('IDBKeyRange', IDBKeyRange))
 import { describe, expect, it, vi } from 'vitest'
-import { indexedDB as testIndexedDB } from 'fake-indexeddb'
+import { IDBKeyRange, indexedDB as testIndexedDB } from 'fake-indexeddb'
 import { createSnapshotIdbStore } from '@/platform/db/snapshot-idb'
 
 import type { BackupReplacementWork } from '@/features/backup/server/backup-replacement-work'

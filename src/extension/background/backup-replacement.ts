@@ -1,3 +1,5 @@
+import { backupSummarySchema } from '@/features/backup/api/backup-contracts'
+import type { PendingCompositePreparation } from '@/platform/db/composite-publication'
 import type {
   BackupReplacementResult,
   BackupReplacementState,
@@ -43,6 +45,10 @@ type PendingWork = BackupReplacementPending &
 export function createBackupReplacementCoordinator(
   options: {
     store?: SnapshotIdbStore
+    validatePrepared?: (record: PendingCompositePreparation) => Promise<void>
+    resumePrepared?: (
+      record: PendingCompositePreparation,
+    ) => Promise<PreparedReplacement>
     resumeAdoption?: (record: ReplacementContinuation) => Promise<void>
     resume?: (
       record: ReplacementContinuation,
@@ -98,6 +104,64 @@ export function createBackupReplacementCoordinator(
                   new Error('Committed replacement cannot be published again.'),
                 ),
               ...options.resume(record),
+            }
+          }
+          const preparation = await options.store?.readPendingPreparation?.()
+          if (preparation) {
+            if (record)
+              throw new Error(
+                'Recovery required: conflicting replacement admission and continuation.',
+              )
+            await options.validatePrepared?.(preparation)
+            const resume = preparation.resume
+            let prepared: PreparedReplacement | undefined
+            const hydrate = async () => {
+              if (!prepared) {
+                if (!options.resumePrepared)
+                  throw new Error(
+                    'Recovery required: prepared replacement owner is unavailable.',
+                  )
+                prepared = await options.resumePrepared(preparation)
+              }
+              return prepared
+            }
+            const bookkeeping = options.resume?.({
+              key: 'replacement-continuation',
+              replacementId: preparation.descriptor.replacementId,
+              kind: resume.kind,
+              committedRevision: preparation.descriptor.baseRevision + 1,
+              needsInvalidation: true,
+              needsSyncMetadata: true,
+              ...(resume.syncMetadataPatch
+                ? { syncMetadataPatch: resume.syncMetadataPatch }
+                : {}),
+            })
+            pending = {
+              kind: resume.kind,
+              summary: backupSummarySchema.nullable().parse(resume.summary),
+              replacementId: preparation.descriptor.replacementId,
+              adopted: false,
+              durable: false,
+              publicationAttempted: false,
+              invalidated: false,
+              continuation: undefined,
+              flush: async (input) => (await hydrate()).publish(input!),
+              adopt: async () => (await hydrate()).adopt(),
+              onDurable:
+                bookkeeping?.onDurable ??
+                (() =>
+                  Promise.reject(
+                    new Error('Replacement bookkeeping owner is unavailable.'),
+                  )),
+              finishSyncMetadata:
+                bookkeeping?.finishSyncMetadata ??
+                (() =>
+                  Promise.reject(
+                    new Error('Replacement bookkeeping owner is unavailable.'),
+                  )),
+              ...(resume.syncMetadataPatch
+                ? { syncMetadataPatch: resume.syncMetadataPatch }
+                : {}),
             }
           }
           loaded = true

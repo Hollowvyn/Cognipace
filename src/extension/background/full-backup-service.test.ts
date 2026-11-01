@@ -1,3 +1,4 @@
+import { resumePendingReplacement } from './replacement-resume'
 import {
   createBackupTransferService,
   reconcileCompletedBackupTransfers,
@@ -286,7 +287,28 @@ it.each(['restore', 'gist-pull'] as const)(
     const first = await prepare()
     const commandId = first.replacementId
     await expect(
-      first.publish({ kind, replacementId: commandId }),
+      first.publish({
+        kind,
+        replacementId: commandId,
+        ...(kind === 'gist-pull'
+          ? {
+              syncMetadataPatch: {
+                enabled: true,
+                gistId: 'frozen-gist',
+                lastSyncAt: '2026-10-31T00:00:00Z',
+                lastSyncDirection: 'pull',
+                lastPullAt: '2026-10-31T00:00:00Z',
+                lastRemoteVersion: 'frozen-v',
+                lastRemoteUpdatedAt: '2026-10-31T00:00:00Z',
+                localDataUpdatedAt: '2026-10-31T00:00:00Z',
+                dirtySinceLastSync: false,
+                lastBlockingReason: null,
+                conflict: null,
+                lastError: null,
+              },
+            }
+          : {}),
+      }),
     ).rejects.toThrow('staging fault')
     const publication = createCompositePublication(local, head.fingerprint)
     const original = await publication.loadPrepared(
@@ -296,16 +318,18 @@ it.each(['restore', 'gist-pull'] as const)(
     expect(restore).toHaveBeenCalledTimes(1)
     fault.mockRestore()
     abortDbReplacement()
-    await expect(
-      createBackupReplacementCoordinator({
-        store: createSnapshotIdbStore(indexedDB),
-      }).run({
-        kind,
-        prepare,
+    const resumed = createBackupReplacementCoordinator({
+      store: createSnapshotIdbStore(indexedDB),
+      resumePrepared: (record) => resumePendingReplacement(local, record),
+      resume: () => ({
         onDurable: async () => {},
         finishSyncMetadata: async () => {},
       }),
-    ).resolves.toMatchObject({ status: 'durable', syncMetadataPending: false })
+    })
+    await expect(resumed.retry()).resolves.toMatchObject({
+      status: 'durable',
+      syncMetadataPending: false,
+    })
     expect(restore).toHaveBeenCalledTimes(1)
     const active = (await local.readHead())!
     expect(active).toMatchObject({
@@ -639,4 +663,79 @@ it('collects technical orphans then recovers the retained pair with exact note, 
       JSON.stringify(payload.body),
     ),
   ).toEqual(archive.payloads.map((payload) => JSON.stringify(payload.body)))
+})
+
+// Regression derived from /private/tmp/cognipace-astra-correctness-review/repro.test.ts.
+it('discovers interrupted prepared restore on worker restart before any DB opens', async () => {
+  const local = await fixture()
+  const store = createSnapshotIdbStore(indexedDB)
+  const prepared = await prepareFullBackupRestore({
+    ...createFrozenV6BackupFixture(),
+    schemaVersion: 7,
+    notesArchive: await makeNotesArchive(),
+  })
+  const actual = archiveOwner.createArchiveGenerationRepository
+  const fault = vi
+    .spyOn(archiveOwner, 'createArchiveGenerationRepository')
+    .mockImplementation((store) => ({
+      ...actual(store),
+      stageImportedArchive: () =>
+        Promise.reject(new Error('interrupted before archive staging')),
+    }))
+  expect(await run(local, prepared, 'restart-discovery')).toMatchObject({
+    status: 'persistence-pending',
+  })
+  expect(await store.readContinuation()).toBeNull()
+  fault.mockRestore()
+  resetAppDbForTesting()
+  const reopened = createBackupReplacementCoordinator({ store })
+  await reopened.ready()
+  expect(reopened.getState()).toMatchObject({
+    status: 'persistence-pending',
+    kind: 'restore',
+    summary: prepared.summary,
+  })
+  expect(() => reopened.assertReadable()).toThrow('still needs saving')
+  expect(() => reopened.assertIdle()).toThrow('still needs saving')
+})
+
+it('rejects valid-digest immutable body collisions before accepting a new durable replacement', async () => {
+  const local = await fixture()
+  const input = {
+    ...createFrozenV6BackupFixture(),
+    schemaVersion: 7,
+    notesArchive: await makeNotesArchive(),
+  }
+  expect(
+    await run(
+      local,
+      await prepareFullBackupRestore(input),
+      'collision-baseline',
+    ),
+  ).toMatchObject({ status: 'durable' })
+  const before = await local.readHead()
+  const changed = structuredClone(input)
+  changed.notesArchive.payloads[0] = await makeNotesPayload(
+    'submitted-code',
+    'different actual body',
+    'code-1',
+  )
+  const prepared = await prepareFullBackupRestore(changed)
+  await expect(run(local, prepared, 'collision-rejected')).rejects.toThrow(
+    'Immutable archive payload identity collision',
+  )
+  expect(await local.readHead()).toEqual(before)
+  expect(
+    await local.readRecord(['composite-candidate', 'collision-rejected']),
+  ).toBeUndefined()
+  expect(
+    await local.readRecord(['replacement-source', 'collision-rejected']),
+  ).toBeUndefined()
+  expect(await local.readRecord('replacement-prepublication')).toBeUndefined()
+  resetAppDbForTesting()
+  const restarted = createBackupReplacementCoordinator({
+    store: createSnapshotIdbStore(indexedDB),
+  })
+  await restarted.ready()
+  expect(restarted.getState()).toEqual({ status: 'idle' })
 })

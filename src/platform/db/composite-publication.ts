@@ -104,11 +104,176 @@ const problemScopeSchema = z.strictObject({
   problemToken: z.string().min(1),
 })
 
-export const preparedCompositeCandidateSchema = z.strictObject({
-  descriptor: compositeDescriptorSchema,
-  fingerprint: z.string(),
-  status: z.literal('prepared'),
+export const pendingCompositeKey = 'replacement-prepublication'
+export const replacementSourceKey = (id: string): IDBValidKey => [
+  'replacement-source',
+  id,
+]
+export const compositeResumeSchema = z.strictObject({
+  kind: z.enum([
+    'restore',
+    'gist-pull',
+    'reset',
+    'problem-reset',
+    'problem-delete',
+  ]),
+  summary: z.unknown(),
+  recipe: z.unknown(),
+  syncMetadataPatch: z.record(z.string(), z.unknown()).optional(),
 })
+export type CompositeResume = z.infer<typeof compositeResumeSchema>
+const pendingCompositeSchema = z.strictObject({
+  replacementId: z.string().min(1),
+  digest: z.string().min(1),
+})
+export async function compositeDigest(value: unknown) {
+  const bytes = isBinary(value)
+    ? value
+    : new TextEncoder().encode(JSON.stringify(value))
+  return Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest('SHA-256', new Uint8Array(bytes)),
+    ),
+    (n) => n.toString(16).padStart(2, '0'),
+  ).join('')
+}
+export const preparedCompositeCandidateSchema = z
+  .strictObject({
+    descriptor: compositeDescriptorSchema,
+    fingerprint: z.string(),
+    status: z.literal('prepared'),
+    coreDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    resume: compositeResumeSchema.optional(),
+    resumeDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    sourceReference: z.string().min(1).optional(),
+  })
+  .refine(
+    (value) =>
+      value.sourceReference === undefined ||
+      value.sourceReference === value.descriptor.replacementId,
+    'Accepted replacement source reference must match its command.',
+  )
+export type PendingCompositePreparation = z.infer<
+  typeof preparedCompositeCandidateSchema
+> & { resume: CompositeResume }
+
+/** Metadata/key discovery only; no SQLite initialization or owner mutation. */
+export async function readPendingCompositePreparation(
+  local: LocalIdbStore,
+): Promise<PendingCompositePreparation | null> {
+  try {
+    return await readPendingPreparation(local)
+  } catch (cause) {
+    throw new Error(
+      'Recovery required: prepared replacement admission cannot be verified.',
+      { cause },
+    )
+  }
+}
+async function readPendingPreparation(
+  local: LocalIdbStore,
+): Promise<PendingCompositePreparation | null> {
+  const head = await local.readHead()
+  const rawPointer = await local.readRecord(pendingCompositeKey)
+  const candidates = await local.transact<
+    Array<{ key: IDBValidKey; value: unknown }>,
+    'records'
+  >(['records'], 'readonly', (s, done) => {
+    const rows: Array<{ key: IDBValidKey; value: unknown }> = []
+    const request = s.records.openCursor(
+      IDBKeyRange.bound(['composite-candidate'], ['composite-candidate', []]),
+    )
+    request.onsuccess = () => {
+      const cursor = request.result
+      if (!cursor) return done(rows)
+      rows.push({ key: cursor.key, value: cursor.value })
+      cursor.continue()
+    }
+  })
+  let unresolved: z.infer<typeof preparedCompositeCandidateSchema> | undefined
+  for (const row of candidates) {
+    const value = preparedCompositeCandidateSchema.parse(row.value)
+    const descriptor = value.descriptor
+    if (
+      !head ||
+      !Array.isArray(row.key) ||
+      row.key[1] !== descriptor.replacementId
+    )
+      throw new Error('Recovery required: invalid prepared replacement root.')
+    if (
+      isCommittedCompositeCandidate(
+        descriptor,
+        await local.readRecord(replacementCommandKey(descriptor.replacementId)),
+        head,
+      )
+    )
+      continue
+    if (unresolved)
+      throw new Error(
+        'Recovery required: multiple unresolved prepared replacements.',
+      )
+    unresolved = value
+  }
+  if (!unresolved && rawPointer === undefined) return null
+  const pointer = pendingCompositeSchema.safeParse(rawPointer)
+  if (
+    !head ||
+    !unresolved ||
+    !pointer.success ||
+    !unresolved.resume ||
+    !unresolved.coreDigest ||
+    pointer.data.replacementId !== unresolved.descriptor.replacementId ||
+    pointer.data.digest !== unresolved.resumeDigest ||
+    unresolved.fingerprint !== head.fingerprint
+  )
+    throw new Error(
+      'Recovery required: prepared replacement admission is missing or invalid.',
+    )
+  assertCandidateBase(head, unresolved.descriptor)
+  const digest = await compositeDigest({
+    descriptor: unresolved.descriptor,
+    resume: unresolved.resume,
+    coreDigest: unresolved.coreDigest,
+    sourceReference: unresolved.sourceReference,
+  })
+  const coreExists = await local.transact<boolean, 'coreSnapshots'>(
+    ['coreSnapshots'],
+    'readonly',
+    (s, done) => {
+      const request = s.coreSnapshots.getKey(
+        unresolved.descriptor.coreSnapshotId,
+      )
+      request.onsuccess = () => done(request.result !== undefined)
+    },
+  )
+  if (digest !== pointer.data.digest || !coreExists)
+    throw new Error(
+      'Recovery required: prepared replacement metadata changed or core is missing.',
+    )
+  if (unresolved.sourceReference) {
+    const exists = await local.transact<boolean, 'records'>(
+      ['records'],
+      'readonly',
+      (s, done) => {
+        const request = s.records.getKey(
+          replacementSourceKey(unresolved.sourceReference!),
+        )
+        request.onsuccess = () => done(request.result !== undefined)
+      },
+    )
+    if (!exists)
+      throw new Error(
+        'Recovery required: accepted replacement source is missing.',
+      )
+  }
+  return { ...unresolved, resume: unresolved.resume }
+}
 
 export function createCompositePublication(
   local: LocalIdbStore,
@@ -147,11 +312,18 @@ export function createCompositePublication(
         throw new Error(
           'Recovery required: prepared replacement core is missing or invalid.',
         )
+      if (
+        parsed.data.coreDigest &&
+        (await compositeDigest(new Uint8Array(bytes))) !==
+          parsed.data.coreDigest
+      )
+        throw new Error('Recovery required: prepared replacement core changed.')
       return { descriptor, bytes: new Uint8Array(bytes) }
     },
     async prepare(
       candidate: CompositeCandidate,
       stageArchive: () => Promise<void>,
+      admission?: { resume: CompositeResume; source?: unknown },
     ) {
       const descriptor = compositeDescriptorSchema.parse(candidate.descriptor)
       if (
@@ -173,42 +345,104 @@ export function createCompositePublication(
         throw new Error(
           'Replacement requires detached core and archive identities.',
         )
+      const resume = admission && compositeResumeSchema.parse(admission.resume)
+      const coreDigest = admission ? await compositeDigest(bytes) : undefined
+      const sourceReference =
+        admission?.source === undefined ? undefined : descriptor.replacementId
+      const resumeDigest = resume
+        ? await compositeDigest({
+            descriptor,
+            resume,
+            coreDigest,
+            sourceReference,
+          })
+        : undefined
       // Serialized candidate only; a WASM handle never crosses the durable boundary.
       await local.transact(
         ['records', 'coreSnapshots'],
         'readwrite',
         (s, done, fail) => {
-          const existing = s.records.get(key(descriptor.replacementId))
-          existing.onsuccess = () => {
-            try {
-              if (existing.result !== undefined) {
-                const prior = preparedCompositeCandidateSchema.parse(
-                  existing.result,
-                )
-                if (
-                  JSON.stringify(prior.descriptor) !==
-                    JSON.stringify(descriptor) ||
-                  prior.fingerprint !== fingerprint
-                )
-                  throw new Error(
-                    'Replacement identity reused with another candidate.',
+          const guard = s.records.get(pendingCompositeKey)
+          guard.onsuccess = () => {
+            if (
+              guard.result !== undefined &&
+              (!resumeDigest ||
+                JSON.stringify(guard.result) !==
+                  JSON.stringify({
+                    replacementId: descriptor.replacementId,
+                    digest: resumeDigest,
+                  }))
+            ) {
+              fail(
+                new Error(
+                  'Recovery required: another prepublication admission is unresolved.',
+                ),
+              )
+              return
+            }
+            const existing = s.records.get(key(descriptor.replacementId))
+            existing.onsuccess = () => {
+              try {
+                if (existing.result !== undefined) {
+                  const prior = preparedCompositeCandidateSchema.parse(
+                    existing.result,
                   )
-                const core = s.coreSnapshots.get(descriptor.coreSnapshotId)
-                core.onsuccess = () => {
-                  if (!isBinary(core.result) || !sameBytes(core.result, bytes))
-                    fail(new Error('Prepared replacement core changed.'))
-                  else done(undefined)
+                  if (
+                    JSON.stringify(prior.descriptor) !==
+                      JSON.stringify(descriptor) ||
+                    prior.fingerprint !== fingerprint ||
+                    (resumeDigest !== undefined &&
+                      prior.resumeDigest !== resumeDigest)
+                  )
+                    throw new Error(
+                      'Replacement identity reused with another candidate.',
+                    )
+                  const core = s.coreSnapshots.get(descriptor.coreSnapshotId)
+                  core.onsuccess = () => {
+                    if (
+                      !isBinary(core.result) ||
+                      !sameBytes(core.result, bytes)
+                    )
+                      fail(new Error('Prepared replacement core changed.'))
+                    else done(undefined)
+                  }
+                } else {
+                  s.coreSnapshots.add(bytes, descriptor.coreSnapshotId)
+                  s.records.add(
+                    {
+                      descriptor,
+                      fingerprint,
+                      status: 'prepared',
+                      ...(resume
+                        ? {
+                            resume,
+                            resumeDigest,
+                            coreDigest,
+                            ...(sourceReference ? { sourceReference } : {}),
+                          }
+                        : {}),
+                    },
+                    key(descriptor.replacementId),
+                  )
+                  if (resumeDigest) {
+                    if (sourceReference)
+                      s.records.add(
+                        admission!.source,
+                        replacementSourceKey(sourceReference),
+                      )
+                    s.records.add(
+                      {
+                        replacementId: descriptor.replacementId,
+                        digest: resumeDigest,
+                      },
+                      pendingCompositeKey,
+                    )
+                  }
+                  done(undefined)
                 }
-              } else {
-                s.coreSnapshots.add(bytes, descriptor.coreSnapshotId)
-                s.records.add(
-                  { descriptor, fingerprint, status: 'prepared' },
-                  key(descriptor.replacementId),
-                )
-                done(undefined)
+              } catch (error) {
+                fail(error)
               }
-            } catch (error) {
-              fail(error)
             }
           }
         },
@@ -338,6 +572,7 @@ export function createCompositePublication(
                                 )
                               }
                               s.records.put(next, 'active')
+                              s.records.delete(pendingCompositeKey)
                               if (
                                 descriptor.datasetToken !== prior.datasetToken
                               ) {

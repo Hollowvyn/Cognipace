@@ -1,3 +1,7 @@
+import {
+  resumePendingReplacement,
+  validatePendingReplacement,
+} from './replacement-resume'
 import { createNotesMaintenanceService } from '@/features/notes/server/notes-maintenance-service'
 import { registerNotesMaintenance } from './scheduler/notes-maintenance'
 import { createTransferOwnerInventory } from './scheduler/transfer-owner-inventory'
@@ -283,6 +287,12 @@ const replacementStore =
     : createSnapshotIdbStore(indexedDB)
 const backupReplacement = createBackupReplacementCoordinator({
   ...(replacementStore ? { store: replacementStore } : {}),
+  validatePrepared: (record) =>
+    validatePendingReplacement(createLocalIdbStore(indexedDB), record).then(
+      () => {},
+    ),
+  resumePrepared: (record) =>
+    resumePendingReplacement(createLocalIdbStore(indexedDB), record),
   resumeAdoption: verifyBackgroundReplacementAdoption,
   resume: (record: ReplacementContinuation) => ({
     onDurable: () => broadcastDataManagementInvalidation('dashboard'),
@@ -575,7 +585,13 @@ export function registerBackgroundHandlers() {
   if (replacementStore) {
     void backupReplacement
       .ready()
-      .then(() => runInMutationQueue(retryReplacementWithTransferReceipts))
+      .then(() => {
+        // Startup may settle committed bookkeeping, but prepublication resume
+        // requires the existing authenticated generic Retry saving command.
+        if (backupReplacement.getState().status === 'persistence-pending')
+          return
+        return runInMutationQueue(retryReplacementWithTransferReceipts)
+      })
       .catch(() => {
         // Failed continuation or receipt bookkeeping stays recoverable on retry.
       })
@@ -2159,8 +2175,14 @@ function createSyncServiceForDbInQueue(db: Db, isInsideMutationQueue: boolean) {
               ? prepareFullBackupReplacement(local, {
                   prepared,
                   commandId: context.confirmationToken,
+                  kind: 'gist-pull',
+                  sourceIdentity: context.sourceIdentity,
                 })
-              : prepareGistFullBackupReplacement(local, prepared),
+              : prepareGistFullBackupReplacement(
+                  local,
+                  prepared,
+                  context?.sourceIdentity,
+                ),
           ...continuations,
           onDurable: async () => {
             clearPendingImportPersistence()
