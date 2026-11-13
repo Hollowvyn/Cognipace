@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/Hollowvyn/Cognipace/compare/v2.3.1...v2.4.0) (2026-11-13)
+
+
+### Features
+
+* **notes:** add durable learning archives and full v7 backups ([#218](https://github.com/Hollowvyn/Cognipace/issues/218)) ([d93f7fc](https://github.com/Hollowvyn/Cognipace/commit/d93f7fcc2872841452bc0adbe3548ed998ee282c))
+
 ## [2.3.1](https://github.com/Hollowvyn/Cognipace/compare/v2.3.0...v2.3.1) (2026-10-31)
 
 
