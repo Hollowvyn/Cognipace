@@ -1,0 +1,97 @@
+import { describe, expect, it } from 'vitest'
+import { FSRSBinding, BindingMemoryState } from '@open-spaced-repetition/binding'
+
+import {
+  createFsrsSchedulerProfile,
+  createInitialFsrsCard,
+  parseFsrsSchedulerProfile,
+  previewReviewWithProfile,
+  scheduleReviewWithProfile,
+  type ReviewRating,
+} from '../index'
+
+// Captured from the disposable packaged Chrome synthetic 200-card run.
+const trainedWeights = [
+  13.831600189208984, 23.438077926635742, 33.81364059448242,
+  46.204166412353516, 6.445772171020508, 0.8058061599731445,
+  3.019399881362915, 0.0010000000474974513, 1.8415918350219727,
+  0.19654500484466553, 0.7652567028999329, 1.4835000038146973,
+  0.061400000005960464, 0.2628999948501587, 1.648300051689148,
+  0.5768350958824158, 1.8729000091552734, 0, 0, 0,
+  0.1269873082637787,
+]
+
+const ratings = ['again', 'hard', 'good', 'easy'] as const satisfies readonly ReviewRating[]
+
+describe('official binding packaged optimizer compatibility', () => {
+  it('reconstructs the actual trained vector with the saved daily profile', () => {
+    const profile = createFsrsSchedulerProfile({
+      weights: trainedWeights,
+      targetRetention: 0.9,
+      maximumInterval: 180,
+      enableFuzz: false,
+      enableShortTerm: false,
+      learningSteps: [],
+      relearningSteps: [],
+    })
+
+    expect(parseFsrsSchedulerProfile(profile)).toEqual(profile)
+    expect(profile.parameters.weights).toEqual(trainedWeights)
+    expect(profile.parameters.maximumInterval).toBe(180)
+    expect(profile.parameters.learningSteps).toEqual([])
+  })
+
+  it('agrees with native predictions on the same synthetic histories', () => {
+    const profile = createFsrsSchedulerProfile({
+      weights: trainedWeights,
+      targetRetention: 0.9,
+      maximumInterval: 180,
+      enableFuzz: false,
+      enableShortTerm: false,
+      learningSteps: [],
+      relearningSteps: [],
+    })
+    const binding = new FSRSBinding([...profile.parameters.weights])
+    const firstAt = new Date('2026-01-01T12:00:00.000Z')
+    const nextAt = new Date('2026-01-05T12:00:00.000Z')
+    const initial = createInitialFsrsCard(firstAt)
+    const bindingInitial = binding.nextStates(null, 0.9, 0)
+    const tsInitial = previewReviewWithProfile(initial, firstAt, profile)
+
+    for (const rating of ratings) {
+      expect(tsInitial[rating].card.stability).toBeCloseTo(bindingInitial[rating].memory.stability, 3)
+      expect(tsInitial[rating].card.difficulty).toBeCloseTo(bindingInitial[rating].memory.difficulty, 3)
+    }
+
+    for (const firstRating of ratings) {
+      const first = scheduleReviewWithProfile(initial, firstRating, firstAt, profile).card
+      const bindingState = new BindingMemoryState(first.stability, first.difficulty)
+      const bindingNext = binding.nextStates(bindingState, 0.9, 4)
+      const tsNext = previewReviewWithProfile(first, nextAt, profile)
+      for (const nextRating of ratings) {
+        expect(tsNext[nextRating].card.stability).toBeCloseTo(bindingNext[nextRating].memory.stability, 3)
+        expect(tsNext[nextRating].card.difficulty).toBeCloseTo(bindingNext[nextRating].memory.difficulty, 3)
+      }
+    }
+  })
+
+  it('agrees on same-day Again after a reviewed card', () => {
+    const profile = createFsrsSchedulerProfile({
+      weights: trainedWeights,
+      targetRetention: 0.9,
+      maximumInterval: 180,
+      enableFuzz: false,
+      enableShortTerm: false,
+      learningSteps: [],
+      relearningSteps: [],
+    })
+    const at = new Date('2026-01-01T12:00:00.000Z')
+    const first = scheduleReviewWithProfile(createInitialFsrsCard(at), 'good', at, profile).card
+    const card = { ...first, stability: 45, difficulty: 8.5, dueAt: at, lastReviewAt: at }
+    const binding = new FSRSBinding([...profile.parameters.weights])
+    const bindingNext = binding.nextStates(new BindingMemoryState(45, 8.5), 0.9, 0)
+    const tsNext = previewReviewWithProfile(card, at, profile)
+
+    expect(tsNext.again.card.stability).toBeCloseTo(bindingNext.again.memory.stability, 3)
+  })
+})

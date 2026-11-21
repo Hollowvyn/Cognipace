@@ -1,0 +1,254 @@
+#!/usr/bin/env node
+
+/** Disposable Phase H probe. Uses only a newly created, removed Chrome profile. */
+import { spawn, execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { accessSync, constants, readdirSync } from 'node:fs'
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { homedir, platform } from 'node:os'
+import { join, resolve } from 'node:path'
+import { performance } from 'node:perf_hooks'
+
+const root = resolve(import.meta.dirname, '..')
+const dist = join(root, 'dist', 'chrome-mv3')
+const timeoutMs = 45_000
+const pause = (ms) => new Promise((done) => setTimeout(done, ms))
+
+class Cdp {
+  constructor(url) {
+    this.ws = new WebSocket(url)
+    this.nextId = 1
+    this.pending = new Map()
+    this.listeners = new Set()
+  }
+  async open() {
+    await new Promise((done, fail) => {
+      this.ws.addEventListener('open', done, { once: true })
+      this.ws.addEventListener('error', fail, { once: true })
+    })
+    this.ws.addEventListener('message', ({ data }) => {
+      const message = JSON.parse(data)
+      if (!message.id) {
+        for (const listener of this.listeners) listener(message)
+        return
+      }
+      const pending = this.pending.get(message.id)
+      if (!pending) return
+      this.pending.delete(message.id)
+      clearTimeout(pending.timer)
+      if (message.error) pending.fail(new Error(message.error.message))
+      else pending.done(message.result ?? {})
+    })
+  }
+  send(method, params = {}, sessionId, limit = timeoutMs) {
+    return new Promise((done, fail) => {
+      const id = this.nextId++
+      const timer = setTimeout(() => {
+        this.pending.delete(id)
+        fail(new Error(`CDP ${method} timed out`))
+      }, limit)
+      this.pending.set(id, { done, fail, timer })
+      this.ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }))
+    })
+  }
+  on(listener) {
+    this.listeners.add(listener)
+  }
+  close() {
+    this.ws.close()
+  }
+}
+
+function chromeExecutable() {
+  const explicit = process.env.FSRS_H_CHROME
+  if (explicit) return resolve(explicit)
+  const candidates = []
+  if (platform() === 'darwin') {
+    const cache = join(homedir(), '.cache', 'puppeteer', 'chrome')
+    try {
+      for (const version of readdirSync(cache).sort().reverse()) {
+        candidates.push(join(cache, version, 'chrome-mac-arm64', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'))
+      }
+    } catch { /* no cached testing Chrome */ }
+    candidates.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+  } else {
+    candidates.push('/usr/bin/google-chrome', '/usr/bin/chromium')
+  }
+  for (const candidate of candidates) {
+    try { accessSync(candidate, constants.X_OK); return candidate } catch { /* next */ }
+  }
+  throw new Error('Chrome executable unavailable')
+}
+
+async function digestBuild() {
+  const hash = createHash('sha256')
+  async function visit(directory, prefix = '') {
+    for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name
+      const full = join(directory, entry.name)
+      if (entry.isDirectory()) await visit(full, relative)
+      else if (entry.isFile()) {
+        hash.update(relative)
+        hash.update('\0')
+        hash.update(await readFile(full))
+      }
+    }
+  }
+  await visit(dist)
+  return hash.digest('hex')
+}
+
+async function waitFor(predicate, limit = timeoutMs) {
+  const start = performance.now()
+  let lastError
+  while (performance.now() - start < limit) {
+    const value = await predicate().catch((error) => { lastError = error; return null })
+    if (value) return value
+    await pause(100)
+  }
+  throw new Error(`Probe timed out${lastError ? `: ${safeError(lastError)}` : ''}`)
+}
+
+async function evaluate(cdp, sessionId, expression) {
+  const answer = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId)
+  if (answer.exceptionDetails) throw new Error(answer.exceptionDetails.text || 'Page exception')
+  return answer.result?.value
+}
+
+function safeError(error) {
+  const raw = String(error?.message ?? error)
+  return raw
+    .replaceAll(/chrome-extension:\/\/[a-p]{32}/g, 'chrome-extension://<extension>')
+    .replaceAll(/\/private\/tmp\/[^\s)]+/g, '<temporary-path>')
+    .slice(0, 500)
+}
+
+async function main() {
+  if (process.argv.join(' ') !== `${process.argv[0]} ${process.argv[1]} --stage feasibility`) {
+    throw new Error('Use --stage feasibility')
+  }
+  const chromePath = chromeExecutable()
+  const profile = await mkdtemp('/private/tmp/fsrs-phase-h-chrome-')
+  const report = {
+    stage: 'feasibility',
+    createdAt: new Date().toISOString(),
+    chrome: execFileSync(chromePath, ['--version'], { encoding: 'utf8' }).trim(),
+    buildHash: await digestBuild(),
+    manifest: JSON.parse(await readFile(join(dist, 'manifest.json'), 'utf8')),
+    assets: {},
+    observations: [],
+  }
+  report.manifest = {
+    manifest_version: report.manifest.manifest_version,
+    permissions: report.manifest.permissions,
+    content_security_policy: report.manifest.content_security_policy,
+  }
+  for (const name of (await readdir(join(dist, 'assets'))).filter((name) => name.includes('fsrs-binding') || name.includes('wasi-worker'))) {
+    report.assets[name] = (await stat(join(dist, 'assets', name))).size
+  }
+  let child
+  let cdp
+  let sessionId
+  let targetId
+  let phase = 'chromeLaunch'
+  let stderr = ''
+  try {
+    child = spawn(chromePath, [
+      '--headless=new', '--no-first-run', '--no-default-browser-check',
+      '--disable-background-networking', '--disable-component-update',
+      '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+      `--disable-extensions-except=${dist}`, `--load-extension=${dist}`, 'about:blank',
+    ], { stdio: ['ignore', 'ignore', 'pipe'] })
+    child.stderr.on('data', (chunk) => { stderr = `${stderr}${chunk}`.slice(-2000) })
+    const port = await waitFor(async () => {
+      if (child.exitCode !== null) throw new Error(`Chrome exited ${child.exitCode}: ${stderr}`)
+      const file = await readFile(join(profile, 'DevToolsActivePort'), 'utf8')
+      return Number(file.split('\n')[0]) || null
+    }, 30_000)
+    phase = 'devtoolsEndpoint'
+    const version = await waitFor(async () => {
+      const response = await fetch(`http://127.0.0.1:${port}/json/version`)
+      return response.ok ? response.json() : null
+    })
+    cdp = new Cdp(version.webSocketDebuggerUrl)
+    await cdp.open()
+    phase = 'extensionId'
+    const extensionId = await waitFor(async () => {
+      const { targetInfos } = await cdp.send('Target.getTargets')
+      for (const target of targetInfos.filter((info) => info.type === 'service_worker' && /^chrome-extension:\/\/[a-p]{32}\//.test(info.url))) {
+        let candidateSession
+        try {
+          ;({ sessionId: candidateSession } = await cdp.send('Target.attachToTarget', { targetId: target.targetId, flatten: true }))
+          await cdp.send('Runtime.enable', {}, candidateSession)
+          if (await evaluate(cdp, candidateSession, 'chrome.runtime.getManifest().name') === 'CogniPace') return new URL(target.url).hostname
+        } finally {
+          if (candidateSession) await cdp.send('Target.detachFromTarget', { sessionId: candidateSession }).catch(() => {})
+        }
+      }
+      return null
+    }, 30_000)
+    phase = 'dashboardOpen'
+    ;({ targetId } = await cdp.send('Target.createTarget', { url: `chrome-extension://${extensionId}/dashboard.html?fsrs-phase-h-probe` }))
+    ;({ sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true }))
+    cdp.on((event) => {
+      if (event.sessionId !== sessionId) return
+      if (event.method === 'Runtime.exceptionThrown') report.observations.push({ kind: 'exception', text: safeError(event.params.exceptionDetails?.text) })
+      if (event.method === 'Runtime.consoleAPICalled' && event.params.type === 'error') report.observations.push({ kind: 'console', text: safeError(event.params.args?.map((arg) => arg.value || arg.description).join(' ')) })
+      if (event.method === 'Log.entryAdded' && event.params.entry?.level === 'error') report.observations.push({ kind: 'log', text: safeError(event.params.entry.text) })
+    })
+    await cdp.send('Runtime.enable', {}, sessionId)
+    await cdp.send('Log.enable', {}, sessionId)
+    phase = 'dashboardProbeReady'
+    await waitFor(async () => evaluate(cdp, sessionId, 'typeof window.__fsrsPhaseHProbe?.run === "function"'), 20_000)
+    report.crossOriginIsolated = await evaluate(cdp, sessionId, 'crossOriginIsolated')
+    report.sharedArrayBuffer = await evaluate(cdp, sessionId, 'typeof SharedArrayBuffer')
+    report.heapBefore = await evaluate(cdp, sessionId, 'performance.memory?.usedJSHeapSize ?? null')
+    await evaluate(cdp, sessionId, `window.__fsrsPhaseHProbeResult = null; window.__fsrsPhaseHTicks = 0; window.__fsrsPhaseHTimer = setInterval(() => window.__fsrsPhaseHTicks++, 50); window.__fsrsPhaseHProbe.run().then(result => { window.__fsrsPhaseHProbeResult = result; }); true`)
+    phase = 'optimizerRun'
+    report.result = await waitFor(async () => evaluate(cdp, sessionId, 'window.__fsrsPhaseHProbeResult'), 45_000)
+    report.timerTicks = await evaluate(cdp, sessionId, 'clearInterval(window.__fsrsPhaseHTimer); window.__fsrsPhaseHTicks')
+    report.heapAfter = await evaluate(cdp, sessionId, 'performance.memory?.usedJSHeapSize ?? null')
+    report.workerTargets = (await cdp.send('Target.getTargets')).targetInfos.filter((info) => info.type === 'worker' && info.url.startsWith(`chrome-extension://${extensionId}/`)).length
+    phase = 'repeatedRuns'
+    report.repeatedRuns = []
+    for (let index = 0; index < 2; index++) {
+      await evaluate(cdp, sessionId, 'window.__fsrsPhaseHProbeResult = null; window.__fsrsPhaseHProbe.run().then(result => { window.__fsrsPhaseHProbeResult = result; }); true')
+      const result = await waitFor(async () => evaluate(cdp, sessionId, 'window.__fsrsPhaseHProbeResult'), 15_000)
+      const targetCount = (await cdp.send('Target.getTargets')).targetInfos.filter((info) => info.type === 'worker' && info.url.startsWith(`chrome-extension://${extensionId}/`)).length
+      report.repeatedRuns.push({ status: result.status, wallMs: result.wallMs, workerCount: result.workerCount, workerTargetsAfter: targetCount, heap: await evaluate(cdp, sessionId, 'performance.memory?.usedJSHeapSize ?? null'), errorMessage: result.errorMessage ?? null })
+    }
+    phase = 'cancelRun'
+    await evaluate(cdp, sessionId, 'window.__fsrsPhaseHProbeResult = null; window.__fsrsPhaseHProbe.run({ epochs: 100, cardCount: 1000 }).then(result => { window.__fsrsPhaseHProbeResult = result; }); true')
+    await pause(20)
+    report.workerTargetsDuringCancel = (await cdp.send('Target.getTargets')).targetInfos.filter((info) => info.type === 'worker' && info.url.startsWith(`chrome-extension://${extensionId}/`)).length
+    report.workersAtCancelRequest = await evaluate(cdp, sessionId, 'window.__fsrsPhaseHProbe.cancel()')
+    report.cancelResult = await waitFor(async () => evaluate(cdp, sessionId, 'window.__fsrsPhaseHProbeResult'), 10_000).catch((error) => ({ status: 'unsettled', error: safeError(error) }))
+    report.workerTargetsAfterCancel = (await cdp.send('Target.getTargets')).targetInfos.filter((info) => info.type === 'worker' && info.url.startsWith(`chrome-extension://${extensionId}/`)).length
+    report.heapAfterCancel = await evaluate(cdp, sessionId, 'performance.memory?.usedJSHeapSize ?? null')
+    phase = 'dashboardClose'
+    await cdp.send('Target.closeTarget', { targetId })
+    targetId = null
+    report.workerTargetsAfterClose = (await cdp.send('Target.getTargets')).targetInfos.filter((info) => info.type === 'worker' && info.url.startsWith(`chrome-extension://${extensionId}/`)).length
+  } catch (error) {
+    report.failedPhase = phase
+    report.driverError = safeError(error)
+    if (phase === 'chromeLaunch') report.chromeStderr = safeError(stderr)
+    if (sessionId && cdp) {
+      report.dashboardDiagnostic = await evaluate(cdp, sessionId, `({ href: location.href, readyState: document.readyState, root: Boolean(document.getElementById('root')), probeType: typeof window.__fsrsPhaseHProbe, importError: window.__fsrsPhaseHProbeError ?? null })`).catch((diagnosticError) => ({ error: safeError(diagnosticError) }))
+    }
+  } finally {
+    if (targetId && cdp) await cdp.send('Target.closeTarget', { targetId }).catch(() => {})
+    cdp?.close()
+    if (child && child.exitCode === null) {
+      child.kill('SIGTERM')
+      await Promise.race([new Promise((done) => child.once('exit', done)), pause(5000)])
+      if (child.exitCode === null) child.kill('SIGKILL')
+    }
+    await rm(profile, { recursive: true, force: true })
+  }
+  const output = '/private/tmp/fsrs-phase-h-feasibility.json'
+  await writeFile(output, JSON.stringify(report, null, 2) + '\n')
+  console.log(JSON.stringify({ output, result: report.result?.status ?? 'driver-error', driverError: report.driverError, crossOriginIsolated: report.crossOriginIsolated, observations: report.observations }))
+}
+
+await main()
