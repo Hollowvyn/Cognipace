@@ -80,7 +80,9 @@ export const ChartContainer = React.forwardRef<
     ref,
   ) => {
     const uniqueId = React.useId()
-    const chartId = `chart-${id ?? uniqueId.replace(/:/g, '')}`
+    // 🛡️ Sanitize user-provided id to prevent CSS injection in style block
+    const sanitizedId = id?.replace(/[^a-zA-Z0-9_-]/g, '')
+    const chartId = `chart-${sanitizedId || uniqueId.replace(/:/g, '')}`
     const prefersReducedMotion = usePrefersReducedMotion()
     const accessibleChartChildren =
       React.isValidElement(children) &&
